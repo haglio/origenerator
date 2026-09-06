@@ -11,7 +11,7 @@ while two built from differently configured images split apart. The enhance
 tail's params are excluded too, so an enhanced render and its unenhanced twin
 land in one folder — enhancement is a finish on an image, not another image).
 
-Media type is not a folder of its own — the gallery's Images/Videos checkboxes
+Media type is not a folder of its own — the gallery's Images/Videos ticks
 decide which kinds are listed (``media_types``) — but it still keys every folder,
 so a workflow that has produced both gets one workflow folder per kind. That
 split is what lets the source-image level stay a property of *videos* alone: it
@@ -123,7 +123,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     params_json = row.get("params_json")
     if level == "media":
         # A tier the tree no longer grows — the Images/Videos folders became the
-        # gallery's two checkboxes — but a star made while it did still records
+        # gallery's two ticks — but a star made while it did still records
         # it, so the key stays computable. It matches no current folder, and the
         # reconcile orphans that bookmark rather than raising over its tier.
         return media_type

@@ -338,7 +338,7 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
     form = panel._param_form
     assert form._size_deriver is not None
     assert "width" in form._present_keys["Dimensions"]
-    assert form._dim_stacks["width"].currentIndex() == 0   # locked: a plain value, not a box
+    assert form._dim_stacks["width"].currentIndex() == 0   # locked: a plain value, not a spinner
     assert form._unlock_btn is not None
 
 
@@ -587,7 +587,7 @@ def test_current_config_does_not_randomize_and_reports_random_flag(panel):
     snap1 = panel.current_config()
     snap2 = panel.current_config()
     assert snap1.workflow_name == "sdxl_t2i"
-    assert snap1.seed_is_random is True  # fresh panel: Random box checked
+    assert snap1.seed_is_random is True  # fresh panel: Random tick checked
     assert snap1.params["seed"] == snap2.params["seed"]  # not re-randomized
 
     panel.prefill("sdxl_t2i", {"seed": 99})

@@ -293,7 +293,7 @@ class InfoPaneTabs(QTabWidget):
         """Pop the tab menu where a tab was right-clicked; nowhere else.
 
         A menu with nothing in it — the pane's single resting tab — doesn't open
-        at all, rather than flashing an empty box at the cursor.
+        at all, rather than flashing an empty menu at the cursor.
         """
         index = self.tabBar().tabAt(pos)
         if index < 0:

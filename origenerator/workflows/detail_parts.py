@@ -248,7 +248,7 @@ def detail_fixes_of(params: dict) -> dict:
 
     ``enhance_detail_fixes`` is where that lives now — one number per part it
     fixes, and a part it doesn't name is a part left alone (zero counts as not
-    named too, which is what a stored setting from before the panel had a box
+    named too, which is what a stored setting from before the panel had a tick
     per part looks like). The older shape is translated
     rather than ignored: a tick, a single denoise and up to two detector files
     named is exactly a fix on whichever parts those files find, all at that one

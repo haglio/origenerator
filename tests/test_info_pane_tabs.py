@@ -103,7 +103,7 @@ def test_closing_the_last_tab_leaves_a_fresh_blank_one(tabs):
 
 
 def test_a_double_click_on_a_tab_never_asks_for_a_name(tabs, monkeypatch):
-    # The gesture used to open a rename box. A tab is named after what it shows
+    # The gesture used to open a rename field. A tab is named after what it shows
     # now, so nothing should be asking the user for one.
     from PyQt6.QtWidgets import QInputDialog
     asked = []
@@ -194,7 +194,7 @@ def test_close_all_leaves_the_pane_on_its_resting_tab(tabs):
 
 
 def test_the_only_tab_has_no_menu_at_all(tabs):
-    # Nothing to close beside it and nothing to its right; an empty box flashed
+    # Nothing to close beside it and nothing to its right; an empty menu flashed
     # at the cursor would be worse than no menu.
     from PyQt6.QtCore import QPoint
 

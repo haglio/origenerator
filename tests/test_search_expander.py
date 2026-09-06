@@ -1,4 +1,4 @@
-"""The background widener behind the gallery search box.
+"""The background widener behind the gallery search field.
 
 Everything here is about not making the user wait and not asking the model
 twice: the deterministic results are already on screen by the time this is

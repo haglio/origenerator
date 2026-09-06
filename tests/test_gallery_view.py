@@ -407,7 +407,7 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     # everything.
     assert set(top) == {"Latest", "Favorites", "Experiments", "Requests",
                         "Trash", "All"}
-    # Media type grows no folder of its own any more; the two boxes over the
+    # Media type grows no folder of its own any more; the two ticks over the
     # tree are what says which kinds are listed.
     assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
 
@@ -568,7 +568,7 @@ def _children_by_detail(item):
 def _search_for(view, text):
     """Type a query and let its debounce fire.
 
-    The box waits out a beat of quiet before searching (and a longer one before
+    The field waits out a beat of quiet before searching (and a longer one before
     asking the model to widen), so a test that only sets the text has typed but
     not yet searched. Nothing under the minimum length searches at all, so that
     case is left to the timer that never fires — as it is in the app.
@@ -596,7 +596,7 @@ def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
 
 def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
     # It used to hide every non-matching row and expand paths down to the hits.
-    # Now nothing in the tree moves, so clearing the box puts the user back in
+    # Now nothing in the tree moves, so clearing the field puts the user back in
     # the folder they were standing in rather than somewhere the search wandered.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
@@ -649,7 +649,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
     # Picking a folder mid-search is a new scope, not an exit — the same
-    # question, asked somewhere else, with the box left as it was.
+    # question, asked somewhere else, with the field left as it was.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -737,7 +737,7 @@ def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
     assert view.visible_prompt_ids() == []
 
 
-def test_the_box_says_what_it_would_search(qtbot):
+def test_the_field_says_what_it_would_search(qtbot):
     # The whole path down to the selected folder, not the folder's own name: a
     # folder is named by a code, which places nothing on its own.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
@@ -763,7 +763,7 @@ def test_the_box_says_what_it_would_search(qtbot):
     assert view._search_edit.placeholderText() == "Search Landscape  ›  Latest…"
 
 
-def test_the_box_shows_the_tail_of_a_path_too_long_for_it(qtbot):
+def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     # A path that doesn't fit is elided from the left, keeping the folder itself
     # and its nearest parents — the half that answers "search where?".
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
@@ -1780,7 +1780,7 @@ class _FailingActions(FakeActions):
 
 
 def _warnings_shown(monkeypatch):
-    """Collect what a warning box would have said, instead of opening one."""
+    """Collect what a warning dialog would have said, instead of opening one."""
     said = []
     monkeypatch.setattr(
         QMessageBox, "warning",
@@ -2292,11 +2292,11 @@ def _answer_menu(monkeypatch, label):
 
 
 def _answer_confirmation(monkeypatch, button):
-    """Click ``button`` on the next confirmation box.
+    """Click ``button`` on the next confirmation dialog.
 
     Most tests of a destructive action replace `_confirm` outright, which is the
     right way to keep a modal out of a test that is about something else. These
-    few answer the real box instead, because the step from the button the user
+    few answer the real dialog instead, because the step from the button the user
     clicks to the decision the gallery takes is otherwise pinned nowhere: with it
     inverted, a "No" at the delete prompt deletes anyway and all 657 tests passed.
     """
@@ -2492,8 +2492,8 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
 
 
-def test_the_media_filter_sits_between_the_search_box_and_the_tree(qtbot):
-    # Where the boxes are is the point: they prune the tree, so they belong to it
+def test_the_media_filter_sits_between_the_search_field_and_the_tree(qtbot):
+    # Where the ticks are is the point: they prune the tree, so they belong to it
     # rather than to whichever shelf happens to be open below.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -2507,18 +2507,18 @@ def test_the_media_filter_sits_between_the_search_box_and_the_tree(qtbot):
     assert view._image_cb.parentWidget() is view._video_cb.parentWidget()
 
 
-def test_media_filter_boxes_default_on_and_stay_up_wherever_you_stand(qtbot):
+def test_media_filter_ticks_default_on_and_stay_up_wherever_you_stand(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Both boxes start checked, so the gallery opens holding every media type.
+    # Both ticks start checked, so the gallery opens holding every media type.
     assert view._image_cb.isChecked()
     assert view._video_cb.isChecked()
 
     # They belong to the gallery, not to one shelf, so they are reachable from
-    # a folder as well as from the shelf — which is what lets an unchecked box
+    # a folder as well as from the shelf — which is what lets an unchecked tick
     # be checked again from wherever it emptied the pane.
     view._tree.setCurrentItem(_image_workflow(view._tree))
     assert not view._image_cb.isHidden() and not view._video_cb.isHidden()
@@ -2546,7 +2546,7 @@ def test_media_filter_hides_the_unchecked_media_type_on_a_shelf(qtbot):
 
 
 def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
-    # The point of moving the boxes over the tree: an unchecked kind takes its
+    # The point of moving the ticks over the tree: an unchecked kind takes its
     # folders with it, so a gallery of images alone has no video folder to open.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
@@ -3731,7 +3731,7 @@ def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
 
 def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     # A search owns the middle pane while it runs, so it is a view Back returns
-    # to — with the query still in the box and the hits still drawn.
+    # to — with the query still in the field and the hits still drawn.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -3767,7 +3767,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
 
 
 def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
-    # One search box, one view: a query being narrowed re-draws the same pane, so
+    # One search field, one view: a query being narrowed re-draws the same pane, so
     # Back leaves the search rather than replaying every word on the way in.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
     view = GalleryView(FakeDB(rows))
@@ -5128,7 +5128,7 @@ def test_main_view_reflows_to_fill_extra_width(qtbot):
 
 
 def test_add_tile_sits_first_beside_the_newest(qtbot):
-    # Thumbnails are newest-first, so the "new variation" box leads the flow,
+    # Thumbnails are newest-first, so the "new variation" tile leads the flow,
     # beside the newest item, not trailing the oldest.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
@@ -6914,7 +6914,7 @@ def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
     client.interrupt.assert_called_once()
     client.cancel_prompt.assert_not_called()
     assert key not in view._reroll_jobs
-    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + box
+    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + tile
 
 
 def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
@@ -7661,7 +7661,7 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
-    # A text editor (e.g. an inline rename box) has focus: Delete edits text.
+    # A text editor (e.g. an inline rename field) has focus: Delete edits text.
     editor = QLineEdit()
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QApplication.focusWidget", lambda: editor
@@ -9835,7 +9835,7 @@ def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_pat
 
 
 def test_auto_enhance_claims_a_newly_generated_image(qtbot, tmp_path):
-    # The box's standing instruction: with it ticked the app turns out finished
+    # The tick's standing instruction: with it ticked the app turns out finished
     # images without the user pressing Enhance All after every run.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -9850,7 +9850,7 @@ def test_auto_enhance_claims_a_newly_generated_image(qtbot, tmp_path):
     assert job.params["enhance_steps"] == 27
 
 
-def test_auto_enhance_leaves_a_new_image_alone_with_the_box_off(qtbot, tmp_path):
+def test_auto_enhance_leaves_a_new_image_alone_with_the_tick_off(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -9862,7 +9862,7 @@ def test_auto_enhance_leaves_a_new_image_alone_with_the_box_off(qtbot, tmp_path)
 
 
 def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_path):
-    # With the box unticked, a fresh seed must come out at base level — even
+    # With the tick unticked, a fresh seed must come out at base level — even
     # from a folder whose rows were made with the inline tail on. The stored
     # enhance flag is the recipe's history, not an instruction for the next run.
     db = _enhanceable_db(tmp_path, count=1)

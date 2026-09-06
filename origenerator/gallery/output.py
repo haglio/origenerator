@@ -76,9 +76,9 @@ def media_type_of_row(row: dict) -> str:
 
 def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -> list[dict]:
     """The rows whose kind is one of ``media_types`` — the gallery's Images/Videos
-    checkboxes applied to any list of generations.
+    ticks applied to any list of generations.
 
-    ``None`` keeps every type; an empty set keeps none. The two boxes narrow the
+    ``None`` keeps every type; an empty set keeps none. The two ticks narrow the
     whole gallery rather than one shelf, so every list the browser pane draws
     (Recents, Starred, Experiments, Requests, Trash, and the search index behind
     them) passes through here, and the folder tree takes the same set (see

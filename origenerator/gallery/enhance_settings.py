@@ -72,7 +72,7 @@ def level_settings(params: dict) -> dict:
 class EnhanceSettings:
     """One folder's enhancement configuration.
 
-    ``auto`` is the subpanel's box: with it on, every image the folder newly
+    ``auto`` is the subpanel's tick: with it on, every image the folder newly
     generates is enhanced as it lands, so a folder can be left to produce
     finished images rather than raw ones. ``params`` holds the settings
     (:data:`ENHANCE_SETTING_KEYS`); a key absent from it falls back to the
@@ -86,7 +86,7 @@ class EnhanceSettings:
     @classmethod
     def parse(cls, raw: str | None) -> "EnhanceSettings":
         """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
-        an unconfigured folder is simply the defaults, box off.
+        an unconfigured folder is simply the defaults, tick off.
 
         A folder configured before the detail pass became a number per part is
         read as what it asked for (:func:`~origenerator.workflows.detail_parts.

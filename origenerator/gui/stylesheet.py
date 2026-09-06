@@ -68,7 +68,7 @@ def build_stylesheet() -> str:
         font-weight: 600;
     }}
     /* A scene card: a scene's texts and its length together. Bordered, so three
-       scenes of three boxes each read as three things rather than nine. */
+       scenes of three fields each read as three things rather than nine. */
     QFrame#sceneCard {{
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
@@ -90,9 +90,9 @@ def build_stylesheet() -> str:
         /* Room for the step buttons, so the value never runs under them. */
         padding-right: 18px;
     }}
-    /* Styling a spin box at all hands Qt the whole widget, step buttons
+    /* Styling a spinner at all hands Qt the whole widget, step buttons
        included — and the default it falls back to for them has no size, so the
-       arrows render as dead slivers you cannot hit. Give them a real box and a
+       arrows render as dead slivers you cannot hit. Give them a real field and a
        drawn arrow and they work again. */
     QSpinBox::up-button, QDoubleSpinBox::up-button,
     QSpinBox::down-button, QDoubleSpinBox::down-button {{

@@ -18,7 +18,7 @@ class ConfigSnapshot:
     """A generate panel's live settings, captured for comparison.
 
     ``params`` is read without randomizing the seed; ``seed_is_random`` records
-    whether the seed's "Random" box is checked (in which case the panel can
+    whether the seed's "Random" tick is checked (in which case the panel can
     never match a concrete past generation), so a reopened tab comes back the way
     it was left.
     """
@@ -166,7 +166,7 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     ``params`` is filled from the workflow's defaults first: a stored row carries
     every param, and :func:`find_duplicate_generation` matches only on identical
     key sets, so a caller passing just the fields it edited would otherwise never
-    match. ``seed_is_random`` is the form's Random box — a seed drawn per run
+    match. ``seed_is_random`` is the form's Random tick — a seed drawn per run
     reproduces nothing, whatever the field it was last pinned to says.
     """
     snapshot = ConfigSnapshot(workflow.name,
@@ -200,7 +200,7 @@ def filled_params(row: dict, workflow) -> dict:
     other param is the recipe, and a variation reproduces it; enhancement is not
     — it is what the gallery's Enhance subpanel applies, deliberately and
     app-wide. Inheriting it silently is what made a re-roll come out enhanced
-    with the subpanel's box unticked.
+    with the subpanel's tick unticked.
     """
     defaults = workflow.default_params()
     params = merge_denormalized(row)

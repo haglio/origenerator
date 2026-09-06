@@ -4,7 +4,7 @@ from origenerator.gui.reroll_prompt import (
     REROLL_BOTH,
     REROLL_IMAGE,
     REROLL_VIDEO,
-    _build_reroll_box,
+    _build_reroll_dialog,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -19,7 +19,7 @@ def _labels(mapping):
 def test_offers_the_two_seed_choice_when_the_frame_is_rebuildable(qtbot):
     # An i2v whose start frame is a re-buildable generation can re-roll either
     # seed on its own, or both.
-    _box, mapping = _build_reroll_box(None, _I2V, can_reroll_image=True)
+    _dialog, mapping = _build_reroll_dialog(None, _I2V, can_reroll_image=True)
     assert _labels(mapping) == {
         "New Video Seed": REROLL_VIDEO,
         "New Image Seed": REROLL_IMAGE,
@@ -30,5 +30,5 @@ def test_offers_the_two_seed_choice_when_the_frame_is_rebuildable(qtbot):
 def test_offers_a_single_seed_choice_otherwise(qtbot):
     # A plain workflow (or an i2v on a hand-picked frame) has only one seed to
     # re-roll — the old single "New Random Seed" button.
-    _box, mapping = _build_reroll_box(None, _SDXL, can_reroll_image=False)
+    _dialog, mapping = _build_reroll_dialog(None, _SDXL, can_reroll_image=False)
     assert _labels(mapping) == {"New Random Seed": REROLL_VIDEO}

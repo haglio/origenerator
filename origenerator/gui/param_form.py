@@ -48,7 +48,7 @@ _SEED_MAX = (1 << 63) - 1
 # scene's length, and each scene's lines.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
 
-# The locked-dimension spinboxes span from a stride floor up past any realistic
+# The locked-dimension spinners span from a stride floor up past any realistic
 # derived or overridden size; 0 is reserved as "no size known yet" (shown as the
 # em dash) for a workflow whose input image can't be measured.
 _DIMENSION_MAX = 8192
@@ -114,12 +114,12 @@ class ParamForm(QWidget):
     every other setting decides which gallery folder a run lands in. They belong
     to the Enhance subpanel, which applies enhancement as a separate layer — and
     pinning them is what stops a Generate seeded from an old enhanced run coming
-    out enhanced again with the subpanel's box unticked.
+    out enhanced again with the subpanel's tick unticked.
 
     ``pins_reused_seed`` is the workflow's answer to
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
-    whether a seed written in by :meth:`set_values` also clears its Random box.
-    False (video) writes the value but leaves the box ticked, so the settings of
+    whether a seed written in by :meth:`set_values` also clears its Random tick.
+    False (video) writes the value but leaves the tick ticked, so the settings of
     a clip loaded into a tab don't quietly pin every later run to its seed.
     """
 
@@ -158,7 +158,7 @@ class ParamForm(QWidget):
         # either field.
         self._unlock_btn: QToolButton | None = None
         self._dimensions_hint: QLabel | None = None
-        # Per derived dimension: the editable spinbox (in ``_widgets``), the plain
+        # Per derived dimension: the editable spinner (in ``_widgets``), the plain
         # value label shown while locked, and the stack that swaps between them.
         self._dim_value_labels: dict[str, QLabel] = {}
         self._dim_stacks: dict[str, QStackedWidget] = {}
@@ -314,11 +314,11 @@ class ParamForm(QWidget):
     def _field_cell(self, pd: ParamDef, widget: QWidget):
         """The input, optionally paired with trailing controls.
 
-        The copy button leads (just right of the input), then the Random checkbox
+        The copy button leads (just right of the input), then the Random tick
         (seed) or Browse button (image). Each sits in a shared cell so the label
         column stays aligned across every row. Next to a tall multiline prompt the
         copy button hugs the top corner; next to a single-line seed it centers so
-        it lines up with the checkbox beside it.
+        it lines up with the tick beside it.
         """
         extras = self._make_extras(pd)
         if not extras:
@@ -518,8 +518,8 @@ class ParamForm(QWidget):
     def _build_derived_dimensions(self):
         """For a size-deriving workflow, add a width/height pair to the Dimensions
         section that reads as plain values while locked (like the read-only
-        passthrough rows — "864", not an input box) and turns into editable
-        spinboxes when unlocked. A floating padlock toggle, centered between the
+        passthrough rows — "864", not an input field) and turns into editable
+        spinners when unlocked. A floating padlock toggle, centered between the
         two rows in a reserved left gutter so it clears the labels, does the
         unlocking. A no-op for a workflow that sets its size by hand (its own
         width/height params already fill this section) or has none.
@@ -527,21 +527,21 @@ class ParamForm(QWidget):
         if self._size_deriver is None:
             return
         for key, label_text in (("width", "Width"), ("height", "Height")):
-            box = NoWheelSpinBox()
-            box.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
-            box.setMaximum(_DIMENSION_MAX)
-            box.setSingleStep(_DIMENSION_STEP)
-            box.setSpecialValueText("—")
-            box.valueChanged.connect(self.changed)
-            self._widgets[key] = box
+            spinner = NoWheelSpinBox()
+            spinner.setMinimum(0)  # 0 == "size not yet known", shown as the em dash
+            spinner.setMaximum(_DIMENSION_MAX)
+            spinner.setSingleStep(_DIMENSION_STEP)
+            spinner.setSpecialValueText("—")
+            spinner.valueChanged.connect(self.changed)
+            self._widgets[key] = spinner
             value_label = QLabel("—")
             value_label.setObjectName("readonlyParamValue")  # match the passthrough rows
             self._dim_value_labels[key] = value_label
-            # A stack so locking swaps the plain value for the spinbox in place,
+            # A stack so locking swaps the plain value for the spinner in place,
             # keeping the row's height and position steady.
             stack = QStackedWidget()
             stack.addWidget(value_label)   # index 0: locked, a plain value
-            stack.addWidget(box)           # index 1: unlocked, editable
+            stack.addWidget(spinner)           # index 1: unlocked, editable
             self._dim_stacks[key] = stack
             self._add_row(key, label_text, stack)
         self._dimensions_hint = QLabel("Sized from the input image. Unlock to override.")
@@ -603,7 +603,7 @@ class ParamForm(QWidget):
 
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
         """Flip the padlock and swap each dimension between its plain locked value
-        and its editable spinbox, re-locking back onto the derived size. Announces
+        and its editable spinner, re-locking back onto the derived size. Announces
         the change so the panel refreshes with it."""
         self._unlock_btn.setText(_LOCK_OPEN if unlocked else _LOCK_CLOSED)
         self._unlock_btn.setToolTip(
@@ -619,17 +619,17 @@ class ParamForm(QWidget):
 
     def _update_derived_display(self):
         """Fill the locked width/height with the size the current input image
-        derives — the plain value label and the spinbox behind it both, so
+        derives — the plain value label and the spinner behind it both, so
         unlocking starts from that value (0 → em dash when none can be measured).
         A no-op while unlocked, so it never clobbers a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():
             return
         size = self._size_deriver(self.get_values_static())
         for key, value in zip(("width", "height"), size or (0, 0)):
-            box = self._widgets[key]
-            blocked = box.blockSignals(True)  # a display refresh isn't a user edit
-            box.setValue(value)
-            box.blockSignals(blocked)
+            spinner = self._widgets[key]
+            blocked = spinner.blockSignals(True)  # a display refresh isn't a user edit
+            spinner.setValue(value)
+            spinner.blockSignals(blocked)
             self._dim_value_labels[key].setText(str(value) if value else "—")
 
     def _override_dimensions(self) -> dict:
@@ -721,7 +721,7 @@ class ParamForm(QWidget):
             w.setObjectName("readonlyParamValue")
             return w
         if pd.type == "bool":
-            # An on/off setting (the enhance toggle): a bare checkbox, its label
+            # An on/off setting (the enhance toggle): a bare tick, its label
             # provided by the form row like every other field's.
             w = TickControl("")
             w.setChecked(bool(pd.default))
@@ -769,14 +769,14 @@ class ParamForm(QWidget):
                 w.addItems(pd.options)
             _select_combo_value(w, str(pd.default))
             return w
-        # An "image" field is a plain path box like any other -- what makes it an
+        # An "image" field is a plain path field like any other -- what makes it an
         # image field is the Browse button beside it, added above.
         w = QLineEdit()
         w.setText(str(pd.default))
         return w
 
     def get_values(self) -> dict:
-        """Read current values; a seed with its Random box checked is randomized."""
+        """Read current values; a seed with its Random tick checked is randomized."""
         return self._collect(randomize_seed=True)
 
     def get_values_static(self) -> dict:
@@ -788,20 +788,20 @@ class ParamForm(QWidget):
         return self._collect(randomize_seed=False)
 
     def seed_is_random(self) -> bool:
-        """True if any seed param's Random box is checked."""
+        """True if any seed param's Random tick is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
     def set_seed_random(self, is_random: bool):
-        """Set every seed's Random box, e.g. when restoring a saved tab.
+        """Set every seed's Random tick, e.g. when restoring a saved tab.
 
         ``set_values`` unchecks Random on a form that pins reused seeds; this
-        lets a caller put the box back the way the user had it.
+        lets a caller put the tick back the way the user had it.
         """
         for cb in self._randomize_checks.values():
             cb.setChecked(is_random)
 
     def _read_field(self, pd: ParamDef, randomize_seed: bool):
-        """One field's current value. A seed with its Random box checked is
+        """One field's current value. A seed with its Random tick checked is
         re-rolled when ``randomize_seed``; otherwise it's read from the field."""
         w = self._widgets[pd.key]
         if w is self._scenes:
@@ -844,7 +844,7 @@ class ParamForm(QWidget):
 
     def _write_field(self, pd: ParamDef, value) -> None:
         """Apply one value to its widget. A seed's value always fills its field;
-        whether that also pins it (clearing its Random box) is
+        whether that also pins it (clearing its Random tick) is
         ``pins_reused_seed`` — reusing a still's settings reproduces its exact
         seed, reusing a clip's shows the seed and goes on drawing fresh ones."""
         w = self._widgets[pd.key]

@@ -507,7 +507,7 @@ def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, 
 
 def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     """A region browsing its whole library is what a satellite does with no loop
-    on, so its HUD must read that way: the loop button dark, the map unboxed,
+    on, so its HUD must read that way: the loop button dark, the map unframed,
     and the line naming the order rather than a loop.  It said "Looping seeds"
     over the base state, which is the one place there is no loop at all."""
     from origenerator.gui.show_hud import show_hud_model

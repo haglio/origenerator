@@ -243,7 +243,7 @@ _PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 # two characters — the table-widened results are already on screen throughout, so
 # nothing is being waited *for*; this only decides how often the model is asked.
 _SEARCH_EXPAND_DELAY_MS = 700
-# How long the box waits after the last keystroke before searching at all. A
+# How long the field waits after the last keystroke before searching at all. A
 # search is cheap but not free — it scores the whole library and rebuilds the
 # pane — and running one per character means the results churn under a word
 # still being typed, which is unreadable however fast it is.
@@ -272,7 +272,7 @@ _ALREADY_AT_THESE_SETTINGS = (
 _SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
                _TRASH_KEY)
 # Their plain names, without the waiting-work counts their tree rows carry —
-# what the search box and header call a shelf it is searching.
+# what the search field and header call a shelf it is searching.
 _SHELF_LABELS = {
     _RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
     _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL, _REQUESTS_KEY: _REQUESTS_LABEL,
@@ -655,13 +655,13 @@ class GalleryView(QWidget):
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._genau_resolving: set[str] = set()
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
-        # --- the gallery search (the box over the tree, the results in the middle
+        # --- the gallery search (the field over the tree, the results in the middle
         # pane). The index is rebuilt with the gallery and queried on each
         # keystroke; the expander widens the query's words through the local LLM
         # once typing stops, and re-runs the search when its answer lands. Both
-        # are built before _build_ui, whose box drives them.
+        # are built before _build_ui, whose field drives them.
         self._search = search.GallerySearch()
-        self._search_query = ""       # what the box holds, stripped ("" = not searching)
+        self._search_query = ""       # what the field holds, stripped ("" = not searching)
         self._search_expansions = None  # the widening in force for that query, if any
         self._search_outcome = search.SearchOutcome((), ())
         self._search_tiles: list = []   # its hits as the pane draws them
@@ -1102,22 +1102,22 @@ class GalleryView(QWidget):
         self._search_edit.setClearButtonEnabled(True)
         self._search_edit.textChanged.connect(self._on_search_changed)
         toc_column.addWidget(self._search_edit)
-        # The gallery's image/video filter: two boxes saying which kinds of
+        # The gallery's image/video filter: two ticks saying which kinds of
         # generation the gallery is made of at all, both on so it opens showing
-        # everything. It sits between the search box and the tree because it
+        # everything. It sits between the search field and the tree because it
         # prunes the tree: a gallery with videos switched off has no video folders
         # in it, and no video tiles in the pane beside them either. (It replaces a
         # pair that filtered the Recents shelf alone, which could only ever answer
         # "which of these do I want to look at" for one shelf.)
         self._image_cb = TickControl("Images")
         self._video_cb = TickControl("Videos")
-        for checkbox in (self._image_cb, self._video_cb):
-            checkbox.setChecked(True)
-            checkbox.setToolTip(
+        for tick in (self._image_cb, self._video_cb):
+            tick.setChecked(True)
+            tick.setToolTip(
                 "Which kinds of generation the gallery lists — the folders below "
                 "as well as the items in the pane beside them"
             )
-            checkbox.toggled.connect(self._on_media_filter_changed)
+            tick.toggled.connect(self._on_media_filter_changed)
         media_filter = QWidget()
         media_row = QHBoxLayout(media_filter)
         media_row.setContentsMargins(0, 0, 0, 0)
@@ -1313,21 +1313,21 @@ class GalleryView(QWidget):
         self._search_count.setObjectName("estimateLabel")
         # No-wheel: it rides directly over the scrolling results, and a wheel
         # notch that lands on it must scroll them rather than re-sort them.
-        self._search_sort_box = NoWheelComboBox()
+        self._search_sort_combo = NoWheelComboBox()
         for label, mode in _SEARCH_SORTS:
-            self._search_sort_box.addItem(label, mode)
-        self._search_sort_box.setToolTip(
+            self._search_sort_combo.addItem(label, mode)
+        self._search_sort_combo.setToolTip(
             "Order the results: newest first, or banded under a heading per "
             "model + LoRA combination — click a heading to fold its band away"
         )
-        self._search_sort_box.currentIndexChanged.connect(self._on_search_sort_changed)
+        self._search_sort_combo.currentIndexChanged.connect(self._on_search_sort_changed)
         self._search_bar = QWidget()
         search_row = QHBoxLayout(self._search_bar)
         search_row.setContentsMargins(0, 0, 0, 0)
         search_row.addWidget(self._search_count)
         search_row.addStretch(1)
         search_row.addWidget(QLabel("Sort:"))
-        search_row.addWidget(self._search_sort_box)
+        search_row.addWidget(self._search_sort_combo)
         self._search_bar.hide()  # shown only while a search is running
         # The Experiments shelf's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header, and appears only
@@ -1427,7 +1427,7 @@ class GalleryView(QWidget):
             self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
             footer.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
         # What an enhancement runs at — the Enhance All button, a single image's
-        # Enhance, and (with its box on) each image the app newly generates.
+        # Enhance, and (with its tick on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
         # moment, not a property of the folder you happen to be standing in, so
         # it shows on the shelves as readily as on a settings folder. Deliberately
@@ -2368,11 +2368,11 @@ class GalleryView(QWidget):
                 self._rebuildable_videos(rows), self._combine.selected_intent()
             )
         )
-        # The Images/Videos boxes narrow everything the gallery shows: which
+        # The Images/Videos ticks narrow everything the gallery shows: which
         # folders the tree grows, which items each shelf lists, and what a search
         # can turn up. The tree takes the filter itself rather than pre-filtered
         # rows, because the start-frame index behind a video's source-image
-        # folders has to see every image whichever way the boxes stand.
+        # folders has to see every image whichever way the ticks stand.
         media_types = self._media_types()
         listed = gallery.rows_of_media_types(rows, media_types)
         # Built once here off the whole library and handed to every tree below —
@@ -2383,14 +2383,14 @@ class GalleryView(QWidget):
                                                 image_index=start_frames)
         unreviewed = self._review_queue(listed)
         # The bin holds every kind, so a restore can still resolve a row of a type
-        # the boxes are hiding; only what the Trash shelf lists is narrowed.
+        # the ticks are hiding; only what the Trash shelf lists is narrowed.
         self._held_rows = recovery.bin_items(self._bin_records())
         held = gallery.rows_of_media_types(self._held_rows, media_types)
         self._live_ids = {row["prompt_id"] for row in rows}
         self._custom_folders = gallery.build_custom_folders(
             tree_model, self._db.list_custom_folders()
         )
-        # Re-index for the search box while the rows are in hand: tokenizing every
+        # Re-index for the search field while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
         # already indexed keep their words and take the fresh row object, since a
         # poll rewrites every row dict without touching the text in it.
@@ -2592,10 +2592,10 @@ class GalleryView(QWidget):
         self._find.clear()
         self._find_bar.hide()
 
-    # --- searching the gallery (the box over the tree) ------------------------
+    # --- searching the gallery (the field over the tree) ------------------------
 
     def _on_search_changed(self, text: str):
-        """A keystroke in the search box: line the search up, don't run it yet.
+        """A keystroke in the search field: line the search up, don't run it yet.
 
         Nothing happens under three characters — one or two letters reach a large
         fraction of any library through stemming alone, so searching them would
@@ -2637,7 +2637,7 @@ class GalleryView(QWidget):
         try. The All row over the workflow folders is what covers the library
         entire, since every other folder narrows the answer before the query does.
 
-        ``path`` is the row's breadcrumb — what the box, the header and the
+        ``path`` is the row's breadcrumb — what the field, the header and the
         empty-result message all name the scope by. A shelf is a single row with
         no branch above it, so its path is just its own name.
         """
@@ -2663,10 +2663,10 @@ class GalleryView(QWidget):
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
     def _sync_search_placeholder(self):
-        """Say in the empty box what a query typed there would search, so the
+        """Say in the empty field what a query typed there would search, so the
         scope is visible before there is a header or a result to name it.
 
-        The whole path goes in; the box shows as much of its tail as it is wide
+        The whole path goes in; the field shows as much of its tail as it is wide
         enough for (:class:`ScopeSearchEdit`)."""
         self._search_edit.set_scope(self._search_scope().path)
 
@@ -2677,7 +2677,7 @@ class GalleryView(QWidget):
         Takes the pane over from that folder — the tree keeps its selection while
         a search runs, because the selection is the *scope*: picking another
         folder re-asks the question there rather than ending it, and clearing the
-        box hands the pane straight back to wherever you had got to.
+        field hands the pane straight back to wherever you had got to.
         """
         scope = self._search_scope()
         self._search_outcome = self._search.search(
@@ -2771,18 +2771,18 @@ class GalleryView(QWidget):
         self._search_bar.hide()
 
     def _leave_search(self, *_args):
-        """Clear the box, if a search is running — what navigating away means.
+        """Clear the field, if a search is running — what navigating away means.
 
         This is for gestures that go *to* a result: opening a hit's folder, or
         following a link out of one. Picking a folder in the tree is not one of
         them — that re-scopes the search (see :meth:`_on_folder_selected`).
 
         Takes and ignores whatever the caller passes, so it can be wired straight
-        to those gestures. Clearing the box is what actually ends the search: its
+        to those gestures. Clearing the field is what actually ends the search: its
         ``textChanged`` runs :meth:`_exit_search`, so there is one path out
         rather than two.
 
-        Off the history, because the folder the box hands the pane back to is a
+        Off the history, because the folder the field hands the pane back to is a
         step on the way rather than anywhere the user went: the caller records the
         result it is opening. Recorded, it would sit between the results and that
         result, and Back out of a hit would land on a folder instead of on the
@@ -2799,7 +2799,7 @@ class GalleryView(QWidget):
 
     def _on_search_sort_changed(self, _index=0):
         """Re-lay the results in the newly picked order (a no-op off a search)."""
-        self._search_sort = self._search_sort_box.currentData() or search.SORT_RECENT
+        self._search_sort = self._search_sort_combo.currentData() or search.SORT_RECENT
         if self._search_query:
             self._run_search()
 
@@ -2816,7 +2816,7 @@ class GalleryView(QWidget):
     def _on_search_expanded(self, query: str, expansions):
         """A widened vocabulary came back: re-run the search on it.
 
-        Only for the query still in the box — a slow answer can land after the
+        Only for the query still in the field — a slow answer can land after the
         user has typed on, and widening results for a query they are no longer
         running would put items on screen they cannot account for. An empty
         answer (the endpoint down, or nothing to add) changes nothing, so it
@@ -2833,9 +2833,9 @@ class GalleryView(QWidget):
     def set_search_sort(self, mode: str | None):
         """Restore the remembered results order (ignoring anything unrecognized,
         so a state file from a version that offered a different one still opens)."""
-        index = self._search_sort_box.findData(mode)
+        index = self._search_sort_combo.findData(mode)
         if index >= 0:
-            self._search_sort_box.setCurrentIndex(index)  # its signal sets the mode
+            self._search_sort_combo.setCurrentIndex(index)  # its signal sets the mode
 
     def _showing_search(self) -> bool:
         return self._browser.showing_search()
@@ -2843,7 +2843,7 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         if self._selection_group is not None:
             return  # a multi-selection owns the panes; the current row is one of many
-        self._sync_search_placeholder()  # the box says what it would search now
+        self._sync_search_placeholder()  # the field says what it would search now
         # A folder picked while a search is running is a new *scope*, not an exit:
         # the same question, asked of somewhere else. Suppressed during a rebuild's
         # restore, where the tree is re-selecting itself and _rebuild re-runs the
@@ -2932,7 +2932,7 @@ class GalleryView(QWidget):
         """A folder tile was clicked: select its tree row, which draws the folder.
         Clicking one is a decision to go there, so it puts a running search away
         first — a search's results are folder tiles too, and this is how they
-        open; without it the box would still be full while the pane shows the
+        open; without it the field would still be full while the pane shows the
         folder it drilled into."""
         item = self._tree_item_for(key)
         if item is not None:
@@ -5042,7 +5042,7 @@ class GalleryView(QWidget):
         return None
 
     def _auto_enhance_if_wanted(self, row: dict | None):
-        """Enhance a just-finished image while the Auto box is on.
+        """Enhance a just-finished image while the Auto tick is on.
 
         The subpanel's standing instruction, app-wide: with it ticked the app
         turns out finished images rather than raw ones, without pressing Enhance
@@ -6534,7 +6534,7 @@ class GalleryView(QWidget):
         return self._browser.visible_prompt_ids()
 
     def _media_types(self) -> set[str]:
-        """The media types the gallery's two checkboxes currently include — what
+        """The media types the gallery's two ticks currently include — what
         the folder tree, every shelf, the in-flight cards and the search index are
         all built from. Both on (the default) means every type; both off means
         none."""
@@ -6546,9 +6546,9 @@ class GalleryView(QWidget):
         return types
 
     def _on_media_filter_changed(self, _checked=False):
-        """A media-type checkbox toggled: rebuild the gallery under the new filter.
+        """A media-type tick toggled: rebuild the gallery under the new filter.
 
-        A full rebuild rather than a re-list, because the boxes decide which
+        A full rebuild rather than a re-list, because the ticks decide which
         *folders* exist as well as which items do — the tree, the shelves and the
         search index are all built from the same narrowed set."""
         self._browser.restart_recents_listing()  # a new filter is a new listing
@@ -7509,7 +7509,7 @@ class GalleryView(QWidget):
             self._suppress_history = False
 
     def _restore_query(self, query: str):
-        """Put the search box back to what it held at a history stop.
+        """Put the search field back to what it held at a history stop.
 
         Set without its typing signals: those debounce and re-run, which would
         answer a restore with a search a beat later, over whatever the restore had

@@ -21,52 +21,52 @@ REROLL_IMAGE = "image"  # re-roll the start frame, keep the video seed
 REROLL_BOTH = "both"    # a fresh frame and a fresh video seed
 
 
-def _build_reroll_box(parent, workflow, can_reroll_image: bool):
+def _build_reroll_dialog(parent, workflow, can_reroll_image: bool):
     """The "already generated" dialog and its button -> choice map (no exec yet).
 
     Split from :func:`offer_reroll` so the button/choice wiring is testable
     without spinning a modal loop. Buttons absent from the map (Cancel, the close
-    box) resolve to ``None``.
+    dialog) resolve to ``None``.
     """
     media = workflow.output_type if workflow.output_type in ("image", "video") else "output"
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Icon.Question)
-    box.setWindowTitle("Already generated")
-    box.setText(
+    dialog = QMessageBox(parent)
+    dialog.setIcon(QMessageBox.Icon.Question)
+    dialog.setWindowTitle("Already generated")
+    dialog.setText(
         f"You've already generated this exact {media} — same settings and "
         f"the same seed.\nRunning it again will just re-create an identical {media}."
     )
     accept = QMessageBox.ButtonRole.AcceptRole
     if not can_reroll_image:
-        box.setInformativeText("Generate a new random seed instead, or cancel to change a setting?")
-        reroll = box.addButton("New Random Seed", accept)
-        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        box.setDefaultButton(reroll)
-        return box, {reroll: REROLL_VIDEO}
+        dialog.setInformativeText("Generate a new random seed instead, or cancel to change a setting?")
+        reroll = dialog.addButton("New Random Seed", accept)
+        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        dialog.setDefaultButton(reroll)
+        return dialog, {reroll: REROLL_VIDEO}
 
-    box.setInformativeText(
+    dialog.setInformativeText(
         "This image-to-video has two seeds — its start frame and its motion.\n"
         "Re-roll the video seed for new motion on the same frame, the image seed "
         "for a new frame with the same motion, or both."
     )
     mapping = {
-        box.addButton("New Video Seed", accept): REROLL_VIDEO,
-        box.addButton("New Image Seed", accept): REROLL_IMAGE,
-        box.addButton("New Both Seeds", accept): REROLL_BOTH,
+        dialog.addButton("New Video Seed", accept): REROLL_VIDEO,
+        dialog.addButton("New Image Seed", accept): REROLL_IMAGE,
+        dialog.addButton("New Both Seeds", accept): REROLL_BOTH,
     }
-    box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-    box.setDefaultButton(next(iter(mapping)))  # New Video Seed — keep the frame you liked
-    return box, mapping
+    dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    dialog.setDefaultButton(next(iter(mapping)))  # New Video Seed — keep the frame you liked
+    return dialog, mapping
 
 
 def offer_reroll(parent, workflow, *, can_reroll_image: bool = False) -> str | None:
     """Warn that this exact config was already generated; ask which seed to re-roll.
 
     Returns ``REROLL_VIDEO`` / ``REROLL_IMAGE`` / ``REROLL_BOTH`` for the chosen
-    re-roll, or ``None`` to cancel (also the dialog's close box). ``can_reroll_image``
+    re-roll, or ``None`` to cancel (also the dialog's close mark). ``can_reroll_image``
     is the caller's word on whether a fresh start frame is possible — only then are
     the per-seed image choices offered.
     """
-    box, mapping = _build_reroll_box(parent, workflow, can_reroll_image)
-    box.exec()
-    return mapping.get(box.clickedButton())
+    dialog, mapping = _build_reroll_dialog(parent, workflow, can_reroll_image)
+    dialog.exec()
+    return mapping.get(dialog.clickedButton())

@@ -180,7 +180,7 @@ class PaneHost:
     value captured earlier would already be the old one.
     """
 
-    # The media types the gallery's two checkboxes currently include.
+    # The media types the gallery's two ticks currently include.
     media_types: Callable[[], set]
     # Every image row of the current model — what places an untracked run and
     # decides whether an i2v item's start frame can itself be re-drawn.

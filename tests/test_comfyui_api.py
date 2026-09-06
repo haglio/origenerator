@@ -350,3 +350,101 @@ def test_comfyui_responding_false_for_200_that_is_not_comfyui():
     body = json.dumps({"message": "hello"}).encode()
     with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
         assert comfyui_responding("127.0.0.1", 8188) is False
+
+
+# --- a submit the server answered too late ----------------------------------------
+
+def _answering(*answers):
+    """A urlopen that works through ``answers`` in order -- each a response to
+    return or an exception to raise -- and repeats the last one after."""
+    answers = list(answers)
+
+    def urlopen(req, timeout=None):
+        answer = answers.pop(0) if len(answers) > 1 else answers[0]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    return patch("urllib.request.urlopen", side_effect=urlopen)
+
+
+def _by_url(**bodies):
+    """A urlopen that times out on the POST and answers each GET by the last
+    path segment of its URL (``queue``, ``history``) with the body named for it."""
+
+    def urlopen(req, timeout=None):
+        if not isinstance(req, str):
+            raise TimeoutError("timed out")  # the POST
+        return _mock_response(200, json.dumps(bodies[req.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+                                                     if "/history/" not in req else "history"]).encode())
+
+    return patch("urllib.request.urlopen", side_effect=urlopen)
+
+
+def _fake_clock():
+    """``time.sleep`` and ``time.monotonic`` on one clock that only sleeps advance."""
+    now = [0.0]
+    sleep = patch("origenerator.comfyui_api.time.sleep", side_effect=lambda s: now.__setitem__(0, now[0] + s))
+    mono = patch("origenerator.comfyui_api.time.monotonic", side_effect=lambda: now[0])
+    return now, sleep, mono
+
+
+def test_a_submit_answered_too_late_stands_once_comfyui_lists_the_prompt():
+    # ComfyUI logs "got prompt" as the request lands and validates it on its
+    # event loop; a validation that takes a minute (2026-09-05: 50 s for a
+    # two-scene clip whose one-scene twin took a tenth of one) answers nothing
+    # meanwhile, so the POST times out on a prompt the server has and goes on
+    # to run. Declared failed, that job ran untracked and its clip never reached
+    # the gallery. So a submit whose answer is late asks whether the prompt is
+    # listed before it gives up -- and asks again while the same stall swallows
+    # the reads.
+    client = ComfyUIApi(client_id="ours-client")
+    listed = json.dumps({"queue_running": [_entry(1, "our-id", "ours-client")],
+                         "queue_pending": []}).encode()
+    now, sleep, mono = _fake_clock()
+    with _answering(TimeoutError("timed out"), TimeoutError("timed out"),
+                    _mock_response(200, listed)), sleep, mono:
+        assert client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id") == "our-id"
+    assert now[0] > 0  # it waited between asks rather than hammering a stalled server
+
+
+def test_a_submit_answered_too_late_stands_once_the_prompt_is_in_history():
+    # A short prompt can be finished by the time the server answers again: it is
+    # gone from the queue and in /history, and that is the same acceptance.
+    client = ComfyUIApi(client_id="ours-client")
+    now, sleep, mono = _fake_clock()
+    with _by_url(queue={"queue_running": [], "queue_pending": []},
+                 history={"our-id": {"outputs": {}, "status": {"completed": True}}}), sleep, mono:
+        assert client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id") == "our-id"
+
+
+def test_a_submit_the_server_answers_without_the_prompt_fails_after_a_grace_period():
+    # Once the server is answering and does not list the prompt, the POST it
+    # took first gets a little longer to land, and then the submit is what it
+    # looks like: not taken. Well short of the whole wait, so a real refusal
+    # is not a two-minute freeze.
+    client = ComfyUIApi(client_id="ours-client")
+    now, sleep, mono = _fake_clock()
+    with _by_url(queue={"queue_running": [], "queue_pending": []}, history={}), sleep, mono, \
+            pytest.raises(RuntimeError, match="never listed"):
+        client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
+    assert 10 <= now[0] < 60
+
+
+def test_a_submit_the_server_never_answers_fails_at_the_end_of_the_wait():
+    client = ComfyUIApi(client_id="ours-client")
+    now, sleep, mono = _fake_clock()
+    with _answering(TimeoutError("timed out")), sleep, mono, \
+            pytest.raises(RuntimeError, match="never listed"):
+        client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
+    assert 100 <= now[0] <= 130
+
+
+def test_a_submit_refused_outright_is_not_waited_on():
+    # A connection refused is a server that is not there; nothing to ask.
+    client = ComfyUIApi(client_id="ours-client")
+    refused = urllib.error.URLError(ConnectionRefusedError(111, "refused"))
+    with _answering(refused), patch("origenerator.comfyui_api.time.sleep") as sleep, \
+            pytest.raises(urllib.error.URLError):
+        client.submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
+    assert not sleep.called

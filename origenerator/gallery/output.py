@@ -19,13 +19,6 @@ from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
 
-#: What a single-stroke cut's ``source`` column says. Nothing makes one any more
-#: (see ``trimmed_from`` in :mod:`origenerator.db_schema`), but the ones that
-#: were made are still in the library, and the Recents shelf still has to know
-#: they are this app's own work rather than something it found on disk.
-STROKE_TRIM_SOURCE = "stroke_trim"
-
-
 def parse_file_list(raw) -> list[dict]:
     """Parse a stored file-list JSON (``output_files``/``original_files``) into
     a list, tolerating bad data."""

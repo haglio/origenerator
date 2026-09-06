@@ -196,7 +196,7 @@ def test_the_preview_tabs_label_is_painted_italic(qtbot):
 
 def test_the_other_tabs_stay_upright(qtbot):
     # The painter carries its font from one label to the next, so an italic left
-    # set would spread down the row.
+    # in place would spread down the row.
     bar = _closable_bar(qtbot, count=3)
     bar.set_preview_index(1)
     assert _painted_label_font(bar, 0).italic() is False

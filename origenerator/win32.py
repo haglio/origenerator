@@ -85,8 +85,9 @@ _kernel32.GetCurrentThreadId.restype = ctypes.wintypes.DWORD
 def window_exists(hwnd: int) -> bool:
     """Whether *hwnd* still names a live window.
 
-    A handle outlives the window it named — closing the window leaves the number
-    over — so anything that must reach *that* window and no other asks first.
+    A handle outlives the window it named — closing the window does not retire
+    the number — so anything that must reach *that* window and no other asks
+    first.
     """
     return bool(hwnd) and bool(_user32.IsWindow(hwnd))
 

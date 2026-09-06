@@ -399,7 +399,7 @@ def enhancement_recency(rows) -> dict[str, int]:
     recent_generations`). A run's id is that place, and it is available at both
     ends of the run — in flight it is the transient enhance row still among
     ``rows``, and once folded it is the id recorded on the level the run
-    left over.
+    left.
 
     An image enhanced before that id was recorded has none here and keeps its own
     place, which is the right answer: an enhancement older than the record of it

@@ -4223,8 +4223,8 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
 
 
 def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
-    # The whole point of the preview tab: a walk through a folder leaves one tab
-    # over, not one per thing looked at.
+    # The whole point of the preview tab: a walk through a folder costs one tab,
+    # not one per thing looked at.
     db = _make_db(tmp_path)
     for i, prompt in enumerate(["a dog", "a heron", "a fox"], start=2):
         db.insert_generation(
@@ -7821,7 +7821,7 @@ def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
         qtbot, tmp_path, monkeypatch):
     # The whole point of the second entry: the loop goes off and the run in it is
     # thrown away. The order matters — a discard under a live loop is its cue to
-    # launch the next seed, so canceling first would leave a fresh run over.
+    # launch the next seed, so canceling first would leave a fresh run running.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()

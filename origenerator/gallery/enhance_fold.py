@@ -176,7 +176,7 @@ def disown_foreign_runs(db) -> int:
     library's order, not where its own generation does. So an id from somewhere
     else seats the image somewhere meaningless.
 
-    Which is what a preview used to leave behind. A branch session kept its own
+    Which is what a preview used to strand here. A branch session kept its own
     database, seeded from this one and counting on from where this one had
     reached, and the rows it made were adopted home with their history intact —
     ids and all, from a counter that ran ahead of this table's. An image wearing

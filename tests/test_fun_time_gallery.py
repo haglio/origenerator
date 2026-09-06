@@ -930,7 +930,7 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
 
 def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
     """A wide picture beside a form gets a column too narrow to show it, and the
-    form loses the width its prompt boxes need."""
+    form loses the width its prompt fields need."""
     from PyQt6.QtGui import QPixmap
 
     from origenerator.gui.generate_config_panel import GenerateConfigPanel

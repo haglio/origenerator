@@ -15,7 +15,7 @@ per scene.
 The lines are spoken: a scene with one renders on the speech model, her lips
 on the words, in the voice the Audio section sets (see
 :mod:`origenerator.speech`). A workflow that cannot speak -- the loop -- has no
-lines param, and its cards carry no lines box.
+lines param, and its cards carry no lines field.
 """
 
 from __future__ import annotations
@@ -38,14 +38,14 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.icons import tab_close_icon
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_box import PromptBox
+from origenerator.gui.prompt_field import PromptField
 from origenerator.workflows.base import ParamDef, chained_frames, scene_prompts, story_of
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
 
 # The texts a scene carries, by the param each is stored as, with the caption
-# over its box. The prompts are stored as stories (see the module above); the
+# over its field. The prompts are stored as stories (see the module above); the
 # lines as a list, one per scene.
 TEXT_CAPTIONS = {
     "positive_prompt": "Positive Prompt",
@@ -88,22 +88,22 @@ class _Scene(QFrame):
         self.remove.clicked.connect(lambda: self.remove_requested.emit(self))
         header.addWidget(self.remove)
         column.addLayout(header)
-        # Captioned, since three boxes in a row say nothing about which is which
+        # Captioned, since three fields in a row say nothing about which is which
         # once they hold text; each carries its param's own help.
-        self.boxes: dict[str, PromptBox] = {}
+        self.fields: dict[str, PromptField] = {}
         for key, caption in TEXT_CAPTIONS.items():
             if key == "scene_lines" and not lines:
                 continue
             label = ElidingLabel(caption)
             label.setToolTip(param_help(key))
             column.addWidget(label)
-            box = PromptBox(key)
-            box.setToolTip(param_help(key))
-            box.textChanged.connect(self.changed)
-            column.addWidget(box)
-            self.boxes[key] = box
+            field = PromptField(key)
+            field.setToolTip(param_help(key))
+            field.textChanged.connect(self.changed)
+            column.addWidget(field)
+            self.fields[key] = field
         if lines:
-            self.boxes["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
+            self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
 
@@ -131,7 +131,7 @@ class ScenesEditor(QWidget):
         super().__init__(parent)
         self._pd = frames_def
         self._prepare_length = prepare_length
-        # Whether the workflow speaks: a card of one that cannot has no lines box.
+        # Whether the workflow speaks: a card of one that cannot has no lines field.
         self._lines = lines
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
@@ -154,8 +154,8 @@ class ScenesEditor(QWidget):
         mostly holds across a story, so blank would mean typing it again."""
         scene = _Scene(self._pd, self._prepare_length, lines=self._lines)
         if self._scenes:
-            scene.boxes["negative_prompt"].setPlainText(
-                diff_text.live_text(self._scenes[-1].boxes["negative_prompt"]))
+            scene.fields["negative_prompt"].setPlainText(
+                diff_text.live_text(self._scenes[-1].fields["negative_prompt"]))
         scene.set_frames(int(self._pd.default[0]))
         scene.changed.connect(self.changed)
         scene.remove_requested.connect(self.remove_scene)
@@ -194,17 +194,17 @@ class ScenesEditor(QWidget):
 
     # --- what the form reads and writes ----------------------------------------
 
-    def boxes(self, key: str) -> list[PromptBox]:
-        """Every scene's box for the text stored as ``key``, in story order."""
-        return [scene.boxes[key] for scene in self._scenes if key in scene.boxes]
+    def fields(self, key: str) -> list[PromptField]:
+        """Every scene's field for the text stored as ``key``, in story order."""
+        return [scene.fields[key] for scene in self._scenes if key in scene.fields]
 
-    def text_boxes(self) -> list[PromptBox]:
-        """Every box on every card, in reading order: what a find searches."""
-        return [box for scene in self._scenes for box in scene.boxes.values()]
+    def text_fields(self) -> list[PromptField]:
+        """Every field on every card, in reading order: what a find searches."""
+        return [field for scene in self._scenes for field in scene.fields.values()]
 
     def story(self, key: str) -> str:
         """The one prompt that stores every scene's ``key`` text."""
-        return story_of([diff_text.live_text(box) for box in self.boxes(key)])
+        return story_of([diff_text.live_text(field) for field in self.fields(key)])
 
     def set_story(self, key: str, text: str) -> None:
         """Lay a stored prompt out one scene per text. The positive prompt is
@@ -215,9 +215,9 @@ class ScenesEditor(QWidget):
         texts = scene_prompts(str(text))
         if key == "positive_prompt":
             self._resize_to(len(texts))
-        for index, box in enumerate(self.boxes(key)):
-            diff_text.forget(box)
-            box.setPlainText(texts[min(index, len(texts) - 1)])
+        for index, field in enumerate(self.fields(key)):
+            diff_text.forget(field)
+            field.setPlainText(texts[min(index, len(texts) - 1)])
 
     def scene_frames(self) -> list[int]:
         return [scene.frames() for scene in self._scenes]
@@ -229,11 +229,11 @@ class ScenesEditor(QWidget):
             scene.set_frames(int(count))
 
     def lines(self) -> list[str]:
-        return [diff_text.live_text(box) for box in self.boxes("scene_lines")]
+        return [diff_text.live_text(field) for field in self.fields("scene_lines")]
 
     def set_lines(self, lines) -> None:
-        for box, text in zip(self.boxes("scene_lines"), list(lines or [])):
-            box.setPlainText(str(text))
+        for field, text in zip(self.fields("scene_lines"), list(lines or [])):
+            field.setPlainText(str(text))
 
     def total_frames(self) -> int:
         """The clip's length: the scenes end to end, each after the first

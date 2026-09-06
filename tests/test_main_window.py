@@ -157,13 +157,13 @@ def test_persists_the_experiments_switch_on_close(qtbot, tmp_path):
 
 @pytest.fixture
 def forget_prompt_heights():
-    """Leave the app-wide prompt-box heights as this test found them.
+    """Leave the app-wide prompt-field heights as this test found them.
 
-    They live in one process-wide store (see ``prompt_box``), so a height set
+    They live in one process-wide store (see ``prompt_field``), so a height set
     here would otherwise be the starting size for every form the rest of the
     suite builds.
     """
-    from origenerator.gui.prompt_box import PROMPT_HEIGHTS
+    from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 
     yield PROMPT_HEIGHTS
     PROMPT_HEIGHTS.restore({})
@@ -172,7 +172,7 @@ def forget_prompt_heights():
 def test_restores_the_dragged_prompt_heights_from_app_state(
     qtbot, tmp_path, forget_prompt_heights
 ):
-    # A prompt box dragged tall stays tall across launches — and the restore has
+    # A prompt field dragged tall stays tall across launches — and the restore has
     # to land before the first form is built, or the session's own tab comes up
     # at the default size. (The resting tab lays out no form until a workflow is
     # picked, so a restored tab is what makes a form at launch.)

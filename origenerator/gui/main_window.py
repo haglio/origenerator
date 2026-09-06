@@ -14,7 +14,7 @@ from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.prompt_box import PROMPT_HEIGHTS
+from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ _ENHANCE_SETTINGS_KEY = "enhance_settings"
 # is a preference, and re-picking it every launch is the kind of small friction
 # that makes a control feel unfinished.
 _SEARCH_SORT_KEY = "search_sort"
-# How tall the user has dragged each prompt box, by param key — app-wide for the
+# How tall the user has dragged each prompt field, by param key — app-wide for the
 # same reason, and restored before the first form is built (see __init__).
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 
@@ -52,7 +52,7 @@ class OrigeneratorWindow(QMainWindow):
         super().__init__(parent)
         self._app_state = app_state
         self._fun_time = fun_time
-        # Before anything below builds a param form: a prompt box reads its
+        # Before anything below builds a param form: a prompt field reads its
         # height as it is constructed, and the view built a few lines down brings
         # its first one with it.
         PROMPT_HEIGHTS.restore(app_state.get(_PROMPT_HEIGHTS_KEY))

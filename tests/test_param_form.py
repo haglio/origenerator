@@ -119,11 +119,11 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
     assert QApplication.clipboard().text() == "a red fox in snow"
 
 
-def test_prompt_fields_are_draggable_boxes_filed_under_their_param(qtbot):
-    # A prompt is the one field worth more than a few lines, so it gets the box
+def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
+    # A prompt is the one field worth more than a few lines, so it gets the field
     # whose lower edge drags — filed under its own key, so the height the user
     # gave Positive Prompt is the height every Positive Prompt opens at.
-    from origenerator.gui.prompt_box import PromptBox
+    from origenerator.gui.prompt_field import PromptField
 
     form = ParamForm([
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
@@ -131,9 +131,9 @@ def test_prompt_fields_are_draggable_boxes_filed_under_their_param(qtbot):
     ])
     qtbot.addWidget(form)
     prompt = form._widgets["positive_prompt"]
-    assert isinstance(prompt, PromptBox)
+    assert isinstance(prompt, PromptField)
     assert prompt._key == "positive_prompt"
-    assert not isinstance(form._widgets["name"], PromptBox)
+    assert not isinstance(form._widgets["name"], PromptField)
     assert form.text_fields() == [prompt]
 
 
@@ -354,7 +354,7 @@ def test_locked_dimensions_render_as_plain_values_not_input_boxes(qtbot):
     assert form._dimensions_hint is not None
     for key in ("width", "height"):
         stack = form._dim_stacks[key]
-        assert stack.currentIndex() == 0                       # the value label, not the box
+        assert stack.currentIndex() == 0                       # the value label, not the field
         assert stack.currentWidget() is form._dim_value_labels[key]
         assert form._dim_value_labels[key].objectName() == "readonlyParamValue"
     # No image yet → no size to show; the value reads as an em dash.
@@ -441,7 +441,7 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
 
     form._unlock_btn.setChecked(True)
     assert fired                                  # the unlock announces itself
-    assert form._dim_stacks["width"].currentIndex() == 1   # editable box now showing
+    assert form._dim_stacks["width"].currentIndex() == 1   # editable field now showing
     form._widgets["width"].setValue(1024)
     form._widgets["height"].setValue(576)
 
@@ -591,7 +591,7 @@ def test_combo_default_absent_from_options_is_still_selected(qtbot):
 def test_get_values_static_does_not_randomize_seed(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
     qtbot.addWidget(form)
-    # Random box defaults to checked; the static read must ignore it.
+    # Random field defaults to checked; the static read must ignore it.
     assert form.get_values_static()["seed"] == 12345
     assert form.get_values_static()["seed"] == 12345
 
@@ -608,7 +608,7 @@ def test_param_form_emits_changed_on_edit(qtbot):
 def test_seed_is_random_reflects_checkbox(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
-    assert form.seed_is_random() is True  # Random box defaults to checked
+    assert form.seed_is_random() is True  # Random field defaults to checked
     form.set_values({"seed": 42})
     assert form.seed_is_random() is False  # set_values unchecks it
 
@@ -1103,7 +1103,7 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
     editor = form._widgets["scene_frames"]
     assert (form._widgets["positive_prompt"] is editor is form._widgets["negative_prompt"]
             is form._widgets["scene_lines"])
-    assert len(editor.boxes("positive_prompt")) == 1
+    assert len(editor.fields("positive_prompt")) == 1
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
     # One row stands for the four, labeled as the scenes: a prompt row of the
@@ -1120,8 +1120,8 @@ def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
-    editor.boxes("positive_prompt")[0].setPlainText("she waves")
-    editor.boxes("positive_prompt")[1].setPlainText("she turns")
+    editor.fields("positive_prompt")[0].setPlainText("she waves")
+    editor.fields("positive_prompt")[1].setPlainText("she turns")
     [scene.length for scene in editor._scenes][1].setCurrentText("10")
     values = form.get_values()
     assert values["positive_prompt"] == "she waves\n---\nshe turns"
@@ -1136,24 +1136,24 @@ def test_each_scene_keeps_out_its_own_and_a_new_one_starts_from_the_last(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
-    editor.boxes("negative_prompt")[0].setPlainText("blurry")
+    editor.fields("negative_prompt")[0].setPlainText("blurry")
     editor.add_scene()
-    assert editor.boxes("negative_prompt")[1].toPlainText() == "blurry"
-    editor.boxes("negative_prompt")[1].setPlainText("blurry, hats")
+    assert editor.fields("negative_prompt")[1].toPlainText() == "blurry"
+    editor.fields("negative_prompt")[1].setPlainText("blurry, hats")
     assert form.get_values()["negative_prompt"] == "blurry\n---\nblurry, hats"
 
 
-def test_a_stored_story_fills_one_box_per_scene(qtbot):
+def test_a_stored_story_fills_one_field_per_scene(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     stored = {"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "x\n---\ny\n---\nz",
               "scene_frames": [161, 81, 161], "scene_lines": ["hi", "", "bye"], "frame_count": 401}
     form.set_values(stored)
     editor = form._widgets["scene_frames"]
-    assert [box.toPlainText() for box in editor.boxes("positive_prompt")] == ["a", "b", "c"]
-    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["x", "y", "z"]
-    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
-    assert [box.toPlainText() for box in editor.boxes("scene_lines")] == ["hi", "", "bye"]
+    assert [field.toPlainText() for field in editor.fields("positive_prompt")] == ["a", "b", "c"]
+    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["x", "y", "z"]
+    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
+    assert [field.toPlainText() for field in editor.fields("scene_lines")] == ["hi", "", "bye"]
     assert form.get_values_static() == stored
 
 
@@ -1162,9 +1162,9 @@ def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbo
     qtbot.addWidget(form)
     form.set_values({"positive_prompt": "one shot", "negative_prompt": "blurry", "frame_count": 121})
     editor = form._widgets["scene_frames"]
-    assert [box.toPlainText() for box in editor.boxes("positive_prompt")] == ["one shot"]
-    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["blurry"]
-    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    assert [field.toPlainText() for field in editor.fields("positive_prompt")] == ["one shot"]
+    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"]
+    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     values = form.get_values_static()
     assert (values["scene_frames"], values["frame_count"]) == ([121], 121)
     assert values["negative_prompt"] == "blurry"
@@ -1179,7 +1179,7 @@ def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
     form.set_values({"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "blurry",
                      "scene_frames": [81, 81, 81], "frame_count": 241})
     editor = form._widgets["scene_frames"]
-    assert [box.toPlainText() for box in editor.boxes("negative_prompt")] == ["blurry"] * 3
+    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"] * 3
 
 
 def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
@@ -1213,19 +1213,19 @@ def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
-    editor.boxes("positive_prompt")[0].setPlainText("a")
-    editor.boxes("positive_prompt")[1].setPlainText("b")
-    editor.boxes("negative_prompt")[1].setPlainText("n")
-    assert editor.boxes("positive_prompt")[0] in form.text_fields()
-    assert editor.boxes("positive_prompt")[1] in form.text_fields()
-    assert editor.boxes("negative_prompt")[1] in form.text_fields()
+    editor.fields("positive_prompt")[0].setPlainText("a")
+    editor.fields("positive_prompt")[1].setPlainText("b")
+    editor.fields("negative_prompt")[1].setPlainText("n")
+    assert editor.fields("positive_prompt")[0] in form.text_fields()
+    assert editor.fields("positive_prompt")[1] in form.text_fields()
+    assert editor.fields("negative_prompt")[1] in form.text_fields()
     assert form._field_text("positive_prompt") == "a\n---\nb"
     assert form._field_text("negative_prompt") == "\n---\nn"
 
 
 def test_each_box_on_a_card_says_what_it_is(qtbot):
-    # Three boxes to a card, so each is captioned and carries its param's help;
-    # the lines box says as well that what goes in it is spoken.
+    # Three fields to a card, so each is captioned and carries its param's help;
+    # the lines field says as well that what goes in it is spoken.
     from origenerator.gui.eliding import ElidingLabel
     from origenerator.gui.param_help import param_help
 
@@ -1234,12 +1234,12 @@ def test_each_box_on_a_card_says_what_it_is(qtbot):
     scene = form._widgets["scene_frames"]._scenes[0]
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
     assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
-    assert scene.boxes["negative_prompt"].toolTip() == param_help("negative_prompt")
-    assert "spoken" in scene.boxes["scene_lines"].placeholderText().lower()
+    assert scene.fields["negative_prompt"].toolTip() == param_help("negative_prompt")
+    assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
 
 
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
-    # The loop has no lines param, so its cards carry no box for one: a box
+    # The loop has no lines param, so its cards carry no field for one: a field
     # that nothing reads would be an invitation to type into the void.
     from origenerator.gui.eliding import ElidingLabel
 
@@ -1248,7 +1248,7 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     editor = form._widgets["scene_frames"]
     editor.add_scene()
     for scene in editor._scenes:
-        assert "scene_lines" not in scene.boxes
+        assert "scene_lines" not in scene.fields
         assert "Her Lines" not in {label.text() for label in scene.findChildren(ElidingLabel)}
     assert editor.lines() == []
     assert "scene_lines" not in form.get_values()
@@ -1262,7 +1262,7 @@ def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbo
     qtbot.addWidget(form)
     form.set_values({"positive_prompt": "x", "frame_count": 121, "scene_frames": [81]})
     editor = form._widgets["scene_frames"]
-    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     assert form.get_values_static()["frame_count"] == 121
 
 

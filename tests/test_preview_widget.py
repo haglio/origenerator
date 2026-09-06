@@ -570,7 +570,7 @@ def test_the_corners_keep_off_the_strip_while_a_videos_size_is_unknown(qtbot, tm
     # A clip's resolution arrives late, or never (a backend need not report it),
     # and until it does the picture is taken to be the whole media area. That
     # is not the whole pane: the strip along the foot is no picture, and a
-    # chip laid over it read as a dark tab hanging off the video's bottom edge.
+    # chip laid over it read as a dark tab hanging off the video's lower edge.
     w = _strip_preview(qtbot)
     w.resize(320, 480)
     w.show()
@@ -601,7 +601,7 @@ def test_the_corners_follow_the_picture_when_the_strip_takes_its_room(qtbot, tmp
     # from the media area. A clip whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
     # shrinks; placed once, against the pane as it was, the bin chip stayed
-    # straddling the video's bottom edge and the strip.
+    # straddling the video's lower edge and the strip.
     from PyQt6.QtCore import QSize
     from PyQt6.QtMultimedia import QMediaMetaData
 

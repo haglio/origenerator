@@ -186,7 +186,7 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
     pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
 
     assert flow.heightForWidth(120) > flow.heightForWidth(4000)   # it wraps
-    assert host.hasHeightForWidth()   # or the wrapped rows are cut off the bottom
+    assert host.hasHeightForWidth()   # or the wrapped rows are cut off the foot
     # Its floor is one part, not the whole line.
     assert host.minimumSizeHint().width() <= max(
         pair.sizeHint().width() for pair in pairs) + 8

@@ -57,7 +57,7 @@ def test_read_actions_passes_a_missing_script_through():
 
 
 def test_synthesize_actions_alternates_extremes_at_half_period():
-    # 1 Hz over 2 s → a half-stroke every 500 ms, starting at the bottom.
+    # 1 Hz over 2 s → a half-stroke every 500 ms, starting at the floor.
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
     assert [a["pos"] for a in actions] == [0, 100, 0, 100, 0]
     assert [a["at"] for a in actions] == [0, 500, 1000, 1500, 2000]

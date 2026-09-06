@@ -10,7 +10,7 @@ Two things are read over that frame rather than in place of it. The stage —
 on a dimming scrim (:class:`origenerator.gui.stage_scrim.StageScrim`), the same
 one a finished thumbnail wears while its enhancement cooks; and along the frame's
 foot a bar carries how far along the run is and how long that has taken
-(:func:`origenerator.timing.progress_status_label`), in the same words the bottom
+(:func:`origenerator.timing.progress_status_label`), in the same words the lower
 strip's queue uses for the same job. A stage message that *replaced* the picture
 hid the one thing worth looking at, and a percentage that lived only in the queue
 left the card and the strip each telling half of one story.
@@ -60,7 +60,7 @@ class InFlightCard(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Right-click anywhere on the card asks the pane for a context menu, the
         # way a finished tile's does — the run this card stands for is otherwise
-        # only stoppable from the bottom strip's queue.
+        # only stoppable from the lower strip's queue.
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self._key, self.mapToGlobal(pos))

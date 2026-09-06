@@ -2,7 +2,7 @@
 
 A thumbnail in the browser pane and the preview in a config tab are showing the
 same thing, so they offer the same three acts on it, in the same three corners:
-bookmark it (top right), bin it (bottom left), enhance it (bottom right). Learn
+bookmark it (top right), bin it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
 Top-LEFT is not one of them: the media-type badge has always lived there, and a
 control that landed on it would be a control that moves depending on which shelf

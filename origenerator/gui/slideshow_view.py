@@ -72,7 +72,7 @@ was handed and both at once meaning what answers both
 They start off, and reset drops them.  What the view has left to say for itself,
 it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
 
-The bottom strip's queue is floated into the bottom-left corner
+The lower strip's queue is floated into the lower-left corner
 (:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
 their buttons — since the strip that carries it is behind this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
@@ -217,9 +217,9 @@ class SlideshowView(QWidget):
         # The items either side of this one, floated over the black surround.
         self._neighbors = NeighborPreviews(self)
 
-        # Where in the set this one is, floated over the bottom of the media.
+        # Where in the set this one is, floated over the foot of the media.
         self._counter = PositionCaption(self)
-        # The bottom strip's queue itself — the live frame, the bar, the rows and
+        # The lower strip's queue itself — the live frame, the bar, the rows and
         # their buttons — floated into the corner this view leaves empty. The
         # strip that normally carries it is behind this window, and a show is
         # both when the queue stops moving (its videos are held) and when the
@@ -392,12 +392,12 @@ class SlideshowView(QWidget):
 
     def queue(self) -> SlideshowQueue:
         """The floated queue, for the gallery to wire its reorder and clear to —
-        it is the same widget as the bottom strip and asks the same things."""
+        it is the same widget as the lower strip and asks the same things."""
         return self._queue
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """Show what is in flight in the corner — the same list, in the same
-        order, the bottom strip this view is covering would be showing."""
+        order, the lower strip this view is covering would be showing."""
         self._queue.set_items(items, foreign_queued)
         self._reposition_queue()
 

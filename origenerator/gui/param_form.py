@@ -243,7 +243,7 @@ class ParamForm(QWidget):
             self._present_keys[title] = []
             self._section_order.append(title)
             outer.addWidget(section)
-        outer.addStretch(1)  # collect any slack at the bottom, not between sections
+        outer.addStretch(1)  # collect any slack at the foot, not between sections
 
         # Fields in canonical order, so the workflow's own declaration order can't
         # reshuffle where a setting lands.
@@ -478,8 +478,8 @@ class ParamForm(QWidget):
             form.setContentsMargins(gutter, 2, 0, 4)
             return
         top = self._widgets["width"].geometry()
-        bottom = self._widgets["height"].geometry()
-        y = (top.center().y() + bottom.center().y()) // 2 - btn.height() // 2
+        lower = self._widgets["height"].geometry()
+        y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
         btn.move(max(0, (gutter - btn.width()) // 2), y)
         btn.raise_()
 
@@ -591,8 +591,8 @@ class ParamForm(QWidget):
             form.setContentsMargins(gutter, 2, 0, 4)
             return
         top = self._dim_stacks["width"].geometry()
-        bottom = self._dim_stacks["height"].geometry()
-        y = (top.center().y() + bottom.center().y()) // 2 - btn.height() // 2
+        lower = self._dim_stacks["height"].geometry()
+        y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
         x = max(0, (gutter - btn.width()) // 2)
         btn.move(x, y)
         btn.raise_()
@@ -728,7 +728,7 @@ class ParamForm(QWidget):
             return w
         if pd.type == "str" and pd.multiline:
             # A prompt is the one field worth more than a few lines of the form,
-            # and how many it wants is the user's call — hence a box whose bottom
+            # and how many it wants is the user's call — hence a box whose lower
             # edge drags, at whatever height this param was last given.
             w = PromptBox(pd.key)
             w.setPlainText(str(pd.default))

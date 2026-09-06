@@ -55,7 +55,7 @@ _SEPARATOR = "::"
 
 # How many measured shapes are kept at once. Comfortably above one library's
 # worth, because a rebuild measures every row: a cap under that would evict the
-# rows measured at the top of a pass before the pass reached the bottom, and
+# rows measured at the top of a pass before the pass reached the end, and
 # every poll would go back to opening a thumbnail per row — the cost the cache
 # exists to avoid. Above that ceiling it is only memory, and this many short
 # paths is a few megabytes.

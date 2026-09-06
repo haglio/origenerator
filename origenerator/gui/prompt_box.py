@@ -2,7 +2,7 @@
 
 A prompt here runs to hundreds of words through a box a hundred pixels tall, so
 most of what you wrote has scrolled away while you are still writing it. The
-bottom edge of the box is a drag handle: grab it and the field grows, the way a
+lower edge of the box is a drag handle: grab it and the field grows, the way a
 browser's textarea does.
 
 The height belongs to the *param*, app-wide — every Positive Prompt is as tall
@@ -31,7 +31,7 @@ DEFAULT_HEIGHT = 100
 # A drag stops here: a box taller than any monitor is a slip of the mouse rather
 # than a request, and it would bury the rest of the form under itself.
 MAX_HEIGHT = 1600
-# The band along the bottom edge that grabs the box instead of placing the text
+# The band along the lower edge that grabs the box instead of placing the text
 # cursor. Narrow, like a splitter handle — the rest of the field is for typing.
 GRIP = 6
 # How wide the pair of rules drawn on that band is.
@@ -98,7 +98,7 @@ PROMPT_HEIGHTS = PromptHeights()
 
 
 class PromptBox(QPlainTextEdit):
-    """A multiline prompt field whose bottom edge drags to resize it.
+    """A multiline prompt field whose lower edge drags to resize it.
 
     ``key`` is the param it edits, which is what its height is filed under in
     :data:`PROMPT_HEIGHTS`.
@@ -137,10 +137,10 @@ class PromptBox(QPlainTextEdit):
     # --- dragging the edge ---------------------------------------------------
 
     def _in_grip(self, pos) -> bool:
-        """Is this point on the bottom edge's drag band?
+        """Is this point on the lower edge's drag band?
 
         Mouse events on a scroll area arrive in *viewport* coordinates, so the
-        band is measured from the viewport's own bottom — which also means the
+        band is measured from the viewport's own lower edge — which also means the
         scrollbar, a child with its own events, is never part of it.
         """
         return pos.y() >= self.viewport().height() - GRIP
@@ -185,7 +185,7 @@ class PromptBox(QPlainTextEdit):
         painter = QPainter(self.viewport())
         painter.setPen(QPen(BORDER_SUBTLE, 1))
         middle = self.viewport().width() // 2
-        bottom = self.viewport().height() - 2
-        for y in (bottom, bottom - 3):
+        lower = self.viewport().height() - 2
+        for y in (lower, lower - 3):
             painter.drawLine(middle - _MARK_WIDTH // 2, y, middle + _MARK_WIDTH // 2, y)
         painter.end()

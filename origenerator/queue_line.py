@@ -80,7 +80,7 @@ def next_ready(line: list, *, videos_held: bool):
 
     With videos held, a video is passed over rather than moved: the line keeps
     the order the videos were asked for, and passing one over has exactly the
-    effect of sending it to the bottom, since everything that can start goes
+    effect of sending it to the end, since everything that can start goes
     first. A line holding nothing but videos yields ``None`` — the queue waits,
     the GPU stays out of the show's way, and the next image asked for is what
     starts it moving again.

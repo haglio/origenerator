@@ -121,7 +121,7 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
 
 def test_prompt_fields_are_draggable_boxes_filed_under_their_param(qtbot):
     # A prompt is the one field worth more than a few lines, so it gets the box
-    # whose bottom edge drags — filed under its own key, so the height the user
+    # whose lower edge drags — filed under its own key, so the height the user
     # gave Positive Prompt is the height every Positive Prompt opens at.
     from origenerator.gui.prompt_box import PromptBox
 
@@ -402,8 +402,8 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
 
     btn = form._unlock_btn.geometry()
     top = form._dim_stacks["width"].geometry()
-    bottom = form._dim_stacks["height"].geometry()
-    assert top.center().y() < btn.center().y() < bottom.center().y()
+    lower = form._dim_stacks["height"].geometry()
+    assert top.center().y() < btn.center().y() < lower.center().y()
 
     dim_form = form._sections["Dimensions"].content_form()
     width_label = dim_form.labelForField(form._dim_stacks["width"])

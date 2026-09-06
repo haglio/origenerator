@@ -158,7 +158,7 @@ def test_started_signal_switches_the_scrim_to_generating(qtbot):
 
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
-    # The same line the bottom strip's queue writes for the same job, so a run
+    # The same line the lower strip's queue writes for the same job, so a run
     # reads identically wherever it is being watched.
     job = FakeJob(state="running", last_progress=(10, 20),
                   started_at=time.time() - 90.5)

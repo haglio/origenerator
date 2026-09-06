@@ -22,7 +22,7 @@ def _broker(tmp_path, sock):
 
 
 def test_format_position_maps_percent_to_four_digit_axis_and_interval():
-    # L0 is the OSR2 stroke axis; position is 0000-9999 (bottom-top), then I<ms>.
+    # L0 is the OSR2 stroke axis; position is 0000-9999 (floor to top), then I<ms>.
     assert format_position(0, 100) == "L00000I100"
     assert format_position(50, 100) == "L05000I100"
     assert format_position(100, 250) == "L09999I250"

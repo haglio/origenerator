@@ -4,7 +4,7 @@ An enhancement is a layer, not a replacement: the enhanced file leads the row's
 ``output_files`` and each earlier one stays listed, so an image can carry several
 levels at once — usually one, more when the same image is enhanced again at
 different settings to compare them. The preview opens on the most-enhanced
-version; this is where the rest are, sitting at the bottom of the info pane
+version; this is where the rest are, sitting at the foot of the info pane
 beside the other cross-links (a video's source image, an image's animations).
 
 One level per row, because each is a file with a file's worth to say about it:

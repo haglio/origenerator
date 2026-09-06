@@ -65,7 +65,7 @@ def funscript_of(video_path, *, output_dir) -> Path | None:
 def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:
     """A periodic stroke over ``duration_s`` at ``hz`` full cycles per second.
 
-    Emits alternating bottom/top extremes (``0``/``100``) every half-period; the
+    Emits alternating floor/top extremes (``0``/``100``) every half-period; the
     device interpolates between them, so a plain point every half-stroke reads as a
     steady stroke. When ``loop`` is set, the half-period is stretched to fit a whole
     (even) number of halves into the clip, so the last action lands back at the start
@@ -77,7 +77,7 @@ def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict
     half_period = 500.0 / hz  # ms between successive extremes (two per full cycle)
     if loop:
         halves = max(2, round(duration_ms / half_period))
-        if halves % 2:  # keep it even so the final extreme matches the first (bottom)
+        if halves % 2:  # keep it even so the final extreme matches the first (the floor)
             halves += 1
         half_period = duration_ms / halves
         count = halves + 1  # inclusive of both endpoints [0, duration]

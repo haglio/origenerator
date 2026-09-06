@@ -177,7 +177,7 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
     assert preview._caption.isHidden()  # the plain line stands down for the bar
 
 
-def test_the_thumbnail_fills_the_strips_bottom_left_corner(queue):
+def test_the_thumbnail_fills_the_strips_lower_left_corner(queue):
     # The live frame is what the left half is for, so it takes the biggest square
     # the strip has room for — its height under the top rule — right into its
     # corner.
@@ -750,7 +750,7 @@ def test_dropping_a_row_above_another_moves_it_there(queue):
     assert asked == [["a", "d", "b", "c"]]
 
 
-def test_dropping_a_row_onto_the_bottom_half_puts_it_after(queue):
+def test_dropping_a_row_onto_the_lower_half_puts_it_after(queue):
     # The half of a row a drop lands on is what says above-or-below, so the same
     # gesture a few pixels lower means something different.
     _four(queue)

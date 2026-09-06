@@ -412,7 +412,7 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
 
 
 def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
-    # The reported gap: after a restart the bottom strip resumed but the Generate
+    # The reported gap: after a restart the lower strip resumed but the Generate
     # button on the tab that started the run stayed idle. The session records which
     # run each tab launched, and the state is re-asserted once the view is up.
     db = Database(tmp_path / "t.db")

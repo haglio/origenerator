@@ -145,7 +145,7 @@ class PreviewWidget(QWidget):
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         # The media (image/video) fills the pane; an optional funscript strip rides
-        # along its bottom edge, so a scripted clip shows its stroke motion at a glance.
+        # along its lower edge, so a scripted clip shows its stroke motion at a glance.
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -240,7 +240,7 @@ class PreviewWidget(QWidget):
         self._controls = CornerControls(self, native=True)
         self._controls.triggered.connect(self._on_control)
 
-        # Opt-in funscript heatmap along the bottom edge (the info-pane and fullscreen
+        # Opt-in funscript heatmap along the lower edge (the info-pane and fullscreen
         # previews use it); hidden until a scripted video is shown.
         self._strip = FunscriptStrip() if show_funscript_strip else None
         if self._strip is not None:
@@ -513,7 +513,7 @@ class PreviewWidget(QWidget):
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
         screen at all -- and never to the strip along the foot, which is no
-        picture: a corner chip laid over it, attached to the video's bottom edge.
+        picture: a corner chip laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():

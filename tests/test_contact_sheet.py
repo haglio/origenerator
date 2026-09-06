@@ -52,7 +52,7 @@ def test_the_grid_the_search_picks_is_the_grid_that_gets_drawn():
 
 def test_the_last_rows_share_the_remainder_rather_than_leaving_a_gap():
     # Nine over four rows is 3/2/2/2, so every row reaches both edges — not
-    # 3/3/3/0, which would leave a whole empty band at the bottom.
+    # 3/3/3/0, which would leave a whole empty band at the foot.
     assert row_counts(9, 4) == [3, 2, 2, 2]
     assert sum(row_counts(17, 5)) == 17
 

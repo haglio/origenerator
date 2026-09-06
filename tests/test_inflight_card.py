@@ -109,7 +109,7 @@ def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
 # --- how far along, and how long it has taken --------------------------------
 
 def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
-    # The same line the bottom strip's queue writes for the same job: the card
+    # The same line the lower strip's queue writes for the same job: the card
     # used to show neither number, so a run being watched here had to be looked
     # up in the strip to find out how far along it was.
     card = InFlightCard(_item(status="running", progress=(10, 20),

@@ -54,7 +54,7 @@ def test_poll_drives_from_the_playhead_without_a_playback_state(qapp):
     driver.start(FakePlayer(pos=0), ACTIONS)
 
     driver.poll()
-    assert broker.positions == [(100, 500)]  # from the bottom, head to the top at 500 ms
+    assert broker.positions == [(100, 500)]  # from the floor, head to the top at 500 ms
 
 
 def test_poll_wraps_position_onto_a_looping_clip(qapp):

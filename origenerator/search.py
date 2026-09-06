@@ -503,7 +503,7 @@ def group_by_recipe(results) -> list[tuple[str, list]]:
 
     Biggest first because the combination you use most is the one you are most
     likely to be looking through, and because it makes a one-off run read as the
-    outlier it is rather than hiding at the bottom of a long alphabet.
+    outlier it is rather than hiding at the end of a long alphabet.
     """
     sections: dict[str, list] = {}
     for result in results:

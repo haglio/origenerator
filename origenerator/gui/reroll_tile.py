@@ -9,7 +9,7 @@ with a dimming scrim over it naming the stage
 ("Waiting…", then "Generating…"), and a bar along the picture's foot carrying
 how far along the run is and how long that has taken
 (:func:`origenerator.timing.progress_status_label`) — the same reading, in the
-same words, as the bottom strip's queue and the Recents shelf's cards. Beside
+same words, as the lower strip's queue and the Recents shelf's cards. Beside
 them a button throws that run away, reading "Cancel" or, while the folder is
 auto-generating, "Next seed" (see :func:`inflight.discard_run_text`).
 

@@ -81,7 +81,7 @@ def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
 
 
 def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
-    # A button bank sits in the bottom-right corner, and has to stay there as it
+    # A button bank sits in the lower-right corner, and has to stay there as it
     # wraps rather than walk off to the left.
     host = QWidget()
     qtbot.addWidget(host)

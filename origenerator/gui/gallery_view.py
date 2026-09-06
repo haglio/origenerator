@@ -348,7 +348,7 @@ def _toolbar_gap() -> QWidget:
     return gap
 
 
-def _bottom_divider() -> QFrame:
+def _lower_divider() -> QFrame:
     """The hairline closing the browser pane off from the panels beneath it.
 
     Drawn with an explicit background rather than a ``QFrame`` sunken line: the
@@ -757,7 +757,7 @@ class GalleryView(QWidget):
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
         # What another app has on the shared ComfyUI, re-read on every poll so the
-        # bottom bar can say the server is busy before a Generate goes in behind it.
+        # lower bar can say the server is busy before a Generate goes in behind it.
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         # What the last Esc took off, for the next one to put back — cleared as
         # soon as it is put back, so the key goes on alternating.
@@ -1360,7 +1360,7 @@ class GalleryView(QWidget):
         # been picked.
         self._scroll.background_clicked.connect(
             self._browser.clear_thumbnail_selection)
-        # The Recents shelf has no end: reaching the bottom of what it has drawn
+        # The Recents shelf has no end: reaching the end of what it has drawn
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
@@ -1413,19 +1413,19 @@ class GalleryView(QWidget):
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_stroke is not None else None
         self._osr2_enabled = False
         self._osr2_driving = None
-        # The bottom of the center (browser) pane, shared by two panels that each
+        # The foot of the center (browser) pane, shared by two panels that each
         # take their own room rather than floating over anyone's buttons: genau's
         # readout, copied, held to the left at its fixed size, and the open
         # folder's Enhance settings taking the width left beside it.  Hosted by
         # Fun Time there is no readout — the real console is on the session's
         # main player — so the Enhance settings take the row alone.
-        bottom = QHBoxLayout()
-        bottom.setContentsMargins(0, 0, 0, 0)
-        bottom.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
         self._stroke_panel = None
         if self._osr2_stroke is not None:
             self._stroke_panel = StrokePanel(self._osr2_stroke, pace=self._pace)
-            bottom.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
+            footer.addWidget(self._stroke_panel, 0, Qt.AlignmentFlag.AlignTop)
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its box on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
@@ -1435,13 +1435,13 @@ class GalleryView(QWidget):
         # lands in, and this one doesn't.
         self._enhance_panel = EnhancePanel(self._on_enhance_settings_changed)
         self._enhance_panel.show_settings(self._enhance_settings)
-        bottom.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
+        footer.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
         # A hairline where the browsing stops and these two panels start. Without
-        # it the Enhance settings read as the bottom of whatever folder is on screen
+        # it the Enhance settings read as the foot of whatever folder is on screen
         # rather than as their own thing — which they are: app-wide settings that
         # don't belong to the folder they happen to be sitting under.
-        browser_box.addWidget(_bottom_divider())
-        browser_box.addLayout(bottom)
+        browser_box.addWidget(_lower_divider())
+        browser_box.addLayout(footer)
 
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs.config_panels():
@@ -1476,7 +1476,7 @@ class GalleryView(QWidget):
         info_box.addWidget(self._find_bar)
 
         if self._stack is not None:
-            # The upright arrangement, top to bottom: the generate tabs (with
+            # The upright arrangement, from the top down: the generate tabs (with
             # the find bar riding under them), then the browser beside a
             # collapsible tree, then the queue across the foot.  The generator
             # leads because it is what the user is doing — a tall rect that
@@ -1784,7 +1784,7 @@ class GalleryView(QWidget):
         # stretch when nobody is waiting on a video. The queue holds them until it
         # closes and keeps making images.
         self._reroll.hold_videos(True)
-        # The queue it floats in its corner is the same widget as the bottom
+        # The queue it floats in its corner is the same widget as the lower
         # strip and asks for the same things, so it goes to the same handlers:
         # a row dragged there re-lines the queue, and its Clear drops another
         # app's work off ComfyUI.
@@ -2161,7 +2161,7 @@ class GalleryView(QWidget):
         an edited config's brand-new folder appears and is navigated to at once —
         the running row it inserts gives the folder a tree node immediately (see
         :func:`build_gallery_tree`). A folder already generating takes the new run
-        too; ComfyUI works through them in turn and the bottom strip shows the line.
+        too; ComfyUI works through them in turn and the lower strip shows the line.
         Missing form params are filled from the workflow's defaults, exactly as the
         old Generate did. A no-op without a client or an unknown workflow.
 
@@ -2312,7 +2312,7 @@ class GalleryView(QWidget):
                 # Wherever they were drawn: the Recents shelf, or a folder with
                 # a batch of them cooking in it.
                 self._browser.refresh_inflight(rows=rows, requests=requests)
-            # The bottom strip is always on screen, so refresh it every tick —
+            # The lower strip is always on screen, so refresh it every tick —
             # its rows' live frames and progress advance between rebuilds. The
             # listing already in hand feeds it, so the strip costs the tick no
             # further table reads.
@@ -3635,7 +3635,7 @@ class GalleryView(QWidget):
 
     def _sync_discard_buttons(self):
         """Re-label every button that throws a run away — the folder's live tile, the
-        bottom strip's rows, each config tab's — after a loop started or ended.
+        lower strip's rows, each config tab's — after a loop started or ended.
 
         Nothing else repaints them at that moment: switching Auto on over a folder
         that is already generating launches nothing, so there is no re-roll change
@@ -6562,7 +6562,7 @@ class GalleryView(QWidget):
         return self._browser.inflight_items(rows=rows, requests=requests)
 
     def _update_queue(self, inflight=None):
-        """Feed the bottom strip every in-flight job, in the order ComfyUI will
+        """Feed the lower strip every in-flight job, in the order ComfyUI will
         work through them, plus whatever another app has on ComfyUI — so the whole
         queue shows from anywhere, and one that isn't ours is visible before
         Generate rather than after.
@@ -6718,7 +6718,7 @@ class GalleryView(QWidget):
         cancel the enhancement in flight. An enhancement has no card of its own —
         it is shown on the tile of the image it improves, under a scrim — so this
         menu is the only thing that tile can be asked to stop it with, and without
-        it the run had to be hunted down among the bottom strip's rows. It sits
+        it the run had to be hunted down among the lower strip's rows. It sits
         beside Enhance, the act that started it.
         """
         rows = [row for pid in prompt_ids

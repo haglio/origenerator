@@ -1,4 +1,4 @@
-"""The bottom strip's queue, floated into the fullscreen show's corner.
+"""The lower strip's queue, floated into the fullscreen show's corner.
 
 It is :class:`GenerationQueue` itself — the live frame, the bar, the rows with
 their buttons and their drag — so what it *says* is covered by
@@ -66,7 +66,7 @@ def test_another_apps_backlog_alone_is_worth_showing(plate):
     assert not plate.isHidden()
 
 
-def test_it_sits_in_the_bottom_left_corner(plate):
+def test_it_sits_in_the_lower_left_corner(plate):
     host = plate.parentWidget()
     plate.set_items([_item(typical_seconds=30)])
     plate.reposition()

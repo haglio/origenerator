@@ -1,7 +1,7 @@
 """What every surface knows about a generation that is still in flight.
 
 Three widgets show queued and running work — the Recents shelf's cards
-(:mod:`origenerator.gui.inflight_card`), the bottom strip's queue
+(:mod:`origenerator.gui.inflight_card`), the lower strip's queue
 (:mod:`origenerator.gui.generation_queue`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
@@ -202,7 +202,7 @@ class EnhancingRun:
 
 def discard_run_text(auto_generating: bool) -> str:
     """The label on the button that throws away the run being made — one wording
-    for the folder's live tile, the bottom strip's rows, and the config pane.
+    for the folder's live tile, the lower strip's rows, and the config pane.
 
     While the folder is auto-generating, that press ends nothing: the loop takes
     it as a discarded seed and launches another at once (see
@@ -245,7 +245,7 @@ def queue_wait_text(foreign_ahead: int | None) -> str | None:
 
     Only another app's work earns this line. A wait behind the user's own jobs is
     no mystery — ComfyUI is working through exactly what they asked for, and they
-    can read the rest of the queue in the bottom strip — so saying "waiting in
+    can read the rest of the queue in the lower strip — so saying "waiting in
     ComfyUI" there sends them hunting for phantom jobs that are their own.
 
     ``None`` when nothing foreign is ahead: every surface's cue to say what it

@@ -92,7 +92,7 @@ _STAR_GLYPH = GREEN
 _REROLL_GLYPH = QColor(255, 255, 255)
 
 # The re-roll glyph is a composite: the media mark up and to the left, leaving
-# the bottom-right corner free for the small regenerate arrow that modifies it.
+# the lower-right corner free for the small regenerate arrow that modifies it.
 _REROLL_MEDIA = 34
 _REROLL_MEDIA_AT = 1
 
@@ -304,7 +304,7 @@ def orientation_mark(orientation: str) -> QPixmap:
 
 # --- the controls a picture wears in its corners --------------------------
 
-# What the plus in a picture's bottom-right corner is saying. The three are the
+# What the plus in a picture's lower-right corner is saying. The three are the
 # whole of what the enhancer can be up to about one image; a picture it cannot
 # take at all (a video, or a run with no file) shows no plus.
 ENHANCE_OPEN = "open"   # nothing made of it yet: the offer of a first one
@@ -343,7 +343,7 @@ def corner_star_icon(*, starred: bool, armed: bool) -> QIcon:
 
 @cache
 def corner_trash_icon(*, armed: bool) -> QIcon:
-    """The trash can in a picture's bottom-left corner: delete this item.
+    """The trash can in a picture's lower-left corner: delete this item.
 
     Red under the cursor rather than the other two's light gray — it is the one
     corner whose act takes something away, and it wears the very can, in the very
@@ -353,7 +353,7 @@ def corner_trash_icon(*, armed: bool) -> QIcon:
 
 @cache
 def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
-    """The plus in a picture's bottom-right corner, reading ``state``.
+    """The plus in a picture's lower-right corner, reading ``state``.
 
     :data:`ENHANCE_OPEN` is a hollow plus — nothing has been made of this image
     and pressing would make the first. :data:`ENHANCE_HELD` is the solid yellow
@@ -455,7 +455,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
 
 
 def _draw_regen_badge(painter: QPainter):
-    """A small circular arrow in the bottom-right — the 're-roll' modifier over
+    """A small circular arrow in the lower-right — the 're-roll' modifier over
     the media glyph, so the control reads as 'regenerate this' not 'play this'."""
     pen = QPen(_REROLL_GLYPH)
     pen.setWidthF(3.4)

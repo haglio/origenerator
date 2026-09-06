@@ -74,7 +74,7 @@ def test_curated_recipe_is_none_for_an_uncurated_act():
 
 
 def test_curated_recipe_is_none_for_a_malformed_entry(monkeypatch):
-    # A junk entry must send the caller to mining, never fail the act outright.
+    # A bad entry must send the caller to mining, never fail the act outright.
     monkeypatch.setitem(recipe_match._CURATED_BY_INTENT, recipe_match.PLAYERS,
                         {"beta": "not a dict", "epsilon": {"params": {}}})
     assert recipe_match.curated_recipe("beta") is None      # not a dict
@@ -118,8 +118,8 @@ def test_best_recipe_breaks_count_ties_by_recency():
 def test_best_recipe_reads_the_act_from_the_prompt_per_category():
     rows = [
         _video("f1", "hardcore delta, delta form", "2026-01-01", lora_high="X"),
-        _video("c1", "a big epsilon on her chest", "2026-01-02", lora_high="Y"),
-        _video("d1", "she is dancing and twerking", "2026-01-03", lora_high="Z"),
+        _video("c1", "a big epsilon in frame", "2026-01-02", lora_high="Y"),
+        _video("d1", "she is dancing", "2026-01-03", lora_high="Z"),
     ]
     assert recipe_match.best_recipe("delta", rows) == "f1"
     assert recipe_match.best_recipe("epsilon", rows) == "c1"

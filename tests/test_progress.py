@@ -3,7 +3,8 @@ import pytest
 from origenerator.progress import (
     ProgressTracker,
     expected_pass_count,
-    expected_progress_steps,
+    expected_sampling_seconds,
+    sampler_costs,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
@@ -27,56 +28,81 @@ def enhance_payload(monkeypatch):
     return build
 
 
-def test_expected_steps_single_ksampler_is_its_step_count():
-    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
-    payload = wf.build_api_payload({**wf.default_params(), "steps": 30})
-    assert expected_progress_steps(payload) == 30
+def _payload(name, **params):
+    wf = WORKFLOW_REGISTRY[name]
+    return wf.build_api_payload({**wf.default_params(), **params})
 
 
-def test_expected_steps_sums_the_base_and_enhance_passes():
+def test_a_lone_sampler_is_budgeted_at_a_still_step_per_step():
+    # Nothing to weigh anything against, so the total is just the step count at
+    # the flat cost of a still: what matters here is only that it scales.
+    assert expected_sampling_seconds(_payload("flux_t2i_upscaled", steps=30)) == 15
+    assert expected_sampling_seconds(_payload("flux_t2i_upscaled", steps=60)) == 30
+
+
+def test_expected_seconds_sums_the_base_and_enhance_passes():
     # sdxl_t2i's enhance tail runs a second KSampler after the base one; the
     # bar's total covers both, so it ramps once across the whole job.
-    payload = WORKFLOW_REGISTRY["sdxl_t2i"].build_api_payload(
-        {**WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
-         "steps": 50, "enhance": True, "enhance_steps": 20}
-    )
-    assert expected_progress_steps(payload) == 70
+    payload = _payload("sdxl_t2i", steps=50, enhance=True, enhance_steps=20)
+    assert expected_sampling_seconds(payload) == 35   # 50 + 20 still steps
 
 
-def test_expected_steps_dual_sampler_sums_the_two_passes():
-    # WAN i2v splits the step schedule across a high- and low-noise sampler; the
-    # two passes together run `steps`. On top of that comes the 50-step audio
-    # pass that scores the video — the larger half of the run, and the half a
-    # total of 20 used to leave the bar pinned at 100% for.
-    wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    payload = wf.build_api_payload({**wf.default_params(), "steps": 20})
-    assert expected_progress_steps(payload) == 70
+def test_the_audio_pass_is_a_sliver_of_a_video_job_not_most_of_it():
+    # The complaint this fixes. A WAN 2.2 I2V run reports 20 video steps and 50
+    # audio ones, so counting steps put three quarters of the bar on the audio —
+    # and the user watched that three quarters go by in fifteen seconds after the
+    # first quarter had taken eleven minutes. Costed, the audio is about 1% of
+    # the run, which is what it is.
+    costs = sampler_costs(_payload("wan22_i2v", steps=20))
+    video = sum(steps * cost for node, (steps, cost) in costs.items() if node in ("15", "16"))
+    audio = sum(steps * cost for node, (steps, cost) in costs.items() if node == "24")
+    assert audio / (video + audio) < 0.02
 
 
-def test_expected_steps_counts_the_audio_pass_of_every_video_workflow():
-    # The bug this guards: the audio sampler's 50 steps are a fixed cost, so the
-    # shorter the video schedule the more of the run the bar was blind to. A
-    # 4-step loop spent 93% of its reported steps outside its own total.
+def test_a_video_step_is_costed_by_the_length_of_the_clip():
+    # Doubling the frames doubles what a step of the same schedule costs, which
+    # is what makes one set of numbers fit a five-second clip and a ten-second
+    # one. A flat cost per step could only ever be right for one of them.
+    short = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=81))["15"]
+    long = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=161))["15"]
+    assert long[1] == pytest.approx(short[1] * 161 / 81)
+
+
+def test_every_video_workflow_costs_its_audio_pass_against_its_video_one():
+    # The audio sampler's 50 steps are a fixed count, so the shorter the video
+    # schedule the more of the bar they used to take: a 4-step loop spent 93% of
+    # its reported steps on the pass that takes seconds.
     for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
-        wf = WORKFLOW_REGISTRY[name]
-        payload = wf.build_api_payload({**wf.default_params(), "steps": 4})
-        assert expected_progress_steps(payload) == 54, name
+        payload = _payload(name, steps=4)
+        costs = sampler_costs(payload)
+        audio = sum(steps * cost for node, (steps, cost) in costs.items()
+                    if payload[node]["class_type"] == "HunyuanFoleySampler")
+        total = sum(steps * cost for steps, cost in costs.values())
+        assert audio / total < 0.1, name
 
 
-def test_expected_steps_budgets_each_detail_fix_at_one_region(enhance_payload):
-    # An enhance that fixes faces and hands runs three sampler passes: the tail,
-    # then a detailer per part. How many regions each detailer finds isn't
-    # knowable up front, but one is — and budgeting that floor is what keeps the
-    # bar from filling and emptying once per fix.
-    payload = enhance_payload(
-        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
-    assert expected_progress_steps(payload) == 60
+def test_a_still_workflow_is_costed_flat_having_no_clip_to_measure():
+    # No latent builder to read a length off, so every sampler is a still's.
+    costs = sampler_costs(_payload("sdxl_t2i", steps=50, enhance=True, enhance_steps=20))
+    assert {cost for _, cost in costs.values()} == {0.5}
+
+
+def test_a_detail_fix_costs_less_per_step_than_the_render_it_patches(enhance_payload):
+    # A fix samples one crop enlarged to at most 1024px; the tail it follows
+    # samples the whole upscaled render. Charged the same, two fixes would take
+    # two thirds of the bar for a fraction of the work.
+    costs = sampler_costs(enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
+    tail = costs["10"][1]
+    assert all(cost < tail for node, (_, cost) in costs.items() if node != "10")
+    assert expected_sampling_seconds(enhance_payload(
+        enhance_steps=20,
+        enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == 16  # 10 + 3 + 3
 
 
 def test_expected_pass_count_is_one_for_a_lone_sampler():
     # Nothing to split a bar over: this job is one pass from end to end.
-    wf = WORKFLOW_REGISTRY["flux_t2i_upscaled"]
-    assert expected_pass_count(wf.build_api_payload(wf.default_params())) == 1
+    assert expected_pass_count(_payload("flux_t2i_upscaled")) == 1
 
 
 def test_expected_pass_count_counts_the_tail_and_each_fix(enhance_payload):
@@ -93,29 +119,39 @@ def test_the_bar_does_not_refill_once_per_fix(enhance_payload):
     # them. Each pass now starts where the last ended.
     tracker = ProgressTracker.for_payload(enhance_payload(
         enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    assert tracker.update(20, 20) == (20, 60)   # the upscale tail finishes: a third
-    assert tracker.update(1, 20) == (21, 60)    # faces begins from there, not from 1/60
-    assert tracker.update(20, 20) == (40, 60)
-    assert tracker.update(1, 20) == (41, 60)    # and so does hands
-    assert tracker.update(20, 20) == (60, 60)
+    assert tracker.update(20, 20, "10") == (10, 16)  # the upscale tail finishes
+    assert tracker.update(1, 20, "15") == (10, 16)   # faces begins from there
+    assert tracker.update(20, 20, "15") == (13, 16)
+    assert tracker.update(1, 20, "18") == (13, 16)   # and so does hands
+    assert tracker.update(20, 20, "18") == (16, 16)
 
 
 def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_payload):
     # The one dip left: a detector that finds two hands runs a pass nobody
     # budgeted. The bar rescales to admit it — which says there is more to do —
-    # rather than sitting at 100% through it.
+    # rather than sitting at 100% through it. The node names itself the same both
+    # times, so what marks the second region is its count starting over.
     tracker = ProgressTracker.for_payload(enhance_payload(
         enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    for _ in range(3):                          # tail, faces, the first hand
-        tracker.update(1, 20)
-        tracker.update(20, 20)
-    assert tracker.update(1, 20) == (61, 80)    # a second hand turns up
-    assert tracker.update(20, 20) == (80, 80)
+    for node in ("10", "15", "18"):             # tail, faces, the first hand
+        tracker.update(1, 20, node)
+        tracker.update(20, 20, node)
+    assert tracker.update(1, 20, "18") == (16, 19)   # a second hand turns up
+    assert tracker.update(20, 20, "18") == (19, 19)
+
+
+def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
+    # Both report 20 steps, and one is worth four of the other. Without the node
+    # id there is nothing in the events to say which is which — a count that runs
+    # 1..20 twice looks the same either way round.
+    tracker = ProgressTracker(100, passes=2, step_seconds={"a": 4.0, "b": 1.0})
+    assert tracker.update(20, 20, "a") == (80, 100)
+    assert tracker.update(20, 20, "b") == (100, 100)
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
-    # The lower band: it restarts per pass, which is exactly what the reading
-    # above it must not do.
+    # The lower band: it restarts per pass and counts steps, which is exactly
+    # what the reading above it must not do.
     tracker = ProgressTracker(60, passes=3)
     tracker.update(5, 20)
     assert tracker.current_pass() == (5, 20)
@@ -140,6 +176,17 @@ def test_a_band_grows_when_an_unbudgeted_second_pass_turns_up():
     assert tracker.current_pass() is None
     tracker.update(1, 200)
     assert tracker.current_pass() == (1, 200)
+
+
+def test_an_unbudgeted_pass_is_charged_at_the_cheapest_rate_the_job_knows():
+    # A node this app has never sized reports 200 steps. Charged at the video
+    # rate it would bury the run it interrupted; charged at the cheapest pass's
+    # rate it widens the bar a little and the tail creeps, which is the way round
+    # that costs less to be wrong about.
+    tracker = ProgressTracker(90, passes=2, step_seconds={"a": 40.0, "b": 0.1})
+    tracker.update(2, 2, "a")                    # the budgeted pass finishes
+    assert tracker.update(1, 200, "?") == (80, 100)
+    assert tracker.update(200, 200, "?") == (100, 100)
 
 
 def test_no_band_before_the_first_step_or_without_a_recognized_sampler():
@@ -200,17 +247,16 @@ def test_tracker_unknown_total_passes_raw_numbers_through():
 
 
 def test_tracker_for_payload_sizes_itself_from_the_workflow():
-    wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    payload = wf.build_api_payload({**wf.default_params(), "steps": 20})
-    tracker = ProgressTracker.for_payload(payload)
-    # Second pass continues from 10, proving it measured the full 20-step run...
-    tracker.update(10, 10)
-    assert tracker.update(1, 10) == (11, 70)
-    # ...and the audio pass that follows has its own 50 steps of the bar to climb
-    # rather than a bar already full.
-    tracker.update(10, 10)
-    assert tracker.update(1, 50) == (21, 70)
-    assert tracker.update(50, 50) == (70, 70)
+    tracker = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
+    # Second pass continues from where the first ended, proving it measured the
+    # whole 20-step schedule...
+    tracker.update(10, 10, "15")
+    assert tracker.update(1, 10, "16") == (446, 818)
+    # ...and the audio pass that follows has a sliver of the bar left to climb,
+    # not the three quarters its step count would have claimed.
+    tracker.update(10, 10, "16")
+    assert tracker.update(1, 50, "24") == (810, 818)
+    assert tracker.update(50, 50, "24") == (818, 818)
 
 
 def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
@@ -227,6 +273,16 @@ def test_snapshot_restore_resumes_a_multi_stage_ramp_across_a_restart():
     resumed.restore(tracker.snapshot())
     assert resumed.current() == (13, 20)         # seeds the bar at its last spot
     assert resumed.update(4, 10) == (14, 20)     # and carries on, not back to 4/20
+
+
+def test_a_snapshot_from_when_the_bar_counted_steps_is_not_resumed():
+    # Its banked figure is a step count, and there is no honest way to read one
+    # against a total of seconds: a job caught mid-run by the upgrade takes its
+    # position from ComfyUI's next push instead of wearing a wrong one to the end.
+    resumed = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
+    resumed.restore({"total": 70, "banked": 10, "stage_max": 10, "last_value": 3})
+    assert resumed.current() == (0, 818)
+    assert resumed.update(4, 10, "15") == (162, 818)
 
 
 def test_snapshot_is_json_serializable():

@@ -40,7 +40,7 @@ _PREVIEW_IMAGE_OFFSET = 8
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
     disconnected = pyqtSignal()
-    progress = pyqtSignal(str, int, int)  # prompt_id, value, max
+    progress = pyqtSignal(str, str, int, int)  # prompt_id, node_id, value, max
     node_executing = pyqtSignal(str, str)  # prompt_id, node_id
     job_completed = pyqtSignal(str, dict)  # prompt_id, history_data
     job_error = pyqtSignal(str, str)  # prompt_id, error_message
@@ -194,7 +194,14 @@ class ComfyUIClient(QThread):
             # can't set this itself.
             if prompt_id:
                 self._executing_prompt_id = prompt_id
-            self.progress.emit(prompt_id, data.get("value", 0), data.get("max", 0))
+            # The node is carried through because what a step costs depends on
+            # which sampler took it: a foley step and a WAN video step are the
+            # same event here and two orders of magnitude apart in the bar
+            # (see origenerator.progress). ComfyUI names it on every progress
+            # event, which a reconnect mid-pass depends on — the "executing"
+            # frame that would otherwise say so is long past by then.
+            self.progress.emit(prompt_id, str(data.get("node") or ""),
+                               data.get("value", 0), data.get("max", 0))
 
         elif msg_type == "execution_error":
             self.job_error.emit(

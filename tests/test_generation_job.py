@@ -52,18 +52,18 @@ def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):
     job.started.connect(lambda: started.append(True))
     job.progress.connect(lambda v, m: progress.append((v, m)))
 
-    client.progress.emit("comfy-OTHER", 5, 50)
+    client.progress.emit("comfy-OTHER", "5", 5, 50)
     assert started == [] and progress == []
 
     # SDXL runs a 50-step base pass then a 20-step enhance pass, so progress
-    # forwards as value over the 70-step whole-run total.
-    client.progress.emit("comfy-A", 5, 50)
+    # forwards as this job's position in a whole run budgeted for both.
+    client.progress.emit("comfy-A", "5", 5, 50)
     assert started == [True]
-    assert progress == [(5, 70)]
+    assert progress == [(2, 35)]
     assert job.state == "running"
-    assert job.last_progress == (5, 70)
+    assert job.last_progress == (2, 35)
 
-    client.progress.emit("comfy-A", 7, 50)
+    client.progress.emit("comfy-A", "5", 7, 50)
     assert started == [True]  # started fires only once
 
 
@@ -71,7 +71,8 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     # A dual-noise video job samples in two passes, then scores itself in a third
     # — 20 video steps and 50 of audio. ComfyUI counts each pass from its own
     # zero, so the job must accumulate them into one 0-to-total ramp rather than
-    # forward a bar that resets partway through.
+    # forward a bar that resets partway through. The audio's 50 steps are worth
+    # about a hundredth of the video's 20, and the ramp is budgeted accordingly.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     client = _client()
     job = GenerationJob(
@@ -83,11 +84,11 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     seen = []
     job.progress.connect(lambda v, m: seen.append((v, m)))
 
-    client.progress.emit("comfy-A", 10, 10)  # first pass finishes (10 of 70)
-    client.progress.emit("comfy-A", 1, 10)   # second pass restarts its own count
+    client.progress.emit("comfy-A", "15", 10, 10)  # the high-noise pass finishes
+    client.progress.emit("comfy-A", "16", 1, 10)   # the low-noise one starts over
 
-    assert seen == [(10, 70), (11, 70)]       # continues past the first pass's end
-    assert job.last_progress == (11, 70)
+    assert seen == [(405, 818), (446, 818)]   # continues past the first pass's end
+    assert job.last_progress == (446, 818)
     # And the pass in hand is reported alongside, for the band along the bar's
     # foot: the whole-run reading above it is what must never restart, so the
     # restarting count has to live somewhere.
@@ -104,8 +105,8 @@ def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
     job.prompt_id = "comfy-A"
     job.start()
 
-    client.progress.emit("comfy-A", 5, 20)
-    assert job.last_progress == (5, 20)
+    client.progress.emit("comfy-A", "8", 5, 20)
+    assert job.last_progress == (2, 10)   # 20 steps of a still, at half a second
     assert job.last_pass_progress is None
 
 
@@ -295,11 +296,11 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
     job = GenerationJob(_client(), wf, {**wf.default_params(), "steps": 20},
                         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
     job.prompt_id = "pid"
-    job._on_progress("pid", 10, 10)   # first pass done
-    job._on_progress("pid", 3, 10)    # second pass at 3 -> 13 of the run's 70
+    job._on_progress("pid", "15", 10, 10)  # the high-noise pass is done
+    job._on_progress("pid", "16", 3, 10)   # the low-noise one is 3 steps in
 
     state = job.progress_state()
-    assert state["last_progress"] == [13, 70]
+    assert state["last_progress"] == [526, 818]
 
 
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
@@ -312,17 +313,17 @@ def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):
 def test_the_start_time_is_stamped_at_the_first_sign_of_life(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     before = time.time()
-    client.progress.emit("comfy-A", 5, 50)
+    client.progress.emit("comfy-A", "s", 5, 50)
     assert before <= job.started_at <= time.time()
 
     stamped = job.started_at
-    client.progress.emit("comfy-A", 6, 50)
+    client.progress.emit("comfy-A", "s", 6, 50)
     assert job.started_at == stamped  # the run began once, not on every tick
 
 
 def test_progress_state_carries_the_start_time(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
-    client.progress.emit("comfy-A", 5, 50)
+    client.progress.emit("comfy-A", "s", 5, 50)
     assert job.progress_state()["started_at"] == job.started_at
 
 
@@ -348,7 +349,7 @@ def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
     )
     assert job.started_at is None
-    job._on_progress("pid", 5, 50)
+    job._on_progress("pid", "5", 5, 50)
     assert job.started_at is not None
 
 
@@ -357,20 +358,21 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
     # tracker carries the multi-pass ramp forward rather than restarting from the
     # pass it reconnects into.
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    state = {"last_progress": [13, 20],
-             "tracker": {"total": 20, "banked": 10, "stage_max": 10, "last_value": 3}}
+    state = {"last_progress": [446, 818],
+             "tracker": {"total": 818.0, "banked": 405.0, "stage_max": 10,
+                         "stage_seconds": 40.5, "last_value": 3, "node": "16"}}
     job = GenerationJob.reconnect(
         _client(), wf, {**wf.default_params(), "steps": 20}, "pid",
         output_dir=tmp_path, thumb_dir=tmp_path / "thumbs", progress_state=state,
     )
-    assert job.last_progress == (13, 20)     # bar resumes at its last spot immediately
+    assert job.last_progress == (446, 818)   # bar resumes at its last spot immediately
     # Its band comes back with it, so the bar isn't whole for a tick and then
     # split. The snapshot predates the recorded pass count; the payload's own
     # (three, for this workflow) stands in.
     assert job.last_pass_progress == (3, 10)
 
-    job._on_progress("pid", 4, 10)           # next real tick from ComfyUI
-    assert job.last_progress == (14, 20)     # carries on, not back to 4/20
+    job._on_progress("pid", "16", 4, 10)     # next real tick from ComfyUI
+    assert job.last_progress == (567, 818)   # carries on, not back to the pass's own 4
 
 
 def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):
@@ -406,7 +408,7 @@ def test_a_job_comfyui_has_started_waits_on_nothing(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     job.take_backlog(3)
 
-    client.progress.emit("comfy-A", 1, 50)  # ComfyUI picked it up
+    client.progress.emit("comfy-A", "s", 1, 50)  # ComfyUI picked it up
 
     assert job.state == "running"
     assert job.foreign_ahead is None  # the count clears the moment it's ours

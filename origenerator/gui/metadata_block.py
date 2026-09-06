@@ -91,7 +91,7 @@ def _build_section(section: MetaSection) -> QWidget:
     It sits among the form's own sections, so it folds by the same header rather
     than being the one heading in the column that doesn't.
     """
-    box = CollapsibleSection(section.title)
+    block = CollapsibleSection(section.title)
     rows = QWidget()
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
@@ -99,8 +99,8 @@ def _build_section(section: MetaSection) -> QWidget:
     label_width = label_column_width(section.items)
     for item in section.items:
         layout.addWidget(meta_row(item, label_width))
-    box.content_form().addRow(rows)
-    return box
+    block.content_form().addRow(rows)
+    return block
 
 
 def label_column_width(items: list[MetaItem]) -> int:

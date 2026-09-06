@@ -19,12 +19,12 @@ class _Pair(QWidget):
 
     def __init__(self, text):
         super().__init__()
-        box = QVBoxLayout(self)
+        column = QVBoxLayout(self)
         self.edit = QPlainTextEdit()
         self.edit.setPlainText(text)
         self.elsewhere = QPlainTextEdit()
-        box.addWidget(self.edit)
-        box.addWidget(self.elsewhere)
+        column.addWidget(self.edit)
+        column.addWidget(self.elsewhere)
 
 
 @pytest.fixture

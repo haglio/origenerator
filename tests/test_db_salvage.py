@@ -163,3 +163,30 @@ def test_a_healthy_database_is_opened_untouched(tmp_path):
 
     assert [r["prompt_id"] for r in rows] == ["job-2", "job-1", "job-0"]
     assert [p.name for p in tmp_path.iterdir()] == ["origenerator.db"]
+
+
+def test_a_database_damaged_before_the_table_rename_keeps_its_folders(tmp_path):
+    """Salvage copies each table out of the damaged file BY NAME, and a file
+    written before the rename spells one of them the way it used to.
+
+    Both probes the copy leans on swallow OperationalError, so a table it
+    cannot find yields no columns and no rows -- every custom folder comes back
+    empty, and the salvage log agrees with itself. Nothing raises.
+    """
+    path = tmp_path / "origenerator.db"
+    _fill(path, 4)
+    db = Database(path)
+    folder_id = db.create_custom_folder("Mine")
+    db.add_custom_folder_items(folder_id, [("key-a", "L1", "job-0"),
+                                           ("key-b", "L1", "job-1")])
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("ALTER TABLE custom_folder_items RENAME TO custom_folder_members")
+        conn.commit()
+    finally:
+        conn.close()
+    _stray_write_over(path, "marker-2-")
+
+    folders = Database(path).list_custom_folders()
+
+    assert [f["items"] for f in folders] == [["key-a", "key-b"]]

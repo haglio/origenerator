@@ -62,7 +62,6 @@ from origenerator.gallery.labels import (
     workflow_label,
 )
 from origenerator.gallery.output import (
-    STROKE_TRIM_SOURCE,
     is_in_progress,
     media_type_of_row,
     produced_output,
@@ -303,26 +302,27 @@ def named_folders_by_row(
     return named
 
 
-#: The sources that mean "this app made this row" -- what the Recents shelf lists.
-_APP_MADE_SOURCES = frozenset({"generated", STROKE_TRIM_SOURCE})
+#: The one source with a shelf of its own: an experiment is reviewed there, not
+#: listed here. Every other row with a result is on the Recents shelf.
+_SHELVED_ELSEWHERE = frozenset({"experiment"})
 
 
 def recent_generations(rows: list[dict]) -> list[dict]:
-    """Every generated row, newest first — the whole of the Recents shelf's list.
+    """Every row with a result, newest first — the whole of the Recents shelf's list.
 
-    "Generated" means this app produced the row, from a Generate tab or a gallery
-    re-roll -- or, with no run behind it at all, cut a single stroke out of a clip
-    for the Genau lane (:data:`~origenerator.gallery.output.STROKE_TRIM_SOURCE`).
-    That last one is the shelf's whole reason for not being a list of *runs*: a
-    cut is something the app just made for you, it lands in the settings folder
-    of the clip it came from rather than anywhere you would think to go looking,
-    and left off here there is nowhere at all that says it happened. An imported
-    file discovered on disk (``source`` ``"imported"``) is not this app's work and
-    is left out; an experiment has a shelf of its own. As in the tree, only rows
-    that produced
-    an output file appear — the shelf is a gallery of results, so a failed or
-    in-flight run with nothing to show doesn't surface. ``rows`` arrive newest-first
-    (the caller lists them by descending id), so the result is too.
+    Made here or found on disk alike. Made here is a Generate tab or a gallery
+    re-roll -- or, with no run behind it at all, a single stroke cut out of a
+    clip for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
+    the app just made for you, it lands in the settings folder of the clip it
+    came from rather than anywhere you would think to go looking, and left off
+    here there is nowhere at all that says it happened. Found on disk is a file
+    ComfyUI wrote that no instance of this app queued (``source``
+    ``"imported"``): it arrives at the launch that finds it, and that is when it
+    is looked for on Latest. An experiment has a shelf of its own and is left
+    out. As in the tree, only rows that produced an output file appear — the
+    shelf is a gallery of results, so a failed or in-flight run with nothing to
+    show doesn't surface. ``rows`` arrive newest-first (the caller lists them by
+    descending id), so the result is too.
 
     An image being enhanced, or lately enhanced, sits where the *enhancement*
     falls in that order rather than where its own generation does
@@ -342,7 +342,7 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     """
     listed = [
         row for row in rows
-        if (row.get("source") or "generated") in _APP_MADE_SOURCES
+        if (row.get("source") or "generated") not in _SHELVED_ELSEWHERE
         and produced_output(row)
     ]
     # Ids are the order the caller already handed them in, so a row with no

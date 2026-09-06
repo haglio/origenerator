@@ -10,7 +10,7 @@ Qt-free so the reconciler can use it without a running UI.
 import logging
 from pathlib import Path
 
-from origenerator.config import STROKE_DEFAULT_HZ
+from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
     ensure_funscript,
     funscript_of,
@@ -78,7 +78,7 @@ def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | No
                 write_funscript(
                     funscript_path_for(source, output_dir=output_dir), authored)
         else:
-            ensure_funscript(source, loop=workflow.looping, hz=STROKE_DEFAULT_HZ,
+            ensure_funscript(source, loop=workflow.looping, hz=MOTION_DEFAULT_HZ,
                              output_dir=output_dir)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)

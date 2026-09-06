@@ -16,6 +16,7 @@ once here. Nothing in the split below may touch it.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+import json
 import sqlite3
 from pathlib import Path
 
@@ -327,6 +328,53 @@ def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_pat
          "items": ["image/sdxl_t2i", "image/flux_t2i"]}]
     with sqlite3.connect(path) as conn:
         assert "custom_folder_members" not in _tables(conn)
+
+
+def _row_with(params: dict) -> tuple:
+    """A minimal completed generation carrying ``params``, for the two stores."""
+    return ("p1", "wan21_ati_i2v", "v1", "completed", json.dumps(params), "{}")
+
+
+def test_a_run_made_before_the_aim_params_were_renamed_is_moved_onto_the_new_keys(tmp_path):
+    """The ATI aim params are not local names: every run ever made carries them
+    in params_json, and the workflow reads them by name. A row left on the old
+    spelling would fall back to the defaults for all four -- silently, since
+    nothing validates a params key set."""
+    path = tmp_path / "origenerator.db"
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT INTO generations (prompt_id, workflow_name, workflow_version,"
+            " status, params_json, workflow_json) VALUES (?, ?, ?, ?, ?, ?)",
+            _row_with({"stroke_hz": 1.5, "stroke_x": 255, "stroke_top": 490,
+                       "stroke_bottom": 650, "seed": 7}))
+
+    Database(path)
+
+    with sqlite3.connect(path) as conn:
+        stored = json.loads(conn.execute(
+            "SELECT params_json FROM generations WHERE prompt_id = 'p1'").fetchone()[0])
+    assert stored == {"motion_hz": 1.5, "motion_x": 255, "motion_ceiling": 490,
+                      "motion_floor": 650, "seed": 7}
+
+
+def test_a_held_deletion_from_before_the_rename_is_moved_onto_the_new_keys(tmp_path):
+    """The bin holds a verbatim copy of the row it took, and a restore puts that
+    copy back exactly as it is. Migrating only the live table would leave every
+    binned ATI run to come back on dead keys the moment it is restored."""
+    path = tmp_path / "origenerator.db"
+    Database(path)
+    row = {"prompt_id": "p1", "workflow_name": "wan21_ati_i2v",
+           "params_json": json.dumps({"stroke_hz": 1.5, "stroke_top": 490})}
+    with sqlite3.connect(path) as conn:
+        conn.execute("INSERT INTO deletions (prompt_id, row_json, batch_json)"
+                     " VALUES (?, ?, ?)", ("p1", json.dumps(row), "{}"))
+
+    db = Database(path)
+
+    held = db.get_deletion("p1")
+    assert json.loads(held["row"]["params_json"]) == {"motion_hz": 1.5,
+                                                     "motion_ceiling": 490}
 
 
 def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):

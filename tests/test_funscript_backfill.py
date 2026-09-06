@@ -88,7 +88,7 @@ def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
     """The same defect on the same line: the stroke rate was bound at import."""
     from origenerator import config, funscript_backfill
 
-    monkeypatch.setattr(config, "STROKE_DEFAULT_HZ", 2.5)
+    monkeypatch.setattr(config, "MOTION_DEFAULT_HZ", 2.5)
     clip = tmp_path / "alpha.mp4"
     clip.write_bytes(b"not really a video")
     rates = []

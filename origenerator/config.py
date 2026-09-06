@@ -161,7 +161,7 @@ CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
 # Each generated video gets a funscript synthesized alongside it (see
 # funscript.py). The motion isn't measured from the video — it's a steady stroke
 # at this cadence (full strokes per second), phased to the clip's duration/loop.
-STROKE_DEFAULT_HZ = 1.2
+MOTION_DEFAULT_HZ = 1.2
 
 # The broker sibling bridges to the OSR2 device (COM4) and forwards raw
 # T-code sent to this UDP port straight to the device (osr2_broker/session.py).

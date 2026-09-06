@@ -78,9 +78,9 @@ def aim_fractions_from_rect(rect, image_w: int, image_h: int) -> dict:
     x, y, w, h = rect
     cx = (x + w / 2) / image_w
     return {
-        "stroke_x": cx,
-        "stroke_top": (y + _SPAN_TOP * h) / image_h,
-        "stroke_bottom": (y + _SPAN_LOWER * h) / image_h,
+        "motion_x": cx,
+        "motion_ceiling": (y + _SPAN_TOP * h) / image_h,
+        "motion_floor": (y + _SPAN_LOWER * h) / image_h,
         "anchor_x": cx,
         "anchor_y": (y + _ANCHOR * h) / image_h,
     }

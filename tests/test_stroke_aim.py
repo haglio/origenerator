@@ -11,10 +11,10 @@ def test_aim_fractions_map_the_rect_to_column_span_and_base():
     # column runs through the rect center; the stroke spans the gripped length
     # (18%..72% of the rect); the anchor pins the base (93%).
     aim = stroke_aim.aim_fractions_from_rect((200, 300, 100, 500), 1000, 1000)
-    assert aim["stroke_x"] == pytest.approx(0.25)
+    assert aim["motion_x"] == pytest.approx(0.25)
     assert aim["anchor_x"] == pytest.approx(0.25)
-    assert aim["stroke_top"] == pytest.approx((300 + 0.18 * 500) / 1000)
-    assert aim["stroke_bottom"] == pytest.approx((300 + 0.72 * 500) / 1000)
+    assert aim["motion_ceiling"] == pytest.approx((300 + 0.18 * 500) / 1000)
+    assert aim["motion_floor"] == pytest.approx((300 + 0.72 * 500) / 1000)
     assert aim["anchor_y"] == pytest.approx((300 + 0.93 * 500) / 1000)
 
 
@@ -29,8 +29,8 @@ def test_detect_grip_aim_picks_the_most_confident_anchor(monkeypatch, tmp_path):
         {"class": "ANCHOR_EXPOSED", "score": 0.8, "rect": (50, 100, 60, 200)},
     ])
     aim = stroke_aim.detect_grip_aim(frame)
-    assert aim["stroke_x"] == pytest.approx((50 + 30) / 200)  # the 0.8 rect wins
-    assert aim["stroke_top"] == pytest.approx((100 + 0.18 * 200) / 400)
+    assert aim["motion_x"] == pytest.approx((50 + 30) / 200)  # the 0.8 rect wins
+    assert aim["motion_ceiling"] == pytest.approx((100 + 0.18 * 200) / 400)
 
 
 def test_detect_grip_aim_returns_none_when_nothing_usable(monkeypatch, tmp_path):

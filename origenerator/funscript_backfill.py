@@ -37,7 +37,7 @@ def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
     not decided on before anything called it.
     """
     output_dir = config.COMFYUI_OUTPUT_DIR if output_dir is None else output_dir
-    hz = config.STROKE_DEFAULT_HZ if hz is None else hz
+    hz = config.MOTION_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "skipped": 0, "missing": 0, "failed": 0}
     for row in db.list_generations():
         if media_type_of_row(row) != "video":

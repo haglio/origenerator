@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image
 
 from origenerator.completion import extract_completion
-from origenerator.config import STROKE_DEFAULT_HZ
+from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -80,7 +80,7 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
     # root it sits under (the scripts have a folder of their own), one-shot (not
     # looped), at the configured cadence.
     assert calls == [
-        (out / "video" / "wan22_i2v_00001_.mp4", False, STROKE_DEFAULT_HZ, out)]
+        (out / "video" / "wan22_i2v_00001_.mp4", False, MOTION_DEFAULT_HZ, out)]
 
 
 def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypatch):
@@ -114,7 +114,7 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
         "origenerator.completion.ensure_funscript",
         lambda *a, **k: metronome.append((a, k)),
     )
-    params = dict(ati.default_params(), stroke_hz=1.5)
+    params = dict(ati.default_params(), motion_hz=1.5)
     extract_completion(
         ati, _video_history("15", "images", "wan21_ati_i2v_00001_.mp4"),
         out, tmp_path / "thumbs", "n1", params=params,

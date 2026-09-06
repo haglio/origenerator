@@ -3,14 +3,12 @@
 `Database` is a facade. Each table's queries live in their own module —
 :mod:`origenerator.db_generations`, :mod:`~origenerator.db_deletions`,
 :mod:`~origenerator.db_requests`, :mod:`~origenerator.db_folder_meta`,
-:mod:`~origenerator.db_custom_folders`, :mod:`~origenerator.db_branch_curation`
-— and this holds one of each, forwarding the method names ~700 call sites across
+:mod:`~origenerator.db_custom_folders` — and this holds one of each, forwarding the method names ~700 call sites across
 this package, the gui package and the suite already spell.
 
 **Hand a unit the store it needs, not this.** Every consumer here uses a
 disjoint slice: recovery and gallery_actions touch only `deletions`, reconcile
-only `folder_meta` and `custom_folder_members`, branch_session only
-`branch_curation` and `generations`. A store is whole on its own, so a unit that
+only `folder_meta` and `custom_folder_members`. A store is whole on its own, so a unit that
 takes one can be given a narrow fake and a change to one table stops being a
 change to the file 24 modules import.
 
@@ -20,7 +18,6 @@ as a snapshot, because evolver reads it.
 """
 from pathlib import Path
 
-from origenerator.db_branch_curation import BranchCurationStore
 from origenerator.db_connection import SqliteFile
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
@@ -46,7 +43,6 @@ class Database:
         self.requests = RequestStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
-        self.branch_curation = BranchCurationStore(file)
 
     # --- generations (see origenerator.db_generations) -----------------------
 
@@ -92,12 +88,6 @@ class Database:
 
     def mark_genau_requested(self, prompt_id: str):
         return self.generations.mark_genau_requested(prompt_id)
-
-    def completed_generated(self) -> list[dict]:
-        return self.generations.completed_generated()
-
-    def starred_prompt_ids(self) -> list[str]:
-        return self.generations.starred_prompt_ids()
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         return self.generations.recent_durations(workflow_name, limit)
@@ -151,8 +141,6 @@ class Database:
         return self.requests.get_request(prompt_id)
 
 
-
-
     # --- folder metadata (see origenerator.db_folder_meta) ------------------
 
     def folder_meta_map(self) -> dict[str, dict]:
@@ -175,15 +163,6 @@ class Database:
 
     def delete_folder_meta(self, folder_key: str):
         return self.folder_meta.delete_folder_meta(folder_key)
-
-    # --- branch-session curation (see origenerator.db_branch_curation) -------
-
-    def branch_curation_state(self, branch: str) -> dict | None:
-        return self.branch_curation.branch_curation_state(branch)
-
-    def set_branch_curation_state(self, branch: str, state: dict):
-        return self.branch_curation.set_branch_curation_state(branch, state)
-
 
 
     # --- custom folders (see origenerator.db_custom_folders) ----------------

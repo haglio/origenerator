@@ -1584,35 +1584,19 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
-def test_a_branch_session_holds_no_experiment_review_queue(qtbot, monkeypatch):
-    # A preview's database is a copy of the live one, so it inherits the live
-    # app's unreviewed experiments — but a verdict recorded here is written to
-    # that throwaway copy and never reaches the live app, which goes on offering
-    # the same items for review. Reviewing is the live install's; a preview's
-    # shelf offers none of it, and its count doesn't nag from the tree.
+def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
+    # The shelf reads the live install's own rows, so a verdict given in a
+    # preview is the verdict: the same items come up for review, and its count
+    # shows on the tree.
     monkeypatch.setenv(ENV_FLAG, "1")
     view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
     qtbot.addWidget(view)
     view.refresh()
 
-    top = _top_level(view._tree)
-    assert "Experiments" in top          # the shelf itself stays, unnumbered
+    assert "Experiments (2)" in _top_level(view._tree)
     view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
-    assert view.visible_prompt_ids() == []
-
-
-def test_a_branch_session_says_why_its_experiments_shelf_is_empty(qtbot, monkeypatch):
-    # Empty with no explanation would read as "nothing came up while you were
-    # away" — when in fact the results are on the live app's shelf, where the
-    # verdicts count. The switch above it says the same about scheduling.
-    monkeypatch.setenv(ENV_FLAG, "1")
-    view = GalleryView(FakeDB([_experiment_row("e1")]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
-
-    assert "live app" in view._browser._experiments_empty_hint()
+    assert sorted(view.visible_prompt_ids()) == ["e1", "e2"]
+    assert "live app" not in view._browser._experiments_empty_hint()
 
 
 # --- the Trash shelf: deleted items, still recoverable ----------------------
@@ -1623,8 +1607,7 @@ def _bin_db(rows=(), held=(), inherited=()):
     oldest first — the way a previous session's deletes would have left it.
 
     ``inherited`` takes the same shape but files each as a delete that moved real
-    files: what a preview's copied database carries over from the live install,
-    and the only thing a preview may not touch.
+    files into the trash, the way a delete made by another instance would have.
     """
     db = FakeDB(list(rows))
     for prompt_id, row in held:
@@ -1979,25 +1962,9 @@ def test_the_trash_shelf_is_a_place_back_returns_to(qtbot):
     assert view._tree.currentItem() is _shelf(view, TRASH_KEY)
 
 
-def test_a_preview_hides_the_deletions_it_inherited(qtbot, monkeypatch):
-    # A preview's database is a copy, so the deletions it inherits point into the
-    # LIVE install's trash: restoring would move the live app's files out from
-    # under rows it is still showing, and purging would destroy its only copies.
-    monkeypatch.setenv(ENV_FLAG, "1")
-    view = GalleryView(_bin_db(inherited=[("live", _image("live", "a cat", 50, 1))]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-
-    assert view.visible_prompt_ids() == []
-    assert "Nothing deleted in this preview" in view._browser._trash_empty_hint()
-
-
-def test_a_preview_still_recovers_what_it_deleted_itself(qtbot, monkeypatch):
-    # Judging the shelf means using it. A preview's own delete takes no files at
-    # all, so its held deletion holds nothing of the live install's: listing it
-    # is safe, and restoring it only puts the row back in the throwaway copy.
+def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypatch):
+    # One library, one trash: what any instance deleted, any instance can put
+    # back, so the shelf holds the same items whichever app is looking at it.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
                  inherited=[("live", _image("live", "a cat", 50, 1))])
@@ -2006,13 +1973,13 @@ def test_a_preview_still_recovers_what_it_deleted_itself(qtbot, monkeypatch):
     view.refresh()
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-    assert view.visible_prompt_ids() == ["mine"]  # its own, and only its own
+    assert sorted(view.visible_prompt_ids()) == ["live", "mine"]
+    assert "preview" not in view._browser._trash_empty_hint()
 
     view.restore_from_trash(["mine"])
 
     assert db.get_generation("mine") is not None
-    assert db.get_deletion("mine") is None
-    assert db.get_deletion("live") is not None  # the live app's is left where it is
+    assert db.get_deletion("live") is not None  # still offered, untouched
 
 
 # --- a deleted item is still a generation you can look at -------------------
@@ -4437,18 +4404,18 @@ def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     assert [r["prompt_id"] for r in actions.deleted[0]] == ["i1"]
 
 
-def test_a_branch_session_deletes_nothing_out_of_the_library(qtbot, monkeypatch, tmp_path):
+def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_path):
     # The composition, not just the rule: a preview's gallery builds its actions
-    # around a trash that takes nothing, so deleting a tile forgets the row in
-    # its own copied database and leaves the file for the live app, whose own
-    # row still points at it.
+    # around the live install's trash, the same one its rows and files belong
+    # to, so a delete in a preview is a delete -- recoverable from the Trash
+    # shelf of whichever instance looks next.
     monkeypatch.setenv(ENV_FLAG, "1")
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     file_path = output_dir / "sdxl_t2i_i1.png"
     file_path.write_bytes(b"data")
     monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "trash")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)  # builds its own actions, the way the app does
     qtbot.addWidget(view)
@@ -4459,7 +4426,8 @@ def test_a_branch_session_deletes_nothing_out_of_the_library(qtbot, monkeypatch,
     view._delete_selection()
 
     assert db.get_generation("i1") is None
-    assert file_path.exists()
+    assert not file_path.exists()
+    assert list((tmp_path / "trash").rglob("*.png"))
 
 
 def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
@@ -10157,7 +10125,7 @@ def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypat
     # leaves its run nowhere to fold: it comes off the queue rather than spending
     # minutes producing an enhanced file with no original to belong to.
     monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
-    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())  # its own actions, as the app builds them
     qtbot.addWidget(view)
@@ -10178,7 +10146,7 @@ def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
     # enhanced file, so the run to stop is found by the image's whole file list
     # rather than by whichever version leads it.
     monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
-    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation(
         "g0",
@@ -10208,7 +10176,7 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     # landing enhance to fold onto — and one that did land would bring a rejected
     # experiment back as an enhanced image.
     monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
-    monkeypatch.setattr(gallery_view_module, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "state" / "trash")
     db = Database(tmp_path / "test.db")
     db.insert_generation(
         prompt_id="g0", workflow_name="sdxl_t2i", workflow_version="v002",

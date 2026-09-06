@@ -36,7 +36,7 @@ from origenerator import (
 )
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
-from origenerator.branch_session import is_branch_session, session_trash
+from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -45,8 +45,8 @@ from origenerator.config import (
     EVOLVER_INBOX_DIR,
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
-    STATE_DIR,
     THUMB_DIR,
+    TRASH_DIR,
     VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
     VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
@@ -180,6 +180,7 @@ from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
+from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
 from origenerator.voice.commands import (
     ShelfCommand,
@@ -638,7 +639,7 @@ class GalleryView(QWidget):
         self._selected_reroll_key: str | None = None
         self._reroll_tile: RerollTile | None = None
         self._actions = actions or GalleryActions(
-            db, COMFYUI_OUTPUT_DIR, session_trash(STATE_DIR / "trash"),
+            db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
             release_files=self._release_held_media, thumb_dir=THUMB_DIR,
             cancel_enhancements=self._cancel_enhancements_of,
         )
@@ -2012,17 +2013,8 @@ class GalleryView(QWidget):
         self._sync_experiments_bar()
 
     def _review_queue(self, rows) -> list[dict]:
-        """The experiments waiting on the user's verdict — the Experiments shelf.
-
-        Empty in a branch session, whatever its database holds. A preview's
-        database is a copy of the live one, so it inherits the live app's
-        unreviewed experiments; but a verdict recorded here stays in the copy
-        while the live app goes on offering the same items, and a rejection here
-        deletes the files the live app's own rows still point at — which is how
-        a shelf of dead "No preview" tiles was built, and rebuilt, in the live
-        install. Reviewing is the live app's, as scheduling is.
-        """
-        return [] if is_branch_session() else gallery.unreviewed_experiments(rows)
+        """The experiments waiting on the user's verdict — the Experiments shelf."""
+        return gallery.unreviewed_experiments(rows)
 
     def _sync_experiments_bar(self):
         """Say what the switch's current position means, under the switch."""
@@ -6797,24 +6789,8 @@ class GalleryView(QWidget):
     # --- the Trash shelf: restoring a delete, or ending it -------------------
 
     def _bin_records(self) -> list[dict]:
-        """The held deletions the Trash shelf offers — every one in the live app,
-        and in a preview only the ones that hold no files.
-
-        That reduces, in a preview, to the deletes it made itself. Its database
-        is a copy, so it inherits the live install's held deletions, and every
-        path in those points into the live install's trash: restoring one would
-        move the live app's files out from under rows it is still showing, and
-        purging one would take its only copies. A preview's own delete takes no
-        files at all (see :func:`~origenerator.branch_session.session_trash`), so
-        it holds nothing that isn't already the copy's — putting one back only
-        re-inserts the row, and ending one only forgets it. Which is what leaves
-        the shelf usable for judging it, rather than a wall saying come back to
-        the live app.
-        """
-        records = self._db.list_deletions()
-        if not is_branch_session():
-            return records
-        return [r for r in records if not (r.get("batch") or {}).get("moves")]
+        """The held deletions the Trash shelf offers."""
+        return self._db.list_deletions()
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
         """A Trash tile's hover control: restore this item, or end it now."""

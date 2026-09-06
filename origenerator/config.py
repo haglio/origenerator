@@ -17,9 +17,11 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # one of them at import gets the same answer, which a test's monkeypatch of
 # this module never could.
 STATE_DIR = Path(os.environ.get("ORIGENERATOR_STATE_DIR") or PROJECT_DIR / "state")
-DB_PATH = STATE_DIR / "origenerator.db"
-THUMB_DIR = STATE_DIR / "thumbnails"
 UI_STATE_PATH = STATE_DIR / "ui_state.json"
+# Set by the preview launcher and never by the live one: this run is a worktree's
+# code shown for judging, not the live install (see origenerator.branch_session).
+BRANCH_SESSION_FLAG = "ORIGENERATOR_BRANCH_SESSION"
+_BRANCH_SESSION = os.environ.get(BRANCH_SESSION_FLAG) == "1"
 
 _CONTENT = load_content()
 # Public now: the tests assert which paths still hang off the media-library root
@@ -80,6 +82,17 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     broker isn't running), so a missing sibling must not be an import-time crash.
     """
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
+
+
+# The library's own state -- the database, the thumbnails it draws, the trash
+# its deletes go to -- is the live install's wherever this app runs from: a
+# branch session reads and writes the primary checkout's, so every instance
+# shows every generation, whichever of them made it. Only what is about this
+# window alone (UI_STATE_PATH, the logs) stays in the checkout that runs it.
+LIBRARY_STATE_DIR = project_dir("origenerator") / "state" if _BRANCH_SESSION else STATE_DIR
+DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
+THUMB_DIR = LIBRARY_STATE_DIR / "thumbnails"
+TRASH_DIR = LIBRARY_STATE_DIR / "trash"
 
 
 # The media library and the third-party apps live outside this repo; their

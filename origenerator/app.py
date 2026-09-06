@@ -163,7 +163,7 @@ def _warm_voice_runtimes() -> None:
 class Library:
     """What the maintenance passes below work on.
 
-    The live database and the ComfyUI client, plus the four folders they read
+    The live database and the ComfyUI client, plus the three folders they read
     and write. One record rather than four more parameters on every pass: they
     all draw from the same set, and a pass that needs none of it still has to be
     callable the same way as the one that needs all of it.
@@ -173,7 +173,6 @@ class Library:
     output_dir: Path
     thumb_dir: Path
     log_dir: Path
-    worktrees: Path
 
 
 @dataclass(frozen=True)
@@ -196,25 +195,6 @@ class BootPass:
     run: Callable[[Library], object]
     failure: str
     counted: str | None = None
-
-
-def _adopt_branch_rows(library: Library):
-    """What a preview branch generated comes home as the rows that session
-    recorded -- generated, full params -- before the import scan below can find
-    the bare files and reconstruct lesser "imported" rows for them."""
-    from origenerator.branch_session import adopt_branch_rows
-
-    return adopt_branch_rows(
-        library.db, library.worktrees, library.output_dir, library.thumb_dir)
-
-
-def _adopt_branch_curation(library: Library):
-    """And the bookmarks that session made on everything else. Separately
-    guarded: a worktree database that defeats one pass has no bearing on the
-    other, and neither is worth a failed launch."""
-    from origenerator.branch_session import adopt_branch_curation
-
-    return adopt_branch_curation(library.db, library.worktrees)
 
 
 def _reconnect_to_running_generations(library: Library):
@@ -278,9 +258,9 @@ def _backfill_input_images(library: Library):
 def _fold_enhancements(library: Library):
     """A standalone enhance is an upgrade of an existing image, not its own
     generation: fold every finished one onto its source. After the scan, because
-    an enhance the live app never recorded -- a branch session's above all --
-    reaches here as a bare file, and the standalone image the scan just
-    reconstructed from it is exactly what there is to fold away."""
+    an enhance no instance recorded -- one queued straight on ComfyUI -- reaches
+    here as a bare file, and the standalone image the scan just reconstructed
+    from it is exactly what there is to fold away."""
     from origenerator.gallery import fold_completed_enhancements
 
     fold_completed_enhancements(library.db)
@@ -314,17 +294,12 @@ def _reconcile_bookmarks(library: Library):
     reconcile_bookmarks(library.db)
 
 
-#: The library maintenance a live launch performs, in order. The order is
-#: load-bearing: adoption before the import scan, the enhancement fold after it,
-#: and the folder reconciles last because every backfill above can move a
-#: generation's folder. tests/test_app.py reads this sequence back.
+#: The library maintenance every launch performs, in order -- a branch session's
+#: too, since it runs on the same library. The order is load-bearing: the
+#: enhancement fold after the import scan, and the folder reconciles last because
+#: every backfill above can move a generation's folder. tests/test_app.py reads
+#: this sequence back.
 MAINTENANCE = (
-    BootPass("Adopting branch-session results...", _adopt_branch_rows,
-             counted="Adopted %d generations from branch sessions",
-             failure="Branch-session adoption failed: %s"),
-    BootPass(None, _adopt_branch_curation,
-             counted="Adopted %d bookmark(s) from branch sessions",
-             failure="Branch-session bookmark adoption failed: %s"),
     BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
              failure="Reconcile of in-flight generations failed: %s"),
     BootPass("Finding files that moved...", _follow_moved_files,
@@ -356,26 +331,6 @@ MAINTENANCE = (
     BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
              failure="Folder bookmark reconcile failed: %s"),
 )
-
-#: What a branch session maintains instead: the two passes that are not
-#: maintenance of the library at all. Every pass above already ran on the
-#: database it was seeded from, and re-running them would only slow the preview
-#: down (the import scan alone reads the whole output history) and write records
-#: the live install then imports as duplicates of its own. These two write no
-#: record and touch no file -- each only rewrites rows the seeded copy already
-#: holds -- and left out, each shows a difference in the copy rather than in the
-#: code: enhancements standing as images of their own long after the live app
-#: stopped doing that, and a generation drawing its thumbnail and nothing else
-#: because its file moved. The moved-file pass reads the output *tree* (one
-#: listing, not the history behind it), which is what keeps it affordable here.
-BRANCH_SESSION_MAINTENANCE = (
-    BootPass("Finding files that moved...", _follow_moved_files,
-             counted="Followed %d output file(s) to where they moved",
-             failure="Relocating moved output files failed: %s"),
-    BootPass("Folding enhancements into their images...", _fold_enhancements,
-             failure="Enhancement fold failed: %s"),
-)
-
 
 def _run_maintenance(library: Library, passes, status, logger) -> None:
     """Run each pass, saying what it is doing and surviving what it cannot do."""
@@ -487,44 +442,17 @@ def _status_line(loading, app, logger):
     return status
 
 
-def _open_database(db_path: Path, *, branch_session: bool, logger):
-    """The live database -- seeded from the primary install first in a preview.
-
-    A branch session (a worktree run via launch_preview_branch.vbs) is here to
-    show unlanded code, not to maintain the library, so it starts from the
-    primary install's database rather than re-scanning ComfyUI's whole history
-    into a fresh one (see origenerator.branch_session).
-    """
-    if branch_session:
-        from origenerator.branch_session import seed_branch_db
-        from origenerator.config import project_dir
-        try:
-            primary_db = project_dir("origenerator") / "state" / db_path.name
-            if seed_branch_db(primary_db, db_path):
-                logger.info("Branch session: database seeded from %s", primary_db)
-        except Exception as e:
-            logger.warning("Branch DB seed failed (starting empty): %s", e)
-    from origenerator.db import Database
-
-    return Database(db_path)
-
-
-def _reclaim_orphaned_trash(db, state_dir: Path, logger) -> None:
+def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
     """Reclaim any trash folder no held deletion names (see origenerator.recovery).
 
     Nothing the recovery bin is holding is touched: a deletion stays until the
     user restores it or ends it from the Trash shelf. This clears only what
     nothing can reach.
-
-    Never in a branch session -- its database is a copy, so the deletions it
-    inherited name the *live* install's held folders, and reclaiming from there
-    by what this copy happens to know about would reach into the library the
-    live app is still showing.
     """
     from origenerator import recovery
-    from origenerator.branch_session import session_trash
+    from origenerator.trash import Trash
     try:
-        reclaimed = recovery.reclaim_orphans(db, session_trash(state_dir / "trash"))
+        reclaimed = recovery.reclaim_orphans(db, Trash(trash_dir))
         if reclaimed:
             logger.info("Trash: reclaimed %d unreachable batch folder(s)", reclaimed)
     except Exception as e:
@@ -631,9 +559,9 @@ def main(argv: list[str] | None = None) -> int:
         COMFYUI_OUTPUT_DIR,
         COMFYUI_PORT,
         DB_PATH,
-        PROJECT_DIR,
         STATE_DIR,
         THUMB_DIR,
+        TRASH_DIR,
         UI_STATE_PATH,
     )
 
@@ -652,9 +580,8 @@ def main(argv: list[str] | None = None) -> int:
         # first window, so a hosting session's test can run the real command
         # against a live machine without touching either.
         from origenerator.app_state import AppState
-        from origenerator.branch_session import is_branch_session
         from origenerator.comfyui_client import ComfyUIClient
-        from origenerator.db import Database  # noqa: F401
+        from origenerator.db import Database
         from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
@@ -674,13 +601,11 @@ def main(argv: list[str] | None = None) -> int:
         on_status=status, pump_events=app.processEvents,
     )
 
-    from origenerator.branch_session import is_branch_session
-    branch_session = is_branch_session()
-
     status("Opening the image library...")
-    db = _open_database(DB_PATH, branch_session=branch_session, logger=logger)
-    if not branch_session:
-        _reclaim_orphaned_trash(db, STATE_DIR, logger)
+    from origenerator.db import Database
+    logger.info("Library: %s", DB_PATH)
+    db = Database(DB_PATH)
+    _reclaim_orphaned_trash(db, TRASH_DIR, logger)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -694,15 +619,10 @@ def main(argv: list[str] | None = None) -> int:
         client_id=resolve_comfyui_client_id(app_state),
     )
 
-    if branch_session:
-        status("Skipping library maintenance (branch session)...")
-        logger.info("Branch session: library maintenance left to the live app")
     _run_maintenance(
         Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
-                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR,
-                worktrees=PROJECT_DIR / ".claude" / "worktrees"),
-        BRANCH_SESSION_MAINTENANCE if branch_session else MAINTENANCE,
-        status, logger,
+                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR),
+        MAINTENANCE, status, logger,
     )
 
     status("Connecting to ComfyUI...")

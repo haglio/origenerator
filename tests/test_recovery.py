@@ -73,7 +73,7 @@ def test_a_bin_items_thumbnail_points_at_where_the_file_actually_is():
 
 
 def test_a_bin_item_keeps_its_path_when_the_delete_moved_nothing():
-    # A branch session's delete takes no files, so there is nothing to re-point.
+    # A delete whose files were already gone moved nothing, so there is nothing to re-point.
     record = _record(row={"prompt_id": "p1", "thumbnail_path": r"C:\thumbs\p1.jpg"})
     (item,) = recovery.bin_items([record], _NOW)
     assert item["thumbnail_path"] == r"C:\thumbs\p1.jpg"

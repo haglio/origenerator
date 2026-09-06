@@ -158,19 +158,6 @@ CREATE TABLE IF NOT EXISTS requests (
 -- record goes away when the item is restored or purged, and not otherwise --
 -- nothing ages out; the generations row itself is gone the moment it is deleted,
 -- which is why the row travels here rather than staying behind a flag.
--- What a branch session had bookmarked when the live app last adopted from it:
--- the items that worktree's database starred, and its folder bookmarks. Only
--- what has *changed* there since is applied at the next launch, so a star the
--- user has removed here is not reinstated on every launch by a worktree copy
--- that still carries it, and an unstar made in a preview crosses exactly once
--- (see origenerator.branch_session.adopt_branch_curation). Keyed by worktree
--- directory name; a row outlives its worktree harmlessly.
-CREATE TABLE IF NOT EXISTS branch_curation (
-    branch     TEXT PRIMARY KEY,
-    state_json TEXT NOT NULL,
-    adopted_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS deletions (
     prompt_id  TEXT PRIMARY KEY,
     row_json   TEXT NOT NULL,
@@ -241,3 +228,6 @@ def migrate(conn) -> None:
             if column not in existing:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+    # What each worktree's copied database had bookmarked, kept for adoption at
+    # the next live launch; a branch session runs on this database now.
+    conn.execute("DROP TABLE IF EXISTS branch_curation")

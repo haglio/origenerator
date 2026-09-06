@@ -28,7 +28,7 @@ def test_light_and_dark_still_differ(qapp):
 
 
 def test_a_transparent_edge_stays_cut_out(qapp):
-    # Grayscale8 carries no alpha, so a naive conversion hands back a gray box
+    # Grayscale8 carries no alpha, so a naive conversion hands back a gray square
     # where the picture had a gap.
     image = QImage(8, 8, QImage.Format.Format_ARGB32)
     image.fill(Qt.GlobalColor.transparent)

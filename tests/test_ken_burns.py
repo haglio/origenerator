@@ -5,7 +5,7 @@ from pytest import approx
 from origenerator.ken_burns import (
     TICK_MS,
     ZOOM_SPAN,
-    crop_box,
+    crop_rect,
     progress_step,
     zoom_at,
 )
@@ -51,11 +51,11 @@ def test_the_move_stops_at_the_end_of_the_move():
 
 
 def test_the_crop_is_centered_and_a_share_of_each_side():
-    assert crop_box(1000, 500, 1.25) == approx((100.0, 50.0, 800.0, 400.0))
+    assert crop_rect(1000, 500, 1.25) == approx((100.0, 50.0, 800.0, 400.0))
 
 
 def test_the_whole_picture_is_the_crop_at_the_start():
-    assert crop_box(640, 480, 1.0) == approx((0.0, 0.0, 640.0, 480.0))
+    assert crop_rect(640, 480, 1.0) == approx((0.0, 0.0, 640.0, 480.0))
 
 
 def test_the_crop_creeps_by_a_fraction_of_a_pixel_rather_than_holding_still():
@@ -63,8 +63,8 @@ def test_the_crop_creeps_by_a_fraction_of_a_pixel_rather_than_holding_still():
     # holds for several ticks and then steps, and the two axes step at
     # different moments -- which reads as the picture twitching, not creeping.
     # So consecutive ticks must differ, however slightly.
-    steps = [crop_box(1920, 1080, zoom_at(tick * progress_step(TICK_MS, 4000)))
+    steps = [crop_rect(1920, 1080, zoom_at(tick * progress_step(TICK_MS, 4000)))
              for tick in range(4)]
-    lefts = [box[0] for box in steps]
+    lefts = [crop[0] for crop in steps]
     assert len(set(lefts)) == len(lefts)
     assert 0 < lefts[1] - lefts[0] < 1  # under a pixel, and never nought

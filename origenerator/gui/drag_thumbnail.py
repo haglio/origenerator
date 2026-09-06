@@ -10,31 +10,31 @@ trail nothing at all, while a dragged still trailed a picture the size of the
 whole preview pane.
 
 So the sources ask here instead, and a drag looks the same wherever it started:
-one box, and nothing shown for the one case with genuinely no picture to show.
+one size, and nothing shown for the one case with genuinely no picture to show.
 """
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 
-# Every drag's picture fits this box. Roughly a drop slot's own preview, so what
+# Every drag's picture fits inside this. Roughly a drop slot's own preview, so what
 # is under the cursor reads as the thing that is about to land in the slot —
 # and a full-size still from the preview pane no longer swallows the pane it is
 # being dragged across.
-THUMBNAIL_BOX = 128
+THUMBNAIL_MAX = 128
 
 
 def fit_thumbnail(pixmap: QPixmap | None) -> QPixmap:
-    """``pixmap`` shrunk into the shared box, or a null pixmap for nothing.
+    """``pixmap`` shrunk into the shared size, or a null pixmap for nothing.
 
     Only ever shrinks: a source that is already thumbnail-sized (an enhancement
     row's tile) keeps its own pixels rather than being blown up soft.
     """
     if pixmap is None or pixmap.isNull():
         return QPixmap()
-    if pixmap.width() <= THUMBNAIL_BOX and pixmap.height() <= THUMBNAIL_BOX:
+    if pixmap.width() <= THUMBNAIL_MAX and pixmap.height() <= THUMBNAIL_MAX:
         return pixmap
     return pixmap.scaled(
-        THUMBNAIL_BOX, THUMBNAIL_BOX,
+        THUMBNAIL_MAX, THUMBNAIL_MAX,
         Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
     )
 
@@ -52,7 +52,7 @@ def label_thumbnail(label) -> QPixmap:
 def set_drag_thumbnail(drag, pixmap: QPixmap) -> None:
     """Hang ``pixmap`` under the cursor for the length of the gesture.
 
-    A null one is left off rather than set: an empty box following the cursor
+    A null one is left off rather than set: an empty square following the cursor
     says less than the plain drag cursor does.
     """
     if pixmap is not None and not pixmap.isNull():

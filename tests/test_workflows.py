@@ -516,7 +516,7 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
         segs = payload[node["inputs"]["segs"][0]]
         assert segs["class_type"] == "BboxDetectorSEGS"
         assert segs["inputs"]["bbox_detector"][0] in providers
-        # Each detector reads the very image its detailer repaints, so the boxes
+        # Each detector reads the very image its detailer repaints, so the rects
         # it found land where it found them.
         assert segs["inputs"]["image"] == node["inputs"]["image"]
         assert node["inputs"]["seed"] == 5

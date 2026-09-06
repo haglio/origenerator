@@ -267,7 +267,7 @@ def media_type_icon(media_type: str) -> QIcon:
 # needs two apps drawing one mark.
 #
 # A 2:3 frame, which is near enough what both sides actually come out at, on the
-# shared square canvas: same box either way, so the two headings' words start at
+# shared square canvas: same square either way, so the two headings' words start at
 # the same x and the pair reads as one control turned a quarter.
 _PROPORTION_LONG = 42.0
 _PROPORTION_SHORT = 28.0
@@ -316,7 +316,7 @@ ENHANCE_MORE = "more"   # it holds one, and these settings would make another
 # the arming and the state it reports stay two separate readings of one mark.
 _CORNER_REST = TEXT_MUTED
 _CORNER_ARMED = TEXT_SECONDARY
-# The mark is drawn a little inside its box rather than filling it, which is what
+# The mark is drawn a little inside its cell rather than filling it, which is what
 # leaves the enhance corner room to shift a second copy of itself down and right
 # without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
 # show as a shadow at the size a corner is drawn at, and no further, since past

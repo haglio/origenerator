@@ -748,7 +748,7 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_
 def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
     # An enhancement is an upscale, so the file behind a version can be huge; the
     # picture under the cursor is the same thumbnail every other drag trails.
-    from origenerator.gui.drag_thumbnail import THUMBNAIL_BOX
+    from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 
     tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
@@ -758,7 +758,7 @@ def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_
     qtbot.mouseMove(tile, QPoint(90, 90))
 
     (drag,) = level_drags
-    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_BOX
+    assert max(drag.pixmap.width(), drag.pixmap.height()) == THUMBNAIL_MAX
 
 
 def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):

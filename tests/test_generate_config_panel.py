@@ -262,7 +262,7 @@ def _layout_containing(root, widget):
 
 def test_info_and_form_share_one_scroll(panel):
     # The read-only info and the editable form live in one scroll, so they move
-    # together — not the form boxed in its own cramped scroll while the info sits in
+    # together — not the form walled into its own cramped scroll while the info sits in
     # a separate static footer.
     for widget in (panel._metadata_block, panel._related._source_tile,
                    panel._related._animated_strip, panel._param_form):

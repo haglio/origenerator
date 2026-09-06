@@ -26,7 +26,7 @@ def _h(color) -> str:
 def _spin_arrow_rules() -> str:
     """The step-button arrows, as ``image:`` rules over generated triangles.
 
-    Qt takes an arrow only as a picture — the CSS zero-box-with-borders triangle
+    Qt takes an arrow only as a picture — the CSS zero-size-element-with-borders triangle
     draws a filled rectangle here, which is what appeared over the buttons — so
     :mod:`origenerator.gui.spin_arrows` renders one. If it can't, this contributes
     nothing and Qt draws its own arrow: uncertain color, but an arrow.
@@ -286,7 +286,7 @@ def build_stylesheet() -> str:
     }}
     /* A tab's close button, and a scene card's remove. Flat and bare, because
        all it is is the style's own ✕ sitting on the tab: the default QToolButton
-       look would wrap it in a raised, rounded, bordered box that looks nothing
+       look would wrap it in a raised, rounded, bordered frame that looks nothing
        like a tab's mark. */
     QToolButton#tabCloseButton, QToolButton#sceneRemove {{
         background-color: transparent;

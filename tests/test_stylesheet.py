@@ -11,7 +11,7 @@ def test_build_stylesheet_resolves_shared_ui_and_returns_qss():
 
 def test_a_tabs_close_mark_is_styled_flat_not_as_a_button():
     # All a tab's ✕ is is the style's own mark sitting on the tab; the default
-    # QToolButton look would box it in a raised, rounded border. A scene card's
+    # QToolButton look would wall it into a raised, rounded border. A scene card's
     # remove wears the same mark, under the same rule.
     qss = build_stylesheet()
     rule = qss.split("QToolButton#tabCloseButton, QToolButton#sceneRemove {", 1)[1].split("}", 1)[0]

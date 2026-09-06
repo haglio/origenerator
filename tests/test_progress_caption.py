@@ -191,8 +191,8 @@ def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
     # keeps the lower third of its letters. Painted last it strikes them out —
     # which is what it did, until the caption was moved to the top layer.
     #
-    # Offscreen has no real fonts, so the glyphs come out as boxes; the point
-    # size is raised until a box reaches into the band, which is what a
+    # Offscreen has no real fonts, so the glyphs come out as squares; the point
+    # size is raised until a square reaches into the band, which is what a
     # descender does at the app's own size on a real display. Only the middle of
     # the band is read: the rounded ends carry border pixels of their own, which
     # would answer "something other than the band is here" whatever happened to

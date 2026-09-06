@@ -61,11 +61,11 @@ from origenerator.gui.metadata_block import label_column_width, meta_cells
 # type; the Enhance subpanel reads it to absorb those settings.
 ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
-_TILE = 96  # the thumbnail box; the level's facts sit beside it
+_TILE = 96  # the thumbnail's side; the level's facts sit beside it
 # The in-flight edge the Recents shelf's cards wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = "2px solid #3080e0"
-# The dashed box of an empty slot waiting to be filled, and the lit edge a level
+# The dashed outline of an empty slot waiting to be filled, and the lit edge a level
 # wears while the row that would duplicate it is hovered.
 _ADD_BORDER = "1px dashed #808080"
 _MATCH_BORDER = "2px solid #30a030"
@@ -266,14 +266,14 @@ class _LevelRow(_Row):
         self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
         # The picture that trails the cursor when this row is dragged, cut once
-        # from the file rather than from the 96px tile — the same box every other
+        # from the file rather than from the 96px tile — the same size every other
         # drag in the app trails.
         self._drag_picture = fit_thumbnail(pixmap)
         if not pixmap.isNull():
             self._show_picture(pixmap)
         else:
             # The file is gone (trashed, or moved out from under us). The level
-            # still lists — its facts say which one it was — so the box shows
+            # still lists — its facts say which one it was — so the tile shows
             # the em dash the rest of the app uses for "nothing to show here".
             self._picture.setText("—")
             self._picture.setToolTip("This version's file is no longer on disk")

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from origenerator.slideshow import LIVE
 
 _MARGIN = 12            # gap from the screen edge, and from the media in a gutter
-_WIDTH_FRACTION = 0.12  # a still's box, as a share of the view's width…
+_WIDTH_FRACTION = 0.12  # a still's bounds, as a share of the view's width…
 _HEIGHT_FRACTION = 0.5  # …and of its height
 _MIN_WIDTH = 64         # …but never so narrow it says nothing
 
@@ -58,9 +58,9 @@ def side_x(side: str, host_width: int, media_rect: QRect, label_width: int) -> i
     return host_width - label_width - _MARGIN
 
 
-def _scaled(source, box: QSize):
+def _scaled(source, bounds: QSize):
     """``source`` — a file path or a live frame's encoded bytes — as a pixmap
-    scaled into ``box``, never blown up past its own size. ``None`` when there's
+    scaled into ``bounds``, never blown up past its own size. ``None`` when there's
     nothing loadable to draw."""
     if source is None:
         return None
@@ -71,7 +71,7 @@ def _scaled(source, box: QSize):
         loaded = pixmap.load(str(source))
     if not loaded or pixmap.isNull():
         return None
-    return pixmap.scaled(box.boundedTo(pixmap.size()),
+    return pixmap.scaled(bounds.boundedTo(pixmap.size()),
                          Qt.AspectRatioMode.KeepAspectRatio,
                          Qt.TransformationMode.SmoothTransformation)
 
@@ -113,10 +113,10 @@ class NeighborPreviews:
         host = self._host
         if media_rect is None or media_rect.isEmpty():
             media_rect = QRect(0, 0, host.width(), host.height())
-        box = QSize(max(_MIN_WIDTH, int(host.width() * _WIDTH_FRACTION)),
-                    max(_MIN_WIDTH, int(host.height() * _HEIGHT_FRACTION)))
+        bounds = QSize(max(_MIN_WIDTH, int(host.width() * _WIDTH_FRACTION)),
+                       max(_MIN_WIDTH, int(host.height() * _HEIGHT_FRACTION)))
         for label, source, side in zip(self._labels, self._sources, ("left", "right")):
-            pixmap = _scaled(source, box)
+            pixmap = _scaled(source, bounds)
             if pixmap is None:
                 label.hide()
                 continue

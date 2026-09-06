@@ -85,7 +85,7 @@ def style_caption(label) -> None:
     label.setMaximumHeight(caption_height())
 
 
-# The resting dashed box, versus the solid border marking the card as the item
+# The resting dashed outline, versus the solid border marking the card as the item
 # driving the info pane — the same mark a selected thumbnail wears.
 IDLE_FRAME_CSS = (
     "#{name} {{ border: 1px dashed #4a4a4a; border-radius: 4px; }}"

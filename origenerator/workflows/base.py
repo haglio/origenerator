@@ -63,9 +63,9 @@ UPSCALE_MODEL_FACTOR = 4.0
 # constants rather than as settings: the pass already costs the user a checkbox and
 # a denoise, and every one of these is a value their answer would be a guess at.
 _DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
-_DETECTOR_DILATION = 10       # pixels grown around each box, so edges are inside
-_DETECTOR_CROP_FACTOR = 3.0   # how much context around the box the sampler sees
-_DETECTOR_DROP_SIZE = 10      # boxes smaller than this are noise, not anatomy
+_DETECTOR_DILATION = 10       # pixels grown around each rect, so edges are inside
+_DETECTOR_CROP_FACTOR = 3.0   # how much context around the rect the sampler sees
+_DETECTOR_DROP_SIZE = 10      # rects smaller than this are noise, not anatomy
 _DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
 _DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
 _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
@@ -528,15 +528,15 @@ class WorkflowTemplate(ABC):
         denoise that could redraw a hand (0.3+) applies to the sky and the
         floorboards too — which is how creases became wounds. This pass spends
         that denoise where it is wanted instead. A YOLO detector finds the part,
-        each box is cropped out and enlarged to the sampler's own working size,
+        each rect is cropped out and enlarged to the sampler's own working size,
         re-sampled at that part's own denoise, and composited back through a
         feathered mask — so a mouth or a finger is redrawn at real resolution
-        while every pixel outside the boxes is left untouched.
+        while every pixel outside the rects is left untouched.
 
         One pass per part asked for (:func:`~origenerator.workflows.detail_parts.
         detail_fix_passes` reads ``enhance_detail_fixes`` and drops what isn't
         installed), each running over the last one's output rather than on a
-        merged box list: they are different models found by different detectors,
+        merged rect list: they are different models found by different detectors,
         and an image with a face and two hands must get all three. Each pass
         takes three consecutive node ids from ``first_id``; a part left at zero
         builds no nodes at all, the same bypass :meth:`lora_model_input` does.

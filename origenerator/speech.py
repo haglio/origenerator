@@ -45,6 +45,10 @@ SPEECH_DIR = "origenerator_speech"
 # exactly what pyproject declares) never asks the app to carry the voice's
 # torch.
 WORKER = Path(__file__).resolve().parents[1] / "tools" / "speech_worker.py"
+# Part of every line's file name: bump it when the worker speaks differently
+# (a model, a setting), so lines already on disk are spoken again rather than
+# reused from before the change.
+SPEECH_VERSION = 2
 # Suppress the console-window flash Windows shows for a bare subprocess.
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _STDERR_TAIL = 2000
@@ -105,7 +109,7 @@ def scene_speech(params: dict) -> list[SceneSpeech | None]:
         if not text:
             spoken.append(None)
             continue
-        shape = json.dumps([text, voice, seed, count], sort_keys=True)
+        shape = json.dumps([SPEECH_VERSION, text, voice, seed, count], sort_keys=True)
         digest = hashlib.sha1(shape.encode("utf-8")).hexdigest()[:20]
         spoken.append(SceneSpeech(text, count, f"{SPEECH_DIR}/{digest}.wav"))
     return spoken

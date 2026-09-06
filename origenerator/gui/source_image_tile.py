@@ -43,12 +43,12 @@ class SourceImageTile(QWidget):
         self._default_media_type = media_type
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(4)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
         self._heading = QLabel(heading)
         self._heading.setStyleSheet("font-weight: 600;")
-        box.addWidget(self._heading)
+        column.addWidget(self._heading)
 
         self._thumb = QLabel()
         self._thumb.setFixedSize(_THUMB, _THUMB)
@@ -56,7 +56,7 @@ class SourceImageTile(QWidget):
         self._thumb.setStyleSheet(
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: 3px;"
         )
-        box.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
+        column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
         # A photo (or play) badge in the thumbnail's top-left corner, like the
         # gallery tiles.
         self._badge = MediaBadge(media_type, self._thumb)
@@ -64,7 +64,7 @@ class SourceImageTile(QWidget):
         self._filename = QLabel()
         self._filename.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
         self._filename.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
-        box.addWidget(self._filename, 0, Qt.AlignmentFlag.AlignLeft)
+        column.addWidget(self._filename, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.hide()
 

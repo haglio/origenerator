@@ -7,12 +7,12 @@ from origenerator.gui.prompt_find import _CURRENT_BG, PromptFind
 def _fields(qtbot, *texts):
     """Loose prompt fields holding ``texts``, in the order a form would lay them."""
     host = QWidget()
-    box = QVBoxLayout(host)
+    column = QVBoxLayout(host)
     made = []
     for text in texts:
         field = QPlainTextEdit()
         field.setPlainText(text)
-        box.addWidget(field)
+        column.addWidget(field)
         made.append(field)
     qtbot.addWidget(host)
     return host, made
@@ -200,12 +200,12 @@ def test_landing_on_a_match_scrolls_the_form_to_its_field(qtbot):
     scroll = QScrollArea()
     scroll.setWidgetResizable(True)
     host = QWidget()
-    box = QVBoxLayout(host)
+    column = QVBoxLayout(host)
     filler = QPlainTextEdit("\n" * 200)   # push the target far below the fold
     filler.setMinimumHeight(1200)
-    box.addWidget(filler)
+    column.addWidget(filler)
     target = QPlainTextEdit("a cat")
-    box.addWidget(target)
+    column.addWidget(target)
     scroll.setWidget(host)
     scroll.resize(300, 200)
     qtbot.addWidget(scroll)

@@ -347,8 +347,8 @@ class GenerateConfigPanel(QWidget):
         self._estimate_label.setWordWrap(True)
         body.addWidget(self._estimate_label)
         self._form_host = QWidget()
-        self._form_host_box = QVBoxLayout(self._form_host)
-        self._form_host_box.setContentsMargins(0, 0, 0, 0)
+        self._form_host_column = QVBoxLayout(self._form_host)
+        self._form_host_column.setContentsMargins(0, 0, 0, 0)
         body.addWidget(self._form_host)
 
     def _build_related_media(self, body: QVBoxLayout) -> None:
@@ -527,7 +527,7 @@ class GenerateConfigPanel(QWidget):
         """
         if self._param_form is None:
             return
-        self._form_host_box.removeWidget(self._param_form)
+        self._form_host_column.removeWidget(self._param_form)
         self._param_form.setParent(None)
         self._param_form.deleteLater()
         self._param_form = None
@@ -552,7 +552,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.refresh_modified_notice)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
-        self._form_host_box.addWidget(self._param_form)
+        self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
         self.form_replaced.emit()

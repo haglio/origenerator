@@ -46,28 +46,28 @@ class AnimatedVideoStrip(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(4)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
         self._heading = QLabel("Animated in")
         self._heading.setStyleSheet("font-weight: 600;")
-        box.addWidget(self._heading)
+        column.addWidget(self._heading)
         self._host = QWidget()
         FlowLayout(self._host, spacing=6)
-        box.addWidget(self._host)
-        self._box = box
+        column.addWidget(self._host)
+        self._column = column
         self.hide()
 
     def show_videos(self, items: list[tuple[str, object, object]]):
         # Rebuild the tile host wholesale — deleting it stops and frees the old
         # tiles' movies, the same replace-the-widget idiom the gallery uses.
-        self._box.removeWidget(self._host)
+        self._column.removeWidget(self._host)
         self._host.deleteLater()
         self._host = QWidget()
         flow = FlowLayout(self._host, spacing=6)
         for prompt_id, movie_path, still_path in items:
             flow.addWidget(self._make_tile(prompt_id, movie_path, still_path))
-        self._box.addWidget(self._host)
+        self._column.addWidget(self._host)
         self.setVisible(bool(items))
 
     def _make_tile(self, prompt_id, movie_path, still_path) -> _VideoTile:

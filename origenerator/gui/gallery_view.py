@@ -1073,11 +1073,11 @@ class GalleryView(QWidget):
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.folders_dropped.connect(self._on_folders_dropped)
         toc = QWidget()
-        toc_box = QVBoxLayout(toc)
-        toc_box.setContentsMargins(*_PANE_MARGINS)
+        toc_column = QVBoxLayout(toc)
+        toc_column.setContentsMargins(*_PANE_MARGINS)
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
-        toc_box.addWidget(self._voice_status)
+        toc_column.addWidget(self._voice_status)
         # The gallery search. It sits over the tree but no longer narrows it: what
         # it fills is the browser pane, with the matching generations themselves
         # (see :meth:`_run_search`), because a thumbnail is what the user
@@ -1101,7 +1101,7 @@ class GalleryView(QWidget):
         )
         self._search_edit.setClearButtonEnabled(True)
         self._search_edit.textChanged.connect(self._on_search_changed)
-        toc_box.addWidget(self._search_edit)
+        toc_column.addWidget(self._search_edit)
         # The gallery's image/video filter: two boxes saying which kinds of
         # generation the gallery is made of at all, both on so it opens showing
         # everything. It sits between the search box and the tree because it
@@ -1124,8 +1124,8 @@ class GalleryView(QWidget):
         media_row.addWidget(self._image_cb)
         media_row.addWidget(self._video_cb)
         media_row.addStretch(1)
-        toc_box.addWidget(media_filter)
-        toc_box.addWidget(self._tree, 1)  # the trees take the height; combine sits below
+        toc_column.addWidget(media_filter)
+        toc_column.addWidget(self._tree, 1)  # the trees take the height; combine sits below
         # Combine: drop an image + an i2v video, Generate re-runs that video's recipe
         # on the image. Needs a client to generate, so it hides without one.
         self._combine = CombinePanel(
@@ -1144,7 +1144,7 @@ class GalleryView(QWidget):
         # long-form video behind it may have no loop at all.
         self._combine.intent_changed.connect(self._on_combine_intent_changed)
         self._combine.setVisible(self._client is not None)
-        toc_box.addWidget(self._combine)
+        toc_column.addWidget(self._combine)
         # Hosted, the tree is the upright column's own left edge rather than a
         # part of the folder row, so it goes straight into the outer splitter.
         (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
@@ -1153,12 +1153,12 @@ class GalleryView(QWidget):
         # toolbar under it) over the flowing contents. Double-clicking the path
         # renames the folder it ends at.
         browser = QWidget()
-        browser_box = QVBoxLayout(browser)
-        browser_box.setContentsMargins(*_PANE_MARGINS)
+        browser_column = QVBoxLayout(browser)
+        browser_column.setContentsMargins(*_PANE_MARGINS)
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
-        browser_box.addWidget(self._title)
+        browser_column.addWidget(self._title)
         # The button bank, in five groups a space apart (see the assembly at
         # the end of this block): where you are, what you did, what to do with
         # what's in front of you, and what the app is doing on its own. Grouping
@@ -1302,7 +1302,7 @@ class GalleryView(QWidget):
                 toolbar.addWidget(button)
             self._toolbar_groups.append((gap, buttons))
         self._sync_toolbar_gaps()
-        browser_box.addWidget(self._toolbar_host)
+        browser_column.addWidget(self._toolbar_host)
         # The search results' own controls, riding under the header and appearing
         # only while a query is running: how many
         # items answered it, and the order they are laid out in. Recency is one
@@ -1347,12 +1347,12 @@ class GalleryView(QWidget):
         experiments_row.addStretch(1)
         self._experiments_bar.hide()  # shown only on the Experiments shelf
         self._sync_experiments_bar()
-        browser_box.addWidget(self._experiments_bar)
-        browser_box.addWidget(self._search_bar)
+        browser_column.addWidget(self._experiments_bar)
+        browser_column.addWidget(self._search_bar)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
-        browser_box.addWidget(self._avg_label)
+        browser_column.addWidget(self._avg_label)
         self._scroll.setWidgetResizable(True)
         # A click on the background between the tiles puts the selection down,
         # as it does in a file browser — and here it is also the only way back
@@ -1364,7 +1364,7 @@ class GalleryView(QWidget):
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
-        browser_box.addWidget(self._scroll, 1)
+        browser_column.addWidget(self._scroll, 1)
         self._folder_panes.addWidget(browser)
 
         # A strip under those two lists every generation in flight — the app hands
@@ -1440,8 +1440,8 @@ class GalleryView(QWidget):
         # it the Enhance settings read as the foot of whatever folder is on screen
         # rather than as their own thing — which they are: app-wide settings that
         # don't belong to the folder they happen to be sitting under.
-        browser_box.addWidget(_lower_divider())
-        browser_box.addLayout(footer)
+        browser_column.addWidget(_lower_divider())
+        browser_column.addLayout(footer)
 
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs.config_panels():
@@ -1470,10 +1470,10 @@ class GalleryView(QWidget):
         self._find_bar.step_requested.connect(self._on_find_step)
         self._find_bar.dismissed.connect(self._close_find)
         info_pane = QWidget()
-        info_box = QVBoxLayout(info_pane)
-        info_box.setContentsMargins(0, 0, 0, 0)
-        info_box.addWidget(self._info_tabs, 1)
-        info_box.addWidget(self._find_bar)
+        info_column = QVBoxLayout(info_pane)
+        info_column.setContentsMargins(0, 0, 0, 0)
+        info_column.addWidget(self._info_tabs, 1)
+        info_column.addWidget(self._find_bar)
 
         if self._stack is not None:
             # The upright arrangement, from the top down: the generate tabs (with

@@ -170,9 +170,9 @@ class EnhancePanel(QWidget):
         self.setObjectName("enhancePanel")
         self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS)
 
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(4)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
         # The title row, with the auto switch at its far right — a bare switch,
         # the way a panel's power is a switch on its corner rather than a line
         # of prose among its dials. What it does is in its tooltip; the settings
@@ -187,7 +187,7 @@ class EnhancePanel(QWidget):
         self._auto.setToolTip(_AUTO_TOOLTIP)
         self._auto.toggled.connect(self._emit)
         title_row.addWidget(self._auto)
-        box.addLayout(title_row)
+        column.addLayout(title_row)
 
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
@@ -238,8 +238,8 @@ class EnhancePanel(QWidget):
         form.addRow(fix_heading)
         form.addRow(self._fix_row())
 
-        box.addLayout(form)
-        box.addStretch(1)
+        column.addLayout(form)
+        column.addStretch(1)
 
     def _fix_row(self) -> QWidget:
         """Every fixable part on one line: a box to tick over its name and the

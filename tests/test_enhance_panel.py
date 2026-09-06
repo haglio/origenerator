@@ -896,9 +896,9 @@ def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
     (level,) = _levels(1)[:1]
     row = _LevelRow(level, 0, None)
     host = QWidget()
-    box = QVBoxLayout(host)
-    box.setContentsMargins(0, 0, 0, 0)
-    box.addWidget(row)
+    column = QVBoxLayout(host)
+    column.setContentsMargins(0, 0, 0, 0)
+    column.addWidget(row)
     qtbot.addWidget(host)
     host.show()
 

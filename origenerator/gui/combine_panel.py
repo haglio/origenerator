@@ -103,11 +103,11 @@ class CombinePanel(QWidget):
         # The video part: the two ways to supply the recipe, side by side in one
         # container so the dropdown reads as belonging to the video side, not the image.
         self._video_part = QWidget()
-        video_box = QHBoxLayout(self._video_part)
-        video_box.setContentsMargins(0, 0, 0, 0)
-        video_box.setSpacing(BUTTON_GAP)  # the family's gap inside a group
-        video_box.addWidget(self._category, 1)  # each takes half the video part's width
-        video_box.addWidget(self.video_slot, 1)
+        video_row = QHBoxLayout(self._video_part)
+        video_row.setContentsMargins(0, 0, 0, 0)
+        video_row.setSpacing(BUTTON_GAP)  # the family's gap inside a group
+        video_row.addWidget(self._category, 1)  # each takes half the video part's width
+        video_row.addWidget(self.video_slot, 1)
 
         # What the result is for. Players is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
@@ -127,12 +127,12 @@ class CombinePanel(QWidget):
         self._intent_group.addButton(self._genau_radio)
         self._intent_group.buttonToggled.connect(self._on_intent_changed)
         self._intent_part = QWidget()
-        intent_box = QHBoxLayout(self._intent_part)
-        intent_box.setContentsMargins(0, 0, 0, 0)
-        intent_box.setSpacing(BUTTON_GAP)  # two radios are one group
-        intent_box.addWidget(self._players_radio)
-        intent_box.addWidget(self._genau_radio)
-        intent_box.addStretch(1)
+        intent_row = QHBoxLayout(self._intent_part)
+        intent_row.setContentsMargins(0, 0, 0, 0)
+        intent_row.setSpacing(BUTTON_GAP)  # two radios are one group
+        intent_row.addWidget(self._players_radio)
+        intent_row.addWidget(self._genau_radio)
+        intent_row.addStretch(1)
 
         # Two ways to act on the same chosen recipe: run it now, or open it in the
         # generator to tweak first. Both gate on the same "image + recipe" readiness.

@@ -587,10 +587,10 @@ class GenerationQueue(QWidget):
         # strip dragged open must hand every extra pixel to these rows.
         self._scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         self._host = QWidget()
-        self._rows_box = QVBoxLayout(self._host)
-        self._rows_box.setContentsMargins(0, 0, 0, 0)
-        self._rows_box.setSpacing(0)
-        self._rows_box.addStretch(1)  # rows stack from the top
+        self._rows_column = QVBoxLayout(self._host)
+        self._rows_column.setContentsMargins(0, 0, 0, 0)
+        self._rows_column.setSpacing(0)
+        self._rows_column.addStretch(1)  # rows stack from the top
         # What the empty line is for. The strip holds its space whether or not
         # anything is queued, so this side spends most of its life with nothing
         # in it, and a blank half of a laid-out strip reads as something that
@@ -599,8 +599,8 @@ class GenerationQueue(QWidget):
         # stack from the top once it has given way to them.
         self._hint = QLabel("(queued jobs show up here)")
         self._hint.setObjectName("estimateLabel")  # muted secondary text
-        self._rows_box.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
-        self._rows_box.addStretch(1)
+        self._rows_column.addWidget(self._hint, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._rows_column.addStretch(1)
         self._scroll.setWidget(self._host)
         layout.addWidget(self._scroll, 1)  # the line takes the rest of the strip
 
@@ -625,9 +625,9 @@ class GenerationQueue(QWidget):
         is no row — nothing may be dropped in front of it, reordered against it,
         or throw it away with the others on a rebuild.
         """
-        return [self._rows_box.itemAt(i).widget()
-                for i in range(self._rows_box.count())
-                if isinstance(self._rows_box.itemAt(i).widget(), QueueRow)]
+        return [self._rows_column.itemAt(i).widget()
+                for i in range(self._rows_column.count())
+                if isinstance(self._rows_column.itemAt(i).widget(), QueueRow)]
 
     def keys(self) -> list[str]:
         return [row.key for row in self.rows()]
@@ -677,13 +677,13 @@ class GenerationQueue(QWidget):
     def _rebuild(self, items: list):
         self._items = list(items)
         for row in self.rows():
-            self._rows_box.removeWidget(row)
+            self._rows_column.removeWidget(row)
             row.deleteLater()
         for index, item in enumerate(items):
             # What ComfyUI is already rendering cannot be moved, and nothing can
             # be dropped in front of it. Everything else is only waiting — held
             # or not — and its place is the user's to change.
-            self._rows_box.insertWidget(
+            self._rows_column.insertWidget(
                 index, QueueRow(item, movable=item.status != "running")
             )
         # The scroll area would otherwise squeeze the whole line into its own

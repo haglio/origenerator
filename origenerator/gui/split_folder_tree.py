@@ -119,9 +119,9 @@ class SplitFolderTree(QWidget):
         # to drag from there.
         self._splitter.setSizes([1] * len(ORIENTATIONS))
 
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.addWidget(self._splitter)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.addWidget(self._splitter)
 
     def _build_half(self, group_role, orientation: str) -> QWidget:
         """One side: its label, then its tree.
@@ -131,10 +131,10 @@ class SplitFolderTree(QWidget):
         library you are reading.
         """
         half = QWidget()
-        box = QVBoxLayout(half)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(2)
-        box.addWidget(_heading(orientation))
+        column = QVBoxLayout(half)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(2)
+        column.addWidget(_heading(orientation))
 
         tree = FolderTree(group_role)
         tree.setHeaderHidden(True)
@@ -155,7 +155,7 @@ class SplitFolderTree(QWidget):
         tree.star_clicked.connect(self.star_clicked)
         tree.delete_clicked.connect(self.delete_clicked)
         tree.folders_dropped.connect(self.folders_dropped)
-        box.addWidget(tree, 1)
+        column.addWidget(tree, 1)
 
         self._halves[orientation] = tree
         return half

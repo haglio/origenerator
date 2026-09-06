@@ -147,18 +147,18 @@ class _Row(QWidget):
         self._column = QVBoxLayout(self)
         self._column.setContentsMargins(2, 2, 2, 2)
         self._column.setSpacing(6)
-        box = QHBoxLayout()
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(8)
-        self._column.addLayout(box)
-        self._beside = box
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+        self._column.addLayout(row)
+        self._beside = row
         self._wrapped = False
         self._picture = QLabel()
         self._picture.setFixedSize(_TILE, _TILE)
         self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._picture.setWordWrap(True)
         _pass_mouse_through(self._picture)
-        box.addWidget(self._picture, 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(self._picture, 0, Qt.AlignmentFlag.AlignTop)
         # A grid rather than a row of rows: a container widget per fact would
         # take every click landing on it, and Qt's hit test skips a container
         # marked transparent along with the buttons inside it — so there would be
@@ -177,7 +177,7 @@ class _Row(QWidget):
         facts.addWidget(self._title, 0, 0, 1, 4)
         self._facts = facts
         self._fact_cells: list[QWidget] = []
-        box.addLayout(facts, 1)
+        row.addLayout(facts, 1)
 
     def minimumSizeHint(self):
         """As narrow as the row gets — which is the wrapped arrangement's width,
@@ -444,14 +444,14 @@ class EnhanceVersions(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.setSpacing(4)
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(4)
         # A foldable section like the form's above it: this pane is one column
         # of collapsible groups, and a heading that cannot fold reads as the one
         # thing you are not allowed to put away.
         self._section = CollapsibleSection("Enhancement levels")
-        box.addWidget(self._section)
+        column.addWidget(self._section)
         self._host = QWidget()
         QVBoxLayout(self._host)
         self._section.content_form().addRow(self._host)

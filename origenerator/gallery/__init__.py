@@ -63,6 +63,7 @@ from origenerator.gallery.enhance import (
     rows_awaiting_enhancement,
 )
 from origenerator.gallery.enhance_fold import (
+    disown_foreign_runs,
     fold_completed_enhancements,
     fold_enhancement,
 )
@@ -196,6 +197,7 @@ __all__ = [
     "custom_folder_key",
     "default_enhance_params",
     "describe_enhance_params",
+    "disown_foreign_runs",
     "displayed_levels",
     "enhance_levels",
     "enhance_params_for",

@@ -95,6 +95,9 @@ class Database:
     def completed_without_duration(self) -> list[dict]:
         return self.generations.completed_without_duration()
 
+    def highest_id_issued(self) -> int:
+        return self.generations.highest_id_issued()
+
     def delete_generation(self, prompt_id: str):
         return self.generations.delete_generation(prompt_id)
 

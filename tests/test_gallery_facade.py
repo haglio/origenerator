@@ -29,6 +29,7 @@ PUBLISHED = {
     "child_groups", "combined_params", "command_bias", "config_folder_name",
     "config_tab_title", "curated_params", "custom_folder_id",
     "custom_folder_key", "default_enhance_params", "describe_enhance_params",
+    "disown_foreign_runs",
     "displayed_levels", "enhance_levels", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",
     "enhancement_recency", "find_source_image_id", "fix_params_for",

@@ -1378,13 +1378,27 @@ def test_recent_generations_keeps_the_callers_newest_first_order():
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
 
 
-def test_recent_generations_excludes_imported_files():
-    # "Recently generated" means this app made it — an imported file discovered on
-    # disk is not a generation and never joins the shelf.
+def test_recent_generations_lists_imported_files_where_they_arrived():
+    # A file ComfyUI wrote that no instance of this app queued joins the shelf at
+    # the launch that found it, which is when it is looked for there; leaving
+    # imports off Latest hid a clip queued straight on ComfyUI in its workflow's
+    # folder alone.
     generated = _img("gen", "a cat", 50, 1)
-    imported = _row(prompt_id="imp", source="imported",
+    imported = _row(prompt_id="imp", source="imported", id=2,
                     output_files=json.dumps([{"filename": "imp.png"}]))
-    assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["gen"]
+    assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["imp", "gen"]
+
+
+def test_recent_generations_leaves_experiments_to_their_own_shelf():
+    # An experiment is reviewed on the Experiments shelf; listed here as well it
+    # would read as something asked for. Everything else with a result is here,
+    # including a stroke cut for the Genau lane, which has no run behind it.
+    generated = _img("gen", "a cat", 50, 1)
+    experiment = _row(prompt_id="exp", source="experiment", id=2,
+                      output_files=json.dumps([{"filename": "exp.png"}]))
+    cut = _row(prompt_id="cut", source="stroke_trim", id=3,
+               output_files=json.dumps([{"filename": "cut.mp4"}]))
+    assert [r["prompt_id"] for r in recent_generations([cut, experiment, generated])] == ["cut", "gen"]
 
 
 def test_recent_generations_excludes_rows_that_produced_no_output():
@@ -1422,9 +1436,9 @@ def test_starred_generations_collects_starred_items_newest_first():
     assert [r["prompt_id"] for r in starred_generations(rows)] == ["i3", "i1"]
 
 
-def test_starred_generations_includes_imported_files_unlike_recents():
-    # Unlike the Recents shelf, a bookmark is a bookmark: an imported image the user
-    # starred belongs on the Starred shelf.
+def test_starred_generations_includes_imported_files():
+    # A bookmark is a bookmark: an imported image the user starred belongs on the
+    # Starred shelf.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))
     assert [r["prompt_id"] for r in starred_generations([imported])] == ["imp"]

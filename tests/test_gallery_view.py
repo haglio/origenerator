@@ -2192,9 +2192,10 @@ def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
     assert view._browser._visible_keys == []
 
 
-def test_recents_shelf_excludes_imported_files(qtbot):
-    # An import still builds the tree (so the shelf exists) but is not a recent
-    # generation, so it never appears on the Recents shelf.
+def test_recents_shelf_lists_imported_files_too(qtbot):
+    # A file ComfyUI wrote on its own arrives at the launch that finds it, and
+    # Latest is where it is looked for then -- it used to sit in its workflow's
+    # folder alone, with nothing to say why it was not the newest thing here.
     generated = _image("gen", "a cat", 50, 1)
     imported = _row("imp", "sdxl_t2i", {"seed": 9}, "imp.png", source="imported")
     view = GalleryView(FakeDB([imported, generated]))
@@ -2202,7 +2203,7 @@ def test_recents_shelf_excludes_imported_files(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
-    assert view.visible_prompt_ids() == ["gen"]
+    assert sorted(view.visible_prompt_ids()) == ["gen", "imp"]
 
 
 def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
@@ -2407,14 +2408,14 @@ def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_pa
     assert job.workflow.name == "image_enhance"
 
 
-def test_recents_shelf_shows_empty_state_when_only_imports_exist(qtbot):
-    imported = _row("imp", "sdxl_t2i", {"seed": 9}, "imp.png", source="imported")
-    view = GalleryView(FakeDB([imported]))
+def test_recents_shelf_shows_empty_state_when_nothing_has_a_result(qtbot):
+    pending = _row("wip", "sdxl_t2i", {"seed": 9}, "wip.png", status="running", output_files=None)
+    view = GalleryView(FakeDB([pending]))
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
-    assert view.visible_prompt_ids() == []  # nothing generated: just the hint
+    assert view.visible_prompt_ids() == []  # nothing to show: just the hint
 
 
 def test_recents_shelf_stays_selected_across_a_refresh(qtbot):

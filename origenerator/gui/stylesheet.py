@@ -105,10 +105,13 @@ def build_stylesheet() -> str:
         subcontrol-position: top right;
         border-top-right-radius: 3px;
     }}
+    /* No placement: Qt's own default for a down-button is the low right corner,
+       which is where this one goes. The radius is uniform because a QSS radius
+       is only settable per corner or for all four, and the corner that matters
+       is the outer one, where the field's own rounding is. */
     QSpinBox::down-button, QDoubleSpinBox::down-button {{
-        subcontrol-position: bottom right;
         border-top: 1px solid {_h(BORDER_SUBTLE)};
-        border-bottom-right-radius: 3px;
+        border-radius: 3px;
     }}
     QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
     QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
@@ -180,8 +183,9 @@ def build_stylesheet() -> str:
     QPushButton#sectionHeader {{
         background-color: transparent;
         color: {_h(TEXT_PRIMARY)};
-        border: none;
-        border-bottom: 1px solid {_h(BORDER_SUBTLE)};
+        border-style: solid;
+        border-color: {_h(BORDER_SUBTLE)};
+        border-width: 0 0 1px 0;
         border-radius: 0;
         text-align: left;
         font-weight: 600;
@@ -265,14 +269,17 @@ def build_stylesheet() -> str:
            the other end (eliding_tab_bar.EDGE), or a tab reads as two separate
            decisions rather than one row. */
         padding: 8px 10px;
-        border: none;
-        /* A hairline between tabs, so it reads which ✕ belongs to which. */
-        border-right: 1px solid {_h(BORDER_SUBTLE)};
-        border-bottom: 2px solid transparent;
+        /* A hairline between tabs, so it reads which ✕ belongs to which, over a
+           rule the selected tab alone colors in. One declaration each way round,
+           since the two edges differ in width and in color: top, right, low,
+           left. */
+        border-style: solid;
+        border-color: transparent {_h(BORDER_SUBTLE)} transparent transparent;
+        border-width: 0 1px 2px 0;
     }}
     QTabBar::tab:selected {{
         color: {_h(TEXT_PRIMARY)};
-        border-bottom: 2px solid {_h(BLUE)};
+        border-color: transparent {_h(BORDER_SUBTLE)} {_h(BLUE)} transparent;
     }}
     QTabBar::tab:hover {{
         color: {_h(TEXT_PRIMARY)};
@@ -287,7 +294,7 @@ def build_stylesheet() -> str:
         border-radius: 0;
         padding: 0;
     }}
-    /* A row in the bottom strip's queue: flat, and lit while hovered or while it
+    /* A row in the lower strip's queue: flat, and lit while hovered or while it
        is the one being dragged, so a drag reads as something the strip meant to
        offer rather than an accident. */
     QWidget#queueRow {{
@@ -335,7 +342,9 @@ def build_stylesheet() -> str:
        inside them. */
     QFrame#treeSectionLabel {{
         background: transparent;
-        border-bottom: 1px solid {_h(BORDER_SUBTLE)};
+        border-style: solid;
+        border-color: {_h(BORDER_SUBTLE)};
+        border-width: 0 0 1px 0;
         padding: 4px 2px 3px 2px;
     }}
     /* Qt style sheets do not hand a parent's color down to its children, so the

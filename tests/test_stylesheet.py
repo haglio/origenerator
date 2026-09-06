@@ -65,7 +65,7 @@ def test_stylesheet_styles_collapsible_section_headers():
     qss = build_stylesheet()
     rule = qss.split("QPushButton#sectionHeader {", 1)[1].split("}", 1)[0]
     assert "background-color: transparent" in rule
-    assert "border: none" in rule
+    assert "border-width: 0 0 1px 0" in rule   # ruled off below, flat everywhere else
     assert "border-radius: 0;" in rule
     pressed = qss.split("QPushButton#sectionHeader:pressed {", 1)[1].split("}", 1)[0]
     assert "background-color" in pressed  # and not Qt's own blue flash
@@ -163,3 +163,110 @@ def test_a_radios_ring_stays_visible_in_both_states(qtbot):
     for checked in (True, False):
         image = _radio_image(qtbot, checked=checked)
         assert max(_lightness(image, x) for x in (0, 1)) > BG_PRIMARY.lightness() + 30
+
+
+def _spin_down_rect(box):
+    """Where the style puts a spin box's step-down sub-control.
+
+    Asked of the style rather than worked out from the sheet: the sheet is one
+    input to that answer and Qt's own default is the other, so the only thing
+    that says where the button actually lands is the style itself.
+    """
+    from PyQt6.QtWidgets import QStyle, QStyleOptionSpinBox
+
+    option = QStyleOptionSpinBox()
+    option.initFrom(box)
+    option.rect = box.rect()
+    option.subControls = (QStyle.SubControl.SC_SpinBoxUp
+                          | QStyle.SubControl.SC_SpinBoxDown)
+    return box.style().subControlRect(
+        QStyle.ComplexControl.CC_SpinBox, option,
+        QStyle.SubControl.SC_SpinBoxDown, box)
+
+
+def _styled_spin_box(qtbot):
+    from PyQt6.QtWidgets import QSpinBox
+
+    box = QSpinBox()
+    qtbot.addWidget(box)
+    box.setStyleSheet(build_stylesheet())
+    box.resize(120, 44)
+    return box
+
+
+def test_the_step_down_button_lands_in_the_lower_right_corner(qtbot):
+    # The sheet no longer places it by hand -- Qt's own default for a
+    # down-button is already this corner -- so what holds it there is the style,
+    # and the style is what this asks. Up must be the other one, or a sheet that
+    # stacked them wrongly would satisfy a one-sided check.
+    box = _styled_spin_box(qtbot)
+
+    down = _spin_down_rect(box)
+
+    assert down.center().y() > box.rect().center().y()
+    assert down.center().x() > box.rect().center().x()
+
+
+def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
+    # It sits in the corner of a field whose own corners are rounded, so a square
+    # one juts past the edge it is inside. Rendered, not read: the sheet spells
+    # the radius one way and Qt either honors it or paints the corner solid.
+    # Two-sided, because "not the button's ground" is also true of a button that
+    # was never painted: five pixels in, the ground is exactly what it must be.
+    from PyQt6.QtCore import QPoint
+    from shared_ui.colors import BG_BUTTON
+
+    box = _styled_spin_box(qtbot)
+    down = _spin_down_rect(box)
+    image = box.grab().toImage()
+
+    assert image.pixelColor(down.bottomRight()) != BG_BUTTON
+    assert image.pixelColor(down.bottomRight() - QPoint(5, 5)) == BG_BUTTON
+
+
+def _tab_bar_image(qtbot):
+    """A two-tab bar under the app stylesheet: its image and its two tab rects.
+
+    The rects come back with the image because a tab's geometry is the styled
+    geometry -- read after the sheet comes off and they describe a bar that was
+    never rendered.
+    """
+    from PyQt6.QtWidgets import QApplication, QTabBar
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        bar = QTabBar()
+        qtbot.addWidget(bar)
+        bar.addTab("Alpha")
+        bar.addTab("Beta")
+        bar.setCurrentIndex(0)
+        bar.resize(bar.sizeHint())
+        return bar.grab().toImage(), bar.tabRect(0), bar.tabRect(1)
+    finally:
+        app.setStyleSheet(prior)
+
+
+def test_the_selected_tab_is_underlined_and_the_others_are_not(qtbot):
+    # The rule that draws it sets three of the four edges at once, so a rewrite
+    # of it can quietly take the mark away or paint it on every tab. Both halves
+    # are asserted: the underline exists, and it belongs to one tab only.
+    from shared_ui.colors import BLUE
+
+    image, selected, other = _tab_bar_image(qtbot)
+    low = selected.bottomLeft().y()
+
+    assert image.pixelColor(selected.center().x(), low) == BLUE
+    assert image.pixelColor(other.center().x(), low) != BLUE
+
+
+def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):
+    # The same rule's other edge: it is what says which close mark belongs to
+    # which tab, and it is drawn by the declaration the underline shares.
+    from shared_ui.colors import BORDER_SUBTLE
+
+    image, selected, _ = _tab_bar_image(qtbot)
+    seam = selected.topRight().x()
+
+    assert image.pixelColor(seam, selected.center().y()) == BORDER_SUBTLE

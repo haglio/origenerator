@@ -382,7 +382,7 @@ def test_reject_experiment_trashes_files_but_keeps_the_learning_row(tmp_path):
     assert kept is not None                      # the row survives...
     assert kept["experiment_verdict"] == "down"  # ...carrying the verdict to learn from
     assert kept["output_files"] is None and kept["thumbnail_path"] is None
-    assert not file_path.exists() and not thumb_path.exists()  # the junk is gone
+    assert not file_path.exists() and not thumb_path.exists()  # the leftovers are gone
     assert actions.can_undo() and actions.undo_label() == "Reject experiment"
 
 

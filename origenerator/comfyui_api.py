@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 # Every HTTP call to ComfyUI carries this timeout. Without one, a wedged or
 # swap-thrashed server hangs the calling thread forever — the GUI thread for a
-# submit/cancel (the whole app freezes), or the websocket thread for a history
+# cancel (the whole app freezes), the submit's own thread (see the follow-up
+# below, and RerollController._hand_over), or the websocket thread for a history
 # fetch (no job ever completes again). Generous, because a busy server that IS
 # answering can legitimately take a while; it's a socket-inactivity limit, not a
 # total-transfer one, so even a large /view download streams fine under it.

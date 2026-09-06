@@ -255,13 +255,27 @@ class GenerationJob(QObject):
         job.prompt_id = prompt_id
         return job
 
-    def start(self):
-        """Submit the job and begin tracking it. Raises if the submit fails."""
+    def start(self, submit=None):
+        """Submit the job and begin tracking it. Raises if the submit fails.
+
+        The submit is the one call here that waits on the server, and it can
+        wait a long time (see ``comfyui_api.submit_job``). ``submit`` is how a
+        caller keeps that wait off its own thread: given the callable that
+        makes the POST, it runs it wherever it likes and returns once it is
+        done, raising what it raised; left ``None``, the POST is made right
+        here. Either way the signals are attached before and the state set
+        after on the calling thread, so nothing of the job's is touched from
+        another.
+        """
         if self._state != "idle":
             return
         self._attach()
-        try:
+
+        def post():
             self._client.submit_job(self.payload, self.prompt_id)
+
+        try:
+            post() if submit is None else submit(post)
         except Exception:
             self._detach()
             raise

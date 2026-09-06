@@ -17,6 +17,7 @@ The websocket half stays where it must: it emits Qt signals from a thread.
 """
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -37,6 +38,23 @@ _HTTP_TIMEOUT_S = 30.0
 # generous limit above would freeze the window for half a minute at a time; under
 # this one it costs a skipped reading.
 _POLL_TIMEOUT_S = 2.0
+
+# A submit whose POST timed out is not yet a failed submit. ComfyUI logs "got
+# prompt" the moment the request lands and only then validates it, on its event
+# loop: while that takes long -- fifty seconds on 2026-09-05, for a two-scene
+# clip whose one-scene twin took a tenth of one -- it answers nothing, the
+# websocket's keepalive dies, and the POST's answer comes after the client has
+# stopped listening; the job runs all the same. Declared failed, that job ran
+# untracked and its clip never reached the gallery. So a late submit goes on
+# asking, for this long in all, whether the server lists the prompt.
+_ACCEPTANCE_WAIT_S = 120.0
+# Once the server is answering and does not list it, this much longer for the
+# POST, which it received first, to finish landing in the queue.
+_ACCEPTANCE_GRACE_S = 15.0
+_ACCEPTANCE_POLL_S = 3.0
+# Each ask's own deadline: short, since a stalled server answers none of them
+# and the wait above is what bounds the whole.
+_ACCEPTANCE_READ_TIMEOUT_S = 10.0
 
 
 class ForeignQueue(NamedTuple):
@@ -113,6 +131,14 @@ def format_execution_error(message: str) -> str:
     return first or (f"{node} failed." if node else "The run failed.")
 
 
+def _timed_out(error: BaseException) -> bool:
+    """Whether urllib gave up waiting: a read that timed out raises the socket's
+    own ``TimeoutError``; a connect that did wraps one in ``URLError``."""
+    if isinstance(error, TimeoutError):
+        return True
+    return isinstance(error, urllib.error.URLError) and isinstance(error.reason, TimeoutError)
+
+
 def _queue_prompt_id(item):
     """The prompt id of a ``/queue`` entry — element 1 of its tuple — or ``None``."""
     if isinstance(item, (list, tuple)) and len(item) > 1:
@@ -175,9 +201,58 @@ class ComfyUIApi:
         ``/history`` entry for this job key on the same id the DB row uses. That
         one shared id is what lets a job be matched live and, after a restart,
         reconnected to. Returns the id for symmetry; it always equals ``prompt_id``.
+
+        A POST the server answers too late is followed up rather than failed:
+        see :meth:`_await_acceptance`.
         """
-        self._post_prompt(workflow_payload, prompt_id)
+        try:
+            self._post_prompt(workflow_payload, prompt_id)
+        except Exception as e:
+            if not _timed_out(e):
+                raise
+            if not self._await_acceptance(prompt_id):
+                raise RuntimeError(
+                    "ComfyUI took too long to answer the submit and never listed the prompt"
+                ) from e
+            logger.info("Submit of %s was answered late; ComfyUI lists it", prompt_id)
         return prompt_id
+
+    def _await_acceptance(self, prompt_id: str) -> bool:
+        """Whether ComfyUI took a prompt whose POST timed out.
+
+        Asks ``/queue`` and ``/history`` for it, patiently: the stall that
+        outlasted the POST swallows these reads at first, so one that fails is
+        asked again, for :data:`_ACCEPTANCE_WAIT_S` in all. A server that
+        answers without the prompt gets :data:`_ACCEPTANCE_GRACE_S` more for the
+        POST, which it received first, to land; after that the prompt is not
+        there and the submit failed.
+        """
+        deadline = time.monotonic() + _ACCEPTANCE_WAIT_S
+        absent_since = None
+        while True:
+            try:
+                if self._lists_prompt(prompt_id):
+                    return True
+                absent_since = absent_since if absent_since is not None else time.monotonic()
+            except Exception as e:  # a stalled server answers none of these
+                logger.debug("Still waiting on ComfyUI to list %s: %s", prompt_id, e)
+            now = time.monotonic()
+            if now >= deadline:
+                return False
+            if absent_since is not None and now - absent_since >= _ACCEPTANCE_GRACE_S:
+                return False
+            time.sleep(_ACCEPTANCE_POLL_S)
+
+    def _lists_prompt(self, prompt_id: str) -> bool:
+        """Whether the server has ``prompt_id`` queued, running, or finished."""
+        data = self._fetch_queue_data(timeout=_ACCEPTANCE_READ_TIMEOUT_S)
+        queued = {
+            pid for key in ("queue_running", "queue_pending") for item in data.get(key, [])
+            if (pid := _queue_prompt_id(item)) is not None
+        }
+        if prompt_id in queued:
+            return True
+        return bool(self._history_entry(prompt_id, timeout=_ACCEPTANCE_READ_TIMEOUT_S))
 
     def interrupt(self):
         """Stop the prompt ComfyUI is currently executing."""
@@ -231,8 +306,12 @@ class ComfyUIApi:
             raise RuntimeError(format_prompt_error(detail)) from e
 
     def fetch_history(self, prompt_id: str) -> dict:
+        return self._history_entry(prompt_id, timeout=_HTTP_TIMEOUT_S)
+
+    def _history_entry(self, prompt_id: str, timeout: float) -> dict:
+        """The prompt's ``/history`` entry, ``{}`` while the server has none."""
         url = f"{self.base_url}/history/{prompt_id}"
-        with urllib.request.urlopen(url, timeout=_HTTP_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read())
             return data.get(prompt_id, {})
 

@@ -345,7 +345,7 @@ def test_settings_signature_ignores_the_enhancement():
     plain = settings_signature("sdxl_t2i", sdxl(enhance=False), None, workflow_version="v004")
     assert settings_signature("sdxl_t2i", sdxl(enhance=True), None,
                               workflow_version="v004") == plain
-    # Nor does HOW it was enhanced: the tail's own knobs are part of the finish,
+    # Nor does HOW it was enhanced: the tail's own settings are part of the finish,
     # so a harder upscale or a second pass at another denoise stays put too.
     assert settings_signature("sdxl_t2i", sdxl(enhance=True, enhance_scale=4.0,
                                                enhance_steps=40, enhance_denoise=0.3,

@@ -114,7 +114,7 @@ def test_the_switch_draws_at_both_states(qtbot):
     switch.setChecked(True)
     on = switch.grab().toImage()
     assert not off.isNull() and not on.isNull()
-    assert off != on            # the knob and the track visibly moved
+    assert off != on            # the setting and the track visibly moved
 
 
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
@@ -127,7 +127,7 @@ def test_loading_a_folders_settings_writes_nothing_back(qtbot):
     assert panel.settings().params["enhance_steps"] == 40
 
 
-def test_every_knob_reports_its_edit(qtbot):
+def test_every_setting_reports_its_edit(qtbot):
     panel, edits = _panel(qtbot)
     panel._auto.setChecked(True)
     panel._scale.setValue(3.0)
@@ -292,7 +292,7 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
 
 def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
-    # Switching the panel off and on again must not hand back a knob that was
+    # Switching the panel off and on again must not hand back a setting that was
     # grayed in its own right: the part still has no model to find it.
     panel, _ = _panel(qtbot, detectors=())
     panel.set_applicable(False, "nope")

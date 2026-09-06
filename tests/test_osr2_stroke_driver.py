@@ -186,7 +186,7 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
     assert gaps and all(abs(g - 0.025) < 1e-9 for g in gaps)
 
 
-def test_the_knobs_shape_the_status_line(qtbot):
+def test_the_dials_shape_the_status_line(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.start()
     driver.adjust_speed(50)          # dial to the top: 200 strokes/min
@@ -196,8 +196,8 @@ def test_the_knobs_shape_the_status_line(qtbot):
     assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
 
 
-def test_the_status_line_reads_off_but_keeps_the_knobs_while_stopped(qtbot):
-    # The slideshow shows this line before the stroke ever starts, so the knobs
+def test_the_status_line_reads_off_but_keeps_the_dials_while_stopped(qtbot):
+    # The slideshow shows this line before the stroke ever starts, so the dials
     # must be readable (and tunable) while the device is still parked.
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)

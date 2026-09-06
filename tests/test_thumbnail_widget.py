@@ -293,7 +293,7 @@ def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
 
 
 def test_set_enhance_re_reads_the_plus_without_a_rebuild(qtbot):
-    # A knob turned on the Enhance panel changes what every picture on screen
+    # A setting turned on the Enhance panel changes what every picture on screen
     # would get from a press, and none of those tiles were touched.
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_HELD)
     qtbot.addWidget(tw)

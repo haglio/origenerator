@@ -7,7 +7,7 @@ a folder may set — everything else about the job (the input file, the prompts
 steering the added texture) is read off the image being enhanced, and the seed is
 re-rolled per launch like any variation.
 
-The same keys are what a level is remembered by, so :func:`level_knobs` and
+The same keys are what a level is remembered by, so :func:`level_settings` and
 :func:`describe_enhance_params` live here too: what one enhancement ran at, and
 the line the versions list says it in.
 """
@@ -22,7 +22,7 @@ from origenerator.workflows.detail_parts import detail_fixes_of
 # generation of its own: its defaults are where an unconfigured folder starts.
 ENHANCE_WORKFLOW = "image_enhance"
 
-# The knobs the Enhance subpanel offers, and so the only params a folder's
+# The settings the Enhance subpanel offers, and so the only params a folder's
 # settings may override on an enhance run. Everything else about the job — the
 # input file, the prompts steering the added texture — is read off the image
 # being enhanced, and the seed is re-rolled per launch like any variation.
@@ -39,7 +39,7 @@ MATCH_SOURCE_MODEL = "(match the source image)"
 
 
 def default_enhance_params() -> dict:
-    """The ``image_enhance`` workflow's own defaults, narrowed to the knobs a
+    """The ``image_enhance`` workflow's own defaults, narrowed to the settings a
     folder may set — what the subpanel shows for a folder that has never been
     configured."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
@@ -48,24 +48,24 @@ def default_enhance_params() -> dict:
     return params
 
 
-def level_knobs(params: dict) -> dict:
-    """The knobs one enhancement is remembered by, out of whatever it recorded.
+def level_settings(params: dict) -> dict:
+    """The settings one enhancement is remembered by, out of whatever it recorded.
 
     :data:`ENHANCE_SETTING_KEYS` filtered off ``params``, with the detail pass
     read through :func:`~origenerator.workflows.detail_parts.detail_fixes_of` —
     so a level recorded under the old tick-and-two-detectors shape comes back as
     the parts it fixed, and captions, re-runs and duplicate checks all see one
     thing. A level that recorded no pass keeps none rather than an empty dict:
-    an enhancement whose knobs are unknown must stay indistinguishable from one
+    an enhancement whose settings are unknown must stay indistinguishable from one
     that recorded nothing at all, which is what an empty ``params`` means.
     """
-    knobs = {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}
+    settings = {k: v for k, v in params.items() if k in ENHANCE_SETTING_KEYS}
     fixes = detail_fixes_of(params)
     if fixes:
-        knobs["enhance_detail_fixes"] = fixes
+        settings["enhance_detail_fixes"] = fixes
     else:
-        knobs.pop("enhance_detail_fixes", None)
-    return knobs
+        settings.pop("enhance_detail_fixes", None)
+    return settings
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class EnhanceSettings:
 
     ``auto`` is the subpanel's box: with it on, every image the folder newly
     generates is enhanced as it lands, so a folder can be left to produce
-    finished images rather than raw ones. ``params`` holds the knobs
+    finished images rather than raw ones. ``params`` holds the settings
     (:data:`ENHANCE_SETTING_KEYS`); a key absent from it falls back to the
     workflow default, and a ``checkpoint`` of :data:`MATCH_SOURCE_MODEL` falls
     back to whichever model made the image.
@@ -113,7 +113,7 @@ class EnhanceSettings:
 
 
 def describe_enhance_params(params: dict) -> str:
-    """A one-line summary of an enhancement's knobs, for the levels list.
+    """A one-line summary of an enhancement's settings, for the levels list.
 
     Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
     distinguish one experiment from another, then each part the detail pass

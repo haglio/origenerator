@@ -79,7 +79,7 @@ def test_settings_round_trip_through_json():
 
 
 def test_stored_settings_cannot_smuggle_in_params_outside_the_panel():
-    # Only the knobs the subpanel offers are honored: a stored blob naming, say,
+    # Only the settings the subpanel offers are honored: a stored blob naming, say,
     # the input image must not be able to redirect what an enhance runs on.
     back = EnhanceSettings.parse(json.dumps(
         {"auto": True, "params": {"input_image": "elsewhere.png", "enhance_steps": 12}}
@@ -107,7 +107,7 @@ def test_enhance_params_take_the_folders_settings_over_the_workflow_defaults():
     assert params["negative_prompt"] == "blurry"
 
 
-def test_the_detail_pass_is_one_of_the_knobs_the_panel_sets():
+def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
     # It is part of what an enhancement IS, not a property of one image, so it
     # is set once on the panel and every enhance launched from there carries it.
     settings = EnhanceSettings(params={"enhance_detail_fixes": {"teeth": 0.5}})
@@ -144,8 +144,8 @@ def test_no_settings_at_all_still_yields_the_workflow_defaults():
 # --- the levels an image accumulates ---------------------------------------
 
 
-def _enhance_row(prompt_id, filename, **knobs):
-    params = {"input_image": "image/sdxl_t2i_src.png [output]", **knobs}
+def _enhance_row(prompt_id, filename, **settings):
+    params = {"input_image": "image/sdxl_t2i_src.png [output]", **settings}
     return {
         "prompt_id": prompt_id,
         "workflow_name": "image_enhance",
@@ -167,10 +167,10 @@ def _seed_source(db, filename="sdxl_t2i_src.png"):
         [{"filename": filename, "subfolder": "image", "type": "output"}]))
 
 
-def _add_and_fold(db, prompt_id, filename, **knobs):
+def _add_and_fold(db, prompt_id, filename, **settings):
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v001",
-        params_json=json.dumps({"input_image": "image/sdxl_t2i_src.png [output]", **knobs}),
+        params_json=json.dumps({"input_image": "image/sdxl_t2i_src.png [output]", **settings}),
         workflow_json="{}",
     )
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(
@@ -186,7 +186,7 @@ def test_an_unenhanced_image_has_no_levels():
 def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
     # Every image the green badge marks lists here — including the ones the
     # inline tail finished, which kept no original. There is one file and no
-    # "before", so the list is that single enhancement, named by the knobs the
+    # "before", so the list is that single enhancement, named by the settings the
     # tail ran at so it can still be dragged onto the panel and reused.
     row = dict(_source_row(), params_json=json.dumps({
         "positive_prompt": "a lantern on a jetty",
@@ -266,11 +266,11 @@ def test_enhance_history_survives_capture_and_restore(tmp_path):
     assert db.get_generation("src")["enhance_history"] == row["enhance_history"]
 
 
-def test_a_level_recorded_before_a_knob_existed_still_reads_as_a_duplicate(tmp_path):
-    # The knob list grows, and a level recorded before one existed was made with
+def test_a_level_recorded_before_a_setting_existed_still_reads_as_a_duplicate(tmp_path):
+    # The setting list grows, and a level recorded before one existed was made with
     # it at its default — so it still matches settings that leave it there, and
     # the + Enhance card still knows it would only be making the same thing
-    # twice. Turning the new knob on is a different enhancement, and does not.
+    # twice. Turning the new setting on is a different enhancement, and does not.
     db = Database(tmp_path / "t.db")
     _seed_source(db)
     _add_and_fold(db, "e1", "image_enhance_00001_.png",

@@ -1208,7 +1208,7 @@ class GenerateConfigPanel(QWidget):
         takes them away — a control on a picture can no more outlive that picture
         than the "no longer these settings" notice beside it can — and because
         everything they report moves under the picture too: the bookmark when the
-        menu toggles one, what the plus is offering whenever a knob turns on the
+        menu toggles one, what the plus offers whenever a setting moves on the
         Enhance panel. An autoshow arms them as readily as an explicit selection:
         the footer stays hidden there because an autoshow is a peek rather than a
         choice, but the picture is a real generation and starring it means exactly

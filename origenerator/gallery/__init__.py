@@ -16,7 +16,7 @@ The logic is split by responsibility, in dependency order:
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
 * :mod:`.enhance_settings` — what a folder's enhancement is configured with,
   and how one enhancement is described.
-* :mod:`.enhance_graph` — the same knobs read back off a row's stored ComfyUI
+* :mod:`.enhance_graph` — the same settings read back off a row's stored ComfyUI
   graph, for a row whose own params are vague about them.
 * :mod:`.enhance` — what an enhancement is, which rows have had one and which
   want one.

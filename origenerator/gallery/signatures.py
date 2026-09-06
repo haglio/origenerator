@@ -37,7 +37,7 @@ INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 # the same thing. This static set serves rows with no registered workflow
 # (imports); a registered row's keys come from its template instead
 # (:meth:`WorkflowTemplate.enhance_keys`), so a workflow growing another enhance
-# knob can't silently start splitting folders by it.
+# setting can't silently start splitting folders by it.
 ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})
 
 def parse_params(params_json: str | None) -> dict:

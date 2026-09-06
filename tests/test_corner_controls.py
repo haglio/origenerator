@@ -71,7 +71,7 @@ def test_an_image_holding_these_very_settings_has_nothing_to_offer():
     assert enhance_state(_enhanced_row(settings), settings) == icons.ENHANCE_HELD
 
 
-def test_a_knob_moved_turns_that_back_into_an_offer():
+def test_a_setting_moved_turns_that_back_into_an_offer():
     # The image is not finished with the enhancer, it is finished with THESE
     # settings — so the corner offers again as soon as they describe another one.
     settings = gallery.EnhanceSettings(auto=False, params={"enhance_scale": 2.0})

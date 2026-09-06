@@ -1,4 +1,4 @@
-"""Reading the enhance knobs back off a stored ComfyUI graph.
+"""Reading the enhance settings back off a stored ComfyUI graph.
 
 A row the import scan reconstructed keeps the tail's numbers under the generic
 names any sampler has — ``steps`` and ``denoise`` — and says nothing at all about
@@ -43,7 +43,7 @@ def _detailer(graph, node_id, part_model, denoise):
     return graph
 
 
-def test_a_graph_gives_up_every_knob_the_row_itself_is_vague_about():
+def test_a_graph_gives_up_every_setting_the_row_itself_is_vague_about():
     found = graph_level_params(_row(_sampler_graph()), _KEYS)
 
     assert found["checkpoint"] == "example_model_v2.safetensors"
@@ -110,7 +110,7 @@ def test_only_the_keys_asked_for_come_back():
     assert found == {"enhance_steps": 20}
 
 
-def test_a_knob_the_graph_left_empty_is_absent_rather_than_none():
+def test_a_setting_the_graph_left_empty_is_absent_rather_than_none():
     graph = _sampler_graph()
     graph["4"]["inputs"] = {"steps": 20}   # a sampler with no denoise on it
 

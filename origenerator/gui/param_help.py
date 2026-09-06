@@ -28,9 +28,19 @@ PARAM_HELP: dict[str, str] = {
     # --- prompts and the input picture ---
     "positive_prompt": (
         "What you want to see. Comma-separated phrases work best; the earlier a "
-        "phrase appears, the more weight it tends to carry. In a video longer than "
-        "10 s, a line holding only --- ends one scene and starts the next: each "
-        "10 s of the clip reads its own scene, and the last scene runs to the end."
+        "phrase appears, the more weight it tends to carry. A video can tell a "
+        "story: add a scene and each runs for its own length, starting on the "
+        "last frame of the one before."
+    ),
+    "scene_frames": (
+        "How long each scene of the story runs, at the rate the model paces "
+        "motion. Every scene after the first starts on the last frame of the one "
+        "before it, so the clip is the scenes end to end."
+    ),
+    "scene_lines": (
+        "What she says in this scene. Saved with the recipe, and nothing hears it "
+        "yet: no voice is wired in, so the field does not change the video until "
+        "one is."
     ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "

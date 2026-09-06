@@ -1081,3 +1081,124 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
     assert form.get_values()["frame_rate"] == 64.0
     qtbot.keyClick(rate.lineEdit(), Qt.Key.Key_Return)
     assert rate.currentText() == "64 fps"
+
+
+# --- a story: one prompt box and one length per scene --------------------------
+
+def _scene_defs():
+    return [
+        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5, max_val=961, step=4,
+                 options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0),
+        ParamDef("scene_lines", "Lines", "lines", [""]),
+        ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=961, step=4,
+                 options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0),
+    ]
+
+
+def test_a_story_starts_as_one_scene_whose_length_is_the_clips(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    assert form._widgets["positive_prompt"] is editor is form._widgets["scene_lines"]
+    assert len(editor.scene_boxes()) == 1
+    assert form.get_values() == {"positive_prompt": "", "scene_frames": [81],
+                                 "scene_lines": [""], "frame_count": 81}
+
+
+def test_adding_a_scene_gives_it_its_own_prompt_and_length_and_the_clip_adds_up(qtbot):
+    # Every scene after the first starts on the frame before it, so 5 s and
+    # 10 s of scenes make 81 + 160 frames of clip, and the story is stored as
+    # one prompt with a scene break between the two texts.
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+    editor.scene_boxes()[0].setPlainText("she waves")
+    editor.scene_boxes()[1].setPlainText("she turns")
+    [scene.length for scene in editor._scenes][1].setCurrentText("10")
+    values = form.get_values()
+    assert values["positive_prompt"] == "she waves\n---\nshe turns"
+    assert values["scene_frames"] == [81, 161]
+    assert values["frame_count"] == 241
+
+
+def test_a_stored_story_fills_one_box_per_scene(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    stored = {"positive_prompt": "a\n---\nb\n---\nc", "scene_frames": [161, 81, 161],
+              "scene_lines": ["hi", "", "bye"], "frame_count": 401}
+    form.set_values(stored)
+    editor = form._widgets["scene_frames"]
+    assert [box.toPlainText() for box in editor.scene_boxes()] == ["a", "b", "c"]
+    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
+    assert [box.toPlainText() for box in [scene.lines for scene in editor._scenes]] == ["hi", "", "bye"]
+    assert form.get_values_static() == stored
+
+
+def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    form.set_values({"positive_prompt": "one shot", "frame_count": 121})
+    editor = form._widgets["scene_frames"]
+    assert [box.toPlainText() for box in editor.scene_boxes()] == ["one shot"]
+    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    values = form.get_values_static()
+    assert (values["scene_frames"], values["frame_count"]) == ([121], 121)
+
+
+def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+    editor.add_scene()
+    assert form.get_values()["frame_count"] == 81 + 80 + 80
+    editor.remove_scene(1)
+    assert form.get_values()["scene_frames"] == [81, 81]
+    editor.remove_scene(0)
+    assert form.get_values()["scene_frames"] == [81]
+    assert not [scene.remove for scene in editor._scenes][0].isEnabled()
+
+
+def test_the_clip_length_reads_as_the_scenes_total_and_takes_no_typing(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    duration = form._widgets["frame_count"]
+    assert isinstance(duration, QLabel)
+    editor.add_scene()
+    [scene.length for scene in editor._scenes][0].setCurrentText("10")
+    assert duration.text() == "15 s"          # 161 + 80 frames, at 16 fps
+    assert form.get_values()["frame_count"] == 241
+
+
+def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+    editor.scene_boxes()[0].setPlainText("a")
+    editor.scene_boxes()[1].setPlainText("b")
+    assert editor.scene_boxes()[0] in form.text_fields()
+    assert editor.scene_boxes()[1] in form.text_fields()
+    assert form._field_text("positive_prompt") == "a\n---\nb"
+
+
+def test_the_lines_box_says_it_is_not_voiced_yet(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    box = form._widgets["scene_frames"]._scenes[0].lines
+    assert "not voiced" in box.placeholderText().lower()
+
+
+def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbot):
+    # A recipe from the overlay carries the clip length over the workflow's
+    # default scene list; the clip length is what the graph runs a lone scene
+    # for, so it is what the form shows and emits.
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    form.set_values({"positive_prompt": "x", "frame_count": 121, "scene_frames": [81]})
+    editor = form._widgets["scene_frames"]
+    assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
+    assert form.get_values_static()["frame_count"] == 121

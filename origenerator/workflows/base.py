@@ -27,9 +27,9 @@ SCHEDULER_OPTIONS = [
 # typed value too. Every rate is a whole multiple of the models' native one,
 # because those are the rates the frame interpolator can produce the frames for
 # — see :mod:`origenerator.workflows.frame_rate`.
-DURATION_OPTIONS = [1, 5, 10, 15, 30]
+DURATION_OPTIONS = [1, 5, 10, 15, 30, 60]
 # The longest of those, in frames at the native rate on the models' 4k+1 grid.
-LONGEST_CLIP_FRAMES = 481
+LONGEST_CLIP_FRAMES = 961
 # Sampled as one window, a clip's activations grow with its length: measured
 # on the 16 GB card, 165 frames at the video pixel budget is 10.5 GB and 481
 # is 31 GB, which Windows pages through system RAM at a crawl rather than
@@ -69,6 +69,18 @@ _DETECTOR_DROP_SIZE = 10      # boxes smaller than this are noise, not anatomy
 _DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
 _DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
 _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
+
+
+def story_of(scenes: list[str]) -> str:
+    """The one positive prompt that stores ``scenes``: their texts with a
+    :data:`SCENE_BREAK` line between each -- what :func:`scene_prompts` splits."""
+    return f"\n{SCENE_BREAK}\n".join(scenes)
+
+
+def chained_frames(lengths: list[int]) -> int:
+    """How many frames pieces chained from each other's last frame add up to:
+    each after the first starts on the frame before it, so counts once."""
+    return lengths[0] + sum(length - 1 for length in lengths[1:])
 
 
 def scene_prompts(text: str) -> list[str]:
@@ -274,23 +286,49 @@ class WorkflowTemplate(ABC):
         return node, [node_id, 0]
 
     @staticmethod
-    def scene_prompt_nodes(index: int, scenes: list[str], clip_ref, first_ref):
-        """The text conditioning segment ``index`` reads: ``first_ref`` -- the
-        graph's own encode of the first scene -- while its scene is that one, or
-        an encode of its own scene. A prompt without a break is one scene, so
-        every segment shares the node the graph always had.
+    def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref):
+        """The text conditioning segment ``index`` of scene ``scene`` reads:
+        ``first_ref`` -- the graph's own encode of the first scene -- while its
+        scene's text is that one, or an encode of its own scene. A prompt without
+        a break is one scene, so every segment shares the node the graph always
+        had; a scene past the last text carries the last text on.
         """
-        scene = scenes[min(index, len(scenes) - 1)]
-        if index == 0 or scene == scenes[0]:
+        text = scenes[min(scene, len(scenes) - 1)]
+        if index == 0 or text == scenes[0]:
             return {}, first_ref
         node_id = f"s{index}_prompt"
         node = {
             node_id: {
                 "class_type": "CLIPTextEncode",
-                "inputs": {"clip": clip_ref, "text": scene},
+                "inputs": {"clip": clip_ref, "text": text},
             }
         }
         return node, [node_id, 0]
+
+    @classmethod
+    def scene_plan(cls, params: dict) -> list[tuple[int, int]]:
+        """Every segment of the clip as ``(length, scene)``, in order.
+
+        A story is ``scene_frames``, one length per scene; a lone scene is the
+        whole clip and runs for ``frame_count`` -- the length every other reader
+        of a recipe goes by, and all a recipe from the overlay carries -- so a
+        single entry never overrules it. Each scene splits into segments of at
+        most :data:`SINGLE_WINDOW_FRAMES` (:meth:`segment_lengths`), and every
+        segment after the first, its scene's first included, starts on the
+        frame before it.
+        """
+        frames = list(params.get("scene_frames") or [])
+        if len(frames) < 2:
+            frames = [params["frame_count"]]
+        return [(length, scene)
+                for scene, count in enumerate(frames)
+                for length in cls.segment_lengths(count)]
+
+    @staticmethod
+    def clip_frames(plan: list[tuple[int, int]]) -> int:
+        """How many frames a plan renders once each seam's shared frame is
+        counted once."""
+        return chained_frames([length for length, _ in plan])
 
     @staticmethod
     def segment_lengths(frame_count: int) -> list[int]:
@@ -310,28 +348,32 @@ class WorkflowTemplate(ABC):
 
     @classmethod
     def chain_segments(cls, params: dict, start_ref, render):
-        """The whole clip as segments chained from each other's last frame,
-        and the IMAGE ref holding every frame in order.
+        """The whole clip as segments chained from each other's last frame:
+        the nodes, the IMAGE ref holding every frame in order, and how many
+        frames that is.
 
-        ``render(index, start_ref, length, last)`` builds one segment -- its
-        conditioning, samplers and decode -- from the image ref it starts on,
-        and returns ``(nodes, frames_ref)``; ``last`` says it is the final
-        one. Segment 0 starts on ``start_ref`` and keeps the graph's own node
-        ids, so a clip that fits one segment is the graph it always was. Each
-        later segment starts on the frame the previous one ended on (cut out
-        with ``ImageFromBatch``), and joins the frames after that shared one
-        onto the clip (``ImageBatch``), so the seam is one frame long.
+        ``render(index, scene, start_ref, length, last)`` builds one segment --
+        its conditioning, samplers and decode -- from the image ref it starts
+        on, and returns ``(nodes, frames_ref)``; ``scene`` is the scene of the
+        story it belongs to and ``last`` says it is the final one. Segment 0
+        starts on ``start_ref`` and keeps the graph's own node ids, so a clip
+        that fits one segment is the graph it always was. Each later segment
+        starts on the frame the previous one ended on (cut out with
+        ``ImageFromBatch``), and joins the frames after that shared one onto
+        the clip (``ImageBatch``), so the seam is one frame long.
         """
-        lengths = cls.segment_lengths(params["frame_count"])
-        nodes, frames = render(0, start_ref, lengths[0], len(lengths) == 1)
-        joined, previous, previous_length = frames, frames, lengths[0]
-        for index, length in enumerate(lengths[1:], start=1):
+        plan = cls.scene_plan(params)
+        first_length, first_scene = plan[0]
+        nodes, frames = render(0, first_scene, start_ref, first_length, len(plan) == 1)
+        joined, previous, previous_length = frames, frames, first_length
+        for index, (length, scene) in enumerate(plan[1:], start=1):
             prefix = f"s{index}_"
             nodes[prefix + "last"] = {
                 "class_type": "ImageFromBatch",
                 "inputs": {"image": previous, "batch_index": previous_length - 1, "length": 1},
             }
-            segment, frames = render(index, [prefix + "last", 0], length, index == len(lengths) - 1)
+            segment, frames = render(index, scene, [prefix + "last", 0], length,
+                                     index == len(plan) - 1)
             nodes.update(segment)
             nodes[prefix + "new"] = {
                 "class_type": "ImageFromBatch",
@@ -342,7 +384,7 @@ class WorkflowTemplate(ABC):
                 "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
             }
             joined, previous, previous_length = [prefix + "join", 0], frames, length
-        return nodes, joined
+        return nodes, joined, cls.clip_frames(plan)
 
     @staticmethod
     def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict,

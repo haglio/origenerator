@@ -2,8 +2,9 @@
 
 A ParamDef key is not a local name. It is written into every run's
 ``params_json``, into the verbatim copy of that row the recovery bin holds, and
-into ``state/ui_state.json`` for every open generate tab -- so renaming one is a
-migration, and it is applied wherever those three are read back.
+into ``state/ui_state.json`` for every open generate tab, and it can be pinned
+by hand in a curated recipe in the content overlay -- so renaming one is a
+migration, and it is applied wherever those four are read back.
 
 Nothing validates a params key set: a workflow asked for a key that is not there
 falls back to its default. So a missed migration is silent, which is why this

@@ -12,6 +12,7 @@ there is no past run to reproduce). Qt-free so it stays unit-testable.
 from origenerator.content import load_content
 from origenerator.gallery.output import output_file_reference, row_output_files
 from origenerator.generation_config import filled_params, randomize_seeds
+from origenerator.param_keys import renamed as renamed_params
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _CONTENT = load_content()
@@ -97,7 +98,7 @@ def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
     if ref is None:
         return None
     params = dict(workflow.default_params())
-    params.update(spec.get("params") or {})
+    params.update(renamed_params(spec.get("params") or {}))
     return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
 
 

@@ -566,6 +566,24 @@ def test_delete_generation_removes_row(tmp_path):
     assert db.get_generation("del-002") is not None
 
 
+def test_the_highest_id_issued_counts_the_rows_that_have_been_and_gone(tmp_path):
+    """`max(id)` answers what is still here, and an enhancement's row is deleted
+    the moment it folds — so the id it ran under, which its level records, is
+    routinely one no longer in the table. The high-water mark is what says
+    whether such an id was ever this table's to give."""
+    db = Database(tmp_path / "test.db")
+    assert db.highest_id_issued() == 0  # a table that has issued nothing
+    for i in range(3):
+        db.insert_generation(
+            prompt_id=f"h-{i}", workflow_name="sdxl_t2i", workflow_version="v002",
+            params_json="{}", workflow_json="{}",
+        )
+    newest = db.get_generation("h-2")["id"]
+    db.delete_generation("h-2")
+
+    assert db.highest_id_issued() == newest
+
+
 def test_restore_generation_brings_back_a_deleted_row_intact(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(

@@ -11,9 +11,12 @@ listed (and on disk) as the original, and the transient row is deleted.
 completions that landed while the app was closed — and retroactively converting
 older rows recorded as ``image_enhance`` generations.
 
+:func:`disown_foreign_runs` is the third, and repairs the one thing a level can
+carry that is not its own: a run id from a database that was never this one.
+
 **This module is the whole of the gallery package's persistence.** Everything
 else under :mod:`origenerator.gallery` takes rows and answers questions about
-them; only these two functions take a database and change what is in it, and
+them; only these functions take a database and change what is in it, and
 ``tests/test_gallery_facade.py`` holds that at one file. So a reader asking what
 the gallery can alter has one file to read, and a caller wanting the pure half
 can have it without a database at all.
@@ -161,3 +164,51 @@ def fold_completed_enhancements(db) -> int:
     if folded:
         logger.info("Folded %d enhancements into their source images", folded)
     return folded
+
+
+def disown_foreign_runs(db) -> int:
+    """Take the run id off every enhance level naming a run this database never
+    made, and say how many rows that repaired.
+
+    A level records the id of the transient row its enhancement ran under
+    (:func:`_history_entries`), and the Recents shelf seats an enhanced image by
+    that number — the image belongs where its newest enhancement falls in the
+    library's order, not where its own generation does. So an id from somewhere
+    else seats the image somewhere meaningless.
+
+    Which is what a preview used to leave behind. A branch session kept its own
+    database, seeded from this one and counting on from where this one had
+    reached, and the rows it made were adopted home with their history intact —
+    ids and all, from a counter that ran ahead of this table's. An image wearing
+    one sits at the top of Latest above every generation since, and nothing
+    moves it until this table's own counter has climbed past a number it never
+    chose. A preview shares the live library now, so nothing writes a foreign id
+    any more; this cleans up after the ones that did.
+
+    An id above this table's high-water mark is provably not its own
+    (:meth:`~origenerator.db_generations.GenerationStore.highest_id_issued`,
+    which counts the rows that have been and gone — an enhancement deletes its
+    own row the moment it folds, so an id missing from the table is the ordinary
+    case and proves nothing). One at or below the mark is left alone: it may well
+    name a run this library really made, and a level's place in the order is not
+    worth guessing at.
+    """
+    ceiling = db.highest_id_issued()
+    if not ceiling:
+        return 0
+    repaired = 0
+    for row in db.list_generations():
+        levels = parse_file_list(row.get("enhance_history"))
+        owned = [
+            {**level, "run_id": None}
+            if isinstance(level, dict) and isinstance(level.get("run_id"), int)
+            and level["run_id"] > ceiling
+            else level
+            for level in levels
+        ]
+        if owned != levels:
+            db.update_generation(row["prompt_id"], enhance_history=json.dumps(owned))
+            repaired += 1
+    if repaired:
+        logger.info("Disowned a foreign run id on %d enhanced images", repaired)
+    return repaired

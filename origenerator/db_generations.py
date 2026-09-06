@@ -230,6 +230,26 @@ class GenerationStore(Store):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def highest_id_issued(self) -> int:
+        """The largest id this table has ever handed out, deleted rows included.
+
+        ``max(id)`` answers a narrower question — what is still here — and the
+        gap between the two is every row that has been and gone: the transient
+        row an enhancement runs under is deleted the moment it folds, taking its
+        id out of the table but not out of the count. AUTOINCREMENT keeps the
+        real high-water mark in ``sqlite_sequence``, which is what says whether
+        an id recorded elsewhere could ever have been one of this table's own
+        (:func:`~origenerator.branch_session.disown_foreign_runs`). A table that
+        has issued nothing yet has no row there, and answers 0.
+        """
+        with self._connect() as conn:
+            for sql in ("SELECT seq FROM sqlite_sequence WHERE name = 'generations'",
+                        "SELECT max(id) FROM generations"):
+                row = conn.execute(sql).fetchone()
+                if row is not None and row[0] is not None:
+                    return int(row[0])
+            return 0
+
     def delete_generation(self, prompt_id: str):
         with self._connect() as conn:
             conn.execute(

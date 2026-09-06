@@ -266,6 +266,16 @@ def _fold_enhancements(library: Library):
     fold_completed_enhancements(library.db)
 
 
+def _disown_foreign_runs(library: Library):
+    """And take off the run ids a preview's own database left on the levels it
+    made back when it kept one: numbers from a counter that ran ahead of this
+    table's, which seat those images above everything this app has made since.
+    After the fold, which is what writes a level's run id in the first place."""
+    from origenerator.gallery import disown_foreign_runs
+
+    return disown_foreign_runs(library.db)
+
+
 def _repair_thumbnails(library: Library):
     """Re-render any thumbnail an old filename-stem collision left wrong or
     missing, so each generation's thumbnail matches its own preview again."""
@@ -322,6 +332,9 @@ MAINTENANCE = (
              failure="Input-image backfill failed: %s"),
     BootPass("Folding enhancements into their images...", _fold_enhancements,
              failure="Enhancement fold failed: %s"),
+    BootPass(None, _disown_foreign_runs,
+             counted="Disowned a preview's run id on %d enhanced image(s)",
+             failure="Disowning foreign enhancement runs failed: %s"),
     BootPass("Repairing thumbnails...", _repair_thumbnails,
              counted="Repaired %d colliding thumbnails",
              failure="Thumbnail repair failed: %s"),

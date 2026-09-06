@@ -181,6 +181,45 @@ def test_a_stamped_run_moves_its_own_image_up_the_shelf(tmp_path):
     assert gallery.enhancement_recency(rows) == {"second": run_id}
 
 
+def test_a_run_id_this_table_never_issued_comes_off_the_level(tmp_path):
+    """A preview used to keep its own database, seeded from the live one and
+    counting on from there, and the rows it made came home with their history
+    intact. The image then sits at the top of Latest on a number from a counter
+    that was never this table's, and nothing moves it until this table's own has
+    climbed past it."""
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "adopted")
+    db.update_generation("adopted", enhance_history=json.dumps(
+        [{"filename": "e.png", "params": {"enhance_scale": 2.0},
+          "run_id": db.highest_id_issued() + 30}]))
+
+    assert gallery.disown_foreign_runs(db) == 1
+
+    level, = json.loads(db.get_generation("adopted")["enhance_history"])
+    assert level["run_id"] is None
+    assert level["params"] == {"enhance_scale": 2.0}   # the settings are the level's
+    assert level["filename"] == "e.png"                # and so is its file
+    assert gallery.disown_foreign_runs(db) == 0        # nothing left to repair
+
+
+def test_a_run_this_table_really_issued_is_left_where_it_is(tmp_path):
+    """Including one whose row is gone: a fold deletes the row its enhancement
+    ran under, so an id missing from the table is the ordinary case. Only one
+    above the high-water mark is provably not ours."""
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "mine")
+    _add_enhance(db, "transient", "image/sdxl_t2i_src.png [output]", "e.png")
+    ran_as = db.get_generation("transient")["id"]
+    db.delete_generation("transient")
+    db.update_generation("mine", enhance_history=json.dumps(
+        [{"filename": "e.png", "params": {}, "run_id": ran_as}]))
+
+    assert gallery.disown_foreign_runs(db) == 0
+
+    level, = json.loads(db.get_generation("mine")["enhance_history"])
+    assert level["run_id"] == ran_as
+
+
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
     # The enhanced image's source was deleted: nothing to fold onto, so the row
     # stays as it is (visible and deletable) rather than half-migrated.

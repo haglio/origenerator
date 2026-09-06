@@ -8608,7 +8608,7 @@ def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
     needs of a clip is a property of its LENGTH, and the clip being mined was
     made before anyone knew that."""
     db = _combine_db(tmp_path)
-    _loop_recipe(db)
+    wf = _loop_recipe(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -8616,8 +8616,9 @@ def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
     view._generate_combination("img", "loop", intent=recipe_match.GENAU)
 
     job = next(iter(view._reroll_jobs.values()))
-    assert job.params["frame_count"] == 13        # 0.81s at 16fps: one stroke
-    assert job.params["interpolation"] > 1        # filled back in to scrub slowly
+    assert job.params["frame_count"] == gallery.STROKE_FRAMES   # the length that closes
+    assert job.params["frame_rate"] > wf.default_params()["frame_rate"]  # smoothed
+    assert job.params["positive_prompt"] != "alpha"             # asked for one stroke
 
 
 def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
@@ -8633,7 +8634,8 @@ def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["frame_count"] == wf.default_params()["frame_count"]
-    assert job.params["interpolation"] == 1
+    assert job.params["frame_rate"] == wf.default_params()["frame_rate"]
+    assert job.params["positive_prompt"] == "alpha"
 
 
 def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_path):

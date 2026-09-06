@@ -952,60 +952,6 @@ def test_wan22_flf2v_payload_generates_synced_foley_audio():
     assert combine["inputs"]["audio"] == [sampler_id, 0]
 
 
-def test_the_loop_writes_the_decoded_frames_when_smoothing_is_off():
-    # Off is the graph the workflow had before the pass existed: no node, the
-    # writer reading straight from the decode, at the rate that was asked for.
-    wf = Wan22Flf2vLoopWorkflow()
-    payload = wf.build_api_payload(dict(wf.default_params(), interpolation=1))
-
-    assert _find_node(payload, "RIFE VFI") is None
-    combine = _find_node(payload, "VHS_VideoCombine")["inputs"]
-    assert combine["images"] == [_node_id(payload, "VAEDecode"), 0]
-    assert combine["frame_rate"] == wf.default_params()["frame_rate"]
-
-
-def test_smoothing_fills_frames_in_and_raises_the_rate_to_match():
-    """A Genau clip is sampled at the length one stroke fits in, which is too few
-    frames to scrub slowly, so the pass fills the gaps. The rate has to rise with
-    them: raising the frames alone would stretch the clip by the multiplier, and
-    a loop that must return to its first frame at exactly its own duration would
-    stop doing so."""
-    wf = Wan22Flf2vLoopWorkflow()
-    params = dict(wf.default_params(), frame_count=13, frame_rate=16.0,
-                  interpolation=4)
-
-    payload = wf.build_api_payload(params)
-
-    rife_id = _node_id(payload, "RIFE VFI")
-    rife = payload[rife_id]["inputs"]
-    assert rife["frames"] == [_node_id(payload, "VAEDecode"), 0]
-    assert rife["multiplier"] == 4
-    combine = _find_node(payload, "VHS_VideoCombine")["inputs"]
-    assert combine["images"] == [rife_id, 0]
-    assert combine["frame_rate"] == 64.0     # 13 frames at 16fps, still 0.81s
-
-
-def test_the_smoothing_checkpoint_is_one_comfyui_will_accept():
-    """The node's own default names a checkpoint that is not installed, and
-    ComfyUI refuses a submit whose combo value is outside the folder listing --
-    a 400 at launch rather than anything visible here."""
-    wf = Wan22Flf2vLoopWorkflow()
-    payload = wf.build_api_payload(dict(wf.default_params(), interpolation=2))
-
-    assert _find_node(payload, "RIFE VFI")["inputs"]["ckpt_name"] == "rife44.pth"
-
-
-def test_the_foley_pass_scores_the_rendered_frames_not_the_filled_in_ones():
-    # It scores what the model actually rendered, at the rate it rendered it;
-    # the fill-in frames carry no motion it has not already heard.
-    wf = Wan22Flf2vLoopWorkflow()
-    payload = wf.build_api_payload(dict(wf.default_params(), interpolation=4))
-
-    sampler = payload[_node_id(payload, "HunyuanFoleySampler")]["inputs"]
-    assert sampler["image"] == [_node_id(payload, "VAEDecode"), 0]
-    assert sampler["frame_rate"] == wf.default_params()["frame_rate"]
-
-
 def test_foley_duration_never_undercuts_the_models_one_second_floor():
     # HunyuanFoley rejects sub-second durations, so a clip shorter than 1s (the
     # default 21-frame loop at 16fps is 1.3s, but 5 frames is 0.2s) asks for a

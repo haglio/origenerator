@@ -2,11 +2,10 @@
 
 import json
 
-import pytest
-
 from origenerator import gallery
-from origenerator.config import STROKE_DEFAULT_HZ
+from origenerator.gallery import combine
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 
@@ -176,49 +175,36 @@ def _shaped(**over):
     return gallery.stroke_shaped(dict(_LOOP.default_params(), **over), _LOOP)
 
 
-def test_a_genau_recipe_is_cut_to_the_length_one_stroke_fits_in():
-    """The lane's whole problem: at 16fps a 21-frame loop is 1.3 seconds, and a
-    stroke at the app's own cadence is 0.83 — so the model has room for a stroke
-    and a half and Genau steers whatever it fits as one. 13 frames is 0.81."""
-    shaped = _shaped()
-
-    assert shaped["frame_count"] == 13
-    assert shaped["frame_count"] / shaped["frame_rate"] == pytest.approx(
-        1 / STROKE_DEFAULT_HZ, abs=0.05)
+def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
+    """Genau steers whatever it is given as ONE stroke, so the ideal clip is the
+    shortest that holds exactly one — 13 frames by the cadence arithmetic. It is
+    29 because the model cannot CLOSE a loop that short: measured at a fixed
+    seed, the last frame lands 2% off the first at 13 frames and 0.2% off at 29,
+    and under 29 the lighting pops on every repeat."""
+    assert _shaped()["frame_count"] == combine.STROKE_FRAMES == 29
 
 
-def test_the_length_lands_on_one_the_sampler_will_take():
-    # 4n+1 and nothing else, whatever the rate makes of the arithmetic.
-    for rate in (8.0, 12.0, 16.0, 24.0, 30.0, 60.0):
-        assert (_shaped(frame_rate=rate)["frame_count"] - 1) % 4 == 0
+def test_a_genau_recipe_plays_at_the_top_rate_the_writer_allows():
+    """29 frames of one stroke is far too coarse to scrub slowly, which is most
+    of what Genau is for. The frames in between are interpolated after decode, so
+    asking for the top rate costs a pass rather than sampler time."""
+    assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
 
 
-def test_the_frames_taken_out_are_filled_back_in():
-    """Few frames is the point AND the cost: the same clip that reads as one
-    stroke is too coarse to scrub slowly. The pass fills it back up, which costs
-    an interpolation rather than sampler time -- and gives the model no extra
-    room to fit a second stroke in."""
-    shaped = _shaped()
+def test_the_words_that_ask_for_one_stroke_are_added_to_the_recipes_own():
+    """At 29 frames the model fits about two strokes left to itself, so the lane
+    asks for one outright. Added to the recipe's prompt rather than replacing it:
+    the recipe says what the clip is OF, and this says how it moves."""
+    shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
 
-    frames_out = (shaped["frame_count"] - 1) * shaped["interpolation"] + 1
-    assert frames_out >= 48
-    # The seconds are unchanged: the writer's rate rises with the frames.
-    assert shaped["frame_rate"] == _LOOP.default_params()["frame_rate"]
-
-
-def test_the_smoothing_stays_inside_what_the_form_can_show():
-    """A recipe sampling slowly enough needs a big multiplier, and a value past
-    the workflow's own ceiling is one the user could not turn back down."""
-    ceiling = next(pd.max_val for pd in _LOOP.param_definitions()
-                   if pd.key == "interpolation")
-
-    for rate in (4.0, 8.0, 16.0, 60.0):
-        assert 1 <= _shaped(frame_rate=rate)["interpolation"] <= ceiling
+    assert shaped["positive_prompt"].startswith("alpha form ")
+    assert len(shaped["positive_prompt"]) > len("alpha form ")
+    assert shaped["negative_prompt"].startswith("beta ")
 
 
 def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():
-    # This shapes a recipe; it does not invent one. A workflow with no length to
-    # set and no pass to run has neither.
+    # This shapes a recipe; it does not invent one. A workflow with no length and
+    # no rate to set has neither.
     params = {"positive_prompt": "alpha", "seed": 3}
 
-    assert gallery.stroke_shaped(params, _I2V) == params
+    assert gallery.stroke_shaped(params, WORKFLOW_REGISTRY["sdxl_t2i"]) == params

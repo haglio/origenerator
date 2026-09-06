@@ -62,8 +62,8 @@ from origenerator.workflows.detail_parts import (
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()
 
-from shared_ui.check_box import CheckBox
 from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
+from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
 _AUTO_TOOLTIP = (
@@ -286,7 +286,7 @@ class EnhancePanel(QWidget):
 
     def _fix_field(self, part) -> QWidget:
         """One part's column: its tick box, over its name and its denoise."""
-        check = CheckBox("")
+        check = TickControl("")
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
         label = self._labeled(part.name.capitalize(), widget)

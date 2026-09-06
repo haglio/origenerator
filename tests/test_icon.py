@@ -10,7 +10,7 @@ ICON_PATH = PROJECT_DIR / "icon.ico"
 
 
 def test_the_icon_is_the_familys_o():
-    # One PINK block letter on the family's 5x5 grid, checked the way every
+    # One MAGENTA block letter on the family's 5x5 grid, checked the way every
     # app's is.  The spec used to live in this file alone, naming the other
     # apps' letters and checking only this one.
     assert_follows_the_family_spec(ICON_PATH, "O")

@@ -44,13 +44,13 @@ from shared_ui.colors import (
     BG_PRIMARY,
     BLUE,
     GREEN,
-    PINK,
+    MAGENTA,
     RED,
     TEXT_MUTED,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
 )
-from shared_ui.icons import CANVAS, STROKE, draw_glyph, glyph_icon, glyph_pixmap
+from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 
@@ -63,7 +63,7 @@ LEVEL_LABELS = {
     "source_image": "Source Image",
 }
 _LEVEL_BADGES = {
-    "workflow": ("W", BLUE), "model": ("M", PINK), "lora": ("L", AMBER),
+    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", AMBER),
     "source_image": ("I", GREEN),
 }
 
@@ -292,7 +292,7 @@ def orientation_mark(orientation: str) -> QPixmap:
     def draw(painter: QPainter):
         painter.scale(_PROPORTION_DISPLAY / _SIZE, _PROPORTION_DISPLAY / _SIZE)
         pen = QPen(TEXT_PRIMARY)
-        pen.setWidthF(STROKE)
+        pen.setWidthF(PEN_WIDTH)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(

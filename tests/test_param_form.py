@@ -1,8 +1,8 @@
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
-from shared_ui.check_box import CheckBox
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
+from shared_ui.tick_control import TickControl
 
 from origenerator.gui import param_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -67,12 +67,12 @@ def test_browse_button_fits_its_caption(qtbot):
 
 
 def test_bool_param_renders_a_checkbox_and_round_trips(qtbot):
-    # The enhance toggle is a "bool" ParamDef: a CheckBox field that reads and
+    # The enhance toggle is a "bool" ParamDef: a TickControl field that reads and
     # writes True/False like any other value — so a stored recipe's flag comes
     # back checked/unchecked, and the emitted params carry a real bool.
     form = ParamForm([ParamDef("enhance", "Enhance", "bool", True)])
     qtbot.addWidget(form)
-    assert isinstance(form._widgets["enhance"], CheckBox)
+    assert isinstance(form._widgets["enhance"], TickControl)
     assert form.get_values()["enhance"] is True
 
     changes = []
@@ -86,11 +86,11 @@ def test_bool_param_renders_a_checkbox_and_round_trips(qtbot):
 
 
 def test_seed_random_control_is_the_ticked_checkbox(qtbot):
-    # The Random control must be our CheckBox, not a plain QCheckBox whose
+    # The Random control must be our TickControl, not a plain QCheckBox whose
     # native dark-style tick renders as a bare down-caret.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
-    assert isinstance(form._randomize_checks["seed"], CheckBox)
+    assert isinstance(form._randomize_checks["seed"], TickControl)
 
 
 # --- copy buttons: the prompt/seed convenience the old inspect pane had ----

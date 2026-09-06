@@ -39,7 +39,7 @@ from origenerator.workflows.duration import (
 )
 
 ensure_shared_ui_on_path()
-from shared_ui.check_box import CheckBox
+from shared_ui.tick_control import TickControl
 
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
@@ -162,7 +162,7 @@ class ParamForm(QWidget):
         self._dim_value_labels: dict[str, QLabel] = {}
         self._dim_stacks: dict[str, QStackedWidget] = {}
         self._widgets: dict[str, QWidget] = {}
-        self._randomize_checks: dict[str, CheckBox] = {}
+        self._randomize_checks: dict[str, TickControl] = {}
         self._browse_buttons: dict[str, QPushButton] = {}
         # Copy-to-clipboard buttons on the fields worth lifting whole — the prompts
         # and the seeds, the read-only inspect pane's copy targets before it merged
@@ -316,7 +316,7 @@ class ParamForm(QWidget):
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
         if pd.type == "seed":
-            cb = CheckBox("Random")
+            cb = TickControl("Random")
             cb.setChecked(True)
             cb.toggled.connect(self.changed)
             self._randomize_checks[pd.key] = cb
@@ -676,7 +676,7 @@ class ParamForm(QWidget):
             widget.valueChanged.connect(self.changed)
         elif isinstance(widget, QComboBox):
             widget.currentIndexChanged.connect(self.changed)
-        elif isinstance(widget, CheckBox):
+        elif isinstance(widget, TickControl):
             widget.toggled.connect(self.changed)
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
@@ -690,7 +690,7 @@ class ParamForm(QWidget):
         if pd.type == "bool":
             # An on/off setting (the enhance toggle): a bare checkbox, its label
             # provided by the form row like every other field's.
-            w = CheckBox("")
+            w = TickControl("")
             w.setChecked(bool(pd.default))
             return w
         if pd.type == "str" and pd.multiline:

@@ -199,7 +199,6 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
-from shared_ui.check_box import CheckBox
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import (
     BUTTON_GAP,
@@ -207,6 +206,7 @@ from shared_ui.spacing import (
     BUTTON_ICON,
     BUTTON_ROW_GAP,
 )
+from shared_ui.tick_control import TickControl
 
 logger = logging.getLogger(__name__)
 
@@ -1109,8 +1109,8 @@ class GalleryView(QWidget):
         # in it, and no video tiles in the pane beside them either. (It replaces a
         # pair that filtered the Recents shelf alone, which could only ever answer
         # "which of these do I want to look at" for one shelf.)
-        self._image_cb = CheckBox("Images")
-        self._video_cb = CheckBox("Videos")
+        self._image_cb = TickControl("Images")
+        self._video_cb = TickControl("Videos")
         for checkbox in (self._image_cb, self._video_cb):
             checkbox.setChecked(True)
             checkbox.setToolTip(
@@ -1332,7 +1332,7 @@ class GalleryView(QWidget):
         # The Experiments shelf's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header, and appears only
         # while that shelf is open.
-        self._experiments_cb = CheckBox("Run experiments while the app is closed")
+        self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         # Scheduling an absence is the live install's alone, so a branch session
         # can't reach the switch (see queue_experiments_for_absence).

@@ -98,7 +98,7 @@ def to_logical_rect(x: int, y: int, width: int, height: int):
     device position and only its SIZE is scaled.  So a whole-desktop
     ``x / scale`` puts a window 2560/0.643 = 3982 across, which is 1422 logical
     px INTO that screen rather than at its left edge: the portrait show landed
-    in the right third of its region and hung off the monitor, with the player
+    in the right third of its region and spilled off the monitor, with the player
     it was supposed to cover showing through beside it.
 
     The conversion is therefore relative to the screen the rect lands on: its

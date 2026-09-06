@@ -23,7 +23,7 @@ def _webp(path, size=(64, 48)):
 
 
 class _RecordingDrag:
-    """Stands in for QDrag, remembering whether a picture was hung on it."""
+    """Stands in for QDrag, remembering whether a picture was attached to it."""
 
     def __init__(self):
         self.pixmap = None

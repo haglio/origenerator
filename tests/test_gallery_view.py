@@ -5018,8 +5018,8 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
 
 def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     # The app holding a file open is what used to fail its own delete: Windows
-    # refuses to move one. Hung off the actions rather than any one caller, so it
-    # covers every delete there is — a picked tile, a folder, a rejected
+    # refuses to move one. Attached to the actions rather than to any one caller,
+    # so it covers every delete there is — a picked tile, a folder, a rejected
     # experiment, a slideshow's Up key.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)

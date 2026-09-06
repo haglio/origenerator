@@ -43,9 +43,9 @@ voice = ["faster-whisper", "sounddevice"]
 # this is its largest suite, and because a session-scoped fixture's teardown
 # is charged to whichever test ran last -- here a full widget-count sweep and
 # gc over a run that built thousands of Qt panels. --timeout-method=thread is
-# the half that pays for itself: it dumps the hung stack, which turns a
-# stalled required check into a one-line diagnosis. tests/test_timeouts.py
-# holds all three halves of it.
+# the half that pays for itself: it dumps the stack of the test that stopped,
+# which turns a stalled required check into a one-line diagnosis.
+# tests/test_timeouts.py holds all three halves of it.
 addopts = "-p app_support.sanitize.pytest_plugin --timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"

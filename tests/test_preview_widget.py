@@ -583,6 +583,18 @@ def test_the_corners_keep_off_the_strip_while_a_videos_size_is_unknown(qtbot, tm
     assert all(b.geometry().bottom() < strip_top for b in w._controls.buttons())
 
 
+def test_the_strip_follows_playback_position(qtbot, tmp_path):
+    # The player's position drives the strip's playhead, so the strip says how
+    # far into the clip playback is -- which is how long the clip is, at a glance.
+    w = _strip_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    follow = w._player.positionChanged.connect.call_args.args[0]
+    follow(1500)
+    assert w._strip._playhead == 1500
+    w.show_video(_scripted_video(tmp_path, name="next.mp4"))
+    assert w._strip._playhead is None
+
+
 def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):
     w = _strip_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written

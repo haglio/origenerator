@@ -242,6 +242,9 @@ class PreviewWidget(QWidget):
         if self._strip is not None:
             outer.addWidget(self._strip)
             self._strip.hide()
+            # Playback's position rides along the strip as a playhead, so a
+            # clip's length can be read off it while it plays.
+            self._player.positionChanged.connect(self._strip.set_playhead)
 
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test

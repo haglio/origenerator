@@ -70,10 +70,7 @@ class FlowLayout(QLayout):
             if item.isEmpty():
                 continue
             size = size.expandedTo(item.minimumSize())
-        margins = self.contentsMargins()
-        size += QSize(margins.left() + margins.right(),
-                      margins.top() + margins.bottom())
-        return size
+        return QRect(QPoint(0, 0), size).marginsAdded(self.contentsMargins()).size()
 
     def _do_layout(self, rect, place):
         """Flow items across ``rect``; return the total height they occupy.
@@ -83,9 +80,8 @@ class FlowLayout(QLayout):
         worked out first and placed after, because a right-aligned row cannot be
         positioned until it is known how wide it ended up.
         """
-        margins = self.contentsMargins()
-        area = rect.adjusted(margins.left(), margins.top(),
-                             -margins.right(), -margins.bottom())
+        area = rect.marginsRemoved(self.contentsMargins())
+        margin_height = rect.height() - area.height()
         spacing = self.spacing()
         rows, row = [], []
         x, row_height = area.x(), 0
@@ -113,5 +109,5 @@ class FlowLayout(QLayout):
                 x += hint.width() + spacing
             y += height + self._row_spacing
         if not rows:
-            return margins.top() + margins.bottom()
-        return y - self._row_spacing - rect.y() + margins.bottom()
+            return margin_height
+        return y - self._row_spacing - area.y() + margin_height

@@ -6013,7 +6013,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
-    assert caption.bottom() <= view._search_edit.mapTo(view, QPoint(0, 0)).y()
+    assert caption.bottomLeft().y() <= view._search_edit.mapTo(view, QPoint(0, 0)).y()
 
 
 def test_esc_stops_auto_generate(qtbot, tmp_path):
@@ -6387,11 +6387,11 @@ def test_the_console_sits_under_the_hud_rather_than_beneath_it(qtbot, monkeypatc
     assert console is not None
 
     assert console.x() == hud.x()
-    assert console.y() == hud.geometry().bottom() + 1 + hud.x()
+    assert console.y() == hud.geometry().bottomLeft().y() + 1 + hud.x()
     assert not console.geometry().intersects(hud.geometry())
 
     hud.resize(hud.width(), hud.height() + 40)   # the map grew: the console follows
-    assert console.y() == hud.geometry().bottom() + 1 + hud.x()
+    assert console.y() == hud.geometry().bottomLeft().y() + 1 + hud.x()
     show.close()
 
 

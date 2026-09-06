@@ -237,7 +237,7 @@ class StrokePanel(QWidget):
         if below is None:
             self.move(self.MARGIN, self.MARGIN)
         else:
-            self.move(below.x(), below.bottom() + 1 + below.x())
+            self.move(below.x(), below.bottomLeft().y() + 1 + below.x())
 
     def showEvent(self, event):
         super().showEvent(event)

@@ -120,7 +120,7 @@ class SlideshowQueue(GenerationQueue):
         room = max(0, host.width() - 2 * MARGIN)
         width = min(max(int(host.width() * WIDTH_FRACTION), min(MIN_WIDTH, room)), room)
         top = max(0, host.height() - height - MARGIN)
-        if avoid is not None and not avoid.isEmpty() and avoid.bottom() >= top:
+        if avoid is not None and not avoid.isEmpty() and avoid.bottomLeft().y() >= top:
             width = min(width, max(0, avoid.left() - GAP - MARGIN))
         self.setGeometry(MARGIN, top, width, height)
         self.raise_()  # over the media, video surface included

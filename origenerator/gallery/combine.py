@@ -9,35 +9,38 @@ overlay's hand-tuned spec for an act (:func:`curated_params`, seeds re-rolled �
 there is no past run to reproduce). Qt-free so it stays unit-testable.
 """
 
-import math
-
-from origenerator.config import STROKE_DEFAULT_HZ
+from origenerator.content import load_content
 from origenerator.gallery.output import output_file_reference, row_output_files
 from origenerator.generation_config import filled_params, randomize_seeds
+from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
+
+_CONTENT = load_content()
 
 # What a size-deriving workflow's stored size is recorded under. Not a recipe
 # setting — it belongs to the frame the recipe ran on, not to the recipe.
 _SIZE_KEYS = ("width", "height")
 
-# How many frames a Genau clip should end up holding. Genau does not play a clip
-# at its own rate — it scrubs it against the device's phase — so at slow speeds
-# it holds single frames on screen, and how smooth the motion is there is simply
-# how many frames the clip has to show for one stroke. Four dozen is about where
-# a slow stroke stops looking stepped; they are filled in rather than sampled
-# (see :meth:`~origenerator.workflows.base.WorkflowTemplate.interpolation_nodes`),
-# so this costs a cheap pass rather than sampler time.
-_FRAMES_PER_STROKE = 48
+# How long a Genau clip is generated for, in frames at the native rate. Genau
+# steers a clip as ONE stroke — see :func:`stroke_shaped` — so the ideal is the
+# shortest clip that holds exactly one, and 13 frames is where the arithmetic
+# lands (a stroke at the app's own cadence is 0.83 s, and 13/16 is 0.81).
+#
+# It is 29 because the model cannot close a loop that short. First-last-frame
+# conditions both ends on the same picture, but the model needs room to come
+# BACK to it, and measured over one recipe at a fixed seed the last frame lands
+# this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
+# 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
+# 29 it stops. So the length is set by the loop closing, and the ONE stroke is
+# asked for in words instead (:data:`_STROKE_PROMPT`).
+STROKE_FRAMES = 29
 
-# The sampler takes a frame count of 4n+1 and nothing else, so a length worked
-# out from seconds has to land on one.
-_LENGTH_STEP = 4
-_MIN_LENGTH = 5
-
-# The most the smoothing pass may be asked for -- the ceiling the workflow's own
-# ParamDef puts on it, so a shaped recipe is a value the form can also show and
-# the user can also turn back down. Reached only by a recipe sampling slowly
-# enough that one stroke is a handful of frames.
-_MAX_SMOOTHING = 8
+# The words that ask a 29-frame loop for ONE stroke, and for a deep one. In the
+# overlay rather than here for the reason every other phrase the library speaks
+# in is: this file is public, and the sanitize guard bans that vocabulary from
+# the tracked tree. Empty when the overlay has neither, which leaves the prompt
+# a recipe carries untouched.
+_STROKE_PROMPT = (_CONTENT.get("genau_stroke_prompt") or "").strip()
+_STROKE_NEGATIVE = (_CONTENT.get("genau_stroke_negative") or "").strip()
 
 
 def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
@@ -88,46 +91,37 @@ def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
     return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
 
 
-def _sampler_length(frames: float) -> int:
-    """``frames`` rounded to the nearest length the sampler will take (4n+1)."""
-    steps = round((frames - 1) / _LENGTH_STEP)
-    return max(_MIN_LENGTH, _LENGTH_STEP * steps + 1)
-
-
 def stroke_shaped(params: dict, workflow) -> dict:
-    """``params`` re-cut so the loop portrays ONE stroke, and portrays it smoothly.
+    """``params`` re-cut so the loop portrays ONE deep stroke, and plays smoothly.
 
-    The Genau lane's whole problem: Genau steers a clip as though it ran from one
-    extreme of the stroke, through the other at its midpoint, and back — and a
-    loop sampled for a second and a third of a second at a natural pace fits a
-    stroke and a half or two into that, so the device makes one slow stroke while
-    the pixels make several. Cutting the finished clip down cannot fix it: the
-    only two frames a first-last-frame loop guarantees will match are its first
-    and its last, so a cut anywhere inside pops when it repeats.
+    The Genau lane's whole problem: Genau does not play a clip, it scrubs it
+    against the device's phase — so it steers whatever it is given as a single
+    stroke running out to one extreme and back. A clip that holds two stumbles;
+    a clip that holds four looks like a machine.
 
-    So the loop is asked for at a length ONE stroke fits in — the app's own
-    cadence (:data:`~origenerator.config.STROKE_DEFAULT_HZ`) says how long that
-    is, and the frame rate turns it into frames — and the endpoints do the rest:
-    the sampler must return to the frame it started on, and at that length there
-    is only room to go out and come back once.
+    Three settings answer that, and each was arrived at by measuring:
 
-    Few frames is the point, and also the cost: the same clip that reads as one
-    stroke is too coarse to scrub slowly. So the smoothing pass fills it back up
-    to :data:`_FRAMES_PER_STROKE`, which costs a cheap interpolation rather than
-    sampler time — and, unlike sampling them, gives the model no extra room to
-    fit another stroke in.
+    * :data:`STROKE_FRAMES` seconds of motion, because that is the shortest loop
+      the model closes cleanly (see the note there).
+    * The words. At 29 frames the model fits about two strokes on its own, so the
+      prompt asks for one outright — naming the cycle in stages rather than
+      saying "one stroke", which does nothing. The same wording doubled the
+      travel, so the clip reads as a deliberate stroke rather than a wiggle. It
+      rides the content overlay rather than this file, like every other phrase
+      the library speaks in.
+    * The top playback rate, because 29 frames of one stroke is too coarse to
+      scrub slowly and the interpolator fills the rest in
+      (:mod:`origenerator.workflows.frame_rate`).
 
-    A workflow with no length to set or no pass to run is handed back unchanged:
-    this shapes a recipe, it does not invent one.
+    A workflow with no length or no rate to set is handed back unchanged: this
+    shapes a recipe, it does not invent one.
     """
     defaults = workflow.default_params()
-    if "frame_count" not in defaults or "interpolation" not in defaults:
+    if "frame_count" not in defaults or "frame_rate" not in defaults:
         return params
-    rate = float(params.get("frame_rate") or defaults.get("frame_rate") or 0) or 16.0
-    frames = _sampler_length(rate / STROKE_DEFAULT_HZ)
-    return {
-        **params,
-        "frame_count": frames,
-        "interpolation": max(1, min(_MAX_SMOOTHING,
-                                    math.ceil(_FRAMES_PER_STROKE / (frames - 1)))),
-    }
+    shaped = {**params, "frame_count": STROKE_FRAMES, "frame_rate": MAX_PLAYBACK_FPS}
+    for key, extra in (("positive_prompt", _STROKE_PROMPT),
+                       ("negative_prompt", _STROKE_NEGATIVE)):
+        if extra:
+            shaped[key] = f"{params.get(key) or ''} {extra}".strip()
+    return shaped

@@ -28,7 +28,12 @@ This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
 """
 
-from origenerator.gallery.combine import combined_params, curated_params, stroke_shaped
+from origenerator.gallery.combine import (
+    STROKE_FRAMES,
+    combined_params,
+    curated_params,
+    stroke_shaped,
+)
 from origenerator.gallery.custom import (
     SELECTION_KEY,
     build_custom_folders,
@@ -166,6 +171,7 @@ __all__ = [
     "GENAU_COMMAND",
     "MATCH_SOURCE_MODEL",
     "SELECTION_KEY",
+    "STROKE_FRAMES",
     "AllGroup",
     "CustomGroup",
     "EnhanceLevel",

@@ -210,14 +210,6 @@ PARAM_HELP: dict[str, str] = {
         "Rates are multiples of 16 because the frames are filled in a whole "
         "number at a time; anything else settles onto the nearest."
     ),
-    "interpolation": (
-        "Fills frames in between the ones the model rendered, so the clip has more "
-        "to show without taking longer to make. The saved frame rate rises with it, "
-        "so the clip keeps its seconds. 1 turns it off. Genau scrubs a clip against "
-        "the device rather than playing it, so a short clip needs this to look "
-        "smooth at slow speeds."
-    ),
-    "rife_model": "Which RIFE weights fill the in-between frames.",
 
     # --- the authored stroke (track-conditioned video) ---
     "stroke_hz": "How many strokes per second the generated motion runs at.",

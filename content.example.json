@@ -95,5 +95,7 @@
       "anchor",
       "ANCHOR_EXPOSED"
     ]
-  }
+  },
+  "genau_stroke_prompt": "(one complete alpha cycle: all the way out, then all the way in, then return:1.5), (long travel:1.4)",
+  "genau_stroke_negative": "(rapid alpha:1.4), (small wiggling:1.4)"
 }

@@ -11,7 +11,7 @@ reorder. Closing all of them is not an empty pane either: the resting tab takes
 their place, which is what "close all" means where one tab is always open.
 
 Tabs open the way an IDE opens files, so browsing doesn't leave a row of them
-behind. A single-clicked generation lands in the *preview* tab, drawn in italic:
+over. A single-clicked generation lands in the *preview* tab, drawn in italic:
 the next single click replaces it. A click on a folder's live tile lands the
 same way — the run's own settings on the form, its frames in the preview — unless
 a tab is already that run's, having launched it or been pointed at its folder,
@@ -263,7 +263,7 @@ class InfoPaneTabs(QTabWidget):
 
         The pane tops itself back up with a fresh resting tab, since it never
         sits empty; "all" is about the work open in the row, not about leaving a
-        black rectangle behind.
+        black rectangle there.
         """
         self._last_close_at = time.monotonic()  # arm the stray-double-click guard
         self._discard_all_subtabs()
@@ -335,7 +335,7 @@ class InfoPaneTabs(QTabWidget):
 
     def _landing_panel(self) -> GenerateConfigPanel:
         """The tab an opened generation lands in, so opening one doesn't leave a
-        trail of tabs behind.
+        trail of tabs over.
 
         In order: the pane's untouched resting tab, which becomes the preview tab
         by being opened into — a blank "New generation" is never left sitting
@@ -439,7 +439,7 @@ class InfoPaneTabs(QTabWidget):
 
     def load_selection(self, row: dict, image_rows: list[dict], request=None):
         """Show a single-clicked generation in a tab, without leaving a trail of
-        them behind.
+        them over.
 
         The front tab takes it when that tab is the clicked row's own settings
         folder already, pinned or not; anything else lands where an open lands

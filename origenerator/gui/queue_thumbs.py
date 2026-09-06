@@ -17,7 +17,7 @@ one a row gets is decided by what the job is:
   job can be placed by at a glance.
 
 Both are drawn into a block of the same width — four square cells in a row, the
-height of the row itself — so the text behind them starts at the same place on
+height of the row itself — so the text beside them starts at the same place on
 every line whether the block holds one picture or four. Laid out across rather
 than as a 2×2: stacked, the cells are half the row's height each, which is small
 enough that four of them read as one smudge.
@@ -216,7 +216,7 @@ class QueueThumbs(QLabel):
 
         ``False`` only when neither has anything to draw: no reference and no
         recipe, or files that have moved or haven't been rendered yet (a video
-        queued behind the image it animates is exactly that). The caller falls
+        queued after the image it animates is exactly that). The caller falls
         back to the folder view rather than leave a blank block standing where a
         picture was promised — but a frame that hasn't landed no longer costs the
         row its recipe cell, which is about this run either way.
@@ -248,7 +248,7 @@ class QueueThumbs(QLabel):
 
     def clear_block(self):
         """Take the block off the row entirely — nothing to show and no empty
-        square left behind claiming there was."""
+        square left claiming there was."""
         if self._showing is None:
             return
         self._showing = None

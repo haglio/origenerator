@@ -1,7 +1,7 @@
 """What the gallery package publishes, and what it does not do.
 
 ``origenerator.gallery`` is a facade: ninety-odd names re-exported from a dozen
-submodules, reached by the GUI as ``gallery.X``. Splitting a submodule behind it
+submodules, reached by the GUI as ``gallery.X``. Splitting a submodule under it
 is meant to be invisible from outside, and these are what say so — the published
 surface held as an equality, and the one rule the package has about itself.
 """

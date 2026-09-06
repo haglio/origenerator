@@ -58,7 +58,7 @@ class SlideshowPace(QObject):
 
 
 class PaceOnlyHost(ShowHost):
-    """What the console acts on where there is no slideshow behind it.
+    """What the console acts on where there is no slideshow under it.
 
     The main window shows the console with nothing to step, so its transport does
     nothing there — but the pace is app-wide and setting it is worth doing

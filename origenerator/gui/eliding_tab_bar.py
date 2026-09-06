@@ -63,7 +63,7 @@ class _PreviewTabStyle(QProxyStyle):
 
     Each label sets the flag either way rather than only slanting the preview
     one: the painter carries its font from one label to the next, so an italic
-    left behind would spread down the row.
+    left set would spread down the row.
     """
 
     def __init__(self, bar: "ElidingTabBar"):
@@ -92,7 +92,7 @@ class ElidingTabBar(QTabBar):
     Each tab is capped at ``MAX_TAB_WIDTH`` with its label elided, so a long
     title takes only its share of the row instead of stretching the tab. When
     more tabs open than fit even at that width, they collapse further — down to
-    an equal share of the bar — rather than disappearing behind scroll buttons.
+    an equal share of the bar — rather than disappearing under scroll buttons.
 
     An empty bar still asks for the height it had while it held tabs, so a bar
     that momentarily empties doesn't collapse the row it stands in.

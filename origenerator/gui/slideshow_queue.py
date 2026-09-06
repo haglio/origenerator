@@ -19,7 +19,7 @@ Three things it does differently from the one in the main window, all of them
 about being a floating plate rather than a docked pane:
 
 * It paints its own background. The strip in the main window is transparent and
-  shows the pane behind it; over a full-screen picture that would be rows of
+  shows the pane under it; over a full-screen picture that would be rows of
   text lying on the media. Here it wears the app's own surface and a hairline
   border, so it reads as the strip lifted onto the show.
 * Nothing in it takes the keyboard. Its buttons are still pressable, but a press
@@ -69,7 +69,7 @@ class SlideshowQueue(GenerationQueue):
     def __init__(self, host: QWidget):
         super().__init__(host)
         # The strip is transparent where it is docked, taking the pane's surface
-        # behind it; floated over a picture it has to bring its own, or its rows
+        # under it; floated over a picture it has to bring its own, or its rows
         # are text lying on the media.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(

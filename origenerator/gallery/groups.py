@@ -138,7 +138,7 @@ def is_renamable(group) -> bool:
 
 def folder_detail(group) -> str:
     """What a folder's name doesn't say, for its tooltip — the prompt and settings
-    behind a settings leaf. Empty for every folder whose own name already says
+    under a settings leaf. Empty for every folder whose own name already says
     what it holds (a workflow, a model, a LoRA)."""
     return getattr(group, "detail", "")
 

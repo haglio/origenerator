@@ -289,7 +289,7 @@ class _Running(NamedTuple):
     instructions — the device, the loop, the show, the sound.
     """
 
-    osr2: bool = False       # the device switch: a funscript, or the stroke behind it
+    osr2: bool = False       # the device switch: a funscript, or the stroke under it
     stroke: bool = False     # the bare stroke, running with the switch off
     auto: str | None = None  # the folder looping, if one is
     audio: bool = False      # the audio bed
@@ -339,7 +339,7 @@ def _toolbar_gap() -> QWidget:
     Space alone is what separates them — a rule here used to, and in a bank that
     wraps onto a second row a rule can land at the end of one row or the start of
     the next, marking nothing. An empty widget rather than layout spacing because
-    the gap comes and goes with the group behind it (see
+    the gap comes and goes with the group under it (see
     :meth:`GalleryView._sync_toolbar_gaps`), and a widget is the thing a flow
     layout can be told to leave out.
     """
@@ -496,7 +496,7 @@ class GalleryView(QWidget):
         # the layout goes vertical, the fullscreen surfaces land on the satellite
         # regions, and the OSR2 is Fun Time's alone (see origenerator.fun_time_mode).
         self._fun_time = fun_time
-        # The app-global audio bed behind the toolbar's audio switch: several
+        # The app-global audio bed under the toolbar's audio switch: several
         # library clips at once, sound only. Injectable so tests never open a
         # real media backend. Built before _build_ui, whose switch drives it.
         self._ambient_audio = (
@@ -678,7 +678,7 @@ class GalleryView(QWidget):
         self._search_expand_timer.setInterval(_SEARCH_EXPAND_DELAY_MS)
         self._search_expand_timer.timeout.connect(self._request_search_expansion)
         # The held deletions the Trash shelf lists, as gallery rows re-pointed at
-        # their files in the trash — the rows behind everything a deleted item can
+        # their files in the trash — the rows under everything a deleted item can
         # still do (see :meth:`_row_for`).
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
@@ -757,7 +757,7 @@ class GalleryView(QWidget):
         self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
         # What another app has on the shared ComfyUI, re-read on every poll so the
-        # lower bar can say the server is busy before a Generate goes in behind it.
+        # lower bar can say the server is busy before a Generate goes in after it.
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         # What the last Esc took off, for the next one to put back — cleared as
         # soon as it is put back, so the key goes on alternating.
@@ -865,7 +865,7 @@ class GalleryView(QWidget):
         It yields when a dialog or popup owns the keystroke, so Esc still closes
         a combo dropdown, and when some other window is up. Our own slideshow is
         not that: it closes itself on Esc, but closing only the show would leave
-        the loop, the device and the sound running behind it, which is the
+        the loop, the device and the sound running under it, which is the
         opposite of what the key means. Returns whether it acted.
         """
         if self._other_window_owns_keys() and not self._our_show_is_in_front():
@@ -953,7 +953,7 @@ class GalleryView(QWidget):
         screen — the gallery is somewhere else by now as often as not, and the
         loop was never about where the user is looking.
 
-        A show with no pass behind it opens on what is in front instead, which is
+        A show with no pass under it opens on what is in front instead, which is
         both the standing start and the show that was following a generation in
         flight: that one has no pass to take up, and what it was watching has
         landed or gone by now.
@@ -1141,7 +1141,7 @@ class GalleryView(QWidget):
                 image_id, video_id, category, self._combine.selected_intent()))
         self._combine.open_category_requested.connect(self._open_category)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
-        # long-form video behind it may have no loop at all.
+        # long-form video under it may have no loop at all.
         self._combine.intent_changed.connect(self._on_combine_intent_changed)
         self._combine.setVisible(self._client is not None)
         toc_column.addWidget(self._combine)
@@ -1570,7 +1570,7 @@ class GalleryView(QWidget):
         generation exactly as a browser thumbnail's do.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
         and re-reads whether the tab still owns a run in flight, a double-click on
-        its preview opens the folder behind it as a held slideshow,
+        its preview opens the folder under it as a held slideshow,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self._follow_link)
@@ -1695,7 +1695,7 @@ class GalleryView(QWidget):
         Up and Down, are the show's own.
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
-        is still running behind it — in which case the show opens over ``frame``,
+        is still running under it — in which case the show opens over ``frame``,
         that run's latest, and goes on following it until the pane hands over the
         file it lands as.
         """
@@ -1955,7 +1955,7 @@ class GalleryView(QWidget):
         one ComfyUI, and its batch outlives it there as work no app can account
         for: the live session cancels only the experiments its own database
         records, so a preview's survive every launch, and each Generate after
-        them waits behind jobs "from another app" that were the user's own
+        them waits on jobs "from another app" that were the user's own
         preview. The GPU while Origenerator is closed belongs to the install
         that is actually closed.
         """
@@ -2075,7 +2075,7 @@ class GalleryView(QWidget):
         several runs queued at once (two pictures of one recipe, both wanted), and
         a tab showing one of them must not claim the others. Of its own it follows
         the *oldest still alive* — the one nearest to being made, and so the one
-        its button discards. A press that stopped the job queued behind the one on
+        its button discards. A press that stopped the job queued after the one on
         screen was the reported dead click. A chained i2v is two prompts but one
         run, so a tab follows its origin across the hand-off, and runs that have
         ended are let go here.
@@ -2085,7 +2085,7 @@ class GalleryView(QWidget):
 
         Idempotent — driven by every re-roll lifecycle change and by switching the
         front tab. Every tab is reconciled, not just the front one, so a run
-        launched from a tab that is now behind another still shows there.
+        launched from a tab that is now under another still shows there.
         """
         for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
@@ -2133,7 +2133,7 @@ class GalleryView(QWidget):
         """Discard the run this tab's bar is showing — its Cancel/Next seed button.
 
         The oldest of the tab's own still alive, so the press acts on the thing on
-        screen rather than something queued behind it.
+        screen rather than something queued after it.
         """
         for origin in panel.launched_runs():
             job = self._reroll.job_for_origin(origin)
@@ -2361,7 +2361,7 @@ class GalleryView(QWidget):
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
-        # An act with no video behind it has no recipe to mine, so gray it out rather
+        # An act with no video under it has no recipe to mine, so gray it out rather
         # than let it be picked only to answer "no recipe yet".
         self._combine.set_available_categories(
             recipe_match.available_categories(
@@ -2371,7 +2371,7 @@ class GalleryView(QWidget):
         # The Images/Videos ticks narrow everything the gallery shows: which
         # folders the tree grows, which items each shelf lists, and what a search
         # can turn up. The tree takes the filter itself rather than pre-filtered
-        # rows, because the start-frame index behind a video's source-image
+        # rows, because the start-frame index under a video's source-image
         # folders has to see every image whichever way the ticks stand.
         media_types = self._media_types()
         listed = gallery.rows_of_media_types(rows, media_types)
@@ -2973,7 +2973,7 @@ class GalleryView(QWidget):
         group = self._selection_group
         self._experiments_bar.hide()
         self._title.set_display(group.label)
-        self._title.setToolTip("")  # a count of folders, with no one folder behind it
+        self._title.setToolTip("")  # a count of folders, with no one folder under it
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._sync_auto_button()  # greyed here, but still lit if a loop runs elsewhere
@@ -3407,7 +3407,7 @@ class GalleryView(QWidget):
 
     def _job_source_picture(self, job) -> str | None:
         """A file showing what ``job`` came from, for the tile to stand blurred
-        behind the wait until the run streams a frame of its own.
+        under the wait until the run streams a frame of its own.
 
         The image it was requested of first — a folder-wide request queues a run
         per image and none of them animates anything, so what it was asked about
@@ -3536,7 +3536,7 @@ class GalleryView(QWidget):
 
         Recorded by the id the run began under, the same name a tab knows its own
         runs by, and pruned to what is still in flight as it goes: only a live run
-        can still finish, so a cancelled variation leaves nothing behind.
+        can still finish, so a cancelled variation leaves nothing.
         """
         job = self._reroll.newest_job_for(key)
         if job is None:
@@ -3842,7 +3842,7 @@ class GalleryView(QWidget):
         """The picked thumbnails this button would actually run on.
 
         Two things are dropped. Videos, because there is no video enhancer — the
-        workflow behind all of this refines a still — and they are picked from
+        workflow under all of this refines a still — and they are picked from
         the same flow and look no different picked, so a picked clip is nothing
         to run rather than a run that fails.
 
@@ -4192,7 +4192,7 @@ class GalleryView(QWidget):
 
     def _answer_command(self, message: str):
         """Say what a spoken command did, where the speaker is looking — the
-        show's own corner while one is up, since the window behind it is covered
+        show's own corner while one is up, since the window under it is covered
         by the very thing being talked to, and this pane's caption otherwise."""
         show = self._slideshow
         if show is not None:
@@ -4265,7 +4265,7 @@ class GalleryView(QWidget):
         """Stand in the shelf a spoken name asks for, exactly as clicking its
         row does.
 
-        Said over a show it still moves — the tree is behind the show, and the
+        Said over a show it still moves — the tree is under the show, and the
         move is what the show leaves you standing in — so the answer says which
         shelf rather than refusing a command whose whole effect is out of sight.
 
@@ -4820,7 +4820,7 @@ class GalleryView(QWidget):
                                                        spoken, revision), spoken)
 
     def _queue_request(self, row, workflow, params, spoken, revision) -> str:
-        """Launch the revised generation and record the request behind it;
+        """Launch the revised generation and record the request under it;
         return the line to say about it.
 
         The revision is the target's own recipe with its prompt pair edited and
@@ -5094,7 +5094,7 @@ class GalleryView(QWidget):
         the videos stay held while the other one is still playing them.
         """
         # Where it had got to, so the next one opens back on that slide: the
-        # look at the folder behind a picture doesn't cost the place among them.
+        # look at the folder under a picture doesn't cost the place among them.
         if show is not None:
             self._show_state = show.state()
         self._live_shows = [entry for entry in self._live_shows
@@ -5415,7 +5415,7 @@ class GalleryView(QWidget):
         would be the same image twice, one of them worse.
 
         A no is kept for the life of the show, since it is asked again of every
-        frame of a run in some other folder — and the set behind a show doesn't
+        frame of a run in some other folder — and the set under a show doesn't
         move while one is up, the gallery being covered by it.
         """
         if prompt_id in self._show_refused:
@@ -5461,7 +5461,7 @@ class GalleryView(QWidget):
         item itself in a config tab.
 
         The tab matters as much as the folder: leaving a show *for* an item is a
-        decision to work on it, and a folder open behind a form still holding
+        decision to work on it, and a folder open under a form still holding
         whatever was there before the show is not that — which landing on the
         item gives it, the way a click on it would (:meth:`_follow_link`).
         The slideshow has already closed itself, so this arrives on the gallery.
@@ -5530,7 +5530,7 @@ class GalleryView(QWidget):
     def _is_rebuildable_video_row(self, row) -> bool:
         """Whether ``row`` is a video whose i2v recipe the app can rebuild — so its
         settings can be re-run on a new image. (``is_image_conditioned`` already
-        implies the workflow is registered.) The shared gate behind both the video
+        implies the workflow is registered.) The shared gate under both the video
         drop slot and the category dropdown's candidate pool."""
         return bool(
             row and gallery.media_type_of_row(row) == "video"
@@ -5738,7 +5738,7 @@ class GalleryView(QWidget):
         The preview is the point of the pair being visible at all — nothing has
         been generated from it yet, so the pane would otherwise sit on the line a
         tab pointed at nothing wears, with both things the tab is about on hand.
-        A curated act has no ``video_row`` behind it, and shows the frame alone.
+        A curated act has no ``video_row`` under it, and shows the frame alone.
         """
         panel = self._info_tabs.open_config(workflow.name, params)
         if panel is None:
@@ -5780,7 +5780,7 @@ class GalleryView(QWidget):
         is the one thing that still rides along — a spoken "genau it" wants its
         clip handed on the moment it exists, and wants no dialog at all: it is
         answered in the show's corner and nothing runs, so the re-roll answers
-        (and the frame re-draw behind them) belong to the pressed path alone.
+        (and the frame re-draw under them) belong to the pressed path alone.
         ``category`` names the act the dropdown was set to, when one was picked.
         The frame re-draw is the one answer it does not reach: that launches the
         frame first and the clip second, under an id this never sees, so such a
@@ -5987,7 +5987,7 @@ class GalleryView(QWidget):
         )
         prompt_id = self._reroll.start_prepared(key, workflow, params)
         if prompt_id:
-            # The act, with no video behind it: a curated recipe is pinned in the
+            # The act, with no video under it: a curated recipe is pinned in the
             # overlay, so there is no past run for the queue row to show in gray.
             self._db.set_recipe_source(prompt_id, category=category)
             self._mark_for_sending(prompt_id, send)
@@ -6118,7 +6118,7 @@ class GalleryView(QWidget):
         or one on the way.
 
         Saying it twice is what someone does when the first time appeared to do
-        nothing, and it usually did appear to: the clip queues behind whatever
+        nothing, and it usually did appear to: the clip queues after whatever
         the machine is on and the picture on screen doesn't change. Answering
         that with a second identical run spends minutes of the one GPU making a
         clip that already exists, and sends both to Genau.
@@ -6156,7 +6156,7 @@ class GalleryView(QWidget):
         Nothing is picked and nothing is dropped: the act comes from the image's
         prompt (:func:`recipe_match.category_for_prompt`), and from there this is
         the Genau lane's ordinary category path. An unreadable prompt or an act
-        with no loop recipe behind it says so rather than animating the wrong
+        with no loop recipe under it says so rather than animating the wrong
         thing. The run is stamped so its finished clip hands itself on without
         being asked again — the whole point of saying it out loud is that the
         picture is wanted moving *now*, and a second press to release it would be
@@ -6509,7 +6509,7 @@ class GalleryView(QWidget):
         """A re-roll failed (recorded by the controller): let go of it wherever it
         was being watched, redraw the folder without its tile, and SAY SO.
 
-        A failed run leaves nothing behind — no file, so no tile, and the row it
+        A failed run leaves nothing — no file, so no tile, and the row it
         does leave is one every shelf filters out for having produced nothing. So
         without this the whole thing simply vanished: a couple of minutes of GPU,
         the tile disappearing off the strip, and no word anywhere but the log.
@@ -6567,7 +6567,7 @@ class GalleryView(QWidget):
         queue shows from anywhere, and one that isn't ours is visible before
         Generate rather than after.
 
-        Behind those, any Generate pressed but not yet turned into a job
+        After those, any Generate pressed but not yet turned into a job
         (:meth:`_show_launching`). They go on here rather than in the in-flight
         list itself because that list is what the database says is in flight, and
         these have no row in it: they are the press's answer, not a record of
@@ -6870,7 +6870,7 @@ class GalleryView(QWidget):
     def purge_from_trash(self, prompt_ids):
         """End deleted items for good — nothing else ever will. Confirmed
         first, and pointedly: this is the one action in the gallery with no undo
-        and no second copy behind it."""
+        and no second copy under it."""
         if not prompt_ids:
             return
         count = len(prompt_ids)
@@ -6977,7 +6977,7 @@ class GalleryView(QWidget):
         for every delete there is: a picked tile, a whole folder, a rejected
         experiment, a slideshow's Up key.
 
-        Canceling frees the queue — a video-length wait can sit behind an
+        Canceling frees the queue — a video-length wait can sit after an
         enhance nobody wants any more — and takes the run's transient row with
         it, so no enhanced file lands with no original to be a version of.
         """
@@ -7211,7 +7211,7 @@ class GalleryView(QWidget):
         """Double-clicking the title bar edits the selected folder's name — but not
         while several are picked, where the title is a count of them and the rename
         would land on whichever one happened to be current, and not over a search,
-        where the title is the query and there is no folder behind it to rename.
+        where the title is the query and there is no folder under it to rename.
 
         Only the folder's own name is edited, not the path on show: the editor is
         the size of that name, at the head of the path (see
@@ -7253,7 +7253,7 @@ class GalleryView(QWidget):
     # --- the selected generation drives a config tab -----------------------
 
     def _row_for(self, prompt_id: str) -> dict | None:
-        """The generation behind a tile: the gallery's own row, else a held
+        """The generation under a tile: the gallery's own row, else a held
         deletion's.
 
         A deleted item's row is out of the ``generations`` table — that is what
@@ -7336,7 +7336,7 @@ class GalleryView(QWidget):
         """Go to a generation: open the folder holding it, draw that folder, pick
         the item's own tile in it, and show the item in the info pane.
 
-        The single move behind every "take me to this picture" — a link, a
+        The single move under every "take me to this picture" — a link, a
         right-click "Go to folder", Back and Forward, a hosted show's lock, an
         undo landing on what it brought back. There is no lighter version of it
         and no separate path for any of them: a move that did some of those and
@@ -7415,7 +7415,7 @@ class GalleryView(QWidget):
             return None
         item = self._selected["prompt_id"] if self._selected else None
         if item is not None and item not in self._browser.visible_prompt_ids():
-            item = None  # left behind by the pane this one replaced
+            item = None  # left by the pane this one replaced
         return Location(view, self._search_query, item)
 
     def _record_location(self, item: str | None = None):

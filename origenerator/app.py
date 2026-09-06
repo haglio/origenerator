@@ -33,7 +33,7 @@ def _name_this_process() -> None:
     """Leave ``launch_origenerator.vbs`` an interpreter that says "Origenerator"
     next time.  The console interpreter, because that is the one the launcher
     runs -- it redirects the app's output into the launcher log.  Why it is one
-    launch behind, and why it can never cost the launch:
+    launch late, and why it can never cost the launch:
     :meth:`ProcessNamer.name_this_process`."""
     icon = Path(__file__).resolve().parent.parent / "icon.ico"
     ProcessNamer("Origenerator", icon=icon).name_this_process(
@@ -69,11 +69,11 @@ def _bring_to_front(window) -> None:
     """Put a just-opened window in front, the way opening an app is supposed to.
 
     A launch here is slow — starting ComfyUI's server, scanning its whole output
-    history, the backfills behind it — and nobody sits and watches that, so by
+    history, the backfills under it — and nobody sits and watches that, so by
     the time there is a window to show, the last input event went to whatever
     the user moved on to. Windows hands the foreground to the process that got
     that input, and refuses it to this one; ``show()`` then puts Origenerator
-    *behind* the window they are looking at, flashing the taskbar button as the
+    *under* the window they are looking at, flashing the taskbar button as the
     only sign it opened at all.
 
     Qt's ``raise_``/``activateWindow`` ask down that same refused path, so they
@@ -89,7 +89,7 @@ def _bring_to_front(window) -> None:
         from origenerator.win32 import force_foreground_window
         force_foreground_window(int(window.winId()))
     except Exception:
-        pass  # cosmetic: a window behind is still a window
+        pass  # cosmetic: a window underneath is still a window
 
 
 def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
@@ -429,7 +429,7 @@ def _open_the_splash(fun_time, app):
     screen owns the boot experience and this app boots parked, so a splash here
     has no audience -- and it is an always-on-top window whose lifetime is the
     boot, which on a slow boot left it sitting over a satellite region after the
-    session revealed ("the landscape player is behind other windows on startup":
+    session revealed ("the landscape player is under other windows on startup":
     the covering window was this splash). The boot phases still land in the log.
     """
     if fun_time is not None:
@@ -497,7 +497,7 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     That file is git-ignored and hand-maintained, so it does not gain a key when
     the app does -- and the committed example it is written from has gone from
     three keys to nine in six weeks. Three of those nine are read with a bare
-    subscript, so an overlay one release behind used to be a dead icon: no
+    subscript, so an overlay one release out of date used to be a dead icon: no
     window, and the traceback in a launcher log nobody opens. The other six went
     quietly one feature at a time, which is worse in its own way -- a stroke
     aimed at the wrong part of the frame reads as the model having a bad day.

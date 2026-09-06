@@ -7,8 +7,8 @@ job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat prog
 bar it measures. That frame opens the folder its run will land in, the way the
 row of the same job on the right does: it is a picture of a job, and a picture of
 a job goes where the job goes. A job ComfyUI hasn't started has no reading to
-write and that bar only sweeps, so where another app's work is what it is stuck
-behind, the line under the bar says so: a bar sweeping with nothing said about it
+write and that bar only sweeps, so where another app's work is what is holding
+it up, the line under the bar says so: a bar sweeping with nothing said about it
 is exactly the thing a user is owed an explanation for. Whatever is true of the
 shared *server* is this half's to say — a row on the right is about one job of
 ours and nothing else. With nothing of ours in flight the same half says what
@@ -160,7 +160,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
     That second line is the strip's one place for a fact about the shared server
     rather than about a job: another app's backlog, or a hold of this queue's own.
-    While the head of the line is stuck behind another app's work its bar has no
+    While the head of the line is held up by another app's work its bar has no
     reading to write and only sweeps, and the line under it is the explanation
     that sweeping is owed.
 
@@ -202,8 +202,8 @@ class RunningPreview(OpensAFolder, QWidget):
         self._progress.setFixedHeight(_BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)
-        # What the shared server is doing to us: the backlog our job is stuck
-        # behind, under its own sweeping bar — or, with nothing of ours in flight
+        # What the shared server is doing to us: the backlog holding our job
+        # up, under its own sweeping bar — or, with nothing of ours in flight
         # at all, what that server is busy with instead, in the bar's own place.
         # Plain text either way, being about the server rather than about a run of
         # ours that a bar could be measuring. It wraps rather than eliding: the
@@ -227,7 +227,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
     def show_foreign(self, text: str):
         """Say what the shared server is holding us up with — under our own job's
-        bar while it is stuck behind that work, or in the bar's own slot while
+        bar while it is held up by that work, or in the bar's own slot while
         nothing of ours is in flight at all.
 
         Hidden with nothing to say, so a job of ours actually being made keeps the
@@ -287,7 +287,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
         Read off the clock rather than off the feed. A job ComfyUI hasn't started
         has no elapsed time to report and the line stays empty — what its bar is
-        sweeping behind is said under the bar (:meth:`show_foreign`), not on it,
+        sweeping while it waits is said under the bar (:meth:`show_foreign`), not on it,
         being about the server rather than a run of ours that a bar could measure.
         A job with no step counts to show leaves the bar indeterminate rather than
         parked at 0%.
@@ -373,12 +373,12 @@ class QueueRow(OpensAFolder, QWidget):
     Only a wait worth explaining puts more text on the row, and only one this job
     is in on its own — a video the queue is holding for a slideshow, or a press of
     Generate not yet submitted — and that note takes the rest of the width, after
-    everything the row always says. A wait behind another app is not one of them:
+    everything the row always says. A wait on another app is not one of them:
     that is the whole line's, and is said once, under the bar in the left half —
     the bar it is holding up, and the thing it is there to explain.
 
     The picture block is one width whether it holds one picture or four, so the
-    line of text behind it starts at the same place on every row.
+    line of text beside it starts at the same place on every row.
 
     The button reads "Cancel", or "Next seed" for a job whose folder is
     auto-generating — where the press discards the seed and the loop starts
@@ -410,7 +410,7 @@ class QueueRow(OpensAFolder, QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 3, 6, 3)
         layout.setSpacing(6)
-        # It leads the row: a button anywhere behind a line that can elide was
+        # It leads the row: a button anywhere after a line that can elide was
         # pushed out of sight at the right-hand end.
         self._cancel = QPushButton()
         self._cancel.setObjectName("queueCancelBtn")
@@ -430,7 +430,7 @@ class QueueRow(OpensAFolder, QWidget):
         # Only a wait needs explaining, so most rows leave this empty. It asks
         # for no width of its own and is elided into whatever is left
         # (:meth:`_render_note`): a label that demands its full text instead can
-        # widen the row past the strip and carry everything behind it off the
+        # widen the row past the strip and carry everything after it off the
         # end — the disappearance the button was moved to the front to escape.
         self._note = QLabel()
         self._note.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -452,7 +452,7 @@ class QueueRow(OpensAFolder, QWidget):
         # job's alone: the stretch before a pressed Generate is a job at all, and
         # one this queue is imposing (a video, while a slideshow plays). The
         # user's own place in the line is the line itself and needs no words, and
-        # a wait behind another app is about the server, not this job — the left
+        # a wait on another app is about the server, not this job — the left
         # half says that one, under the bar that wait is holding up.
         self._note_text = (
             starting_row_text(item.starting) or held_row_text(item.held) or ""
@@ -645,7 +645,7 @@ class GenerationQueue(QWidget):
         ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
         It puts Clear up whenever there is any, and with nothing of ours running
         it is what the free half says — the point being to see that backlog before
-        a Generate goes in behind it — after the queue's own hold, which is nearer
+        a Generate joins the line — after the queue's own hold, which is nearer
         to hand and is ended by closing the show.
         """
         leader = items[0] if items and not items[0].held else None

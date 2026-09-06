@@ -145,7 +145,7 @@ def reclaim_orphans(db, trash) -> int:
     holding: every held record's batch folder is named as one to spare, so what
     is removed is only what no record points at — a rejected experiment's batch
     that fell off the undo stack, a batch from before the bin existed, or a
-    folder left behind by a crash between the move and the record. Nothing here
+    folder left by a crash between the move and the record. Nothing here
     reads a clock. A held deletion stays until the user restores it or ends it
     from the Trash shelf, however long that takes.
     """

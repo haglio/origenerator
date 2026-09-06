@@ -417,7 +417,7 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
 def test_derived_dimensions_track_the_input_image(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
     form._widgets["input_image"].setText("frame.png")
-    # Both the plain locked value and the spinner behind it follow the image.
+    # Both the plain locked value and the spinner under it follow the image.
     assert form._dim_value_labels["width"].text() == "864"
     assert form._dim_value_labels["height"].text() == "480"
     assert form._widgets["width"].value() == 864

@@ -958,7 +958,7 @@ class GenerateConfigPanel(QWidget):
         """Stop this tab being a folder rewrite, leaving an ordinary config.
 
         The prompt fields go back to plain inputs holding the prompts they show —
-        a marked-up field left behind would go on measuring edits against a
+        a marked-up field left over would go on measuring edits against a
         folder the tab is no longer about, and would keep its undo switched off.
         """
         if self._folder_request is None:
@@ -1088,7 +1088,7 @@ class GenerateConfigPanel(QWidget):
 
         A tab follows a folder rather than one run because a folder's runs come
         one after another — an auto-generate loop's variations, a second
-        Generate queued behind the first — and watching one is watching the
+        Generate queued after the first — and watching one is watching the
         next. Set by this tab's own Generate and by a click on the folder's live
         tile; ended by pointing the tab at a saved generation, or by the folder
         running out of runs (:meth:`stop_watching`).
@@ -1217,7 +1217,7 @@ class GenerateConfigPanel(QWidget):
         ``prompt_id`` names the generation when it is NOT the row this tab holds —
         the picture a followed run landed as (:meth:`show_finished_media`) goes
         up without the tab taking it on, and the corners have to be about the
-        picture rather than about the row behind it.
+        picture rather than about the row under it.
         """
         row = (self._displayed_row if prompt_id is None
                else self._db.get_generation(prompt_id))
@@ -1353,7 +1353,7 @@ class GenerateConfigPanel(QWidget):
 
     def set_fullscreen_factory(self, make):
         """Wire what a double-click on this tab's preview opens — a slideshow of
-        the folder behind it, which only the gallery can assemble. Passed straight
+        the folder under it, which only the gallery can assemble. Passed straight
         through to the preview (see
         :meth:`~origenerator.gui.preview_widget.PreviewWidget.set_fullscreen_factory`).
         """

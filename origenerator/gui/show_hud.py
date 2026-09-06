@@ -76,14 +76,14 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_items`` empty or unanswered).
 
-    *hosted* is whether a Fun Time session is behind the show, and the only
+    *hosted* is whether a Fun Time session is under the show, and the only
     thing it governs is the mode row.  Defaulted to the hosted answer because
     that is what every reading of a region's model wants; :class:`ShowHud`
     passes its own.
     """
     cells, position, locked = host.hud_items()
     if not cells:
-        return None  # a host with no set behind it, and so nothing to map
+        return None  # a host with no set under it, and so nothing to map
     hud_cells = tuple(
         HudCell(path=str(path), thumb=str(thumb) if thumb else "")
         for path, thumb in cells
@@ -276,7 +276,7 @@ class ShowHud(QLabel):
 
     def _deliver(self, command: str) -> None:
         """Route one HUD press: map clicks act on the show itself, session
-        commands go out on the dashboard channel — or, with no session behind
+        commands go out on the dashboard channel — or, with no session under
         this show, onto the show as well (:meth:`_act_here`) — and the rest are
         swallowed.
         """
@@ -333,7 +333,7 @@ class ShowHud(QLabel):
         # underneath.
 
     def _act_here(self, verb: str) -> None:
-        """A press with no session behind it: the show answers it itself.
+        """A press with no session under it: the show answers it itself.
 
         Standalone there is no dashboard channel and no player under the show,
         so the transport cannot take the round trip a hosted press takes — out

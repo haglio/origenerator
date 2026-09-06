@@ -62,7 +62,7 @@ class ForeignQueue(NamedTuple):
     """What clients other than this one have on ComfyUI's queue right now.
 
     ``running`` is what ComfyUI is executing for them (at most one), ``pending``
-    what waits behind it. Split because they're cleared differently: a pending
+    what waits on it. Split because they're cleared differently: a pending
     prompt is deleted out of the queue, while the executing one can only be
     interrupted.
     """
@@ -386,7 +386,7 @@ class ComfyUIApi:
         queue can be full of work no window here accounts for — another
         Origenerator instance, a branch preview whose background experiments
         outlived it, another app entirely. Until it's read, the first sign of it
-        is a fresh Generate landing behind a pile of jobs the user never asked
+        is a fresh Generate landing after a pile of jobs the user never asked
         for. Reading it lets a surface say so beforehand, and
         :meth:`clear_foreign_queue` is what gets rid of it.
         """

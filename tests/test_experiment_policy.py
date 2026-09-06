@@ -211,7 +211,7 @@ def test_lora_dims_are_the_favorite_mutation(monkeypatch):
     # "Experimenting with LoRAs" — the LoRA file and its strength get picked to
     # mutate well beyond an even split with the other dimensions. Measured against
     # the same run with the favouring switched off, not against a number: the
-    # arithmetic behind the old threshold was wrong for this fixture (an even
+    # arithmetic under the old threshold was wrong for this fixture (an even
     # split already lands at 51%, not 40%), so removing the weighting entirely
     # left the one behaviour this test names passing.
     rows = [make_row("vid-1", workflow_name="fake_i2v",

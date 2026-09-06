@@ -33,7 +33,7 @@ def _press_escape_elsewhere(qtbot):
 
 def test_closing_a_gallery_that_was_never_shown_stops_its_poll(qtbot):
     """The poll does blocking HTTP and a whole-table SELECT every 1.5 s, so one
-    left running behind a closed view is work nobody is looking at."""
+    left running once a view is closed is work nobody is looking at."""
     view = _gallery(qtbot)
     assert view._poll_timer.isActive()
 

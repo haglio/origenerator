@@ -1,5 +1,5 @@
 """Read what a model file *is* off its own header, so a picker can offer only
-the files the graph behind it can actually run.
+the files the graph under it can actually run.
 
 ``ComfyUI/models/<category>`` is a folder, not a catalogue: ``checkpoints`` holds
 SDXL and SD1.5 checkpoints beside WAN and LTX video models, ``diffusion_models``

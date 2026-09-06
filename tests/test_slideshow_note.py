@@ -62,7 +62,7 @@ def _fade(view):
 
 def _corner(view) -> str:
     """What the corner actually reads.  A note with nothing to say is hidden
-    rather than emptied, and the toast keeps its last line behind that — so
+    rather than emptied, and the toast keeps its last line under that — so
     ``text()`` alone would read a blank corner as still saying the old thing."""
     return "" if view._note.isHidden() else view._note.text()
 
@@ -129,7 +129,7 @@ def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkey
 
 def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, monkeypatch):
     """Whisper keeps transcribing while the request is worked out, and the app
-    says what it heard. That line is a flash; the work behind it is not."""
+    says what it heard. That line is a flash; the work under it is not."""
     view = _mid_request(qtbot, tmp_path, monkeypatch)
     show = view._slideshow
 

@@ -75,7 +75,7 @@ def _unmark(edit: QPlainTextEdit) -> None:
 
 
 class _Tracker(QObject):
-    """Keeps one field's marks — and the prompt behind them — in step with what is
+    """Keeps one field's marks — and the prompt under them — in step with what is
     typed into it."""
 
     def __init__(self, edit: QPlainTextEdit, baseline: str):
@@ -214,7 +214,7 @@ class _Tracker(QObject):
     # --- what the typist does -----------------------------------------------
 
     def _on_contents_change(self, position: int, removed: int, added: int) -> None:
-        """Follow one edit of the document through to the prompt behind it.
+        """Follow one edit of the document through to the prompt under it.
 
         The document may hold struck-through words at this point, so where the
         edit landed in it is not where it landed in the prompt — which is why

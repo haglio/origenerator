@@ -23,7 +23,7 @@ from origenerator.gui.slideshow_view import SlideshowView
 # What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
 # the transport every host has; the rest are about a set, and a host with no set
-# behind it takes the protocol's own answers for them.
+# under it takes the protocol's own answers for them.
 TRANSPORT = (
     "locked", "dwell_s", "set_dwell_s",
     "stroke_step", "stroke_toggle_hold", "stroke_cull",
@@ -71,7 +71,7 @@ def test_a_slideshow_answers_every_attribute_of_the_protocol(slideshow, attribut
 
 @pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
 def test_a_pace_only_host_answers_every_attribute_of_the_protocol(pace_only, attribute):
-    # The main window's console with nothing behind it: it answers the transport
+    # The main window's console with nothing under it: it answers the transport
     # itself and takes the protocol's answers for the set it does not have.
     assert hasattr(pace_only, attribute)
 

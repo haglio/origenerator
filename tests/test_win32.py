@@ -89,7 +89,7 @@ class TestWindowExists:
 class TestForceForegroundWindow:
     """The boot takes long enough that the user clicks into something else while
     it runs, which leaves the last input event with THAT app — and Windows then
-    refuses this process the foreground silently, dropping the window behind
+    refuses this process the foreground silently, dropping the window under
     whatever they moved on to. Attaching to the foreground thread's input queue
     is what makes the activation go through."""
 

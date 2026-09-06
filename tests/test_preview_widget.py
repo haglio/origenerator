@@ -368,7 +368,7 @@ def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path):
 
 
 def test_a_pane_with_nothing_wired_opens_nothing(make_preview, tmp_path):
-    # Without the gallery behind it there is no folder to make a show of.
+    # Without the gallery under it there is no folder to make a show of.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     assert w.open_fullscreen() is None
@@ -451,7 +451,7 @@ def test_a_live_frame_opens_fullscreen_over_the_generation(live_preview):
     win = live_preview.open_fullscreen()
 
     assert win is not None
-    assert win.media is None          # no file behind it yet — it follows the run
+    assert win.media is None          # no file under it yet — it follows the run
     assert win.frames == [_png_bytes()]  # seeded with the frame that was on screen
 
 
@@ -653,7 +653,7 @@ def drags(monkeypatch):
     Stands in for QDrag, whose exec is modal and blocks on a real drag loop. The
     list is this test's own: the stand-in used to keep its latest instance on the
     class, where four of these tests read whatever the one before them had left
-    behind — and the video drag passed that way with its own feature broken.
+    over — and the video drag passed that way with its own feature broken.
     """
     started = []
 
@@ -941,7 +941,7 @@ def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
 
     assert not w._notice.isHidden()
     assert w._notice.text() == "(not yet generated with modifications)"
-    assert not w._notice_dim.isHidden()  # the picture behind it is dimmed
+    assert not w._notice_dim.isHidden()  # the picture under it is dimmed
 
 
 def test_the_dim_covers_the_media_and_the_plate_sits_top_left(make_preview, tmp_path):
@@ -1067,7 +1067,7 @@ def test_the_recipe_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
 
 def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, tmp_path):
     # A curated act is pinned in the content overlay: there is no past video
-    # behind it, so there is no sum to draw a plus in the middle of.
+    # under it, so there is no sum to draw a plus in the middle of.
     w = make_preview()
 
     w.show_combination(_make_png(tmp_path / "frame.png"), None)
@@ -1078,7 +1078,7 @@ def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, 
 
 
 def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
-    # Its clip would otherwise keep looping behind whatever replaced it.
+    # Its clip would otherwise keep looping under whatever replaced it.
     w = make_preview()
     w.show_combination(_make_png(tmp_path / "frame.png"),
                        _animated_webp(tmp_path / "recipe.webp"))

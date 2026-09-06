@@ -80,7 +80,7 @@ def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -
 
     ``None`` keeps every type; an empty set keeps none. The two ticks narrow the
     whole gallery rather than one shelf, so every list the browser pane draws
-    (Recents, Starred, Experiments, Requests, Trash, and the search index behind
+    (Recents, Starred, Experiments, Requests, Trash, and the search index under
     them) passes through here, and the folder tree takes the same set (see
     :func:`~origenerator.gallery.tree.build_gallery_tree`).
     """

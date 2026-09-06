@@ -312,7 +312,7 @@ def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
     assert describe_enhance_params({}) == ""
 
 
-# --- what the info pane lists, and what deleting a level leaves behind ------
+# --- what the info pane lists, and what deleting a level leaves ------
 
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():

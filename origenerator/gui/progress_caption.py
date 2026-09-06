@@ -8,7 +8,7 @@ at all), which spent two rows on one reading and left each surface free to
 invent its own arrangement.
 
 Here they are one widget: the numbers sit *on* the bar they measure. The fill is
-the app's flat blue behind the writing rather than a wash over it — a
+the app's flat blue under the writing rather than a wash over it — a
 translucent fill tints the letters as it passes under them, which is the one
 place the text has to stay legible.
 

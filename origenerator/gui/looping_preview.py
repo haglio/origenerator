@@ -25,7 +25,7 @@ from PyQt6.QtGui import QImageReader, QMovie
 # The freeze, and who is under it.  A weak set because a movie is parented to
 # the widget that shows it: PyQt keeps a parented wrapper alive for as long as
 # its parent, so an entry lives exactly as long as the preview it stands for
-# and a rebuilt strip leaves nothing behind here.
+# and a rebuilt strip leaves nothing here.
 _paused = False
 _movies: weakref.WeakSet = weakref.WeakSet()
 

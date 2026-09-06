@@ -272,7 +272,7 @@ def test_closing_with_the_switch_off_queues_nothing(qtbot, tmp_path):
 
 def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
     # A preview's batch would outlive it in the shared ComfyUI as work the live
-    # app can neither see nor cancel — every Generate after it waits behind jobs
+    # app can neither see nor cancel — every Generate after it waits on jobs
     # "from another app" that were the user's own preview. Only the live install
     # schedules an absence.
     monkeypatch.setenv(ENV_FLAG, "1")

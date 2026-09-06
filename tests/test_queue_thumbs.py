@@ -74,7 +74,7 @@ def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
 
 
 def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
-    # A video queued behind the image it animates has no frame on disk yet. The
+    # A video queued after the image it animates has no frame on disk yet. The
     # recipe still says something about this run, and stays in its own cell so
     # the two read as one column down the line.
     recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
@@ -129,7 +129,7 @@ def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
 
 
 def test_one_picture_takes_the_same_width_as_four(qapp, tmp_path):
-    # So the line of text behind the block starts at the same place on every row.
+    # So the line of text beside the block starts at the same place on every row.
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
     mates = [_picture(tmp_path / f"m{i}.png", (0, 0, 255)) for i in range(4)]
 
@@ -196,7 +196,7 @@ def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):
 
 def test_a_source_frame_that_is_not_on_disk_yet_leaves_the_block_to_the_folder(
         qtbot, tmp_path):
-    # A video queued behind the image it animates: its start frame is named but
+    # A video queued after the image it animates: its start frame is named but
     # not rendered, so the caller is told to fall back rather than draw a blank.
     thumbs = QueueThumbs(CELL)
     qtbot.addWidget(thumbs)

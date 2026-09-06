@@ -35,7 +35,7 @@ _CORNER_BUTTON_CSS = (
     CHIP_CSS + "QPushButton:hover { background: rgba(48,128,224,0.9); }"
 )
 
-# A selected thumbnail lightens its whole tile — behind both the image and the
+# A selected thumbnail lightens its whole tile — under both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
 # the fill actually show:
 #   * WA_StyledBackground, or a plain QWidget subclass paints no stylesheet
@@ -116,7 +116,7 @@ class ThumbnailWidget(QWidget):
         # A video's seed is twenty digits, which is what most of these captions
         # are; the family's font is the size that gets one across a card.
         grid_card.style_caption(self._text_label)
-        # Transparent so the tile's fill shows through behind the caption.
+        # Transparent so the tile's fill shows through under the caption.
         self._text_label.setStyleSheet("background-color: transparent;")
 
         # Let mouse events (clicks, hover) fall through to the tile, so enter/leave
@@ -309,7 +309,7 @@ class ThumbnailWidget(QWidget):
         else:
             self.setStyleSheet("")
             border = _BORDER_UNSELECTED
-        # Transparent background so the tile fill shows behind any letterboxing.
+        # Transparent background so the tile fill shows under any letterboxing.
         self._image_label.setStyleSheet(
             f"background-color: transparent; border: {border}; border-radius: 3px;"
         )

@@ -381,7 +381,7 @@ def test_thumbnail_starts_unselected(qtbot):
 
 
 def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
-    """The fill must reach behind the image and the caption, not just the margin.
+    """The fill must reach under the image and the caption, not just the margin.
 
     Rendered with the app stylesheet, which paints bare QLabels opaque — the
     exact reason an earlier fill showed only as a frame. Sampling real pixels
@@ -399,8 +399,8 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
         qtbot.waitExposed(tw)
         img = tw.grab().toImage()
         fill = QColor(_SELECTED_BG)
-        assert img.pixelColor(8, 8) == fill     # behind the image
-        assert img.pixelColor(8, 182) == fill    # behind the caption text
+        assert img.pixelColor(8, 8) == fill     # under the image
+        assert img.pixelColor(8, 182) == fill    # under the caption text
     finally:
         app.setStyleSheet(prior)
 

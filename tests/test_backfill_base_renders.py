@@ -172,7 +172,7 @@ def test_attaching_the_base_gives_the_row_its_two_levels(tmp_path):
 
     upgraded = db.get_generation("baked")
     # The enhanced file keeps its place at the head — it is still what the row
-    # shows — and the base joins behind it as the original.
+    # shows — and the base joins under it as the original.
     assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
         ["sdxl_t2i_a.png", "sdxl_t2i_a_base.png"]
     assert [lvl.label for lvl in gallery.enhance_levels(upgraded)] == \

@@ -9,7 +9,7 @@ That is what made
 ``test_gallery_view.py::test_a_finished_request_queues_the_revision_with_the_same_seed``
 the one flake this suite has been seen to have: it waits up to three seconds for
 an answer that crosses back from a pool thread, and 1.4 s of that budget went on
-delivering the 44,659 DeferredDelete events its neighbours had left behind
+delivering the 44,659 DeferredDelete events its neighbours had left over
 (measured; the hop itself is 20 ms, and the bill grows with the number of tests
 that ran first).  On a machine running several suites at once it overran, and
 the test went red on two runs in five.

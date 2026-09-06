@@ -62,7 +62,7 @@ def test_no_step_counts_leaves_it_sweeping_rather_than_stuck_at_zero(bar):
 def test_the_caption_still_shows_on_a_bar_with_nothing_to_count(bar):
     # Qt's own text() goes empty on an indeterminate bar, which would drop the
     # caption exactly when it is the only thing the surface has to say.
-    bar.show_progress("Waiting behind 2 jobs from another app", None)
+    bar.show_progress("Waiting on 2 jobs from another app", None)
     assert bar.text()
 
 
@@ -215,7 +215,7 @@ def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
 def test_a_sweeping_bar_grows_no_band(styled_bar):
     # A job ComfyUI hasn't started has no run to measure, so there is nothing
     # for a band under it to be a part of.
-    styled_bar.show_progress("Waiting behind 2 jobs from another app", None, (3, 20))
+    styled_bar.show_progress("Waiting on 2 jobs from another app", None, (3, 20))
     image = styled_bar.grab().toImage()
 
     assert image.pixelColor(8, _foot(styled_bar)) != BLUE_LIGHT

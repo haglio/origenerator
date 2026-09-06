@@ -79,7 +79,7 @@ class InFlightItem:
     # A file on disk showing what this run came from — the start frame above,
     # or the image a request was made of. A queued run has no picture of its
     # own, so surfaces that would otherwise show a blank plate stand this
-    # behind the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
+    # under the wait, blurred (:mod:`origenerator.gui.blurred`). ``None``
     # where the run came from nothing, which is most images.
     source_picture: str | None = None
     # The act picked in the Combine panel's dropdown, for a run launched from
@@ -243,7 +243,7 @@ def stop_loop_tooltip() -> str:
 def queue_wait_text(foreign_ahead: int | None) -> str | None:
     """How a job's wait reads while another app is holding ComfyUI in front of it.
 
-    Only another app's work earns this line. A wait behind the user's own jobs is
+    Only another app's work earns this line. A wait on the user's own jobs is
     no mystery — ComfyUI is working through exactly what they asked for, and they
     can read the rest of the queue in the lower strip — so saying "waiting in
     ComfyUI" there sends them hunting for phantom jobs that are their own.
@@ -253,14 +253,14 @@ def queue_wait_text(foreign_ahead: int | None) -> str | None:
     """
     if not foreign_ahead:
         return None
-    return f"Waiting behind {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
+    return f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
 
 
 def queue_held_text(held: int | None) -> str | None:
     """What a queue holding videos back for a slideshow reads like.
 
     A line that stops moving with the GPU idle is the same mystery as a wait
-    behind another app's work, and worse for being this app's own doing — so the
+    on another app's work, and worse for being this app's own doing — so the
     strip says it outright, and says what ends it. ``None`` when the gate is
     holding nothing, which is every moment no slideshow is playing.
     """

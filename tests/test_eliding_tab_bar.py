@@ -49,7 +49,7 @@ def test_labels_elide_with_an_ellipsis(qtbot):
 
 
 def test_never_shows_scroll_buttons(qtbot):
-    # Overflow collapses the tabs instead of hiding them behind scroll arrows,
+    # Overflow collapses the tabs instead of hiding them under scroll arrows,
     # so every tab stays on screen.
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
@@ -130,10 +130,10 @@ def test_the_close_mark_is_padded_off_the_tabs_edge(qtbot):
 def test_the_same_mark_whichever_tab_is_in_front(qtbot):
     bar = _closable_bar(qtbot)
     bar.setCurrentIndex(0)
-    front, behind = _close_button(bar, 0), _close_button(bar, 1)
+    front, next_along = _close_button(bar, 0), _close_button(bar, 1)
     size = front.iconSize()
     assert (front.icon().pixmap(size).toImage()
-            == behind.icon().pixmap(size).toImage())
+            == next_along.icon().pixmap(size).toImage())
 
 
 def test_clicking_a_close_button_asks_for_that_tab(qtbot):
@@ -196,7 +196,7 @@ def test_the_preview_tabs_label_is_painted_italic(qtbot):
 
 def test_the_other_tabs_stay_upright(qtbot):
     # The painter carries its font from one label to the next, so an italic left
-    # behind would spread down the row.
+    # set would spread down the row.
     bar = _closable_bar(qtbot, count=3)
     bar.set_preview_index(1)
     assert _painted_label_font(bar, 0).italic() is False

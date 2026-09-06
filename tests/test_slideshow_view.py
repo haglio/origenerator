@@ -455,10 +455,10 @@ def test_the_items_either_side_ride_along_as_stills(qtbot, tmp_path):
     view.resize(800, 600)
 
     left, right = view._neighbors._labels
-    assert view._neighbors._sources == (items[2][0], items[1][0])  # c behind, b ahead
+    assert view._neighbors._sources == (items[2][0], items[1][0])  # c before, b ahead
     assert not left.pixmap().isNull() and not right.pixmap().isNull()
 
-    _press(view, Qt.Key.Key_Right)  # onto b: a behind it now, c ahead
+    _press(view, Qt.Key.Key_Right)  # onto b: a before it now, c ahead
     assert view._neighbors._sources == (items[0][0], items[2][0])
 
 
@@ -468,7 +468,7 @@ def test_a_video_neighbor_falls_back_to_its_thumbnail(qtbot, tmp_path):
     view = SlideshowView(items, player=MagicMock(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
-    # Two items, so the clip is both what's behind and what's ahead — and it's
+    # Two items, so the clip is both what's before and what's ahead — and it's
     # drawn as its stored still, the only thing a video can show small.
     assert view._neighbors._sources == (thumb, thumb)
 
@@ -705,7 +705,7 @@ def _inflight(**kw):
 
 
 def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):
-    # The lower strip that normally carries it is behind this view, and a show
+    # The lower strip that normally carries it is under this view, and a show
     # is when the queue stops moving: its videos are held until it ends.
     view = _view(qtbot)
     view.resize(1920, 1080)
@@ -1209,7 +1209,7 @@ def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
 def test_opens_over_a_running_generation_showing_its_frame(qtbot):
     view = _view(qtbot, [], frame=_png_bytes())
     assert view.is_live() is True
-    assert view._preview._media is None                     # no file behind it yet
+    assert view._preview._media is None                     # no file under it yet
     assert not view._preview._image_label.pixmap().isNull()  # the streamed frame shows
 
 
@@ -1510,7 +1510,7 @@ def test_the_state_names_the_pass_and_the_slide_it_is_on(qtbot):
 
 
 def test_a_reopened_show_stands_where_the_last_one_was_closed(qtbot):
-    # Closing a show is usually a detour — the folder behind the picture, a fix
+    # Closing a show is usually a detour — the folder under the picture, a fix
     # in a tab — so coming back is coming back to that picture.
     closed = _view(qtbot, _THREE)
     _press(closed, Qt.Key.Key_Right)

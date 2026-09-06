@@ -1268,7 +1268,7 @@ def test_build_gallery_tree_keeps_only_the_checked_media_types():
 
 
 def test_hiding_images_leaves_a_videos_source_image_folders_untouched():
-    # The filter narrows the folders, never the index behind them: the frame a
+    # The filter narrows the folders, never the index under them: the frame a
     # video animates is still looked up among every finished image, so a gallery
     # showing videos alone keys and names its source-image folders exactly as a
     # gallery showing both does.
@@ -1392,7 +1392,7 @@ def test_recent_generations_lists_imported_files_where_they_arrived():
 def test_recent_generations_leaves_experiments_to_their_own_shelf():
     # An experiment is reviewed on the Experiments shelf; listed here as well it
     # would read as something asked for. Everything else with a result is here,
-    # including a stroke cut for the Genau lane, which has no run behind it.
+    # including a stroke cut for the Genau lane, which has no run under it.
     generated = _img("gen", "a cat", 50, 1)
     experiment = _row(prompt_id="exp", source="experiment", id=2,
                       output_files=json.dumps([{"filename": "exp.png"}]))
@@ -1489,7 +1489,7 @@ def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
 
 
 def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():
-    # The transient row is deleted by the fold, so the level it left behind is
+    # The transient row is deleted by the fold, so the level it left is
     # what remembers where the run fell in the library's order: the image stays
     # lifted after it completes rather than dropping back to where it was made.
     i1, = _shelf(("i1", 1))
@@ -1521,7 +1521,7 @@ def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place
 
 
 def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():
-    # A re-enhance runs on the pre-enhance file, still listed behind the enhanced
+    # A re-enhance runs on the pre-enhance file, still listed under the enhanced
     # one: the row it belongs to is the same image, so it is that image that moves.
     i1, = _shelf(("i1", 1))
     i1["output_files"] = json.dumps([{"filename": "image_enhance_e1.png"},
@@ -1557,7 +1557,7 @@ def test_build_gallery_tree_labels_workflow_with_display_name():
 def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     # A prompt is a paragraph where a folder name is a line, so a settings leaf
     # is named from its key instead. What the prompt said is still there, as the
-    # description behind the name.
+    # description under the name.
     prompt = "a cat asleep on a windowsill in the late afternoon sun"
     (lora,) = build_gallery_tree(
         [_img("i1", prompt, 50, 1)])[0].model_groups[0].children

@@ -62,5 +62,5 @@ def test_clicks_fall_through_to_the_tile_underneath(host):
 
 
 def test_the_message_wraps_rather_than_running_off_the_picture(host):
-    # "Waiting behind 2 jobs from another app" is a sentence, not a word.
+    # "Waiting on 2 jobs from another app" is a sentence, not a word.
     assert StageScrim(host).wordWrap()

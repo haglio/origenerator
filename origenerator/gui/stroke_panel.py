@@ -99,7 +99,7 @@ def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated stroke over
-    what is on screen, with no Nau playlist behind it. The empty
+    what is on screen, with no Nau playlist under it. The empty
     :class:`ModeHud` is what leaves the status line saying only whether the
     slide is held — there is no compilation, no browse order and no length
     filter here to report.
@@ -159,7 +159,7 @@ class StrokePanel(QWidget):
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
-        # Without a slideshow behind it the console still has a pace to set: the
+        # Without a slideshow under it the console still has a pace to set: the
         # one the next slideshow will open at.
         self._host = host if host is not None else PaceOnlyHost(
             pace if pace is not None else SlideshowPace(parent=self))
@@ -318,7 +318,7 @@ class StrokePanel(QWidget):
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device
-        is switched on and off behind this app's back, so there is nothing to
+        is switched on and off without this app knowing, so there is nothing to
         cache the answer against."""
         ask = self._ask_device if self._ask_device is not None else osr2.device_on
         return bool(ask())

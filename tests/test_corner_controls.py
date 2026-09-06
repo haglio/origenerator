@@ -36,7 +36,7 @@ def _image_row(**extra):
 
 def _enhanced_row(settings):
     """That image with one enhancement folded onto it, made at ``settings`` — the
-    enhanced file leading, the original still listed behind it, and the level
+    enhanced file leading, the original still listed under it, and the level
     recording the params the run actually used."""
     row = _image_row()
     made_at = gallery.enhance_params_for(row, settings)

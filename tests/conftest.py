@@ -10,7 +10,7 @@ import and every module that reads it binds its own copy, so the one place a
 run can be pointed at a directory of its own is the environment, before the
 first origenerator import.  A run used to leave a log, arrow PNGs, thumbnails,
 trash and a real recording in the checkout's live state/, and what one run
-left behind decided what the next one drew.
+left decided what the next one drew.
 """
 import atexit
 import os

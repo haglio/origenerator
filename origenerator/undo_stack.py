@@ -1,4 +1,4 @@
-"""One undo stack and the redo stack behind it. Knows nothing of what it undoes.
+"""One undo stack and the redo stack under it. Knows nothing of what it undoes.
 
 Session-scoped, bounded, and generic: a step is a label, a way to reverse it,
 and optionally a way to run it again. What it reverses — a delete, a rename, a
@@ -11,7 +11,7 @@ arguments, so it files fresh trash batches and a fresh undo entry rather than
 trying to re-drive the ones the undo already spent. That is what lets a step be
 undone and redone any number of times. And because a re-run pushes an entry of
 its own, ``_redoing`` is what stops that entry from clearing the redo stack it
-just came off — the older redos behind it are still good.
+just came off — the older redos under it are still good.
 
 Any *new* step does clear it, as everywhere else: once history has forked, the
 branch you left is gone.

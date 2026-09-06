@@ -456,12 +456,12 @@ def test_the_left_half_says_what_the_bar_is_sweeping_behind(queue):
     # A job ComfyUI hasn't started leaves the bar's reading slot empty and the bar
     # sweeping, which is precisely when a sweeping bar is owed a reason.
     queue.set_items([_item(status="queued", foreign_ahead=3)])
-    assert _timing(queue) == "Waiting behind 3 jobs from another app"
+    assert _timing(queue) == "Waiting on 3 jobs from another app"
 
 
 def test_one_job_ahead_reads_in_the_singular(queue):
     queue.set_items([_item(status="queued", foreign_ahead=1)])
-    assert _timing(queue) == "Waiting behind 1 job from another app"
+    assert _timing(queue) == "Waiting on 1 job from another app"
 
 
 def test_the_row_does_not_repeat_the_wait(queue):
@@ -552,7 +552,7 @@ def test_shows_how_far_along_it_is_the_elapsed_time_and_what_is_left(queue):
 
 
 def test_shows_the_elapsed_time_alone_with_no_estimate(queue):
-    # The first run of a workflow has no history behind it, and one step in it's
+    # The first run of a workflow has no history under it, and one step in it's
     # too early to pace off — the elapsed count still stands on its own.
     queue.set_items([_item(status="running", progress=(1, 20),
                            started_at=time.time() - 45.5)])
@@ -765,7 +765,7 @@ def test_nothing_can_be_dropped_in_front_of_the_job_being_made(queue):
 
     _drop(queue, "d", at_row=0)  # aimed above the head of the line
 
-    assert queue.keys() == ["a", "d", "b", "c"]  # it lands just behind it instead
+    assert queue.keys() == ["a", "d", "b", "c"]  # it lands just after it instead
 
 
 def test_a_drag_over_the_strip_marks_where_it_would_land(queue):
@@ -923,7 +923,7 @@ def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
 
 
 def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_path):
-    # A video queued behind the image it animates names a start frame that isn't
+    # A video queued after the image it animates names a start frame that isn't
     # on disk. Better its folder than a blank square where a picture was promised.
     mates = (_picture(tmp_path / "mate.png"),)
     queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
@@ -943,7 +943,7 @@ def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path
 
 
 def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue, tmp_path):
-    # A chained run draws its frame first, so the video behind it names one that
+    # A chained run draws its frame first, so the video after it names one that
     # isn't on disk yet. The recipe is about this run either way — better it than
     # the folder, which says only where the result will land.
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
@@ -1013,7 +1013,7 @@ def test_rows_are_the_height_that_shows_about_two_at_a_time(queue):
 
 
 def test_cancel_leads_each_row_so_nothing_can_bury_it(queue):
-    # A button behind a line that can elide was pushed out of sight at the
+    # A button after a line that can elide was pushed out of sight at the
     # right-hand end, which read as no way to cancel a queued item.
     from PyQt6.QtWidgets import QApplication
 

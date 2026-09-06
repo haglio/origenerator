@@ -138,7 +138,7 @@ def enhance_icon() -> QIcon:
     """A bold plus — enhance (upscale + re-sample) images.
 
     Yellow, the very plus a picture wears in its enhance corner once it holds one
-    (:func:`corner_enhance_icon`), so the button and the mark it leaves behind are
+    (:func:`corner_enhance_icon`), so the button and the mark it leaves are
     one symbol in one color — and so it can't be read as a star, which is what
     green means across this family (:data:`_STAR_GLYPH`)."""
     return glyph_icon("plus", color=AMBER, size=_SIZE)
@@ -320,7 +320,7 @@ _CORNER_ARMED = TEXT_SECONDARY
 # leaves the enhance corner room to shift a second copy of itself down and right
 # without running off the canvas. _ENHANCE_SHADOW is that shift: far enough to
 # show as a shadow at the size a corner is drawn at, and no further, since past
-# the margin it stops being behind the mark and starts being beside it.
+# the margin it stops being under the mark and starts being beside it.
 _CORNER_MARK = 40.0
 _CORNER_MARK_AT = 4.0
 _ENHANCE_SHADOW = 5.0
@@ -364,10 +364,10 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
     the image holds an enhancement AND the settings on the panel would make a
     different one. So the solid yellow plus goes down first, shifted a little,
     and is then cleared back out under the hollow one — leaving the enhancement
-    it has as a yellow shadow behind the offer of another. The clear is safe here
+    it has as a yellow shadow under the offer of another. The clear is safe here
     in the one way it is anywhere: this pixmap is ours and the only thing under
     the mark is the shadow just drawn, so what shows through the hollow is the
-    chip the button paints behind it.
+    chip the button paints under it.
     """
     if state == ENHANCE_HELD:
         return _corner_icon("plus", AMBER, armed=False)
@@ -387,7 +387,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
 
 def _corner_icon(glyph: str, ink, armed: bool, *, arm_color=None) -> QIcon:
     """One corner control's mark, at rest or armed — bare line art, since the
-    button paints the translucent chip behind it that the badges draw into
+    button paints the translucent chip under it that the badges draw into
     themselves."""
     color = (arm_color or _CORNER_ARMED) if armed else ink
     return _same_when_dead(_painted(lambda painter: _mark(painter, glyph, color)))
@@ -438,7 +438,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     """A thumbnail hover-button glyph: a regenerate ring around a small play/photo
     mark — "re-roll this video" (its motion) or "this image" (its start frame).
 
-    White line art; the button paints its own translucent chip behind it, so the
+    White line art; the button paints its own translucent chip under it, so the
     glyph reads over a thumbnail of any color. The two differ by their inner mark,
     so a video seed control is never mistaken for an image seed one.
     """

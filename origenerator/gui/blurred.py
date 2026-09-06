@@ -1,4 +1,4 @@
-"""A picture stood behind something that hasn't been drawn yet.
+"""A picture stood under something that hasn't been drawn yet.
 
 A queued generation has no picture of its own — that is the whole of what is
 being waited for — so its card is a blank plate with a word on it, and a line of

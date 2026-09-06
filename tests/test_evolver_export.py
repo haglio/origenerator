@@ -42,7 +42,7 @@ def test_export_writes_a_partial_file_before_finalizing(tmp_path, monkeypatch):
     assert ".partial." in seen["copy_dest"].name  # Evolver skips this mid-copy
     assert seen["final_present_during_copy"] is False
     assert dest.name == "clip.mp4"
-    assert [p.name for p in inbox.iterdir()] == ["clip.mp4"]  # no partial left behind
+    assert [p.name for p in inbox.iterdir()] == ["clip.mp4"]  # no partial left over
 
 
 def test_export_does_not_clobber_an_already_queued_video(tmp_path):

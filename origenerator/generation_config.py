@@ -158,7 +158,7 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     """True when launching ``workflow`` with ``params`` would re-create a
     byte-identical past generation among ``rows``.
 
-    The question behind both the "already generated" guard the gallery runs at
+    The question under both the "already generated" guard the gallery runs at
     launch and the caption the Generate button wears while a press would do it —
     one function, so the button can never promise a fresh seed the launch doesn't
     draw (or stay silent about one it does).

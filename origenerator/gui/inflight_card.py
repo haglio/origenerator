@@ -140,7 +140,7 @@ class InFlightCard(QWidget):
 
     def _show_backdrop(self, item: InFlightItem):
         """Until this run streams a frame of its own, stand what it came from
-        behind the wait — blurred, so it reads as where the result is coming
+        under the wait — blurred, so it reads as where the result is coming
         from rather than as the result (:mod:`origenerator.gui.blurred`).
 
         A run that came from nothing keeps the plain plate: there is no honest
@@ -154,7 +154,7 @@ class InFlightCard(QWidget):
     @staticmethod
     def _stage_message(item: InFlightItem) -> str:
         """What the scrim says about this job: the stage it is at, or — when the
-        hold is another app's — what it is waiting behind."""
+        hold is another app's — what it is waiting on."""
         return (queue_wait_text(item.foreign_ahead)
                 or {"running": "Generating…", "speaking": "Speaking her lines…"}.get(
                     item.status, "Queued…"))

@@ -1,4 +1,4 @@
-"""The ordering and pacing behind the fullscreen slideshow.
+"""The ordering and pacing under the fullscreen slideshow.
 
 Pure, Qt-free playlist state: what's on screen, how to step through it, and how
 long to dwell on an image before advancing. :class:`SlideshowPlaylist` plays a
@@ -224,7 +224,7 @@ class SlideshowPlaylist:
 
         Next rather than at the end of the pass: this is how a generation made
         while the show runs reaches the screen, and watching a folder fill is
-        watching for the new one — parked behind a hundred others it would be an
+        watching for the new one — parked after a hundred others it would be an
         hour away. The rest of the pass then carries on where it left off.
         """
         prompt_id = item[2] if len(item) > 2 else None
@@ -254,7 +254,7 @@ class SlideshowPlaylist:
         Returns whether there was such a slide.
 
         Only a live one. A frame arriving after the run landed — a message from
-        the tail of it, or a poll a beat behind — must not take the finished
+        the tail of it, or a poll a beat late — must not take the finished
         picture back off the screen and put a half-rendered one there.
         """
         found = False
@@ -286,7 +286,7 @@ class SlideshowPlaylist:
         """Take a named item out of the set wherever it sits, rather than only
         while it is the one on screen. Returns whether it was here.
 
-        What a run that stopped being made leaves behind: cancelled or failed, it
+        What a run that stopped being made leaves: cancelled or failed, it
         has no file coming and its last frame would otherwise sit in the pass
         forever.
         """

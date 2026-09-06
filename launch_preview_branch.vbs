@@ -34,7 +34,7 @@ primaryRoot = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolde
 ' The primary's venv when it has one, else whatever python the live launcher
 ' would have found. An empty or absent .venv is a normal state of the primary
 ' (it runs off PATH python), so refusing to launch there would strand every
-' preview behind a MsgBox for an interpreter the app never needed.
+' preview at a message dialog for an interpreter the app never needed.
 Function FindPythonCommand()
   Dim venvPython, candidates, i
 

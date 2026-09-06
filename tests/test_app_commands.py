@@ -180,7 +180,7 @@ def test_whispers_punctuation_and_case_are_ignored():
 @pytest.mark.parametrize("said", [
     "a lock of hair over her eye",
     "the next one should be brighter",
-    "star field behind her",
+    "star field around her",
     "delete the harsh shadow",
     "she is standing on the trash heap",
 ])

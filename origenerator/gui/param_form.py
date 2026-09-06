@@ -27,7 +27,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_box import PromptBox
+from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.speech import CUSTOM_VOICE
@@ -384,9 +384,9 @@ class ParamForm(QWidget):
             # A story of one scene is marked like any prompt; one of several
             # takes the revised text as scenes, since a diff over the breaks
             # would strike the story's own structure through.
-            boxes = widget.boxes(key)
-            if len(boxes) == 1:
-                diff_text.show_diff(boxes[0], before, after)
+            fields = widget.fields(key)
+            if len(fields) == 1:
+                diff_text.show_diff(fields[0], before, after)
             else:
                 widget.set_story(key, after)
             return
@@ -425,7 +425,7 @@ class ParamForm(QWidget):
         prompt is searchable the day it lands. What Ctrl+F searches; see
         :mod:`origenerator.gui.prompt_find`.
         """
-        scenes = self._scenes.text_boxes() if self._scenes is not None else []
+        scenes = self._scenes.text_fields() if self._scenes is not None else []
         return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
 
     def _has_param(self, key: str) -> bool:
@@ -728,9 +728,9 @@ class ParamForm(QWidget):
             return w
         if pd.type == "str" and pd.multiline:
             # A prompt is the one field worth more than a few lines of the form,
-            # and how many it wants is the user's call — hence a box whose lower
+            # and how many it wants is the user's call — hence a field whose lower
             # edge drags, at whatever height this param was last given.
-            w = PromptBox(pd.key)
+            w = PromptField(pd.key)
             w.setPlainText(str(pd.default))
             return w
         if pd.type == "str":

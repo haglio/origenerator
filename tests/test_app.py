@@ -552,6 +552,28 @@ def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
         qapp.setStyleSheet(prior)  # every later test renders in the chrome it expected
 
 
+def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library):
+    # The sheet dresses the widgets it names; the palette answers for the colors
+    # it names none of. Left to Qt those are the desktop's, which is how a
+    # selected word in this dark app came to be highlighted in the accent color
+    # the user picked for Windows -- an orange nothing here chose. Read back off
+    # the application for the same reason the sheet above is.
+    from PyQt6.QtGui import QColor, QPalette
+    from shared_ui.colors import BLUE
+
+    prior = qapp.palette()
+    desktop = QPalette(prior)
+    # A fabricated accent, so a launch in an earlier test cannot answer for this one.
+    desktop.setColor(QPalette.ColorRole.Highlight, QColor(210, 70, 54))
+    qapp.setPalette(desktop)
+    try:
+        _boot(library)
+
+        assert qapp.palette().color(QPalette.ColorRole.Highlight) == BLUE
+    finally:
+        qapp.setPalette(prior)  # every later test renders in the chrome it expected
+
+
 def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
     # The reconcile is why a star survives a change to the key formula. Deleting
     # both its calls left the boot tests green, and the star would simply be gone

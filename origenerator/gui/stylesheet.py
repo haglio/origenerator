@@ -15,6 +15,7 @@ from shared_ui.colors import (
     TEXT_MUTED,
     TEXT_PRIMARY,
     TEXT_SECONDARY,
+    family_palette,
 )
 
 
@@ -342,3 +343,18 @@ def build_stylesheet() -> str:
         color: {_h(TEXT_PRIMARY)};
     }}
     """
+
+
+def dress_application(app) -> None:
+    """Put the family's palette and this app's sheet on the QApplication.
+
+    The application and not a window, for two reasons that arrived separately.
+    A QToolTip popup is a top-level widget no window-level sheet reaches, so
+    styling per window left every tooltip on the native Windows 11 dark palette
+    -- unreadable, which is to say missing.  And a palette is the application's
+    to begin with: a sheet dresses the widgets it names, while the colors it
+    names none of -- a selection's ground, a link's ink -- stay whatever the
+    desktop handed the app, which here was the user's accent orange.
+    """
+    app.setPalette(family_palette(app.palette()))
+    app.setStyleSheet(build_stylesheet())

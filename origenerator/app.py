@@ -639,12 +639,11 @@ def main(argv: list[str] | None = None) -> int:
 
     logger = _configure_logging(STATE_DIR)
 
-    # The one place the stylesheet is applied, and it must be the application:
-    # QToolTip popups are top-level widgets a window-level sheet never reaches,
-    # so styling per-window left every tooltip on the native Windows 11 dark
-    # palette — which renders them unreadable, i.e. effectively missing.
-    from origenerator.gui.stylesheet import build_stylesheet
-    app.setStyleSheet(build_stylesheet())
+    # The one place the app is dressed — palette and stylesheet both, and both
+    # on the application rather than on a window. origenerator.gui.stylesheet
+    # says what each of them is answering for.
+    from origenerator.gui.stylesheet import dress_application
+    dress_application(app)
 
     if app_args.check_launch:
         # Everything the launch imports, imported -- including the modules that

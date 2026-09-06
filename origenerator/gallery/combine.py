@@ -34,13 +34,23 @@ _SIZE_KEYS = ("width", "height")
 # asked for in words instead (:data:`_STROKE_PROMPT`).
 STROKE_FRAMES = 29
 
-# The words that ask a 29-frame loop for ONE stroke, and for a deep one. In the
-# overlay rather than here for the reason every other phrase the library speaks
-# in is: this file is public, and the sanitize guard bans that vocabulary from
-# the tracked tree. Empty when the overlay has neither, which leaves the prompt
-# a recipe carries untouched.
-_STROKE_PROMPT = (_CONTENT.get("genau_stroke_prompt") or "").strip()
-_STROKE_NEGATIVE = (_CONTENT.get("genau_stroke_negative") or "").strip()
+# The words that ask a 29-frame loop for ONE stroke, and for a deep one, PER
+# ACT: ``{act: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
+# in for an act that has none of its own.
+#
+# Per act because a stroke is not one motion. What made the difference on the act
+# it was tuned on was naming the cycle in stages -- out to one end, in to the
+# other, back -- and the stages are different parts of the body from one act to
+# the next; the wording that doubled the travel on one would be describing
+# something that is not happening in another. The default carries whichever act's
+# wording generalizes furthest, and an act sets its own when that is not close
+# enough.
+#
+# In the overlay rather than here for the reason every other phrase the library
+# speaks in is: this file is public, and the sanitize guard bans that vocabulary
+# from the tracked tree. An overlay with none of this leaves every prompt exactly
+# as its recipe wrote it.
+_STROKE_WORDS: dict = _CONTENT.get("genau_stroke_prompts") or {}
 
 
 def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
@@ -91,7 +101,19 @@ def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
     return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
 
 
-def stroke_shaped(params: dict, workflow) -> dict:
+def stroke_words(category: str = "") -> tuple[str, str]:
+    """The ``(positive, negative)`` a Genau clip of ``category`` asks for, or the
+    default pair when that act has none of its own -- see :data:`_STROKE_WORDS`.
+
+    Empty strings when the overlay carries nothing at all, which is what leaves
+    a recipe's prompt untouched rather than appending a stray space.
+    """
+    words = _STROKE_WORDS.get(category) or _STROKE_WORDS.get("") or {}
+    return ((words.get("positive") or "").strip(),
+            (words.get("negative") or "").strip())
+
+
+def stroke_shaped(params: dict, workflow, category: str = "") -> dict:
     """``params`` re-cut so the loop portrays ONE deep stroke, and plays smoothly.
 
     The Genau lane's whole problem: Genau does not play a clip, it scrubs it
@@ -103,12 +125,12 @@ def stroke_shaped(params: dict, workflow) -> dict:
 
     * :data:`STROKE_FRAMES` seconds of motion, because that is the shortest loop
       the model closes cleanly (see the note there).
-    * The words. At 29 frames the model fits about two strokes on its own, so the
-      prompt asks for one outright — naming the cycle in stages rather than
-      saying "one stroke", which does nothing. The same wording doubled the
-      travel, so the clip reads as a deliberate stroke rather than a wiggle. It
-      rides the content overlay rather than this file, like every other phrase
-      the library speaks in.
+    * The words, chosen by the act (:func:`stroke_words`). At 29 frames the model
+      fits about two strokes on its own, so the prompt asks for one outright —
+      naming the cycle in stages rather than saying "one stroke", which does
+      nothing. The same wording doubled the travel, so the clip reads as a
+      deliberate stroke rather than a wiggle. It rides the content overlay rather
+      than this file, like every other phrase the library speaks in.
     * The top playback rate, because 29 frames of one stroke is too coarse to
       scrub slowly and the interpolator fills the rest in
       (:mod:`origenerator.workflows.frame_rate`).
@@ -119,9 +141,10 @@ def stroke_shaped(params: dict, workflow) -> dict:
     defaults = workflow.default_params()
     if "frame_count" not in defaults or "frame_rate" not in defaults:
         return params
+    positive, negative = stroke_words(category)
     shaped = {**params, "frame_count": STROKE_FRAMES, "frame_rate": MAX_PLAYBACK_FPS}
-    for key, extra in (("positive_prompt", _STROKE_PROMPT),
-                       ("negative_prompt", _STROKE_NEGATIVE)):
+    for key, extra in (("positive_prompt", positive),
+                       ("negative_prompt", negative)):
         if extra:
             shaped[key] = f"{params.get(key) or ''} {extra}".strip()
     return shaped

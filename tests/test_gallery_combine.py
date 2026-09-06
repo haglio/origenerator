@@ -171,8 +171,8 @@ def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
 _LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
 
-def _shaped(**over):
-    return gallery.stroke_shaped(dict(_LOOP.default_params(), **over), _LOOP)
+def _shaped(category="", **over):
+    return gallery.stroke_shaped(dict(_LOOP.default_params(), **over), _LOOP, category)
 
 
 def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
@@ -200,6 +200,30 @@ def test_the_words_that_ask_for_one_stroke_are_added_to_the_recipes_own():
     assert shaped["positive_prompt"].startswith("alpha form ")
     assert len(shaped["positive_prompt"]) > len("alpha form ")
     assert shaped["negative_prompt"].startswith("beta ")
+
+
+def test_an_act_with_its_own_words_gets_them_and_the_rest_get_the_default():
+    """A stroke is not one motion: what made the difference on the act it was
+    tuned on was naming the cycle in STAGES, and the stages are different parts of
+    the body from one act to the next."""
+    own = combine.stroke_words("beta")
+    default = combine.stroke_words("")
+
+    assert own != default
+    assert combine.stroke_words("an act with no entry") == default
+    assert _shaped(positive_prompt="x", category="beta")["positive_prompt"] !=         _shaped(positive_prompt="x")["positive_prompt"]
+
+
+def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkeypatch):
+    # The wording is the library's, not this repo's, so a checkout without it
+    # still shapes the length and the rate and says nothing about the motion.
+    monkeypatch.setattr(combine, "_STROKE_WORDS", {})
+    params = dict(_LOOP.default_params(), positive_prompt="alpha", negative_prompt="")
+
+    shaped = gallery.stroke_shaped(params, _LOOP)
+
+    assert shaped["positive_prompt"] == "alpha"
+    assert shaped["frame_count"] == combine.STROKE_FRAMES
 
 
 def test_a_recipe_with_nothing_to_shape_is_handed_back_as_it_is():

@@ -234,7 +234,7 @@ def test_every_command_has_at_least_one_word_that_reaches_it():
 
 def test_every_dial_can_be_sent_to_every_stop_on_the_grid():
     # The grid is uniform on purpose: three dials, the same stops, both ends
-    # named. A hole in it is a number that works on one dial and not another.
+    # named. A gap in it is a number that works on one dial and not another.
     reachable = {value for value in _PHRASES.values()
                  if isinstance(value, DialSetting)}
     assert reachable == {

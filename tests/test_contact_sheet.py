@@ -69,7 +69,7 @@ def test_the_sheet_tiles_every_readable_picture(qtbot, tmp_path):
     assert len(sheet.cells()) == 6
 
 
-def test_a_picture_the_library_has_moved_is_left_out_rather_than_drawn_as_a_hole(
+def test_a_picture_the_library_has_moved_is_left_out_rather_than_drawn_as_a_gap(
         qtbot, tmp_path):
     sheet = ContactSheet()
     qtbot.addWidget(sheet)

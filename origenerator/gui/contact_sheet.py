@@ -88,7 +88,7 @@ class ContactSheet(QWidget):
 
     def show_pictures(self, paths) -> None:
         """Tile these files. Ones that can't be read are left out rather than
-        drawn as holes — the wall says how big the folder is, and a missing file
+        drawn as gaps — the wall says how big the folder is, and a missing file
         is not a picture in it."""
         self._pictures = [p for path in paths if (p := _readable(path)) is not None]
         self.update()

@@ -12,7 +12,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # the suite says otherwise: it points every run at a fresh temporary directory
 # before this module is imported, so three thousand tests stop writing a log,
 # the spinner arrows, thumbnails, trash and a diagnostic recording into the
-# live app's state/ -- where what a previous run left behind decided what the
+# live app's state/ -- where what a previous run left decided what the
 # next one drew.  Every path below hangs off it, and every module that binds
 # one of them at import gets the same answer, which a test's monkeypatch of
 # this module never could.

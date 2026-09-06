@@ -122,7 +122,7 @@ def test_nothing_in_it_takes_the_keyboard(plate):
 
 
 def test_it_brings_its_own_background(plate):
-    """Docked, the strip is transparent and takes the pane's surface behind it;
+    """Docked, the strip is transparent and takes the pane's surface under it;
     floated over a picture that would be rows of text lying on the media."""
     assert plate.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
     assert "background-color" in plate.styleSheet()

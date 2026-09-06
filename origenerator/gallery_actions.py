@@ -279,7 +279,7 @@ class GalleryActions:
         An enhancement being made of the rejected item is stopped like any
         delete's would be (:meth:`_stop_enhancements`): the row survives, but
         with no files left it is no longer a source anything can fold onto, so
-        the run would leave the same stray behind — and resurrect a rejection
+        the run would leave the same stray — and resurrect a rejection
         as an enhanced image if it did land.
         """
         prompt_id = row["prompt_id"]
@@ -308,7 +308,7 @@ class GalleryActions:
     def rename_folder(self, key: str, name: str | None) -> None:
         """Rename a folder. A derived folder gets an overlay name (blank resets it
         to the label its settings produce); a custom folder's name IS the folder,
-        so a blank one is refused rather than leaving an unnamed row behind."""
+        so a blank one is refused rather than leaving an unnamed row."""
         folder_id = custom_folder_id(key)
         if folder_id is not None:
             self._rename_custom_folder(folder_id, name)

@@ -208,7 +208,7 @@ def available_categories(video_rows, intent: str = PLAYERS) -> set[str]:
 def best_recipe(category: str, video_rows, intent: str = PLAYERS) -> str | None:
     """The prompt_id of the exemplar for ``category``'s best recipe, or ``None``.
 
-    "Best" is the recipe (model + params) behind the most of the user's videos of
+    "Best" is the recipe (model + params) under the most of the user's videos of
     that act; a tie goes to the recipe with the more recent video. The winning recipe
     is represented by its most-recent video, whose full params (prompt included) the
     caller re-runs on the dropped image. ``None`` when the gallery holds no video of

@@ -74,7 +74,7 @@ def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
     # frames that follow (which carry no id of their own) attribute to that job
     # instead of being dropped. Without this, a reconnected run shows no live frame.
     client = ComfyUIClient()
-    client._executing_prompt_id = ""  # the empty tag the reconnect replay left behind
+    client._executing_prompt_id = ""  # the empty tag the reconnect replay left over
 
     client._handle_ws_message(json.dumps({
         "type": "progress", "data": {"prompt_id": "job1", "value": 3, "max": 10},

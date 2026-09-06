@@ -91,7 +91,7 @@ class _TickThread:
             due += self._interval
             now = self._now()
             if due < now - self._interval:
-                # A long way behind — a machine suspend, say. Those ticks are
+                # A long way late — a machine suspend, say. Those ticks are
                 # owed to nobody: firing the backlog would fling the device
                 # through a burst of stale positions. Pick the beat up here.
                 due = now + self._interval
@@ -177,7 +177,7 @@ class Osr2StrokeDriver(QObject):
 
         The place and the time are the same number twice — aim as far ahead as
         the device is allowed to take. That is what keeps it on the stroke
-        rather than behind it, through the glide as much as after it: given
+        rather than trailing it, through the glide as much as after it: given
         longer, it is also sent further, so it arrives where the stroke has got
         to instead of where the stroke was when the command left.
         """

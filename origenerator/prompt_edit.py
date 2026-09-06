@@ -243,7 +243,7 @@ def _index_of(prompt: str, term: str, match) -> int | None:
 
 
 def _tidy(prompt: str) -> str:
-    """A rebuilt prompt without the empty edges a removal leaves behind."""
+    """A rebuilt prompt without the empty edges a removal leaves."""
     return re.sub(r"^[\s,]+|[\s,]+$", "", prompt)
 
 

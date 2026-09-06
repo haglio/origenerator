@@ -8,7 +8,7 @@ A deleted generation's whole row travels here, plus where in the trash its files
 went, so the Trash shelf can list it, put both back, or end it for good. The
 record goes away when the item is restored or purged, and not otherwise —
 nothing here ages out; the generations row itself is gone the moment it is
-deleted, which is why the row travels here rather than staying behind a flag.
+deleted, which is why the row travels here rather than staying gated by a flag.
 """
 import json
 

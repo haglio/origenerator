@@ -65,7 +65,7 @@ def clock_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
-# How much of a run's sampling has to be behind it before its own pace is worth
+# How much of a run's sampling has to be done before its own pace is worth
 # extrapolating from. The opening steps carry the model load — a 14B checkpoint
 # coming off disk — so a rate measured across one or two of them predicts a run
 # several times longer than the real one.
@@ -226,7 +226,7 @@ def _coarse_duration(seconds: float) -> str:
 def queue_estimate_label(seconds: float | None) -> str:
     """What a job still waiting in the line is expected to cost, in a row's width.
 
-    Coarse on purpose, like every resting estimate here: the figure behind it is
+    Coarse on purpose, like every resting estimate here: the figure under it is
     the median of that workflow's recent runs whatever length and resolution each
     was asked for, so "~2 min" claims exactly as much as it can back up. ``"~?"``
     when the workflow has never been timed — a first run has to happen before

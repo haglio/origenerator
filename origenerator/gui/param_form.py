@@ -138,7 +138,7 @@ class ParamForm(QWidget):
         # Whether a written-in seed is pinned as well as shown (see the class
         # docstring). Defaults to pinning: that is what reusing a still's
         # settings means, and it is the answer a form built without a workflow
-        # behind it (a test's bare field list) should get.
+        # under it (a test's bare field list) should get.
         self._pins_reused_seed = pins_reused_seed
         # Params carried but never shown, pinned at the definitions' own defaults
         # — a loaded config never moves them (see the class docstring).
@@ -619,7 +619,7 @@ class ParamForm(QWidget):
 
     def _update_derived_display(self):
         """Fill the locked width/height with the size the current input image
-        derives — the plain value label and the spinner behind it both, so
+        derives — the plain value label and the spinner under it both, so
         unlocking starts from that value (0 → em dash when none can be measured).
         A no-op while unlocked, so it never clobbers a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():

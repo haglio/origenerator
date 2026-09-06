@@ -287,7 +287,7 @@ def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
-    # An act the players' lane answers happily can still have no loop behind it, so
+    # An act the players' lane answers happily can still have no loop under it, so
     # the greyed-out reason has to name which lane it is talking about.
     assert "looping" in reason.lower()
 

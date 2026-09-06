@@ -234,7 +234,7 @@ def _denoise(value) -> float | None:
 
     Zero is how a part says "leave it alone", and so is anything that isn't a
     number at all — these come back through JSON, where a stored setting can be
-    whatever an older version or a hand edit left behind.
+    whatever an older version or a hand edit left over.
     """
     try:
         number = float(value)

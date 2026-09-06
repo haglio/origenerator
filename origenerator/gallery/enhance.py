@@ -93,7 +93,7 @@ def original_files_of(row: dict) -> list[dict]:
     """The pre-enhance version(s) this row holds, or ``[]`` for an unenhanced one.
 
     Two routes get here and both leave the same shape — the enhanced file(s)
-    leading ``output_files``, the original(s) behind them:
+    leading ``output_files``, the original(s) under them:
 
     * a standalone enhance folded in, which records what the row held before its
       first enhance in ``original_files``;
@@ -170,7 +170,7 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
         if enhanced:
             return [level(len(enhanced) - i, f) for i, f in enumerate(enhanced)]
     if is_enhanced_row(row):
-        # Enhanced with nothing kept behind it: the row's leading file IS the
+        # Enhanced with nothing kept under it: the row's leading file IS the
         # enhancement. Only that one — a batch's other files are its siblings,
         # not versions of it.
         return [level(1, files[0])]
@@ -237,7 +237,7 @@ def remove_enhance_levels(row: dict, filenames) -> dict:
 
     Deleting the last enhancement leaves a plain image, so the enhancement
     bookkeeping is cleared out with it — the column, the history, and the
-    ``role`` tag an inline run left on its base render. Left behind, any of the
+    ``role`` tag an inline run left on its base render. Left over, any of the
     three would make the one remaining file read as an enhancement of itself.
     """
     doomed = {name for name in filenames if name}
@@ -380,7 +380,7 @@ def enhance_targets_row(input_image: str | None, row: dict) -> bool:
 
     Compared by the same frame-name key an i2v start-frame lookup uses, against
     every file the row holds — a first enhance runs on its output, a re-enhance
-    on the original still listed behind it, and both are this image.
+    on the original still listed under it, and both are this image.
     """
     name = _frame_name(input_image)
     if not name:
@@ -398,8 +398,8 @@ def enhancement_recency(rows) -> dict[str, int]:
     not where its own generation does (:func:`~origenerator.gallery.tree.
     recent_generations`). A run's id is that place, and it is available at both
     ends of the run — in flight it is the transient enhance row still among
-    ``rows``, and once folded it is the id recorded on the level the run left
-    behind.
+    ``rows``, and once folded it is the id recorded on the level the run
+    left over.
 
     An image enhanced before that id was recorded has none here and keeps its own
     place, which is the right answer: an enhancement older than the record of it
@@ -409,7 +409,7 @@ def enhancement_recency(rows) -> dict[str, int]:
     for row in rows:
         # Every file an image holds, not just its leading one: a first enhance
         # runs on the image's output and a re-enhance on the original still
-        # listed behind it, and both are the same image — the match
+        # listed under it, and both are the same image — the match
         # :func:`enhance_targets_row` makes one row at a time, indexed. First
         # match wins over the newest-first rows, which is the row
         # :func:`fold_enhancement` will pick when the run lands.

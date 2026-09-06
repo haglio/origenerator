@@ -11,7 +11,7 @@ the same room, on a surface that already wears the players' own HUD.
 
 Matched through the tokens rather than by eye. The color and the face come out
 of :mod:`shared_ui`, which is where Fun Time takes them from too, so a palette
-change moves both at once instead of leaving one of them behind. Only the
+change moves both at once instead of leaving one of them stale. Only the
 geometry is spelled out here, because that is all Fun Time's own overlay spells
 out: the padding, the corner radius, and the gap from the top edge.
 

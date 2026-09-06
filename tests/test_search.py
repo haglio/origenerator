@@ -112,7 +112,7 @@ def test_the_negative_prompt_is_not_searched():
 
 
 def test_a_decimal_is_one_word_not_two():
-    # An emphasis weight — (term:1.2) — used to leave a bare "2" behind, and a
+    # An emphasis weight — (term:1.2) — used to leave a bare "2" over, and a
     # query's "two" folds to "2": searching for two of something matched every
     # prompt that had ever weighted a term (52% of a real library).
     rows = [_row("g1", "a (red:1.2) lamp"), _row("g2", "two red lamps")]
@@ -204,7 +204,7 @@ def test_only_generations_that_produced_something_are_searchable():
 
 def test_results_come_back_in_the_order_the_rows_were_given():
     # The view hands them over newest-first and reads them straight out, so the
-    # index must not re-order them behind its own scoring.
+    # index must not re-order them under its own scoring.
     rows = [_row("g3", "a red lamp"), _row("g1", "a red lamp"),
             _row("g2", "a red lamp")]
     assert _hits(_index(rows), "lamp") == ["g3", "g1", "g2"]

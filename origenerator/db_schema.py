@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS requests (
 -- list it, put both back, or end it for good (see origenerator.recovery). The
 -- record goes away when the item is restored or purged, and not otherwise --
 -- nothing ages out; the generations row itself is gone the moment it is deleted,
--- which is why the row travels here rather than staying behind a flag.
+-- which is why the row travels here rather than staying gated by a flag.
 CREATE TABLE IF NOT EXISTS deletions (
     prompt_id  TEXT PRIMARY KEY,
     row_json   TEXT NOT NULL,

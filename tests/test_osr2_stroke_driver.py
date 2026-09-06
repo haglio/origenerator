@@ -86,7 +86,7 @@ def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
     # the time the command lands the stroke has moved on. Every command names
     # the place the stroke will have reached when its own interval runs out —
     # through the takeover glide as much as after it, so being given longer
-    # means being sent further rather than being left behind.
+    # means being sent further rather than trailing the stroke.
     driver, broker, clock = _driver(qtbot)
     driver.start()
     for step in (0.025, 0.025, 0.5, 0.025):
@@ -162,7 +162,7 @@ def test_the_clock_runs_off_the_gui_thread(qtbot):
 
 
 def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
-    # A machine that suspends (or a laptop lid) comes back seconds behind. The
+    # A machine that suspends (or a laptop lid) comes back seconds late. The
     # loop owes those ticks to nobody: firing them all at once would fling the
     # device through a burst of stale positions.
     stalls, clock, ticks = [1.0], [0.0], []

@@ -22,7 +22,7 @@ class LoadingScreen(QDialog):
     at all: the session's own loading screen owns that boot's feedback, and an
     always-on-top splash of ours could outlive the reveal and sit over one of
     the session's players (it did — reported as "the landscape player is
-    behind other windows on startup").
+    under other windows on startup").
     """
 
     def __init__(self, parent=None):

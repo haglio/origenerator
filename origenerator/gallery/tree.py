@@ -311,7 +311,7 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     """Every row with a result, newest first — the whole of the Recents shelf's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
-    re-roll -- or, with no run behind it at all, a single stroke cut out of a
+    re-roll -- or, with no run under it at all, a single stroke cut out of a
     clip for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
     the app just made for you, it lands in the settings folder of the clip it
     came from rather than anywhere you would think to go looking, and left off
@@ -591,7 +591,7 @@ def build_gallery_tree(
     ``media_types`` is the gallery's image/video filter: the
     :func:`media_type_of_row` values whose folders to build. ``None`` (the
     default) builds every type; an empty set builds nothing. It narrows the
-    *folders*, never the index behind them — the start-frame configurations that
+    *folders*, never the index under them — the start-frame configurations that
     key a video's source-image folders are read from every finished image
     whichever way the filter stands, so hiding images can't re-key, and so
     re-shuffle, the video folders that name them.

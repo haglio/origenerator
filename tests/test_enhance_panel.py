@@ -252,7 +252,7 @@ def _mean_ink(widget) -> float:
 
     Rendered onto a filled pixmap rather than grabbed: a bare ``grab`` leaves
     whatever the widget doesn't paint uninitialized, and a switch that dims by
-    going translucent then measures as whatever happened to be behind it.
+    going translucent then measures as whatever happened to be under it.
     """
     from PyQt6.QtGui import QPixmap
     from PyQt6.QtWidgets import QWidget
@@ -746,7 +746,7 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_
 
 
 def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
-    # An enhancement is an upscale, so the file behind a version can be huge; the
+    # An enhancement is an upscale, so the file under a version can be huge; the
     # picture under the cursor is the same thumbnail every other drag trails.
     from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 

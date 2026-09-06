@@ -25,7 +25,7 @@ class ShowActions:
     """What a press on a show asks the gallery to do on its behalf.
 
     A show owns what happens to the slide *on screen* — the hold, the step, the
-    cull off its own pass — but not what happens to the generation behind it,
+    cull off its own pass — but not what happens to the generation under it,
     which lives in a database the show has never seen. Each of these is that
     second half, and each is optional: a show handed none of them still answers
     every key, it just asks nobody. That is what a test's show gets, and what a

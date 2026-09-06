@@ -157,7 +157,7 @@ def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
 def test_a_radios_ring_stays_visible_in_both_states(qtbot):
     # The ring is what says there is a choice here at all, so the disc arriving
     # must not swallow it, and neither state may leave it as dark as the panel
-    # behind it.
+    # under it.
     from shared_ui.colors import BG_PRIMARY
 
     for checked in (True, False):

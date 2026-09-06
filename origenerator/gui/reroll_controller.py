@@ -114,7 +114,7 @@ class RerollController(QObject):
 
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment (the one generator of jobs the user didn't ask for), so
-    a Generate starts at once instead of queuing behind a long experiment run."""
+    a Generate starts at once instead of queuing after a long experiment run."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -202,7 +202,7 @@ class RerollController(QObject):
 
         User work always may, even into a folder already generating: ComfyUI runs
         one prompt at a time and the lower strip shows the line, so a second
-        Generate of the same settings queues behind the first instead of being
+        Generate of the same settings queues after the first instead of being
         silently refused — which is what blocked two pictures of one recipe from
         being re-rolled together. A background experiment still takes only an idle
         folder, and never stacks; user work preempts one in :meth:`_launch`.
@@ -342,7 +342,7 @@ class RerollController(QObject):
         video would jump every picture already waiting.
 
         User work preempts a background experiment here, at the one choke point
-        every user path funnels through — so a Generate never sits behind an
+        every user path funnels through — so a Generate never sits after an
         experiment's run (see :meth:`_preempt_experiments`). The job joins the
         line rather than the server: its row is written first (``pending``, the
         row it will run under) so a restart can find it either way, and
@@ -474,7 +474,7 @@ class RerollController(QObject):
         last absence left (see :func:`origenerator.experiments.background
         .cancel_experiments`) — but one whose dequeue ComfyUI refused survives
         that sweep and is adopted as a live job. A video experiment can hold the
-        GPU for many minutes; without this the user's job silently queues behind
+        GPU for many minutes; without this the user's job silently queues after
         it and their progress bar never moves, indistinguishable from a hang.
         Each preempted experiment is dropped exactly as a hand-cancel would drop
         it: interrupted or dequeued, its abandoned row deleted.
@@ -574,7 +574,7 @@ class RerollController(QObject):
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
             return
-        job.origin = job.prompt_id  # a resumed run's chain, if any, is behind it
+        job.origin = job.prompt_id  # a resumed run's chain, if any, is already done
         self._register(key, job, self._on_finished)
         self._on_server.append(job)  # it is ComfyUI's to finish, not ours to send
 

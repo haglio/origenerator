@@ -154,7 +154,7 @@ def _say(command: AppCommand | DialSetting, *phrases: str) -> None:
 
 # The shelves, by name. Each answers bare — which is the whole point, since the
 # name is what the row says — and to a verb in front of it or the word "shelf"
-# behind, for a speaker who would rather say a sentence.
+# after it, for a speaker who would rather say a sentence.
 _SHELF_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.RECENTS: ("recents", "recent"),
     AppCommand.STARRED: ("starred",),

@@ -45,7 +45,7 @@ def test_a_videos_start_frame_joins_the_back_though_it_draws_a_still():
 
 
 def test_a_show_holds_a_video_run_from_its_start_frame():
-    # The frame is seconds of GPU, but the video behind it cannot start while the
+    # The frame is seconds of GPU, but the video after it cannot start while the
     # show plays, so drawing it in front of the show buys nothing.
     assert queue_line.next_ready([_video_frame()], videos_held=True) is None
 

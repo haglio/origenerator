@@ -1,6 +1,6 @@
 """What a show answers to — the interface, written down once.
 
-Three things drive whatever is holding a region or sitting behind a console:
+Three things drive whatever is holding a region or sitting under a console:
 the players' own HUD (:mod:`origenerator.gui.show_hud`), the on-video console
 (:mod:`origenerator.gui.stroke_panel`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.gui.fun_time_bridge`). They reached it through
@@ -12,7 +12,7 @@ other two guarded every one, so nothing in the repo said which was right.
 There are exactly two hosts, and this says what each owes.
 :class:`~origenerator.gui.slideshow_view.SlideshowView` has a set and answers
 all of it. :class:`~origenerator.gui.slideshow_pace.PaceOnlyHost` is the main
-window's console with no show behind it — a pace to set and nothing to step —
+window's console with no show under it — a pace to set and nothing to step —
 so it inherits this and takes the answers below for the half it has no set for.
 Those answers are exactly what the probes' defaults used to be, in one place
 rather than sixteen.

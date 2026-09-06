@@ -91,11 +91,11 @@ def test_update_item_refreshes_caption_frame_and_stage_in_place(qtbot):
 
 
 def test_card_names_another_apps_hold_instead_of_a_bare_queued(qtbot):
-    # "Queued…" alone is the mystery: queued behind what? Another app's jobs are
+    # "Queued…" alone is the mystery: queued after what? Another app's jobs are
     # the part nothing else in this app can explain.
     card = InFlightCard(_item(status="queued", foreign_ahead=2))
     qtbot.addWidget(card)
-    assert card._scrim.text() == "Waiting behind 2 jobs from another app"
+    assert card._scrim.text() == "Waiting on 2 jobs from another app"
 
 
 def test_a_queue_of_the_users_own_jobs_says_nothing_extra(qtbot):
@@ -164,7 +164,7 @@ def test_foreign_queue_text_counts_the_whole_of_somebody_elses_queue():
     assert foreign_queue_text(None) is None
 
 
-# --- what a queued run came from, blurred behind the wait -------------------
+# --- what a queued run came from, blurred under the wait -------------------
 
 
 def _source_file(tmp_path):

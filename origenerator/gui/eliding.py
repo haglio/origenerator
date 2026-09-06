@@ -5,7 +5,7 @@ Qt sizes a button or a label to its whole text and, squeezed below that, clips i
 grows a horizontal bar rather than let the column shrink. These ask for a couple of
 characters at their narrowest and elide to whatever width they are given: "Show in
 Explorer" reads as "Show i…" in a slim pane instead of being cut mid-letter or
-dragging a scroll bar in behind it.
+dragging a scroll bar in beneath it.
 
 Word wrap is the other way to fit a long label into a narrow column, and it is a
 trap here: ``QFormLayout``'s ``WrapLongRows`` lays a wrapped label out at its own

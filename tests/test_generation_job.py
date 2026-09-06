@@ -506,7 +506,7 @@ def test_a_re_adopted_job_reports_the_run_it_is_finally_given(qtbot, tmp_path):
 
 
 def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
-    # A count that outlived the read behind it would be a worse lie than none:
+    # A count that outlived the read under it would be a worse lie than none:
     # a failed fetch arrives as None, and None replaces what was showing.
     job, _client = _started_job(tmp_path)
     job.take_backlog(2)

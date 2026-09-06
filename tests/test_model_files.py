@@ -85,7 +85,7 @@ def test_lora_picker_leads_with_the_none_sentinel(installed_models):
 def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
     # Where the detail pass's provider node looks for them. Empty rather than a
     # fallback name: "no detector installed" is a real state the panel has to be
-    # able to read, and a fabricated default would hide it behind a failed submit.
+    # able to read, and a fabricated default would hide it under a failed submit.
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_detector_files() == []
 

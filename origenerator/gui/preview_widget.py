@@ -97,7 +97,7 @@ class PreviewWidget(QWidget):
         # The current on-disk media as (path, media_type), or None while showing a
         # placeholder or a live frame — what a double-click pops open fullscreen.
         self._media: tuple | None = None
-        # Whether a generation is running behind this pane — its streamed frames, or
+        # Whether a generation is running under this pane — its streamed frames, or
         # the wait before the first one arrives — and that latest frame. A double-click
         # opens fullscreen over these too, and the view opened that way keeps following
         # from here: later frames, then the finished file. Without it, watching a
@@ -107,7 +107,7 @@ class PreviewWidget(QWidget):
         self._allow_fullscreen = allow_fullscreen  # a slideshow's own preview opts out
         self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
         # What builds that window. The gallery sets it, because what a double-click
-        # opens is a slideshow of the folder behind this pane — which this pane
+        # opens is a slideshow of the folder under this pane — which this pane
         # knows nothing about. Unset, a double-click opens nothing.
         self._open_fullscreen_view = None
         # A double-click that doesn't open fullscreen (this preview opted out, or has
@@ -398,7 +398,7 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._image_label)
 
     def set_notice(self, text: str | None) -> None:
-        """Dim the media behind ``text``, or take the notice away (``None``).
+        """Dim the media under ``text``, or take the notice away (``None``).
 
         For a pane whose picture no longer answers the settings beside it: the
         media stays on screen — it is still the last thing generated — but is
@@ -781,7 +781,7 @@ class PreviewWidget(QWidget):
         """Pop what's on screen open fullscreen (Escape or a double-click closes it):
         a slideshow of this generation's folder, held on this one.
 
-        That's the current file, or — while a generation is running behind this pane —
+        That's the current file, or — while a generation is running under this pane —
         its live frames, in a view that goes on following the run from here and swaps
         to the finished file when it lands. A no-op when this preview opted out (a
         slideshow's own inner preview), when nothing has wired
@@ -827,7 +827,7 @@ class PreviewWidget(QWidget):
         if Python drops the wrapper before the next paint.
 
         Every ``show_*`` passes through here, so it is also where the other pages
-        are put down — a combination's clip would otherwise keep looping behind
+        are put down — a combination's clip would otherwise keep looping under
         whatever replaced it, and a folder's wall would hold every one of its
         pictures in memory. Both :meth:`show_combination` and
         :meth:`show_folder` call this before laying their own out, so neither

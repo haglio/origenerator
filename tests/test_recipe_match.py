@@ -209,7 +209,7 @@ def test_genau_mines_only_looping_videos():
         _loop("l1", "a beta", "2026-01-02", lora_high="Z"),
     ]
     # The players' lane sees both and prefers the newer of the one shared recipe;
-    # the Genau lane can only use the loop, whatever else the act has behind it.
+    # the Genau lane can only use the loop, whatever else the act has under it.
     assert recipe_match.best_recipe("beta", rows) == "l1"
     assert recipe_match.best_recipe("beta", rows, recipe_match.GENAU) == "l1"
 

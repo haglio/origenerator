@@ -420,7 +420,7 @@ class BrowserPane(QObject):
         was that", and there the tiles are cut into a labelled band per
         combination rather than interleaved, so the answer is the heading you
         stopped scrolling at. Those bands fold shut on their headers — with a
-        dozen combinations behind a broad query, being able to shut the ones you
+        dozen combinations under a broad query, being able to shut the ones you
         are not asking about is what makes the sort usable rather than merely
         sorted. ``collapsed`` is the set of headings to open shut, and
         ``on_section_toggled(heading, collapsed)`` reports each click so the view
@@ -859,7 +859,7 @@ class BrowserPane(QObject):
                 # placed the way every other image's is — by the folder it joins.
                 source_image=(params.get("input_image")
                               if kind in SOURCE_FRAME_KINDS else None),
-                # What to stand behind the wait: the image this run was
+                # What to stand under the wait: the image this run was
                 # requested of, else the frame it animates or enhances.
                 source_picture=self._source_picture(
                     requested.get(pid), thumb_by_id, params, kind),
@@ -1327,7 +1327,7 @@ class BrowserPane(QObject):
         Newest first, like everything else in the grid: an in-flight row is
         the newest thing in the folder, so the cards lead the finished
         pictures. Costs nothing in a folder with nothing cooking, which is
-        almost all of them — the listing behind the cards is only built once
+        almost all of them — the listing under the cards is only built once
         there is a card to build.
         """
         leading = self._reroll.job_for(group.key)

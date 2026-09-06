@@ -16,7 +16,7 @@ it was when the show started.
 
 Closing one doesn't lose your place in it. :meth:`SlideshowView.state` is where
 a show was — the pass, the slide, the hold on it — and :meth:`SlideshowView.resume`
-opens the next one there, so the look at the folder behind a picture that closing
+opens the next one there, so the look at the folder under a picture that closing
 the show is usually for doesn't cost the picture.
 
 **Double-clicking a picture opens this same view at a pace of nought** — its
@@ -74,7 +74,7 @@ it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
 
 The lower strip's queue is floated into the lower-left corner
 (:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
-their buttons — since the strip that carries it is behind this window, and a show
+their buttons — since the strip that carries it is under this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
 shared OSR2 stroke keys ride along too (Space and friends — see
 :mod:`origenerator.gui.stroke_hud`) with genau's drive panel floated up top,
@@ -192,7 +192,7 @@ class SlideshowView(QWidget):
         self._playlist = SlideshowPlaylist(items, **playlist_kwargs)
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAutoFillBackground(True)  # a solid black surround behind the media
+        self.setAutoFillBackground(True)  # a solid black surround under the media
         palette = self.palette()
         palette.setColor(QPalette.ColorRole.Window, QColor("black"))
         self.setPalette(palette)
@@ -221,7 +221,7 @@ class SlideshowView(QWidget):
         self._counter = PositionCaption(self)
         # The lower strip's queue itself — the live frame, the bar, the rows and
         # their buttons — floated into the corner this view leaves empty. The
-        # strip that normally carries it is behind this window, and a show is
+        # strip that normally carries it is under this window, and a show is
         # both when the queue stops moving (its videos are held) and when the
         # user keeps adding to it (a held slide asks for an enhancement).
         self._queue = SlideshowQueue(self)
@@ -348,7 +348,7 @@ class SlideshowView(QWidget):
         """Re-seed the set this show plays, on ``index``.
 
         What a double-clicked picture's show is armed with once the gallery has
-        worked out the folder behind it: the view comes up on the one item the
+        worked out the folder under it: the view comes up on the one item the
         pane had, and this hands it the rest in the browser's own order. A view
         still following a generation keeps its frames — it has no place among
         those files until an arrow leaves them for one.
@@ -424,7 +424,7 @@ class SlideshowView(QWidget):
         """Open where a closed show left off rather than at the top of a fresh
         shuffle. Returns whether the place carried.
 
-        Closing a show is usually a detour — the folder behind the picture, a fix
+        Closing a show is usually a detour — the folder under the picture, a fix
         in a tab — so coming back is coming back to that picture: the slide it
         ended on, still held if it was held, still showing the version it had been
         stepped to. The switch (holding-to-enhance) carries whether or not the
@@ -432,7 +432,7 @@ class SlideshowView(QWidget):
         since a show of another folder has nowhere to put it.
 
         Called after :meth:`set_levels`, because which version a slide was showing
-        is only a version once the levels behind it are armed.
+        is only a version once the levels under it are armed.
         """
         if self._actions.enhance is not None:
             self._enhance_on_hold = state.enhance_on_hold
@@ -574,7 +574,7 @@ class SlideshowView(QWidget):
         slide releases its lock, so the way out of a hold is the same key that
         got you anywhere else, not a second press of the one that set it."""
         if self._live and self._playlist.is_empty():
-            return  # a run with no folder armed behind it: nowhere to step to
+            return  # a run with no folder armed under it: nowhere to step to
         self._playlist.unlock()
         self._live = False  # stepped off a live generation: its frames stop landing
         if delta > 0:
@@ -787,7 +787,7 @@ class SlideshowView(QWidget):
 
         The id rather than the file, because what the panel prints is this
         app's own name for the item (its folder and its seed), and only the
-        row behind the id carries either.
+        row under the id carries either.
         """
         current = self._playlist.current()
         return current[2] if current and len(current) > 2 else ""
@@ -889,7 +889,7 @@ class SlideshowView(QWidget):
             self._update_counter()
             self._update_neighbors()
 
-    # --- the whole set, behind whatever the switches keep of it -------------
+    # --- the whole set, under whatever the switches keep of it -------------
     # Kept in step with the pass by id where an item has one, so an arrival,
     # a cull or an enhancement landing while a switch is on is still there —
     # or still gone — when the switch comes off.
@@ -1201,7 +1201,7 @@ class SlideshowView(QWidget):
 
     def note_voice_command(self, message: str) -> None:
         """Say what a spoken command did. Here rather than in the gallery's own
-        caption because the speaker is looking at this — the window behind it is
+        caption because the speaker is looking at this — the window under it is
         covered by the very show being talked to."""
         self._flash_note(message, ms=2500)
 

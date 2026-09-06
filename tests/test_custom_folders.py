@@ -1,4 +1,4 @@
-"""Custom folders: the pure grouping model, and the storage behind it."""
+"""Custom folders: the pure grouping model, and the storage under it."""
 
 import json
 

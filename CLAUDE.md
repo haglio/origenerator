@@ -66,8 +66,8 @@ test, which is how a script comes to re-implement a loop the app already owns.
 
 The pre-publication content guard is no longer among them: it is
 `app_support.sanitize`, published once for the family (backlog item 44), and the
-harvester that learned its list off the media library is deleted. What stayed
-behind is the two hooks that call the guard, below.
+harvester that learned its list off the media library is deleted. What is left
+is the two hooks that call the guard, below.
 
 - `tools/backfill_base_renders.py` — re-derives the base renders an inline
   enhance threw away, run to completion in one sitting instead of a few rows per

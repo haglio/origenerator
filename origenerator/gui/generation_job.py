@@ -202,7 +202,7 @@ class GenerationJob(QObject):
         job — fetched by the poll, applied here.
 
         The poll re-reads this while the job waits. ComfyUI is a shared server
-        that outlives the app, so a submit can sit behind work this session
+        that outlives the app, so a submit can sit after work this session
         never launched, and with no word of it that wait is indistinguishable
         from a hang. The user's own jobs ahead aren't counted — those are what
         they asked for — and a job ComfyUI has already started waits on nothing,

@@ -559,7 +559,7 @@ def _first_leaf(view):
 
 def _children_by_detail(item):
     """A folder's settings children keyed by what they hold — the description
-    behind their name, since the name itself is a code (see gallery.keys)."""
+    under their name, since the name itself is a code (see gallery.keys)."""
     children = [item.child(i) for i in range(item.childCount())]
     return {gallery.folder_detail(child.data(0, _GROUP_ROLE)): child
             for child in children}
@@ -959,7 +959,7 @@ def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):
 
 
 def test_a_recipe_band_folds_shut_on_its_heading(qtbot):
-    # With a dozen combinations behind a broad query, being able to shut the ones
+    # With a dozen combinations under a broad query, being able to shut the ones
     # you are not asking about is what makes the sort usable rather than sorted.
     rows = [_i2v_video("v1", "styleA", prompt="a cat"),
             _i2v_video("v2", "styleB", prompt="a cat")]
@@ -1099,7 +1099,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
 def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
     # Collapsing is for the near-copies; a folder that answered once has nothing
-    # to collapse, and a folder tile there would hide the picture behind a name.
+    # to collapse, and a folder tile there would hide the picture under a name.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -1183,7 +1183,7 @@ def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
 
 def _press_ctrl_f(view, monkeypatch):
     """Ctrl+F through the app-wide event filter, with the other-window guard
-    stood down: a widget another test left behind can still read as the active
+    stood down: a widget another test left over can still read as the active
     window here, and that guard (shared with Esc) has its own tests."""
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     return view.eventFilter(
@@ -1269,7 +1269,7 @@ def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypat
 
     assert handled is True
     assert not view._find_bar.isVisible()
-    assert not positive.extraSelections()  # a closed find leaves no marks behind
+    assert not positive.extraSelections()  # a closed find leaves no marks
 
 
 def test_ctrl_f_falls_back_to_the_tree_find_with_no_prompts_in_front(qtbot, tmp_path, monkeypatch):
@@ -1565,7 +1565,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     # Scheduling an absence is the live install's alone. A preview instance
     # shares the same ComfyUI, so a batch queued as it closes outlives it as
     # work the live app can neither see nor cancel — and the user's next
-    # Generate waits behind jobs "from another app" that were his own preview's.
+    # Generate waits on jobs "from another app" that were his own preview's.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, client=ComfyUIClient())
@@ -1748,7 +1748,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
 
 def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
-    # The one gallery action with no undo and no second copy behind it.
+    # The one gallery action with no undo and no second copy under it.
     actions = FakeActions()
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
@@ -1834,7 +1834,7 @@ def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, mon
 
 def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch):
     # This entry and the tile's own corner are the only two routes in the app that
-    # take files with nothing behind them, so the menu's wiring is not a detail.
+    # take files with nothing under them, so the menu's wiring is not a detail.
     actions = FakeActions()
     view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)
     view._browser.apply_selection("d2", _CTRL)
@@ -2903,7 +2903,7 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     a search's hits, a shelf — and setting a row Qt already holds current fires
     no signal to draw anything. The move draws it itself in that case rather than
     trusting the signal, which is how a click came to fill the info pane while
-    the middle pane behind it stood still.
+    the middle pane under it stood still.
     """
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient())
     qtbot.addWidget(view)
@@ -3125,7 +3125,7 @@ def _video_leaf(view):
 
 
 def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
-    # There is no video enhancer — the workflow behind all of this refines a
+    # There is no video enhancer — the workflow under all of this refines a
     # still — so a picked video is nothing to run, not a run that fails.
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
@@ -3276,7 +3276,7 @@ def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp
     # An image holding the very version the panel describes has nothing to gain
     # from a press, so its plus is the solid yellow badge alone. Turn a setting and
     # what it holds is one enhancement short of what the panel now describes, so
-    # the plus goes back to offering — with the one it has as a shadow behind it.
+    # the plus goes back to offering — with the one it has as a shadow under it.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -4224,7 +4224,7 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
 
 def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
     # The whole point of the preview tab: a walk through a folder leaves one tab
-    # behind, not one per thing looked at.
+    # over, not one per thing looked at.
     db = _make_db(tmp_path)
     for i, prompt in enumerate(["a dog", "a heron", "a fox"], start=2):
         db.insert_generation(
@@ -4540,7 +4540,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
 
 
 def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
-    """A tile answers its own click, so the pane behind it never sees one — else
+    """A tile answers its own click, so the pane under it never sees one — else
     picking a thumbnail would select it and deselect it in the same press."""
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
@@ -5026,18 +5026,18 @@ def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     assert view._actions._release_files == view._release_held_media
 
 
-def test_releasing_held_media_clears_a_pane_behind_the_one_in_front(qtbot, tmp_path):
+def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_path):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
-    behind = view._info_tabs.current_config_panel()
-    behind._preview.show_image(doomed)
+    covered = view._info_tabs.current_config_panel()
+    covered._preview.show_image(doomed)
     view._info_tabs._add_subtab()  # a second tab takes the front
 
     view._release_held_media([doomed])
 
-    assert not behind._preview.is_showing_any([doomed])
+    assert not covered._preview.is_showing_any([doomed])
 
 
 def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
@@ -6057,7 +6057,7 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
 
 
 def _standalone_show(qtbot, monkeypatch):
-    """A fullscreen show of two pictures, opened with no session behind it."""
+    """A fullscreen show of two pictures, opened with no session under it."""
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
@@ -6470,7 +6470,7 @@ def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeyp
     assert shown in view.visible_prompt_ids()       # ...into the folder holding it
     assert view._browser.selected_ids == {shown}    # with that item picked
     # And the item open in a tab: leaving a show for an item is a decision to
-    # work on it, which a folder behind a stale form isn't.
+    # work on it, which a folder under a stale form isn't.
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
 
 
@@ -6875,7 +6875,7 @@ def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path, monkeypatch)
 
 
 def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch):
-    """A failed run leaves nothing behind — no file, so no tile, and the row it
+    """A failed run leaves nothing — no file, so no tile, and the row it
     does leave is one every shelf filters out for having produced nothing. So it
     used to simply disappear: minutes of GPU, the tile gone off the strip, and no
     word anywhere but the log. Someone watching read that as a success and went
@@ -6896,7 +6896,7 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch)
 
     warn.assert_called_once()
     assert warn.call_args.args[1] == "Generation failed"
-    # The node that threw and its first line -- not the download log behind it.
+    # The node that threw and its first line -- not the download log under it.
     assert warn.call_args.args[2] == "RIFE VFI failed: Tried all base urls but no success"
 
 
@@ -7215,13 +7215,13 @@ def _waiting_view(qtbot, tmp_path, backlog):
 
 
 def test_a_run_stuck_behind_another_app_says_how_much_is_ahead(qtbot, tmp_path):
-    # The reported mystery: a Generate parked behind another client's work looked
+    # The reported mystery: a Generate parked after another client's work looked
     # exactly like a hang. The pane now names what's holding it.
     view, _client = _waiting_view(qtbot, tmp_path, backlog=3)
 
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs from another app"
+    assert view._preview.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
 def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
@@ -7231,7 +7231,7 @@ def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
     client.foreign_backlog = MagicMock(return_value=1)  # one finished ahead of us
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting behind 1 job from another app"
+    assert view._preview.show_message.call_args.args[0] == "Waiting on 1 job from another app"
 
 
 def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
@@ -7821,7 +7821,7 @@ def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
         qtbot, tmp_path, monkeypatch):
     # The whole point of the second entry: the loop goes off and the run in it is
     # thrown away. The order matters — a discard under a live loop is its cue to
-    # launch the next seed, so canceling first would leave a fresh run behind.
+    # launch the next seed, so canceling first would leave a fresh run over.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -8214,7 +8214,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
-    # Nothing has begun, so there is no elapsed time to report — the wait behind
+    # Nothing has begun, so there is no elapsed time to report — the wait on
     # ComfyUI is the queue beside it to explain.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
@@ -8945,7 +8945,7 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
 def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
     # Generate twice from one tab and the tab owns two runs. Its bar follows the
     # one being made, so its Cancel stops that one — the reported dead click was
-    # the tab having quietly swapped its claim to the run queued behind, so a
+    # the tab having quietly swapped its claim to the run queued after, so a
     # press stopped something off screen and what was rendering carried on.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -8955,13 +8955,13 @@ def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
     panel.use_random_seed()
     panel._on_generate()
     panel._on_generate()
-    being_made, queued_behind = [job.prompt_id for job in view._reroll.all_jobs]
+    being_made, queued_after = [job.prompt_id for job in view._reroll.all_jobs]
 
     panel._cancel_btn.click()
 
-    assert [job.prompt_id for job in view._reroll.all_jobs] == [queued_behind]
+    assert [job.prompt_id for job in view._reroll.all_jobs] == [queued_after]
     assert view._db.get_generation(being_made) is None
-    assert panel._generating is True  # the one behind is still its run to watch
+    assert panel._generating is True  # the one after it is still its run to watch
 
     panel._cancel_btn.click()
 
@@ -8991,7 +8991,7 @@ def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
 
 
 def test_clicking_the_tabs_cancel_button_stops_its_run(qtbot, tmp_path):
-    # The button itself, not the signal behind it: it is what the user presses.
+    # The button itself, not the signal under it: it is what the user presses.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -9668,7 +9668,7 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
     rows = panel._versions._host.findChildren(_LevelRow)
-    assert len(rows) == 2       # the enhancement, and the original behind it
+    assert len(rows) == 2       # the enhancement, and the original under it
     # The live row gave way to the level it was making, rather than to nothing.
     assert not panel._versions._host.findChildren(_PendingRow)
     assert panel.displayed_row()["prompt_id"] == "g0"   # still the same image
@@ -9912,7 +9912,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
 
 def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
     # A batch of enhances goes to the controller whole, and its jobs share one
-    # settings key, so the ones behind the leader must still be findable: a tab
+    # settings key, so the ones after the leader must still be findable: a tab
     # showing an image waiting its turn says so, rather than borrowing the frame
     # of the one ComfyUI is actually rendering.
     db = _enhanceable_db(tmp_path, count=2)
@@ -9932,7 +9932,7 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._reroll.jobs) == 1
-    # The one behind counts too — and reads as queued, since it isn't rendering.
+    # The one after it counts too — and reads as queued, since it isn't rendering.
     assert view.enhancing_run(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
@@ -10075,7 +10075,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
 def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     # A batch shares one folder and so one frame slot: the frame there belongs
     # to whichever of them ComfyUI is running, and lending it to the tiles queued
-    # behind would show each of those a picture of a different image.
+    # after it would show each of those a picture of a different image.
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -10138,13 +10138,13 @@ def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypat
     view._delete_rows([db.get_generation("g0")])
 
     assert doomed.state == "canceled"                   # off ComfyUI's queue
-    assert db.get_generation(doomed.prompt_id) is None  # no transient row left behind
+    assert db.get_generation(doomed.prompt_id) is None  # no transient row left over
     assert view._reroll.all_jobs == [kept]              # the other image's run goes on
 
 
 def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
                                                              tmp_path):
-    # A re-enhance runs on the pre-enhance original still listed behind the
+    # A re-enhance runs on the pre-enhance original still listed under the
     # enhanced file, so the run to stop is found by the image's whole file list
     # rather than by whichever version leads it.
     monkeypatch.setattr(gallery_view_module, "COMFYUI_OUTPUT_DIR", tmp_path / "output")
@@ -10499,11 +10499,11 @@ class _FakeDriver:
 
 def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
                        target=None):
-    """The double-click path end to end: the gallery opens the folder behind the
+    """The double-click path end to end: the gallery opens the folder under the
     pane as a real show, held at a pace of nought.
 
     ``media`` is what the pane was showing — ``None`` for a generation still
-    running behind it, which opens the show over ``frame``. ``target`` stands in
+    running under it, which opens the show over ``frame``. ``target`` stands in
     for the OSR2 drive target the clip on screen would offer, since these tests
     carry no real scripted video.
     """
@@ -11014,7 +11014,7 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
 
 
 def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
-    # The shared guard behind both Esc and Delete: when a separate top-level window
+    # The shared guard under both Esc and Delete: when a separate top-level window
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
     from PyQt6.QtWidgets import QApplication
     view, _driver, _panel = _osr2_view(qtbot)
@@ -11029,7 +11029,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
     assert view._other_window_owns_keys() is True
 
-    # And a dialog or a combo's dropdown with no window of its own behind it: the
+    # And a dialog or a combo's dropdown with no window of its own under it: the
     # filter is installed on the application, so without this it eats the keys the
     # popup was opened to take.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
@@ -11095,7 +11095,7 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
 def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
                                                            monkeypatch):
     # The show is a window of ours, and Esc closes it — but on its own that left
-    # the loop and the sound running behind it, which is the opposite of what
+    # the loop and the sound running under it, which is the opposite of what
     # the key means. So this one window doesn't take the key away.
     from PyQt6.QtWidgets import QApplication
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
@@ -12702,7 +12702,7 @@ def _spoken_genau_rows(view):
 
 def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, monkeypatch):
     # Saying it twice is what you do when the first time appeared to do nothing,
-    # and it does appear to: the clip queues behind whatever the machine is on
+    # and it does appear to: the clip queues after whatever the machine is on
     # and the picture on screen doesn't change. Two identical runs would spend
     # minutes of the one GPU making a clip that is already coming.
     view = _genau_view(qtbot, tmp_path, monkeypatch)

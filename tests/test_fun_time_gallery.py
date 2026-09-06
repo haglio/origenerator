@@ -617,7 +617,7 @@ def test_a_lock_on_a_hosted_show_opens_its_generate_tab(qtbot, tmp_path, monkeyp
     """Locking an item on a show answers in the core window too — the way the
     RFB opens a tab for a locked video, the item arrives as a generate tab
     ready to work on.  Releasing the hold (the second toggle) asks nothing."""
-    # _open_slideshow names its items id-<name>-<n>, so the row behind the one
+    # _open_slideshow names its items id-<name>-<n>, so the row under the one
     # on screen is id-tall-0.
     row = _image("id-tall-0", "a cat", 50, 1)
     view = GalleryView(FakeDB([row]), fun_time=_session_with_dashboard(tmp_path))

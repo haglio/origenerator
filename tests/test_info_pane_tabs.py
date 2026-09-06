@@ -552,11 +552,11 @@ def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs):
 
 def test_watching_prefers_a_given_wait_note(tabs):
     # "Waiting for preview…" says nothing about why. When the caller knows what the
-    # run is stuck behind, that replaces it.
+    # run is held up by, that replaces it.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
-    panel.watch_folder("k", None, "Waiting behind 3 jobs from another app")
-    assert panel._preview.show_message.call_args.args[0] == "Waiting behind 3 jobs from another app"
+    panel.watch_folder("k", None, "Waiting on 3 jobs from another app")
+    assert panel._preview.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
 def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
@@ -565,10 +565,10 @@ def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
     panel._preview.show_frame = MagicMock()
-    panel.watch_folder("k", None, "Waiting behind 3 jobs from another app")
-    panel.show_live_wait("Waiting behind 3 jobs from another app")
+    panel.watch_folder("k", None, "Waiting on 3 jobs from another app")
+    panel.show_live_wait("Waiting on 3 jobs from another app")
     assert panel._preview.show_message.call_count == 1
-    panel.show_live_wait("Waiting behind 1 job from another app")
+    panel.show_live_wait("Waiting on 1 job from another app")
     assert panel._preview.show_message.call_count == 2
 
     panel.show_live_frame(b"frame")
@@ -866,13 +866,13 @@ def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
     doomed.write_bytes(b"x")
     kept = tmp_path / "kept.png"
     kept.write_bytes(b"x")
-    behind, front = tabs.current_config_panel(), tabs._add_subtab()
-    behind._preview.show_image(doomed)
+    covered, front = tabs.current_config_panel(), tabs._add_subtab()
+    covered._preview.show_image(doomed)
     front._preview.show_image(kept)
 
     tabs.release_media([doomed])
 
-    assert not behind._preview.is_showing_any([doomed])  # the tab behind let go
+    assert not covered._preview.is_showing_any([doomed])  # the covered tab let go
     assert front._preview.is_showing_any([kept])         # the other one kept its item
 
 

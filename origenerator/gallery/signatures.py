@@ -281,7 +281,7 @@ def rows_in_settings(rows, key, image_index=None):
     :func:`settings_signature`. ``image_index`` positions image rows for the
     signature (see :func:`build_image_config_index`). Empty for a ``None`` key.
 
-    The shared predicate behind "everything in this settings folder" — the config
+    The shared predicate under "everything in this settings folder" — the config
     tabs' seeded history and a tab's most-recent-matching preview both read it.
     """
     if key is None:

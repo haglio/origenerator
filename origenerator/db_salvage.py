@@ -52,7 +52,7 @@ def _move_aside(path: Path, target: Path) -> None:
     """Move a database and its journal files out of the way as one thing.
 
     A write-ahead log names no database of its own -- SQLite finds it by the
-    file name beside it -- so one left behind would be replayed into whatever
+    file name beside it -- so one left over would be replayed into whatever
     inherits that name, which here is the freshly rebuilt database.
     """
     for suffix in ("", "-wal", "-shm"):

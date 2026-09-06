@@ -3,7 +3,7 @@
 Live progress, the executing node, preview frames and completion come back over
 a websocket, and each is re-emitted as a Qt signal for the UI to connect to. The
 loop reconnects on its own, and ``stop`` cancels whatever it is awaiting so the
-process closing behind it exits at once.
+process closing under it exits at once.
 
 The REST half is :mod:`origenerator.comfyui_api`, which needs no Qt at all;
 :class:`ComfyUIClient` holds one and forwards every call, so a consumer that
@@ -158,7 +158,7 @@ class ComfyUIClient(QThread):
         time awaiting a websocket message or parked in the reconnect sleep, and
         would only notice the flag once that await returns (up to 3s later).
         Cancelling the task interrupts whatever it is awaiting right now, so the
-        thread — and the process closing behind it — exits at once.
+        thread — and the process closing under it — exits at once.
         """
         self._running = False
         loop, task = self._loop, self._task

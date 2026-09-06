@@ -86,7 +86,7 @@ def window_exists(hwnd: int) -> bool:
     """Whether *hwnd* still names a live window.
 
     A handle outlives the window it named — closing the window leaves the number
-    behind — so anything that must reach *that* window and no other asks first.
+    over — so anything that must reach *that* window and no other asks first.
     """
     return bool(hwnd) and bool(_user32.IsWindow(hwnd))
 
@@ -130,7 +130,7 @@ def force_foreground_window(hwnd: int) -> bool:
     owns the foreground window or received the last input event, and by the time
     a launch has finished its boot work the user has clicked into something else,
     so Origenerator is neither. The refusal is silent — it flashes the taskbar
-    button and leaves the window sitting behind whatever they moved on to, which
+    button and leaves the window sitting under whatever they moved on to, which
     is the bug this exists for. Attaching this thread's input queue to the
     foreground window's thread makes the two one queue, and a thread sharing the
     foreground thread's queue is one of the cases the rule accepts, so the call

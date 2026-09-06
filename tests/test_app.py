@@ -122,7 +122,7 @@ class TestBringToFront:
     """Opening the app has to put it in front of what the user is looking at.
     The boot is slow enough that they click elsewhere while it runs, and Windows
     then refuses this process the foreground — silently — so ``show()`` alone
-    leaves the window behind their other windows."""
+    leaves the window under their other windows."""
 
     def test_raises_activates_and_takes_the_foreground(self):
         window = MagicMock()
@@ -149,7 +149,7 @@ class TestBringToFront:
         window.raise_.assert_called_once_with()
 
     def test_a_refused_foreground_never_costs_the_launch(self):
-        # Being behind is cosmetic; failing to open is not.
+        # Being underneath is cosmetic; failing to open is not.
         window = MagicMock()
         window.winId.return_value = 4242
 
@@ -307,7 +307,7 @@ def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
     Run in a child, because there is no surviving this in-process. The child
     arms the crash log the way the launch does and then faults deliberately --
     faulthandler's own _sigsegv, so nothing is left to chance about what kind of
-    death it is -- and the file it leaves behind has to name the frame.
+    death it is -- and the file it leaves has to name the frame.
     """
     import subprocess
     import textwrap
@@ -449,7 +449,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
     """Hosted, the app boots with no splash at all: the session's own loading
     screen owns the boot's feedback, and an always-on-top splash of ours can
     outlive the session's reveal and sit over one of its players — reported
-    as 'the landscape player is behind other windows on startup', and the
+    as 'the landscape player is under other windows on startup', and the
     covering window a z-order walk named was exactly this splash."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.gui.loading_screen.LoadingScreen") as mock_loading, \
@@ -589,7 +589,7 @@ def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
 
     meta = db.folder_meta_map()
     assert meta.get(gallery.settings_folder_key(row), {}).get("starred") is True
-    assert legacy not in meta  # and the stale key is not left behind beside it
+    assert legacy not in meta  # and the stale key is not left beside it
 
 
 def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
@@ -648,7 +648,7 @@ def test_the_launch_keeps_a_deletion_however_long_it_has_been_held(qapp, library
 
 
 def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
-    # The one thing launch still clears: a batch nothing can reach, left behind
+    # The one thing launch still clears: a batch nothing can reach, left over
     # by a crash between the move and the record. Without it the trash only ever
     # grows.
     from origenerator import config
@@ -825,14 +825,14 @@ def test_every_pass_says_what_went_wrong_when_something_does():
         assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__
 
 
-# --- the overlay is behind the app ---------------------------------------------
+# --- the overlay is under the app ---------------------------------------------
 
 
 class TestAnOverlayShortOfAKey:
     """`content.local.json` is hand-maintained and git-ignored, so it does not
     gain a key when the app does — and the committed example went from three
     keys to nine in six weeks. Three of the nine were read with a bare
-    subscript, so an overlay a release behind was a dead icon: no window, and
+    subscript, so an overlay a release out of date was a dead icon: no window, and
     the traceback only in the launcher's log.
 
     One rule now, for all nine: the launch says which keys are missing and does
@@ -878,7 +878,7 @@ class TestAnOverlayShortOfAKey:
         assert "content.example.json" in said   # the file to copy from
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
-        """Parked behind a Fun Time session there is nobody at this window to
+        """Parked under a Fun Time session there is nobody at this window to
         dismiss a modal, and it would sit over one of the session's players —
         the same reason the splash is suppressed there. It goes to the console
         the launcher redirects into its log instead."""

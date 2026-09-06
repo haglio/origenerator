@@ -898,7 +898,7 @@ def _enhanced_image_row(db, prompt_id="img1"):
 def _fold_enhancement(db, prompt_id="img1"):
     """Fold an enhancement onto an image already recorded — what the gallery does
     to the row when a standalone enhance lands: the enhanced file leads, the
-    original stays listed behind it, and the level's settings are recorded."""
+    original stays listed under it, and the level's settings are recorded."""
     db.update_generation(
         prompt_id,
         output_files=json.dumps([
@@ -1873,7 +1873,7 @@ def test_showing_a_generation_ends_the_request(requesting, tmp_path):
 
 def test_ending_the_request_gives_the_prompts_their_undo_back(requesting):
     # Undo is off while a field is tracked, since the document is rewritten under
-    # the typist; a field left behind must not keep that.
+    # the typist; a field left over must not keep that.
     assert not _positive_field(requesting).isUndoRedoEnabled()
 
     requesting._end_folder_request()

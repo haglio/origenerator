@@ -127,7 +127,7 @@ def test_start_prepared_records_the_callers_source(qtbot, tmp_path):
 
 
 def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
-    # Two pictures of one recipe, both wanted: the second queues behind the first
+    # Two pictures of one recipe, both wanted: the second queues after the first
     # rather than being refused, which is what stopped them being made together.
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)
@@ -144,7 +144,7 @@ def test_a_second_user_launch_joins_a_folder_already_running(qtbot, tmp_path):
 
 def test_the_folders_live_tile_still_follows_the_job_in_front(qtbot, tmp_path):
     # Things keyed by folder — the one live re-roll tile, the selection that
-    # follows it — show the leading job, not a second one queued behind it.
+    # follows it — show the leading job, not a second one queued after it.
     controller = RerollController(Database(tmp_path / "test.db"), _client())
     controller.start_prepared("k", _I2V, _params(seed=3))
     leader = controller.job_for("k")
@@ -294,7 +294,7 @@ def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
 
 def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
     # A video experiment can hold the GPU for many minutes; a user's Generate must
-    # kick it off rather than silently queue behind it with a dead progress bar.
+    # kick it off rather than silently queue after it with a dead progress bar.
     client = _client()
     db = Database(tmp_path / "test.db")
     controller = RerollController(db, client)
@@ -507,7 +507,7 @@ def test_a_cancelled_job_starts_the_next_one_rather_than_stalling(qtbot, tmp_pat
 
 
 def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
-    # A queue stalled on a job ComfyUI won't take would strand everything behind
+    # A queue stalled on a job ComfyUI won't take would strand everything after
     # it; the refused job fails and the line carries on.
     client = _client()
     db = Database(tmp_path / "test.db")
@@ -524,7 +524,7 @@ def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
 
 def test_an_image_jumps_ahead_of_the_videos_waiting(qtbot, tmp_path):
     # A picture is seconds of GPU and is usually the thing being waited for; a
-    # video queued earlier is a "later", and keeps its place behind it.
+    # video queued earlier is a "later", and keeps its place after it.
     controller = RerollController(Database(tmp_path / "test.db"), _client())
     running = _launch_video(controller, "v1", seed=1)
     waiting = _launch_video(controller, "v2", seed=2)
@@ -623,11 +623,11 @@ def test_a_held_video_is_passed_over_rather_than_blocking_the_line(qtbot, tmp_pa
     controller = RerollController(Database(tmp_path / "test.db"), client)
     controller.hold_videos(True)
     video = _launch_video(controller, "v", seed=1)
-    behind = controller.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF],
+    queued = controller.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF],
                                        _image_params(), source="experiment")
 
-    assert behind
-    client.submit_job.assert_called_once()  # the image behind it, not the video
+    assert queued
+    client.submit_job.assert_called_once()  # the image after it, not the video
     assert controller.queue_order[-1] == video.prompt_id
 
 

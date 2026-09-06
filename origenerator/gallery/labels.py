@@ -6,7 +6,7 @@ description, a Generate tab's default title, and a source image's folder name.
 Pure presentation over the identity layer.
 
 A settings folder is *named* by its key rather than from here (see
-:mod:`.keys`); what :func:`settings_label` builds is the description behind that
+:mod:`.keys`); what :func:`settings_label` builds is the description under that
 name, which the tree and the folder tiles show on hover.
 """
 

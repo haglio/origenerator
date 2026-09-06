@@ -267,7 +267,7 @@ def test_a_stroke_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
 
 
 def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
-    # Asked per draw rather than once: the OSR2 is switched on and off behind
+    # Asked per draw rather than once: the OSR2 is switched on and off without
     # this app's back, so a console that read it at build time would go on
     # claiming whatever was true when it opened.
     answers = [False, True]

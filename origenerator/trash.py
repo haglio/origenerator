@@ -96,7 +96,7 @@ class Trash:
         wholesale (what a launch used to do) would destroy exactly what is now
         recoverable. What is left over once the bin's own folders are spared is
         genuinely unreachable: a rejected experiment's batch that fell off the
-        undo stack, a batch from before the bin existed, or a folder left behind
+        undo stack, a batch from before the bin existed, or a folder left over
         by a crash between the move and the record. Without this the trash only
         ever grows.
         """

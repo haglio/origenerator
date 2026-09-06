@@ -356,7 +356,7 @@ def test_a_live_slide_takes_the_newest_frame_of_itself():
 
 
 def test_a_frame_for_a_slide_that_already_landed_is_ignored():
-    # A message from the tail of a run, or a poll a beat behind: it must not take
+    # A message from the tail of a run, or a poll a beat late: it must not take
     # the finished picture back off the screen and put a half-rendered one there.
     playlist = _four()
 

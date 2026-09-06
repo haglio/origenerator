@@ -139,7 +139,7 @@ def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
 def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
     from shared_ui.colors import AMBER
 
-    # A hollow plus with the one it already holds as a yellow shadow behind it:
+    # A hollow plus with the one it already holds as a yellow shadow under it:
     # the middle stays empty like the plain hollow one, and the amber shows out
     # from under it down and to the right.
     more = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_MORE, armed=False))

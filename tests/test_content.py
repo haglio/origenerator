@@ -145,7 +145,7 @@ def test_a_consumer_of_the_overlay_does_not_read_it_at_import(module):
     assert seen["overlay_reads"] == ["content.example.json"]
 
 
-# --- the overlay is behind the app ---------------------------------------------
+# --- the overlay is under the app ---------------------------------------------
 #
 # `content.local.json` is hand-maintained and git-ignored, so it does not gain a
 # key when the app does — and the committed example has gone from three keys to

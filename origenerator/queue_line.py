@@ -14,7 +14,7 @@ Two rules, and both are about what the user is doing while the GPU works:
   what is on screen. Asking for one means "now", so it starts next, ahead of
   everything that hasn't started yet.
 * **A video joins the back.** Minutes of GPU, and asking for one means "later":
-  it waits behind every image, and behind every video asked for before it. That
+  it goes after every image, and after every video asked for before it. That
   is what keeps a handful of queued videos from taking the machine away from the
   work in front of the user. A chained i2v's start frame counts as the video it
   opens, not as the picture it draws: placed by what its own prompt makes, it
@@ -28,7 +28,7 @@ would be the whole cost of the feature.
 And one gate: **while the slideshow is playing, no video starts.** A video
 generation saturates the GPU the show is being drawn with, and a show is exactly
 when nobody is waiting for a video. So a video that comes up while one plays is
-passed over — every image behind it goes first — and with nothing but videos
+passed over — every image after it goes first — and with nothing but videos
 left the line simply holds until an image is asked for or the show ends.
 
 Pure ordering, no Qt and no server: it works on anything carrying a

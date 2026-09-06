@@ -142,7 +142,7 @@ def test_the_rebuilt_database_keeps_the_journal_mode_it_replaced(tmp_path):
 
 def test_the_damaged_files_write_ahead_log_goes_aside_with_it(tmp_path):
     # A write-ahead log names no database of its own -- it belongs to whatever
-    # file sits beside it. One left behind by the crash would be replayed into
+    # file sits beside it. One left by the crash would be replayed into
     # the rebuilt database that inherits the name, whose pages it knows nothing
     # about.
     path = tmp_path / "origenerator.db"

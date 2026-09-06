@@ -139,7 +139,7 @@ class CombinationView(QWidget):
         """Show ``image_path`` beside the looping ``video_path``, in gray.
 
         Either may be missing — a curated act is pinned in the overlay and has no
-        past video behind it, and a frame can have moved — and the plus shows only
+        past video under it, and a frame can have moved — and the plus shows only
         when both halves are there, since a lone picture is not a sum.
         """
         self._stop_movie()

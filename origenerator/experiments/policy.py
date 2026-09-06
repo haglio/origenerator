@@ -20,7 +20,7 @@ from origenerator.gallery import parse_params, produced_output
 from origenerator.generation_config import filled_params, randomize_seeds
 
 # A base is worth more when the user has explicitly liked it: a star is the
-# strongest signal, an up-voted experiment close behind, newness a mild boost.
+# strongest signal, an up-voted experiment close after it, newness a mild boost.
 _STAR_BONUS = 2.0
 _UP_BONUS = 1.0
 _RECENT_BONUS = 0.5

@@ -4,7 +4,7 @@ Every query in every store goes through :class:`SqliteFile.connect`, so the two
 things it promises — commit on the way out, close whatever happens — are worth
 one test each rather than being re-asserted in six store modules.
 
-Closing is the half with a bug behind it: the plain ``with sqlite3.connect(...)``
+Closing is the half with a bug under it: the plain ``with sqlite3.connect(...)``
 this replaced commits and then leaves the connection to the garbage collector,
 which on Windows keeps the file open long enough for the next rename or replace
 of it to be refused (see origenerator.db_salvage).

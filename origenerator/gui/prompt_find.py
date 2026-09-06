@@ -145,7 +145,7 @@ class PromptFind:
         self._reveal()
 
     def clear(self):
-        """End the search: no query, no matches, and no paint left behind in the
+        """End the search: no query, no matches, and no paint left over in the
         prompts."""
         self._query = ""
         self._matches = []

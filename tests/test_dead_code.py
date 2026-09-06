@@ -42,7 +42,7 @@ def test_the_whitelist_still_suppresses_what_it_claims_to():
 
 
 def test_nothing_is_imported_or_assigned_and_left_unread():
-    """The hole vulture cannot see: deadness local to one module.
+    """The blind spot vulture cannot see: deadness local to one module.
 
     Vulture resolves names across the whole tree it is handed, so an import
     unused HERE but live in a sibling module does not report -- which is how

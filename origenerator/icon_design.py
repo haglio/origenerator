@@ -38,7 +38,7 @@ def render_icon(size: int = CANVAS) -> Image.Image:
     box = BOX * scale
     unit = UNIT * scale
     radius = CORNER_RADIUS * scale
-    hole = box - 2 * unit
+    cutout = box - 2 * unit
 
     qimg = QImage(size, size, QImage.Format.Format_RGBA8888)
     qimg.fill(Qt.GlobalColor.transparent)
@@ -51,7 +51,7 @@ def render_icon(size: int = CANVAS) -> Image.Image:
     outer = QPainterPath()
     outer.addRoundedRect(QRectF(inset, inset, box, box), radius, radius)
     inner = QPainterPath()
-    inner.addRoundedRect(QRectF(inset + unit, inset + unit, hole, hole), radius, radius)
+    inner.addRoundedRect(QRectF(inset + unit, inset + unit, cutout, cutout), radius, radius)
     painter.drawPath(outer.subtracted(inner))
     painter.end()
 

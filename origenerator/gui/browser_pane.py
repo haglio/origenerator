@@ -35,7 +35,6 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator import gallery, search, timing
-from origenerator.branch_session import is_branch_session
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
 from origenerator.gui.corner_controls import enhance_state
@@ -1017,11 +1016,6 @@ class BrowserPane(QObject):
         return base == EXPERIMENTS_KEY
 
     def _experiments_empty_hint(self) -> str:
-        if is_branch_session():
-            return ("Reviewing experiments is the live app's.\n\nA preview's "
-                    "database is a copy, so a verdict recorded here would never "
-                    "reach the live app — and rejecting would delete files its "
-                    "own gallery still shows. The results are waiting there.")
         if self._host.experiments_enabled():
             return ("Nothing to review yet.\n\nEach time you close the app, "
                     "variations of your own generations are queued up and run "
@@ -1147,12 +1141,6 @@ class BrowserPane(QObject):
         self.trash_menu_requested.emit(global_pos)
 
     def _trash_empty_hint(self) -> str:
-        if is_branch_session():
-            return ("Nothing deleted in this preview.\n\nDelete something and it "
-                    "waits here to be restored, the way it would in the live app. "
-                    "What the live app is holding stays out of reach: those files "
-                    "sit in its trash, and a preview reaching in would move them "
-                    "out from under the rows it is still showing.")
         return ("Nothing deleted.\n\nItems you delete wait here for as long as "
                 "you leave them — nothing here is removed on its own. Restore one, "
                 "or delete it permanently when you're sure.")

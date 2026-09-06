@@ -476,10 +476,9 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
 # The tests above hand main a MagicMock database, whose every query answers with
 # an empty iterable — so the boot phases their patch chain does not name run over
 # nothing at all and are asserted by nothing. Four separate mutations to main
-# survived them: the folder-bookmark reconcile deleted, the duration backfill's
-# result thrown away, a branch preview sweeping the LIVE install's recovery bin,
-# and the branch database never seeded. These boot the same main over a real
-# database under tmp_path and read each phase's effect off it afterwards.
+# survived them: the folder-bookmark reconcile deleted, and the duration
+# backfill's result thrown away. These boot the same main over a real database
+# under tmp_path and read each phase's effect off it afterwards.
 
 @pytest.fixture
 def library(tmp_path, monkeypatch):
@@ -495,6 +494,7 @@ def library(tmp_path, monkeypatch):
                        ("COMFYUI_OUTPUT_DIR", tmp_path / "output"),
                        ("COMFYUI_LOG_DIR", tmp_path / "logs"),
                        ("THUMB_DIR", tmp_path / "thumbs"),
+                       ("TRASH_DIR", state / "trash"),
                        ("PROJECT_DIR", tmp_path / "checkout")):
         path.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(config, name, path)
@@ -653,7 +653,7 @@ def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
     # grows.
     from origenerator import config
 
-    orphan = config.STATE_DIR / "trash" / "0123456789abcdef"
+    orphan = config.TRASH_DIR / "0123456789abcdef"
     orphan.mkdir(parents=True)
     (orphan / "0_gone.png").write_bytes(b"x")
 
@@ -662,58 +662,16 @@ def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
     assert not orphan.exists()
 
 
-def test_a_branch_preview_reclaims_nothing_out_of_the_trash(
-        qapp, library, monkeypatch):
-    # A preview's database is a copy, so the deletions it inherits name the LIVE
-    # install's held folders: what looks unreachable from here is only
-    # unreachable to a copy, and the batches a preview filled before it stopped
-    # taking files hold the only copies of what they took. Letting the reclaim
-    # run anyway left the boot tests green.
-    from origenerator import config
-    from origenerator.branch_session import ENV_FLAG
-
-    _held_deletion(library, "p1", days_ago=61)
-    orphan = config.STATE_DIR / "trash" / "0123456789abcdef"
-    orphan.mkdir(parents=True)
-    monkeypatch.setenv(ENV_FLAG, "1")
-
-    db = _boot(library)
-
-    assert [record["prompt_id"] for record in db.list_deletions()] == ["p1"]
-    assert orphan.exists()
-
-
-def test_a_branch_preview_starts_from_the_live_installs_library(
-        qapp, library, monkeypatch, tmp_path):
-    # Without the seed the preview comes up on an empty database with no library
-    # at all, and there is nothing in it to judge the branch by. Skipping the seed
-    # left the boot tests green.
-    from origenerator import config
-    from origenerator.branch_session import ENV_FLAG
-    from origenerator.db import Database
-
-    primary = tmp_path / "primary"
-    _completed_image(Database(primary / "state" / library.name), "live-1")
-    monkeypatch.setattr(config, "project_dir", lambda name, *a, **kw: primary)
-    monkeypatch.setenv(ENV_FLAG, "1")
-    assert not library.exists()  # the preview has no database of its own yet
-
-    db = _boot(library)
-
-    assert [row["prompt_id"] for row in db.list_generations()] == ["live-1"]
 # --- the boot sequence itself -------------------------------------------------
 #
 # What the tests above pin is what main *reaches*; these pin the order it
 # reaches it in, which is the part a phase split can silently reorder. The order
-# is load-bearing and stated in main's own comments: adoption before the import
-# scan (so a preview's own rows are not rebuilt as lesser "imported" ones from
-# the bare files), the enhancement fold after that scan, and the folder
-# reconciles last because every backfill above can move a generation's folder.
+# is load-bearing and stated in main's own comments: the enhancement fold after
+# the import scan, and the folder reconciles last because every backfill above
+# can move a generation's folder.
 
 # Each maintenance pass, as (module, attribute), in the order main runs them.
 _MAINTENANCE_PASSES = (
-    ("origenerator.branch_session", "adopt_branch_rows"),
-    ("origenerator.branch_session", "adopt_branch_curation"),
     ("origenerator.inflight", "reconcile_in_flight"),
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
@@ -794,34 +752,20 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
     window.show.assert_called_once()
 
 
-def test_a_branch_session_maintains_only_what_is_not_library_maintenance(qapp):
-    """A preview shows unlanded code, not a maintained library: its database is
-    a seeded copy the live app already maintains. Two passes are the exception:
-    each rewrites rows the copy already holds, writing no record and touching
-    no file, and leaving either out would show a difference in the copy rather
-    than in the code - enhancements standing as images of their own, or a
-    generation drawing its thumbnail and nothing else because its file moved."""
+def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qapp):
+    """A preview runs on the live install's own library (config.LIBRARY_STATE_DIR),
+    so it keeps it the way the live app does: the same passes, in the same order,
+    the orphaned-trash sweep included. A copy of its own would have hidden a
+    branch's generations from the live app and the live app's from the branch."""
     ran = []
 
-    with _a_faked_boot(ran), \
-         patch("origenerator.branch_session.is_branch_session", return_value=True), \
-         patch("origenerator.branch_session.seed_branch_db", return_value=True):
-        assert main([]) == 0
-
-    assert ran == ["relocate_moved_outputs", "fold_completed_enhancements"]
-
-
-def test_a_branch_session_reclaims_no_trash(qapp):
-    """The seeded deletions name the *live* install's held folders, so reclaiming
-    by what this copy happens to know about would reach into the library the
-    live app is still showing."""
-    with _a_faked_boot([]) as _, \
+    with _a_faked_boot(ran) as _, \
          patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
-         patch("origenerator.branch_session.is_branch_session", return_value=True), \
-         patch("origenerator.branch_session.seed_branch_db", return_value=True):
+         patch("origenerator.branch_session.is_branch_session", return_value=True):
         assert main([]) == 0
 
-    reclaim.assert_not_called()
+    assert ran == [name for _, name in _MAINTENANCE_PASSES]
+    reclaim.assert_called_once()
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():
@@ -850,7 +794,6 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
 # dropped changes what the user reads; and in a hosted session, where there is
 # no splash, these are the lines that go to the log instead.
 _SPLASH_LINES = (
-    "Adopting branch-session results...",
     "Reconnecting to running generations...",
     "Finding files that moved...",
     "Scanning for new images...",
@@ -865,29 +808,19 @@ _SPLASH_LINES = (
 )
 
 
-def test_the_boot_says_the_same_twelve_things_it_always_has():
-    """Twelve, not fourteen: the bookmark adoption runs under the line above it
-    rather than announcing itself, which is what `status=None` on a pass means."""
+def test_the_boot_says_the_same_eleven_things_it_always_has():
     from origenerator.app import MAINTENANCE
 
     assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
 
 
-def test_a_branch_session_says_only_that_it_is_skipping_and_folding():
-    from origenerator.app import BRANCH_SESSION_MAINTENANCE
-
-    assert tuple(p.status for p in BRANCH_SESSION_MAINTENANCE) == (
-        "Finding files that moved...",
-        "Folding enhancements into their images...")
-
-
 def test_every_pass_says_what_went_wrong_when_something_does():
-    """The one thing all fifteen share: a failure costs one warning line naming
+    """The one thing they all share: a failure costs one warning line naming
     the operation, never the launch. A pass with no failure message would report
     a genuine bug as a bare format string."""
-    from origenerator.app import BRANCH_SESSION_MAINTENANCE, MAINTENANCE
+    from origenerator.app import MAINTENANCE
 
-    for boot_pass in (*MAINTENANCE, *BRANCH_SESSION_MAINTENANCE):
+    for boot_pass in MAINTENANCE:
         assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__
 
 

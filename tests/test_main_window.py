@@ -312,10 +312,10 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
 
 
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
-    # The other half of leaving experiments to the live install: a preview's
-    # database is a copy of the live one, so the rows it would "clear" are the
-    # live app's own experiments, running in the ComfyUI they share — dropping
-    # them (and interrupting the one mid-render) destroys the absence's work.
+    # The other half of leaving experiments to the live install: the rows a
+    # preview would "clear" are the live app's own experiments, running in the
+    # ComfyUI they share — dropping them (and interrupting the one mid-render)
+    # destroys the absence's work.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = Database(tmp_path / "t.db")
     db.insert_generation(

@@ -6,11 +6,12 @@
 '     falling back to python on PATH exactly as the live launcher does — the
 '     primary runs happily without a venv, and a preview that refuses to start
 '     where the live app starts fine is a review cycle lost to the launcher,
-'   - it marks the run a branch session (ORIGENERATOR_BRANCH_SESSION=1), so the
-'     app seeds its database from the primary's and skips the library
-'     maintenance only the live app should do (see origenerator/branch_session.py),
-'   - state (DB, thumbnails, trash) stays in the worktree's own state\ folder,
-'     so the live install's state is untouched.
+'   - it marks the run a branch session (ORIGENERATOR_BRANCH_SESSION=1): the app
+'     opens the live install's own library (the primary's database, thumbnails
+'     and trash), so every generation shows in every instance, and leaves
+'     ComfyUI's absence work to the live app (see origenerator/branch_session.py),
+'   - only this window's own state (ui_state.json) and its logs land in the
+'     worktree's state\ folder.
 ' Close the live app first — two instances would both drive ComfyUI. Copy the
 ' primary's content.local.json into the worktree root before the first run, or
 ' the session comes up on the example overlay and finds no library.

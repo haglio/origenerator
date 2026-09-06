@@ -27,11 +27,6 @@ from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 # (name, type, not_null, default, primary_key_position) per column, in
 # declaration order — exactly what `PRAGMA table_info` reports.
 SCHEMA = {
-    "branch_curation": (
-        ("branch", "TEXT", 0, None, 1),
-        ("state_json", "TEXT", 1, None, 0),
-        ("adopted_at", "TEXT", 1, "datetime('now')", 0),
-    ),
     "custom_folder_members": (
         ("folder_id", "INTEGER", 1, None, 1),
         ("folder_key", "TEXT", 1, None, 2),
@@ -215,7 +210,6 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
 # fails this file instead of quietly shipping a column every existing user's
 # database will never have.
 FIRST_SHIPPED = {
-    "branch_curation": {"branch", "state_json", "adopted_at"},
     "custom_folder_members": {
         "folder_id", "folder_key", "level", "ref_prompt_id", "position"},
     "custom_folders": {"id", "name", "created_at"},
@@ -303,3 +297,20 @@ def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, 
              for name, type_, not_null, default, _ in SCHEMA[table]}
     for column in ADDED_COLUMNS[table]:
         assert migrated[column] == fresh[column], column
+
+
+def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
+    # The table recorded what each worktree's copied database had bookmarked,
+    # for adoption at the next live launch; there are no copies now, so it is
+    # dropped on open rather than left as a fossil in every library.
+    import sqlite3
+
+    from origenerator.db import Database
+
+    path = tmp_path / "origenerator.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE branch_curation (branch TEXT PRIMARY KEY, state_json TEXT NOT NULL)")
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "branch_curation" not in tables

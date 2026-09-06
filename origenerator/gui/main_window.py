@@ -108,9 +108,8 @@ class OrigeneratorWindow(QMainWindow):
         # Background experiments belong to the closed app, so the ones the last
         # absence left in ComfyUI's queue are dropped before anything is adopted:
         # an open app never has one competing for the GPU. The live install's
-        # alone, both ends of it — a branch session's database is a copy of the
-        # live one, so the rows it would clear are the live app's experiments
-        # running in the ComfyUI they share.
+        # alone, both ends of it: the rows a branch session would clear are the
+        # live app's experiments, running in the ComfyUI they share.
         if not is_branch_session():
             cancel_experiments(db, client)
         # The same absence carried a batch of base re-renders. Fold the ones that

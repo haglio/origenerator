@@ -2,9 +2,8 @@
 
 `Database` was one 626-line class over six unrelated tables, so a unit that
 touches one of them — recovery reads only `deletions`, reconcile only
-`folder_meta` and `custom_folder_members`, branch_session only
-`branch_curation` — had to be handed the whole surface, and could be given no
-narrow fake. The queries live one table to a module now, and these are the tests
+`folder_meta` and `custom_folder_members` — had to be handed the whole surface,
+and could be given no narrow fake. The queries live one table to a module now, and these are the tests
 that a store is a whole object on its own, and that the facade over them is
 exactly a facade.
 
@@ -21,7 +20,6 @@ import pytest
 
 import origenerator.db_generations
 from origenerator.db import Database
-from origenerator.db_branch_curation import BranchCurationStore
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_custom_folders import CustomFolderStore
 from origenerator.db_deletions import DeletionStore
@@ -38,8 +36,6 @@ STORES = {
     "requests": (RequestStore, lambda s: s.list_requests()),
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
     "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
-    "branch_curation": (
-        BranchCurationStore, lambda s: s.branch_curation_state("worktree-alpha")),
 }
 
 

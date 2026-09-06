@@ -141,7 +141,7 @@ def test_a_re_made_batch_can_purge_what_it_holds(tmp_path):
 
 
 def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
-    # What a branch session's NoTrash records: nothing was taken, so nothing is
+    # A delete whose files were already gone records no moves: nothing is
     # restored or purged, and neither call may raise.
     batch = TrashedBatch.from_record({"moves": [], "subdir": None})
     batch.restore()

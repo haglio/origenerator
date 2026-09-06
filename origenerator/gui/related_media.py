@@ -8,7 +8,7 @@ bare autoshow rather than a generation someone chose.
 
 "Built from" is one slot answering three relations, because they are one
 question: a video's start frame, the item a spoken request revised, and — for the
-single stroke the Genau lane cuts out of a clip — the clip it was cut out of.
+single cycle the Genau lane cuts out of a clip — the clip it was cut out of.
 
 Fed one row at a time and nothing else: the panel that owns it reads the library
 and hands over the rows this needs, so this touches no database and can be stood
@@ -50,7 +50,7 @@ class RelatedMedia(QWidget):
 
     def __init__(self, parent=None, *, video_rows=None):
         """``video_rows`` answers the library's videos, and is asked only for a
-        row that could have animations, or is a stroke cut out of one of them —
+        row that could have animations, or is a cycle cut out of one of them —
         which is why it is a call rather than a list. Reading it is a whole-table
         read and a parse per row, and every video shown would otherwise pay for
         it to be told it has none.
@@ -107,7 +107,7 @@ class RelatedMedia(QWidget):
     def _built_from(self, row: dict, image_rows: list[dict], request):
         """``(the row this was built from, what to head the tile, its kind)``.
 
-        Three relations, most particular first. A stroke the Genau lane cut is
+        Three relations, most particular first. A cycle the Genau lane cut is
         the only one whose source is a VIDEO, and it has to be asked about first:
         a cut carries its source clip's params, start frame included, so asking
         for a start frame would answer with the picture the ORIGINAL was animated

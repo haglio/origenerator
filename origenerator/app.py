@@ -499,7 +499,7 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     three keys to nine in six weeks. Three of those nine are read with a bare
     subscript, so an overlay one release out of date used to be a dead icon: no
     window, and the traceback in a launcher log nobody opens. The other six went
-    quietly one feature at a time, which is worse in its own way -- a stroke
+    quietly one feature at a time, which is worse in its own way -- a motion
     aimed at the wrong part of the frame reads as the model having a bad day.
 
     One rule for all nine, then: name what is missing and do not start. A key

@@ -21,7 +21,7 @@ from origenerator.gui import grid_card
 _IDLE_FRAME_CSS = grid_card.idle_css("folderRequestTile")
 
 # A pencil rather than a plus: the card next door makes another one of these, and
-# this one writes on them. Smaller than the plus, which is a bare stroke — a
+# this one writes on them. Smaller than the plus, which is a bare line — a
 # glyph with detail in it needs the room to show the detail.
 _GLYPH = "✎"
 _GLYPH_PT = 48

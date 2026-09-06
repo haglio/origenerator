@@ -1,4 +1,4 @@
-"""Drive the OSR2 from a self-generated stroke — no video, no funscript.
+"""Drive the OSR2 from a self-generated motion — no video, no funscript.
 
 The counterpart to :class:`~origenerator.gui.osr2_driver.Osr2Driver` for stills:
 where that one follows a playing video's script, this one *is* the motion
@@ -7,7 +7,7 @@ of its own and streaming each sampled position as T-code. Same broker etiquette,
 too: it pauses genau while it drives, and parks the device + restores genau when
 it stops. The gallery owns the one instance, app-global — every surface (the main
 window, the fullscreen show) drives it through the shared
-key cluster in :mod:`origenerator.gui.motion_hud`, and the stroke outlives any
+key cluster in :mod:`origenerator.gui.motion_hud`, and the motion outlives any
 of them: closing a view leaves the device running until Space (or Esc in the
 gallery) stops it.
 
@@ -19,8 +19,8 @@ missing while this drove off a GUI-thread timer aimed at the present:
   living there. The device feels that as a freeze followed by a lunge to catch
   up. The clock here answers to nothing but the wall.
 * **Aiming ahead.** Each command says *be at this place in this long*, so the
-  place has to be one the stroke is due to reach when the time is up. Aimed at
-  where the stroke already is, the device can only chase, and every wobble in
+  place has to be one the motion is due to reach when the time is up. Aimed at
+  where the motion already is, the device can only chase, and every wobble in
   the tick spacing becomes a stall and then a sprint.
 """
 
@@ -43,14 +43,14 @@ from origenerator.osr2 import Osr2Broker
 
 logger = logging.getLogger(__name__)
 
-_TICK_MS = 25  # the stroke's own clock — 40 Hz, a beat under genau's own loop
+_TICK_MS = 25  # the motion's own clock — 40 Hz, a beat under genau's own loop
 # How far ahead of now each command aims, and so how long the device is given to
 # get there. Comfortably more than a tick, so a tick that runs a little late
 # still finds the device short of its target and simply re-aims it — under a
 # tick and the device arrives early, stands still, then sprints for the next.
 _LOOKAHEAD_MS = 40
 # The device is parked wherever the last thing to hold it left it, and the
-# stroke's first target can be the length of the axis away. Every command inside
+# motion's first target can be the length of the axis away. Every command inside
 # this window is given a longer interval, easing out to the ordinary lookahead
 # as the window closes, so the seam is a movement rather than a slam. (Genau's
 # HandoffGlide, minus its cliff edge at the end.)
@@ -58,10 +58,10 @@ _HANDOFF_MS = 300
 
 
 class _TickThread:
-    """The stroke's clock, off the GUI thread.
+    """The motion's clock, off the GUI thread.
 
     A plain sleeping loop rather than a ``QTimer``: it needs the wall clock, the
-    stroke state and a datagram socket, none of which belong to Qt, and living
+    motion state and a datagram socket, none of which belong to Qt, and living
     outside the GUI thread is the whole point — see this module's docstring.
     """
 
@@ -72,7 +72,7 @@ class _TickThread:
         self._now = now
         self._sleep = sleep
         self._stopping = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="osr2-stroke",
+        self._thread = threading.Thread(target=self._run, name="osr2-motion",
                                         daemon=True)
 
     def start(self) -> None:
@@ -105,7 +105,7 @@ class _TickThread:
 
 class Osr2MotionDriver(QObject):
     # The device changed hands: the funscript reconcile stands down while the
-    # stroke holds it, and every surface's caption follows along.
+    # motion holds it, and every surface's caption follows along.
     active_changed = pyqtSignal(bool)
 
     def __init__(self, broker=None, *, interval_ms: int = _TICK_MS,
@@ -133,7 +133,7 @@ class Osr2MotionDriver(QObject):
         return self._active
 
     def toggle(self) -> bool:
-        """Start or stop driving; returns whether the stroke is now running."""
+        """Start or stop driving; returns whether the motion is now running."""
         if self._active:
             self.stop()
         else:
@@ -141,7 +141,7 @@ class Osr2MotionDriver(QObject):
         return self._active
 
     def start(self) -> None:
-        """Take the device: pause genau and start streaming the stroke."""
+        """Take the device: pause genau and start streaming the motion."""
         if self._active:
             return
         self._active = True
@@ -151,7 +151,7 @@ class Osr2MotionDriver(QObject):
         self._last_tick = now
         self._glide_until = now + _HANDOFF_MS / 1000.0
         self._broker.pause_genau()
-        logger.info("OSR2 stroke engaged: %s", self.status_text())
+        logger.info("OSR2 motion engaged: %s", self.status_text())
         self.poll()  # move on the keypress, not a tick later
         self._ticker = self._make_ticker(self.poll, self._interval_s)
         self._ticker.start()
@@ -168,26 +168,26 @@ class Osr2MotionDriver(QObject):
             ticker.stop()  # waits, so no tick can land after the park below
         self._broker.park()
         self._broker.restore_genau()
-        logger.info("OSR2 stroke released: parked, genau restored")
+        logger.info("OSR2 motion released: parked, genau restored")
         self.active_changed.emit(False)
 
     def poll(self) -> None:
-        """One tick: carry the phase up to now, then name where the stroke will
+        """One tick: carry the phase up to now, then name where the motion will
         be when the time this command is given runs out.
 
         The place and the time are the same number twice — aim as far ahead as
-        the device is allowed to take. That is what keeps it on the stroke
+        the device is allowed to take. That is what keeps it on the motion
         rather than trailing it, through the glide as much as after it: given
-        longer, it is also sent further, so it arrives where the stroke has got
-        to instead of where the stroke was when the command left.
+        longer, it is also sent further, so it arrives where the motion has got
+        to instead of where the motion was when the command left.
         """
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:
-            # Carry the stroke to now first: that is what moves its own clock,
+            # Carry the motion to now first: that is what moves its own clock,
             # and cruise control's ramps are all timed against that clock. Then
             # let cruise move things, before the phase is sampled, so a tick
-            # sends the stroke it just asked for rather than the one before.
+            # sends the motion it just asked for rather than the one before.
             motion_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
             motion_engine.tick_cruise_control(self._state, now)
@@ -195,7 +195,7 @@ class Osr2MotionDriver(QObject):
         self._broker.send_position(pos, lead_ms)
         if not self._streaming:
             self._streaming = True
-            logger.info("OSR2 stroke streaming: first T-code pos=%.0f", pos)
+            logger.info("OSR2 motion streaming: first T-code pos=%.0f", pos)
 
     def _lead_for(self, now: float) -> int:
         """How far ahead this command aims, and so how long the device is given
@@ -212,7 +212,7 @@ class Osr2MotionDriver(QObject):
 
     @property
     def state(self) -> Motion:
-        """The live stroke, for the drive panel to draw. Read-only by
+        """The live motion, for the drive panel to draw. Read-only by
         convention — the setters below are how it changes."""
         return self._state
 
@@ -245,13 +245,13 @@ class Osr2MotionDriver(QObject):
             motion_engine.cycle_shape(self._state.state, step)
 
     def toggle_cruise(self) -> None:
-        """Hands off: cruise control takes the stroke over (genau's ``/``).
+        """Hands off: cruise control takes the motion over (genau's ``/``).
 
         What it hands the device is several waves summed — a deep slow one with
         a quicker ripple riding it, say — with every wave's speed and share of
         the travel always on its way somewhere else. The dials go on reading the
-        whole stroke's travel, center and pace, so the console still says what is
-        being sent. It only moves while the stroke is actually running, so arming
+        whole motion's travel, center and pace, so the console still says what is
+        being sent. It only moves while the motion is actually running, so arming
         it against a parked device changes nothing until the device is taken."""
         with self._lock:
             motion_engine.toggle_cruise_control(self._state)
@@ -272,14 +272,14 @@ class Osr2MotionDriver(QObject):
                 motion_engine.disable_cruise_control(self._state)
 
     def quarter_offset(self) -> None:
-        r"""Shift the stroke a quarter cycle (genau's ``\``)."""
+        r"""Shift the motion a quarter cycle (genau's ``\``)."""
         with self._lock:
             motion_engine.quarter_offset(self._state)
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the
         slideshow's standing caption — the dials read the same either way, so
-        the stroke can be tuned before it's started."""
+        the motion can be tuned before it's started."""
         state = self._state.state
         dials = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")

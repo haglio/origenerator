@@ -6,7 +6,7 @@ line, the transport, the clip-seconds pace, the hands-free row, the OSR2 line
 and the drive readout under them, all the code Fun Time runs. What a press posts
 is that console's own answer too — the same command strings Fun Time routes —
 and this only routes them to what this app has: the slideshow for the transport
-and the pace, the stroke driver for everything about the stroke.
+and the pace, the motion driver for everything about the motion.
 
 The one row left off is the one naming the three players, and the minimize
 button riding it (``modes_row=False``). This console is inside another app's
@@ -70,12 +70,12 @@ def _limits(state) -> drive_layout.Limits:
 
 
 def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
-    """The live stroke as the readout's own view of it.
+    """The live motion as the readout's own view of it.
 
-    The dials, where the device is, and the stroke sampled forward — the same
+    The dials, where the device is, and the motion sampled forward — the same
     samples it is being sent, so the trace is the motion rather than a drawing
     of it. ``driven`` is what dims the whole readout: nothing reaching the
-    device is a picture of a stroke nobody is making, and it goes grey exactly
+    device is a picture of a motion nobody is making, and it goes grey exactly
     as Fun Time's does.
     """
     dials = state.state
@@ -95,21 +95,21 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
+def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
-    ``mode`` is genau because that is what this is: a self-generated stroke over
+    ``mode`` is genau because that is what this is: a self-generated motion over
     what is on screen, with no Nau playlist under it. The empty
     :class:`ModeHud` is what leaves the status line saying only whether the
     slide is held — there is no compilation, no browse order and no length
     filter here to report.
 
     ``device_on`` is whether the OSR2 is answering at all
-    (:func:`origenerator.osr2.device_on`). A stroke running with the device off
-    is a stroke nobody is receiving, and the console says so exactly as Fun
+    (:func:`origenerator.osr2.device_on`). A motion running with the device off
+    is a motion nobody is receiving, and the console says so exactly as Fun
     Time's does: the OSR2 row reads "Off" and the painter takes that as nothing
-    driving, which greys the readout and holds the trace still. The stroke goes
-    on stroking — it cannot see the device either way — so this is the only
+    driving, which greys the readout and holds the trace still. The motion goes
+    on — it cannot see the device either way — so this is the only
     thing standing between a switched-off OSR2 and a console animating a blue
     wave nothing is riding.
 
@@ -117,33 +117,33 @@ def console_hud(stroke, host, *, device_on: bool = True) -> ConsoleHud:
     only where the host hands over a set to narrow, and here the show's own HUD
     carries them instead.
     """
-    driving = stroke.active and device_on
+    driving = motion.active and device_on
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
             mode="genau", active=True, locked=host.locked,
             osr2=OSR2_ROBOT_HAND if driving else "off",
-            cruise=stroke.state.cruise.active,
-            shape=stroke.state.state.shape.value,
+            cruise=motion.state.cruise.active,
+            shape=motion.state.state.shape.value,
             advance_interval=host.dwell_s,
         ),
-        drive=drive_hud(stroke.state, driving, host.dwell_s),
+        drive=drive_hud(motion.state, driving, host.dwell_s),
         modes_row=False,
     )
 
 
-def panel_size(stroke, host) -> tuple[int, int]:
+def panel_size(motion, host) -> tuple[int, int]:
     """How big the console draws, which is what the widget has to be."""
-    return ConsolePainter().rgba(console_hud(stroke, host))[1]
+    return ConsolePainter().rgba(console_hud(motion, host))[1]
 
 
 class MotionPanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
-    It is always here, stroke or no stroke. Part of what is on it is not about a
-    running stroke at all — the pace an unheld slide moves on at — and a panel
+    It is always here, motion or no motion. Part of what is on it is not about a
+    running motion at all — the pace an unheld slide moves on at — and a panel
     that appeared only once the device was being driven made that reachable
-    only by starting a stroke first. With nothing driving, it draws itself
+    only by starting a motion first. With nothing driving, it draws itself
     exactly as Fun Time's does with the OSR2 off: the OSR2 row reads "Off", the
     readout greys, and the trace holds still rather than animating a wave
     nobody is riding.
@@ -153,9 +153,9 @@ class MotionPanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None):
+    def __init__(self, motion, parent=None, host=None, pace=None, device_on=None):
         super().__init__(parent)
-        self._motion = stroke
+        self._motion = motion
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -181,8 +181,8 @@ class MotionPanel(QWidget):
         # and the console then came out TWICE over a show: once where Qt drew
         # it and once more at double its offset, where that surface ended up.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-        self.setToolTip(f"OSR2 stroke — {MOTION_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(stroke, self._host))
+        self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
+        self.setFixedSize(*panel_size(motion, self._host))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
         # second is the same picture at Pillow's price, and with the panel now
@@ -190,10 +190,10 @@ class MotionPanel(QWidget):
         self._repaint = QTimer(self)
         self._repaint.setInterval(_REPAINT_MS)
         self._repaint.timeout.connect(self.update)
-        # Followed from wherever the stroke was toggled — the signal for a driver
-        # that has one, and :meth:`refresh` (which the hosts call on every stroke
+        # Followed from wherever the motion was toggled — the signal for a driver
+        # that has one, and :meth:`refresh` (which the hosts call on every motion
         # key) for one that doesn't.
-        signal = getattr(stroke, "active_changed", None)
+        signal = getattr(motion, "active_changed", None)
         if signal is not None:
             signal.connect(self._on_active_changed)
 
@@ -202,9 +202,9 @@ class MotionPanel(QWidget):
         self.update()
 
     def refresh(self) -> None:
-        """Redraw, and re-check whether the stroke is running.
+        """Redraw, and re-check whether the motion is running.
 
-        The hosts call this after every stroke key, which is the one moment the
+        The hosts call this after every motion key, which is the one moment the
         answer can have changed under a driver that reports no signal — so the
         trace starts and stops on the key that did it, not only on the signal a
         full driver happens to emit.
@@ -213,7 +213,7 @@ class MotionPanel(QWidget):
         self.update()
 
     def _sync_repaint(self) -> None:
-        """Animate only what is moving: a shown panel with a running stroke."""
+        """Animate only what is moving: a shown panel with a running motion."""
         if self.isVisible() and getattr(self._motion, "active", False):
             self._repaint.start()
         else:
@@ -272,32 +272,32 @@ class MotionPanel(QWidget):
         """Do here what Fun Time would route to whichever player owns it."""
         if not action:
             return
-        stroke, host = self._motion, self._host
+        motion, host = self._motion, self._host
         if action.startswith("robot_hand_") and "_" in action[11:]:
             axis, _, value = action[11:].rpartition("_")
             if value.isdigit() and axis in ("amp", "center", "speed"):
-                {"amp": stroke.set_amplitude, "center": stroke.set_center,
-                 "speed": stroke.set_speed}[axis](int(value))
+                {"amp": motion.set_amplitude, "center": motion.set_center,
+                 "speed": motion.set_speed}[axis](int(value))
                 self.update()
                 return
         step = {
-            "robot_hand_speed_up": (stroke.adjust_speed, 5),
-            "robot_hand_speed_down": (stroke.adjust_speed, -5),
-            "robot_hand_amplitude_up": (stroke.adjust_amplitude, 10),
-            "robot_hand_amplitude_down": (stroke.adjust_amplitude, -10),
-            "robot_hand_center_up": (stroke.adjust_center, 5),
-            "robot_hand_center_down": (stroke.adjust_center, -5),
+            "robot_hand_speed_up": (motion.adjust_speed, 5),
+            "robot_hand_speed_down": (motion.adjust_speed, -5),
+            "robot_hand_amplitude_up": (motion.adjust_amplitude, 10),
+            "robot_hand_amplitude_down": (motion.adjust_amplitude, -10),
+            "robot_hand_center_up": (motion.adjust_center, 5),
+            "robot_hand_center_down": (motion.adjust_center, -5),
             "genau_prev_clip": (host.show_step, -1),
             "genau_next_clip": (host.show_step, 1),
         }.get(action)
         if step is not None:
             step[0](step[1])
         elif action == "robot_hand_toggle_cruise":
-            stroke.toggle_cruise()
+            motion.toggle_cruise()
         elif action == "robot_hand_cycle_shape":
-            stroke.cycle_shape()
+            motion.cycle_shape()
         elif action == "quarter_button":
-            stroke.quarter_offset()
+            motion.quarter_offset()
         elif action == "main_lock":
             host.show_toggle_hold()
         elif action == "genau_weird_clip":

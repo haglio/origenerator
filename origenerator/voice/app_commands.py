@@ -14,7 +14,7 @@ says — a fix leads with "fix", a show command names the slideshow — but a ba
 lock of hair over her eye" is a prompt.
 
 Most of the vocabulary is a fixed set of things to ask for, and one part of it
-is not: the stroke's dials take a number said outright — "amp fifty", "max
+is not: the motion's dials take a number said outright — "amp fifty", "max
 speed" — so those phrases answer with a :class:`DialSetting` carrying the dial
 and the value rather than a constant each for three dozen combinations. Both come
 back from the one matcher, and the caller tells them apart by type.
@@ -24,7 +24,7 @@ target. A fullscreen show has the floor while one is up and the gallery has it
 otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
 slide over a show and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
-OSR2) and the stroke's own dials belong to no surface and answer from either.
+OSR2) and the motion's own dials belong to no surface and answer from either.
 
 One word is deliberately missing. The Requests shelf answers to the plural
 "requests" and never to the singular, because "request" is what opens a spoken
@@ -87,7 +87,7 @@ class AppCommand(Enum):
     FILTER_ENHANCED = "filter_enhanced"
     FILTER_OFF = "filter_off"
 
-    # The OSR2 stroke's dials, in Fun Time's own words. The driver is app-wide,
+    # The OSR2 motion's dials, in Fun Time's own words. The driver is app-wide,
     # so these answer from the gallery and from a show alike.
     SPEED_UP = "speed_up"
     SPEED_DOWN = "speed_down"
@@ -105,10 +105,10 @@ class AppCommand(Enum):
 
 @dataclass(frozen=True)
 class DialSetting:
-    """One of the stroke's dials, said outright rather than nudged.
+    """One of the motion's dials, said outright rather than nudged.
 
     "speed up" walks a dial five at a time, which is the right shape when the
-    stroke is nearly where you want it and the wrong one when it is not — from
+    motion is nearly where you want it and the wrong one when it is not — from
     the far end, arriving takes a dozen utterances and every one of them has to
     be heard. Fun Time answers that with the number said plainly ("amp fifty",
     "max speed"), and this is that vocabulary: the dial, the value, and nothing
@@ -191,7 +191,7 @@ _say(AppCommand.GROUP, "group", "group folders")
 for _words, (_toggle, _on, _off) in (
     (("auto", "auto generate"), (AppCommand.AUTO, AppCommand.AUTO_ON, AppCommand.AUTO_OFF)),
     (("audio", "ambient"), (AppCommand.AUDIO, AppCommand.AUDIO_ON, AppCommand.AUDIO_OFF)),
-    (("drive", "stroke"), (AppCommand.DRIVE, AppCommand.DRIVE_ON, AppCommand.DRIVE_OFF)),
+    (("drive", "motion"), (AppCommand.DRIVE, AppCommand.DRIVE_ON, AppCommand.DRIVE_OFF)),
 ):
     for _word in _words:
         _say(_toggle, _word)
@@ -211,7 +211,7 @@ _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "upscales", "upscales only", "filter upscales", "upscaled only")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
-# The stroke's dials, said the way Fun Time says them, so the muscle memory
+# The motion's dials, said the way Fun Time says them, so the muscle memory
 # carries between the two apps the way the keys already do.
 _say(AppCommand.SPEED_UP, "speed up")
 _say(AppCommand.SPEED_DOWN, "speed down", "slow down")

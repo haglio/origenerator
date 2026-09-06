@@ -1,4 +1,4 @@
-"""The OSR2 stroke's shared key cluster.
+"""The OSR2 motion's shared key cluster.
 
 Every surface that can drive the device answers these keys through one helper, so
 the muscle memory carries from genau — and so a slip here is a slip on all of
@@ -43,21 +43,21 @@ _KEYS = [
 
 @pytest.mark.parametrize("key, asked", _KEYS, ids=lambda v: getattr(v, "name", None))
 def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
-    stroke = _Motion()
+    motion = _Motion()
 
-    handled = apply_motion_key(stroke, key)
+    handled = apply_motion_key(motion, key)
 
     assert handled is True
-    assert stroke.asked == [asked]
+    assert motion.asked == [asked]
 
 
 def test_a_key_the_cluster_does_not_answer_falls_through_untouched():
     # False is how the caller learns the key is still its own to handle — a
     # surface's own shortcuts live on the other side of this return.
-    stroke = _Motion()
+    motion = _Motion()
 
-    assert apply_motion_key(stroke, Qt.Key.Key_K) is False
-    assert stroke.asked == []
+    assert apply_motion_key(motion, Qt.Key.Key_K) is False
+    assert motion.asked == []
 
 
 def test_no_driver_means_every_key_falls_through():
@@ -68,15 +68,15 @@ def test_no_driver_means_every_key_falls_through():
 
 def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():
     # Driving is one switch — the gallery's — which picks the funscript or the
-    # stroke by what is playing. Space starting a second source alongside a
+    # motion by what is playing. Space starting a second source alongside a
     # script already streaming is the failure this argument exists to prevent.
-    stroke = _Motion()
+    motion = _Motion()
     pressed = []
 
-    apply_motion_key(stroke, Qt.Key.Key_Space, on_drive_toggle=lambda: pressed.append(1))
+    apply_motion_key(motion, Qt.Key.Key_Space, on_drive_toggle=lambda: pressed.append(1))
 
     assert pressed == [1]
-    assert stroke.asked == []
+    assert motion.asked == []
 
 
 def test_the_legend_names_every_key_the_cluster_answers():

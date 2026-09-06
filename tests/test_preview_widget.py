@@ -529,7 +529,7 @@ def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
     assert win.frames == [_png_bytes()]  # the view still shows what it landed on
 
 
-# --- funscript strip: proof a shown video carries a stroke script -----------
+# --- funscript strip: proof a shown video carries a funscript -----------
 
 def _strip_preview(qtbot):
     w = PreviewWidget(player=MagicMock(), show_funscript_strip=True)

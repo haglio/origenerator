@@ -266,7 +266,7 @@ def _never_take_the_real_device(monkeypatch):
     """Keep the suite off the OSR2 and off genau's state file.
 
     A test that builds a gallery gets real drive controllers, and the one OSR2
-    switch now *drives* the moment it goes on — a stroke when there's no
+    switch now *drives* the moment it goes on — a motion when there's no
     funscript to follow — where it used to arm and wait. So turning it on in a
     test would open a socket at the broker's port, spin the 40 Hz clock, and
     write "0" into the sibling app's ``genau_enabled.txt``, which is a live file

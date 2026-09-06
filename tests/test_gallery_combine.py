@@ -166,7 +166,7 @@ def test_a_recipe_written_against_the_shared_strength_still_renders_at_it():
 
     assert [n["inputs"]["cfg"] for n in samplers] == [1.0, 1.0]
 
-# --- shaping a recipe into one stroke, for the lane that scrubs it ------------
+# --- shaping a recipe into one cycle, for the lane that scrubs it ------------
 
 _LOOP = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
 
@@ -176,7 +176,7 @@ def _shaped(category="", **over):
 
 
 def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
-    """Genau steers whatever it is given as ONE stroke, so the ideal clip is the
+    """Genau steers whatever it is given as ONE cycle, so the ideal clip is the
     shortest that holds exactly one — 13 frames by the cadence arithmetic. It is
     29 because the model cannot CLOSE a loop that short: measured at a fixed
     seed, the last frame lands 2% off the first at 13 frames and 0.2% off at 29,
@@ -185,14 +185,14 @@ def test_a_genau_recipe_is_generated_at_the_shortest_length_that_closes():
 
 
 def test_a_genau_recipe_plays_at_the_top_rate_the_writer_allows():
-    """29 frames of one stroke is far too coarse to scrub slowly, which is most
+    """29 frames of one cycle is far too coarse to scrub slowly, which is most
     of what Genau is for. The frames in between are interpolated after decode, so
     asking for the top rate costs a pass rather than sampler time."""
     assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
 
 
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_recipes_own():
-    """At 29 frames the model fits about two strokes left to itself, so the lane
+    """At 29 frames the model fits about two cycles left to itself, so the lane
     asks for one outright. Added to the recipe's prompt rather than replacing it:
     the recipe says what the clip is OF, and this says how it moves."""
     shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
@@ -203,7 +203,7 @@ def test_the_words_that_ask_for_one_cycle_are_added_to_the_recipes_own():
 
 
 def test_an_act_with_its_own_words_gets_them_and_the_rest_get_the_default():
-    """A stroke is not one motion: what made the difference on the act it was
+    """A cycle is not one motion: what made the difference on the act it was
     tuned on was naming the cycle in STAGES, and the stages are different parts of
     the body from one act to the next."""
     own = combine.cycle_words("beta")

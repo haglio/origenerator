@@ -100,7 +100,7 @@ def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypa
 
 
 def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_path, monkeypatch):
-    # A workflow that authored its motion (ATI) knows the exact stroke, so its
+    # A workflow that authored its motion (ATI) knows the exact motion, so its
     # sidecar comes straight from authored_actions — the metronome synthesizer
     # must not run for it, or the script would drift from the pixels.
     from origenerator.funscript import read_actions

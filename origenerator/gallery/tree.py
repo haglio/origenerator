@@ -311,7 +311,7 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     """Every row with a result, newest first — the whole of the Recents shelf's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
-    re-roll -- or, with no run under it at all, a single stroke cut out of a
+    re-roll -- or, with no run under it at all, a single cycle cut out of a
     clip for the Genau lane (``source`` ``"stroke_trim"``): a cut is something
     the app just made for you, it lands in the settings folder of the clip it
     came from rather than anywhere you would think to go looking, and left off

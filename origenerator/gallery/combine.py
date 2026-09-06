@@ -21,24 +21,24 @@ _CONTENT = load_content()
 _SIZE_KEYS = ("width", "height")
 
 # How long a Genau clip is generated for, in frames at the native rate. Genau
-# steers a clip as ONE stroke — see :func:`cycle_shaped` — so the ideal is the
+# steers a clip as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
 # shortest clip that holds exactly one, and 13 frames is where the arithmetic
-# lands (a stroke at the app's own cadence is 0.83 s, and 13/16 is 0.81).
+# lands (a cycle at the app's own cadence is 0.83 s, and 13/16 is 0.81).
 #
 # It is 29 because the model cannot close a loop that short. First-last-frame
 # conditions both ends on the same picture, but the model needs room to come
 # BACK to it, and measured over one recipe at a fixed seed the last frame lands
 # this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
 # 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
-# 29 it stops. So the length is set by the loop closing, and the ONE stroke is
+# 29 it stops. So the length is set by the loop closing, and the ONE cycle is
 # asked for in words instead (:data:`_CYCLE_WORDS`).
 CYCLE_FRAMES = 29
 
-# The words that ask a 29-frame loop for ONE stroke, and for a deep one, PER
+# The words that ask a 29-frame loop for ONE cycle, and for a deep one, PER
 # ACT: ``{act: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
 # in for an act that has none of its own.
 #
-# Per act because a stroke is not one motion. What made the difference on the act
+# Per act because a cycle is not one motion. What made the difference on the act
 # it was tuned on was naming the cycle in stages -- out to one end, in to the
 # other, back -- and the stages are different parts of the body from one act to
 # the next; the wording that doubled the travel on one would be describing
@@ -114,11 +114,11 @@ def cycle_words(category: str = "") -> tuple[str, str]:
 
 
 def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
-    """``params`` re-cut so the loop portrays ONE deep stroke, and plays smoothly.
+    """``params`` re-cut so the loop portrays ONE deep cycle, and plays smoothly.
 
     The Genau lane's whole problem: Genau does not play a clip, it scrubs it
     against the device's phase — so it steers whatever it is given as a single
-    stroke running out to one extreme and back. A clip that holds two stumbles;
+    cycle running out to one extreme and back. A clip that holds two stumbles;
     a clip that holds four looks like a machine.
 
     Three settings answer that, and each was arrived at by measuring:
@@ -126,12 +126,12 @@ def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
     * :data:`CYCLE_FRAMES` seconds of motion, because that is the shortest loop
       the model closes cleanly (see the note there).
     * The words, chosen by the act (:func:`cycle_words`). At 29 frames the model
-      fits about two strokes on its own, so the prompt asks for one outright —
-      naming the cycle in stages rather than saying "one stroke", which does
+      fits about two cycles on its own, so the prompt asks for one outright —
+      naming the cycle in stages rather than saying "one cycle", which does
       nothing. The same wording doubled the travel, so the clip reads as a
-      deliberate stroke rather than a wiggle. It rides the content overlay rather
+      deliberate cycle rather than a wiggle. It rides the content overlay rather
       than this file, like every other phrase the library speaks in.
-    * The top playback rate, because 29 frames of one stroke is too coarse to
+    * The top playback rate, because 29 frames of one cycle is too coarse to
       scrub slowly and the interpolator fills the rest in
       (:mod:`origenerator.workflows.frame_rate`).
 

@@ -29,11 +29,11 @@ from origenerator.workflows.motion_aim import detect_grip_aim
 # the same mapping, which is what keeps them locked to each other.
 TRACK_POINTS = 121
 TRACK_SECONDS = 5.0
-# The three cluster points ride the stroke slightly staggered (as derisked in
+# The three cluster points ride the motion slightly staggered (as derisked in
 # the PoC): enough spread to read as a hand, not so much it smears the patch.
 _CLUSTER_OFFSETS = ((-5.0, -30.0), (3.0, 0.0), (-3.0, 30.0))
 
-# The reference frame the stored stroke coordinates are authored in. They're
+# The reference frame the stored motion coordinates are authored in. They're
 # rescaled from here into the derived output space (see ``_scaled_motion_params``),
 # and this doubles as the fallback size when the input image can't be measured.
 REFERENCE_WIDTH = 480
@@ -41,7 +41,7 @@ REFERENCE_HEIGHT = 864
 
 
 class Wan21AtiI2vWorkflow(WorkflowTemplate):
-    """WAN 2.1 ATI image-to-video: the video follows an authored stroke track.
+    """WAN 2.1 ATI image-to-video: the video follows an authored motion track.
 
     Motion authorship is flipped relative to the other video workflows: a
     motion is authored first (``motion_*`` params), ``WanTrackToVideo``
@@ -58,7 +58,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     but app-side rather than in-graph (see :meth:`build_api_payload`): its
     ``WanTrackToVideo`` needs the integer size *and* a track whose coordinates
     share that space, and an in-graph ``GetImageSize`` couldn't feed the track,
-    which is built here. The stroke is authored in a fixed 480×864 reference
+    which is built here. The motion is authored in a fixed 480×864 reference
     frame and rescaled into the derived size, so one authored track fits any
     aspect ratio. Frame count stops at 113 because ComfyUI's track resampler
     faults at exactly 121 frames (its length-1=120 off-by-one).
@@ -158,7 +158,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     _AIM_KEYS = ("motion_x", "motion_ceiling", "motion_floor", "anchor_x", "anchor_y")
 
     def _auto_aim_params(self, params: dict) -> dict:
-        """``params`` with the stroke aimed at the detected anchor, when the user
+        """``params`` with the motion aimed at the detected anchor, when the user
         left every aim coordinate at its default and the start frame yields a
         detection — choosing where in the frame a thing is shouldn't be the
         user's job. Any edited coordinate, or no detection, leaves the given
@@ -181,9 +181,9 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _motion_reversals(params: dict) -> list[tuple[float, float]]:
-        """The authored stroke's turnaround points as ``(track_t, y)`` pairs.
+        """The authored motion's turnaround points as ``(track_t, y)`` pairs.
 
-        Alternating half-strokes with a seeded wobble in each one's pace (±18%)
+        Alternating half-cycles with a seeded wobble in each one's pace (±18%)
         and landing depth (up to 18% short), so the rhythm reads human rather
         than metronomic. Seeded by the generation seed: deterministic per run,
         re-rolled by a variation. These reversals are the single source both
@@ -191,23 +191,23 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         them locked."""
         rng = random.Random(params["seed"])
         top = float(params["motion_ceiling"])
-        bottom = float(params["motion_floor"])
-        depth = bottom - top
+        floor = float(params["motion_floor"])
+        depth = floor - top
         half = 0.5 / params["motion_hz"]
         reversals = [(0.0, top)]
         t, going_down = 0.0, True
         while t <= TRACK_SECONDS:
             t += half * rng.uniform(0.82, 1.18)
             short = depth * rng.uniform(0.0, 0.18)
-            reversals.append((t, bottom - short if going_down else top + short))
+            reversals.append((t, floor - short if going_down else top + short))
             going_down = not going_down
         return reversals
 
     @classmethod
     def _motion_series(cls, params: dict) -> list[float]:
-        """The stroke as its 121 track-time samples (y per sample): the
+        """The motion as its 121 track-time samples (y per sample): the
         reversals of :meth:`_motion_reversals` with cosine easing through every
-        half-stroke, so the hand decelerates into each turnaround instead of
+        half-cycle, so the hand decelerates into each turnaround instead of
         bouncing off it."""
         reversals = cls._motion_reversals(params)
         ys, seg = [], 0
@@ -223,7 +223,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     def _output_size(self, params: dict) -> tuple[int, int]:
         """The size this run renders at: the user's explicit width/height when the
         derived size was unlocked and overridden, else the size derived from the
-        input image (:meth:`_derived_size`). The stroke track is then rescaled into
+        input image (:meth:`_derived_size`). The motion track is then rescaled into
         whichever size wins, so it stays in the same relative place either way."""
         return override_size(params) or self._derived_size(params)
 
@@ -241,7 +241,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     @staticmethod
     def _scaled_motion_params(params: dict, width: int, height: int) -> dict:
-        """``params`` with the stroke coordinates rescaled from the 480×864
+        """``params`` with the motion coordinates rescaled from the 480×864
         reference frame into the derived ``width``×``height`` space, so a track
         authored once lands in the same relative place whatever the input image's
         aspect ratio. X coordinates scale by the width ratio, Y by the height
@@ -258,7 +258,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         }
 
     def _motion_tracks(self, params: dict) -> str:
-        """The tracks JSON: three staggered points riding the authored stroke
+        """The tracks JSON: three staggered points riding the authored motion
         series, plus one static point pinning the anchor. 121 points at 24fps,
         ATI's fixed convention."""
         amplitude = (params["motion_floor"] - params["motion_ceiling"]) / 2
@@ -279,22 +279,22 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     # driver re-sends "next action, time until it" every poll, so actions spaced
     # near (or under) the poll period become a new target per tick and the device
     # spasms instead of gliding. Reversals plus at most one shaping point per
-    # half-stroke keeps every gap far above this floor at any sane cadence.
+    # half-cycle keeps every gap far above this floor at any sane cadence.
     _MIN_HALF_CYCLE_MS_FOR_SHAPING = 300
 
     def authored_actions(self, params: dict) -> list[dict]:
-        """The funscript for the authored stroke: its reversal points — the
+        """The funscript for the authored motion: its reversal points — the
         same ones the pixel track is built from — mapped from track time onto
-        the clip's real duration and normalized to stroke depth (100 at the top
-        of the stroke, 0 at the bottom). SPARSE by contract: the OSR2 driver
+        the clip's real duration and normalized to travel depth (100 at the
+        ceiling, 0 at the floor). SPARSE by contract: the OSR2 driver
         interpolates between actions itself, and dense scripts make it jitter
-        (see ``_MIN_HALF_CYCLE_MS_FOR_SHAPING``). Each half-stroke long enough
+        (see ``_MIN_HALF_CYCLE_MS_FOR_SHAPING``). Each half-cycle long enough
         to afford it gets one mid point at 55% time / 82% travel, approximating
         the track's cosine easing so the device also decelerates into the
         reversal rather than moving at one flat speed."""
         top = float(params["motion_ceiling"])
-        bottom = float(params["motion_floor"])
-        depth = (bottom - top) or 1.0
+        floor = float(params["motion_floor"])
+        depth = (floor - top) or 1.0
         video_s = params["frame_count"] / NATIVE_FPS
         scale = video_s / TRACK_SECONDS
 
@@ -302,7 +302,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             return round(track_t * scale * 1000)
 
         def to_pos(y: float) -> int:
-            return max(0, min(100, round(100 * (bottom - y) / depth)))
+            return max(0, min(100, round(100 * (floor - y) / depth)))
 
         reversals = self._motion_reversals(params)
         limit_ms = round(video_s * 1000)
@@ -320,7 +320,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         # ATI can't derive its size in-graph (its WanTrackToVideo needs the
         # integer size AND a track whose coordinates share that space), so both
         # are built here: the size is the input image's derived size (or the
-        # unlocked override) and the authored stroke — auto-aimed at the
+        # unlocked override) and the authored motion — auto-aimed at the
         # detected anchor unless the user placed it — is rescaled into it.
         params = self._auto_aim_params(params)
         width, height = self._output_size(params)

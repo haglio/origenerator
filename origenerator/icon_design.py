@@ -1,7 +1,7 @@
 """Generates the Origenerator app icon: a MAGENTA "O" on the suite's grid.
 
 Every app in the suite draws a single MAGENTA letter on a 5x5 grid inset 31px
-inside a 256px canvas, with each stroke exactly one grid unit -- 1/5 of the
+inside a 256px canvas, with each bar exactly one cell -- 1/5 of the
 letter grid -- thick and near-square corners.  This module renders Origenerator's
 "O" as a 1/5-thick square ring to match.
 
@@ -26,7 +26,7 @@ from shared_ui.colors import MAGENTA
 CANVAS = 256  # icon master size
 INSET = 31  # the letter grid's offset within the canvas
 GRID = CANVAS - 2 * INSET  # 194 -- the letter grid, shared across the suite
-UNIT = GRID / 5  # 38.8 -- one cell == stroke width ("1/5-based")
+UNIT = GRID / 5  # 38.8 -- one cell == pen width ("1/5-based")
 CORNER_RADIUS = 5  # renders to a ~3px outer corner, matching the suite
 ICON_SIZES = (16, 32, 48, 256)  # frames stored in the .ico
 

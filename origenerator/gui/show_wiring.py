@@ -37,7 +37,7 @@ class ShowActions:
     held item as a generate tab. ``reset`` takes the show itself and is a
     session's too — hosted, "how it started" is the REGION's base state, which
     only the gallery knows. ``drive_toggle`` takes nothing: Space goes to the
-    app's one OSR2 switch rather than straight to this show's stroke.
+    app's one OSR2 switch rather than straight to this show's motion.
     """
 
     delete: Callable[[str], None] | None = None

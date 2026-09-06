@@ -35,7 +35,7 @@ from player_core.tcode import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# The device's rest command -- stroke axis to the floor over half a second, the
+# The device's rest command -- motion axis to the floor over half a second, the
 # family's one spelling of it, which the broker parks with too -- so a stopped
 # video leaves the OSR2 where the broker expects it.
 PARK_TCODE = PARK_COMMAND
@@ -50,7 +50,7 @@ def device_on(*, now: float | None = None, rx_file=None,
     at the end of it has power, and T-code carries no acknowledgment, so a write
     that goes nowhere looks exactly like one that arrives. The broker keeps a
     second stamp for what it last *sent*, and that one is nothing to go by here
-    for precisely this app's reason: its stroke streams T-code through the broker
+    for precisely this app's reason: its motion streams T-code through the broker
     the moment the switch goes on, which would keep the sent stamp fresh against
     a device that is switched off and have the console call it driving. (Fun
     Time can afford to count that stamp — the genau it runs drives only a device
@@ -68,7 +68,7 @@ def device_on(*, now: float | None = None, rx_file=None,
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:
-    """A T-code move for the L0 stroke axis: ``L0<0000-9999>I<ms>``.
+    """A T-code move for the L0 motion axis: ``L0<0000-9999>I<ms>``.
 
     ``pos_0_100`` is a funscript position (0 floor, 100 top); ``interval_ms`` is
     how long the device takes to get there, so streaming each action with the
@@ -81,7 +81,7 @@ def format_position(pos_0_100: float, interval_ms: float) -> str:
 class Osr2Broker:
     """A thin UDP client to the broker's T-code listener, plus genau coordination.
 
-    Holds one datagram socket for streaming stroke positions, and knows how to pause
+    Holds one datagram socket for streaming motion positions, and knows how to pause
     and restore genau auto-mode via the broker's shared enabled-flag file so a driving
     video fully owns the device. ``sock_factory`` is injectable for tests.
     """
@@ -99,7 +99,7 @@ class Osr2Broker:
         self._send_error_logged = False
 
     def send_position(self, pos_0_100: float, interval_ms: float) -> None:
-        """Move the stroke axis to ``pos_0_100`` over ``interval_ms``."""
+        """Move the motion axis to ``pos_0_100`` over ``interval_ms``."""
         self._send(format_position(pos_0_100, interval_ms))
 
     def park(self) -> None:

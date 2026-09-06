@@ -85,7 +85,7 @@ def test_the_output_folder_is_resolved_when_the_sweep_runs(tmp_path, monkeypatch
 
 
 def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
-    """The same defect on the same line: the stroke rate was bound at import."""
+    """The same defect on the same line: the motion rate was bound at import."""
     from origenerator import config, funscript_backfill
 
     monkeypatch.setattr(config, "MOTION_DEFAULT_HZ", 2.5)

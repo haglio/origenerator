@@ -253,7 +253,7 @@ class WorkflowTemplate(ABC):
         """The funscript actions this generation's motion was AUTHORED to, or
         ``None`` when the workflow doesn't condition motion on a track.
 
-        A track-conditioned workflow (ATI) knows its stroke exactly, so its
+        A track-conditioned workflow (ATI) knows its motion exactly, so its
         funscript comes from here — completion prefers it over the synthesized
         metronome, which remains the fallback for pixels-only workflows."""
         return None

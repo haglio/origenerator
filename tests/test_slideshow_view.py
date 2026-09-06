@@ -291,7 +291,7 @@ def test_culling_releases_the_lock(qtbot):
 
 
 class _FakeMotion:
-    """Enough of the stroke driver for the shared keys and the drive panel."""
+    """Enough of the motion driver for the shared keys and the drive panel."""
 
     def __init__(self):
         self.active = False
@@ -311,15 +311,15 @@ class _FakeMotion:
 
 
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
-    # Space belongs to the app-global OSR2 stroke everywhere; locking the
-    # slideshow is Down. The standing caption comes with the wired stroke.
-    stroke = _FakeMotion()
+    # Space belongs to the app-global OSR2 motion everywhere; locking the
+    # slideshow is Down. The standing caption comes with the wired motion.
+    motion = _FakeMotion()
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
-                         stroke=stroke)
+                         motion=motion)
     qtbot.addWidget(view)
     assert view._motion_panel is not None  # the drive panel rides along
     _press(view, Qt.Key.Key_Space)
-    assert ("toggle", True) in stroke.calls
+    assert ("toggle", True) in motion.calls
     assert not view._playlist.locked
 
 

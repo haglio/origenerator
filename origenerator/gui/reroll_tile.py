@@ -176,10 +176,11 @@ class RerollTile(QFrame):
         elapsed = None if started is None else max(0.0, time.time() - started)
         progress = self._job.last_progress
         self._bar.show_progress(
-            # A tile's width takes the compact reading: how far along, and how
-            # much longer. The strip's queue has the room for the elapsed count.
+            # A tile's width takes the compact reading: what pass is being
+            # taken, how far along, and how much longer. The strip's queue has
+            # the room for the elapsed count too.
             progress_status_label(elapsed, progress, self._typical_seconds,
-                                  compact=True),
+                                  step=self._job.last_pass_name, compact=True),
             progress if self._job.state == "running" else None,
             (self._job.last_pass_progress
              if self._job.state == "running" else None),

@@ -214,6 +214,28 @@ def test_progress_status_label_leads_with_how_far_along_it_is():
     assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
 
 
+def test_the_line_leads_with_the_step_being_taken():
+    # What the user asked for: the band along the bar's foot restarts once per
+    # pass, and nothing on screen said which pass that was. It leads because it
+    # is the part that says what is happening — and because a caption too wide
+    # for its bar elides from the right, so the name has to be leftmost to
+    # survive on a tile.
+    assert progress_status_label(83.0, (10, 20), 724.0, step="High noise") ==         "High noise · 50% · 1:23 elapsed · ~6:02 left"
+    assert progress_status_label(83.0, (10, 20), 724.0, step="Audio", compact=True) ==         "Audio · 50% · ~6:02 left"
+
+
+def test_a_run_with_no_step_to_name_reads_as_it_did():
+    # A single-pass job has no band and so no name; its line is unchanged.
+    assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
+
+
+def test_the_step_is_what_a_run_past_its_prior_has_left_to_say():
+    # The two halves together: the countdown falls silent where nothing has
+    # measured how much longer, and the step name is what fills that gap rather
+    # than the "finishing" that used to sit there for minutes at a time.
+    assert progress_status_label(900.0, (1, 20), 724.0, step="High noise") ==         "High noise · 5% · 15:00 elapsed"
+
+
 def test_progress_status_label_drops_whichever_half_is_unknown():
     assert progress_status_label(83.0, None, None) == "1:23 elapsed"   # no steps reported
     assert progress_status_label(None, (10, 20), 724.0) == "50%"       # not started yet

@@ -165,6 +165,39 @@ def _step_seconds(class_type: str, inputs: dict, frames: int) -> float:
     return _IMAGE_STEP_SECONDS
 
 
+def _pass_name(class_type: str, inputs: dict) -> str:
+    """What to call this sampler's pass on the bar that reports it.
+
+    Read off what the node is set to do rather than declared per workflow,
+    because the node ids a workflow hands its own helpers are the only place
+    those names could be kept in step — and a second table of them is a table
+    that goes stale. A WAN pair splits one schedule between its two experts and
+    is named the way the app's own form names them ("Model (High)", "Shift
+    (High)"); a still's second sampler is the enhance tail, which is the one that
+    denoises partway rather than from scratch.
+    """
+    if class_type == "HunyuanFoleySampler":
+        return "Audio"
+    if class_type == "DetailerForEach":
+        return "Detail fix"
+    if class_type == "KSamplerAdvanced":
+        return "High noise" if inputs.get("add_noise") == "enable" else "Low noise"
+    return "Enhance" if _literal(inputs.get("denoise"), 1.0) < 1.0 else "Render"
+
+
+def pass_names(payload: dict) -> dict[str, str]:
+    """What each of a payload's sampler passes is called, by node id.
+
+    The band along a bar's foot restarts once per pass, and until these it said
+    only that something had started over. Named, it says which of a run's several
+    jobs is being done — which is what the caption reads out (see
+    :func:`origenerator.timing.progress_status_label`).
+    """
+    return {str(node_id): _pass_name(node["class_type"], node.get("inputs", {}))
+            for node_id, node in payload.items()
+            if node.get("class_type") in _SAMPLER_STEPS}
+
+
 def sampler_costs(payload: dict) -> dict[str, tuple[int, float]]:
     """Every progress-reporting sampler in ``payload``, by node id.
 
@@ -232,13 +265,16 @@ class ProgressTracker:
             expected_sampling_seconds(payload),
             expected_pass_count(payload),
             {node_id: cost for node_id, (_, cost) in sampler_costs(payload).items()},
+            pass_names(payload),
         )
 
     def __init__(self, total_seconds: float, passes: int = 1,
-                 step_seconds: dict[str, float] | None = None):
+                 step_seconds: dict[str, float] | None = None,
+                 names: dict[str, str] | None = None):
         self._total = float(total_seconds)
         self._passes = max(1, passes)   # sampler passes the payload budgets for
         self._step_seconds = dict(step_seconds or {})  # node id -> a step's cost
+        self._names = dict(names or {})  # node id -> what to call its pass
         # What a pass nobody budgeted is charged per step: the cheapest thing this
         # job does. Such a pass is a node this app has never sized, and the two
         # ways of being wrong about one are not equal — charging it too little
@@ -326,6 +362,18 @@ class ProgressTracker:
         if self._passes <= 1 and self._pass_index <= 1:
             return None
         return min(self._last_value or 0, self._stage_max), self._stage_max
+
+    def current_pass_name(self) -> str:
+        """What the pass running right now is called — ``""`` where nothing is.
+
+        Tied to :meth:`current_pass`, and empty wherever that is ``None``: a run
+        of one pass has no band to name, and a name for a step the bar isn't
+        showing would be a label for something the user cannot see. Empty too for
+        a tracker built without names, and for a pass this app has no name for.
+        """
+        if self.current_pass() is None:
+            return ""
+        return self._names.get(self._node, "")
 
     def update(self, value: int, max_val: int,
                node: str | None = None) -> tuple[int, int]:

@@ -21,7 +21,7 @@ one thing everywhere: the row went through the upscale + low-denoise re-sample
 tail — inline (its workflow's ``enhance`` toggle) or folded in from a standalone
 run. ``enhance_detail_fixes`` adds a second stage past that tail, re-sampling
 one named part at a time — the faces, the hands, the teeth — each at its own
-denoise, one the whole-frame pass could never survive; it is one of the knobs a
+denoise, one the whole-frame pass could never survive; it is one of the settings a
 level records, so an image can carry both a plain enhancement and a detail-fixed
 one and show which is which.
 """
@@ -37,7 +37,7 @@ from origenerator.gallery.enhance_settings import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
     describe_enhance_params,
-    level_knobs,
+    level_settings,
 )
 from origenerator.gallery.output import (
     media_type_of_row,
@@ -68,9 +68,9 @@ class EnhanceLevel:
     """One version of an image: its file, and how it came to be.
 
     ``index`` counts enhancements from the original (0), so the labels read
-    "Original", "Enhance 1", "Enhance 2"… ``params`` are the knobs that produced
+    "Original", "Enhance 1", "Enhance 2"… ``params`` are the settings that produced
     it — empty for the original, and for any level folded in before the settings
-    were recorded — and ``settings`` is those knobs as a line of text. Both:
+    were recorded — and ``settings`` is those settings as a line of text. Both:
     the string captions the tile, the dict is what a tile dragged onto the
     Enhance subpanel hands over.
     """
@@ -126,7 +126,7 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
 
     Each level names the settings that made it: a folded enhance recorded its
     own (``enhance_history``), an inline one is described by the row's params,
-    which are the very knobs its tail ran at. That is what makes a level worth
+    which are the very settings its tail ran at. That is what makes a level worth
     dragging onto the Enhance panel even when it stands alone.
 
     A third shape appears once levels can be deleted (:func:`remove_enhance_levels`):
@@ -145,14 +145,14 @@ def enhance_levels(row: dict) -> list[EnhanceLevel]:
     }
     # A row's own params describe its enhancement only when the tail ran inline;
     # a folded standalone enhance ran at its own settings, which live in the
-    # history, and the source row's knobs would be a plausible-looking lie.
+    # history, and the source row's settings would be a plausible-looking lie.
     inline = ({} if row.get("original_files")
-              else level_knobs(parse_params(row.get("params_json"))))
+              else level_settings(parse_params(row.get("params_json"))))
 
     def level(index: int, f: dict) -> EnhanceLevel:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceLevel(index, f"Enhance {index}", f, level_knobs(params))
+        return EnhanceLevel(index, f"Enhance {index}", f, level_settings(params))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):
@@ -329,14 +329,14 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
     return ids, names
 
 
-def _knobs(params: dict) -> dict:
-    """One enhancement's identity as every recorded knob, defaults filling the
+def _settings(params: dict) -> dict:
+    """One enhancement's identity as every recorded setting, defaults filling the
     gaps — the parts its detail pass redrew included, since a targeted fix and
     a plain enhancement differ by nothing else."""
     defaults = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params()
     base = {k: defaults[k] for k in ENHANCE_SETTING_KEYS if k in defaults}
     base["checkpoint"] = MATCH_SOURCE_MODEL
-    base.update(level_knobs(params))
+    base.update(level_settings(params))
     return base
 
 
@@ -350,11 +350,11 @@ def level_matching_settings(row: dict, settings: EnhanceSettings | None) -> int 
     comparison — otherwise "the same settings" would read as different for every
     image the default is left on.
 
-    Both sides are read as the FULL set of knobs, a level's missing ones filled
+    Both sides are read as the FULL set of settings, a level's missing ones filled
     from the workflow defaults: :data:`ENHANCE_SETTING_KEYS` grows over time, and
-    a level recorded before a knob existed was made with that knob at its
+    a level recorded before a setting existed was made with that setting at its
     default — so it still matches settings that leave it there, and turning the
-    new knob on correctly reads as a different enhancement.
+    new setting on correctly reads as a different enhancement.
 
     What tells the ``+ Enhance`` card it would only be making a duplicate.
     """
@@ -368,9 +368,9 @@ def level_matching_params(row: dict, wanted: dict | None) -> int | None:
     directly (a spoken targeted fix) rather than from folder settings."""
     if wanted is None:
         return None
-    knobs = _knobs(wanted)
+    settings = _settings(wanted)
     for position, level in enumerate(enhance_levels(row)):
-        if level.params and _knobs(level.params) == knobs:
+        if level.params and _settings(level.params) == settings:
             return position
     return None
 
@@ -464,7 +464,7 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     workflows record one), so an enhanced image stays in its own style.
 
     ``settings`` is the Enhance subpanel's current, app-wide configuration: the
-    knobs it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the workflow
+    settings it names (:data:`ENHANCE_SETTING_KEYS`) are laid over the workflow
     defaults, so Enhance All, a single enhance, and an auto-enhance of a newly
     generated image all run at whatever the panel says. Omitted, the workflow's
     own defaults apply.
@@ -500,7 +500,7 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     """The ``image_enhance`` params for a spoken "fix <part>": the row's latest
     enhancement done again, with a detail pass aimed at each part named.
 
-    The base is the newest level's own recorded knobs — the ask is "the same
+    The base is the newest level's own recorded settings — the ask is "the same
     enhancement, plus the fix", so it must not quietly change the scale or
     model the image was finished at. An image never enhanced runs at
     ``settings`` the way any first enhance would.
@@ -589,14 +589,14 @@ def is_enhance_product_row(row: dict) -> bool:
 
 
 def enhance_level_params(row: dict) -> dict:
-    """The knobs one enhancement ran at, as the keys a level records.
+    """The settings one enhancement ran at, as the keys a level records.
 
     The row's own params first — a standalone ``image_enhance`` row names every
     one of them — then the stored graph for whatever they leave out, which is
     everything but the sampler numbers on a row the import scan reconstructed.
     """
     params = parse_params(row.get("params_json"))
-    level = level_knobs(params)
+    level = level_settings(params)
     for key, value in graph_level_params(row, ENHANCE_SETTING_KEYS).items():
         level.setdefault(key, value)
     return level

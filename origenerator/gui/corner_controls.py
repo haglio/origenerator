@@ -67,7 +67,7 @@ def enhance_state(row: dict, settings) -> str | None:
     enhancement is not finished with the enhancer, it is finished with *these
     settings*. So the corner says "you have this one" only while the panel would
     reproduce what is already there, and goes back to offering another the moment
-    a knob moves — which is the same question the version list's ``+ Enhance``
+    a setting moves — which is the same question the version list's ``+ Enhance``
     card and the button bank's Enhance both answer
     (:func:`~origenerator.gallery.enhance.level_matching_settings`).
     """
@@ -171,7 +171,7 @@ class CornerControls(QObject):
 
     def set_enhance(self, enhance: str | None):
         """Follow the enhance corner's reading changing under the item — which a
-        turn of the Enhance panel's knobs does to every picture on screen at
+        turn of the Enhance panel's settings does to every picture on screen at
         once, without any of them being touched."""
         if enhance == self._enhance:
             return
@@ -222,5 +222,5 @@ class CornerControls(QObject):
         # The solid plus is a finished statement rather than an offer: this image
         # already holds the very version the panel describes, so pressing would
         # spend a generation arriving at the picture that is already there. Turn
-        # any knob and it becomes an offer again.
+        # any setting and it becomes an offer again.
         self._enhance_button.setEnabled(self._enhance != icons.ENHANCE_HELD)

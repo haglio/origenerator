@@ -594,7 +594,7 @@ def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
     assert save["inputs"]["images"] == [_node_id(payload, "VAEDecode"), 0]
 
 
-def test_the_detail_passs_knob_is_defined_with_the_range_its_boxes_take():
+def test_the_detail_passs_setting_is_defined_with_the_range_its_boxes_take():
     # The Enhance panel builds its per-part spin boxes from this, so the range
     # lives with the workflow rather than being retyped beside it.
     defs = {pd.key: pd
@@ -668,8 +668,8 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
         ) == [{"filename": "x.png"}]
 
 
-def test_sdxl_workflows_expose_the_enhance_knobs(monkeypatch):
-    # The enhance tail's look-affecting knobs are ordinary form fields: the
+def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
+    # The enhance tail's look-affecting settings are ordinary form fields: the
     # upscale model picked from the installed upscale_models files like every
     # other model picker, and the scale/steps/denoise numerics — not hidden
     # defaults the form would silently reset.
@@ -1909,7 +1909,7 @@ def test_flux_t2i_upscaled_default_params_has_required_keys():
     }
     assert required.issubset(params.keys())
     # Flux is a guidance-distilled model: it samples at cfg 1.0 with an empty
-    # negative, so the real "prompt strength" knob is FluxGuidance, not cfg.
+    # negative, so the real "prompt strength" setting is FluxGuidance, not cfg.
     assert params["guidance"] == 4.5
     assert params["unet"].endswith(".gguf")
 

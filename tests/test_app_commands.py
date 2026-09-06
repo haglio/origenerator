@@ -56,7 +56,7 @@ def test_the_words_fun_times_players_answer_to_mean_the_same_here():
     assert match_app_command("back") is AppCommand.BACK
 
 
-def test_the_stroke_knobs_keep_fun_times_phrases():
+def test_the_stroke_dials_keep_fun_times_phrases():
     assert match_app_command("speed up") is AppCommand.SPEED_UP
     assert match_app_command("slow down") is AppCommand.SPEED_DOWN
     assert match_app_command("amp down") is AppCommand.AMP_DOWN
@@ -114,7 +114,7 @@ def test_the_nudges_still_outrank_the_grid_they_sit_beside():
 
 
 def test_a_two_word_command_is_not_shadowed_by_its_first_word():
-    # "next" walks the playlist and "next shape" turns a knob; the whole
+    # "next" walks the playlist and "next shape" turns a dial; the whole
     # utterance decides, so the shorter one never eats the longer.
     assert match_app_command("next") is AppCommand.FORWARD
     assert match_app_command("next shape") is AppCommand.NEXT_SHAPE

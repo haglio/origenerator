@@ -35,7 +35,7 @@ _.playing  # noqa  # origenerator/gui/osr2_stroke_driver.py:146, origenerator/gu
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `gallery_view._VOICE_STROKE` maps AppCommand.CRUISE_ON/CRUISE_OFF to the string
-# "set_cruise", which `_turn_stroke_knob` hands to getattr.
+# "set_cruise", which `_turn_stroke_dial` hands to getattr.
 _.set_cruise  # noqa  # origenerator/gui/osr2_stroke_driver.py:257
 
 # --- sqlite3 reads this off the connection it was set on ---

@@ -24,7 +24,7 @@ target. A fullscreen show has the floor while one is up and the gallery has it
 otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
 slide over a show and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
-OSR2) and the stroke's own knobs belong to no surface and answer from either.
+OSR2) and the stroke's own dials belong to no surface and answer from either.
 
 One word is deliberately missing. The Requests shelf answers to the plural
 "requests" and never to the singular, because "request" is what opens a spoken
@@ -87,7 +87,7 @@ class AppCommand(Enum):
     FILTER_ENHANCED = "filter_enhanced"
     FILTER_OFF = "filter_off"
 
-    # The OSR2 stroke's knobs, in Fun Time's own words. The driver is app-wide,
+    # The OSR2 stroke's dials, in Fun Time's own words. The driver is app-wide,
     # so these answer from the gallery and from a show alike.
     SPEED_UP = "speed_up"
     SPEED_DOWN = "speed_down"
@@ -211,7 +211,7 @@ _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "upscales", "upscales only", "filter upscales", "upscaled only")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
-# The stroke's knobs, said the way Fun Time says them, so the muscle memory
+# The stroke's dials, said the way Fun Time says them, so the muscle memory
 # carries between the two apps the way the keys already do.
 _say(AppCommand.SPEED_UP, "speed up")
 _say(AppCommand.SPEED_DOWN, "speed down", "slow down")

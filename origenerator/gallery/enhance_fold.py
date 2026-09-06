@@ -37,7 +37,7 @@ from origenerator.gallery.enhance import (
     enhance_target_id,
     is_enhance_product_row,
 )
-from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_knobs
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_settings
 from origenerator.gallery.output import (
     media_type_of_row,
     parse_file_list,
@@ -50,14 +50,14 @@ logger = logging.getLogger(__name__)
 def _history_entries(files: list[dict], params: dict,
                      run_id: int | None) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
-    name, the knobs that made it — so a level can name its own settings even
+    name, the settings that made it — so a level can name its own settings even
     after the transient job row is gone — and ``run_id``, the id that row had.
 
     The id is kept for the same reason: the row about to be deleted is what said
     where this enhancement falls in the library's order, and the image it
     upgraded sorts on the shelf by the newest one it has received
     (:func:`enhancement_recency`)."""
-    settings = level_knobs(params)
+    settings = level_settings(params)
     return [
         {"filename": f.get("filename"), "params": settings, "run_id": run_id}
         for f in files if f.get("filename")

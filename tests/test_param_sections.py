@@ -49,7 +49,7 @@ def test_unknown_key_falls_into_the_other_section_sorted_last():
 
 
 def test_key_rank_orders_across_and_within_sections():
-    # Across sections: a prompt precedes a seed precedes a sampling knob.
+    # Across sections: a prompt precedes a seed precedes a sampling setting.
     assert ps.key_rank("positive_prompt") < ps.key_rank("seed")
     assert ps.key_rank("seed") < ps.key_rank("steps")
     assert ps.key_rank("steps") < ps.key_rank("width")

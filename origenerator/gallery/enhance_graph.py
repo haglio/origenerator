@@ -7,7 +7,7 @@ file the level with a blank settings line and leave the Enhance panel unable to
 tell it apart from a level it has not made yet. The graph that ran is exact about
 all of it, and it is stored on the row.
 
-Which of the knobs it finds are wanted is the caller's business, so the keys to
+Which of the settings it finds are wanted is the caller's business, so the keys to
 keep come in as an argument: this reads a graph and says what is in it. That is
 workflow knowledge rather than gallery knowledge — its home is beside the
 workflows that write these graphs, which is the first half of the audit's
@@ -25,7 +25,7 @@ from origenerator.workflows.detail_parts import detector_part_label
 
 # What each node type of the enhance tail says about the run, given its inputs.
 # One entry per node the tail lays down; anything else in the graph is scenery.
-_KNOBS_BY_NODE = {
+_SETTINGS_BY_NODE = {
     "CheckpointLoaderSimple": lambda inputs: {"checkpoint": inputs.get("ckpt_name")},
     "UpscaleModelLoader": lambda inputs: {"upscale_model": inputs.get("model_name")},
     # ImageScaleBy holds the fraction of the upscale model's own 4x output the
@@ -42,7 +42,7 @@ _DETAIL_PASS = "DetailerForEach"
 
 
 def graph_level_params(row: dict, keys) -> dict:
-    """The enhance knobs a row's stored ComfyUI graph gives up, kept to *keys*.
+    """The enhance settings a row's stored ComfyUI graph gives up, kept to *keys*.
 
     The upscale model by name, the scale as the fraction of that model's own 4x
     output the result was taken back down to, the sampler's numbers, and the
@@ -51,7 +51,7 @@ def graph_level_params(row: dict, keys) -> dict:
     graph = _graph_of(row)
     found = {}
     for _node_id, inputs, node_type in _nodes_of(graph):
-        found.update(_KNOBS_BY_NODE.get(node_type, lambda _inputs: {})(inputs))
+        found.update(_SETTINGS_BY_NODE.get(node_type, lambda _inputs: {})(inputs))
     fixes = _detail_fixes(graph)
     if fixes:
         found["enhance_detail_fixes"] = fixes

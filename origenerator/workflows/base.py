@@ -45,7 +45,7 @@ FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
 # The interpolation model that fills in the frames between the generated ones
 # (see :meth:`WorkflowTemplate.interpolation_nodes`). RIFE 4.7 is the pack's own
-# recommendation and its default; a knob here would be one more question whose
+# recommendation and its default; a setting here would be one more question whose
 # answer is a guess, so it is a constant like the detector settings below.
 RIFE_CHECKPOINT = "rife47.pth"
 # How many source frames the interpolator processes before clearing the CUDA
@@ -60,7 +60,7 @@ UPSCALE_MODEL_FACTOR = 4.0
 
 # The detail pass's fixed shape (see :meth:`WorkflowTemplate.detail_fix_nodes`).
 # All of these are the detector/detailer nodes' own defaults, kept here as named
-# constants rather than as knobs: the pass already costs the user a checkbox and
+# constants rather than as settings: the pass already costs the user a checkbox and
 # a denoise, and every one of these is a value their answer would be a guess at.
 _DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
 _DETECTOR_DILATION = 10       # pixels grown around each box, so edges are inside
@@ -238,7 +238,7 @@ class WorkflowTemplate(ABC):
 
         Derived from the ``enhance``/``enhance_*`` naming (plus
         :attr:`extra_enhance_keys` for the tail params that convention misses),
-        so a workflow growing another enhance knob can't silently start
+        so a workflow growing another enhance setting can't silently start
         splitting folders by it.
         """
         named = tuple(pd.key for pd in self.param_definitions()

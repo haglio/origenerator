@@ -9,7 +9,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     """Flux text-to-image on a GGUF-quantized UNET, with a RealESRGAN upscale.
 
     Flux is guidance-distilled: it samples at cfg 1.0 with an empty negative, so
-    the meaningful "prompt strength" knob is ``FluxGuidance``, not cfg. The GGUF
+    the meaningful "prompt strength" setting is ``FluxGuidance``, not cfg. The GGUF
     diffusion model (loaded by ``UnetLoaderGGUF``) is what a user swaps between
     — three different Flux checkpoints in the imports this reproduces — so it's
     the model the gallery groups by. The decoded image is passed through an

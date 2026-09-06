@@ -404,7 +404,7 @@ _VOICE_SHELVES = {
     AppCommand.TRASH: _TRASH_KEY,
 }
 
-# The stroke knob each spoken word turns, as (the driver's method, its argument
+# The stroke dial each spoken word turns, as (the driver's method, its argument
 # or ``None`` for a method that takes none) — the very moves the keys make (see
 # :mod:`origenerator.gui.stroke_hud`), said out loud instead of pressed.
 _VOICE_STROKE = {
@@ -1437,7 +1437,7 @@ class GalleryView(QWidget):
         self._enhance_panel.show_settings(self._enhance_settings)
         bottom.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
         # A hairline where the browsing stops and these two panels start. Without
-        # it the Enhance knobs read as the bottom of whatever folder is on screen
+        # it the Enhance settings read as the bottom of whatever folder is on screen
         # rather than as their own thing — which they are: app-wide settings that
         # don't belong to the folder they happen to be sitting under.
         browser_box.addWidget(_bottom_divider())
@@ -3851,7 +3851,7 @@ class GalleryView(QWidget):
         picture that is already there. Judged against what the run would *use*
         (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
         source-matched model resolves to this image's own checkpoint before the
-        comparison rather than the panel's raw value. Change any knob and the
+        comparison rather than the panel's raw value. Change any setting and the
         button comes back, which is what makes it read as "you have this one"
         rather than as "no".
         """
@@ -3890,7 +3890,7 @@ class GalleryView(QWidget):
         The panel is app-wide and follows you rather than the folder, which is
         why it shows on the shelves as readily as on a settings folder — but a
         video is the one place with no enhancement to configure at all, and live
-        knobs there advertise an action that isn't on offer. A mixed folder
+        settings there advertise an action that isn't on offer. A mixed folder
         keeps them: the images in it are still enhanceable.
         """
         self._enhance_panel.set_applicable(
@@ -3989,7 +3989,7 @@ class GalleryView(QWidget):
         self._enhance_settings = settings
         self._push_enhance_settings()
         # Whether a picked image already holds this exact version is what the
-        # button is answering, so turning a knob is what brings it back.
+        # button is answering, so turning a setting is what brings it back.
         self._sync_enhance_button()
         # Every picture on screen is answering it too, in its own corner.
         self._browser.refresh_enhance_corners()
@@ -4237,14 +4237,14 @@ class GalleryView(QWidget):
             else f"🎤 slideshow at {seconds}s"
         )
 
-    # --- the bare vocabulary: a shelf, a switch, a knob, or the slide --------
+    # --- the bare vocabulary: a shelf, a switch, a dial, or the slide --------
 
     def _run_app_command(self, command: AppCommand, side: str | None = None):
         """One bare spoken word.
 
         Four kinds, and which it is decides where it lands: a shelf name stands
         the tree in that shelf, a switch word flips one of the app-wide
-        switches, a knob word turns the stroke — and everything else is about
+        switches, a dial word turns the stroke — and everything else is about
         whatever surface is in front of the speaker, which is the fullscreen
         show while one is up and the gallery otherwise.
         """
@@ -4255,7 +4255,7 @@ class GalleryView(QWidget):
         elif command in _VOICE_SWITCHES:
             self._flip_switch(command)
         elif command in _VOICE_STROKE:
-            self._turn_stroke_knob(command)
+            self._turn_stroke_dial(command)
         elif self._slideshow is not None and command in _ABOUT_THE_SLIDE:
             self._run_on_show(self._slideshow, command)
         else:
@@ -4338,11 +4338,11 @@ class GalleryView(QWidget):
         else:
             show.note_voice_command("🎤 nothing here is enhanced")
 
-    def _turn_stroke_knob(self, command: AppCommand):
-        """Turn one of the stroke's knobs — the move its key makes.
+    def _turn_stroke_dial(self, command: AppCommand):
+        """Turn one of the stroke's dials — the move its key makes.
 
         The driver is app-wide, so this answers from the gallery and from a show
-        alike, and the knobs read the same whether or not the device is running:
+        alike, and the dials read the same whether or not the device is running:
         a stroke can be set up before it is started, exactly as the panel allows.
         """
         method, argument = _VOICE_STROKE[command]
@@ -4628,7 +4628,7 @@ class GalleryView(QWidget):
         Only an image that has received no enhancement gets one, the same gate a
         fullscreen hold's Down uses — spoken over a show, this is a gesture made
         with no view of the Enhance panel, and an image already carrying an
-        enhancement someone chose must not be re-derived at whatever the knobs
+        enhancement someone chose must not be re-derived at whatever the settings
         happen to say now. Re-enhancing stays a deliberate act made in front of
         the settings it will use (the thumbnail menu, the ``+ Enhance`` card).
         """

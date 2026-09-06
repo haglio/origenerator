@@ -53,5 +53,5 @@ def test_help_reads_as_a_sentence_not_a_restatement_of_the_label():
         assert text[0].isupper(), f"{key} help should start as a sentence"
 
 
-def test_the_knobs_the_enhance_panel_shows_are_all_explained():
+def test_the_settings_the_enhance_panel_shows_are_all_explained():
     assert all(param_help(key) for key in ENHANCE_SETTING_KEYS)

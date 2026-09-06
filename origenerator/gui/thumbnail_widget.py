@@ -189,7 +189,7 @@ class ThumbnailWidget(QWidget):
 
     def set_enhance(self, enhance: str | None):
         """Re-read the enhance corner without rebuilding the tile — what a turn of
-        the Enhance panel's knobs does to every picture on screen at once."""
+        the Enhance panel's settings does to every picture on screen at once."""
         if enhance == self._enhance:
             return
         self._enhance = enhance

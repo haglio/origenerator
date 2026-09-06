@@ -408,7 +408,7 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
 
 def test_a_rebuilt_level_keeps_the_settings_that_made_it(tmp_path):
     # The row's own params name the sampler numbers generically and the upscale
-    # not at all, so the level reads its knobs off the graph that ran: the scale
+    # not at all, so the level reads its settings off the graph that ran: the scale
     # is what the 4x model's output was taken back down to, and the detail pass
     # is there iff its detector nodes are.
     db = Database(tmp_path / "t.db")

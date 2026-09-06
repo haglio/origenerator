@@ -3147,14 +3147,14 @@ def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
     assert not view._enhance_panel.isEnabled()
     assert "no video enhancer" in view._enhance_panel.toolTip()
 
-    _select_first_leaf(view)   # back on images, and the knobs come back
+    _select_first_leaf(view)   # back on images, and the settings come back
     assert view._enhance_panel.isEnabled()
     assert view._enhance_panel.toolTip() == ""
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
     # Pressing it would spend a generation arriving at the picture already
-    # sitting in the version list. Turning any knob makes it a different
+    # sitting in the version list. Turning any setting makes it a different
     # enhancement, and the button comes back — which is what tells the two
     # reasons apart: "you have this one" rather than "not this image".
     db = _enhanceable_db(tmp_path, count=1)
@@ -3272,9 +3272,9 @@ def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
     assert view._browser._thumb_widgets["v1"].enhance_state() is None
 
 
-def test_the_enhance_corner_offers_another_the_moment_a_knob_moves(qtbot, tmp_path):
+def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp_path):
     # An image holding the very version the panel describes has nothing to gain
-    # from a press, so its plus is the solid yellow badge alone. Turn a knob and
+    # from a press, so its plus is the solid yellow badge alone. Turn a setting and
     # what it holds is one enhancement short of what the panel now describes, so
     # the plus goes back to offering — with the one it has as a shadow behind it.
     db = _enhanceable_db(tmp_path, count=1)
@@ -9732,7 +9732,7 @@ def test_the_hud_holds_the_left_of_the_bottom_row_and_enhance_the_right(qtbot, t
 
 
 def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp_path):
-    # Without it the Enhance knobs read as the bottom of whatever folder is on
+    # Without it the Enhance settings read as the bottom of whatever folder is on
     # screen, rather than as the app-wide settings they are.
     from PyQt6.QtWidgets import QFrame
 
@@ -11891,7 +11891,7 @@ def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_pa
 
 def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
     # A hold is made with no view of the Enhance panel, so an image that already
-    # carries an enhancement must not be re-derived at whatever the knobs happen
+    # carries an enhancement must not be re-derived at whatever the settings happen
     # to say now — however far those settings have moved since. Re-enhancing is
     # the thumbnail menu's job, pressed while looking at the settings it uses.
     db = _enhanceable_db(tmp_path, count=1)
@@ -12844,7 +12844,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
 def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
     # Said over a show, this is a gesture made with no view of the Enhance panel
     # — the same reason a hold's Down leaves one alone — so it says so rather
-    # than re-deriving the picture at whatever the knobs happen to read now.
+    # than re-deriving the picture at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -13203,16 +13203,16 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
     assert not view._voice.commands_on
 
 
-def test_a_spoken_knob_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
+def test_a_spoken_dial_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    knobs = view._osr2_stroke.state.state
-    amplitude, center = knobs.amplitude, knobs.center
+    dials = view._osr2_stroke.state.state
+    amplitude, center = dials.amplitude, dials.center
 
     view._voice.speak("amp down")   # travel opens at its widest, so down from there
     view._voice.speak("center up")
 
-    assert knobs.amplitude == amplitude - 10
-    assert knobs.center == center + 5
+    assert dials.amplitude == amplitude - 10
+    assert dials.center == center + 5
     # Answered with what the device now reads, which is the panel's own line.
     assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
 
@@ -13221,16 +13221,16 @@ def test_a_spoken_number_puts_a_dial_where_it_says(qtbot, tmp_path):
     # The nudges walk a dial five or ten at a time, which never arrives from the
     # far end; the number said outright is what Fun Time answers with too.
     view = _listening(qtbot, tmp_path)
-    knobs = view._osr2_stroke.state.state
+    dials = view._osr2_stroke.state.state
 
     view._voice.speak("amp fifty")
-    assert knobs.amplitude == 50
+    assert dials.amplitude == 50
 
     view._voice.speak("center 30")   # whisper writes the number either way
-    assert knobs.intended_center == 30
+    assert dials.intended_center == 30
 
     view._voice.speak("max speed")
-    assert knobs.speed == stroke_engine.MAX_SPEED
+    assert dials.speed == stroke_engine.MAX_SPEED
     assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
 
 
@@ -13257,7 +13257,7 @@ def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     assert not view._osr2_stroke.state.cruise.active
 
 
-def test_a_stroke_knob_answers_from_a_show_too(qtbot, tmp_path):
+def test_a_stroke_dial_answers_from_a_show_too(qtbot, tmp_path):
     # The driver is app-wide, so its words belong to no surface — but the answer
     # goes where the speaker is looking.
     view = _listening(qtbot, tmp_path)

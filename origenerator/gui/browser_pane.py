@@ -1503,7 +1503,7 @@ class BrowserPane(QObject):
     def refresh_enhance_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.
 
-        Turning a knob in the Enhance subpanel changes what every picture on
+        Turning a setting in the Enhance subpanel changes what every picture on
         screen would get from a press — an image holding the version the panel
         described a moment ago is now one enhancement short of the new one — and
         none of those tiles were touched, so nothing else would tell them.

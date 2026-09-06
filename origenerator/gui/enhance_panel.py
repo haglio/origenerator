@@ -11,7 +11,7 @@ lands. It follows you rather than the folder, so it shows on the shelves
 
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a
-bare switch on the title row rather than a labeled checkbox among the knobs: it
+bare switch on the title row rather than a labeled checkbox among the settings: it
 is the panel's power, not one of its dials.
 
 An enhancement level dragged in from the info pane's version strip is absorbed:
@@ -138,7 +138,7 @@ def _fill(widget, value) -> None:
 
 
 def _enhancer_param_defs() -> dict:
-    """The standalone enhancer's own knob definitions, keyed by param — so this
+    """The standalone enhancer's own setting definitions, keyed by param — so this
     panel's ranges, steps and option lists can't drift from the workflow's.
 
     Read once per panel: ``param_definitions`` scans the model directories, and
@@ -151,7 +151,7 @@ def _enhancer_param_defs() -> dict:
 
 
 class EnhancePanel(QWidget):
-    """The Enhance subpanel: an auto box over the knobs an enhancement runs at.
+    """The Enhance subpanel: an auto box over the settings an enhancement runs at.
 
     ``show_settings`` loads a stored configuration (or the defaults, before
     anything has been set); every edit calls back with the new
@@ -175,7 +175,7 @@ class EnhancePanel(QWidget):
         box.setSpacing(4)
         # The title row, with the auto switch at its far right — a bare switch,
         # the way a panel's power is a switch on its corner rather than a line
-        # of prose among its dials. What it does is in its tooltip; the knobs
+        # of prose among its dials. What it does is in its tooltip; the settings
         # below are what it does it with.
         title_row = QHBoxLayout()
         title_row.setContentsMargins(0, 0, 0, 0)
@@ -361,7 +361,7 @@ class EnhancePanel(QWidget):
 
         Off, every field is disabled *and* muted, so the panel reads as what it
         is where it can't apply — settings for an action that isn't on offer —
-        rather than as live knobs that quietly do nothing. Back on, each field
+        rather than as live settings that quietly do nothing. Back on, each field
         returns to whatever it was in its own right: a part stays grayed if
         ComfyUI still hasn't got a detector that finds it.
         """
@@ -399,7 +399,7 @@ class EnhancePanel(QWidget):
         return list(pd.options or []) if pd is not None else []
 
     def _number(self, key: str, widget):
-        """One numeric knob, ranged from the enhancer's own ParamDef."""
+        """One numeric setting, ranged from the enhancer's own ParamDef."""
         pd = self._defs.get(key)
         if pd is not None:
             widget.setMinimum(pd.min_val if pd.min_val is not None else 0)

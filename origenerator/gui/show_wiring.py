@@ -6,7 +6,7 @@ constructor arguments. Six were callbacks back into the gallery and three were
 the players' HUD's description of the set, and neither group ever travelled
 alone: the six are passed at exactly one place and always all six, and the three
 go together at every caller that passes any of them. Written out one argument at
-a time they read as nine unrelated knobs, and a caller could set the order
+a time they read as nine unrelated settings, and a caller could set the order
 without the loop — which is the pair that has to move together, because a set
 listed in its own order that says it is looping is the HUD making something up.
 

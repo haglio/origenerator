@@ -121,7 +121,7 @@ class Osr2StrokeDriver(QObject):
         self._now = now_source
         self._last_tick = 0.0
         self._glide_until = 0.0  # takeover: intervals ease out until this passes
-        # The knobs are turned on the GUI thread while the clock samples the
+        # The dials are turned on the GUI thread while the clock samples the
         # state on its own, so both go through this.
         self._lock = threading.RLock()
         self._interval_s = interval_ms / 1000.0
@@ -208,7 +208,7 @@ class Osr2StrokeDriver(QObject):
         eased = left / (_HANDOFF_MS / 1000.0)
         return round(_LOOKAHEAD_MS + (_HANDOFF_MS - _LOOKAHEAD_MS) * eased)
 
-    # --- the knobs the keys and the drive panel turn -----------------------
+    # --- the dials the keys and the drive panel turn ------------------------
 
     @property
     def state(self) -> Stroke:
@@ -278,11 +278,11 @@ class Osr2StrokeDriver(QObject):
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the
-        slideshow's standing caption — the knobs read the same either way, so
+        slideshow's standing caption — the dials read the same either way, so
         the stroke can be tuned before it's started."""
         state = self._state.state
-        knobs = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
+        dials = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")
         if self._state.cruise.active:
-            knobs += " · cruise"
-        return f"OSR2 · {knobs}" if self._active else f"OSR2 off · {knobs}"
+            dials += " · cruise"
+        return f"OSR2 · {dials}" if self._active else f"OSR2 off · {dials}"

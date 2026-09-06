@@ -641,7 +641,7 @@ class PreviewWidget(QWidget):
         a file that does not exist yet, and a message is not a picture at all.
 
         Re-armed rather than remembered, because the answers move under the
-        picture — a star toggled from the menu, an enhancement landing, a knob
+        picture — a star toggled from the menu, an enhancement landing, a setting
         turned on the Enhance panel — and the owner is what hears about that.
         """
         self._actions_id = prompt_id

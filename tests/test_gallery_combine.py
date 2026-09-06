@@ -137,6 +137,24 @@ def test_curated_params_lays_the_spec_over_defaults_and_swaps_the_image():
     assert params["shift_high"] == _I2V.default_params()["shift_high"]  # unnamed → default
 
 
+def test_curated_params_moves_a_recipe_pinned_under_a_retired_key():
+    """The overlay is the fourth home for a ParamDef key, and the only one
+    nobody can migrate: it is the user's own file, hand-edited, git-ignored.
+
+    Nothing validates a params key set, so a recipe still pinning the old
+    spelling would silently fall back to the workflow's defaults for those
+    values and write the dead keys into the run it started.
+    """
+    image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
+    spec = {"workflow": "wan22_i2v", "params": {"stroke_hz": 1.5, "stroke_top": 490}}
+
+    params = gallery.curated_params(spec, image, _I2V)
+
+    assert params["motion_hz"] == 1.5
+    assert params["motion_ceiling"] == 490
+    assert "stroke_hz" not in params and "stroke_top" not in params
+
+
 def test_curated_params_rerolls_every_seed():
     # A curated recipe has no exemplar run to reproduce; a pinned seed would
     # render the identical video for the same image every time.

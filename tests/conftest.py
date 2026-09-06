@@ -304,7 +304,7 @@ def _never_take_the_real_device(monkeypatch):
 def _no_dialog_nobody_can_answer(monkeypatch):
     """Fail on a modal the test never arranged to answer, rather than hang on it.
 
-    A message box or input dialog raised in an offscreen run has nobody to click
+    A message dialog or input dialog raised in an offscreen run has nobody to click
     it: it spins a nested event loop that nothing ever ends, so the test stops
     dead and holds the merge gate open until GitHub's six-hour limit, with no
     output naming which test it was. That is worse than the wrong answer in every

@@ -24,7 +24,7 @@ def _wheel():
     )
 
 
-def test_combo_box_ignores_the_wheel(qtbot):
+def test_a_dropdown_ignores_the_wheel(qtbot):
     w = NoWheelComboBox()
     w.addItems(["a", "b", "c"])
     w.setCurrentIndex(1)
@@ -37,7 +37,7 @@ def test_combo_box_ignores_the_wheel(qtbot):
     assert not event.isAccepted()    # ignored → scrolls the form instead of editing
 
 
-def test_spin_box_ignores_the_wheel(qtbot):
+def test_a_spinner_ignores_the_wheel(qtbot):
     w = NoWheelSpinBox()
     w.setRange(0, 100)
     w.setValue(5)
@@ -50,7 +50,7 @@ def test_spin_box_ignores_the_wheel(qtbot):
     assert not event.isAccepted()
 
 
-def test_double_spin_box_ignores_the_wheel(qtbot):
+def test_a_double_spinner_ignores_the_wheel(qtbot):
     w = NoWheelDoubleSpinBox()
     w.setRange(0.0, 10.0)
     w.setValue(2.5)

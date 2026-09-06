@@ -13,7 +13,7 @@ class _RenameEdit(QLineEdit):
 
 
 # The editor is sized to the name it holds, not to the header it sits in: what
-# is being edited is one folder's name, and a box the size of a wrapped
+# is being edited is one folder's name, and a field the size of a wrapped
 # six-level path reads as though the whole path were up for editing.
 _EDIT_SLACK = 40   # room past the current name, so there is somewhere to type
 _EDIT_MIN_WIDTH = 120
@@ -54,7 +54,7 @@ class EditableHeader(QWidget):
         return self._label.text()
 
     def begin_edit(self, value: str):
-        """Open the editor on ``value`` — a box the width of that name, one line
+        """Open the editor on ``value`` — a field the width of that name, one line
         tall, wherever the display text starts."""
         self._edit.setText(value)
         wanted = self._edit.fontMetrics().horizontalAdvance(value) + _EDIT_SLACK
@@ -71,7 +71,7 @@ class EditableHeader(QWidget):
         """One line while editing, the wrapped display text otherwise.
 
         Without this the header keeps the height of the whole wrapped path while
-        the editor is open, leaving the small box adrift in a block of blank
+        the editor is open, leaving the small field adrift in a block of blank
         space the path used to fill.
         """
         if self._editing():

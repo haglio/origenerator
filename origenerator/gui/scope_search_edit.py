@@ -1,8 +1,8 @@
-"""The gallery's search box: a line edit whose placeholder names what it covers.
+"""The gallery's search field: a line edit whose placeholder names what it covers.
 
 The tree's selection is the search's scope, and the thing that says which folder
 that is, is its whole path — a folder is named by a short code, and a code on its
-own says nothing about which branch it sits in. So the box holds the full
+own says nothing about which branch it sits in. So the field holds the full
 breadcrumb and elides it from the left when the pane is too narrow for all of it:
 the tail is the folder itself and its nearest parents, which is the half that
 answers "search where?".
@@ -22,8 +22,8 @@ _CHROME = 12
 
 
 class ScopeSearchEdit(QLineEdit):
-    """A search box that says, in its placeholder, which folder a query would
-    search — the whole path, elided from the left to whatever the box is wide."""
+    """A search field that says, in its placeholder, which folder a query would
+    search — the whole path, elided from the left to whatever the field is wide."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

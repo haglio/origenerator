@@ -5,20 +5,20 @@ lands in — it is a finish applied to an image afterward — so it is deliberat
 not on the Generate form beside Seed, Dimensions and Output. It lives here
 instead, beside Genau's console, and it is app-wide: whatever is set here is
 what Enhance All runs with, what a single image's Enhance action runs with, and
-— with the box ticked — what every image the app newly generates receives as it
+— with the tick on — what every image the app newly generates receives as it
 lands. It follows you rather than the folder, so it shows on the shelves
 (Recents, Starred, Experiments) exactly as it does on a settings folder.
 
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a
-bare switch on the title row rather than a labeled checkbox among the settings: it
+bare switch on the title row rather than a labeled tick among the settings: it
 is the panel's power, not one of its dials.
 
 An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
 again" doesn't mean reading its numbers off and typing them back in.
 
-Each part the detail pass can redraw is a box to tick and a denoise to run it
+Each part the detail pass can redraw is a tick and a denoise to run it
 at: the tick is whether that part is fixed at all, so an unticked part greys its
 own name and number rather than making zero mean off. A part whose detector
 isn't installed in ComfyUI can't be ticked at all, and says why — the
@@ -77,19 +77,19 @@ _NO_DETECTOR_TOOLTIP = (
     "models/ultralytics/bbox folder, and restart it."
 )
 # What a fix field costs around its digits: the padding either side below, its
-# 1px border, and the pixels a spin box keeps for its cursor and its own inner
+# 1px border, and the pixels a spinner keeps for its cursor and its own inner
 # margin. Measured by rendering one and looking, since a field a hair too narrow
 # doesn't complain — it clips a digit off 0.45, which still reads as a number.
 _FIX_FIELD_PADDING = 4
 _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
 # Disabling a widget is not the same as it looking disabled: the app's sheet
-# colors every label, picker and spin box outright and names no disabled state,
+# colors every label, picker and spinner outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
 # this panel's own fields — set on the panel, so nothing outside it is touched.
 # (The auto switch is the exception: it paints itself, and dims itself.)
 _FIX_FIELD_CSS = f"""
     #enhancePanel QDoubleSpinBox#fixField {{
-        /* The app sheet holds 18px on the right of every spin box for the step
+        /* The app sheet holds 18px on the right of every spinner for the step
            buttons. These have none, and seven fields' worth of held-back space
            is the difference between one line of parts and two. */
         padding: {_FIX_FIELD_PADDING}px;
@@ -151,7 +151,7 @@ def _enhancer_param_defs() -> dict:
 
 
 class EnhancePanel(QWidget):
-    """The Enhance subpanel: an auto box over the settings an enhancement runs at.
+    """The Enhance subpanel: an auto tick over the settings an enhancement runs at.
 
     ``show_settings`` loads a stored configuration (or the defaults, before
     anything has been set); every edit calls back with the new
@@ -228,7 +228,7 @@ class EnhancePanel(QWidget):
             numbers.addWidget(widget, 1)
         form.addRow(numbers)
 
-        # The detail pass: a box and a number per part it can be aimed at, the
+        # The detail pass: a tick and a number per part it can be aimed at, the
         # number being the denoise that part is redrawn at. Their denoise is
         # separate from the one above, and from each other's, because it can
         # afford to be far bolder: nothing outside the regions a detector finds
@@ -242,7 +242,7 @@ class EnhancePanel(QWidget):
         column.addStretch(1)
 
     def _fix_row(self) -> QWidget:
-        """Every fixable part on one line: a box to tick over its name and the
+        """Every fixable part on one line: a tick over its name and the
         denoise it runs at.
 
         The tick is what turns a part's fix on, so the number underneath is free
@@ -261,7 +261,7 @@ class EnhancePanel(QWidget):
         Flowed rather than fixed, so a pane too narrow for the line wraps the
         last parts onto a second one instead of cutting them off — and so the
         line never widens the window, which tiles into a third of a monitor.
-        Each part's box, name and number travel together, so a wrap can't
+        Each part's tick, name and number travel together, so a wrap can't
         separate them.
 
         Every part the app knows is here, installed detector or not: one with
@@ -285,7 +285,7 @@ class EnhancePanel(QWidget):
         return host
 
     def _fix_field(self, part) -> QWidget:
-        """One part's column: its tick box, over its name and its denoise."""
+        """One part's column: its tick, over its name and its denoise."""
         check = TickControl("")
         check.setToolTip(param_help("enhance_detail_fixes"))
         widget = self._fix_number()
@@ -317,7 +317,7 @@ class EnhancePanel(QWidget):
         self._emit()
 
     def _show_fix_on(self, name: str) -> None:
-        """Grey one part's name and number unless its box is ticked."""
+        """Grey one part's name and number unless it is ticked."""
         check = self._fix_checks[name]
         widget = self._fixes[name]
         on = check.isChecked() and check.isEnabled()
@@ -327,11 +327,11 @@ class EnhancePanel(QWidget):
             label.setEnabled(on)
 
     def _fix_number(self) -> NoWheelDoubleSpinBox:
-        """One part's denoise box, ranged from the enhancer's own ParamDef so a
+        """One part's denoise spinner, ranged from the enhancer's own ParamDef so a
         floor of zero — the value that means "leave this part alone" — stays the
         workflow's answer rather than this panel's.
 
-        Sized to the digits it shows: Qt's own hint for a spin box is two and a
+        Sized to the digits it shows: Qt's own hint for a spinner is two and a
         half times ``0.00``, and seven of those hints is the difference between
         one line of parts and three. Measured off the font rather than typed as
         a number, so it still fits at another font size.
@@ -342,7 +342,7 @@ class EnhancePanel(QWidget):
         widget.setMaximum(pd.max_val if pd is not None else 1.0)
         widget.setSingleStep(pd.step if pd is not None and pd.step else 0.05)
         widget.setDecimals(2)
-        # The denoise a fix runs at unless it is given another: the box beside
+        # The denoise a fix runs at unless it is given another: the tick beside
         # it is what says whether this part is fixed, so the number never has to
         # mean off, and a part ticked on runs at something sensible untouched.
         widget.setValue(DEFAULT_FIX_DENOISE)
@@ -476,7 +476,7 @@ class EnhancePanel(QWidget):
     def dropEvent(self, event):
         """Take the settings of the version dropped on us.
 
-        The auto box is left as it is: the drop says what to enhance *at*, not
+        The auto tick is left as it is: the drop says what to enhance *at*, not
         whether to keep enhancing.
         """
         params = params_from_mime(event.mimeData())

@@ -42,7 +42,7 @@ def test_stylesheet_greys_disabled_dropdown_items():
 def test_stylesheet_styles_tooltips():
     # Native tooltips render unreadably on Windows 11 dark mode, so the sheet
     # must style QToolTip explicitly — with square corners, since a rounded
-    # stylesheet tooltip paints artifact boxes on Windows.
+    # stylesheet tooltip paints artifact squares on Windows.
     qss = build_stylesheet()
     tooltip_rule = qss.split("QToolTip", 1)[1].split("}", 1)[0]
     assert "background-color" in tooltip_rule
@@ -165,8 +165,8 @@ def test_a_radios_ring_stays_visible_in_both_states(qtbot):
         assert max(_lightness(image, x) for x in (0, 1)) > BG_PRIMARY.lightness() + 30
 
 
-def _spin_down_rect(box):
-    """Where the style puts a spin box's step-down sub-control.
+def _spin_down_rect(spinner):
+    """Where the style puts a spinner's step-down sub-control.
 
     Asked of the style rather than worked out from the sheet: the sheet is one
     input to that answer and Qt's own default is the other, so the only thing
@@ -175,23 +175,23 @@ def _spin_down_rect(box):
     from PyQt6.QtWidgets import QStyle, QStyleOptionSpinBox
 
     option = QStyleOptionSpinBox()
-    option.initFrom(box)
-    option.rect = box.rect()
+    option.initFrom(spinner)
+    option.rect = spinner.rect()
     option.subControls = (QStyle.SubControl.SC_SpinBoxUp
                           | QStyle.SubControl.SC_SpinBoxDown)
-    return box.style().subControlRect(
+    return spinner.style().subControlRect(
         QStyle.ComplexControl.CC_SpinBox, option,
-        QStyle.SubControl.SC_SpinBoxDown, box)
+        QStyle.SubControl.SC_SpinBoxDown, spinner)
 
 
-def _styled_spin_box(qtbot):
+def _styled_spinner(qtbot):
     from PyQt6.QtWidgets import QSpinBox
 
-    box = QSpinBox()
-    qtbot.addWidget(box)
-    box.setStyleSheet(build_stylesheet())
-    box.resize(120, 44)
-    return box
+    spinner = QSpinBox()
+    qtbot.addWidget(spinner)
+    spinner.setStyleSheet(build_stylesheet())
+    spinner.resize(120, 44)
+    return spinner
 
 
 def test_the_step_down_button_lands_in_the_lower_right_corner(qtbot):
@@ -199,12 +199,12 @@ def test_the_step_down_button_lands_in_the_lower_right_corner(qtbot):
     # down-button is already this corner -- so what holds it there is the style,
     # and the style is what this asks. Up must be the other one, or a sheet that
     # stacked them wrongly would satisfy a one-sided check.
-    box = _styled_spin_box(qtbot)
+    spinner = _styled_spinner(qtbot)
 
-    down = _spin_down_rect(box)
+    down = _spin_down_rect(spinner)
 
-    assert down.center().y() > box.rect().center().y()
-    assert down.center().x() > box.rect().center().x()
+    assert down.center().y() > spinner.rect().center().y()
+    assert down.center().x() > spinner.rect().center().x()
 
 
 def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
@@ -216,9 +216,9 @@ def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
     from PyQt6.QtCore import QPoint
     from shared_ui.colors import BG_BUTTON
 
-    box = _styled_spin_box(qtbot)
-    down = _spin_down_rect(box)
-    image = box.grab().toImage()
+    spinner = _styled_spinner(qtbot)
+    down = _spin_down_rect(spinner)
+    image = spinner.grab().toImage()
 
     assert image.pixelColor(down.bottomRight()) != BG_BUTTON
     assert image.pixelColor(down.bottomRight() - QPoint(5, 5)) == BG_BUTTON

@@ -270,7 +270,7 @@ def test_sdxl_t2i_extract_output_info():
     assert files[0]["filename"] == "sdxl_t2i_00001_.png"
 
 
-# ---- The upscale/enhance tail (a checkbox on every image workflow) ----
+# ---- The upscale/enhance tail (a tick on every image workflow) ----
 
 # Every image-producing workflow carries the enhance toggle; these are they.
 _ENHANCE_TOGGLE_WORKFLOWS = ("sdxl_t2i", "sdxl_pose_transfer",
@@ -292,7 +292,7 @@ def test_image_workflows_carry_the_enhance_toggle_off_by_default():
 
 
 def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
-    # With the checkbox on, every image workflow ends in the shared tail:
+    # With the tick on, every image workflow ends in the shared tail:
     # model upscale -> rescale to enhance_scale x the base (the model is 4x) ->
     # re-encode -> a low-denoise KSampler on the workflow's own model and
     # conditioning -> decode -> save.
@@ -594,8 +594,8 @@ def test_asking_for_parts_with_nothing_installed_builds_none_of_it():
     assert save["inputs"]["images"] == [_node_id(payload, "VAEDecode"), 0]
 
 
-def test_the_detail_passs_setting_is_defined_with_the_range_its_boxes_take():
-    # The Enhance panel builds its per-part spin boxes from this, so the range
+def test_the_detail_passs_setting_is_defined_with_the_range_its_spinners_take():
+    # The Enhance panel builds its per-part spinners from this, so the range
     # lives with the workflow rather than being retyped beside it.
     defs = {pd.key: pd
             for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()}

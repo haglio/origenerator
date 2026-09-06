@@ -33,7 +33,7 @@ def test_every_workflow_param_a_surface_can_show_is_explained(workflow_name):
 def test_no_help_is_written_for_a_key_no_surface_can_show(workflow_name):
     # The other way round, so the four cannot come back: a line nobody can read
     # is a line that goes stale unnoticed, which is what the deleted `enhance`
-    # entry had already done — it explained a checkbox the panel replaced.
+    # entry had already done — it explained a tick the panel replaced.
     wf = WORKFLOW_REGISTRY[workflow_name]
     hidden = (set(wf.enhance_keys()) | ps.HIDDEN_KEYS) - set(ENHANCE_SETTING_KEYS)
     unreadable = sorted(k for k in hidden if param_help(k))

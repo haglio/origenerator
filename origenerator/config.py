@@ -11,7 +11,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # The checkout's own state directory, unless the process says otherwise.  Only
 # the suite says otherwise: it points every run at a fresh temporary directory
 # before this module is imported, so three thousand tests stop writing a log,
-# the spin-box arrows, thumbnails, trash and a diagnostic recording into the
+# the spinner arrows, thumbnails, trash and a diagnostic recording into the
 # live app's state/ -- where what a previous run left behind decided what the
 # next one drew.  Every path below hangs off it, and every module that binds
 # one of them at import gets the same answer, which a test's monkeypatch of

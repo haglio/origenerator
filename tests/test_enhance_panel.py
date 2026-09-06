@@ -69,7 +69,7 @@ def _items(levels):
 # --- the subpanel ----------------------------------------------------------
 
 
-def test_a_fresh_panel_reads_as_the_workflow_defaults_box_off(qtbot):
+def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
     panel, _ = _panel(qtbot)
     settings = panel.settings()
     assert settings.auto is False
@@ -105,7 +105,7 @@ def test_the_switch_flips_and_reports(qtbot):
 
 
 def test_the_switch_draws_at_both_states(qtbot):
-    # It paints itself (a stylesheet cannot move a checkbox's indicator), so the
+    # It paints itself (a stylesheet cannot move a tick's indicator), so the
     # paint path is worth exercising in both positions.
     switch = ToggleSwitch("Auto")
     qtbot.addWidget(switch)
@@ -142,8 +142,8 @@ def test_every_setting_reports_its_edit(qtbot):
     assert latest.params["enhance_denoise"] == 0.4
 
 
-def test_every_fixable_part_gets_a_box_and_a_number_of_its_own(qtbot):
-    # One of each per part the app can aim a detail pass at: the box says
+def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
+    # One of each per part the app can aim a detail pass at: the tick says
     # whether that part is fixed, the number how hard — a mouth wants a harder
     # redraw than a face, and one shared number could never say so.
     panel, edits = _panel(qtbot)
@@ -164,16 +164,16 @@ def test_every_fixable_part_gets_a_box_and_a_number_of_its_own(qtbot):
 
 def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
     # Seven parts share one line only if none of them is padded out: Qt's own
-    # hint for a spin box is far wider than "0.00", and a field given a floor
+    # hint for a spinner is far wider than "0.00", and a field given a floor
     # and a share of the slack (as the three numbers above have) costs another
     # part its place on the line.
     panel, _ = _panel(qtbot)
-    box = panel._fixes["faces"]
-    digits = box.fontMetrics().horizontalAdvance("0.00")
+    spinner = panel._fixes["faces"]
+    digits = spinner.fontMetrics().horizontalAdvance("0.00")
 
-    assert digits < box.minimumWidth() <= digits + 30   # its own chrome, no more
-    assert box.minimumWidth() == box.maximumWidth()     # fixed, so a wide pane
-    assert box.minimumWidth() < box.sizeHint().width()  # doesn't stretch it
+    assert digits < spinner.minimumWidth() <= digits + 30   # its own chrome, no more
+    assert spinner.minimumWidth() == spinner.maximumWidth()     # fixed, so a wide pane
+    assert spinner.minimumWidth() < spinner.sizeHint().width()  # doesn't stretch it
 
 
 def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
@@ -209,7 +209,7 @@ def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
 
 def test_an_unticked_parts_name_and_number_grey_out(qtbot):
     # Which parts are on has to be readable down the line at a glance, not
-    # worked out box by box.
+    # worked out tick by tick.
     panel, _ = _panel(qtbot)
     label = panel._label_for(panel._fixes["faces"])
 
@@ -223,7 +223,7 @@ def test_an_unticked_parts_name_and_number_grey_out(qtbot):
 def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
     # The settings here that can be unavailable rather than merely unset: the
     # model that finds a part is a separate install, and a run naming one
-    # ComfyUI hasn't got is rejected on submit. Better a box that says why than
+    # ComfyUI hasn't got is rejected on submit. Better a tick that says why than
     # one that quietly fails.
     panel, _ = _panel(qtbot, detectors=("face_finder.pt",))
     assert panel._fix_checks["faces"].isEnabled()
@@ -239,10 +239,10 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
 
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
-    # Some other detector sitting in that folder would leave every box tickable
+    # Some other detector sitting in that folder would leave every part tickable
     # and every pass finding nothing. Unavailable says which file to add.
     panel, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not any(box.isEnabled() for box in panel._fix_checks.values())
+    assert not any(tick.isEnabled() for tick in panel._fix_checks.values())
 
 
 def _mean_ink(widget) -> float:
@@ -272,7 +272,7 @@ def _mean_ink(widget) -> float:
 
 def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     # setEnabled alone changed nothing here: the app's sheet colors every label,
-    # picker and spin box outright and names no disabled state, so a panel that
+    # picker and spinner outright and names no disabled state, so a panel that
     # could not apply went on reading exactly as live as one that could.
     panel, _ = _panel(qtbot)
     panel.show_settings(EnhanceSettings(auto=True, params={}))

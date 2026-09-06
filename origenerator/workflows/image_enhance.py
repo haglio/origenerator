@@ -93,7 +93,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
                      min_val=0.0, max_val=1.0, step=0.05),
             # One denoise per part fixed, keyed by the part's name — the Enhance
-            # panel's line of numbers, and the range those spin boxes take. A
+            # panel's line of numbers, and the range those spinners take. A
             # part not named here is a part left alone; a part that IS named
             # runs a real pass, so the floor sits above zero (the detailer node
             # rejects a zero denoise, and a pass that repaints nothing is a

@@ -1257,7 +1257,7 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
 
 
 def test_build_gallery_tree_keeps_only_the_checked_media_types():
-    # The gallery's two boxes decide which folders exist at all, so an unchecked
+    # The gallery's two ticks decide which folders exist at all, so an unchecked
     # kind takes its whole branch with it — and unchecking both leaves no tree.
     rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
     assert {w.key for w in build_gallery_tree(rows, {}, {"image", "video"})} \
@@ -1417,7 +1417,7 @@ def test_recent_generations_is_uncapped():
 
 
 def test_rows_of_media_types_keeps_only_the_checked_kinds():
-    # The gallery's two boxes narrow every list it draws: with only "video"
+    # The gallery's two ticks narrow every list it draws: with only "video"
     # checked the images drop out, and with only "image" the videos do.
     rows = [_i2v("v2", "styleA", seed=2), _img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
     assert [r["prompt_id"] for r in rows_of_media_types(rows, {"video"})] == ["v2", "v1"]
@@ -1459,7 +1459,7 @@ def test_recent_generations_reaches_a_lone_old_match_of_the_selected_type():
 
 
 def test_rows_of_media_types_with_nothing_checked_is_empty():
-    # Unchecking both boxes selects nothing, so every list the gallery draws clears.
+    # Unchecking both ticks selects nothing, so every list the gallery draws clears.
     rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
     assert rows_of_media_types(rows, set()) == []
 

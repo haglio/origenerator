@@ -1,4 +1,4 @@
-"""The find strip: a query box, a match count, and the two steps between hits.
+"""The find strip: a query field, a match count, and the two steps between hits.
 
 Pops open at the foot of the info pane on Ctrl+F and puts itself away on Esc or
 its own ✕. Controls only — it holds no matches and touches no prompt; what it
@@ -35,7 +35,7 @@ class FindBar(QWidget):
         self._query.setClearButtonEnabled(True)
         self._query.textChanged.connect(self.query_changed)
         # Enter walks the matches without leaving the keyboard, Shift+Enter backs
-        # up — the pairing every find box in every app makes.
+        # up — the pairing every find field in every app makes.
         self._query.returnPressed.connect(self._on_return)
         row.addWidget(self._query, 1)
         self._count = QLabel("")

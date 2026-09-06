@@ -60,7 +60,7 @@ UPSCALE_MODEL_FACTOR = 4.0
 
 # The detail pass's fixed shape (see :meth:`WorkflowTemplate.detail_fix_nodes`).
 # All of these are the detector/detailer nodes' own defaults, kept here as named
-# constants rather than as settings: the pass already costs the user a checkbox and
+# constants rather than as settings: the pass already costs the user a tick and
 # a denoise, and every one of these is a value their answer would be a guess at.
 _DETECTOR_THRESHOLD = 0.5     # how sure the detector must be to call it a face
 _DETECTOR_DILATION = 10       # pixels grown around each rect, so edges are inside
@@ -211,7 +211,7 @@ class WorkflowTemplate(ABC):
 
     def pins_reused_seed(self) -> bool:
         """Whether loading a past generation's settings into a config tab pins its
-        seed(s) — clearing their Random boxes — so the next Generate re-creates
+        seed(s) — clearing their Random ticks — so the next Generate re-creates
         that exact output rather than drawing a fresh one.
 
         True for an image: a still's seed is its composition, and "the same
@@ -552,7 +552,7 @@ class WorkflowTemplate(ABC):
                 str(first_id + index * 3 + offset) for offset in range(3))
             nodes[provider_id] = {
                 "class_type": "UltralyticsDetectorProvider",
-                # The provider's own picker prefixes its bounding-box models
+                # The provider's own picker prefixes its detector models
                 # this way, and the value is matched against that list.
                 "inputs": {"model_name": f"bbox/{detector}"},
             }

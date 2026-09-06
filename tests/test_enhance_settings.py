@@ -51,7 +51,7 @@ def _source_row(filename="sdxl_t2i_src.png", checkpoint="anemone_v3.safetensors"
 # --- the stored settings ---------------------------------------------------
 
 
-def test_an_unconfigured_folder_reads_as_the_defaults_with_the_box_off():
+def test_an_unconfigured_folder_reads_as_the_defaults_with_the_tick_off():
     settings = EnhanceSettings.parse(None)
     assert settings.auto is False
     assert settings.params == default_enhance_params()
@@ -464,7 +464,7 @@ def test_a_spoken_fix_on_an_unenhanced_image_runs_at_the_current_settings(monkey
     assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}
 
 
-def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_boxes(
+def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
         monkeypatch):
     # The bug this is here for: a folder set to fix every part turned a spoken
     # "fix teeth" into a pass over all of them — a redraw of the whole picture

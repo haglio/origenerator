@@ -1,4 +1,4 @@
-"""The up/down triangles a styled spin box needs, drawn to disk once.
+"""The up/down triangles a styled spinner needs, drawn to disk once.
 
 Qt's stylesheet engine is not a browser's: the CSS trick of collapsing an element to
 zero size and letting its borders meet as a triangle draws a filled rectangle
@@ -58,7 +58,7 @@ def arrow_paths(color) -> tuple[str, str] | None:
         if not down.exists():
             _draw(down, rgb, pointing_down=True)
     except Exception as e:
-        logger.warning("Could not draw the spin-box arrows: %s", e)
+        logger.warning("Could not draw the spinner arrows: %s", e)
         return None
     # Forward slashes: a Windows backslash in a Qt stylesheet url() is an escape.
     return up.as_posix(), down.as_posix()

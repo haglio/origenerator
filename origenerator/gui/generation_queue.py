@@ -621,7 +621,7 @@ class GenerationQueue(QWidget):
     def rows(self) -> list[QueueRow]:
         """Every job in the line, in order — the one being made first.
 
-        Jobs only: the hint that fills an empty line shares the same box, and it
+        Jobs only: the hint that fills an empty line shares the same column, and it
         is no row — nothing may be dropped in front of it, reordered against it,
         or throw it away with the others on a rebuild.
         """

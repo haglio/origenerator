@@ -769,7 +769,7 @@ class GenerateConfigPanel(QWidget):
 
         Landscape media stays stacked: a wide picture beside a form gets a
         column too narrow to show it, and the form loses the width its prompt
-        boxes need.
+        fields need.
         """
         if self._fun_time is None:
             return  # standalone the pane is wide; stacking is right at any shape

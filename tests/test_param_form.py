@@ -66,7 +66,7 @@ def test_browse_button_fits_its_caption(qtbot):
     assert btn.width() >= reference.sizeHint().width()
 
 
-def test_bool_param_renders_a_checkbox_and_round_trips(qtbot):
+def test_bool_param_renders_a_tick_control_and_round_trips(qtbot):
     # The enhance toggle is a "bool" ParamDef: a TickControl field that reads and
     # writes True/False like any other value — so a stored recipe's flag comes
     # back checked/unchecked, and the emitted params carry a real bool.
@@ -85,7 +85,7 @@ def test_bool_param_renders_a_checkbox_and_round_trips(qtbot):
     assert form.get_values()["enhance"] is True
 
 
-def test_seed_random_control_is_the_ticked_checkbox(qtbot):
+def test_seed_random_control_is_the_ticked_control(qtbot):
     # The Random control must be our TickControl, not a plain QCheckBox whose
     # native dark-style tick renders as a bare down-caret.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
@@ -148,7 +148,7 @@ def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
     assert form._copy_buttons == {}
 
 
-def test_seed_keeps_its_random_checkbox_beside_the_copy_button(qtbot):
+def test_seed_keeps_its_random_tick_beside_the_copy_button(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     assert "seed" in form._randomize_checks   # the Random control survives
@@ -246,8 +246,8 @@ def _field_cell_of(form, key):
     return None
 
 
-def test_seed_copy_button_sits_left_of_the_random_checkbox(qtbot):
-    # The seed row reads [field] [copy] [Random ☐] — copy before the checkbox.
+def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
+    # The seed row reads [field] [copy] [Random ☐] — copy before the tick.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     cell = _field_cell_of(form, "seed")
@@ -344,9 +344,9 @@ def _sized_form(qtbot, size=(864, 480)):
     return form
 
 
-def test_locked_dimensions_render_as_plain_values_not_input_boxes(qtbot):
+def test_locked_dimensions_render_as_plain_values_not_input_fields(qtbot):
     # Locked, each dimension shows as a plain value (a readonlyParamValue label,
-    # like "batch_size 1"), not a spinbox — the stack sits on its label page.
+    # like "batch_size 1"), not a spinner — the stack sits on its label page.
     form = _sized_form(qtbot)
     assert "width" in form._present_keys["Dimensions"]
     assert "height" in form._present_keys["Dimensions"]
@@ -354,19 +354,19 @@ def test_locked_dimensions_render_as_plain_values_not_input_boxes(qtbot):
     assert form._dimensions_hint is not None
     for key in ("width", "height"):
         stack = form._dim_stacks[key]
-        assert stack.currentIndex() == 0                       # the value label, not the field
+        assert stack.currentIndex() == 0                       # the value label, not the spinner
         assert stack.currentWidget() is form._dim_value_labels[key]
         assert form._dim_value_labels[key].objectName() == "readonlyParamValue"
     # No image yet → no size to show; the value reads as an em dash.
     assert form._dim_value_labels["width"].text() == "—"
 
 
-def test_unlocking_swaps_the_plain_value_for_an_editable_box(qtbot):
+def test_unlocking_swaps_the_plain_value_for_an_editable_field(qtbot):
     form = _sized_form(qtbot)
     form._unlock_btn.setChecked(True)
     for key in ("width", "height"):
         stack = form._dim_stacks[key]
-        assert stack.currentIndex() == 1                       # now the editable spinbox
+        assert stack.currentIndex() == 1                       # now the editable spinner
         assert stack.currentWidget() is form._widgets[key]
 
 
@@ -417,7 +417,7 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
 def test_derived_dimensions_track_the_input_image(qtbot):
     form = _sized_form(qtbot, size=(864, 480))
     form._widgets["input_image"].setText("frame.png")
-    # Both the plain locked value and the spinbox behind it follow the image.
+    # Both the plain locked value and the spinner behind it follow the image.
     assert form._dim_value_labels["width"].text() == "864"
     assert form._dim_value_labels["height"].text() == "480"
     assert form._widgets["width"].value() == 864
@@ -441,7 +441,7 @@ def test_unlocking_lets_the_user_override_the_size(qtbot):
 
     form._unlock_btn.setChecked(True)
     assert fired                                  # the unlock announces itself
-    assert form._dim_stacks["width"].currentIndex() == 1   # editable field now showing
+    assert form._dim_stacks["width"].currentIndex() == 1   # editable spinner now showing
     form._widgets["width"].setValue(1024)
     form._widgets["height"].setValue(576)
 
@@ -591,8 +591,7 @@ def test_combo_default_absent_from_options_is_still_selected(qtbot):
 def test_get_values_static_does_not_randomize_seed(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
     qtbot.addWidget(form)
-    # Random field defaults to checked; the static read must ignore it.
-    assert form.get_values_static()["seed"] == 12345
+    # Random tick defaults to checked; the static read must ignore it.
     assert form.get_values_static()["seed"] == 12345
 
 
@@ -605,15 +604,15 @@ def test_param_form_emits_changed_on_edit(qtbot):
     assert fired
 
 
-def test_seed_is_random_reflects_checkbox(qtbot):
+def test_seed_is_random_reflects_the_tick(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
-    assert form.seed_is_random() is True  # Random field defaults to checked
+    assert form.seed_is_random() is True  # Random tick defaults to checked
     form.set_values({"seed": 42})
     assert form.seed_is_random() is False  # set_values unchecks it
 
 
-def test_set_seed_random_re_checks_the_box(qtbot):
+def test_set_seed_random_re_ticks_it(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     form.set_values({"seed": 42})       # unchecks Random, pins the seed

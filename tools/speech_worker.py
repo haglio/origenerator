@@ -64,9 +64,11 @@ def main(job_path: str) -> int:
         torch.manual_seed(int(job.get("seed") or 0))
         started = time.time()
         if clone:
-            wavs, rate = model.generate_voice_clone(text=item["text"], voice_clone_prompt=prompt)
+            wavs, rate = model.generate_voice_clone(
+                text=item["text"], language="Auto", voice_clone_prompt=prompt)
         else:
-            wavs, rate = model.generate_custom_voice(text=item["text"], speaker=voice["speaker"])
+            wavs, rate = model.generate_custom_voice(
+                text=item["text"], language="Auto", speaker=voice["speaker"])
         spoken = len(wavs[0]) / rate
         if spoken > item["seconds"]:
             print(f"cut: {spoken:.1f}s of words for a {item['seconds']:.1f}s scene", flush=True)

@@ -1264,3 +1264,57 @@ def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbo
     editor = form._widgets["scene_frames"]
     assert [box.currentText() for box in [scene.length for scene in editor._scenes]] == ["7.6 s"]
     assert form.get_values_static()["frame_count"] == 121
+
+
+# --- the voice her lines are spoken in -----------------------------------------
+
+
+def _voice_defs():
+    from origenerator.speech import VOICE_OPTIONS
+
+    return [
+        ParamDef("voice", "Voice", "combo", "Vivian", options=list(VOICE_OPTIONS)),
+        ParamDef("voice_sample", "Voice Sample", "audio", ""),
+        ParamDef("voice_sample_text", "Voice Sample Says", "str", "", multiline=True),
+    ]
+
+
+def _row_visible(form, key):
+    title = param_sections.section_title(key)
+    return form._sections[title].content_form().isRowVisible(form._present_keys[title].index(key))
+
+
+def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
+    # A preset needs no recording, and two fields under it read as a second
+    # thing to fill in; they appear when the Voice is the custom one, and go
+    # with a recipe that stored it.
+    from origenerator.speech import CUSTOM_VOICE
+
+    form = ParamForm(_voice_defs())
+    qtbot.addWidget(form)
+    assert not _row_visible(form, "voice_sample") and not _row_visible(form, "voice_sample_text")
+    form._widgets["voice"].setCurrentText(CUSTOM_VOICE)
+    assert _row_visible(form, "voice_sample") and _row_visible(form, "voice_sample_text")
+    form.set_values({"voice": "Serena"})
+    assert not _row_visible(form, "voice_sample")
+    form.set_values({"voice": CUSTOM_VOICE, "voice_sample": "C:/v/her.wav", "voice_sample_text": "Hi."})
+    assert _row_visible(form, "voice_sample")
+    assert form.get_values()["voice_sample"] == "C:/v/her.wav"
+
+
+def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
+    import origenerator.gui.param_form as pf
+
+    asked = {}
+
+    def fake(parent, caption, directory, kinds):
+        asked.update(caption=caption, kinds=kinds)
+        return "C:/v/her.wav", ""
+
+    monkeypatch.setattr(pf.QFileDialog, "getOpenFileName", fake)
+    form = ParamForm(_voice_defs())
+    qtbot.addWidget(form)
+    form._browse_buttons["voice_sample"].click()
+    assert form._widgets["voice_sample"].text() == "C:/v/her.wav"
+    assert "Voice Sample" in asked["caption"] and "*.wav" in asked["kinds"]
+    assert form.get_values()["voice_sample"] == "C:/v/her.wav"

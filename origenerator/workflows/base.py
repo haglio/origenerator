@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from origenerator.speech import SPEECH_SAMPLE_RATE
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
@@ -679,27 +678,34 @@ class WorkflowTemplate(ABC):
         return nodes, [prefix + "hear", 0]
 
     @staticmethod
-    def speech_track_nodes(prefix: str, scenes: list[tuple[int, list | None]]):
-        """The clip's spoken track for the writer: every scene's line laid end
-        to end, silence where a scene has none. ``scenes`` is ``(frames,
-        line_ref)`` per scene in order, the ref ``None`` for a silent scene.
-        Returns ``(nodes, audio_ref)``.
+    def speech_track_nodes(prefix: str, scenes: list[tuple[int, list | None]], foley_ref):
+        """The clip's track for the writer: her line where a scene speaks, the
+        foley's own stretch where it does not, laid end to end. ``scenes`` is
+        ``(frames, line_ref)`` per scene in order, the ref ``None`` for a silent
+        scene; ``foley_ref`` is the foley scored over the whole clip. Returns
+        ``(nodes, audio_ref)``.
+
+        The foley watches the frames it scores, and shown a woman talking it
+        scores what it sees: a garbled voice under hers, which is what made the
+        first spoken clip unlistenable. So a speaking scene carries her line
+        alone, and only a silent scene keeps the foley -- cut from the whole
+        clip's score at the scene's own place in it.
 
         Each scene after the first starts on the frame before it, so every
-        scene but the last is cut to the frames it adds -- its line runs a
-        frame long, the seam being the next scene's -- and the last keeps its
-        whole file, which is exactly its length.
+        scene but the last is cut to the frames it adds (its seam frame is the
+        next scene's); the last keeps its whole length.
         """
         nodes: dict = {}
         track = None
         last = len(scenes) - 1
+        offset = 0
         for index, (frames, line_ref) in enumerate(scenes):
             seconds = (frames if index == last else frames - 1) / NATIVE_FPS
             if line_ref is None:
-                node_id = f"{prefix}silence{index}"
+                node_id = f"{prefix}ambience{index}"
                 nodes[node_id] = {
-                    "class_type": "EmptyAudio",
-                    "inputs": {"duration": seconds, "sample_rate": SPEECH_SAMPLE_RATE, "channels": 1},
+                    "class_type": "TrimAudioDuration",
+                    "inputs": {"audio": foley_ref, "start_index": offset / NATIVE_FPS, "duration": seconds},
                 }
                 piece = [node_id, 0]
             elif index == last:
@@ -711,6 +717,7 @@ class WorkflowTemplate(ABC):
                     "inputs": {"audio": line_ref, "start_index": 0.0, "duration": seconds},
                 }
                 piece = [node_id, 0]
+            offset += frames - 1
             if track is None:
                 track = piece
                 continue
@@ -721,23 +728,6 @@ class WorkflowTemplate(ABC):
             }
             track = [node_id, 0]
         return nodes, track
-
-    @staticmethod
-    def speech_mix_nodes(prefix: str, foley_ref, track_ref, duck_db: int):
-        """Her lines over the foley: the foley stepped back ``duck_db`` decibels
-        so the words carry, the spoken track added on top. Returns ``(nodes,
-        audio_ref)`` for the writer."""
-        nodes = {
-            prefix + "duck": {
-                "class_type": "AudioAdjustVolume",
-                "inputs": {"audio": foley_ref, "volume": duck_db},
-            },
-            prefix + "mix": {
-                "class_type": "AudioMerge",
-                "inputs": {"audio1": [prefix + "duck", 0], "audio2": track_ref, "merge_method": "add"},
-            },
-        }
-        return nodes, [prefix + "mix", 0]
 
     @staticmethod
     def interpolation_nodes(node_id: str, frames_ref, params: dict):

@@ -105,26 +105,27 @@ def test_a_spoken_scene_longer_than_one_window_hears_its_line_window_by_window()
     assert spoken[1]["inputs"]["ref_motion"] == payload[spoken[1]["inputs"]["ref_image"][0]]["inputs"]["image"]
 
 
-def test_the_writer_hears_the_lines_laid_over_the_foley():
-    # The file's track is the foley stepped back with the lines added on top:
-    # scene one's line cut to the frames it adds, silence for scene two, scene
-    # three's whole line, end to end.
+def test_the_writer_hears_her_line_where_she_speaks_and_the_foley_where_she_does_not():
+    # The foley scores what it sees, and shown a woman talking it scores a
+    # garbled voice under hers; so the file's track is her line for a scene
+    # that speaks, and the foley's own stretch for one that does not: scene
+    # one's line cut to the frames it adds, the foley from 10 s for scene two,
+    # scene three's whole line, end to end.
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params())
-    mix = _writer_audio(payload)
-    assert (mix["class_type"], mix["inputs"]["merge_method"]) == ("AudioMerge", "add")
-    duck = payload[mix["inputs"]["audio1"][0]]
-    assert (duck["class_type"], duck["inputs"]["volume"]) == ("AudioAdjustVolume", -6)
-    assert payload[duck["inputs"]["audio"][0]]["class_type"] == "HunyuanFoleySampler"
-    join = payload[mix["inputs"]["audio2"][0]]
+    join = _writer_audio(payload)
     assert join["class_type"] == "AudioConcat"
     assert payload[join["inputs"]["audio2"][0]]["class_type"] == "LoadAudio"
     earlier = payload[join["inputs"]["audio1"][0]]
     assert earlier["class_type"] == "AudioConcat"
-    silence = payload[earlier["inputs"]["audio2"][0]]
-    assert (silence["class_type"], silence["inputs"]["duration"]) == ("EmptyAudio", pytest.approx(80 / 16))
+    ambience = payload[earlier["inputs"]["audio2"][0]]
+    assert ambience["class_type"] == "TrimAudioDuration"
+    assert (ambience["inputs"]["start_index"], ambience["inputs"]["duration"]) == (
+        pytest.approx(160 / 16), pytest.approx(80 / 16))
+    assert payload[ambience["inputs"]["audio"][0]]["class_type"] == "HunyuanFoleySampler"
     first = payload[earlier["inputs"]["audio1"][0]]
     assert (first["class_type"], first["inputs"]["duration"]) == ("TrimAudioDuration", pytest.approx(160 / 16))
     assert payload[first["inputs"]["audio"][0]]["class_type"] == "LoadAudio"
+    assert "AudioMerge" not in {node["class_type"] for node in payload.values()}
 
 
 def test_a_story_without_lines_keeps_the_graph_it_always_had():
@@ -151,7 +152,8 @@ def test_the_speech_slot_offers_only_the_speech_model_and_the_experts_never_do(i
 def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks():
     by_key = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}
     assert by_key["voice"].type == "combo" and by_key["voice"].options[0] == by_key["voice"].default
-    assert by_key["voice_sample"].type == "str" and not by_key["voice_sample"].multiline
+    assert by_key["voice_sample"].type == "audio" and by_key["voice_sample"].browse_dir is not None
+    assert by_key["voice"].options[-1] == "Custom voice (a recording)"
     assert by_key["voice_sample_text"].type == "str" and by_key["voice_sample_text"].multiline
     loop = Wan22Flf2vLoopWorkflow()
     assert "scene_lines" not in loop.default_params()

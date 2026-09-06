@@ -156,7 +156,8 @@ class InFlightCard(QWidget):
         """What the scrim says about this job: the stage it is at, or — when the
         hold is another app's — what it is waiting behind."""
         return (queue_wait_text(item.foreign_ahead)
-                or ("Generating…" if item.status == "running" else "Queued…"))
+                or {"running": "Generating…", "speaking": "Speaking her lines…"}.get(
+                    item.status, "Queued…"))
 
     def _render_timing(self):
         """Write the run's reading across the bar at the frame's foot.

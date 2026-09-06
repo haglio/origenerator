@@ -1,4 +1,6 @@
-from origenerator.speech import VOICE_PRESETS, scene_speech
+from pathlib import Path
+
+from origenerator.speech import VOICE_OPTIONS, VOICE_PRESETS, scene_speech
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
@@ -27,8 +29,6 @@ _SPEECH_CFG = 1.0
 _SPEECH_SAMPLER = "uni_pc"
 _SPEECH_SCHEDULER = "simple"
 _SPEECH_SHIFT = 8.0
-# How far the foley steps back under her lines, so the words carry.
-_FOLEY_UNDER_SPEECH_DB = -6
 
 
 class Wan22I2vWorkflow(WorkflowTemplate):
@@ -52,7 +52,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     A story's scene with a line (``scene_lines``) is spoken instead: that
     scene's segments render on WAN 2.2's speech-to-video model, hearing the
     line as audio (made beforehand, see :mod:`origenerator.speech`) and moving
-    her lips to it, and the line is laid over the foley in the file.
+    her lips to it, and in the file that scene carries her line in place of
+    the foley.
     """
 
     name = "wan22_i2v"
@@ -134,8 +135,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("input_image", "Start Image", "image", ""),
             ParamDef("audio_prompt", "Audio Prompt", "str", "", multiline=True),
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
-            ParamDef("voice", "Voice", "combo", VOICE_PRESETS[0], options=list(VOICE_PRESETS)),
-            ParamDef("voice_sample", "Voice Sample", "str", ""),
+            ParamDef("voice", "Voice", "combo", VOICE_PRESETS[0], options=list(VOICE_OPTIONS)),
+            ParamDef("voice_sample", "Voice Sample", "audio", "", browse_dir=Path.home()),
             ParamDef("voice_sample_text", "Voice Sample Says", "str", "", multiline=True),
             ParamDef("noise_seed", "Seed (High)", "seed", 0),
             ParamDef("seed", "Seed (Low)", "seed", 0),
@@ -367,19 +368,18 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # stored clip length says whenever the form wrote it.
         foley, audio_ref = self.foley_audio_nodes(
             "22", "23", "24", decoded_ref, {**params, "frame_count": total_frames})
-        # Her lines are a second layer over the foley: each spoken scene's file
-        # laid at its place in the clip, silence where a scene says nothing,
-        # and the foley stepped back under it. A story with no line keeps the
-        # graph it always had.
+        # Her lines take the writer's track where she speaks: each spoken
+        # scene's file at its place in the clip, the foley's own stretch where
+        # a scene says nothing (WorkflowTemplate.speech_track_nodes says why
+        # not both at once). A story with no line keeps the graph it always had.
         speech = {}
         if any(scene is not None for scene in spoken):
             speech = self._speech_nodes(params, spoken)
-            track, track_ref = self.speech_track_nodes("speech_", [
+            track, audio_ref = self.speech_track_nodes("speech_", [
                 (frames, [f"scene{index}_line", 0] if line is not None else None)
-                for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken))])
-            mix, audio_ref = self.speech_mix_nodes("speech_", audio_ref, track_ref, _FOLEY_UNDER_SPEECH_DB)
+                for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken))],
+                audio_ref)
             speech.update(track)
-            speech.update(mix)
         # The decode's frames are the clip's motion; the writer's are that motion
         # shown more often. Foley above watches the former, CreateVideo below
         # encodes the latter, and at the native rate they are the same frames.

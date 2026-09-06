@@ -31,7 +31,7 @@ class InFlightItem:
 
     key: str                     # stable id: the job's prompt id
     caption: str                 # what a surface labels the job (workflow › prompt)
-    status: str                  # "running" or "queued"
+    status: str                  # "running", "queued", or "speaking" (its lines, before it is sent)
     frame: bytes | None          # latest live preview frame, if one has arrived
     reveal: Callable[[], None]   # show the job's gallery folder and its live tile
     media_type: str | None = None  # "image"/"video" for the corner badge, if known

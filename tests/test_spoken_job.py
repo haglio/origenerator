@@ -1,8 +1,14 @@
 """A job whose story has lines speaks them before it is sent."""
 
+import sys
+import threading
+import time
 from unittest.mock import MagicMock
 
+from PyQt6.QtCore import QTimer
+
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.gui import generation_job
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.speech import scene_speech
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -88,3 +94,73 @@ def test_a_job_canceled_while_its_lines_are_spoken_is_not_sent(qtbot, tmp_path):
     done()
     client.submit_job.assert_not_called()
     assert job.state == "canceled"
+
+
+# ---- the voice at work, off the GUI thread ---------------------------------------
+
+
+def _spoken_file(params, input_dir):
+    path = input_dir / scene_speech(params)[0].file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"RIFF")
+    return [path]
+
+
+def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, tmp_path, monkeypatch):
+    # The real speaker: a thread does the speaking (here a half-second stand-in)
+    # while the window keeps its events flowing, and the submit that follows
+    # happens back on the GUI thread, where every job's signals are wired.
+    seen = {}
+    gui_thread = threading.get_ident()
+
+    def slow_speak(params, *, input_dir, python, **kwargs):
+        seen["spoke_on"] = threading.get_ident()
+        time.sleep(0.5)
+        return _spoken_file(params, input_dir)
+
+    monkeypatch.setattr(generation_job.speech, "ensure_speech_files", slow_speak)
+    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
+    client = _client()
+    client.submit_job = MagicMock(side_effect=lambda *a: seen.setdefault("sent_on", threading.get_ident()))
+    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    ticks = []
+    timer = QTimer()
+    timer.timeout.connect(lambda: ticks.append(time.monotonic()))
+    timer.start(20)
+    started = time.monotonic()
+    job.start()
+    assert time.monotonic() - started < 0.25, "start() waited on the voice"
+    assert job.state == "speaking"
+    qtbot.waitUntil(lambda: job.state == "queued", timeout=5000)
+    timer.stop()
+    client.free_memory.assert_called_once()
+    assert seen["spoke_on"] != gui_thread
+    assert seen["sent_on"] == gui_thread
+    assert len(ticks) >= 5, "the window's events stopped while the voice spoke"
+
+
+def test_the_voice_runs_as_a_real_process_without_holding_the_window(qtbot, tmp_path, monkeypatch):
+    # The worker is a process the thread waits on; a stand-in worker here
+    # sleeps and writes the files the job asks for, the way the real one does.
+    worker = tmp_path / "worker.py"
+    worker.write_text(
+        "import json, sys, time, pathlib\n"
+        "time.sleep(0.6)\n"
+        "for item in json.load(open(sys.argv[1]))['items']:\n"
+        "    pathlib.Path(item['out']).write_bytes(b'RIFF')\n",
+        encoding="utf-8")
+    monkeypatch.setattr(generation_job.speech, "WORKER", worker)
+    monkeypatch.setattr(generation_job, "COMFYUI_INPUT_DIR", tmp_path)
+    monkeypatch.setattr(generation_job, "SPEECH_PYTHON", sys.executable)
+    client = _client()
+    job = GenerationJob(client, I2V, _spoken_params(), input_dir=tmp_path)
+    ticks = []
+    timer = QTimer()
+    timer.timeout.connect(lambda: ticks.append(1))
+    timer.start(20)
+    job.start()
+    qtbot.waitUntil(lambda: job.state == "queued", timeout=10000)
+    timer.stop()
+    client.submit_job.assert_called_once()
+    assert (tmp_path / scene_speech(_spoken_params())[0].file).exists()
+    assert len(ticks) >= 5, "the window's events stopped while the voice spoke"

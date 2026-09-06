@@ -20,10 +20,11 @@ import time
 import uuid
 from datetime import UTC, datetime
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
+from origenerator import speech
 from origenerator.completion import extract_completion
-from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
 from origenerator.progress import ProgressTracker, stage_names
 
 logger = logging.getLogger(__name__)
@@ -82,11 +83,16 @@ class GenerationJob(QObject):
     failed = pyqtSignal(str)                     # error message
 
     def __init__(self, client, workflow, params, *, source="generated",
-                 output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR, parent=None):
+                 output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR, input_dir=COMFYUI_INPUT_DIR,
+                 speaker=None, parent=None):
         super().__init__(parent)
         self._client = client
         self.workflow = workflow
         self.params = dict(params)
+        # Where ComfyUI reads a story's spoken lines from, and who speaks the
+        # ones not spoken yet before the job is sent (see start()).
+        self._input_dir = input_dir
+        self._speaker = speaker or ThreadedSpeaker(client)
         # Who asked for this run: "generated" for the user's own work,
         # "experiment" for a background experiment's. Kept on the job (not just
         # the DB row) so the controller can tell a preemptible experiment from
@@ -291,6 +297,18 @@ class GenerationJob(QObject):
         """
         if self._state != "idle":
             return
+        # A story whose lines are not all spoken yet is spoken first: the voice
+        # runs off the GUI thread and the job is sent when it is done, or fails
+        # without ever reaching ComfyUI if the voice does. Whoever holds the
+        # line takes the job as started either way: the machine is busy with
+        # its voice, which is that job's own work.
+        if speech.missing_speech(self.params, self._input_dir):
+            self._state = "speaking"
+            self._speaker.speak(self.params, lambda: self._spoken(submit), self._unspoken)
+            return
+        self._submit(submit)
+
+    def _submit(self, submit):
         self._attach()
 
         def post():
@@ -302,6 +320,25 @@ class GenerationJob(QObject):
             self._detach()
             raise
         self._state = "queued"
+
+    def _spoken(self, submit):
+        """The lines are on disk: send the job, unless it was canceled while
+        the voice spoke. A submit refused here has no caller to raise to, so
+        it fails the job the way a run that errors does."""
+        if self._state != "speaking":
+            return
+        self._state = "idle"
+        try:
+            self._submit(submit)
+        except Exception as e:
+            self._state = "failed"
+            self.failed.emit(str(e))
+
+    def _unspoken(self, message: str):
+        if self._state != "speaking":
+            return
+        self._state = "failed"
+        self.failed.emit(message)
 
     def cancel(self):
         """Stop the job: interrupt it if running, else drop it from the queue."""
@@ -442,3 +479,52 @@ class GenerationJob(QObject):
         self._detach()
         self._state = "failed"
         self.failed.emit(message)
+
+
+class _Speaking(QThread):
+    """The voice at work, off the GUI thread: ComfyUI asked to give the GPU
+    back first (its resident models would leave the voice no room), then
+    every line the recipe still lacks spoken to disk."""
+
+    def __init__(self, client, params, parent=None):
+        super().__init__(parent)
+        self._client = client
+        self._params = params
+        self.error: str | None = None
+
+    def run(self):
+        try:
+            try:
+                self._client.free_memory()
+            except Exception as e:  # noqa: BLE001 -- a voice with less room, not a failed job
+                logger.info("ComfyUI kept its models while the lines were spoken: %s", e)
+            speech.ensure_speech_files(self._params, input_dir=COMFYUI_INPUT_DIR, python=SPEECH_PYTHON)
+        except Exception as e:  # noqa: BLE001 -- reported to the job, whatever it was
+            self.error = str(e)
+
+
+class ThreadedSpeaker(QObject):
+    """Speaks a job's lines on a thread of their own and answers on the GUI's.
+
+    ``speak(params, done, failed)`` returns at once; ``done()`` or
+    ``failed(message)`` is called on this object's thread when the voice has
+    finished, which is what lets a job submit itself from the callback.
+    """
+
+    def __init__(self, client, parent=None):
+        super().__init__(parent)
+        self._client = client
+        self._speaking: list[_Speaking] = []  # alive until they answer
+
+    def speak(self, params: dict, done, failed) -> None:
+        thread = _Speaking(self._client, params)
+        thread.finished.connect(lambda: self._answer(thread, done, failed))
+        self._speaking.append(thread)
+        thread.start()
+
+    def _answer(self, thread, done, failed) -> None:
+        self._speaking.remove(thread)
+        if thread.error is None:
+            done()
+        else:
+            failed(thread.error)

@@ -213,7 +213,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
 
     assert documented == {
-        "suite_root", "ambient_audio_dir", "genau_source", "recipe_categories",
+        "suite_root", "ambient_audio_dir", "speech_python", "genau_source", "recipe_categories",
         "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
         "detector_labels", "genau_stroke_prompts",
     }

@@ -1225,7 +1225,7 @@ def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
 
 def test_each_box_on_a_card_says_what_it_is(qtbot):
     # Three boxes to a card, so each is captioned and carries its param's help;
-    # the lines box says as well that nothing voices it yet.
+    # the lines box says as well that what goes in it is spoken.
     from origenerator.gui.eliding import ElidingLabel
     from origenerator.gui.param_help import param_help
 
@@ -1235,7 +1235,23 @@ def test_each_box_on_a_card_says_what_it_is(qtbot):
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
     assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
     assert scene.boxes["negative_prompt"].toolTip() == param_help("negative_prompt")
-    assert "not voiced" in scene.boxes["scene_lines"].placeholderText().lower()
+    assert "spoken" in scene.boxes["scene_lines"].placeholderText().lower()
+
+
+def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
+    # The loop has no lines param, so its cards carry no box for one: a box
+    # that nothing reads would be an invitation to type into the void.
+    from origenerator.gui.eliding import ElidingLabel
+
+    form = ParamForm([pd for pd in _scene_defs() if pd.key != "scene_lines"])
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+    for scene in editor._scenes:
+        assert "scene_lines" not in scene.boxes
+        assert "Her Lines" not in {label.text() for label in scene.findChildren(ElidingLabel)}
+    assert editor.lines() == []
+    assert "scene_lines" not in form.get_values()
 
 
 def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbot):

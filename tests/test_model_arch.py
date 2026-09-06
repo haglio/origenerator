@@ -4,7 +4,7 @@ import struct
 import pytest
 
 from origenerator.workflows import model_arch
-from origenerator.workflows.model_arch import FLUX, LTX, QWEN, SD15, SDXL, WAN
+from origenerator.workflows.model_arch import FLUX, LTX, QWEN, SD15, SDXL, WAN, WAN_S2V
 
 
 def _write(path, tensor_names):
@@ -50,6 +50,10 @@ ARCH_CASES = [
     (WAN, ["blocks.0.cross_attn.k.lora_A.weight"]),
     (WAN, ["lora_unet_blocks_0_cross_attn_k.lora_down.weight"]),
     (WAN, ["vace_blocks.0.before_proj.weight", "vace_patch_embedding.weight"]),
+    # WAN 2.2 S2V: WAN's blocks with the audio injector beside them, which is
+    # what makes it its own family rather than one more WAN expert.
+    (WAN_S2V, ["audio_injector.injector.0.k.weight", "blocks.0.self_attn.q.weight",
+               "patch_embedding.weight", "time_projection.1.weight"]),
 ]
 
 

@@ -38,9 +38,27 @@ PARAM_HELP: dict[str, str] = {
         "before it, so the clip is the scenes end to end."
     ),
     "scene_lines": (
-        "What she says in this scene. Saved with the recipe, and nothing hears it "
-        "yet: no voice is wired in, so the field does not change the video until "
-        "one is."
+        "What she says in this scene, spoken in the voice set under Audio: the "
+        "scene renders on the speech model, her lips on the words, and the line "
+        "plays over the soundtrack. Words past the scene's end are cut; a scene "
+        "left blank renders as it always has."
+    ),
+    "voice": (
+        "Whose voice speaks the lines: one of the speech model's preset speakers, "
+        "the same voice every run. A Voice Sample below takes its place."
+    ),
+    "voice_sample": (
+        "The full path of a recording, five to fifteen seconds of one clean voice, "
+        "for the lines to be spoken in a copy of that voice instead of a preset. "
+        "Blank keeps the preset."
+    ),
+    "voice_sample_text": (
+        "The words the Voice Sample says, exactly. With them the copy carries the "
+        "recording's manner as well as its timbre; without them only the timbre."
+    ),
+    "unet_s2v": (
+        "The speech-to-video model a scene with a line renders on, in place of "
+        "the two experts; it hears the line and moves her lips to it."
     ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "
@@ -99,6 +117,10 @@ PARAM_HELP: dict[str, str] = {
     ),
     "pose_bbox_detector": "The detector that finds people in the input picture before posing them.",
     "pose_estimator": "The model that reads the skeleton out of each person it found.",
+    "audio_encoder_name": (
+        "The listener the speech model hears her lines through, so its lips "
+        "follow the words."
+    ),
     "foley_model": "The model that scores the finished video with sound.",
     "foley_vae": "The decoder that turns the scoring model's output into audio.",
     "foley_synchformer": "The model that keeps the generated sound aligned to the motion on screen.",

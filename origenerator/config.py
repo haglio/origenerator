@@ -69,6 +69,24 @@ def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
 
 
 AMBIENT_AUDIO_DIR = ambient_audio_dir()
+
+
+def speech_python(content: dict[str, Any] | None = None) -> Path | None:
+    """The Python that speaks a story's lines (see :mod:`origenerator.speech`),
+    or ``None`` when no voice is set up.
+
+    Qwen3-TTS pins a torch and a transformers that would break this app's own
+    environment and ComfyUI's, so it lives in one of its own, and which one is
+    a fact about the machine: the overlay names its interpreter. Absent, a
+    recipe with lines fails at submit saying so, rather than the app guessing
+    at an environment that may not exist.
+    """
+    content = _CONTENT if content is None else content
+    raw = content.get("speech_python")
+    return Path(raw) if raw else None
+
+
+SPEECH_PYTHON = speech_python()
 # How many clips the audio bed plays at once. Each voice walks its own shuffled
 # pass of the folder, so they drift apart the moment two clip lengths differ.
 AMBIENT_AUDIO_VOICES = 3

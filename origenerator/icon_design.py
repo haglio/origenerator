@@ -1,6 +1,6 @@
-"""Generates the Origenerator app icon: a PINK "O" on the suite's grid.
+"""Generates the Origenerator app icon: a MAGENTA "O" on the suite's grid.
 
-Every app in the suite draws a single PINK letter on a 5x5 grid inset 31px
+Every app in the suite draws a single MAGENTA letter on a 5x5 grid inset 31px
 inside a 256px canvas, with each stroke exactly one grid unit -- 1/5 of the
 glyph box -- thick and near-square corners.  This module renders Origenerator's
 "O" as a 1/5-thick square ring to match.
@@ -21,7 +21,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import PINK
+from shared_ui.colors import MAGENTA
 
 CANVAS = 256  # icon master size
 INSET = 31  # glyph box offset within the canvas
@@ -46,7 +46,7 @@ def render_icon(size: int = CANVAS) -> Image.Image:
     painter = QPainter(qimg)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(PINK)
+    painter.setBrush(MAGENTA)
 
     outer = QPainterPath()
     outer.addRoundedRect(QRectF(inset, inset, box, box), radius, radius)

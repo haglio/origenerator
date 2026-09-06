@@ -184,7 +184,7 @@ def output_file_reference(files: list[dict]) -> str | None:
 
     A saved file lives in ComfyUI's output dir, so the reference carries its
     subfolder and an ``[output]`` tag (LoadImage validates by file existence via
-    that annotation, not by input-folder membership). Feeds a re-rolled i2v its
+    that annotation, not by which input folder it is in). Feeds a re-rolled i2v its
     freshly generated start frame. ``None`` when no file has a name to reference.
     """
     for f in files:

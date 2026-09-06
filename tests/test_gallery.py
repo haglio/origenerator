@@ -224,7 +224,7 @@ def test_an_import_keeps_one_folder_however_this_param_varies(key, one, other):
     """The two static key sets are only ever the answer for a row with no
     registered workflow, and every test that names one of these behaviours passes
     a registered name — which derives its keys from the template instead. So a
-    member dropped from either set shows up here or nowhere, and an imported row
+    key dropped from either set shows up here or nowhere, and an imported row
     would start splitting its folder by the foley seed, or by how hard it was
     upscaled after the fact.
     """
@@ -909,7 +909,7 @@ def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
 
 
 def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
-    # A source-image bookmark's key is recomputed from a member row; it depends on
+    # A source-image bookmark's key is recomputed from a row under it; it depends on
     # the start frame's config, so folder_key_at_level must resolve it through the
     # image index — matching the tree, not the bare filename.
     from origenerator.gallery import folder_key_at_level
@@ -956,7 +956,7 @@ def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
-    # The reconcile recomputes a settings bookmark's key from a member row; for an
+    # The reconcile recomputes a settings bookmark's key from a row under it; for an
     # i2v that key depends on the start frame's config, so folder_key_at_level must
     # resolve it through the image index — matching the tree, not the bare filename.
     from origenerator.gallery import folder_key_at_level, settings_folder_key
@@ -1027,8 +1027,8 @@ def test_group_level_names_each_tier():
         ["workflow", "model", "lora", "source_image", "settings"]
 
 
-def test_folder_key_at_level_recomputes_each_tiers_key_from_a_member_row():
-    # A bookmark stores its tier + a member row; recomputing the key from that row
+def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
+    # A bookmark stores its tier + a row under it; recomputing the key from that row
     # must reproduce the folder's key at every tier, so the star can follow it.
     from origenerator.gallery import folder_key_at_level, group_level
     rows = [_i2v("v1", "styleA")]

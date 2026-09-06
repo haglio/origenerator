@@ -27,7 +27,7 @@ from origenerator.db_schema import ADDED_COLUMNS, GENERATION_COLUMNS
 # (name, type, not_null, default, primary_key_position) per column, in
 # declaration order — exactly what `PRAGMA table_info` reports.
 SCHEMA = {
-    "custom_folder_members": (
+    "custom_folder_items": (
         ("folder_id", "INTEGER", 1, None, 1),
         ("folder_key", "TEXT", 1, None, 2),
         ("level", "TEXT", 0, None, 0),
@@ -210,7 +210,7 @@ def test_the_replayed_column_list_is_the_tables_own_order(opened):
 # fails this file instead of quietly shipping a column every existing user's
 # database will never have.
 FIRST_SHIPPED = {
-    "custom_folder_members": {
+    "custom_folder_items": {
         "folder_id", "folder_key", "level", "ref_prompt_id", "position"},
     "custom_folders": {"id", "name", "created_at"},
     "deletions": {"prompt_id", "row_json", "batch_json", "deleted_at"},
@@ -297,6 +297,36 @@ def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, 
              for name, type_, not_null, default, _ in SCHEMA[table]}
     for column in ADDED_COLUMNS[table]:
         assert migrated[column] == fresh[column], column
+
+
+def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_path):
+    """The table holding what each custom folder gathers was renamed with the
+    vocabulary sweep. Every user's database still has the old one, and it is the
+    only record of the groupings they built by hand -- so it is renamed in
+    place, rows and order intact, rather than left beside an empty new table
+    while the gallery reports no custom folders at all."""
+    path = tmp_path / "origenerator.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE custom_folders (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "name TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))")
+        conn.execute(
+            "CREATE TABLE custom_folder_members (folder_id INTEGER NOT NULL, "
+            "folder_key TEXT NOT NULL, level TEXT, ref_prompt_id TEXT, "
+            "position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (folder_id, folder_key))")
+        conn.execute("INSERT INTO custom_folders (id, name) VALUES (1, 'Favorites')")
+        conn.executemany(
+            "INSERT INTO custom_folder_members VALUES (?, ?, ?, ?, ?)",
+            [(1, "image/sdxl_t2i", "settings", "i1", 0),
+             (1, "image/flux_t2i", "settings", "i2", 1)])
+
+    db = Database(path)
+
+    assert db.list_custom_folders() == [
+        {"id": 1, "name": "Favorites",
+         "items": ["image/sdxl_t2i", "image/flux_t2i"]}]
+    with sqlite3.connect(path) as conn:
+        assert "custom_folder_members" not in _tables(conn)
 
 
 def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):

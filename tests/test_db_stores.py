@@ -2,7 +2,7 @@
 
 `Database` was one 626-line class over six unrelated tables, so a unit that
 touches one of them — recovery reads only `deletions`, reconcile only
-`folder_meta` and `custom_folder_members` — had to be handed the whole surface,
+`folder_meta` and `custom_folder_items` — had to be handed the whole surface,
 and could be given no narrow fake. The queries live one table to a module now, and these are the tests
 that a store is a whole object on its own, and that the facade over them is
 exactly a facade.

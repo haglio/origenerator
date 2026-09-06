@@ -1,7 +1,7 @@
 """How a derived folder is identified, and what it is called before you name it.
 
-A folder's *key* is what its star, its custom name and its membership of a custom
-folder hang off, so it has to be derivable from any member row and has to stay
+A folder's *key* is what its star, its custom name and its place in a custom
+folder hang off, so it has to be derivable from any row under it and has to stay
 put as the library grows. Every level below the workflow is keyed by a hash of
 the facet it projects — the model, the LoRA, the start frame, the full settings —
 tagged with the media type, the workflow and a letter for the level.

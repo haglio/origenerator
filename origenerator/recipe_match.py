@@ -26,7 +26,7 @@ device's phase (:data:`GENAU`). The same act wants a different recipe for each, 
 the intent chooses both the overlay table consulted and, for ``GENAU``, narrows
 mining to videos a looping workflow made.
 
-The LLM boundary is one function, so the grouping and act-membership logic stays
+The LLM boundary is one function, so the grouping and act-matching logic stays
 unit-testable without a live model, a database, or a widget.
 """
 
@@ -152,7 +152,7 @@ def _created(row) -> str:
 def _act_recipe_groups(category: str, video_rows, *, require_scene: bool = False,
                        loop_only: bool = False) -> dict:
     """The act's videos grouped by recipe signature. ``require_scene`` also drops
-    members with no ``start_scene`` — nothing for the LLM to situation-match on.
+    rows with no ``start_scene`` — nothing for the LLM to situation-match on.
     ``loop_only`` keeps just the ones a looping workflow made (see :func:`_loops`)."""
     groups = defaultdict(list)
     for row in video_rows:
@@ -226,7 +226,7 @@ def best_recipe(category: str, video_rows, intent: str = PLAYERS) -> str | None:
 
 def _recipe_representatives(category: str, video_rows, *, loop_only: bool = False) -> list:
     """One representative video per recipe among ``category``'s videos: the most-recent
-    member of each recipe group that carries a ``start_scene`` (its input image's
+    row of each recipe group that carries a ``start_scene`` (its input image's
     prompt) to match on. A recipe with no start scene anywhere is left out — there's
     nothing to compare the dropped image against."""
     groups = _act_recipe_groups(category, video_rows, require_scene=True, loop_only=loop_only)

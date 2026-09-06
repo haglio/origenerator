@@ -7,7 +7,7 @@ tables that hold such a key are reconciled at startup, and both the same way,
 for each stored key:
 
   - **still matches a folder** → refresh its stored ``(level, ref)`` so a future
-    formula change can re-derive it from a member generation;
+    formula change can re-derive it from a generation under it;
   - **dangles, stored ref still exists** → recompute the key at the stored tier
     and move the bookmark onto it (robust to *any* formula change);
   - **dangles, no usable identity** → try the legacy settings formulas, which
@@ -42,7 +42,7 @@ class Folders:
     asserts that, since sharing it is what makes the assumption load-bearing.
     """
 
-    #: folder key → ``(level, a member prompt_id)``, for every folder there is.
+    #: folder key → ``(level, a prompt_id under it)``, for every folder there is.
     current: dict
     #: a settings folder's keys under older formulas → its key today.
     legacy_keys: dict
@@ -68,7 +68,7 @@ def reconcile_bookmarks(db) -> dict:
     Ordered: the stars and names first, then the folders the user composed by
     hand. Returns each pass's summary under its own key.
     """
-    if not db.folder_meta_full() and not db.custom_folder_members_full():
+    if not db.folder_meta_full() and not db.custom_folder_items_full():
         return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING)}
     folders = index_folders(db)
     return {
@@ -105,29 +105,29 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
 
 
 def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
-    """Re-point custom-folder memberships whose folder key no longer matches.
+    """Re-point custom-folder items whose folder key no longer matches.
 
     A custom folder gathers folders by key, so it drifts exactly the way a star
     does — and a grouping the user built by hand is worth no less than a star.
 
     Returns ``{"refreshed": n, "repointed": n, "orphaned": n}``.
     """
-    members = db.custom_folder_members_full()
-    if not members:
+    items = db.custom_folder_items_full()
+    if not items:
         return dict(_NOTHING)
     folders = index_folders(db) if folders is None else folders
 
-    def refresh(member, identity):
+    def refresh(item, identity):
         level, ref = identity
-        db.stamp_custom_folder_member(member["folder_id"], member["folder_key"],
+        db.stamp_custom_folder_item(item["folder_id"], item["folder_key"],
                                       level=level, ref_prompt_id=ref)
 
-    def repoint(member, target, identity):
+    def repoint(item, target, identity):
         level, ref = identity
-        db.repoint_custom_folder_member(member["folder_id"], member["folder_key"],
+        db.repoint_custom_folder_item(item["folder_id"], item["folder_key"],
                                         target, level=level, ref_prompt_id=ref)
 
-    summary = _reconcile_keys(members, folders, refresh, repoint)
+    summary = _reconcile_keys(items, folders, refresh, repoint)
     logger.info("Reconciled custom folders: %(refreshed)d refreshed, "
                 "%(repointed)d re-pointed, %(orphaned)d orphaned", summary)
     return summary
@@ -137,9 +137,9 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
     """The three-outcome pass both tables get, with the writes handed in.
 
     *refresh* takes ``(row, identity)`` and *repoint* ``(row, target, identity)``,
-    where an identity is the ``(level, member prompt_id)`` of a folder that is
+    where an identity is the ``(level, prompt_id)`` of a folder that is
     there today. Everything else — which key is live, which dangles, and where a
-    dangling one belongs — is the same question for a star and for a membership.
+    dangling one belongs — is the same question for a star and for a folder's item.
     """
     summary = dict(_NOTHING)
     for row in rows:
@@ -160,7 +160,7 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
 
 
 def _index_current_folders(rows, image_index):
-    """Map every current folder key → ``(level, a member prompt_id)``, plus each
+    """Map every current folder key → ``(level, a prompt_id under it)``, plus each
     settings folder's legacy keys → its current key (for the historical formula
     changes, so bookmarks made before stored identity can still be recovered)."""
     current: dict = {}
@@ -168,18 +168,19 @@ def _index_current_folders(rows, image_index):
 
     def walk(groups):
         for group in groups:
-            members = gallery.rows_under(group)
-            if members:
-                current[group.key] = (gallery.group_level(group), members[0]["prompt_id"])
+            folder_rows = gallery.rows_under(group)
+            if folder_rows:
+                current[group.key] = (gallery.group_level(group),
+                                      folder_rows[0]["prompt_id"])
                 if isinstance(group, gallery.SettingsGroup):
                     for legacy in (
-                        gallery.legacy_settings_folder_key(members[0]),
-                        gallery.legacy_preframe_settings_folder_key(members[0]),
-                        gallery.legacy_preversion_settings_folder_key(members[0], image_index),
-                        # Per member, not just the first: the enhancement split
+                        gallery.legacy_settings_folder_key(folder_rows[0]),
+                        gallery.legacy_preframe_settings_folder_key(folder_rows[0]),
+                        gallery.legacy_preversion_settings_folder_key(folder_rows[0], image_index),
+                        # Per row, not just the first: the enhancement split
                         # merged two folders into this one, and a star on either
                         # of them has to find its way here.
-                        *gallery.legacy_preenhance_settings_folder_keys(members, image_index),
+                        *gallery.legacy_preenhance_settings_folder_keys(folder_rows, image_index),
                     ):
                         if legacy != group.key:
                             legacy_keys.setdefault(legacy, group.key)
@@ -192,7 +193,7 @@ def _index_current_folders(rows, image_index):
 def _repoint_target(row, folders: Folders):
     """The current key a dangling bookmark should move to, or ``None``.
 
-    Prefers recomputing from the bookmark's stored identity — a member row at its
+    Prefers recomputing from the bookmark's stored identity — a row under it at its
     tier, robust to any formula change — and falls back to a legacy settings
     formula for bookmarks that predate stored identity."""
     ref, level = row["ref_prompt_id"], row["level"]

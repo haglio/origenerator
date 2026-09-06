@@ -192,7 +192,7 @@ class FolderTree(QTreeWidget):
 
         Tree keys rather than folder keys so a set picked across both sides
         stays two distinct folders: composing one out of a folder key alone
-        would resolve every member onto whichever side happened to be open, and
+        would resolve every folder onto whichever side happened to be open, and
         a grouping of mixed shapes is the one thing the split exists to stop.
         """
         keys = []

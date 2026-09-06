@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEW = REPO_ROOT / "origenerator" / "gui" / "gallery_view.py"
 PANE = REPO_ROOT / "origenerator" / "gui" / "browser_pane.py"
 
-# A private member read through a privately held object — self._x._y — the
+# A private attribute read through a privately held object — self._x._y — the
 # reach-through shape the audit counted 93 of. Zero everywhere in both files:
 # scoping it to one attribute name would let a renamed handle walk past it.
 _REACH_THROUGH = re.compile(r"self\._[a-z_]+\._[a-z_]")
@@ -61,7 +61,7 @@ def test_neither_knot_file_reaches_a_private_through_a_private():
 
 def test_the_pane_holds_no_view():
     """The back-pointer stays deleted. The regex above would miss a re-added
-    self._v that only called public members, so the handle itself is banned:
+    self._v that only called public attributes, so the handle itself is banned:
     no name in browser_pane.py mentions GalleryView, and the constructor's
     parameters are exactly the collaborators the split ended on."""
     tree = ast.parse(PANE.read_text(encoding="utf-8"))

@@ -1146,7 +1146,7 @@ class GalleryView(QWidget):
         self._combine.setVisible(self._client is not None)
         toc_box.addWidget(self._combine)
         # Hosted, the tree is the upright column's own left edge rather than a
-        # member of the folder row, so it goes straight into the outer splitter.
+        # part of the folder row, so it goes straight into the outer splitter.
         (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
 
         # Browser pane: a header (the folder's path, then a back/forward/undo
@@ -3011,19 +3011,19 @@ class GalleryView(QWidget):
         group = self._selection_group
         if group is None:
             return
-        members = gallery.child_groups(group)
+        folders = gallery.child_groups(group)
         name, ok = QInputDialog.getText(
             self, "New Folder",
-            f"Name for a folder holding these {len(members)} folders:",
+            f"Name for a folder holding these {len(folders)} folders:",
         )
         if not ok or not name.strip():
             return
         folder_id = self._actions.create_custom_folder(
-            name.strip(), [self._member_identity(m) for m in members]
+            name.strip(), [self._item_identity(f) for f in folders]
         )
         self._open_custom_folder(folder_id)
 
-    def _member_identity(self, group) -> tuple:
+    def _item_identity(self, group) -> tuple:
         """A gathered folder as ``(key, level, ref_prompt_id)`` — its key plus the
         identity the reconcile re-derives it from when a key formula moves."""
         rows = gallery.rows_under(group)
@@ -3054,7 +3054,7 @@ class GalleryView(QWidget):
         if folder_id is None:
             return
         self._actions.add_to_custom_folder(
-            folder_id, [self._member_identity(g) for g in groups]
+            folder_id, [self._item_identity(g) for g in groups]
         )
         self._open_custom_folder(folder_id)
 
@@ -3082,12 +3082,12 @@ class GalleryView(QWidget):
         self.refresh()
         self._sync_history_buttons()
 
-    def _remove_from_custom_folder(self, group, member_key: str):
+    def _remove_from_custom_folder(self, group, item_key: str):
         """Drop one gathered folder out of the custom folder on screen."""
-        member = self._group_for_key(member_key)
-        identity = self._member_identity(member) if member is not None else (member_key, None, None)
+        item = self._group_for_key(item_key)
+        identity = self._item_identity(item) if item is not None else (item_key, None, None)
         self._actions.remove_from_custom_folder(
-            group.folder_id, member_key, level=identity[1], ref_prompt_id=identity[2]
+            group.folder_id, item_key, level=identity[1], ref_prompt_id=identity[2]
         )
         self.refresh()
         self._sync_history_buttons()
@@ -3875,7 +3875,7 @@ class GalleryView(QWidget):
 
     def _enhance_selection(self):
         """The bank button's action: enhance the picked thumbnails, or every
-        member image of this folder that isn't enhanced yet."""
+        image in this folder that isn't enhanced yet."""
         if self._browser.selected_ids:
             ids = self._enhanceable_selection()
             if ids:
@@ -3996,7 +3996,7 @@ class GalleryView(QWidget):
 
     def _enhance_all(self):
         """The folder button's action: queue a standalone enhance for every
-        member image that isn't enhanced yet, at the current settings, then
+        image in it that isn't enhanced yet, at the current settings, then
         retire the button."""
         group = self._current_group()
         if not isinstance(group, gallery.SettingsGroup):
@@ -4874,7 +4874,7 @@ class GalleryView(QWidget):
         like it is turning out plain images and ignoring the switch.
 
         Every live job is searched, not each folder's leading one: a batch of
-        enhances goes out whole and its members share a settings key, so all but
+        enhances goes out whole and its jobs share a settings key, so all but
         the first would read as not-cooking off the folder-facing view."""
         for job in self._enhance_jobs():
             if self._enhance_of_row(job, row):
@@ -4906,7 +4906,7 @@ class GalleryView(QWidget):
     def _enhancing_run(self, job) -> EnhancingRun:
         """One enhance in flight, as the tile of the image it improves sees it:
         the job's own latest frame — a run that hasn't started has streamed
-        none, so a batch's queued members show as queued rather than borrowing
+        none, so a batch's queued jobs show as queued rather than borrowing
         the picture of the one being rendered."""
         rendering = job.state == "running"
         return EnhancingRun(
@@ -5031,7 +5031,7 @@ class GalleryView(QWidget):
         answer.
 
         The frame is the job's own latest, which a run that hasn't started has
-        none of: a batch's queued members say "queued" instead — and "queued"
+        none of: a batch's queued jobs say "queued" instead — and "queued"
         covers both waits the same way, whether the job is still in this app's
         line or already sitting on ComfyUI, since neither has a frame to show."""
         for job in running:
@@ -5384,7 +5384,7 @@ class GalleryView(QWidget):
         being watched for. The first iterations are already worth looking at, so
         the run joins on its first frame and swaps for the file when it lands.
 
-        The membership question is asked once per run, either way: a run the show
+        Whether it belongs is asked once per run, either way: a run the show
         holds answers itself, and one it turned down is remembered as turned down
         (:attr:`_show_refused`). A frame arrives every second or so, and the
         question costs a row lookup and a walk of what is on screen.
@@ -7117,7 +7117,7 @@ class GalleryView(QWidget):
         # a LoRA, a source image (see :func:`gallery.is_renamable`).
         rename_action = menu.addAction("Rename…") if gallery.is_renamable(group) else None
         star_action = menu.addAction("Unstar" if group.starred else "Star")
-        # Inside a folder the user made, a member tile can also be dropped from it.
+        # Inside a folder the user made, an item tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
         # it isn't in any grouping from there.
         open_custom = self._current_group()

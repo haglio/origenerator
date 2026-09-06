@@ -145,7 +145,7 @@ class FakeDB:
         self._rows = list(rows)
         self._by_id = {r["prompt_id"]: r for r in rows}
         self._meta = {}
-        self._custom = {}       # folder id -> {"name", "members": {key: (level, ref)}}
+        self._custom = {}       # folder id -> {"name", "items": {key: (level, ref)}}
         self._next_custom = 1
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
@@ -241,7 +241,7 @@ class FakeDB:
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "members": {}}
+        self._custom[folder_id] = {"name": name, "items": {}}
         return folder_id
 
     def rename_custom_folder(self, folder_id, name):
@@ -250,21 +250,21 @@ class FakeDB:
     def delete_custom_folder(self, folder_id):
         self._custom.pop(folder_id, None)
 
-    def add_custom_folder_members(self, folder_id, members):
-        for folder_key, level, ref in members:
-            self._custom[folder_id]["members"][folder_key] = (level, ref)
+    def add_custom_folder_items(self, folder_id, items):
+        for folder_key, level, ref in items:
+            self._custom[folder_id]["items"][folder_key] = (level, ref)
 
-    def remove_custom_folder_member(self, folder_id, folder_key):
-        self._custom[folder_id]["members"].pop(folder_key, None)
+    def remove_custom_folder_item(self, folder_id, folder_key):
+        self._custom[folder_id]["items"].pop(folder_key, None)
 
     def list_custom_folders(self):
-        return [{"id": fid, "name": f["name"], "members": list(f["members"])}
+        return [{"id": fid, "name": f["name"], "items": list(f["items"])}
                 for fid, f in sorted(self._custom.items())]
 
-    def custom_folder_members_full(self):
+    def custom_folder_items_full(self):
         return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
                 for fid, f in self._custom.items()
-                for key, (level, ref) in f["members"].items()]
+                for key, (level, ref) in f["items"].items()]
 
     def add(self, row):  # test helper: simulate a new generation landing
         self._rows.insert(0, row)
@@ -9617,7 +9617,7 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     assert view._enhance_btn.toolTip() == "Nothing here to enhance"
 
 
-def test_enhance_all_queues_every_member_image(qtbot, tmp_path):
+def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -9911,7 +9911,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
 
 
 def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
-    # A batch of enhances goes to the controller whole, and its members share one
+    # A batch of enhances goes to the controller whole, and its jobs share one
     # settings key, so the ones behind the leader must still be findable: a tab
     # showing an image waiting its turn says so, rather than borrowing the frame
     # of the one ComfyUI is actually rendering.
@@ -11359,7 +11359,7 @@ def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, mo
 
     (record,) = view._db.list_custom_folders()
     assert record["name"] == "Favorites"
-    assert record["members"] == [cat, dog]
+    assert record["items"] == [cat, dog]
     # ...and the view has landed on it, showing what it gathered.
     assert _top_level(view._tree)["Favorites"] is view._tree.currentItem()
     assert view._browser._visible_keys == [cat, dog]
@@ -11378,7 +11378,7 @@ def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
 
 def _make_folder(view, name, keys):
     folder_id = view._db.create_custom_folder(name)
-    view._db.add_custom_folder_members(
+    view._db.add_custom_folder_items(
         folder_id, [(key, "settings", None) for key in keys]
     )
     view.refresh()
@@ -11392,7 +11392,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     row = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(row)
 
-    assert row.childCount() == 0  # flat like a shelf: its members live elsewhere
+    assert row.childCount() == 0  # flat like a shelf: its items live elsewhere
     assert view._browser._visible_keys == [cat]
     assert {r["prompt_id"] for r in view._slideshow_rows()} == {"i1"}
 
@@ -11411,7 +11411,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     view._on_folders_dropped(gallery.custom_folder_key(folder_id), [dog])
 
     (record,) = view._db.list_custom_folders()
-    assert record["members"] == [cat, dog]
+    assert record["items"] == [cat, dog]
     assert view._browser._visible_keys == [cat, dog]  # landed on it
 
 
@@ -11424,15 +11424,15 @@ def test_dropping_a_folder_onto_starred_stars_it(qtbot):
 
 
 def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
-    # Without (level, ref) a membership cannot be re-derived when a key formula
+    # Without (level, ref) an item cannot be re-derived when a key formula
     # moves, and the grouping silently loses the folder.
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
     view._on_folders_dropped(gallery.custom_folder_key(folder_id), [cat])
 
-    (member,) = view._db.custom_folder_members_full()
-    assert (member["level"], member["ref_prompt_id"]) == ("settings", "i1")
+    (item,) = view._db.custom_folder_items_full()
+    assert (item["level"], item["ref_prompt_id"]) == ("settings", "i1")
 
 
 def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
@@ -11443,7 +11443,7 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     view._remove_from_custom_folder(group, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["members"] == [cat]
+    assert record["items"] == [cat]
     assert view._db.get_generation("i2") is not None  # the folder itself survives
 
 
@@ -11483,7 +11483,7 @@ def test_renaming_a_custom_folder_renames_the_folder_itself(qtbot):
     assert "Best of" in _top_level(view._tree)
 
 
-def test_a_custom_folder_survives_a_rebuild_and_follows_its_members(qtbot):
+def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
@@ -11595,7 +11595,7 @@ def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monke
     _tree_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["members"] == [cat, dog]
+    assert record["items"] == [cat, dog]
 
 
 def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
@@ -11619,7 +11619,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     _tree_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
-    assert record["id"] == folder_id and record["members"] == [cat]
+    assert record["id"] == folder_id and record["items"] == [cat]
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
@@ -11648,7 +11648,7 @@ def test_renaming_a_folder_of_your_own_renames_it_rather_than_removing_it(
     _tree_menu(view, gallery.custom_folder_key(folder_id))
 
     (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Best of" and record["members"] == [cat]
+    assert record["name"] == "Best of" and record["items"] == [cat]
     assert "Best of" in _top_level(view._tree)
 
 
@@ -11675,7 +11675,7 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     _tree_menu(view)  # no row under the cursor
 
     (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Keepers" and record["members"] == []
+    assert record["name"] == "Keepers" and record["items"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
 
 
@@ -11689,7 +11689,7 @@ def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkey
     _tree_menu(view, cat)
 
     (record,) = view._db.list_custom_folders()
-    assert record["members"] == [cat, dog]  # both, not the one under the cursor
+    assert record["items"] == [cat, dog]  # both, not the one under the cursor
 
 
 def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(

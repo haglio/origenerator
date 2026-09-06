@@ -91,7 +91,7 @@ class CustomGroup:
     """A folder the user composed: the folders they gathered into it, in the
     order they were added.
 
-    Unlike every tier above, its members can sit at any depth and in any branch —
+    Unlike every tier above, its items can sit at any depth and in any branch —
     it is a grouping, not a projection — so it holds resolved child *groups*
     rather than rows, and nothing nests beneath it in the tree. ``folder_id`` is
     the saved custom folder it renders (``None`` for the throwaway one a live
@@ -175,7 +175,7 @@ def rows_under(group) -> list[dict]:
 def group_level(group) -> str:
     """Which tier of the tree ``group`` sits at: all, workflow, model, lora,
     source_image, custom, or settings. A bookmark records its tier so its key can
-    be recomputed from a member row under whatever key formula is current (see
+    be recomputed from one of its rows under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
     if isinstance(group, AllGroup):
         return "all"

@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS folder_meta (
     folder_key    TEXT PRIMARY KEY,
     custom_name   TEXT,
     starred       INTEGER NOT NULL DEFAULT 0,
-    -- A bookmark's identity: the tree tier it sits at and a member generation, so
+    -- A bookmark's identity: the tree tier it sits at and a generation under it, so
     -- its key can be recomputed under any future key formula (see reconcile).
     level         TEXT,
     ref_prompt_id TEXT
@@ -105,21 +105,21 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 
 -- A folder the user composed by hand out of other folders (see
 -- origenerator.gallery.custom). The name is the whole of it; what it holds lives
--- in custom_folder_members.
+-- in custom_folder_items.
 CREATE TABLE IF NOT EXISTS custom_folders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS custom_folder_members (
+CREATE TABLE IF NOT EXISTS custom_folder_items (
     folder_id     INTEGER NOT NULL REFERENCES custom_folders(id) ON DELETE CASCADE,
     -- The gathered folder, by tree key, plus the same identity a folder_meta
     -- bookmark carries so the reconcile can re-point it when a key formula moves.
     folder_key    TEXT    NOT NULL,
     level         TEXT,
     ref_prompt_id TEXT,
-    -- Membership order, so a custom folder lists what it holds the way it was built.
+    -- The order they were added, so a custom folder lists what it holds that way.
     position      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (folder_id, folder_key)
 );
@@ -196,6 +196,11 @@ ADDED_COLUMNS = {
     },
 }
 
+# Tables under a name this app has stopped using, and the name they carry now.
+# History, like FIRST_SHIPPED in tests/test_db_schema.py: an entry stays here
+# for as long as a database written before the rename might still be opened.
+RENAMED_TABLES = {"custom_folder_members": "custom_folder_items"}
+
 # Every column of the generations table, in declaration order. Used to restore a
 # previously-captured row verbatim (see ``restore_generation``).
 GENERATION_COLUMNS = (
@@ -211,8 +216,24 @@ GENERATION_COLUMNS = (
 
 def create(conn) -> None:
     """Make every table and index this app needs, if they are not there already."""
+    rename_tables(conn)
     conn.executescript(SCHEMA)
     migrate(conn)
+
+
+def rename_tables(conn) -> None:
+    """Move a table an older database spells differently onto its current name.
+
+    Before the schema script, not after: CREATE TABLE IF NOT EXISTS would
+    otherwise stand an empty table up beside the user's populated one, and every
+    row in it -- every custom folder they have ever composed -- would read as
+    gone while still sitting in the file.
+    """
+    have = {row[0] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'")}
+    for old, new in RENAMED_TABLES.items():
+        if old in have and new not in have:
+            conn.execute(f"ALTER TABLE {old} RENAME TO {new}")
 
 
 def migrate(conn) -> None:

@@ -76,7 +76,7 @@ def fold_enhancement(db, enhance_row: dict,
     records what the row held before its first enhance, which is also what
     marks it enhanced. The settings this run used are appended to
     ``enhance_history``, so the level it just added can be told apart from the
-    ones already there (:func:`enhance_levels`). Folder membership, star,
+    ones already there (:func:`enhance_levels`). Which folder it is in, star,
     params and identity are untouched: enhancing never moves or duplicates a
     node. The transient enhance row is deleted (row only — its file now
     belongs to the source).

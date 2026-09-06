@@ -397,12 +397,12 @@ class BrowserPane(QObject):
         so the bare label the hierarchy relies on isn't enough here (the Starred
         shelf shows its folders the same way, for the same reason).
         """
-        members = gallery.child_groups(group)
+        folders = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
-        for member in members:
-            self._add_folder_tile(flow, member, starred=member.starred,
-                                  context=self._tree.folder_context(member.key))
-        self.show_widget(container if members else self._empty_state(
+        for folder in folders:
+            self._add_folder_tile(flow, folder, starred=folder.starred,
+                                  context=self._tree.folder_context(folder.key))
+        self.show_widget(container if folders else self._empty_state(
             f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
             "pick several folders with Shift/Ctrl and group them."
         ))

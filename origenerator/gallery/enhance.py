@@ -440,7 +440,7 @@ def enhancement_recency(rows) -> dict[str, int]:
 
 
 def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
-    """The members of a folder its Enhance All button targets: finished images
+    """What a folder's Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked
     against ``all_rows``, where the transient job rows live)."""
     cooking_ids, cooking_names = _enhances_in_flight(all_rows)

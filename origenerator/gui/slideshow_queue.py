@@ -1,7 +1,7 @@
-"""The bottom strip's queue itself, floated into the fullscreen show's corner.
+"""The lower strip's queue itself, floated into the fullscreen show's corner.
 
 Not a summary of the queue — the queue: :class:`GenerationQueue` as the main
-window lays it out, with the running job's live frame filling its bottom-left,
+window lays it out, with the running job's live frame filling its lower-left,
 the fat progress bar with the clock written across it, and every waiting job as
 a row of its own carrying its Cancel, its picture and its drag to reorder. This
 is that widget, parented to the show and given a corner to sit in, so nothing
@@ -12,7 +12,7 @@ one stretch where the line deliberately stops moving — every video in it is he
 until the show closes (:mod:`origenerator.queue_line`) — and it is when the user
 keeps *adding* to it, since holding a slide stars it and asks for the better
 version of that picture. So the strip comes along, into the one region this view
-leaves empty: the console is top-left, the position counter bottom-center, the
+leaves empty: the console is top-left, the position counter lower-center, the
 neighbor stills up the two side edges.
 
 Three things it does differently from the one in the main window, all of them
@@ -44,7 +44,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 ensure_shared_ui_on_path()
 from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE
 
-# How far the plate floats off the screen's left and bottom edges — the position
+# How far the plate floats off the screen's left and lower edges — the position
 # counter's own margin, so the two sit on one baseline across the foot of the
 # show rather than at two heights that happen to be close.
 MARGIN = 24
@@ -64,7 +64,7 @@ ROWS = 4
 
 
 class SlideshowQueue(GenerationQueue):
-    """The generation queue, floated over a fullscreen show's bottom-left."""
+    """The generation queue, floated over a fullscreen show's lower-left."""
 
     def __init__(self, host: QWidget):
         super().__init__(host)
@@ -104,11 +104,11 @@ class SlideshowQueue(GenerationQueue):
             child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
     def reposition(self, avoid: QRect | None = None) -> None:
-        """Put the plate in the host's bottom-left corner.
+        """Put the plate in the host's lower-left corner.
 
         ``avoid`` is a rectangle to stay clear of — the position counter, which
         owns the middle of the same edge. The plate gives up width rather than
-        move: it is the bottom-left corner's, and a strip that slid up or along
+        move: it is the lower-left corner's, and a strip that slid up or along
         to dodge a caption would be somewhere different every time the caption's
         text changed length.
         """

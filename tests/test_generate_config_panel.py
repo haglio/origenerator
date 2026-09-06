@@ -232,7 +232,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
 
 def test_the_pane_keeps_a_margin_round_its_contents(panel):
     # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the settings down either side, not the button bank at the bottom. The width
+    # the settings down either side, not the button bank at the foot. The width
     # is written out rather than read from _PANE_MARGIN: taken from the constant
     # that sets it, this test passes at any margin at all.
     panel.show()
@@ -244,8 +244,8 @@ def test_the_pane_keeps_a_margin_round_its_contents(panel):
     scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
     assert panel.width() - scroll_right - 1 == 8
     generate = panel._generate_btn
-    bottom = generate.mapTo(panel, generate.rect().bottomLeft()).y()
-    assert panel.height() - bottom - 1 == 8
+    lower = generate.mapTo(panel, generate.rect().bottomLeft()).y()
+    assert panel.height() - lower - 1 == 8
 
 
 def _layout_containing(root, widget):
@@ -271,7 +271,7 @@ def test_info_and_form_share_one_scroll(panel):
 
 def test_file_info_above_form_related_media_below(panel):
     # File/Created sits above the form; the source-image tile and animated-in strip
-    # sit below it, at the bottom of the scroll just above the buttons.
+    # sit below it, at the foot of the scroll just above the buttons.
     body = panel._scroll.widget().layout()
     form_at = body.indexOf(panel._form_host)
     assert body.indexOf(panel._metadata_block) < form_at

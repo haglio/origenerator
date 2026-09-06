@@ -188,7 +188,7 @@ def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
 
 def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
     # The band lies along the foot of the bar, which is where a line of text
-    # keeps the bottom third of its letters. Painted last it strikes them out —
+    # keeps the lower third of its letters. Painted last it strikes them out —
     # which is what it did, until the caption was moved to the top layer.
     #
     # Offscreen has no real fonts, so the glyphs come out as boxes; the point

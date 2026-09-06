@@ -187,7 +187,7 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     for corner in (star, trash, plus):
         assert picture.contains(corner)
         assert corner.size().width() == CORNER_SIZE
-    # Top-right, bottom-left, bottom-right — and never top-left, which the
+    # Top-right, lower-left, lower-right — and never top-left, which the
     # media-type badge has always had.
     assert star.left() == plus.left() > picture.center().x()
     assert star.top() < picture.center().y() < plus.top()

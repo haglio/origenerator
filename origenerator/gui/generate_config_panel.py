@@ -109,7 +109,7 @@ class GenerateConfigPanel(QWidget):
     Clicking Generate doesn't run a job here — it emits :attr:`generate_requested`
     for the gallery to launch as a re-roll of this config's settings folder. The
     panel is one column: a fixed preview on top, then one scroll holding the
-    File/Created block above the editable form and, at its bottom, the displayed
+    File/Created block above the editable form and, at its foot, the displayed
     generation's related media, then a single button bank
     (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
     There's no status line: Generate only ever submits, and a run in flight is
@@ -121,7 +121,7 @@ class GenerateConfigPanel(QWidget):
 
     The info appears only while the tab is displaying a saved generation
     (:meth:`show_saved_generation`): a File/Created block above the form, and at the
-    bottom of the scroll the videos an image was animated into, or a clickable
+    foot of the scroll the videos an image was animated into, or a clickable
     source-image tile for a video. Send-to-Evolver and Send-to-Genau (a video), and
     the Drive-OSR2 toggle key off the displayed row. A blank
     tab, or one showing a bare autoshow, hides them all.
@@ -208,7 +208,7 @@ class GenerateConfigPanel(QWidget):
         self._caption_timer.timeout.connect(self._apply_generate_caption)
         # The hosting session, or None standalone.  Hosted, this tab lives in
         # the RFB's upright column, where a portrait picture stacked over the
-        # form pushes every prompt field off the bottom (_reflow_for_the_media).
+        # form pushes every prompt field off the foot (_reflow_for_the_media).
         self._fun_time = fun_time
         self._build_ui()
 
@@ -359,7 +359,7 @@ class GenerateConfigPanel(QWidget):
         showing a saved generation.
 
         Stacked straight under the form, with no stretch between. A stretch here
-        used to push these to the bottom of the viewport, which meant folding a
+        used to push these to the foot of the viewport, which meant folding a
         form section opened an elastic gap above them — the space growing by
         exactly what the fold saved, so the closer the form got the further away
         they went. Every gap in this column is the layout's spacing now, the same
@@ -763,7 +763,7 @@ class GenerateConfigPanel(QWidget):
 
         Only hosted by Fun Time, where this tab lives in the Random Favs
         Browser's upright rect: stacked there, a portrait picture takes the
-        whole column and pushes every prompt field off the bottom.  Side by side
+        whole column and pushes every prompt field off the foot.  Side by side
         it keeps its height and the form keeps its place — settings left,
         picture right, which is the order they are read in.
 

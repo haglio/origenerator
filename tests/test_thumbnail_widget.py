@@ -320,7 +320,7 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
 
 
 def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
-    # Star top-right, trash bottom-left, plus bottom-right — and the media badge
+    # Star top-right, trash lower-left, plus lower-right — and the media badge
     # keeps the top-left it has always had, so all four can coexist.
     tw = ThumbnailWidget("p1", None, "label", starred=True,
                          enhance=icons.ENHANCE_HELD, media_type="image")

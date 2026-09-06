@@ -110,11 +110,11 @@ class ContactSheet(QWidget):
         laid = []
         for row, columns in enumerate(row_counts(len(self._pictures), rows)):
             top = round(row * self.height() / rows)
-            bottom = round((row + 1) * self.height() / rows)
+            lower = round((row + 1) * self.height() / rows)
             for column in range(columns):
                 left = round(column * self.width() / columns)
                 right = round((column + 1) * self.width() / columns)
-                laid.append(QRect(left, top, right - left, bottom - top))
+                laid.append(QRect(left, top, right - left, lower - top))
         return laid
 
     def paintEvent(self, event):

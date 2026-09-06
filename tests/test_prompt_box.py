@@ -33,7 +33,7 @@ def _box(qtbot, key="positive_prompt"):
 
 
 def _drag_edge(qtbot, box, dy):
-    """Grab the box's bottom edge and pull it ``dy`` pixels down (up, if negative)."""
+    """Grab the box's lower edge and pull it ``dy`` pixels down (up, if negative)."""
     grab = QPoint(box.viewport().width() // 2, box.viewport().height() - 1)
     drop = grab + QPoint(0, dy)
     qtbot.mousePress(box.viewport(), Qt.MouseButton.LeftButton, pos=grab)
@@ -47,13 +47,13 @@ def test_a_fresh_prompt_box_is_the_familiar_height(qtbot):
     assert _box(qtbot).height() == DEFAULT_HEIGHT
 
 
-def test_dragging_the_bottom_edge_makes_the_box_taller(qtbot):
+def test_dragging_the_lower_edge_makes_the_box_taller(qtbot):
     box = _box(qtbot)
     _drag_edge(qtbot, box, 80)
     assert box.height() == DEFAULT_HEIGHT + 80
 
 
-def test_dragging_the_bottom_edge_up_makes_it_shorter(qtbot):
+def test_dragging_the_lower_edge_up_makes_it_shorter(qtbot):
     box = _box(qtbot)
     _drag_edge(qtbot, box, -40)
     assert box.height() == DEFAULT_HEIGHT - 40
@@ -76,7 +76,7 @@ def test_a_runaway_drag_stops_at_the_cap(qtbot):
 
 
 def test_pressing_in_the_middle_types_rather_than_resizes(qtbot):
-    # Only the bottom edge is a handle; the rest of the field is for writing in.
+    # Only the lower edge is a handle; the rest of the field is for writing in.
     box = _box(qtbot)
     box.setPlainText("a fox in snow")
     middle = QPoint(box.viewport().width() // 2, box.viewport().height() // 2)

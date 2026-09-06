@@ -1,6 +1,6 @@
 """A progress bar that carries its own caption, read on top of the fill.
 
-Every surface that reports a run in flight — the bottom strip's queue, the
+Every surface that reports a run in flight — the lower strip's queue, the
 Recents shelf's cards, a folder's re-roll tile — says two things at once: how
 far along it is, and how long that has taken. Those used to be laid out
 separately (a line of text above a bar, or a percentage in a caption with no bar
@@ -192,7 +192,7 @@ class ProgressCaption(QProgressBar):
 
         Three layers in that order, because the caption has to be the top one:
         the band is painted over the foot of the bar, which is where a line of
-        text keeps its descenders, and a band drawn last strikes the bottom of
+        text keeps its descenders, and a band drawn last strikes the foot of
         every letter out. So the style is asked for the bar without its label
         (the caption it would draw is taken out of the option), and the writing
         goes on by hand once the band is down.

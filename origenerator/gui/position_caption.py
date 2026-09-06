@@ -1,4 +1,4 @@
-"""The "3 / 17" plate the fullscreen show floats over the bottom of its media.
+"""The "3 / 17" plate the fullscreen show floats over the foot of its media.
 
 A show always plays a set — a folder's, a shelf's, or the folder a double-clicked
 picture came from — so it always has somewhere in it to be. A suffix carries
@@ -8,11 +8,11 @@ whatever else it has to add: the lock.
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
-_BOTTOM_MARGIN = 24  # how far the plate floats above the bottom edge
+_LOWER_MARGIN = 24  # how far the plate floats above the lower edge
 
 
 class PositionCaption(QLabel):
-    """Where in the set the item on screen is, floated over its bottom edge."""
+    """Where in the set the item on screen is, floated over its lower edge."""
 
     def __init__(self, host: QWidget):
         super().__init__(host)
@@ -36,6 +36,6 @@ class PositionCaption(QLabel):
         host = self.parentWidget()
         self.adjustSize()
         x = (host.width() - self.width()) // 2
-        y = host.height() - self.height() - _BOTTOM_MARGIN
+        y = host.height() - self.height() - _LOWER_MARGIN
         self.move(max(0, x), max(0, y))
         self.raise_()  # over the media, video surface included

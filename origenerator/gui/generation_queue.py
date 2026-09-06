@@ -2,7 +2,7 @@
 
 Two halves, each answering one question. On the left, *what is being made*: the
 live frame of the job ComfyUI is rendering, filling the strip's height out of its
-bottom-left corner, and beside it a column no wider than a bar needs to be — the
+lower-left corner, and beside it a column no wider than a bar needs to be — the
 job's reading, "45% · 1:30 elapsed · ~10:34 left", written across the fat progress
 bar it measures. That frame opens the folder its run will land in, the way the
 row of the same job on the right does: it is a picture of a job, and a picture of
@@ -88,7 +88,7 @@ ensure_shared_ui_on_path()
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 
 # The strip's opening height, its floor, and so the widest the live thumbnail
-# ever gets: it takes the bottom-left corner whole, being the one thing here worth
+# ever gets: it takes the lower-left corner whole, being the one thing here worth
 # looking at (the full-size preview is still one click away). The strip never
 # opens taller than this however long the line gets, so the panes above it don't
 # move on their own — only on a drag of the handle at its top edge.
@@ -185,7 +185,7 @@ class RunningPreview(OpensAFolder, QWidget):
         self._frame = QLabel()
         self._frame.setFixedSize(_STRIP_HEIGHT, _STRIP_HEIGHT)  # kept square: resizeEvent
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Pinned to the bottom, so it still sits in the strip's corner once the
+        # Pinned to the foot, so it still sits in the strip's corner once the
         # strip is dragged taller than the square it stops growing at.
         layout.addWidget(self._frame, 0, Qt.AlignmentFlag.AlignBottom)
 
@@ -564,7 +564,7 @@ class GenerationQueue(QWidget):
 
         layout = QHBoxLayout()
         # Flush at the left and both ends, so the live frame fills the strip's
-        # bottom-left corner; only the far right is held off the window edge.
+        # lower-left corner; only the far right is held off the window edge.
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(8)
         outer.addLayout(layout, 1)
@@ -619,7 +619,7 @@ class GenerationQueue(QWidget):
         return QSize(super().sizeHint().width(), _STRIP_HEIGHT + 1)  # and its rule
 
     def rows(self) -> list[QueueRow]:
-        """Every job in the line, top to bottom — the one being made first.
+        """Every job in the line, in order — the one being made first.
 
         Jobs only: the hint that fills an empty line shares the same box, and it
         is no row — nothing may be dropped in front of it, reordered against it,

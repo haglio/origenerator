@@ -201,7 +201,7 @@ class RerollController(QObject):
         """Whether a launch may join ``key``.
 
         User work always may, even into a folder already generating: ComfyUI runs
-        one prompt at a time and the bottom strip shows the line, so a second
+        one prompt at a time and the lower strip shows the line, so a second
         Generate of the same settings queues behind the first instead of being
         silently refused — which is what blocked two pictures of one recipe from
         being re-rolled together. A background experiment still takes only an idle

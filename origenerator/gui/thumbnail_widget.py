@@ -274,7 +274,7 @@ class ThumbnailWidget(QWidget):
 
     def _render_enhancing_timing(self):
         """Write the run's reading across the bar at the picture's foot — the
-        compact one, since a tile is a third of the bottom strip's width."""
+        compact one, since a tile is a third of the lower strip's width."""
         run = self._enhancing
         if run is None:
             return

@@ -42,7 +42,7 @@ _MIN_SCORE = 0.22
 # length a hand travels), and the anchor pins the base itself. Calibrated
 # against the hand-aimed proof-of-concept frame.
 _SPAN_TOP = 0.18
-_SPAN_BOTTOM = 0.72
+_SPAN_LOWER = 0.72
 _ANCHOR = 0.93
 
 _detector = None
@@ -80,7 +80,7 @@ def aim_fractions_from_box(box, image_w: int, image_h: int) -> dict:
     return {
         "stroke_x": cx,
         "stroke_top": (y + _SPAN_TOP * h) / image_h,
-        "stroke_bottom": (y + _SPAN_BOTTOM * h) / image_h,
+        "stroke_bottom": (y + _SPAN_LOWER * h) / image_h,
         "anchor_x": cx,
         "anchor_y": (y + _ANCHOR * h) / image_h,
     }

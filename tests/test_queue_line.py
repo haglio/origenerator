@@ -80,7 +80,7 @@ def test_an_empty_line_starts_nothing():
 
 
 def test_a_held_video_is_passed_over_for_the_image_behind_it():
-    # "Sent to the bottom": passing it over has exactly that effect, since
+    # "Sent to the end": passing it over has exactly that effect, since
     # everything that can start goes first — and it keeps its place among the
     # videos for when the show ends.
     image = _image()

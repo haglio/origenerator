@@ -6,7 +6,7 @@ gray, a hairline of the text's own color, a bold heading face, rounded corners
 (``fun_time.notice_overlay.NoticeOverlay``). This is that toast, worn by
 Origenerator's own notices: the request being spoken, the enhancement cooking,
 which version of a picture is on screen. They used to be a dark plate of body
-text down at the bottom of the show — a second dialect for the same job, said in
+text down at the foot of the show — a second dialect for the same job, said in
 the same room, on a surface that already wears the players' own HUD.
 
 Matched through the tokens rather than by eye. The color and the face come out

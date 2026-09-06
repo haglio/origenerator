@@ -87,11 +87,11 @@ def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
     assert stack.widget(1) is view._panes
     assert view._panes.count() == 2
     assert view._panes.widget(1) is view._folder_panes
-    # Bottom floor: the queue, spanning the tree's width too.
+    # The lowest row: the queue, spanning the tree's width too.
     assert stack.widget(2) is view._queue
 
 
-def test_fun_time_gallery_gives_the_bottom_corner_to_the_queue(qtbot):
+def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
     """The tree stops above the queue rather than running the rect's full
     height, so the corner under it is the queue — where standalone has it."""
     view = _fun_time_view(qtbot)
@@ -910,7 +910,7 @@ def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, mo
 
 def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
     """In the RFB's upright column a portrait picture stacked over the settings
-    pushes every prompt field off the bottom, so the two go side by side —
+    pushes every prompt field off the foot, so the two go side by side —
     settings left, picture right, the order they are read in."""
     from PyQt6.QtGui import QPixmap
 

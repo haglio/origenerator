@@ -181,7 +181,7 @@ def progress_status_label(elapsed: float | None, progress: tuple[int, int] | Non
     """The one line every surface writes across a running job's bar:
     ``"High noise · 45% · 1:23 elapsed · ~4:10 left"``.
 
-    One wording, shared by the bottom strip's queue, the shelf's in-flight cards
+    One wording, shared by the lower strip's queue, the shelf's in-flight cards
     and a folder's re-roll tile, so the same run reads the same wherever it is
     being watched — three surfaces used to each say a different half of it in
     different words.

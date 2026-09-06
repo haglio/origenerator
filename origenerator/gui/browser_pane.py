@@ -632,7 +632,7 @@ class BrowserPane(QObject):
         page just drawn has been laid out, which is when a shelf redrawn back at
         the offset it was being read at finds itself already near the end. A range
         of zero is that not-yet-laid-out pane rather than a shelf scrolled to its
-        bottom, so it waits rather than drawing pages nobody has scrolled to.
+        end, so it waits rather than drawing pages nobody has scrolled to.
         """
         if (self._recents_flow is None
                 or self._recents_drawn >= len(self._filtered_recent_rows())):
@@ -699,7 +699,7 @@ class BrowserPane(QObject):
         one, and the image it upgrades is already on this shelf wearing the
         "Enhancing…" scrim and streaming the run's frames. A card beside that tile
         says a second thing is being made, and clicking it goes nowhere — the
-        folder it would open is the one the tree declines to grow. The bottom
+        folder it would open is the one the tree declines to grow. The lower
         strip's queue still lists the job, which is where a run that has the GPU
         belongs.
         """
@@ -949,7 +949,7 @@ class BrowserPane(QObject):
         The one act a queued or running card has, and until now the one act it
         offered nowhere: a finished tile answers a right-click with its own menu,
         and a card answered with nothing, so stopping a run meant finding it again
-        among the bottom strip's rows. The wording is the strip's
+        among the lower strip's rows. The wording is the strip's
         (:func:`inflight.discard_run_text`) — "Next seed" while the folder is
         auto-looping, where the press starts another rather than stopping
         anything.
@@ -1496,7 +1496,7 @@ class BrowserPane(QObject):
         self.item_action_triggered.emit(prompt_id, action)
 
     def _enhance_state(self, row) -> str | None:
-        """What the plus in this row's bottom-right corner has to say, at the
+        """What the plus in this row's lower-right corner has to say, at the
         Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
         return enhance_state(row, self._host.enhance_settings())
 

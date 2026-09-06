@@ -462,7 +462,7 @@ def test_the_header_path_carries_what_its_last_code_doesnt_say(qtbot):
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # The tree is six levels deep by the time it reaches a settings folder and it
     # lives in the window's narrowest column, so every wasted pixel per level is
-    # six wasted at the bottom. Each step is one indentation and no more.
+    # six wasted at the foot. Each step is one indentation and no more.
     #
     # Measured at the left edge of each row's *name block* — its chip when it has
     # one, its text when it does not — because the chip reads as the first
@@ -3450,7 +3450,7 @@ def _linked_view(qtbot, source="i7", count=12):
 def test_following_a_source_link_lands_on_the_image_itself(qtbot):
     # Opening the folder the source image lives in isn't enough: with a dozen
     # siblings in it, which one the link meant has to be picked out — highlighted,
-    # and scrolled to rather than left off the bottom of the pane.
+    # and scrolled to rather than left off the foot of the pane.
     view, scrolled = _linked_view(qtbot)
 
     view._follow_link("i7")                    # follow its source-image link
@@ -5581,7 +5581,7 @@ def _folder_tab(view, db):
 
 
 def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
-    # Center (the folder's live tile), bottom (the queue row) and right (the config
+    # Center (the folder's live tile), foot (the queue row) and right (the config
     # tab) each draw a button for the run in flight. While the folder loops, the
     # press throws away a seed and the loop starts another, so all three say so.
     db = _seeded_db(tmp_path)
@@ -7779,7 +7779,7 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
         qtbot, tmp_path, monkeypatch):
     # A card is the whole of what the shelf shows of a run being made, and it used
     # to answer a right-click with nothing at all: stopping the run meant finding
-    # it again among the bottom strip's rows.
+    # it again among the lower strip's rows.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -8055,7 +8055,7 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
 
 
 def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
-    # The bottom strip surfaces in-flight work from anywhere in the view, then
+    # The lower strip surfaces in-flight work from anywhere in the view, then
     # empties once nothing runs — keeping its slot so the panes never shift.
     db = FakeDB([_image("done", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
@@ -8105,7 +8105,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
 
 def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
-    # The float is the same widget as the bottom strip and asks for the same
+    # The float is the same widget as the lower strip and asks for the same
     # things, so it reaches the same handler.
     from unittest.mock import patch
 
@@ -9628,7 +9628,7 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
 
     # Both images share one source config, so their enhances share one folder —
     # and both go to ComfyUI, which works through them one at a time with the
-    # bottom strip showing the line.
+    # lower strip showing the line.
     jobs = view._reroll.all_jobs
     assert len(jobs) == 2
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
@@ -9718,8 +9718,8 @@ def _set_enhance(view, **fields):
     return settings
 
 
-def test_the_hud_holds_the_left_of_the_bottom_row_and_enhance_the_right(qtbot, tmp_path):
-    # Both panels share the bottom of the center pane: genau's console at its
+def test_the_hud_holds_the_left_of_the_lower_row_and_enhance_the_right(qtbot, tmp_path):
+    # Both panels share the foot of the center pane: genau's console at its
     # fixed size on the left, the Enhance settings taking the width beside it.
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -9732,7 +9732,7 @@ def test_the_hud_holds_the_left_of_the_bottom_row_and_enhance_the_right(qtbot, t
 
 
 def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp_path):
-    # Without it the Enhance settings read as the bottom of whatever folder is on
+    # Without it the Enhance settings read as the foot of whatever folder is on
     # screen, rather than as the app-wide settings they are.
     from PyQt6.QtWidgets import QFrame
 
@@ -9979,7 +9979,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     # An enhancement gets no card of its own — it shows on the tile of the image
     # it improves — so that tile's menu is the only thing in the middle column
     # that can be asked to stop it. Without the entry the run had to be hunted
-    # down among the bottom strip's rows.
+    # down among the lower strip's rows.
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -10035,7 +10035,7 @@ def test_a_tile_with_nothing_cooking_offers_no_cancel(qtbot, tmp_path, monkeypat
 def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     # An enhancement is a version of an image, not an item beside it — so the
     # shelf shows the run on that image's own tile, under the scrim, and never as
-    # a second card claiming something else is being made. The bottom strip's
+    # a second card claiming something else is being made. The lower strip's
     # queue still lists it: that is what the GPU is doing.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())

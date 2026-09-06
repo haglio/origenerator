@@ -704,8 +704,8 @@ def _inflight(**kw):
     return InFlightItem(**kw)
 
 
-def test_the_queue_rides_along_in_the_shows_bottom_left(qtbot):
-    # The bottom strip that normally carries it is behind this view, and a show
+def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):
+    # The lower strip that normally carries it is behind this view, and a show
     # is when the queue stops moving: its videos are held until it ends.
     view = _view(qtbot)
     view.resize(1920, 1080)
@@ -728,7 +728,7 @@ def test_a_show_with_nothing_in_flight_shows_no_queue_at_all(qtbot):
     assert view._queue.isHidden()
 
 
-def test_the_queue_follows_the_shows_bottom_edge_on_a_resize(qtbot):
+def test_the_queue_follows_the_shows_lower_edge_on_a_resize(qtbot):
     view = _view(qtbot)
     view.resize(800, 600)
     view.set_queue([_inflight(typical_seconds=30, job_kind="Image")])

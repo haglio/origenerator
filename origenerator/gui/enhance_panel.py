@@ -1,4 +1,4 @@
-"""The app's enhancement settings, at the bottom of the browser pane.
+"""The app's enhancement settings, at the foot of the browser pane.
 
 Enhancement is not one of the settings that decide which folder a generation
 lands in — it is a finish applied to an image afterward — so it is deliberately

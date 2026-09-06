@@ -617,7 +617,7 @@ def test_an_image_still_goes_while_the_slideshow_plays(qtbot, tmp_path):
 
 
 def test_a_held_video_is_passed_over_rather_than_blocking_the_line(qtbot, tmp_path):
-    # "Sent to the bottom": everything that can start goes first, and the videos
+    # "Sent to the end": everything that can start goes first, and the videos
     # keep the order they were asked in for when the show ends.
     client = _client()
     controller = RerollController(Database(tmp_path / "test.db"), client)

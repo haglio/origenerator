@@ -35,7 +35,7 @@ from player_core.tcode import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# The device's rest command -- stroke axis to the bottom over half a second, the
+# The device's rest command -- stroke axis to the floor over half a second, the
 # family's one spelling of it, which the broker parks with too -- so a stopped
 # video leaves the OSR2 where the broker expects it.
 PARK_TCODE = PARK_COMMAND
@@ -70,7 +70,7 @@ def device_on(*, now: float | None = None, rx_file=None,
 def format_position(pos_0_100: float, interval_ms: float) -> str:
     """A T-code move for the L0 stroke axis: ``L0<0000-9999>I<ms>``.
 
-    ``pos_0_100`` is a funscript position (0 bottom, 100 top); ``interval_ms`` is
+    ``pos_0_100`` is a funscript position (0 floor, 100 top); ``interval_ms`` is
     how long the device takes to get there, so streaming each action with the
     time until the next reads as smooth motion.  The scaling and the clamp are
     player_core's, the same ones every other driver in the family sends with.

@@ -286,17 +286,19 @@ class WorkflowTemplate(ABC):
         return node, [node_id, 0]
 
     @staticmethod
-    def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref):
-        """The text conditioning segment ``index`` of scene ``scene`` reads:
-        ``first_ref`` -- the graph's own encode of the first scene -- while its
-        scene's text is that one, or an encode of its own scene. A prompt without
-        a break is one scene, so every segment shares the node the graph always
-        had; a scene past the last text carries the last text on.
+    def scene_prompt_nodes(index: int, scene: int, scenes: list[str], clip_ref, first_ref,
+                           role: str = "prompt"):
+        """The text conditioning segment ``index`` of scene ``scene`` reads --
+        ``role`` "prompt" for what it shows, "negative" for what it keeps out:
+        ``first_ref``, the graph's own encode of the first scene's text, while
+        its scene's text is that one, or an encode of its own scene. A text
+        without a break is one scene, so every segment shares the node the
+        graph always had; a scene past the last text carries the last text on.
         """
         text = scenes[min(scene, len(scenes) - 1)]
         if index == 0 or text == scenes[0]:
             return {}, first_ref
-        node_id = f"s{index}_prompt"
+        node_id = f"s{index}_{role}"
         node = {
             node_id: {
                 "class_type": "CLIPTextEncode",

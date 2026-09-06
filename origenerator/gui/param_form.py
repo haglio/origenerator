@@ -43,8 +43,9 @@ from shared_ui.check_box import CheckBox
 
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
-# prompt), each scene's length, and each scene's lines.
-_SCENE_KEYS = ("positive_prompt", "scene_frames", "scene_lines")
+# prompt), what each scene keeps out (stored as the negative prompt), each
+# scene's length, and each scene's lines.
+_SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
 
 # The locked-dimension spinboxes span from a stride floor up past any realistic
 # derived or overridden size; 0 is reserved as "no size known yet" (shown as the
@@ -190,7 +191,7 @@ class ParamForm(QWidget):
         # slot rather than merely appending after the editable fields.
         self._present_keys: dict[str, list[str]] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
-        # A workflow that tells a story in scenes hands the prompt, the scene
+        # A workflow that tells a story in scenes hands both prompts, the scene
         # lengths and the lines to one editor (see origenerator.gui.scenes_editor);
         # None for a workflow with one prompt and one length.
         scenes_def = next((pd for pd in self._param_defs if pd.type == "scenes"), None)
@@ -224,7 +225,7 @@ class ParamForm(QWidget):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             if widget is self._scenes:
-                if pd.key == "positive_prompt":  # the editor's one row
+                if pd.type == "scenes":  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
                 continue
             self._wire_changed(widget)
@@ -337,7 +338,7 @@ class ParamForm(QWidget):
         clipboard."""
         w = self._widgets[key]
         if w is self._scenes:
-            return w.story()
+            return w.story(key)
         if isinstance(w, QPlainTextEdit):
             return diff_text.live_text(w)
         return w.text()
@@ -357,11 +358,11 @@ class ParamForm(QWidget):
             # A story of one scene is marked like any prompt; one of several
             # takes the revised text as scenes, since a diff over the breaks
             # would strike the story's own structure through.
-            boxes = widget.scene_boxes()
+            boxes = widget.boxes(key)
             if len(boxes) == 1:
                 diff_text.show_diff(boxes[0], before, after)
             else:
-                widget.set_story(after)
+                widget.set_story(key, after)
             return
         if isinstance(widget, QPlainTextEdit):
             diff_text.show_diff(widget, before, after)
@@ -398,7 +399,7 @@ class ParamForm(QWidget):
         prompt is searchable the day it lands. What Ctrl+F searches; see
         :mod:`origenerator.gui.prompt_find`.
         """
-        scenes = self._scenes.scene_boxes() if self._scenes is not None else []
+        scenes = self._scenes.text_boxes() if self._scenes is not None else []
         return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
 
     def _has_param(self, key: str) -> bool:
@@ -771,9 +772,11 @@ class ParamForm(QWidget):
         re-rolled when ``randomize_seed``; otherwise it's read from the field."""
         w = self._widgets[pd.key]
         if w is self._scenes:
-            read = {"positive_prompt": w.story, "scene_frames": w.scene_frames,
-                    "scene_lines": w.lines}
-            return read[pd.key]()
+            if pd.key == "scene_frames":
+                return w.scene_frames()
+            if pd.key == "scene_lines":
+                return w.lines()
+            return w.story(pd.key)
         if self._scenes is not None and pd.key == "frame_count":
             return self._scenes.total_frames()
         if pd.type == "bool":
@@ -813,9 +816,12 @@ class ParamForm(QWidget):
         seed, reusing a clip's shows the seed and goes on drawing fresh ones."""
         w = self._widgets[pd.key]
         if w is self._scenes:
-            write = {"positive_prompt": w.set_story, "scene_frames": w.set_scene_frames,
-                     "scene_lines": w.set_lines}
-            write[pd.key](value)
+            if pd.key == "scene_frames":
+                w.set_scene_frames(value)
+            elif pd.key == "scene_lines":
+                w.set_lines(value)
+            else:
+                w.set_story(pd.key, value)
             return
         if self._scenes is not None and pd.key == "frame_count":
             self._refresh_clip_length()
@@ -953,7 +959,9 @@ class ParamForm(QWidget):
             # A lone scene is the whole clip and runs for the clip length, which
             # is all a recipe from before scenes (or from the overlay) carries.
             params = {**params, "scene_frames": [params["frame_count"]]}
-        for pd in self._param_defs:
+        # The story first: it sets how many scenes there are, and every other
+        # per-scene value is laid over the scenes it made.
+        for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
         self._refresh_clip_length()

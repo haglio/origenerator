@@ -44,7 +44,8 @@ PARAM_HELP: dict[str, str] = {
     ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "
-        "by accident. Leaving it empty is fine."
+        "by accident. Leaving it empty is fine. In a story each scene keeps out "
+        "its own, and a new scene starts with the one before it."
     ),
     "input_image": (
         "The picture this run is built from: the start frame for a video, or the "

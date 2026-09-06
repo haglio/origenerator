@@ -112,6 +112,7 @@ class GenerationJob(QObject):
         self._progress_tracker = ProgressTracker.for_payload(self.payload)
         self._last_progress = (0, 0)
         self._last_pass_progress: tuple[int, int] | None = None
+        self._last_pass_name = ""
         self._last_preview: bytes | None = None
         # When ComfyUI actually began executing this job — not when it was
         # submitted, which on a busy queue can be many minutes earlier. What the
@@ -156,6 +157,17 @@ class GenerationJob(QObject):
         passes shows how far through *this* fix it is without the reading above
         it having to restart per fix."""
         return self._last_pass_progress
+
+    @property
+    def last_pass_name(self) -> str:
+        """What that pass is called — "High noise", "Audio", "Detail fix".
+
+        The band alone says only that something started over. Named, the bar's
+        caption says which of the run's several jobs is being done, which is what
+        a twelve-minute video run has to answer while the countdown is still too
+        early to mean anything. ``""`` for a single-pass run, which has no band.
+        """
+        return self._last_pass_name
 
     @property
     def last_preview(self) -> bytes | None:
@@ -211,6 +223,7 @@ class GenerationJob(QObject):
             # reconnected multi-pass job shows which pass it is in rather than a
             # whole bar until its next tick.
             self._last_pass_progress = self._progress_tracker.current_pass()
+            self._last_pass_name = self._progress_tracker.current_pass_name()
         last = state.get("last_progress")
         if isinstance(last, (list, tuple)) and len(last) == 2:
             self._last_progress = (int(last[0]), int(last[1]))
@@ -354,6 +367,7 @@ class GenerationJob(QObject):
         self._last_progress = self._progress_tracker.update(
             value, max_val, node=node_id or None)
         self._last_pass_progress = self._progress_tracker.current_pass()
+        self._last_pass_name = self._progress_tracker.current_pass_name()
         self.progress.emit(*self._last_progress)
 
     def _on_node_executing(self, prompt_id: str, _node_id: str):

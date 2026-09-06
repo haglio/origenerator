@@ -168,10 +168,12 @@ class InFlightCard(QWidget):
         started = self._item.started_at
         elapsed = None if started is None else max(0.0, time.time() - started)
         self._bar.show_progress(
-            # A tile's width takes the compact reading: how far along, and how
-            # much longer. The strip's queue has the room for the elapsed count.
+            # A tile's width takes the compact reading: what pass is being
+            # taken, how far along, and how much longer. The strip's queue has
+            # the room for the elapsed count too.
             progress_status_label(elapsed, self._item.progress,
-                                  self._item.typical_seconds, compact=True),
+                                  self._item.typical_seconds,
+                                  step=self._item.pass_name, compact=True),
             self._item.progress if self._item.status == "running" else None,
             self._item.pass_progress if self._item.status == "running" else None,
         )

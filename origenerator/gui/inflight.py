@@ -44,6 +44,10 @@ class InFlightItem:
     # the foot of that bar. ``None`` for a job of a single pass, which has
     # nothing to say the whole-run reading doesn't.
     pass_progress: tuple[int, int] | None = None
+    # What that pass is called ("High noise", "Audio", "Detail fix"), which the
+    # bar's caption leads with. "" alongside a None pass_progress: no band, so
+    # nothing to name.
+    pass_name: str = ""
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     # End the loop its folder is on. What a menu's real stop calls before
@@ -188,6 +192,7 @@ class EnhancingRun:
     # each detail fix is a pass of its own, and one bar between them can only
     # restart per fix.
     pass_progress: tuple[int, int] | None = None
+    pass_name: str = ""   # what to call it, for the caption over that bar
     # When ComfyUI began executing it (None while it's still queued), and what
     # this workflow's recent runs say a whole one takes — the two halves of the
     # countdown on the bar.

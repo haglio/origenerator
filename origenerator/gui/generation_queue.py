@@ -296,7 +296,8 @@ class RunningPreview(OpensAFolder, QWidget):
         elapsed = None if started is None else max(0.0, time.time() - started)
         self._progress.show_progress(
             progress_status_label(elapsed, self._item.progress,
-                                  self._item.typical_seconds),
+                                  self._item.typical_seconds,
+                                  step=self._item.pass_name),
             self._item.progress if self._item.status == "running" else None,
             self._item.pass_progress if self._item.status == "running" else None,
         )

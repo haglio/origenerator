@@ -19,11 +19,12 @@ class FakeJob(QObject):
     preview = pyqtSignal(bytes)
 
     def __init__(self, state="queued", last_progress=(0, 0), last_preview=None,
-                 started_at=None, last_pass_progress=None):
+                 started_at=None, last_pass_progress=None, last_pass_name=""):
         super().__init__()
         self._state = state
         self._last_progress = last_progress
         self._last_pass_progress = last_pass_progress
+        self._last_pass_name = last_pass_name
         self._last_preview = last_preview
         self._started_at = started_at
 
@@ -38,6 +39,10 @@ class FakeJob(QObject):
     @property
     def last_pass_progress(self):
         return self._last_pass_progress
+
+    @property
+    def last_pass_name(self):
+        return self._last_pass_name
 
     @property
     def last_preview(self):
@@ -161,6 +166,19 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
     qtbot.addWidget(tile)
     assert tile._bar.caption() == "50% · ~6:02 left"
     assert (tile._bar.value(), tile._bar.maximum()) == (10, 20)
+
+
+def test_the_bar_says_which_pass_is_being_taken(qtbot):
+    # A video run is three passes, and the band along the bar's foot restarts
+    # once per pass. Named, the caption says which of them is being done — the
+    # one thing a twelve-minute run can report while the countdown is still too
+    # early to mean anything.
+    job = FakeJob(state="running", last_progress=(405, 818),
+                  last_pass_progress=(1, 10), last_pass_name="Low noise",
+                  started_at=time.time() - 90.5)
+    tile = RerollTile(job, typical_seconds=725.0)
+    qtbot.addWidget(tile)
+    assert tile._bar.caption().startswith("Low noise · 49% · ")
 
 
 def test_progress_signal_advances_the_bar(qtbot):

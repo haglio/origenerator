@@ -176,27 +176,37 @@ def percent_label(progress: tuple[int, int] | None) -> str:
 
 
 def progress_status_label(elapsed: float | None, progress: tuple[int, int] | None,
-                          typical: float | None, *, compact: bool = False) -> str:
+                          typical: float | None, *, step: str = "",
+                          compact: bool = False) -> str:
     """The one line every surface writes across a running job's bar:
-    ``"45% · 1:23 elapsed · ~4:10 left"``.
+    ``"High noise · 45% · 1:23 elapsed · ~4:10 left"``.
 
     One wording, shared by the bottom strip's queue, the shelf's in-flight cards
     and a folder's re-roll tile, so the same run reads the same wherever it is
     being watched — three surfaces used to each say a different half of it in
     different words.
 
+    ``step`` is the pass being taken right now
+    (:meth:`origenerator.progress.ProgressTracker.current_pass_name`), and it
+    leads because it is the one part of the line that says what is *happening*:
+    a run of several passes has a band along the bar's foot that restarts once
+    per pass, and until it was named the only thing on screen said the job had
+    started over. It leads for a second reason too — a caption too wide for its
+    bar elides from the right, so whatever matters most has to be leftmost. Empty
+    for a run of a single pass, which has no band and so nothing to name.
+
     ``compact`` is that line in a gallery tile's width, which is a third of the
-    strip's: it drops the elapsed count and keeps the two readings that answer
-    "how much longer" — ``"45% · ~4:10 left"``. The full line is a good half wider
-    than a 180px tile at the app's own font, so a tile carrying it would elide the
-    countdown away on exactly the long runs worth counting down.
+    strip's: it drops the elapsed count and keeps the readings that answer what
+    and how much longer — ``"High noise · 45% · ~4:10 left"``. The full line is a
+    good half wider than a 180px tile at the app's own font, so a tile carrying it
+    would elide the countdown away on exactly the long runs worth counting down.
 
     Whichever readings are unknown drop out, down to ``""`` for a job that has
     neither started nor reported a step.
     """
     clock = (remaining_label(elapsed, progress, typical) if compact
              else progress_time_label(elapsed, progress, typical))
-    return " · ".join(part for part in (percent_label(progress), clock) if part)
+    return " · ".join(part for part in (step, percent_label(progress), clock) if part)
 
 
 def _coarse_duration(seconds: float) -> str:

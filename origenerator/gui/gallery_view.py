@@ -4885,6 +4885,7 @@ class GalleryView(QWidget):
             frame=job.last_preview,
             progress=job.last_progress,
             pass_progress=job.last_pass_progress,
+            pass_name=job.last_pass_name,
             started_at=job.started_at,
             typical_seconds=self._typical_run_seconds(job),
         )

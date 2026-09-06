@@ -62,7 +62,7 @@ def test_missing_movie_file_falls_back_to_the_still(qtbot, tmp_path):
 
 
 class _RecordingDrag:
-    """Stands in for QDrag, remembering the picture hung under the cursor."""
+    """Stands in for QDrag, remembering the picture carried under the cursor."""
 
     last = None
 

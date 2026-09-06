@@ -513,7 +513,7 @@ class PreviewWidget(QWidget):
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
         screen at all -- and never to the strip along the foot, which is no
-        picture: a corner chip laid over it hung off the video's bottom edge.
+        picture: a corner chip laid over it, attached to the video's bottom edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():

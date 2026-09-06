@@ -78,9 +78,10 @@ from origenerator.gui.inflight import (
     starting_row_text,
 )
 from origenerator.gui.progress_caption import ProgressCaption
-from origenerator.gui.queue_thumbs import QueueThumbs
+from origenerator.gui.queue_thumbs import QueueThumbs, pair_pixmap
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import progress_status_label
+from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BLUE, BORDER_SUBTLE
@@ -262,7 +263,7 @@ class RunningPreview(OpensAFolder, QWidget):
         self._item = item
         if item is None:
             self._frame.unsetCursor()  # nothing to go to, so nothing to invite a click
-            self._frame.clear()
+            self._render_frame(None)
             self._progress.hide()
             self._caption.show()
             self._tick.stop()
@@ -275,7 +276,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # cannot say for itself, and the reason it is sweeping rather than filling.
         self.show_foreign(queue_wait_text(item.foreign_ahead) or "")
         self._progress.show()
-        self._render_frame(item.frame)
+        self._render_frame(item)
         self._render_timing()
         self._tick.start()
 
@@ -297,21 +298,43 @@ class RunningPreview(OpensAFolder, QWidget):
         self._progress.show_progress(
             progress_status_label(elapsed, self._item.progress,
                                   self._item.typical_seconds,
-                                  step=self._item.pass_name),
+                                  step=self._item.stage),
             self._item.progress if self._item.status == "running" else None,
             self._item.pass_progress if self._item.status == "running" else None,
         )
 
-    def _render_frame(self, frame):
-        side = self._frame.width()
+    def _render_frame(self, item):
+        """What is being made, or — until ComfyUI has streamed a frame of it —
+        what it is being made from.
+
+        A live frame is the whole point of this corner and wins whenever there is
+        one. There is none for a good while: a WAN video spends over a minute
+        loading two 14B models before its first preview, and this corner stood
+        empty through all of it. So the wait shows what the config tab above
+        shows for the same job — the frame an i2v animates, the recipe clip
+        beside it in gray where a combine brought one, and nothing at all for a
+        run made from nothing, which is a text-to-video with no picture to its
+        name yet.
+
+        The label is sized to what it draws, since the pair is twice as wide as
+        the square a single picture (or a live frame) fills.
+        """
+        side = min(self.height(), _STRIP_HEIGHT)
         pixmap = QPixmap()
+        frame = None if item is None else item.frame
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
-            self._frame.setPixmap(pixmap.scaled(
-                side, side, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            ))
+            pixmap = pixmap.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio,
+                                   Qt.TransformationMode.SmoothTransformation)
         else:
-            self._frame.clear()  # no frame yet — a blank square, not a stale one
+            pixmap = None if item is None else pair_pixmap(
+                resolve_input_image_path(item.source_image), item.recipe_thumbnail, side,
+            )
+        if pixmap is None:
+            self._frame.setFixedSize(side, side)
+            self._frame.clear()  # nothing of this run to show — a blank square
+            return
+        self._frame.setFixedSize(max(side, pixmap.width()), side)
+        self._frame.setPixmap(pixmap)
 
     def resizeEvent(self, event):
         """Keep the frame the largest square the strip's height leaves room for.
@@ -323,10 +346,8 @@ class RunningPreview(OpensAFolder, QWidget):
         to read the line, and every pixel past that goes to the rows.
         """
         super().resizeEvent(event)
-        side = min(self.height(), _STRIP_HEIGHT)
-        if side != self._frame.width():
-            self._frame.setFixedSize(side, side)
-            self._render_frame(None if self._item is None else self._item.frame)
+        if min(self.height(), _STRIP_HEIGHT) != self._frame.height():
+            self._render_frame(self._item)
 
 
 class QueueRow(OpensAFolder, QWidget):

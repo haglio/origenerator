@@ -7685,14 +7685,14 @@ class _FakeRerollJob:
 
     def __init__(self, prompt_id, workflow_name, params, state="running", frame=None,
                  progress=(0, 0), foreign_ahead=None, started_at=None,
-                 pass_progress=None, pass_name=""):
+                 pass_progress=None, stage=""):
         self.prompt_id = prompt_id
         self.origin = prompt_id  # a run of its own, not a chained stage
         self.state = state
         self.last_preview = frame
         self.last_progress = progress
         self.last_pass_progress = pass_progress  # the pass in hand, for the bar's band
-        self.last_pass_name = pass_name          # and what the caption calls it
+        self.last_stage = stage                  # and what the caption calls it
         self.foreign_ahead = foreign_ahead  # another app's jobs ahead of it, if any
         self.started_at = started_at        # when ComfyUI began it; None while queued
         self.params = params

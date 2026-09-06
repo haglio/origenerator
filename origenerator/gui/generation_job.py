@@ -24,7 +24,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
-from origenerator.progress import ProgressTracker
+from origenerator.progress import ProgressTracker, stage_names
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,12 @@ class GenerationJob(QObject):
         self._progress_tracker = ProgressTracker.for_payload(self.payload)
         self._last_progress = (0, 0)
         self._last_pass_progress: tuple[int, int] | None = None
-        self._last_pass_name = ""
+        # What the app is doing right now, by the node ComfyUI says it is running
+        # (see origenerator.progress.stage_names). Kept rather than recomputed so
+        # a node with nothing worth saying about it leaves the last real stage
+        # standing instead of blanking the caption between two of them.
+        self._stages = stage_names(self.payload)
+        self._last_stage = ""
         self._last_preview: bytes | None = None
         # When ComfyUI actually began executing this job — not when it was
         # submitted, which on a busy queue can be many minutes earlier. What the
@@ -159,15 +164,16 @@ class GenerationJob(QObject):
         return self._last_pass_progress
 
     @property
-    def last_pass_name(self) -> str:
-        """What that pass is called — "High noise", "Audio", "Detail fix".
+    def last_stage(self) -> str:
+        """What the app is doing right now — "Loading models", "High noise",
+        "Decoding frames".
 
-        The band alone says only that something started over. Named, the bar's
-        caption says which of the run's several jobs is being done, which is what
-        a twelve-minute video run has to answer while the countdown is still too
-        early to mean anything. ``""`` for a single-pass run, which has no band.
+        The bar's caption leads with this. Without it a run said nothing for its
+        first minute and more, which on a WAN video is two 14B models coming off
+        disk before a single step is reported — and then said only that some
+        nameless pass had started over. ``""`` before ComfyUI has named a node.
         """
-        return self._last_pass_name
+        return self._last_stage
 
     @property
     def last_preview(self) -> bytes | None:
@@ -219,11 +225,14 @@ class GenerationJob(QObject):
         tracker = state.get("tracker")
         if isinstance(tracker, dict):
             self._progress_tracker.restore(tracker)
+            # The node the ramp was on names the stage, so a reconnected job says
+            # what it is doing from its first repaint rather than staying mute
+            # until ComfyUI's next push.
+            self._note_stage(tracker.get("node") or "")
             # The band along the bar's foot comes back with the ramp, so a
             # reconnected multi-pass job shows which pass it is in rather than a
             # whole bar until its next tick.
             self._last_pass_progress = self._progress_tracker.current_pass()
-            self._last_pass_name = self._progress_tracker.current_pass_name()
         last = state.get("last_progress")
         if isinstance(last, (list, tuple)) and len(last) == 2:
             self._last_progress = (int(last[0]), int(last[1]))
@@ -364,16 +373,28 @@ class GenerationJob(QObject):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
+        self._note_stage(node_id)  # also the reconnect's first word on the stage
         self._last_progress = self._progress_tracker.update(
             value, max_val, node=node_id or None)
         self._last_pass_progress = self._progress_tracker.current_pass()
-        self._last_pass_name = self._progress_tracker.current_pass_name()
         self.progress.emit(*self._last_progress)
 
-    def _on_node_executing(self, prompt_id: str, _node_id: str):
+    def _on_node_executing(self, prompt_id: str, node_id: str):
         if not self._is_mine(prompt_id):
             return
         self._mark_running()
+        self._note_stage(node_id)
+
+    def _note_stage(self, node_id: str) -> None:
+        """Take up the stage this node stands for, if it stands for one.
+
+        A node this app has no word for leaves the last stage in place: the run
+        is still doing whatever it was doing, and a caption that empties between
+        two named stages reads as a run that lost its way.
+        """
+        stage = self._stages.get(node_id)
+        if stage:
+            self._last_stage = stage
 
     def _on_preview(self, prompt_id: str, data: bytes):
         if not self._is_mine(prompt_id):

@@ -173,7 +173,7 @@ class InFlightCard(QWidget):
             # the room for the elapsed count too.
             progress_status_label(elapsed, self._item.progress,
                                   self._item.typical_seconds,
-                                  step=self._item.pass_name, compact=True),
+                                  step=self._item.stage, compact=True),
             self._item.progress if self._item.status == "running" else None,
             self._item.pass_progress if self._item.status == "running" else None,
         )

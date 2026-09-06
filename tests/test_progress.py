@@ -4,8 +4,8 @@ from origenerator.progress import (
     ProgressTracker,
     expected_pass_count,
     expected_sampling_seconds,
-    pass_names,
     sampler_costs,
+    stage_names,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
@@ -150,59 +150,44 @@ def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
     assert tracker.update(20, 20, "b") == (100, 100)
 
 
-def test_each_pass_is_named_by_what_its_node_is_set_to_do():
+def test_each_sampler_pass_is_named_by_what_its_node_is_set_to_do():
     # A WAN pair splits one schedule between its experts, and the names are the
     # ones the app's own form uses for them ("Model (High)", "Shift (High)"). The
     # audio pass that scores the clip is the third.
-    assert pass_names(_payload("wan22_i2v", steps=20)) == {
-        "15": "High noise", "16": "Low noise", "24": "Audio"}
+    names = stage_names(_payload("wan22_i2v", steps=20))
+    assert (names["15"], names["16"], names["24"]) == ("High noise", "Low noise", "Audio")
 
 
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):
     # The base render denoises from scratch; the tail that follows it re-samples
     # what is already there, which is the whole difference between them.
-    assert pass_names(_payload("sdxl_t2i", steps=50, enhance=True)) == {
-        "5": "Render", "13": "Enhance"}
-    assert pass_names(enhance_payload(
-        enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == {
-        "10": "Enhance", "15": "Detail fix", "18": "Detail fix"}
+    names = stage_names(_payload("sdxl_t2i", steps=50, enhance=True))
+    assert (names["5"], names["13"]) == ("Render", "Enhance")
+    fixes = stage_names(enhance_payload(
+        enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
+    assert (fixes["10"], fixes["15"], fixes["18"]) == ("Enhance", "Detail fix", "Detail fix")
 
 
-def test_the_name_follows_the_pass_in_hand():
-    # What the bar's caption leads with: the band alone says only that something
-    # started over, and the twelve-minute video run this came from had nothing on
-    # screen saying which of its three jobs was being done.
-    tracker = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
-    tracker.update(1, 10, "15")
-    assert tracker.current_pass_name() == "High noise"
-    tracker.update(10, 10, "15")
-    tracker.update(1, 10, "16")
-    assert tracker.current_pass_name() == "Low noise"
-    tracker.update(10, 10, "16")
-    tracker.update(1, 50, "24")
-    assert tracker.current_pass_name() == "Audio"
+def test_the_minutes_before_the_first_step_are_named_too():
+    # The complaint this answers: over a minute of a WAN run goes by with two
+    # 14B models coming off disk, no sampler started, and — before these — not a
+    # word on screen about what was happening.
+    names = stage_names(_payload("wan22_i2v", steps=20))
+    assert names["4"] == "Loading models"    # the high-noise UNET, off disk
+    assert names["10"] == "Reading the prompt"
+    assert names["12"] == "Loading the image"
+    assert names["14"] == "Preparing the clip"
+    assert names["17"] == "Decoding frames"
+    assert names["19"] == "Writing the video"
 
 
-def test_a_run_with_no_band_names_no_step():
-    # Nothing is drawn for a single-pass run, so naming a step would label
-    # something the user cannot see. Same for a run before its first tick.
-    single = ProgressTracker.for_payload(_payload("flux_t2i_upscaled"))
-    assert single.current_pass_name() == ""
-    single.update(5, 20, "8")
-    assert single.current_pass() is None and single.current_pass_name() == ""
-    assert ProgressTracker.for_payload(
-        _payload("wan22_i2v", steps=20)).current_pass_name() == ""
-
-
-def test_the_name_comes_back_with_a_restored_ramp():
-    # A reconnected job says which pass it is in from its first repaint, the way
-    # its band does — both are read off the node the snapshot carries.
-    tracker = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
-    tracker.update(10, 10, "15")
-    tracker.update(3, 10, "16")
-    resumed = ProgressTracker.for_payload(_payload("wan22_i2v", steps=20))
-    resumed.restore(tracker.snapshot())
-    assert resumed.current_pass_name() == "Low noise"
+def test_a_node_with_nothing_worth_saying_is_left_unnamed():
+    # Naming an instantaneous node would flash a word between two real stages;
+    # absent, the caption keeps the last thing it said.
+    payload = _payload("wan22_i2v", steps=20)
+    named = stage_names(payload)
+    assert "8" not in named    # ModelSamplingSD3, a setting applied in no time
+    assert "21" not in named   # GetImageSize, likewise
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():

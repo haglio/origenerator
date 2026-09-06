@@ -29,7 +29,7 @@ reading asks :func:`origenerator.timing.progress_status_label` for its compact
 one instead, and eliding is what happens when even that overruns.
 """
 
-from PyQt6.QtCore import QRect, QRectF, Qt
+from PyQt6.QtCore import QRect, QRectF, Qt, QTimer
 from PyQt6.QtGui import QFontMetrics, QPainterPath
 from PyQt6.QtWidgets import (
     QProgressBar,
@@ -44,7 +44,16 @@ ensure_shared_ui_on_path()
 
 from shared_ui.colors import BG_PRIMARY, BLUE_LIGHT
 
-_TEXT_MARGIN = 6  # breathing room at each end before the caption starts eliding
+_TEXT_MARGIN = 6  # breathing room at each end before the caption has to move
+# The scroll a caption too wide for its bar is read by: how often it steps, how
+# far each step takes it, the blank between the end of one lap and the start of
+# the next, and how long it waits at the top of a lap before setting off. The
+# pause is what makes the leading words — the stage the run is at — readable
+# rather than something that only ever goes past.
+_SCROLL_MS = 33
+_SCROLL_PX = 1.0
+_SCROLL_GAP = 48
+_HOLD_TICKS = 45
 _BAND_PX = 6      # the current pass's band, along the foot of a 26px bar
 _BAND_RADIUS = 3  # the stylesheet's corner radius, so the band's ends match
 # The band reads as a groove cut into the bar rather than a second fill of the
@@ -64,23 +73,46 @@ class ProgressCaption(QProgressBar):
         self.setTextVisible(True)
         self._caption = ""
         self._pass_progress: tuple[int, int] | None = None
+        # How far the caption has slid left, in pixels, while it is too wide to
+        # fit. Held across captions rather than reset with each one: the elapsed
+        # count in it ticks every second, so a scroll that started over on every
+        # change would never leave the first few words.
+        self._scrolled = 0.0
+        self._hold = 0            # ticks left of the pause at the top of a lap
+        self._scroll = QTimer(self)
+        self._scroll.setInterval(_SCROLL_MS)
+        self._scroll.timeout.connect(self._advance)
 
     def text(self) -> str:
-        """The label the style paints over the bar.
+        """The label the style paints over the bar — the whole of it.
 
         Overridden rather than set through ``setFormat``: a bar with no total to
         count against (a job still queued) is indeterminate, and Qt's own
         ``text()`` returns nothing there — which would drop the caption exactly
         when it is the only thing the surface has to say.
+
+        No longer elided. A line too wide for its bar is slid past instead (see
+        :meth:`_paint_caption`), because these lines now lead with the stage the
+        run is at — and an ellipsis kept whichever readings the bar had room for
+        while cutting the rest off for good.
         """
-        room = max(0, self.width() - _TEXT_MARGIN)
-        return QFontMetrics(self.font()).elidedText(
-            self._caption, Qt.TextElideMode.ElideRight, room
-        )
+        return self._caption
 
     def caption(self) -> str:
-        """The full caption, before any eliding to fit the bar."""
+        """The whole caption, whether or not it fits the bar at once."""
         return self._caption
+
+    def scrolling(self) -> bool:
+        """Whether the caption is wider than the bar and so has to be slid past."""
+        return QFontMetrics(self.font()).horizontalAdvance(self._caption) > self._room()
+
+    def scrolled(self) -> float:
+        """How far left the caption has slid, in pixels."""
+        return self._scrolled
+
+    def _room(self) -> int:
+        """The width a caption has to sit in before it has to move to be read."""
+        return max(0, self.width() - _TEXT_MARGIN)
 
     def pass_progress(self) -> tuple[int, int] | None:
         """The ``(done, total)`` the band along the foot is drawing, if any."""
@@ -106,7 +138,54 @@ class ProgressCaption(QProgressBar):
             self.setValue(progress[0])
         else:
             self.setRange(0, 0)
+        self._retime_scroll()
         self.update()
+
+    def _retime_scroll(self) -> None:
+        """Run the scroll while there is more caption than bar, and only then.
+
+        A bar per queue row, per shelf card and per tile is a lot of repainting
+        to leave running for lines that already fit — and a line that fits and
+        crawls anyway reads as a fault.
+        """
+        if self.scrolling() and self.isVisible():
+            if not self._scroll.isActive():
+                self._scrolled, self._hold = 0.0, _HOLD_TICKS
+                self._scroll.start()
+        elif self._scroll.isActive():
+            self._scroll.stop()
+            self._scrolled = 0.0
+
+    def _advance(self) -> None:
+        """Slide the caption one step left, holding a beat at the top of each lap.
+
+        The hold is what makes the loop readable: the line leads with the stage
+        the run is at, and a caption that swept straight past it would show that
+        word only in motion.
+        """
+        if self._hold > 0:
+            self._hold -= 1
+            return
+        self._scrolled += _SCROLL_PX
+        if self._scrolled >= self._lap():
+            self._scrolled, self._hold = 0.0, _HOLD_TICKS
+        self.update()
+
+    def _lap(self) -> float:
+        """One full turn of the caption: its width plus the gap before it repeats."""
+        return QFontMetrics(self.font()).horizontalAdvance(self._caption) + _SCROLL_GAP
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._retime_scroll()   # a bar shown again picks its scroll back up
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._scroll.stop()     # nothing to animate for a bar nobody can see
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._retime_scroll()   # a bar widened past its caption stops sliding
 
     def paintEvent(self, event):
         """Groove and fill, then the current pass's band, then the caption.
@@ -131,9 +210,35 @@ class ProgressCaption(QProgressBar):
         painter.drawControl(QStyle.ControlElement.CE_ProgressBar, option)
         self._paint_pass_band(painter)
         if self.isTextVisible() and caption:
+            self._paint_caption(painter, caption)
+
+    def _paint_caption(self, painter, caption: str) -> None:
+        """Write the caption across the bar — centered where it fits, else sliding.
+
+        A line wider than its bar is drawn twice, one lap apart, and clipped to
+        the bar: as the first copy leaves to the left the second is arriving from
+        the right, so the reading loops without a blank stretch between turns.
+        Eliding was what this did before, and it stopped serving once the line
+        began with the stage the run is at rather than a percentage — on a wide
+        bar the tail was cut, and on a tile there was room for little but the
+        stage, so the countdown went instead.
+        """
+        if not self.scrolling():
             painter.drawItemText(self.rect(), Qt.AlignmentFlag.AlignCenter,
                                  self.palette(), self.isEnabled(), caption,
                                  self.foregroundRole())
+            return
+        painter.save()
+        painter.setClipRect(self.rect())
+        lap = self._lap()
+        left = _TEXT_MARGIN / 2 - self.scrolled()
+        for start in (left, left + lap):
+            painter.drawItemText(
+                QRect(round(start), 0, round(lap), self.height()),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                self.palette(), self.isEnabled(), caption, self.foregroundRole(),
+            )
+        painter.restore()
 
     def _paint_pass_band(self, painter):
         """Lay the current pass's band along the foot of the bar, if there is one."""

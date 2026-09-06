@@ -2,6 +2,7 @@ import pytest
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
+from origenerator.gui import progress_caption
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.paths import ensure_shared_ui_on_path
@@ -65,17 +66,78 @@ def test_the_caption_still_shows_on_a_bar_with_nothing_to_count(bar):
     assert bar.text()
 
 
-def test_a_caption_too_long_for_the_bar_elides_at_its_tail(qtbot):
-    # Centered text in a narrow bar is otherwise clipped mid-letter at BOTH ends,
-    # which loses the percentage as readily as the countdown.
+def test_a_caption_too_long_for_the_bar_scrolls_past_instead_of_being_cut(qtbot):
+    # It used to elide, which on these lines means losing whichever readings the
+    # bar has no room for — the stage on a wide bar, the countdown on a tile.
+    # Slid past, all of it is read in turn.
     narrow = ProgressCaption()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
-    narrow.show_progress("100% · 12:30 elapsed · ~16:02 left", (10, 20))
+    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
 
-    assert narrow.text() != narrow.caption()
-    assert narrow.text().endswith("…")
-    assert narrow.caption() == "100% · 12:30 elapsed · ~16:02 left"  # the whole line is kept
+    assert narrow.scrolling()
+    assert narrow.text() == narrow.caption()          # nothing is cut off it
+    assert "…" not in narrow.text()
+
+
+def test_a_caption_that_fits_does_not_move(qtbot):
+    # A line crawling across a bar it already fits in reads as a fault.
+    wide = ProgressCaption()
+    qtbot.addWidget(wide)
+    wide.resize(400, 22)
+    wide.show_progress("50%", (10, 20))
+
+    assert not wide.scrolling()
+    assert wide.scrolled() == 0
+
+
+def test_the_scroll_holds_at_the_top_of_a_lap_then_sets_off(qtbot):
+    # The line leads with the stage the run is at, so a scroll that swept
+    # straight past would show that word only in motion.
+    narrow = ProgressCaption()
+    qtbot.addWidget(narrow)
+    narrow.resize(40, 22)
+    narrow.show()
+    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
+
+    for _ in range(progress_caption._HOLD_TICKS):
+        narrow._advance()
+    assert narrow.scrolled() == 0        # still held at the start of the line
+
+    narrow._advance()
+    assert narrow.scrolled() > 0         # and away
+
+
+def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
+    # The elapsed count ticks every second, so a scroll that started over on
+    # every caption would never leave the first few words.
+    narrow = ProgressCaption()
+    qtbot.addWidget(narrow)
+    narrow.resize(40, 22)
+    narrow.show()
+    narrow.show_progress("High noise · 40% · 12:30 elapsed · ~16:02 left", (10, 20))
+    for _ in range(progress_caption._HOLD_TICKS + 5):
+        narrow._advance()
+    travelled = narrow.scrolled()
+
+    narrow.show_progress("High noise · 40% · 12:31 elapsed · ~16:01 left", (10, 20))
+
+    assert narrow.scrolled() == travelled
+
+
+def test_a_bar_nobody_can_see_stops_scrolling(qtbot):
+    # One of these per queue row, per shelf card and per tile: a repaint every
+    # tick for bars that are not on screen is a cost with nothing bought by it.
+    narrow = ProgressCaption()
+    qtbot.addWidget(narrow)
+    narrow.resize(40, 22)
+    narrow.show()
+    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
+    assert narrow._scroll.isActive()
+
+    narrow.hide()
+
+    assert not narrow._scroll.isActive()
 
 
 def test_the_fill_is_the_flat_blue_behind_the_writing(styled_bar):

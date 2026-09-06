@@ -282,7 +282,7 @@ class ThumbnailWidget(QWidget):
                    else max(0.0, time.time() - run.started_at))
         self._enhancing_bar.show_progress(
             progress_status_label(elapsed, run.progress, run.typical_seconds,
-                                  step=run.pass_name, compact=True),
+                                  step=run.stage, compact=True),
             run.progress if run.status == "running" else None,
             run.pass_progress if run.status == "running" else None,
         )

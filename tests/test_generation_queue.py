@@ -237,6 +237,61 @@ def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
     assert frame.pixmap().height() == frame.height()
 
 
+def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_path):
+    # The complaint this answers: a WAN run spends over a minute loading models
+    # before ComfyUI streams a preview, and this corner was blank for all of it.
+    # It shows what the config tab shows for the same job — the frame being
+    # animated — until there is a frame of the run itself.
+    from PyQt6.QtWidgets import QApplication
+
+    frame = _picture(tmp_path / "frame.png")
+    queue.set_items([_item(job_kind="I2V", source_image=frame)])
+    QApplication.processEvents()
+    corner = queue._running._frame
+
+    assert corner.pixmap() is not None and not corner.pixmap().isNull()
+    assert corner.width() == corner.height()   # one picture, one square
+
+
+def test_the_corner_stands_the_recipe_beside_the_frame_where_there_is_one(queue, tmp_path):
+    # A combine's job is a picture and a past clip's settings, and that is what
+    # the config tab shows above the form. The corner says the same thing, the
+    # clip drawn gray beside the frame — so it needs the room for two.
+    from PyQt6.QtWidgets import QApplication
+
+    frame = _picture(tmp_path / "frame.png")
+    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe)])
+    QApplication.processEvents()
+    corner = queue._running._frame
+
+    assert corner.width() > corner.height()
+
+
+def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path):
+    # Once the run has a picture of its own, that is what the corner is for.
+    from PyQt6.QtWidgets import QApplication
+
+    frame = _picture(tmp_path / "frame.png")
+    queue.set_items([_item(job_kind="I2V", source_image=frame, frame=_png_bytes())])
+    QApplication.processEvents()
+    corner = queue._running._frame
+
+    assert corner.pixmap().height() == corner.height()
+    assert corner.width() == corner.height()
+
+
+def test_a_run_made_from_nothing_leaves_the_corner_empty(queue):
+    # A text-to-video has no picture to its name yet, and a stand-in for one
+    # would be a picture of something that has nothing to do with it.
+    from PyQt6.QtWidgets import QApplication
+
+    queue.set_items([_item(job_kind="T2V")])
+    QApplication.processEvents()
+
+    assert queue._running._frame.pixmap().isNull()
+
+
 def test_the_left_half_follows_the_job_being_made(queue):
     queue.set_items([
         _item(key="a", caption="the one rendering", progress=(5, 20)),

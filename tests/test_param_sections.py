@@ -7,7 +7,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
-        "Prompts", "Seed", "Model & LoRA", "Sampling", "Stroke",
+        "Prompts", "Seed", "Model & LoRA", "Sampling", "Motion",
         "Dimensions", "Video", "Audio",
     ]
 
@@ -32,8 +32,8 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("steps") == "Sampling"
     assert ps.section_title("scheduler") == "Sampling"
     assert ps.section_title("upscale_model") == "Model & LoRA"  # a model file slot
-    assert ps.section_title("stroke_hz") == "Stroke"
-    assert ps.section_title("anchor_y") == "Stroke"
+    assert ps.section_title("motion_hz") == "Motion"
+    assert ps.section_title("anchor_y") == "Motion"
     assert ps.section_title("width") == "Dimensions"
     assert ps.section_title("frame_count") == "Video"
     assert ps.section_title("frame_rate") == "Video"

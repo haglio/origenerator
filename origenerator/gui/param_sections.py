@@ -55,8 +55,8 @@ SECTIONS: tuple[Section, ...] = (
         "guidance", "sampler_name", "scheduler",
         "shift", "shift_high", "shift_low", "denoise",
     ), collapsed=True),
-    Section("Stroke", (
-        "stroke_hz", "stroke_x", "stroke_top", "stroke_bottom",
+    Section("Motion", (
+        "motion_hz", "motion_x", "motion_ceiling", "motion_floor",
         "anchor_x", "anchor_y",
     ), collapsed=True),
     Section("Dimensions", ("width", "height", "length"), collapsed=True),

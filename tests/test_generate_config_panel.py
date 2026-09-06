@@ -328,7 +328,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
     assert values["steps"] == 7
     ati_defaults = WORKFLOW_REGISTRY["wan21_ati_i2v"].default_params()
     assert values["cfg"] == ati_defaults["cfg"]        # flf2v's 1.0 didn't leak
-    assert values["stroke_hz"] == ati_defaults["stroke_hz"]
+    assert values["motion_hz"] == ati_defaults["motion_hz"]
 
 
 def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):

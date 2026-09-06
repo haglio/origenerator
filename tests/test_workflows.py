@@ -1170,7 +1170,7 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     # video on a stroke track built from the stroke params, so the pixels follow
     # the track instead of the track guessing at pixels. The track is ATI's
     # fixed 121-point/24fps convention: a 3-point cluster riding the authored
-    # sine between stroke_top and stroke_bottom, plus one static point holding
+    # sine between motion_ceiling and motion_floor, plus one static point holding
     # the anchor (e.g. a anchor base) in place.
     from origenerator.workflows.wan21_ati_i2v import (
         REFERENCE_HEIGHT,
@@ -1190,10 +1190,10 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
         input_image="start.png",
         seed=7,
         audio_seed=8,
-        stroke_hz=1.0,
-        stroke_x=200,
-        stroke_top=400,
-        stroke_bottom=600,
+        motion_hz=1.0,
+        motion_x=200,
+        motion_ceiling=400,
+        motion_floor=600,
         anchor_x=180,
         anchor_y=700,
     )
@@ -1214,8 +1214,8 @@ def test_wan21_ati_i2v_payload_follows_an_authored_stroke_track():
     cluster = tracks[:3]
     ys = [pt["y"] for pt in cluster[1]]          # the centered stroke point
     assert ys[0] == pytest.approx(400, abs=1)    # starts at the top of the stroke
-    assert min(ys) == pytest.approx(400, abs=2)  # tops ride near stroke_top...
-    assert 575 <= max(ys) <= 601                 # ...bottoms near stroke_bottom
+    assert min(ys) == pytest.approx(400, abs=2)  # tops ride near motion_ceiling...
+    assert 575 <= max(ys) <= 601                 # ...bottoms near motion_floor
     anchor = tracks[3]
     assert all(pt == {"x": 180.0, "y": 700.0} for pt in anchor)  # pinned still
 
@@ -1246,12 +1246,12 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     import json as _json
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
-    params = dict(wf.default_params(), stroke_hz=1.2, frame_count=81, frame_rate=16.0, seed=42)
+    params = dict(wf.default_params(), motion_hz=1.2, frame_count=81, frame_rate=16.0, seed=42)
     actions = wf.authored_actions(params)
     payload = wf.build_api_payload(params)
     tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
     ys = [pt["y"] for pt in tracks[1]]           # the centered cluster point
-    top, bottom = params["stroke_top"], params["stroke_bottom"]
+    top, bottom = params["motion_ceiling"], params["motion_floor"]
     depth = bottom - top
 
     assert actions[0] == {"at": 0, "pos": 100}   # the stroke starts at its top
@@ -1446,10 +1446,10 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_stroke(tmp_path, monkeypatc
     ys = [pt["y"] for pt in tracks[1]]                       # centered stroke point
     # The organic stroke starts exactly at the (scaled) top and lands within its
     # humanized shortfall of the (scaled) bottom — never beyond either bound.
-    scaled_depth = (params["stroke_bottom"] - params["stroke_top"]) * sy
-    assert min(ys) == pytest.approx(params["stroke_top"] * sy, abs=1)
-    assert params["stroke_bottom"] * sy - 0.12 * scaled_depth <= max(ys)
-    assert max(ys) <= params["stroke_bottom"] * sy + 1
+    scaled_depth = (params["motion_floor"] - params["motion_ceiling"]) * sy
+    assert min(ys) == pytest.approx(params["motion_ceiling"] * sy, abs=1)
+    assert params["motion_floor"] * sy - 0.12 * scaled_depth <= max(ys)
+    assert max(ys) <= params["motion_floor"] * sy + 1
 
 
 def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkeypatch):
@@ -1481,9 +1481,9 @@ def test_wan21_ati_stroke_coordinates_are_bounded_by_the_reference_frame():
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     by_key = {pd.key: pd for pd in wf.param_definitions()}
-    for key in ("stroke_x", "anchor_x"):
+    for key in ("motion_x", "anchor_x"):
         assert by_key[key].max_val == REFERENCE_WIDTH
-    for key in ("stroke_top", "stroke_bottom", "anchor_y"):
+    for key in ("motion_ceiling", "motion_floor", "anchor_y"):
         assert by_key[key].max_val == REFERENCE_HEIGHT
 
 
@@ -1504,7 +1504,7 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
         Wan21AtiI2vWorkflow,
     )
 
-    aim = {"stroke_x": 0.5, "stroke_top": 0.25, "stroke_bottom": 0.5,
+    aim = {"motion_x": 0.5, "motion_ceiling": 0.25, "motion_floor": 0.5,
            "anchor_x": 0.45, "anchor_y": 0.6}
     calls = []
     monkeypatch.setattr(ati, "detect_grip_aim", lambda path: (calls.append(path), aim)[1])
@@ -1523,12 +1523,12 @@ def test_wan21_ati_i2v_auto_aims_untouched_stroke_params(monkeypatch, tmp_path):
 
     # The funscript ignores aim entirely: same seed, same actions, aimed or not.
     assert wf.authored_actions(params) == wf.authored_actions(
-        dict(params, stroke_x=10, stroke_top=20, stroke_bottom=400, anchor_x=5, anchor_y=500)
+        dict(params, motion_x=10, motion_ceiling=20, motion_floor=400, anchor_x=5, anchor_y=500)
     )
 
     # An edited coordinate is a manual override: no detection, the numbers rule.
     calls.clear()
-    edited = dict(params, stroke_top=300)
+    edited = dict(params, motion_ceiling=300)
     payload = wf.build_api_payload(edited)
     tracks = _json.loads(_find_node(payload, "WanTrackToVideo")["inputs"]["tracks"])
     assert calls == []

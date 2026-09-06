@@ -8,6 +8,8 @@ tests/test_db_schema.py holds all of it as a snapshot: another app reads this
 file (evolver mounts it read-only and selects seven columns off ``generations``
 by name), and every user's database is migrated in place rather than rebuilt.
 """
+from origenerator.param_keys import migrate_stored_params
+
 SCHEMA = """\
 CREATE TABLE IF NOT EXISTS generations (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,3 +254,4 @@ def migrate(conn) -> None:
     # What each worktree's copied database had bookmarked, kept for adoption at
     # the next live launch; a branch session runs on this database now.
     conn.execute("DROP TABLE IF EXISTS branch_curation")
+    migrate_stored_params(conn)

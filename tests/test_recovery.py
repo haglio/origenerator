@@ -213,3 +213,25 @@ def test_a_stored_record_survives_the_round_trip_through_the_database(tmp_path):
         (str(source), str(batch.moves[0][1]))
     ]
     assert Path(record["batch"]["subdir"]) == batch.subdir
+
+
+def test_restoring_a_deletion_from_before_the_rename_brings_back_live_keys(tmp_path):
+    """A restore re-inserts the held row verbatim, so whatever the bin is
+    holding is what rejoins the gallery. Held records are migrated when the
+    database opens; this is the half that says the migrated copy is what a
+    restore actually puts back."""
+    path = tmp_path / "t.db"
+    db = Database(path)
+    db.insert_generation(prompt_id="p1", workflow_name="wan21_ati_i2v",
+                         workflow_version="v1", params_json="{}", workflow_json="{}")
+    held = dict(db.get_generation("p1"), params_json=json.dumps(
+        {"stroke_hz": 1.5, "stroke_x": 255, "stroke_top": 490, "stroke_bottom": 650}))
+    db.record_deletion("p1", held, {"moves": [], "subdir": None})
+    db.delete_generation("p1")
+
+    reopened = Database(path)          # the launch that migrates what the bin holds
+    recovery.restore(reopened, reopened.get_deletion("p1"))
+
+    restored = json.loads(reopened.get_generation("p1")["params_json"])
+    assert restored == {"motion_hz": 1.5, "motion_x": 255,
+                        "motion_ceiling": 490, "motion_floor": 650}

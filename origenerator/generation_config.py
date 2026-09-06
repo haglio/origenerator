@@ -8,6 +8,8 @@ import json
 import random
 from dataclasses import dataclass
 
+from origenerator.param_keys import renamed as renamed_params
+
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
 
 _SEED_MAX = (1 << 63) - 1
@@ -37,10 +39,17 @@ class ConfigSnapshot:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ConfigSnapshot":
-        """Rebuild from :meth:`to_dict` output, tolerating partial/corrupt data."""
+        """Rebuild from :meth:`to_dict` output, tolerating partial/corrupt data.
+
+        A tab saved before a param was renamed comes back on the current key:
+        this is the one place ``ui_state.json``'s stored params are read, and
+        a workflow asked for a key that has moved falls back to its default
+        without saying so (see :mod:`origenerator.param_keys`).
+        """
         params = data.get("params")
         if not isinstance(params, dict):
             params = {}
+        params = renamed_params(params)
         return cls(
             workflow_name=str(data.get("workflow_name", "")),
             params=params,

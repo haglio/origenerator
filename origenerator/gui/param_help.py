@@ -247,10 +247,10 @@ PARAM_HELP: dict[str, str] = {
     ),
 
     # --- the authored stroke (track-conditioned video) ---
-    "stroke_hz": "How many strokes per second the generated motion runs at.",
-    "stroke_x": "The horizontal line the stroke travels along, in pixels across the frame.",
-    "stroke_top": "The pixel row the stroke reaches at the top of its travel.",
-    "stroke_bottom": "The pixel row the stroke reaches at the bottom of its travel.",
+    "motion_hz": "How many cycles per second the generated motion runs at.",
+    "motion_x": "The horizontal line the motion travels along, in pixels across the frame.",
+    "motion_ceiling": "The pixel row the motion reaches at the top of its travel.",
+    "motion_floor": "The pixel row the motion reaches at the floor of its travel.",
     "anchor_x": "The horizontal position of the point that stays put while the stroke moves.",
     "anchor_y": "The vertical position of the point that stays put while the stroke moves.",
 

@@ -76,6 +76,25 @@ def test_restores_config_tabs_from_app_state(qtbot, tmp_path):
     assert panels[1]._workflow_combo.currentData() == "wan22_i2v"
 
 
+def test_a_saved_tab_from_before_the_rename_reopens_on_the_live_aim_keys(qtbot, tmp_path):
+    # ui_state.json holds each open tab's params verbatim, so a tab saved before
+    # the ATI aim params were renamed would reopen naming keys the workflow no
+    # longer reads -- and every one of the four would silently take its default.
+    state = AppState(tmp_path / "ui.json")
+    state.set("generate_tabs", {"tabs": [
+        {"config": {"workflow_name": "wan21_ati_i2v", "seed_is_random": False,
+                    "params": {"stroke_hz": 1.5, "stroke_x": 255,
+                               "stroke_top": 490, "stroke_bottom": 650}}},
+    ], "current": 0})
+    win = _window(qtbot, tmp_path, state)
+
+    params = win._gallery_view._info_tabs.config_panels()[0].current_config().params
+    assert params["motion_hz"] == 1.5
+    assert params["motion_ceiling"] == 490
+    assert params["motion_floor"] == 650
+    assert "stroke_hz" not in params
+
+
 def test_restores_the_global_osr2_toggle_from_app_state(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("osr2_enabled", True)

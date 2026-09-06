@@ -93,10 +93,10 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "shift": 8.0,
             "frame_rate": NATIVE_FPS,
-            "stroke_hz": 1.2,
-            "stroke_x": 255,
-            "stroke_top": 490,
-            "stroke_bottom": 650,
+            "motion_hz": 1.2,
+            "motion_x": 255,
+            "motion_ceiling": 490,
+            "motion_floor": 650,
             "anchor_x": 233,
             "anchor_y": 760,
             "audio_prompt": "",
@@ -129,13 +129,13 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("audio_negative_prompt", "Audio Negative Prompt", "str", "noisy, harsh", multiline=True),
             ParamDef("seed", "Seed", "seed", 0),
             ParamDef("audio_seed", "Audio Seed", "seed", 0),
-            ParamDef("stroke_hz", "Stroke Rate (Hz)", "float", 1.2, min_val=0.2, max_val=4.0, step=0.1),
+            ParamDef("motion_hz", "Motion Rate (Hz)", "float", 1.2, min_val=0.2, max_val=4.0, step=0.1),
             # Stroke coordinates are authored in the 480×864 reference frame and
             # rescaled into the derived output size at payload build, so their
             # ranges are the reference frame's bounds (width for X, height for Y).
-            ParamDef("stroke_x", "Stroke X", "int", 255, min_val=0, max_val=REFERENCE_WIDTH),
-            ParamDef("stroke_top", "Stroke Top Y", "int", 490, min_val=0, max_val=REFERENCE_HEIGHT),
-            ParamDef("stroke_bottom", "Stroke Bottom Y", "int", 650, min_val=0, max_val=REFERENCE_HEIGHT),
+            ParamDef("motion_x", "Motion X", "int", 255, min_val=0, max_val=REFERENCE_WIDTH),
+            ParamDef("motion_ceiling", "Motion Ceiling Y", "int", 490, min_val=0, max_val=REFERENCE_HEIGHT),
+            ParamDef("motion_floor", "Motion Floor Y", "int", 650, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("anchor_x", "Anchor X", "int", 233, min_val=0, max_val=REFERENCE_WIDTH),
             ParamDef("anchor_y", "Anchor Y", "int", 760, min_val=0, max_val=REFERENCE_HEIGHT),
             ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=113, step=4,
@@ -155,7 +155,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     # The aim params auto-detection may fill; leaving ALL of them untouched is
     # what opts a run into detection, and editing ANY is the manual override.
-    _AIM_KEYS = ("stroke_x", "stroke_top", "stroke_bottom", "anchor_x", "anchor_y")
+    _AIM_KEYS = ("motion_x", "motion_ceiling", "motion_floor", "anchor_x", "anchor_y")
 
     def _auto_aim_params(self, params: dict) -> dict:
         """``params`` with the stroke aimed at the detected anchor, when the user
@@ -172,10 +172,10 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             return params
         return {
             **params,
-            "stroke_x": round(aim["stroke_x"] * REFERENCE_WIDTH),
+            "motion_x": round(aim["motion_x"] * REFERENCE_WIDTH),
             "anchor_x": round(aim["anchor_x"] * REFERENCE_WIDTH),
-            "stroke_top": round(aim["stroke_top"] * REFERENCE_HEIGHT),
-            "stroke_bottom": round(aim["stroke_bottom"] * REFERENCE_HEIGHT),
+            "motion_ceiling": round(aim["motion_ceiling"] * REFERENCE_HEIGHT),
+            "motion_floor": round(aim["motion_floor"] * REFERENCE_HEIGHT),
             "anchor_y": round(aim["anchor_y"] * REFERENCE_HEIGHT),
         }
 
@@ -190,10 +190,10 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         the pixel track and the funscript are built from, which is what keeps
         them locked."""
         rng = random.Random(params["seed"])
-        top = float(params["stroke_top"])
-        bottom = float(params["stroke_bottom"])
+        top = float(params["motion_ceiling"])
+        bottom = float(params["motion_floor"])
         depth = bottom - top
-        half = 0.5 / params["stroke_hz"]
+        half = 0.5 / params["motion_hz"]
         reversals = [(0.0, top)]
         t, going_down = 0.0, True
         while t <= TRACK_SECONDS:
@@ -250,10 +250,10 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         sy = height / REFERENCE_HEIGHT
         return {
             **params,
-            "stroke_x": params["stroke_x"] * sx,
+            "motion_x": params["motion_x"] * sx,
             "anchor_x": params["anchor_x"] * sx,
-            "stroke_top": params["stroke_top"] * sy,
-            "stroke_bottom": params["stroke_bottom"] * sy,
+            "motion_ceiling": params["motion_ceiling"] * sy,
+            "motion_floor": params["motion_floor"] * sy,
             "anchor_y": params["anchor_y"] * sy,
         }
 
@@ -261,13 +261,13 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         """The tracks JSON: three staggered points riding the authored stroke
         series, plus one static point pinning the anchor. 121 points at 24fps,
         ATI's fixed convention."""
-        amplitude = (params["stroke_bottom"] - params["stroke_top"]) / 2
+        amplitude = (params["motion_floor"] - params["motion_ceiling"]) / 2
         series = self._stroke_series(params)
         tracks = []
         for x_off, y_off in _CLUSTER_OFFSETS:
             spread = min(abs(y_off), amplitude * 0.4) * (1 if y_off >= 0 else -1)
             tracks.append([
-                {"x": float(params["stroke_x"] + x_off), "y": float(y + spread)}
+                {"x": float(params["motion_x"] + x_off), "y": float(y + spread)}
                 for y in series
             ])
         tracks.append(
@@ -292,8 +292,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         to afford it gets one mid point at 55% time / 82% travel, approximating
         the track's cosine easing so the device also decelerates into the
         reversal rather than moving at one flat speed."""
-        top = float(params["stroke_top"])
-        bottom = float(params["stroke_bottom"])
+        top = float(params["motion_ceiling"])
+        bottom = float(params["motion_floor"])
         depth = (bottom - top) or 1.0
         video_s = params["frame_count"] / NATIVE_FPS
         scale = video_s / TRACK_SECONDS

@@ -503,12 +503,14 @@ class PreviewWidget(QWidget):
         Media is fitted keeping its aspect ratio, so a portrait image on a wide
         screen leaves surround either side of it — which is what an overlay (the
         slideshows' neighbor stills) needs to know to keep clear of the picture.
-        Falls back to the whole pane whenever the drawn size isn't knowable yet:
-        a video whose resolution hasn't arrived, or nothing on screen at all.
+        Falls back to the whole media area whenever the drawn size isn't
+        knowable yet -- a video whose resolution hasn't arrived, or nothing on
+        screen at all -- and never to the strip along the foot, which is no
+        picture: a corner chip laid over it hung off the video's bottom edge.
         """
         drawn = self._drawn_size()
         if drawn is None or drawn.isEmpty():
-            return self.rect()
+            return self._media_host.geometry()
         rect = QRect(QPoint(0, 0), drawn)
         rect.moveCenter(self._image_label.mapTo(self, self._image_label.rect().center()))
         return rect

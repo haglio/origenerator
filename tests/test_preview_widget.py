@@ -566,6 +566,23 @@ def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeyp
     assert not w._strip.isHidden()
 
 
+def test_the_corners_keep_off_the_strip_while_a_videos_size_is_unknown(qtbot, tmp_path):
+    # A clip's resolution arrives late, or never (a backend need not report it),
+    # and until it does the picture is taken to be the whole media area. That
+    # is not the whole pane: the strip along the foot is no picture, and a
+    # chip laid over it read as a dark tab hanging off the video's bottom edge.
+    w = _strip_preview(qtbot)
+    w.resize(320, 480)
+    w.show()
+    w.show_video(_scripted_video(tmp_path))
+    w.set_actions("gen-1")
+    w.layout().activate()
+    strip_top = w._strip.geometry().top()
+    assert not w._strip.isHidden() and strip_top > 0
+    assert w.media_rect().bottom() < strip_top
+    assert all(b.geometry().bottom() < strip_top for b in w._controls.buttons())
+
+
 def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):
     w = _strip_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written

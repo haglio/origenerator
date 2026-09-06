@@ -116,15 +116,15 @@ class FunTimeBridge(QObject):
         if show is None:
             return  # an empty region has nothing to drive
         if action == "NEXT":
-            show.stroke_step(1)
+            show.show_step(1)
         elif action == "PREV":
-            show.stroke_step(-1)
+            show.show_step(-1)
         elif action == "TRASH":
-            show.stroke_cull()
+            show.show_cull()
         elif action == "LOCK":
-            show.stroke_toggle_hold()
+            show.show_toggle_hold()
         elif action == "RESET":
-            show.stroke_reset()
+            show.show_reset()
 
     # --- the paused flag ----------------------------------------------------
 

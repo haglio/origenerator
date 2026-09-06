@@ -56,7 +56,7 @@ def test_the_words_fun_times_players_answer_to_mean_the_same_here():
     assert match_app_command("back") is AppCommand.BACK
 
 
-def test_the_stroke_dials_keep_fun_times_phrases():
+def test_the_motion_dials_keep_fun_times_phrases():
     assert match_app_command("speed up") is AppCommand.SPEED_UP
     assert match_app_command("slow down") is AppCommand.SPEED_DOWN
     assert match_app_command("amp down") is AppCommand.AMP_DOWN

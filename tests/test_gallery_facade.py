@@ -22,7 +22,7 @@ PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "BASE_RENDER_SOURCE", "CustomGroup",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
     "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "LoraGroup",
-    "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "STROKE_FRAMES",
+    "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_path",
     "build_custom_folders", "build_gallery_tree", "build_image_config_index",
@@ -52,7 +52,7 @@ PUBLISHED = {
     "rows_of_media_types", "rows_under", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",
     "starred_folders", "starred_generations", "start_frame_index",
-    "stroke_shaped",
+    "cycle_shaped",
     "unreviewed_experiments",
     "videos_from_source_image", "workflow_output_type",
 }

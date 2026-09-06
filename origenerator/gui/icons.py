@@ -153,7 +153,7 @@ def mic_icon() -> QIcon:
     return glyph_icon("mic", size=_SIZE)
 
 
-def stroke_icon() -> QIcon:
+def motion_icon() -> QIcon:
     """A sine wave — the one OSR2 switch. It wears the waveform whichever source
     is driving, because from the outside they are the same thing: motion the app
     is sending the device."""

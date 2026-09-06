@@ -1,4 +1,4 @@
-"""StrokePanel — Genau's console, shown here, and what a press on it does.
+"""MotionPanel — Genau's console, shown here, and what a press on it does.
 
 The console is player_core's and tested there. What this covers is the two
 things that are this app's: that the picture really is that console (not a
@@ -10,16 +10,16 @@ from player_core.console import console_rows
 from player_core.console_hud import ConsoleHud, ConsolePainter
 from player_core.robot_hand import POSITION_MAX
 
-from origenerator import stroke_engine
-from origenerator.gui.stroke_panel import StrokePanel, console_hud, drive_hud
-from origenerator.stroke_engine import Stroke
+from origenerator import motion_engine
+from origenerator.gui.motion_panel import MotionPanel, console_hud, drive_hud
+from origenerator.motion_engine import Motion
 
 
-class FakeStroke:
+class FakeMotion:
     """Stands in for the driver: records what the console asked it to do."""
 
     def __init__(self):
-        self.state = Stroke()
+        self.state = Motion()
         self.active = False
         self.calls = []
 
@@ -60,13 +60,13 @@ class FakeHost:
         self.locked = True
         self.calls = []
 
-    def stroke_step(self, delta):
+    def show_step(self, delta):
         self.calls.append(("step", delta))
 
-    def stroke_toggle_hold(self):
+    def show_toggle_hold(self):
         self.calls.append("hold")
 
-    def stroke_cull(self):
+    def show_cull(self):
         self.calls.append("cull")
 
     def set_dwell_s(self, seconds):
@@ -76,9 +76,9 @@ class FakeHost:
 
 
 def _panel(qtbot, stroke=None, host=None):
-    stroke = stroke if stroke is not None else FakeStroke()
+    stroke = stroke if stroke is not None else FakeMotion()
     host = host if host is not None else FakeHost()
-    panel = StrokePanel(stroke, host=host)
+    panel = MotionPanel(stroke, host=host)
     qtbot.addWidget(panel)
     return panel, stroke, host
 
@@ -91,7 +91,7 @@ def _press(panel, action):
     """
     rect = next(r for r, b in panel._painter.buttons if b.action == action)
     x, y, w, h = rect
-    margin = StrokePanel.MARGIN
+    margin = MotionPanel.MARGIN
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
 
 
@@ -99,7 +99,7 @@ def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     # Over a show the two switches saying what it may play are on the players'
     # HUD this panel sits under, and a second pair here would be two switches
     # for one thing — so the console offers neither, the way Genau's own does.
-    panel, _stroke, _host = _panel(qtbot)
+    panel, _motion, _host = _panel(qtbot)
     panel.render_console()
     for action in ("main_fmode", "genau_filter_enhanced"):
         assert action not in [b.action for _r, b in panel._painter.buttons]
@@ -114,10 +114,10 @@ def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
 
     parent = QWidget()
     qtbot.addWidget(parent)
-    panel = StrokePanel(FakeStroke(), parent, host=FakeHost())
+    panel = MotionPanel(FakeMotion(), parent, host=FakeHost())
 
     panel.reposition()
-    assert (panel.x(), panel.y()) == (StrokePanel.MARGIN, StrokePanel.MARGIN)
+    assert (panel.x(), panel.y()) == (MotionPanel.MARGIN, MotionPanel.MARGIN)
 
     panel.reposition(below=QRect(12, 12, 300, 140))
     assert (panel.x(), panel.y()) == (12, 12 + 140 + 12)
@@ -131,12 +131,12 @@ def test_the_console_is_a_native_window_that_does_not_ask_for_a_translucent_surf
     # ground needs nothing but the RGBA picture over the parent's own paint.
     from PyQt6.QtCore import Qt
 
-    panel, _stroke, _host = _panel(qtbot)
+    panel, _motion, _host = _panel(qtbot)
     assert panel.testAttribute(Qt.WidgetAttribute.WA_NativeWindow)
     assert not panel.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
 
-def test_the_console_is_here_whether_or_not_a_stroke_is_running(qtbot):
+def test_the_console_is_here_whether_or_not_a_motion_is_running(qtbot):
     # Part of what is on it is not about a running stroke at all — the pace an
     # unheld slide moves on at. A panel that appeared only once the device was
     # driven made that reachable only by starting a stroke.
@@ -178,7 +178,7 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
         assert kept in actions, kept
 
 
-def test_the_stroke_buttons_reach_the_driver(qtbot):
+def test_the_motion_buttons_reach_the_driver(qtbot):
     panel, stroke, _host = _panel(qtbot)
     stroke.active = True  # a parked device's marks are dimmed, and dim is unpressable
     # A full-travel stroke has its center pinned, and a pinned mark is dim too.
@@ -195,7 +195,7 @@ def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):
     # Genau's transport steps its clips and its clip-seconds pair paces them;
     # here the clips are the slides, which is what makes the same row mean
     # something rather than being drawn dead.
-    panel, _stroke, host = _panel(qtbot)
+    panel, _motion, host = _panel(qtbot)
     panel.render_console()
     for action in ("genau_next_clip", "genau_prev_clip", "main_lock",
                    "genau_weird_clip", "genau_clip_seconds_up"):
@@ -203,7 +203,7 @@ def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):
     assert host.calls == [("step", 1), ("step", -1), "hold", "cull", ("dwell", 5)]
 
 
-def test_a_parked_device_offers_none_of_the_strokes_marks(qtbot):
+def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     # A press that could do nothing is not offered — the readout is dimmed whole
     # while nothing is reaching the device, exactly as it is in Fun Time while a
     # funscript has it.
@@ -217,7 +217,7 @@ def test_a_parked_device_offers_none_of_the_strokes_marks(qtbot):
 def test_the_pace_stops_at_its_ends(qtbot):
     from origenerator.gui.slideshow_pace import MAX_S, MIN_S
 
-    panel, _stroke, host = _panel(qtbot)
+    panel, _motion, host = _panel(qtbot)
     host.dwell_s = MIN_S
     panel.render_console()
     _press(panel, "genau_clip_seconds_down")
@@ -234,7 +234,7 @@ def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
     panel.render_console()
     speed = next(t for t in panel._painter.tracks if t.axis == "speed")
     x, y, w, _h = speed.rect
-    margin = StrokePanel.MARGIN
+    margin = MotionPanel.MARGIN
     panel._post(panel._painter.press_at(x + w - 1 + margin, y + margin))
     assert stroke.calls == [("set_speed", 100)]
 
@@ -242,7 +242,7 @@ def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
 def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
     from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 
-    stroke = FakeStroke()
+    stroke = FakeMotion()
     assert drive_hud(stroke.state, False).driven == DRIVEN_BY_NOTHING
     assert drive_hud(stroke.state, True).driven == DRIVEN_BY_ROBOT_HAND
     assert console_hud(stroke, FakeHost()).console.osr2 == "off"
@@ -250,14 +250,14 @@ def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
     assert console_hud(stroke, FakeHost()).console.osr2 == "robot_hand"
 
 
-def test_a_stroke_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
+def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     # The stroke goes on stroking with the device unplugged — it cannot see the
     # wire — so without this the console animated a blue wave nobody was riding.
     # Saying "off" is also what greys the readout and holds its trace still: the
     # painter reads who has the device off this one value (player_core).
     from player_core.drive_readout import DRIVEN_BY_NOTHING
 
-    stroke = FakeStroke()
+    stroke = FakeMotion()
     stroke.active = True
 
     hud = console_hud(stroke, FakeHost(), device_on=False)
@@ -271,9 +271,9 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     # this app's back, so a console that read it at build time would go on
     # claiming whatever was true when it opened.
     answers = [False, True]
-    stroke = FakeStroke()
+    stroke = FakeMotion()
     stroke.active = True
-    panel = StrokePanel(stroke, host=FakeHost(), device_on=lambda: answers.pop(0))
+    panel = MotionPanel(stroke, host=FakeHost(), device_on=lambda: answers.pop(0))
     qtbot.addWidget(panel)
 
     panel.render_console()
@@ -313,9 +313,9 @@ def test_the_pace_starts_at_the_slideshows_own_default(qtbot):
 
     pace = SlideshowPace()
     assert pace.seconds == DEFAULT_IMAGE_DWELL_MS // 1000
-    panel = StrokePanel(FakeStroke(), host=PaceOnlyHost(pace))
+    panel = MotionPanel(FakeMotion(), host=PaceOnlyHost(pace))
     qtbot.addWidget(panel)
-    assert console_hud(panel._stroke, panel._host).console.advance_interval == pace.seconds
+    assert console_hud(panel._motion, panel._host).console.advance_interval == pace.seconds
 
 
 def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtbot):
@@ -323,7 +323,7 @@ def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtb
     from origenerator.gui.slideshow_view import SlideshowView
 
     pace = SlideshowPace()
-    panel = StrokePanel(FakeStroke(), host=PaceOnlyHost(pace))
+    panel = MotionPanel(FakeMotion(), host=PaceOnlyHost(pace))
     qtbot.addWidget(panel)
     panel.render_console()
     _press(panel, "genau_clip_seconds_up")
@@ -346,23 +346,23 @@ def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
     assert view.dwell_s == 9
 
 
-def test_the_readout_shows_the_summed_stroke_while_cruise_has_it(qtbot):
+def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
     # Cruise control hands the device several waves summed, and the readout is
     # meant to be the motion rather than a drawing of it — so the bar is the
     # whole stroke's travel and center, and the trace is the sum, not whichever
     # wave happens to be the big one.
     import random
 
-    stroke = FakeStroke()
+    stroke = FakeMotion()
     live = stroke.state
     live.state.playing = True
     live.cruise.rng = random.Random(4)
-    stroke_engine.toggle_cruise_control(live)
+    motion_engine.toggle_cruise_control(live)
     now = 1000.0
     for _ in range(400):
         now += 0.05
-        stroke_engine.advance(live, 0.05)
-        stroke_engine.tick_cruise_control(live, now)
+        motion_engine.advance(live, 0.05)
+        motion_engine.tick_cruise_control(live, now)
 
     dials = wave_stack.dials(live.cruise.stack, live.clock)
     hud = drive_hud(live, active=True)

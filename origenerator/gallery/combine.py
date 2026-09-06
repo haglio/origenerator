@@ -21,7 +21,7 @@ _CONTENT = load_content()
 _SIZE_KEYS = ("width", "height")
 
 # How long a Genau clip is generated for, in frames at the native rate. Genau
-# steers a clip as ONE stroke — see :func:`stroke_shaped` — so the ideal is the
+# steers a clip as ONE stroke — see :func:`cycle_shaped` — so the ideal is the
 # shortest clip that holds exactly one, and 13 frames is where the arithmetic
 # lands (a stroke at the app's own cadence is 0.83 s, and 13/16 is 0.81).
 #
@@ -31,8 +31,8 @@ _SIZE_KEYS = ("width", "height")
 # this far from the first: 13 frames -2.02%, 17 +1.34%, 21 +0.99%, 29 +0.23%,
 # 41 -0.19%, 81 +0.05%. Under 29 the lighting visibly pops on every repeat; at
 # 29 it stops. So the length is set by the loop closing, and the ONE stroke is
-# asked for in words instead (:data:`_STROKE_PROMPT`).
-STROKE_FRAMES = 29
+# asked for in words instead (:data:`_CYCLE_WORDS`).
+CYCLE_FRAMES = 29
 
 # The words that ask a 29-frame loop for ONE stroke, and for a deep one, PER
 # ACT: ``{act: {"positive": ..., "negative": ...}}`` with a ``""`` entry standing
@@ -50,7 +50,7 @@ STROKE_FRAMES = 29
 # speaks in is: this file is public, and the sanitize guard bans that vocabulary
 # from the tracked tree. An overlay with none of this leaves every prompt exactly
 # as its recipe wrote it.
-_STROKE_WORDS: dict = _CONTENT.get("genau_stroke_prompts") or {}
+_CYCLE_WORDS: dict = _CONTENT.get("genau_stroke_prompts") or {}
 
 
 def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
@@ -101,19 +101,19 @@ def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
     return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
 
 
-def stroke_words(category: str = "") -> tuple[str, str]:
+def cycle_words(category: str = "") -> tuple[str, str]:
     """The ``(positive, negative)`` a Genau clip of ``category`` asks for, or the
-    default pair when that act has none of its own -- see :data:`_STROKE_WORDS`.
+    default pair when that act has none of its own -- see :data:`_CYCLE_WORDS`.
 
     Empty strings when the overlay carries nothing at all, which is what leaves
     a recipe's prompt untouched rather than appending a stray space.
     """
-    words = _STROKE_WORDS.get(category) or _STROKE_WORDS.get("") or {}
+    words = _CYCLE_WORDS.get(category) or _CYCLE_WORDS.get("") or {}
     return ((words.get("positive") or "").strip(),
             (words.get("negative") or "").strip())
 
 
-def stroke_shaped(params: dict, workflow, category: str = "") -> dict:
+def cycle_shaped(params: dict, workflow, category: str = "") -> dict:
     """``params`` re-cut so the loop portrays ONE deep stroke, and plays smoothly.
 
     The Genau lane's whole problem: Genau does not play a clip, it scrubs it
@@ -123,9 +123,9 @@ def stroke_shaped(params: dict, workflow, category: str = "") -> dict:
 
     Three settings answer that, and each was arrived at by measuring:
 
-    * :data:`STROKE_FRAMES` seconds of motion, because that is the shortest loop
+    * :data:`CYCLE_FRAMES` seconds of motion, because that is the shortest loop
       the model closes cleanly (see the note there).
-    * The words, chosen by the act (:func:`stroke_words`). At 29 frames the model
+    * The words, chosen by the act (:func:`cycle_words`). At 29 frames the model
       fits about two strokes on its own, so the prompt asks for one outright —
       naming the cycle in stages rather than saying "one stroke", which does
       nothing. The same wording doubled the travel, so the clip reads as a
@@ -141,8 +141,8 @@ def stroke_shaped(params: dict, workflow, category: str = "") -> dict:
     defaults = workflow.default_params()
     if "frame_count" not in defaults or "frame_rate" not in defaults:
         return params
-    positive, negative = stroke_words(category)
-    shaped = {**params, "frame_count": STROKE_FRAMES, "frame_rate": MAX_PLAYBACK_FPS}
+    positive, negative = cycle_words(category)
+    shaped = {**params, "frame_count": CYCLE_FRAMES, "frame_rate": MAX_PLAYBACK_FPS}
     for key, extra in (("positive_prompt", positive),
                        ("negative_prompt", negative)):
         if extra:

@@ -25,8 +25,8 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
 from origenerator.ken_burns import TICK_MS, ZOOM_SPAN
+from origenerator.motion_engine import Motion
 from origenerator.slideshow import LIVE, in_order
-from origenerator.stroke_engine import Stroke
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -274,7 +274,7 @@ def test_stepping_away_releases_the_lock(qtbot):
 def test_the_consoles_transport_releases_the_lock_too(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
-    view.stroke_step(1)                     # the console's transport, not the key
+    view.show_step(1)                     # the console's transport, not the key
     assert not view.locked
     assert view._playlist.current() == ("b.mp4", "video")
 
@@ -290,13 +290,13 @@ def test_culling_releases_the_lock(qtbot):
     assert view._timer.isActive()           # so the rest keeps rotating
 
 
-class _FakeStroke:
+class _FakeMotion:
     """Enough of the stroke driver for the shared keys and the drive panel."""
 
     def __init__(self):
         self.active = False
         self.calls = []
-        self.state = Stroke()
+        self.state = Motion()
 
     def toggle(self):
         self.active = not self.active
@@ -310,14 +310,14 @@ class _FakeStroke:
         return "OSR2 stub"
 
 
-def test_space_drives_the_shared_stroke_not_the_lock(qtbot):
+def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     # Space belongs to the app-global OSR2 stroke everywhere; locking the
     # slideshow is Down. The standing caption comes with the wired stroke.
-    stroke = _FakeStroke()
+    stroke = _FakeMotion()
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
                          stroke=stroke)
     qtbot.addWidget(view)
-    assert view._stroke_panel is not None  # the drive panel rides along
+    assert view._motion_panel is not None  # the drive panel rides along
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in stroke.calls
     assert not view._playlist.locked

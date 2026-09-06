@@ -9,10 +9,10 @@ cruise toggle off `/`, left 184 tests green across the five files that reach it.
 import pytest
 from PyQt6.QtCore import Qt
 
-from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND, apply_stroke_key
+from origenerator.gui.motion_hud import MOTION_KEY_LEGEND, apply_motion_key
 
 
-class _Stroke:
+class _Motion:
     """Records what a keystroke asked of the driver, in the driver's own words."""
 
     def __init__(self):
@@ -42,10 +42,10 @@ _KEYS = [
 
 
 @pytest.mark.parametrize("key, asked", _KEYS, ids=lambda v: getattr(v, "name", None))
-def test_each_stroke_key_asks_the_driver_for_its_own_move(key, asked):
-    stroke = _Stroke()
+def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
+    stroke = _Motion()
 
-    handled = apply_stroke_key(stroke, key)
+    handled = apply_motion_key(stroke, key)
 
     assert handled is True
     assert stroke.asked == [asked]
@@ -54,26 +54,26 @@ def test_each_stroke_key_asks_the_driver_for_its_own_move(key, asked):
 def test_a_key_the_cluster_does_not_answer_falls_through_untouched():
     # False is how the caller learns the key is still its own to handle — a
     # surface's own shortcuts live on the other side of this return.
-    stroke = _Stroke()
+    stroke = _Motion()
 
-    assert apply_stroke_key(stroke, Qt.Key.Key_K) is False
+    assert apply_motion_key(stroke, Qt.Key.Key_K) is False
     assert stroke.asked == []
 
 
 def test_no_driver_means_every_key_falls_through():
     # Inside a Fun Time session the OSR2 is the main player's alone and this app
     # holds no driver at all, so none of these keys may be swallowed here.
-    assert apply_stroke_key(None, Qt.Key.Key_Space) is False
+    assert apply_motion_key(None, Qt.Key.Key_Space) is False
 
 
-def test_space_reaches_the_switch_it_is_given_rather_than_the_strokes_own():
+def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():
     # Driving is one switch — the gallery's — which picks the funscript or the
     # stroke by what is playing. Space starting a second source alongside a
     # script already streaming is the failure this argument exists to prevent.
-    stroke = _Stroke()
+    stroke = _Motion()
     pressed = []
 
-    apply_stroke_key(stroke, Qt.Key.Key_Space, on_drive_toggle=lambda: pressed.append(1))
+    apply_motion_key(stroke, Qt.Key.Key_Space, on_drive_toggle=lambda: pressed.append(1))
 
     assert pressed == [1]
     assert stroke.asked == []
@@ -86,4 +86,4 @@ def test_the_legend_names_every_key_the_cluster_answers():
     # "J/L" and elsewhere, so on their own they would say nothing.
     for written in ("Space drives", "J/L speed", "7/9 travel", "U/O center",
                     "I shape", "/ cruise", "\\ nudge"):
-        assert written in STROKE_KEY_LEGEND
+        assert written in MOTION_KEY_LEGEND

@@ -1,13 +1,13 @@
-"""Osr2StrokeDriver — broker etiquette and the self-generated position stream."""
+"""Osr2MotionDriver — broker etiquette and the self-generated position stream."""
 
 import threading
 import time
 
-from origenerator import stroke_engine
-from origenerator.gui.osr2_stroke_driver import (
+from origenerator import motion_engine
+from origenerator.gui.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
-    Osr2StrokeDriver,
+    Osr2MotionDriver,
     _TickThread,
 )
 
@@ -64,7 +64,7 @@ def _driver(qtbot):
         tickers.append(FakeTicker(tick, interval_s))
         return tickers[-1]
 
-    driver = Osr2StrokeDriver(broker, now_source=clock, ticker_factory=factory)
+    driver = Osr2MotionDriver(broker, now_source=clock, ticker_factory=factory)
     driver.tickers = tickers
     return driver, broker, clock
 
@@ -93,9 +93,9 @@ def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
         clock.t += step
         driver.poll()
         pos, interval = broker.positions[-1]
-        assert pos == stroke_engine.position_ahead(driver.state, interval / 1000)
+        assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
     assert interval == _LOOKAHEAD_MS  # the last one, well past the glide
-    assert pos > stroke_engine.position(driver.state)  # ahead, on the way up
+    assert pos > motion_engine.position(driver.state)  # ahead, on the way up
 
 
 def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
@@ -204,7 +204,7 @@ def test_the_status_line_reads_off_but_keeps_the_dials_while_stopped(qtbot):
     assert driver.status_text() == "OSR2 off · 200/min · sine · travel 100 around 50"
 
 
-def test_cruise_control_takes_the_stroke_over_and_it_is_what_is_streamed(qtbot):
+def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     # Hands off, the motion is no longer one wave: it is several summed, each
     # with its own speed and its own share of the travel, both on their way
     # somewhere else. What has to stay true is that the tick still sends where
@@ -218,7 +218,7 @@ def test_cruise_control_takes_the_stroke_over_and_it_is_what_is_streamed(qtbot):
         clock.t += 0.025
         driver.poll()
         pos, interval = broker.positions[-1]
-        assert pos == stroke_engine.position_ahead(driver.state, interval / 1000)
+        assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
     assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
     assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
     assert driver.state.cruise.stack.waves

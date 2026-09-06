@@ -11,7 +11,7 @@ from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
 
-from origenerator import evolver_export, gallery, recipe_match, search, stroke_engine
+from origenerator import evolver_export, gallery, motion_engine, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -47,9 +47,9 @@ from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.motion_engine import Motion
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
-from origenerator.stroke_engine import Stroke
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import SurfaceCommand
@@ -6383,7 +6383,7 @@ def test_the_console_sits_under_the_hud_rather_than_beneath_it(qtbot, monkeypatc
 
     show = _standalone_show(qtbot, monkeypatch)
     hud, = show.findChildren(ShowHud)
-    console = show._stroke_panel
+    console = show._motion_panel
     assert console is not None
 
     assert console.x() == hud.x()
@@ -8572,7 +8572,7 @@ def _loop_recipe(db, prompt_id="loop"):
     return wf
 
 
-def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
+def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
     """The lane used to choose only WHICH past clip was mined, and from there a
     Genau clip was made exactly like any other video. It cannot be: what Genau
     needs of a clip is a property of its LENGTH, and the clip being mined was
@@ -8586,12 +8586,12 @@ def test_the_genau_lane_asks_for_a_recipe_one_stroke_long(qtbot, tmp_path):
     view._generate_combination("img", "loop", intent=recipe_match.GENAU)
 
     job = next(iter(view._reroll_jobs.values()))
-    assert job.params["frame_count"] == gallery.STROKE_FRAMES   # the length that closes
+    assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
     assert job.params["frame_rate"] > wf.default_params()["frame_rate"]  # smoothed
     assert job.params["positive_prompt"] != "alpha"             # asked for one stroke
 
 
-def test_the_act_chooses_which_stroke_words_the_lane_adds(qtbot, tmp_path):
+def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
     """A stroke is not one motion, so the wording is per act — and the act has to
     reach the shaping, which is the whole reason it is threaded through."""
     db = _combine_db(tmp_path)
@@ -8600,19 +8600,19 @@ def test_the_act_chooses_which_stroke_words_the_lane_adds(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     asked = []
-    real = gallery.stroke_shaped
+    real = gallery.cycle_shaped
     view._db  # noqa: B018  (the view is built; patch after)
 
     def spy(params, workflow, category=""):
         asked.append(category)
         return real(params, workflow, category)
 
-    gallery_view_module.gallery.stroke_shaped = spy
+    gallery_view_module.gallery.cycle_shaped = spy
     try:
         view._generate_combination("img", "loop", intent=recipe_match.GENAU,
                                    category="beta")
     finally:
-        gallery_view_module.gallery.stroke_shaped = real
+        gallery_view_module.gallery.cycle_shaped = real
 
     assert asked == ["beta"]
 
@@ -9723,10 +9723,10 @@ def test_the_hud_holds_the_left_of_the_lower_row_and_enhance_the_right(qtbot, tm
     # fixed size on the left, the Enhance settings taking the width beside it.
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    row = view._stroke_panel.parentWidget().layout().itemAt(
-        _row_index(view, view._stroke_panel)
+    row = view._motion_panel.parentWidget().layout().itemAt(
+        _row_index(view, view._motion_panel)
     )
-    assert row.itemAt(0).widget() is view._stroke_panel
+    assert row.itemAt(0).widget() is view._motion_panel
     assert row.itemAt(1).widget() is view._enhance_panel
     assert row.stretch(0) == 0 and row.stretch(1) == 1
 
@@ -9738,8 +9738,8 @@ def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp
 
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    column = view._stroke_panel.parentWidget().layout()
-    above = column.itemAt(_row_index(view, view._stroke_panel) - 1).widget()
+    column = view._motion_panel.parentWidget().layout()
+    above = column.itemAt(_row_index(view, view._motion_panel) - 1).widget()
 
     assert isinstance(above, QFrame)
     assert above.height() == 1
@@ -10536,7 +10536,7 @@ def _osr2_view(qtbot):
     """A gallery with both drive sources stubbed: the funscript driver, and the
     stroke the one switch falls back to when there is no script to follow."""
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(),
-                       osr2_stroke=_SignalStroke())
+                       osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
     driver = _FakeDriver()
     view._osr2_driver = driver
@@ -10554,7 +10554,7 @@ def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
     assert driver.stopped == 1
 
 
-def test_toggle_on_with_no_video_shown_strokes_instead(qtbot):
+def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     # "Genau mode when no funscript is going": with nothing scripted in front,
     # the one switch drives the device from the app's own stroke rather than
     # sitting armed and doing nothing.
@@ -10562,13 +10562,13 @@ def test_toggle_on_with_no_video_shown_strokes_instead(qtbot):
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
     view._osr2_btn.setChecked(True)
-    assert driver.started == [] and view._osr2_stroke.active
+    assert driver.started == [] and view._osr2_motion.active
 
     view._osr2_btn.setChecked(False)
-    assert not view._osr2_stroke.active
+    assert not view._osr2_motion.active
 
 
-def test_space_flips_the_one_switch_rather_than_the_stroke_alone(qtbot, monkeypatch):
+def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot, monkeypatch):
     # Space is genau's "drives" key and the switch is the same control, so it has
     # to reach the switch: routed to the stroke directly it would start a second
     # source alongside a funscript the switch already had streaming.
@@ -10576,13 +10576,13 @@ def test_space_flips_the_one_switch_rather_than_the_stroke_alone(qtbot, monkeypa
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
     view._osr2_btn.setChecked(True)
-    assert driver.started == [("pA", "aA")] and not view._osr2_stroke.active
+    assert driver.started == [("pA", "aA")] and not view._osr2_motion.active
 
     space = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, _NO_MOD)
     assert view.eventFilter(view, space) is True
 
     assert not view._osr2_btn.isChecked()      # the switch went off, not the stroke
-    assert driver.stopped >= 1 and not view._osr2_stroke.active
+    assert driver.stopped >= 1 and not view._osr2_motion.active
 
 
 def test_a_show_gets_space_wired_to_the_switch(qtbot):
@@ -10708,8 +10708,8 @@ def test_stepping_a_double_clicked_show_re_aims_the_osr2(qtbot):
 
 # --- watching a folder that is auto-generating, and the app-global stroke -----
 
-class _SignalStroke(QObject):
-    """Stands in for the app-global Osr2StrokeDriver: records the calls, flips
+class _SignalMotion(QObject):
+    """Stands in for the app-global Osr2MotionDriver: records the calls, flips
     on toggle, and reports the handovers — no device backend spins up."""
 
     active_changed = pyqtSignal(bool)
@@ -10718,7 +10718,7 @@ class _SignalStroke(QObject):
         super().__init__()
         self.active = False
         self.calls = []
-        self.state = Stroke()
+        self.state = Motion()
 
     def toggle(self):
         self.active = not self.active
@@ -10766,7 +10766,7 @@ def _looping_view(qtbot, monkeypatch, rows):
     """A gallery on a settings leaf whose loop reports active, built on a stubbed
     stroke so no device backend spins up."""
     view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(),
-                       osr2_stroke=_SignalStroke())
+                       osr2_motion=_SignalMotion())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -10790,7 +10790,7 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     win.close()
 
 
-def test_a_funscript_coming_into_view_takes_the_device_off_the_stroke(qtbot, monkeypatch):
+def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
     # The one switch picks the source, and a script beats the stroke: turning it
     # on over an image strokes, and browsing to a scripted video hands the device
     # to the funscript rather than leaving both streaming at it.
@@ -10801,16 +10801,16 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_stroke(qtbot, mon
     panel.osr2_drive_target = lambda: None
 
     view._osr2_btn.setChecked(True)
-    assert view._osr2_stroke.active and driver.started == []
+    assert view._osr2_motion.active and driver.started == []
 
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     panel.displayed_changed.emit()
 
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_stroke.active  # the stroke stood down for the script
+    assert not view._osr2_motion.active  # the stroke stood down for the script
 
 
-def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
+def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     # The stroke is app-global: dismissing a view must not park the device.
     _resolve_by_id(monkeypatch)
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
@@ -10820,29 +10820,29 @@ def test_closing_a_slideshow_leaves_the_stroke_running(qtbot, monkeypatch):
     assert view._slideshow._actions.drive_toggle == view._toggle_osr2_drive
     view._osr2_btn.setChecked(True)
     view._slideshow.close()
-    assert view._osr2_stroke.active
+    assert view._osr2_motion.active
 
 
-def test_escape_panic_stops_a_running_stroke(qtbot, monkeypatch):
+def test_escape_panic_stops_a_running_motion(qtbot, monkeypatch):
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Esc is the gallery's here — no dialog and no fullscreen view up. Said
     # outright, because which window Qt calls active is ambient in a test process
     # (a fullscreen view another test opened and closed can still hold it).
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     view._osr2_btn.setChecked(True)
-    assert view._osr2_stroke.active
+    assert view._osr2_motion.active
     assert view._handle_escape() is True
-    assert not view._osr2_stroke.active
+    assert not view._osr2_motion.active
 
 
-def test_the_stroke_keys_work_in_the_main_window_too(qtbot, monkeypatch):
+def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_L, _NO_MOD)
     assert view.eventFilter(view, event) is True
-    assert ("speed", 5) in view._osr2_stroke.calls
+    assert ("speed", 5) in view._osr2_motion.calls
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
@@ -11260,20 +11260,20 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
     assert not view._auto.is_active(key) and view._slideshow is None
 
 
-def test_esc_puts_back_a_stroke_that_was_running_without_the_switch(qtbot,
+def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
                                                                     monkeypatch):
     # Started by a stroke key rather than the OSR2 switch, so it is the stroke
     # itself that has to be started again — the switch was never on to restore.
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
     view._auto.stop_all()
-    view._osr2_stroke.start()
+    view._osr2_motion.start()
 
     _press_escape(view)
-    assert not view._osr2_stroke.active
+    assert not view._osr2_motion.active
 
     _press_escape(view)
-    assert view._osr2_stroke.active and not view._osr2_btn.isChecked()
+    assert view._osr2_motion.active and not view._osr2_btn.isChecked()
 
 
 def test_esc_stops_the_audio_bed_on_its_own(qtbot):
@@ -13203,9 +13203,9 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
     assert not view._voice.commands_on
 
 
-def test_a_spoken_dial_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
+def test_a_spoken_dial_turns_the_motion_the_way_its_key_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    dials = view._osr2_stroke.state.state
+    dials = view._osr2_motion.state.state
     amplitude, center = dials.amplitude, dials.center
 
     view._voice.speak("amp down")   # travel opens at its widest, so down from there
@@ -13214,14 +13214,14 @@ def test_a_spoken_dial_turns_the_stroke_the_way_its_key_does(qtbot, tmp_path):
     assert dials.amplitude == amplitude - 10
     assert dials.center == center + 5
     # Answered with what the device now reads, which is the panel's own line.
-    assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
+    assert view._voice_status.text() == f"🎤 {view._osr2_motion.status_text()}"
 
 
 def test_a_spoken_number_puts_a_dial_where_it_says(qtbot, tmp_path):
     # The nudges walk a dial five or ten at a time, which never arrives from the
     # far end; the number said outright is what Fun Time answers with too.
     view = _listening(qtbot, tmp_path)
-    dials = view._osr2_stroke.state.state
+    dials = view._osr2_motion.state.state
 
     view._voice.speak("amp fifty")
     assert dials.amplitude == 50
@@ -13230,34 +13230,34 @@ def test_a_spoken_number_puts_a_dial_where_it_says(qtbot, tmp_path):
     assert dials.intended_center == 30
 
     view._voice.speak("max speed")
-    assert dials.speed == stroke_engine.MAX_SPEED
-    assert view._voice_status.text() == f"🎤 {view._osr2_stroke.status_text()}"
+    assert dials.speed == motion_engine.MAX_SPEED
+    assert view._voice_status.text() == f"🎤 {view._osr2_motion.status_text()}"
 
 
-def test_min_speed_lands_on_the_slowest_the_dial_actually_strokes(qtbot, tmp_path):
+def test_min_speed_lands_on_the_slowest_the_dial_actually_moves(qtbot, tmp_path):
     # The vocabulary says nought and the dial says what its floor is; the
     # clamping is the dial's business, which is why the grid can be uniform.
     view = _listening(qtbot, tmp_path)
 
     view._voice.speak("min speed")
 
-    assert view._osr2_stroke.state.state.speed == stroke_engine.MIN_SPEED
+    assert view._osr2_motion.state.state.speed == motion_engine.MIN_SPEED
 
 
 def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.speak("cruise on")
-    assert view._osr2_stroke.state.cruise.active
+    assert view._osr2_motion.state.cruise.active
 
     view._voice.speak("cruise on")       # already on: still ends up on
-    assert view._osr2_stroke.state.cruise.active
+    assert view._osr2_motion.state.cruise.active
 
     view._voice.speak("cruise off")
-    assert not view._osr2_stroke.state.cruise.active
+    assert not view._osr2_motion.state.cruise.active
 
 
-def test_a_stroke_dial_answers_from_a_show_too(qtbot, tmp_path):
+def test_a_motion_dial_answers_from_a_show_too(qtbot, tmp_path):
     # The driver is app-wide, so its words belong to no surface — but the answer
     # goes where the speaker is looking.
     view = _listening(qtbot, tmp_path)
@@ -13266,7 +13266,7 @@ def test_a_stroke_dial_answers_from_a_show_too(qtbot, tmp_path):
 
     view._voice.speak("next shape")
 
-    assert surface.said == f"🎤 {view._osr2_stroke.status_text()}"
+    assert surface.said == f"🎤 {view._osr2_motion.status_text()}"
 
 
 def test_a_sentence_holding_a_command_word_still_steers_the_prompt(qtbot, tmp_path):

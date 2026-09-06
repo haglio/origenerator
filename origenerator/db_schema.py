@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS generations (
     -- The clip this row is one stroke of, by that clip's prompt_id. Nothing
     -- writes it any more: cutting a finished clip down was how a Genau clip was
     -- made for one afternoon, until the lane learned to ask the sampler for a
-    -- loop one stroke long instead (origenerator.gallery.combine.stroke_shaped),
+    -- loop one stroke long instead (origenerator.gallery.combine.cycle_shaped),
     -- which is the same answer without a second file. The cuts that were made
     -- are still here and still in Genau's folder, so the column stays and the
     -- Generate tab still follows it back to the clip each came out of. An

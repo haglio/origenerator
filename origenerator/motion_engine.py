@@ -9,7 +9,7 @@ apps stroke the same way rather than two ways that look alike until they don't.
 What genau keeps elsewhere and this has to carry is the phase. Genau's engine
 advances it against the clip's beats; here there is no clip, so the stroke
 free-runs on the driver's clock and the phase rides along with the dials, in
-:class:`Stroke`.
+:class:`Motion`.
 
 Hands-free is player_core's too: :mod:`player_core.cruise_control` hands the
 device a stroke that is several waves summed, each with its own travel, center
@@ -46,17 +46,34 @@ from player_core.robot_hand import (  # noqa: E402
 )
 
 __all__ = [
-    "MAX_SPEED", "MIN_SPEED", "CruiseControlState", "RobotHandState",
-    "Stroke", "WaveformShape", "adjust_amplitude", "adjust_center",
-    "adjust_speed", "advance", "bpm_for_speed", "cycle_shape",
-    "disable_cruise_control", "enable_cruise_control", "position",
-    "position_ahead", "quarter_offset", "set_amplitude", "set_center",
-    "set_speed", "tick_cruise_control", "toggle_cruise_control", "trace",
+    "MAX_SPEED",
+    "MIN_SPEED",
+    "CruiseControlState",
+    "Motion",
+    "RobotHandState",
+    "WaveformShape",
+    "adjust_amplitude",
+    "adjust_center",
+    "adjust_speed",
+    "advance",
+    "bpm_for_speed",
+    "cycle_shape",
+    "disable_cruise_control",
+    "enable_cruise_control",
+    "position",
+    "position_ahead",
+    "quarter_offset",
+    "set_amplitude",
+    "set_center",
+    "set_speed",
+    "tick_cruise_control",
+    "toggle_cruise_control",
+    "trace",
 ]
 
 
 @dataclass
-class Stroke:
+class Motion:
     """The live stroke: genau's dials, cruise control's waves, and the phase.
 
     The stack has a clock of its own — the stroke's seconds rather than the
@@ -79,7 +96,7 @@ class Stroke:
         return self.cruise.clock
 
 
-def advance(stroke: Stroke, dt_s: float) -> None:
+def advance(stroke: Motion, dt_s: float) -> None:
     """Carry the single wave's phase forward by ``dt_s`` seconds of stroking.
 
     The stacked stroke's phases are carried by its own tick below, which is
@@ -89,37 +106,37 @@ def advance(stroke: Stroke, dt_s: float) -> None:
     stroke.phase = phase_advanced(stroke.phase, stroke.state.bpm, dt_s)
 
 
-def tick_cruise_control(stroke: Stroke, now: float) -> None:
+def tick_cruise_control(stroke: Motion, now: float) -> None:
     """Let the dice move the stroke, if cruise control has it."""
     cruise_control.tick_cruise_control(stroke.state, stroke.cruise, now,
                                        phase=stroke.phase)
 
 
-def toggle_cruise_control(stroke: Stroke) -> None:
+def toggle_cruise_control(stroke: Motion) -> None:
     """Hands off, or hands back on — taking the stroke over from where the dials
     already have it, and handing the single wave back at the phase of the wave
     that was carrying most of the travel, so neither seam is felt."""
     _picked_up(stroke, cruise_control.toggle_cruise_control(stroke.cruise))
 
 
-def enable_cruise_control(stroke: Stroke) -> None:
+def enable_cruise_control(stroke: Motion) -> None:
     """Hands off, whichever way the switch was standing — what a spoken "cruise
     on" is, where the toggle above is what a key press is."""
     cruise_control.enable_cruise_control(stroke.cruise)
 
 
-def disable_cruise_control(stroke: Stroke) -> None:
+def disable_cruise_control(stroke: Motion) -> None:
     """Hands back on, whichever way the switch was standing."""
     _picked_up(stroke, cruise_control.disable_cruise_control(stroke.cruise))
 
 
-def _picked_up(stroke: Stroke, phase: float | None) -> None:
+def _picked_up(stroke: Motion, phase: float | None) -> None:
     """Cruise control letting go says where the single wave should pick up."""
     if phase is not None:
         stroke.phase = phase
 
 
-def quarter_offset(stroke: Stroke) -> None:
+def quarter_offset(stroke: Motion) -> None:
     """Jump a quarter cycle — genau's ``\\`` key, for when the stroke is out of
     step with what is on screen and you want it moved rather than restarted."""
     stroke.phase = (stroke.phase + 0.25) % 1.0
@@ -127,7 +144,7 @@ def quarter_offset(stroke: Stroke) -> None:
         wave.phase = (wave.phase + 0.25) % 1.0
 
 
-def position(stroke: Stroke) -> float:
+def position(stroke: Motion) -> float:
     """Where the stroke is now, 0-100 — the scale
     :func:`origenerator.osr2.format_position` takes."""
     # Read the stack once: the driver's clock thread can swap it out from
@@ -138,7 +155,7 @@ def position(stroke: Stroke) -> float:
     return _at(stroke, stroke.phase)
 
 
-def position_ahead(stroke: Stroke, lead_s: float) -> float:
+def position_ahead(stroke: Motion, lead_s: float) -> float:
     """Where the stroke will be ``lead_s`` seconds from now, 0-100.
 
     This, not :func:`position`, is what a device command should aim at: the OSR2
@@ -152,7 +169,7 @@ def position_ahead(stroke: Stroke, lead_s: float) -> float:
     return _at(stroke, stroke.phase + lead_s * stroke.state.bpm / 60.0)
 
 
-def trace(stroke: Stroke, samples: int, span_s: float) -> list[float]:
+def trace(stroke: Motion, samples: int, span_s: float) -> list[float]:
     """The stroke sampled forward from now as 0-1 heights — the drive readout's
     picture of the motion the device is being sent, ``span_s`` seconds of it."""
     stack = stroke.cruise.stack
@@ -165,7 +182,7 @@ def trace(stroke: Stroke, samples: int, span_s: float) -> list[float]:
     ]
 
 
-def _at(stroke: Stroke, phase: float) -> float:
+def _at(stroke: Motion, phase: float) -> float:
     state = stroke.state
     return 100.0 * position_fraction(
         phase, shape=state.shape, amplitude=state.amplitude, center=state.center)

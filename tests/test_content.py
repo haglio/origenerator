@@ -118,7 +118,7 @@ def test_a_workflow_imports_on_an_overlay_that_is_missing_what_it_wants(tmp_path
     edited to drop it, took the whole app down with a bare KeyError: no window,
     and nothing said about which key or which file.
 
-    The control on this is in tests/test_stroke_aim.py — the same overlay, read
+    The control on this is in tests/test_motion_aim.py — the same overlay, read
     where the labels are actually used, still refuses.
     """
     incomplete = tmp_path / "content.local.json"

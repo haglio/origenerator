@@ -29,10 +29,10 @@ import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X
 """
 
 from origenerator.gallery.combine import (
-    STROKE_FRAMES,
+    CYCLE_FRAMES,
     combined_params,
     curated_params,
-    stroke_shaped,
+    cycle_shaped,
 )
 from origenerator.gallery.custom import (
     SELECTION_KEY,
@@ -166,13 +166,13 @@ __all__ = [
     "ALL_KEY",
     "ALL_LABEL",
     "BASE_RENDER_SOURCE",
+    "CYCLE_FRAMES",
     "ENHANCE_COMMAND",
     "ENHANCE_SETTING_KEYS",
     "ENHANCE_WORKFLOW",
     "GENAU_COMMAND",
     "MATCH_SOURCE_MODEL",
     "SELECTION_KEY",
-    "STROKE_FRAMES",
     "AllGroup",
     "CustomGroup",
     "EnhanceLevel",
@@ -195,6 +195,7 @@ __all__ = [
     "curated_params",
     "custom_folder_id",
     "custom_folder_key",
+    "cycle_shaped",
     "default_enhance_params",
     "describe_enhance_params",
     "disown_foreign_runs",
@@ -261,7 +262,6 @@ __all__ = [
     "starred_folders",
     "starred_generations",
     "start_frame_index",
-    "stroke_shaped",
     "unreviewed_experiments",
     "videos_from_source_image",
     "workflow_output_type",

@@ -63,7 +63,7 @@ def test_the_six_acts_travel_as_one_record_and_land_where_they_did(wired):
     _press(view, Qt.Key.Key_Up)       # cull
     assert calls["delete"] == [("id-a",)]
 
-    view.stroke_reset()
+    view.show_reset()
     assert calls["reset"] == [(view,)]
 
 

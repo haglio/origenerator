@@ -26,10 +26,10 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import osr2, stroke_engine
+from origenerator import motion_engine, osr2
+from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
-from origenerator.gui.stroke_hud import STROKE_KEY_LEGEND
 from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
@@ -60,8 +60,8 @@ def _limits(state) -> drive_layout.Limits:
     dials = state.state
     half = dials.amplitude // 2
     return drive_layout.Limits(
-        spd_at_min=dials.speed <= stroke_engine.MIN_SPEED,
-        spd_at_max=dials.speed >= stroke_engine.MAX_SPEED,
+        spd_at_min=dials.speed <= motion_engine.MIN_SPEED,
+        spd_at_max=dials.speed >= motion_engine.MAX_SPEED,
         amp_at_min=dials.amplitude <= 0,
         amp_at_max=dials.amplitude >= 100,
         ctr_at_min=dials.intended_center <= half,
@@ -83,14 +83,14 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     return DriveHud(
         speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
         shape=dials.shape.value,
-        position=round(POSITION_MAX * stroke_engine.position(state) / 100),
+        position=round(POSITION_MAX * motion_engine.position(state) / 100),
         driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
         advance_interval=dwell_s,
         trace_seconds=_TRACE_SECONDS,
         spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
         amp_at_min=limits.amp_at_min, amp_at_max=limits.amp_at_max,
         ctr_at_min=limits.ctr_at_min, ctr_at_max=limits.ctr_at_max,
-        waveform=tuple(stroke_engine.trace(
+        waveform=tuple(motion_engine.trace(
             state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)),
     )
 
@@ -137,7 +137,7 @@ def panel_size(stroke, host) -> tuple[int, int]:
     return ConsolePainter().rgba(console_hud(stroke, host))[1]
 
 
-class StrokePanel(QWidget):
+class MotionPanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
     It is always here, stroke or no stroke. Part of what is on it is not about a
@@ -155,7 +155,7 @@ class StrokePanel(QWidget):
 
     def __init__(self, stroke, parent=None, host=None, pace=None, device_on=None):
         super().__init__(parent)
-        self._stroke = stroke
+        self._motion = stroke
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -181,7 +181,7 @@ class StrokePanel(QWidget):
         # and the console then came out TWICE over a show: once where Qt drew
         # it and once more at double its offset, where that surface ended up.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-        self.setToolTip(f"OSR2 stroke — {STROKE_KEY_LEGEND}")
+        self.setToolTip(f"OSR2 stroke — {MOTION_KEY_LEGEND}")
         self.setFixedSize(*panel_size(stroke, self._host))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
@@ -214,7 +214,7 @@ class StrokePanel(QWidget):
 
     def _sync_repaint(self) -> None:
         """Animate only what is moving: a shown panel with a running stroke."""
-        if self.isVisible() and getattr(self._stroke, "active", False):
+        if self.isVisible() and getattr(self._motion, "active", False):
             self._repaint.start()
         else:
             self._repaint.stop()
@@ -272,7 +272,7 @@ class StrokePanel(QWidget):
         """Do here what Fun Time would route to whichever player owns it."""
         if not action:
             return
-        stroke, host = self._stroke, self._host
+        stroke, host = self._motion, self._host
         if action.startswith("robot_hand_") and "_" in action[11:]:
             axis, _, value = action[11:].rpartition("_")
             if value.isdigit() and axis in ("amp", "center", "speed"):
@@ -287,8 +287,8 @@ class StrokePanel(QWidget):
             "robot_hand_amplitude_down": (stroke.adjust_amplitude, -10),
             "robot_hand_center_up": (stroke.adjust_center, 5),
             "robot_hand_center_down": (stroke.adjust_center, -5),
-            "genau_prev_clip": (host.stroke_step, -1),
-            "genau_next_clip": (host.stroke_step, 1),
+            "genau_prev_clip": (host.show_step, -1),
+            "genau_next_clip": (host.show_step, 1),
         }.get(action)
         if step is not None:
             step[0](step[1])
@@ -299,9 +299,9 @@ class StrokePanel(QWidget):
         elif action == "quarter_button":
             stroke.quarter_offset()
         elif action == "main_lock":
-            host.stroke_toggle_hold()
+            host.show_toggle_hold()
         elif action == "genau_weird_clip":
-            host.stroke_cull()
+            host.show_cull()
         elif action in ("genau_clip_seconds_up", "genau_clip_seconds_down"):
             delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
             host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
@@ -314,7 +314,7 @@ class StrokePanel(QWidget):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         return self._painter.rgba(
-            console_hud(self._stroke, self._host, device_on=self._device_on()))
+            console_hud(self._motion, self._host, device_on=self._device_on()))
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device

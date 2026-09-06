@@ -30,9 +30,10 @@ ones — and so the app closing can hand ComfyUI everything left
 
 import json
 import logging
+import threading
 import time
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, pyqtSignal
 
 from origenerator import gallery, queue_line
 from origenerator.generation_config import filled_params, prepared_params
@@ -49,6 +50,45 @@ logger = logging.getLogger(__name__)
 # progress ticks fire per sampler step (sub-second for images); the persisted value
 # only needs to be recent enough that a restart resumes the bar near where it was.
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
+
+
+def _off_the_gui_thread(run) -> None:
+    """Run ``run`` on a thread of its own and keep the window alive until it
+    returns, then raise whatever it raised.
+
+    For the one call in this module that waits on the server: the submit.
+    ComfyUI can take a minute to accept a prompt (fifty seconds on 2026-09-05,
+    validating a two-scene clip), and the follow-up on a late answer waits
+    longer still (``comfyui_api.submit_job``). Made on the GUI thread, that
+    wait was the window freezing solid -- no paint, no click -- which reads as
+    a crash, and the row the launch had just written could not be shown. So the
+    call goes to a thread, and this thread pumps the window's events meanwhile:
+    the new row is painted, the poll runs, a Cancel is taken. Still on the
+    calling thread's stack, so everything around the wait stays in order and
+    every caller of the line stays synchronous; what the pumping lets in is
+    handled where it arrives (:meth:`RerollController._pump` stands down while
+    a hand-over is out). Without an application to pump, it just runs.
+    """
+    app = QCoreApplication.instance()
+    if app is None:
+        run()
+        return
+    outcome: list = []
+
+    def target():
+        try:
+            run()
+            outcome.append(None)
+        except BaseException as e:  # carried back to the caller's thread
+            outcome.append(e)
+
+    worker = threading.Thread(target=target, name="comfyui-submit", daemon=True)
+    worker.start()
+    while worker.is_alive():
+        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
+        worker.join(0.02)
+    if outcome and outcome[0] is not None:
+        raise outcome[0]
 
 
 def _parse_progress_state(raw):
@@ -101,6 +141,7 @@ class RerollController(QObject):
         # to be handed over, in the order it will be.
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
+        self._in_flight: GenerationJob | None = None  # out to the server, unanswered
         self._videos_held = False  # the slideshow's gate (see :meth:`hold_videos`)
 
     @property
@@ -323,6 +364,10 @@ class RerollController(QObject):
         # is just handed to something else.
         if source != "experiment":
             self._preempt_experiments()
+        # Announced before the hand-over, not after: the server can take a
+        # minute to answer, and the launch is in the line the moment its row is
+        # written, so that is when its tile appears.
+        self.changed.emit()
         self._pump()
         self.changed.emit()
         return job
@@ -340,8 +385,12 @@ class RerollController(QObject):
         already on the server can no longer be re-ordered or held back, so
         nothing is sent until the machine is free to run it. A submit that fails
         takes that job out of the line and the next one is tried, rather than the
-        queue stalling on a job the server refuses.
+        queue stalling on a job the server refuses. While a hand-over is out --
+        its submit unanswered, the window alive meanwhile -- nothing else moves:
+        whatever asked is answered when it lands, by the loop that sent it.
         """
+        if self._in_flight is not None:
+            return
         while not self._on_server:
             job = queue_line.next_ready(self._waiting, videos_held=self._videos_held)
             if job is None:
@@ -350,15 +399,31 @@ class RerollController(QObject):
             if self._hand_over(job):
                 return
 
-    def _hand_over(self, job: GenerationJob) -> bool:
-        """Submit one job to ComfyUI, reporting whether the server took it."""
+    def _hand_over(self, job: GenerationJob, off_thread: bool = True) -> bool:
+        """Submit one job to ComfyUI, reporting whether the server took it.
+
+        The submit waits off the GUI thread with the window kept alive
+        (:func:`_off_the_gui_thread`), so a Cancel can arrive while it is out:
+        the job is gone from the line by the time the server answers, and a
+        server that took it is told to let it go. ``off_thread`` False makes
+        the plain blocking call, for the closing app, which has no window left
+        to keep alive.
+        """
         key = self._key_of(job)
+        self._in_flight = job
         try:
-            job.start()
+            job.start(_off_the_gui_thread if off_thread else None)
         except Exception as e:
+            if self._key_of(job) is None:
+                return False  # canceled while out, and never taken: nothing to undo
             logger.warning("Re-roll submission failed for %s: %s", key, e)
             self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
             self._drop(key, job)
+            return False
+        finally:
+            self._in_flight = None
+        if self._key_of(job) is None:
+            job.cancel()  # canceled while out; the server has it and must not run it
             return False
         self._on_server.append(job)
         self._db.update_generation(job.prompt_id, status="running")
@@ -377,7 +442,7 @@ class RerollController(QObject):
         handed = 0
         for job in list(self._waiting):
             self._waiting.remove(job)
-            if self._hand_over(job):
+            if self._hand_over(job, off_thread=False):
                 handed += 1
         if handed:
             logger.info("Handed ComfyUI %d queued job(s) as the app closed", handed)

@@ -1,7 +1,10 @@
 """RerollController — launching re-roll jobs: whole-folder, per-seed, and combine."""
 
 import json
+import threading
 from unittest.mock import MagicMock
+
+from PyQt6.QtCore import QTimer
 
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -787,3 +790,88 @@ def test_parse_progress_state_tolerates_absent_or_corrupt():
     assert _parse_progress_state("not json") is None
     assert _parse_progress_state("[1, 2]") is None          # valid JSON, but not a dict
     assert _parse_progress_state('{"total": 20}') == {"total": 20}
+
+
+# --- a submit the server is slow to answer -----------------------------------------
+
+def _gated_client():
+    """A client whose submit waits until the test lets it go: ComfyUI taking its
+    time to answer, as it can for a minute. The wait is capped so a hand-over
+    that never pumps the gate's opener fails instead of hanging the suite."""
+    client = _client()
+    gate = threading.Event()
+    client.submit_job = MagicMock(side_effect=lambda payload, pid: gate.wait(5) and "comfy-X")
+    return client, gate
+
+
+def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(qtbot, tmp_path):
+    # ComfyUI can take a minute to accept a prompt (fifty seconds, 2026-09-05),
+    # and the submit used to wait for it on the GUI thread: the window froze
+    # solid, which reads as a crash, and the row the launch had just written
+    # could not even be painted. The wait is off that thread now and the window
+    # is kept alive meanwhile -- so a timer fires during it, and finds the
+    # launch already in the line, on a row already written and announced.
+    client, gate = _gated_client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    announced = []
+    controller.changed.connect(lambda: announced.append(True))
+    seen = {}
+
+    def while_the_submit_is_out():
+        seen["rows"] = [r["status"] for r in db.list_generations()]
+        seen["in_line"] = controller.has("video/wf/deadbeef")
+        seen["announced"] = len(announced)
+        gate.set()
+
+    QTimer.singleShot(0, while_the_submit_is_out)
+    controller.start_prepared("video/wf/deadbeef", _I2V, _params())
+
+    assert seen == {"rows": ["pending"], "in_line": True, "announced": 1}
+    assert db.list_generations()[0]["status"] == "running"
+
+
+def test_a_launch_canceled_while_its_submit_is_out_is_dequeued_when_it_lands(qtbot, tmp_path):
+    # The window being alive, its Cancel can be pressed while the server has not
+    # answered. The job is forgotten at once; when the server does take it, it is
+    # told to let it go, since nobody wants it any more.
+    client, gate = _gated_client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    seen = {}
+
+    def while_the_submit_is_out():
+        seen["pid"] = controller.jobs["video/wf/deadbeef"].prompt_id
+        controller.cancel_job(seen["pid"])
+        gate.set()
+
+    QTimer.singleShot(0, while_the_submit_is_out)
+    controller.start_prepared("video/wf/deadbeef", _I2V, _params())
+
+    assert not controller.has("video/wf/deadbeef")
+    assert controller.queue_order == []
+    client.cancel_prompt.assert_called_once_with(seen["pid"])
+    assert db.list_generations() == []
+
+
+def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_path):
+    # One hand-over at a time, still: a second launch during the wait joins the
+    # line rather than racing the first to the server.
+    client, gate = _gated_client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    seen = {}
+
+    def while_the_submit_is_out():
+        controller.start_prepared("video/wf/second", _I2V, _params(seed=2))
+        seen["submits"] = client.submit_job.call_count
+        gate.set()
+
+    QTimer.singleShot(0, while_the_submit_is_out)
+    controller.start_prepared("video/wf/first", _I2V, _params(seed=1))
+
+    first = controller.jobs["video/wf/first"].prompt_id
+    second = controller.jobs["video/wf/second"].prompt_id
+    assert seen["submits"] == 1
+    assert controller.queue_order == [first, second]
+    assert client.submit_job.call_count == 1  # the second waits for the first to finish

@@ -36,6 +36,12 @@ def _payload(name, **params):
     return wf.build_api_payload({**wf.default_params(), **params})
 
 
+def _ids(payload, class_type):
+    """The payload's nodes of one class, in insertion order — how a caller of
+    these functions finds a pass, since the ids are the graph's own business."""
+    return [nid for nid, node in payload.items() if node["class_type"] == class_type]
+
+
 def test_a_lone_sampler_is_budgeted_at_a_still_step_per_step():
     # Nothing to weigh anything against, so the total is just the step count at
     # the flat cost of a still: what matters here is only that it scales.
@@ -94,10 +100,12 @@ def test_a_detail_fix_costs_less_per_step_than_the_render_it_patches(enhance_pay
     # A fix samples one crop enlarged to at most 1024px; the tail it follows
     # samples the whole upscaled render. Charged the same, two fixes would take
     # two thirds of the bar for a fraction of the work.
-    costs = sampler_costs(enhance_payload(
-        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    tail = costs["10"][1]
-    assert all(cost < tail for node, (_, cost) in costs.items() if node != "10")
+    payload = enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    costs = sampler_costs(payload)
+    tail_id = _ids(payload, "KSampler")[0]
+    tail = costs[tail_id][1]
+    assert all(cost < tail for node, (_, cost) in costs.items() if node != tail_id)
     assert expected_sampling_seconds(enhance_payload(
         enhance_steps=20,
         enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == 16  # 10 + 3 + 3
@@ -120,13 +128,16 @@ def test_the_bar_does_not_refill_once_per_fix(enhance_payload):
     # The complaint this fixes: a multi-fix enhance used to fill to 100%, snap
     # back near zero and fill again for every fix, so one job read as a queue of
     # them. Each pass now starts where the last ended.
-    tracker = ProgressTracker.for_payload(enhance_payload(
-        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    assert tracker.update(20, 20, "10") == (10, 16)  # the upscale tail finishes
-    assert tracker.update(1, 20, "15") == (10, 16)   # faces begins from there
-    assert tracker.update(20, 20, "15") == (13, 16)
-    assert tracker.update(1, 20, "18") == (13, 16)   # and so does hands
-    assert tracker.update(20, 20, "18") == (16, 16)
+    payload = enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    tail = _ids(payload, "KSampler")[0]
+    faces, hands = _ids(payload, "DetailerForEach")
+    tracker = ProgressTracker.for_payload(payload)
+    assert tracker.update(20, 20, tail) == (10, 16)   # the upscale tail finishes
+    assert tracker.update(1, 20, faces) == (10, 16)   # faces begins from there
+    assert tracker.update(20, 20, faces) == (13, 16)
+    assert tracker.update(1, 20, hands) == (13, 16)   # and so does hands
+    assert tracker.update(20, 20, hands) == (16, 16)
 
 
 def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_payload):
@@ -134,13 +145,16 @@ def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_pa
     # budgeted. The bar rescales to admit it — which says there is more to do —
     # rather than sitting at 100% through it. The node names itself the same both
     # times, so what marks the second region is its count starting over.
-    tracker = ProgressTracker.for_payload(enhance_payload(
-        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    for node in ("10", "15", "18"):             # tail, faces, the first hand
+    payload = enhance_payload(
+        enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    tail = _ids(payload, "KSampler")[0]
+    faces, hands = _ids(payload, "DetailerForEach")
+    tracker = ProgressTracker.for_payload(payload)
+    for node in (tail, faces, hands):           # tail, faces, the first hand
         tracker.update(1, 20, node)
         tracker.update(20, 20, node)
-    assert tracker.update(1, 20, "18") == (16, 19)   # a second hand turns up
-    assert tracker.update(20, 20, "18") == (19, 19)
+    assert tracker.update(1, 20, hands) == (16, 19)   # a second hand turns up
+    assert tracker.update(20, 20, hands) == (19, 19)
 
 
 def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
@@ -163,11 +177,15 @@ def test_each_sampler_pass_is_named_by_what_its_node_is_set_to_do():
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):
     # The base render denoises from scratch; the tail that follows it re-samples
     # what is already there, which is the whole difference between them.
-    names = stage_names(_payload("sdxl_t2i", steps=50, enhance=True))
-    assert (names["5"], names["13"]) == ("Render", "Enhance")
-    fixes = stage_names(enhance_payload(
-        enhance_detail_fixes={"faces": 0.45, "hands": 0.5}))
-    assert (fixes["10"], fixes["15"], fixes["18"]) == ("Enhance", "Detail fix", "Detail fix")
+    stills = _payload("sdxl_t2i", steps=50, enhance=True)
+    render, enhance = _ids(stills, "KSampler")
+    names = stage_names(stills)
+    assert (names[render], names[enhance]) == ("Render", "Enhance")
+    fixed = enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    fixes = stage_names(fixed)
+    tail = _ids(fixed, "KSampler")[0]
+    assert [fixes[tail], *(fixes[n] for n in _ids(fixed, "DetailerForEach"))] == [
+        "Enhance", "Detail fix", "Detail fix"]
 
 
 def test_the_minutes_before_the_first_step_are_named_too():

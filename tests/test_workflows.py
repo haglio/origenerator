@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, base
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     RIFE_CHECKPOINT,
@@ -778,6 +778,65 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     }
     # A workflow with no tail at all declares nothing.
     assert WORKFLOW_REGISTRY["wan22_i2v"].enhance_keys() == ()
+
+
+def _every_link(payload: dict):
+    """Each ``[node_id, slot]`` reference the payload's nodes read, with the
+    node that reads it — the shape ComfyUI resolves a graph by."""
+    for reader, node in payload.items():
+        for name, value in node.get("inputs", {}).items():
+            if (isinstance(value, list) and len(value) == 2
+                    and isinstance(value[0], str) and isinstance(value[1], int)):
+                yield reader, name, value[0]
+
+
+@pytest.mark.parametrize("enhance", [False, True])
+def test_no_workflow_can_build_a_graph_with_a_link_to_a_node_it_lost(enhance, monkeypatch):
+    # Every payload is assembled by merging fragments whose node ids the caller
+    # invented, so two fragments sharing an id silently overwrite each other and
+    # the link that pointed at the loser is left naming nothing. Nothing checked
+    # that: allocation was tracked by hand in comments ("21 is the union
+    # ControlNet and 22/23 the depth pair, so this sits clear of both"). ComfyUI
+    # answers a collision with a submit rejection at generate time, which is the
+    # user's first and only warning.
+    import origenerator.workflows.detail_parts as detail_module
+    monkeypatch.setattr(detail_module, "list_detector_files",
+                        lambda: list(_FOUND_DETECTORS))
+
+    checked = 0
+    for name, wf in WORKFLOW_REGISTRY.items():
+        params = dict(wf.default_params(), input_image="start.png", seed=3)
+        if "enhance" in params:
+            params["enhance"] = enhance
+        if "enhance_detail_fixes" in params:
+            params["enhance_detail_fixes"] = {"faces": 0.4, "hands": 0.5}
+        payload = wf.build_api_payload(params)
+
+        for reader, field, target in _every_link(payload):
+            assert target in payload, f"{name}: node {reader}.{field} -> missing {target}"
+        checked += 1
+    assert checked == len(WORKFLOW_REGISTRY)
+
+
+def test_a_shared_fragment_never_builds_under_an_id_a_hand_numbered_graph_could_pick():
+    # The half a dangling-link check cannot see: an overwrite whose loser was
+    # itself a link target still resolves, to the wrong node. What rules that
+    # out is that a workflow numbers its own nodes and a shared fragment names
+    # its own, so the two sets cannot meet however many nodes either grows --
+    # which is what replaced tracking the numbers by hand in comments.
+    fragment_ids = {
+        base._SIZE_SCALE, base._SIZE_GET,
+        base._ENH_LOADER, base._ENH_UPSCALE, base._ENH_RESCALE,
+        base._ENH_ENCODE, base._ENH_SAMPLER, base._ENH_DECODE,
+    }
+    assert not any(node_id.isdigit() for node_id in fragment_ids)
+
+    payload = _enhance_payload(enhance_detail_fixes={"faces": 0.4, "hands": 0.5})
+    detail_ids = [nid for nid, node in payload.items()
+                  if node["class_type"] in
+                  ("UltralyticsDetectorProvider", "BboxDetectorSEGS", "DetailerForEach")]
+    assert len(detail_ids) == 6
+    assert not any(node_id.isdigit() for node_id in detail_ids)
 
 
 def test_a_form_starts_on_the_value_a_stored_recipe_is_normalized_against():

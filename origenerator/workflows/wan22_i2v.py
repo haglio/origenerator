@@ -263,9 +263,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         )
         # Size the video off the input image: derived in-graph by default, or
         # scaled to the user's explicit WxH when the derived size was unlocked.
-        size_nodes, start_ref, width_ref, height_ref = self.image_size_nodes(
-            "20", "21", ["12", 0], params
-        )
+        sized = self.image_size_nodes(["12", 0], params)
+        size_nodes, start_ref = sized.nodes, sized.image
+        width_ref, height_ref = sized.width, sized.height
 
         # Each segment reads its own scene of the prompt and of the negative (a
         # --- line starts the next of each, which is how the scenes editor stores

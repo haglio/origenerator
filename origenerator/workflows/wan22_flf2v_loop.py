@@ -130,9 +130,9 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
         # Size the loop off the input image: derived in-graph by default, or scaled
         # to the user's explicit WxH when the derived size was unlocked. Both
         # endpoints read the same scaled image.
-        size_nodes, frame_ref, width_ref, height_ref = self.image_size_nodes(
-            "17", "18", ["11", 0], params
-        )
+        sized = self.image_size_nodes(["11", 0], params)
+        size_nodes, frame_ref = sized.nodes, sized.image
+        width_ref, height_ref = sized.width, sized.height
 
         # Each segment reads its own scene of the prompt and of the negative (a
         # --- line starts the next of each, which is how the scenes editor stores

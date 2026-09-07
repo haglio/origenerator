@@ -88,12 +88,12 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             # stage — with the same conditioning and VAE as the base pass. The
             # WAN VAE encodes the kept frame as a one-frame video latent, which
             # is exactly the shape the t2i pass itself denoises.
-            enhance_nodes, enhanced_ref = self.enhance_image_nodes(
-                "15", "16", "17", "18", "19", "20",
+            tail = self.enhance_image_nodes(
                 image_ref=["13", 0], model_ref=["6", 0],
                 positive_ref=["7", 0], negative_ref=["8", 0], vae_ref=["2", 0],
                 params=params,
             )
+            enhance_nodes, enhanced_ref = tail.nodes, tail.image
         return {
             "1": {
                 "class_type": "CLIPLoader",

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app_support import siblings
+from app_support import ports, siblings
 from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
 
 from origenerator.content import load_content, overlay_value
@@ -170,7 +170,7 @@ MOTION_DEFAULT_HZ = 1.2
 # shared enabled-flag file (and restores the prior value after). All harmless
 # no-ops when the broker isn't running.
 OSR2_BROKER_HOST = "127.0.0.1"
-OSR2_TCODE_UDP_PORT = 50557
+OSR2_TCODE_UDP_PORT = ports.TCODE_UDP
 OSR2_STATE_DIR = project_dir("fun_time") / "state"
 OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / GENAU_ENABLED
 # The broker stamps this with the time the OSR2 last spoke. It is the only

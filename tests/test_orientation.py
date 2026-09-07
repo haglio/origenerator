@@ -381,7 +381,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
                      oriented_key("image/sdxl_t2i", "landscape")]
     for key, expected in zip(drawn, (["t1"], ["w1"])):
         assert [row["prompt_id"] for row in view._rows_at(key)] == expected
-        assert view._group_for_key(key).key == "image/sdxl_t2i"  # its identity is unsplit
+        assert view.group_for_key(key).key == "image/sdxl_t2i"  # its identity is unsplit
 
 
 def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):

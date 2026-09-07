@@ -980,6 +980,25 @@ def test_release_media_reaches_a_tab_that_is_not_in_front(tabs, tmp_path):
     assert front._preview.is_showing_any([kept])         # the other one kept its item
 
 
+def test_a_deleted_generation_leaves_every_tab_showing_it_empty(tabs, tmp_path):
+    # A rebuild takes in a deletion, and a tab left open on the row that went
+    # would otherwise go on showing a picture that is not there any more. Every
+    # tab, and only what has gone: a rebuild happens whenever anything lands.
+    gone, kept = tmp_path / "gone.png", tmp_path / "kept.png"
+    gone.write_bytes(b"x")
+    kept.write_bytes(b"x")
+    doomed, other = tabs.current_config_panel(), tabs._add_subtab()
+    doomed.show_saved_generation({"prompt_id": "g1", "workflow_name": "sdxl_t2i"}, [])
+    doomed._preview.show_image(gone)
+    other.show_saved_generation({"prompt_id": "g2", "workflow_name": "sdxl_t2i"}, [])
+    other._preview.show_image(kept)
+
+    tabs.drop_previews_of_gone_rows({"g2"})
+
+    assert not doomed._preview.is_showing_any([gone])
+    assert other._preview.is_showing_any([kept])
+
+
 def test_capture_restore_round_trips_config(tabs, qtbot):
     tabs.currentWidget().prefill("sdxl_t2i", {})  # a plain sdxl tab
     tabs.open_config("wan22_i2v", {"positive_prompt": "a fox", "seed": 7})  # current

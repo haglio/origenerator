@@ -567,6 +567,14 @@ def _children_by_detail(item):
             for child in children}
 
 
+def _preview_of(view):
+    """The preview of the tab in front — reached through the panel that owns it,
+    since the gallery no longer keeps a handle on another class's private widget
+    (C/design/004)."""
+    panel = view._info_tabs.current_config_panel()
+    return panel._preview if panel is not None else None
+
+
 def _search_for(view, text):
     """Type a query and let its debounce fire.
 
@@ -3837,7 +3845,7 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._preview.show_media = MagicMock()
+    _preview_of(view).show_media = MagicMock()
     resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
     monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=resolved))
 
@@ -3845,7 +3853,7 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
 
     # The loaded tab resolves the selection's output and shows it last (after any
     # settings-folder autoshow the form prefill does).
-    assert view._preview.show_media.call_args.args == (resolved[0], "image")
+    assert _preview_of(view).show_media.call_args.args == (resolved[0], "image")
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
@@ -3853,21 +3861,21 @@ def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._preview.clear = MagicMock()
-    view._preview.show_media = MagicMock()
+    _preview_of(view).clear = MagicMock()
+    _preview_of(view).show_media = MagicMock()
     monkeypatch.setattr(gcp_module, "resolve_preview", MagicMock(return_value=None))
 
     view._on_thumbnail_clicked("i1")
 
     # Nothing displayable resolved for the selection, so the preview ends cleared.
-    assert view._preview.clear.called
-    view._preview.show_media.assert_not_called()
+    assert _preview_of(view).clear.called
+    _preview_of(view).show_media.assert_not_called()
 
 
 def test_gallery_creates_a_preview_widget(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert isinstance(view._preview, PreviewWidget)
+    assert isinstance(_preview_of(view), PreviewWidget)
 
 
 def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
@@ -3890,7 +3898,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert view._left_column.widget(1) is view._queue
     assert view._panes.count() == 2
     assert view._panes.widget(0) is view._left_column
-    assert view._panes.widget(1).isAncestorOf(view._preview)
+    assert view._panes.widget(1).isAncestorOf(_preview_of(view))
     assert not view._panes.widget(1).isAncestorOf(view._queue)
 
 
@@ -3922,7 +3930,7 @@ def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     # holds a wrapper rather than the tab widget itself.
     assert view._panes.widget(1).isAncestorOf(view._info_tabs)
     assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
-    assert view._info_tabs.widget(0).isAncestorOf(view._preview)
+    assert view._info_tabs.widget(0).isAncestorOf(_preview_of(view))
 
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
@@ -4204,7 +4212,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
 
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view._preview.show_media = MagicMock()  # don't start WMF playback
+    _preview_of(view).show_media = MagicMock()  # don't start WMF playback
     view.select_folder(folder_key)
     view.select_generation("i2")  # what the last session was looking at
     view.refresh()
@@ -7002,11 +7010,11 @@ def test_selecting_a_running_reroll_shows_its_live_preview_in_the_info_pane(qtbo
     _key, job = _running_reroll(view)
     frame = _png_bytes()
     client.preview_image.emit(job.prompt_id, frame)  # a frame arrives, cached on the job
-    view._preview.show_frame = MagicMock()
+    _preview_of(view).show_frame = MagicMock()
 
     _reroll_tile(view).selected.emit()  # user clicks the running tile
 
-    view._preview.show_frame.assert_called_once_with(frame)
+    _preview_of(view).show_frame.assert_called_once_with(frame)
 
 
 def test_new_frames_route_to_the_info_pane_while_the_reroll_is_selected(qtbot, tmp_path):
@@ -7016,11 +7024,11 @@ def test_new_frames_route_to_the_info_pane_while_the_reroll_is_selected(qtbot, t
     view.refresh()
     _key, job = _running_reroll(view)
     _reroll_tile(view).selected.emit()
-    view._preview.show_frame = MagicMock()
+    _preview_of(view).show_frame = MagicMock()
 
     client.preview_image.emit(job.prompt_id, _png_bytes())  # a later frame
 
-    view._preview.show_frame.assert_called_once_with(_png_bytes())
+    _preview_of(view).show_frame.assert_called_once_with(_png_bytes())
 
 
 def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_info_pane(qtbot, tmp_path):
@@ -7031,10 +7039,10 @@ def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_info_pane(qtbot
     _key, job = _running_reroll(view)  # starting the re-roll selects it
     view._on_thumbnail_clicked("orig")  # user views a finished item instead
 
-    view._preview.show_frame = MagicMock()
+    _preview_of(view).show_frame = MagicMock()
     client.preview_image.emit(job.prompt_id, _png_bytes())  # tile updates, info pane does not
 
-    view._preview.show_frame.assert_not_called()
+    _preview_of(view).show_frame.assert_not_called()
     assert view._selected_reroll_key is None
 
 
@@ -7147,7 +7155,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     _reroll_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
-    win = view._preview.open_fullscreen()  # the double-click, mid-generation
+    win = _preview_of(view).open_fullscreen()  # the double-click, mid-generation
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
     assert not win._preview._image_label.pixmap().isNull()  # seeded with the frame
@@ -7225,8 +7233,8 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     view.refresh()
     _running_reroll(view)  # no preview frame has arrived yet
     painted = []  # what the pane is told to show, in order
-    view._preview.clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
-    view._preview.show_message = MagicMock(
+    _preview_of(view).clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
+    _preview_of(view).show_message = MagicMock(
         side_effect=lambda text, **kwargs: painted.append(text))
 
     _reroll_tile(view).selected.emit()
@@ -7234,7 +7242,7 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     # Seeding the landing tab from the run's settings may pass through the
     # placeholder; what the pane ends on is the point.
     assert painted[-1] == "Waiting for preview…"
-    assert view._preview.show_message.call_args == (("Waiting for preview…",), {"live": True})
+    assert _preview_of(view).show_message.call_args == (("Waiting for preview…",), {"live": True})
 
 
 def _waiting_view(qtbot, tmp_path, backlog):
@@ -7247,7 +7255,7 @@ def _waiting_view(qtbot, tmp_path, backlog):
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
-    view._preview.show_message = MagicMock()  # the resting tab, where the click lands
+    _preview_of(view).show_message = MagicMock()  # the resting tab, where the click lands
     _reroll_tile(view).selected.emit()
     return view, client
 
@@ -7259,7 +7267,7 @@ def test_a_run_stuck_behind_another_app_says_how_much_is_ahead(qtbot, tmp_path):
 
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
+    assert _preview_of(view).show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
 def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
@@ -7269,7 +7277,7 @@ def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
     client.foreign_backlog = MagicMock(return_value=1)  # one finished ahead of us
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting on 1 job from another app"
+    assert _preview_of(view).show_message.call_args.args[0] == "Waiting on 1 job from another app"
 
 
 def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
@@ -7279,7 +7287,7 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
 
     view._poll()
 
-    assert view._preview.show_message.call_args.args[0] == "Waiting for preview…"
+    assert _preview_of(view).show_message.call_args.args[0] == "Waiting for preview…"
 
 
 def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
@@ -7288,11 +7296,11 @@ def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
     view._poll()
     job = list(view._reroll_jobs.values())[0]
     client.preview_image.emit(job.prompt_id, _png_bytes())
-    view._preview.show_message = MagicMock()
+    _preview_of(view).show_message = MagicMock()
 
     view._poll()
 
-    view._preview.show_message.assert_not_called()
+    _preview_of(view).show_message.assert_not_called()
 
 
 def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tmp_path):

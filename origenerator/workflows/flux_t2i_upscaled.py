@@ -86,15 +86,15 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
 
     def build_api_payload(self, params: dict) -> dict:
         if params.get("enhance"):
-            # The tail's loader/upscaler take over the legacy nodes' ids ("10"/
-            # "11", same content), then rescale, re-encode, and re-sample on the
-            # same Flux model, guided conditioning, and VAE as the base pass.
-            tail, saved_ref = self.enhance_image_nodes(
-                "10", "11", "13", "14", "15", "16",
+            # The tail's own upscale is this workflow's namesake 4x, so the
+            # plain output stays reachable either way — it is what the base save
+            # keeps when the tail runs.
+            enhanced = self.enhance_image_nodes(
                 image_ref=["9", 0], model_ref=["1", 0],
                 positive_ref=["5", 0], negative_ref=["6", 0], vae_ref=["3", 0],
                 params=params,
             )
+            tail, saved_ref, upscaled_ref = enhanced.nodes, enhanced.image, enhanced.upscaled
         else:
             tail = {
                 "10": {
@@ -106,7 +106,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
                     "inputs": {"upscale_model": ["10", 0], "image": ["9", 0]},
                 },
             }
-            saved_ref = ["11", 0]
+            saved_ref = upscaled_ref = ["11", 0]
         return {
             "1": {
                 "class_type": "UnetLoaderGGUF",
@@ -175,5 +175,5 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             # With the tail on, keep the plain upscale too — this workflow's own
             # namesake output, made on the way and otherwise discarded. Last, so
             # the primary save is still the first SaveImage in the payload.
-            **self.base_save_node(self.base_output_node_id, ["11", 0], params),
+            **self.base_save_node(self.base_output_node_id, upscaled_ref, params),
         }

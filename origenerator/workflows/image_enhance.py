@@ -5,10 +5,6 @@ from origenerator.workflows.derived_size import measure_image_size, override_siz
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
-# The first of the node ids the detail pass takes, three per part it fixes —
-# past the twelve this workflow's own graph uses.
-_FIRST_DETAIL_NODE_ID = 13
-
 
 class ImageEnhanceWorkflow(WorkflowTemplate):
     """Upscale and enhance an existing image — the standalone form of the
@@ -115,30 +111,13 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         return round(size[0] * scale), round(size[1] * scale)
 
     def build_api_payload(self, params: dict) -> dict:
-        tail, enhanced_ref = self.enhance_image_nodes(
-            "6", "7", "8", "9", "10", "11",
+        enhanced = self.enhance_image_nodes(
             image_ref=["1", 0], model_ref=["2", 0],
             positive_ref=["3", 0], negative_ref=["4", 0], vae_ref=["5", 0],
-            params=params,
+            params=params, rescale_to=override_size(params),
         )
-        # An unlocked explicit WxH replaces the relative rescale with an exact
-        # one, so the Dimensions override actually governs the saved size.
-        override = override_size(params)
-        if override is not None:
-            width, height = override
-            tail["8"] = {
-                "class_type": "ImageScale",
-                "inputs": {
-                    "image": ["7", 0],
-                    "upscale_method": "lanczos",
-                    "width": width,
-                    "height": height,
-                    "crop": "disabled",
-                },
-            }
         detail, saved_ref = self.detail_fix_nodes(
-            _FIRST_DETAIL_NODE_ID,
-            image_ref=enhanced_ref, model_ref=["2", 0], clip_ref=["2", 1],
+            image_ref=enhanced.image, model_ref=["2", 0], clip_ref=["2", 1],
             vae_ref=["5", 0], positive_ref=["3", 0], negative_ref=["4", 0],
             params=params,
         )
@@ -163,7 +142,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                 "class_type": "VAELoader",
                 "inputs": {"vae_name": params["vae"]},
             },
-            **tail,
+            **enhanced.nodes,
             **detail,
             "12": {
                 "class_type": "SaveImage",

@@ -72,6 +72,42 @@ _DETAIL_GUIDE_SIZE = 512      # each crop is enlarged to this before sampling
 _DETAIL_MAX_SIZE = 1024       # …but never past this, which is where VRAM goes
 _DETAIL_FEATHER = 5           # pixels the repaint fades over on the way back in
 
+# The node ids the shared fragments below build under. Named rather than
+# numbered, and allocated by the fragment rather than by its caller: a payload
+# is assembled by merging fragments into one dict, so an id a caller invented
+# for a fragment could silently overwrite one of the caller's own nodes and
+# leave the link that pointed at it naming something else. Numbers were tracked
+# by hand in comments ("21 is the union ControlNet and 22/23 the depth pair, so
+# this sits clear of both"); a name a workflow's own graph never uses cannot
+# collide at all.
+_SIZE_SCALE, _SIZE_GET = "size_scale", "size_get"
+_ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_rescale"
+_ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
+
+
+@dataclass(frozen=True)
+class SizedInput:
+    """The nodes that size a run off its input image, and what reads them:
+    ``image`` the scaled image's ref, ``width``/``height`` either a ref into
+    the size node or the literal the user pinned."""
+
+    nodes: dict
+    image: list
+    width: object
+    height: object
+
+
+@dataclass(frozen=True)
+class EnhanceTail:
+    """The upscale/enhance tail's nodes and the two images it makes: ``image``
+    the re-sampled result a save node stores, and ``upscaled`` the plain model
+    upscale before it — which is the whole output of the workflow named for it
+    (Flux), kept alongside rather than discarded."""
+
+    nodes: dict
+    image: list
+    upscaled: list
+
 
 def story_of(scenes: list[str]) -> str:
     """The one positive prompt that stores ``scenes``: their texts with a
@@ -402,13 +438,11 @@ class WorkflowTemplate(ABC):
         return nodes, joined, cls.clip_frames(plan)
 
     @staticmethod
-    def image_size_nodes(scale_id: str, size_id: str, image_ref, params: dict,
-                         megapixels: float = 0.4):
+    def image_size_nodes(image_ref, params: dict, megapixels: float = 0.4) -> SizedInput:
         """The subgraph that sizes a run off its input image, and the refs the
         downstream nodes read for the scaled image and its width/height.
 
-        Returns ``(nodes, scaled_image_ref, width_ref, height_ref)`` to merge into
-        the payload. By default the image is scaled to ``megapixels`` in-graph
+        By default the image is scaled to ``megapixels`` in-graph
         (``ImageScaleToTotalPixels`` on a /16 stride — 0.4 MP is the video
         budget; the SDXL still workflow passes its own) and the size read back
         off it (``GetImageSize``), so a portrait or widescreen yields a
@@ -416,13 +450,13 @@ class WorkflowTemplate(ABC):
         the derived size and set an explicit ``width``/``height`` (see
         :func:`~origenerator.workflows.derived_size.override_size`), the image is
         instead scaled to that exact size (``ImageScale``) and the literal
-        width/height drive the consumer — ``size_id`` is then unused.
+        width/height drive the consumer, with no second node to read them off.
         """
         override = override_size(params)
         if override is not None:
             width, height = override
             nodes = {
-                scale_id: {
+                _SIZE_SCALE: {
                     "class_type": "ImageScale",
                     "inputs": {
                         "image": image_ref,
@@ -433,9 +467,9 @@ class WorkflowTemplate(ABC):
                     },
                 },
             }
-            return nodes, [scale_id, 0], width, height
+            return SizedInput(nodes, [_SIZE_SCALE, 0], width, height)
         nodes = {
-            scale_id: {
+            _SIZE_SCALE: {
                 "class_type": "ImageScaleToTotalPixels",
                 "inputs": {
                     "image": image_ref,
@@ -444,18 +478,17 @@ class WorkflowTemplate(ABC):
                     "resolution_steps": 16,
                 },
             },
-            size_id: {
+            _SIZE_GET: {
                 "class_type": "GetImageSize",
-                "inputs": {"image": [scale_id, 0]},
+                "inputs": {"image": [_SIZE_SCALE, 0]},
             },
         }
-        return nodes, [scale_id, 0], [size_id, 0], [size_id, 1]
+        return SizedInput(nodes, [_SIZE_SCALE, 0], [_SIZE_GET, 0], [_SIZE_GET, 1])
 
     @staticmethod
-    def enhance_image_nodes(loader_id: str, upscale_id: str, scale_id: str,
-                            encode_id: str, sampler_id: str, decode_id: str, *,
-                            image_ref, model_ref, positive_ref, negative_ref,
-                            vae_ref, params: dict):
+    def enhance_image_nodes(*, image_ref, model_ref, positive_ref, negative_ref,
+                            vae_ref, params: dict,
+                            rescale_to: tuple[int, int] | None = None) -> EnhanceTail:
         """The upscale/enhance tail appended after a workflow's decode, and the
         IMAGE ref its save node should store.
 
@@ -472,37 +505,56 @@ class WorkflowTemplate(ABC):
         still exactly the recipe its params record; at ``enhance_denoise`` 0 it
         degrades to a plain sharpening upscale.
 
-        Returns ``(nodes, [decode_id, 0])`` — the dict to merge into the
-        payload, and the enhanced-image ref to feed the save node.
+        ``rescale_to`` replaces the relative rescale with an exact WxH, for the
+        one workflow whose Dimensions field is a derived size the user can
+        unlock (the standalone enhance): its override has to govern the saved
+        size, and this is the node that decides it. The workflows whose width
+        and height are ordinary form fields pass nothing — their size is settled
+        long before the tail runs, and reading their params here would rescale
+        every enhanced render to the base render's own dimensions.
         """
-        nodes = {
-            loader_id: {
-                "class_type": "UpscaleModelLoader",
-                "inputs": {"model_name": params["upscale_model"]},
-            },
-            upscale_id: {
-                "class_type": "ImageUpscaleWithModel",
-                "inputs": {"upscale_model": [loader_id, 0], "image": image_ref},
-            },
-            scale_id: {
+        if rescale_to is None:
+            rescale = {
                 "class_type": "ImageScaleBy",
                 "inputs": {
-                    "image": [upscale_id, 0],
+                    "image": [_ENH_UPSCALE, 0],
                     "upscale_method": "lanczos",
                     "scale_by": params["enhance_scale"] / UPSCALE_MODEL_FACTOR,
                 },
+            }
+        else:
+            width, height = rescale_to
+            rescale = {
+                "class_type": "ImageScale",
+                "inputs": {
+                    "image": [_ENH_UPSCALE, 0],
+                    "upscale_method": "lanczos",
+                    "width": width,
+                    "height": height,
+                    "crop": "disabled",
+                },
+            }
+        nodes = {
+            _ENH_LOADER: {
+                "class_type": "UpscaleModelLoader",
+                "inputs": {"model_name": params["upscale_model"]},
             },
-            encode_id: {
+            _ENH_UPSCALE: {
+                "class_type": "ImageUpscaleWithModel",
+                "inputs": {"upscale_model": [_ENH_LOADER, 0], "image": image_ref},
+            },
+            _ENH_RESCALE: rescale,
+            _ENH_ENCODE: {
                 "class_type": "VAEEncode",
-                "inputs": {"pixels": [scale_id, 0], "vae": vae_ref},
+                "inputs": {"pixels": [_ENH_RESCALE, 0], "vae": vae_ref},
             },
-            sampler_id: {
+            _ENH_SAMPLER: {
                 "class_type": "KSampler",
                 "inputs": {
                     "model": model_ref,
                     "positive": positive_ref,
                     "negative": negative_ref,
-                    "latent_image": [encode_id, 0],
+                    "latent_image": [_ENH_ENCODE, 0],
                     "seed": params["seed"],
                     "steps": params["enhance_steps"],
                     "cfg": params["cfg"],
@@ -511,16 +563,15 @@ class WorkflowTemplate(ABC):
                     "denoise": params["enhance_denoise"],
                 },
             },
-            decode_id: {
+            _ENH_DECODE: {
                 "class_type": "VAEDecode",
-                "inputs": {"samples": [sampler_id, 0], "vae": vae_ref},
+                "inputs": {"samples": [_ENH_SAMPLER, 0], "vae": vae_ref},
             },
         }
-        return nodes, [decode_id, 0]
+        return EnhanceTail(nodes, [_ENH_DECODE, 0], [_ENH_UPSCALE, 0])
 
     @staticmethod
-    def detail_fix_nodes(first_id: int, *,
-                         image_ref, model_ref, clip_ref, vae_ref,
+    def detail_fix_nodes(*, image_ref, model_ref, clip_ref, vae_ref,
                          positive_ref, negative_ref, params: dict):
         """The per-part detail pass appended after the enhance tail, and the
         IMAGE ref the save node should store.
@@ -539,9 +590,9 @@ class WorkflowTemplate(ABC):
         detail_fix_passes` reads ``enhance_detail_fixes`` and drops what isn't
         installed), each running over the last one's output rather than on a
         merged rect list: they are different models found by different detectors,
-        and an image with a face and two hands must get all three. Each pass
-        takes three consecutive node ids from ``first_id``; a part left at zero
-        builds no nodes at all, the same bypass :meth:`lora_model_input` does.
+        and an image with a face and two hands must get all three. A part left
+        at zero builds no nodes at all, the same bypass
+        :meth:`lora_model_input` does.
 
         Returns ``(nodes, image_ref)`` — the dict to merge into the payload, and
         the end of the chain. With no part asked for (or no detector installed
@@ -551,7 +602,7 @@ class WorkflowTemplate(ABC):
         nodes: dict = {}
         for index, (detector, denoise) in enumerate(detail_fix_passes(params)):
             provider_id, segs_id, detailer_id = (
-                str(first_id + index * 3 + offset) for offset in range(3))
+                f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
             nodes[provider_id] = {
                 "class_type": "UltralyticsDetectorProvider",
                 # The provider's own picker prefixes its detector models

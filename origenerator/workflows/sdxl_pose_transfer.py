@@ -225,9 +225,9 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         # Size the still off the input image: derived in-graph at the SDXL
         # budget by default, or scaled to the user's explicit WxH when the
         # derived size was unlocked.
-        size_nodes, scaled_ref, width_ref, height_ref = self.image_size_nodes(
-            "2", "3", ["1", 0], params, megapixels=_TARGET_MEGAPIXELS
-        )
+        sized = self.image_size_nodes(["1", 0], params, megapixels=_TARGET_MEGAPIXELS)
+        size_nodes, scaled_ref = sized.nodes, sized.image
+        width_ref, height_ref = sized.width, sized.height
         structure, hint_ref = self._structure_nodes(params, scaled_ref)
         controlnet, controlnet_ref = self._controlnet_nodes(params)
         enhance_nodes: dict = {}
@@ -235,12 +235,12 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         if params.get("enhance"):
             # The enhance pass re-samples on the ControlNet-applied conditioning
             # (node 9), so the upscale can't drift off the structure map.
-            enhance_nodes, enhanced_ref = self.enhance_image_nodes(
-                "15", "16", "17", "18", "19", "20",
+            tail = self.enhance_image_nodes(
                 image_ref=["13", 0], model_ref=["4", 0],
                 positive_ref=["9", 0], negative_ref=["9", 1], vae_ref=["12", 0],
                 params=params,
             )
+            enhance_nodes, enhanced_ref = tail.nodes, tail.image
         return {
             **size_nodes,
             **structure,

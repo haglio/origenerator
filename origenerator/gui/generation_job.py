@@ -145,16 +145,14 @@ class GenerationJob(QObject):
         """What this prompt will output — ``"image"`` or ``"video"``.
 
         Read off the workflow rather than off any file, since the whole point of
-        knowing it is to place the job in the line *before* it has run. A
-        workflow that declares nothing counts as an image: the queue's images go
-        first and start sooner, so an unfamiliar one being made promptly is the
-        harmless way to be wrong (see :mod:`origenerator.queue_line`).
+        knowing it is to place the job in the line *before* it has run (see
+        :mod:`origenerator.queue_line`).
 
         What the *run* makes is :attr:`run_media_type`, and the two differ for a
         chained i2v's start frame — an image prompt opening a video. The queue
         reads that one; this is what the prompt itself puts on disk.
         """
-        return getattr(self.workflow, "output_type", None) or "image"
+        return self.workflow.output_type
 
     @property
     def last_progress(self) -> tuple[int, int]:

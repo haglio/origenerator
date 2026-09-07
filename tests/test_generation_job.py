@@ -454,16 +454,6 @@ def test_media_type_comes_from_the_workflow_not_a_file(qtbot, tmp_path):
     assert (image.media_type, video.media_type) == ("image", "video")
 
 
-def test_an_undeclared_workflow_counts_as_an_image(qtbot, tmp_path):
-    # Images go first and start sooner, so an unfamiliar one being made promptly
-    # is the harmless way to be wrong; treating it as a video could hold it back
-    # through a whole slideshow.
-    job = GenerationJob(_client(), SDXL, _params())
-    job.workflow = MagicMock(spec=[])  # a workflow declaring no output type
-
-    assert job.media_type == "image"
-
-
 def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
     # A built job is only a job this app is holding: nothing was submitted, so
     # the queue is free to re-order it, gate it, or drop it.

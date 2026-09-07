@@ -19,13 +19,12 @@ from origenerator.workflows.frame_rate import (
 from origenerator.workflows.model_arch import WAN, WAN_S2V
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
-# What a speaking scene starts at: the lightning LoRA Comfy's own S2V template
-# runs the model with, four steps at no guidance, which is what the probe he
-# judged by eye ran (2026-09-06). These are the defaults of three fields the
-# form now carries, not the fixed settings they were, because at no guidance
-# the prompt barely reaches the picture -- see the Speech settings note on
-# :class:`Wan22I2vWorkflow`. His own LoRAs stay off the slot's default: the one
-# tried put artifacts all over the picture.
+# A scene with a line renders on WAN 2.2's speech-to-video model: one model in
+# place of the two experts, reading the line as audio and moving her lips to
+# it, under the lightning LoRA Comfy's own S2V template runs it with -- four
+# steps at no guidance, which is what the probe he judged by eye ran
+# (2026-09-06). His LoRAs stay off it: the one tried put artifacts all over
+# the picture.
 _SPEECH_LORA = "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
 _SPEECH_STEPS = 4
 _SPEECH_CFG = 1.0
@@ -57,19 +56,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     line as audio (made beforehand, see :mod:`origenerator.speech`) and moving
     her lips to it, and in the file that scene carries her line in place of
     the foley.
-
-    That pass has its own steps, prompt strength and LoRA
-    (``speech_steps``/``speech_cfg``/``lora_speech``), separate from the
-    experts' above, because the two are sampled on different terms. It starts
-    at four steps and a strength of 1.0, the lightning LoRA's own settings --
-    and a strength of 1.0 is no guidance at all: ComfyUI drops the negative
-    branch entirely there, so a speaking scene renders its prompt unguided and
-    what she says can end up the only thing that happens in it. Raising the
-    strength is what gives the prompt its pull back (the node hands the model
-    the audio on the positive branch and a zeroed copy on the negative, so
-    guidance drives the words *and* the actions together), but the lightning
-    LoRA is distilled for a strength of 1.0 and has to come off or come down
-    for that -- which means real steps, and roughly ten times the render.
     """
 
     name = "wan22_i2v"
@@ -111,10 +97,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "unet_low": "split_files\\diffusion_models\\wan2.2_i2v_low_noise_14B_fp16.safetensors",
             "lora_high": "wan22-f4c3spl4sh-100epoc-high-k3nk.safetensors",
             "lora_low": "wan22-f4c3spl4sh-154epoc-low-k3nk.safetensors",
-            "lora_speech": _SPEECH_LORA,
-            "lora_strength_speech": 1.0,
-            "speech_steps": _SPEECH_STEPS,
-            "speech_cfg": _SPEECH_CFG,
             "audio_prompt": "",
             "audio_negative_prompt": "noisy, harsh",
             "audio_seed": 0,
@@ -145,11 +127,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # The speech slot takes only the speech model: an expert in it would
         # render deaf, and the expert slots above never offer it.
         speech = list_model_files("diffusion_models", [defaults["unet_s2v"]], accepts=(WAN_S2V,))
-        # Its LoRA slot takes either family and names no expert: the speech
-        # model is one model, not half a pair, and what runs on it today is a
-        # WAN t2v LoRA (the lightning one), so narrowing to WAN_S2V would hide
-        # the very file the default names.
-        loras_speech = list_lora_files([defaults["lora_speech"]], accepts=(WAN, WAN_S2V))
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
             ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5,
@@ -172,9 +149,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("split_step", "Handoff Step (0 = half)", "int", 0, min_val=0, max_val=100),
             ParamDef("cfg_high", "Prompt Strength (High)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("cfg_low", "Prompt Strength (Low)", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("speech_steps", "Steps (Speech)", "int", _SPEECH_STEPS, min_val=1, max_val=100),
-            ParamDef("speech_cfg", "Prompt Strength (Speech)", "float", _SPEECH_CFG,
-                     min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=high),
@@ -184,9 +158,6 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "LoRA Strength (High)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_speech", "LoRA (Speech)", "combo", defaults["lora_speech"], options=loras_speech),
-            ParamDef("lora_strength_speech", "LoRA Strength (Speech)", "float", 1.0,
-                     min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("frame_rate", "Frame Rate", "float", NATIVE_FPS,
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
@@ -203,27 +174,23 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             return params["cfg_high"], params["cfg_low"]
         return params["cfg_high"] or shared, params["cfg_low"] or shared
 
-    def _speech_nodes(self, params: dict, spoken) -> dict:
-        """What every speaking segment shares: the speech model under the LoRA
-        the recipe picked for it, the audio encoder that hears the lines, and
-        each spoken scene's line loaded once (``scene<k>_line``).
-
-        Its LoRA is optional like the experts': "None" adds no loader and the
-        samplers run the speech model bare (``lora_model_input``), which is
-        what a run at real prompt strength wants, the lightning LoRA being
-        distilled for no guidance.
-        """
-        lora, model_ref = self.lora_model_input(
-            "31", ["30", 0], params["lora_speech"], params["lora_strength_speech"])
+    @staticmethod
+    def _speech_nodes(params: dict, spoken) -> dict:
+        """What every speaking segment shares: the speech model under its
+        lightning LoRA, the audio encoder that hears the lines, and each spoken
+        scene's line loaded once (``scene<k>_line``)."""
         nodes = {
             "30": {
                 "class_type": "UNETLoader",
                 "inputs": {"unet_name": params["unet_s2v"], "weight_dtype": "default"},
             },
-            **lora,
+            "31": {
+                "class_type": "LoraLoaderModelOnly",
+                "inputs": {"model": ["30", 0], "lora_name": _SPEECH_LORA, "strength_model": 1.0},
+            },
             "32": {
                 "class_type": "ModelSamplingSD3",
-                "inputs": {"model": model_ref, "shift": _SPEECH_SHIFT},
+                "inputs": {"model": ["31", 0], "shift": _SPEECH_SHIFT},
             },
             "33": {
                 "class_type": "AudioEncoderLoader",
@@ -269,8 +236,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                     "negative": [prefix + "s2v", 1],
                     "latent_image": [prefix + "s2v", 2],
                     "seed": params["noise_seed"] + index,
-                    "steps": params["speech_steps"],
-                    "cfg": params["speech_cfg"],
+                    "steps": _SPEECH_STEPS,
+                    "cfg": _SPEECH_CFG,
                     "sampler_name": _SPEECH_SAMPLER,
                     "scheduler": _SPEECH_SCHEDULER,
                     "denoise": 1.0,

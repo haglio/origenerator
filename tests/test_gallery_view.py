@@ -4045,6 +4045,42 @@ def test_selected_folder_returns_current_folder_key(qtbot):
     assert view.selected_folder() == oriented_key(_key(workflow), LANDSCAPE)
 
 
+def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
+    # The key names the tree leaf a run lands in, and five call sites used to
+    # build the row it is derived from by hand -- one leaving the workflow version
+    # out, two putting it in, two spreading a whole row -- so a reader could not
+    # tell which of those differences meant anything. It does mean something: the
+    # version is part of the signature, and it is an argument now rather than a
+    # field one dict happened to carry.
+    row = _image("i1", "a cat", 50, 1)
+    view = GalleryView(FakeDB([row]))
+    qtbot.addWidget(view)
+    view.refresh()
+    params = json.loads(row["params_json"])
+    version = row["workflow_version"]
+
+    assert view._folder_key_for(row["workflow_name"], params, version)         == view._folder_key_of(row)
+    assert view._folder_key_for(row["workflow_name"], params)         != view._folder_key_of(row)
+
+
+def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
+    # Memoized because it was rebuilt from scratch at eight sites, several on a
+    # click's path -- but an i2v's folder key is derived against it, so a stale
+    # one would file a run under the start frame the gallery used to hold.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    first = view.image_config_index()
+    assert view.image_config_index() is first          # asked twice, built once
+
+    db._rows.append(_image("i2", "a dog", 50, 2))
+    view.refresh()
+
+    assert view.image_config_index() is not first
+    assert len(view.image_config_index()) > len(first)
+
+
 def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)

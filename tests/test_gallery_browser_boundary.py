@@ -90,9 +90,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the five the controller asks of its host, and the history guard those
     needed. Back and Forward followed as `NavigationController`: nine out,
     seven host methods and two delegations in, and those two went when the voice
-    tables stopped naming their handlers as strings. 80: dropping the trash's retention window took the pane's two
+    tables stopped naming their handlers as strings. 371 → 372: one folder-key
+    derivation replaced the five that were written inline, and it takes a row as
+    readily as a config. 80: dropping the trash's retention window took the pane's two
     countdown helpers with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 371
+               for x in _class_def(VIEW, "GalleryView").body) == 372
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 80

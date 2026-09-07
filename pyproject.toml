@@ -6,30 +6,39 @@ build-backend = "setuptools.build_meta"
 name = "origenerator"
 version = "0.1.0"
 description = "Local ComfyUI frontend with metadata tracking and gallery browser"
-requires-python = ">=3.10"
+# 3.12, not 3.10: every gate in the family runs 3.12 and nothing has ever
+# collected a suite on anything older, so >=3.10 was a promise no run backed.
+requires-python = ">=3.12"
+# Every requirement carries a ceiling. Without one each run installs whatever
+# PyPI served that morning: that is how this venv came to hold opencv-python 5
+# while four of its siblings hold 4, with nothing anywhere saying so. Floors are
+# what this repo's venv holds today, and opencv's ceiling is the next major
+# rather than the current one because 5 is what this repo actually runs and its
+# suite is green on it.
 dependencies = [
-    "PyQt6",
-    "Pillow",
-    "opencv-python>=4.8",
-    "websockets",
-    "numpy",
+    "PyQt6>=6,<7",
+    "pillow>=12,<13",
+    "opencv-python>=4.8,<6",
+    "websockets>=17,<18",
+    "numpy>=2.5,<3",
     # Auto-aiming the ATI motion track: a censor-detection YOLO finds the anchor
     # in a start frame so the user never places coordinates by hand
     # (workflows/motion_aim). onnxruntime executes it; huggingface_hub fetches
     # and caches its weights.
-    "onnxruntime",
-    "huggingface_hub",
+    "onnxruntime>=1,<2",
+    "huggingface_hub>=1,<2",
 ]
 
 [project.scripts]
 origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt", "pytest-timeout", "vulture", "ruff==0.16.6"]
+dev = ["pytest>=9,<10", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3",
+       "ruff==0.16.6"]
 # Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
 # optional — the mic button degrades gracefully when these aren't installed.
 # Install with:  pip install -e .[voice]
-voice = ["faster-whisper", "sounddevice"]
+voice = ["faster-whisper>=1,<2", "sounddevice>=0.5,<0.6"]
 
 [tool.pytest.ini_options]
 # The content guard's enforcement check, adopted the way every repo in the
@@ -49,6 +58,13 @@ voice = ["faster-whisper", "sounddevice"]
 addopts = "-p app_support.sanitize.pytest_plugin --timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"
+
+# The family checkouts this one is installed beside. All three were imported and
+# named nowhere in this file, so the only record of what a checkout needs was
+# the CI workflow. None is published, so none can go in [project.dependencies];
+# tests/test_dependencies.py holds this list against the tree instead.
+[tool.haglio]
+siblings = ["app_support", "player_core", "shared_ui"]
 
 [tool.setuptools.packages.find]
 include = ["origenerator*"]

@@ -2,11 +2,15 @@
 
 import re
 
-from PyQt6.QtCore import QRegularExpression, pyqtSignal
+from PyQt6.QtCore import QRegularExpression, QSize, pyqtSignal
 from PyQt6.QtGui import QRegularExpressionValidator
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
 
 from origenerator.gui.no_wheel import NoWheelComboBox
+
+# What the line edit inside the box keeps for itself: a couple of pixels either
+# side of the text, and one more for the cursor at its end.
+_FIELD_MARGINS = 5
 
 
 class PresetComboBox(NoWheelComboBox):
@@ -37,6 +41,33 @@ class PresetComboBox(NoWheelComboBox):
     def _text_for(self, value: float) -> str:
         text = f"{value:g}"
         return f"{text} {self._unit}" if self._unit else text
+
+    def sizeHint(self) -> QSize:
+        return self._roomy(super().sizeHint())
+
+    def minimumSizeHint(self) -> QSize:
+        return self._roomy(super().minimumSizeHint())
+
+    def _roomy(self, hint: QSize) -> QSize:
+        """``hint``, never narrower than the longest preset needs to read whole.
+
+        Qt sizes an editable box to the widest text it lists and stops there,
+        with nothing left for the margins the line edit keeps around what it
+        shows. A few pixels short, that field scrolls its text rather than
+        clipping it -- so the preset picked wasn't cut off, it was a different
+        number: "10 s" read as "0 s", a length nothing here offers. Ask for the
+        text, the margins, and a digit more so a typed value has somewhere to go.
+        """
+        metrics = self.fontMetrics()
+        widest = max((metrics.horizontalAdvance(self.itemText(index))
+                      for index in range(self.count())), default=0)
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        room = QSize(widest + _FIELD_MARGINS + metrics.horizontalAdvance("0"),
+                     metrics.height())
+        hint.setWidth(max(hint.width(), self.style().sizeFromContents(
+            QStyle.ContentsType.CT_ComboBox, option, room, self).width()))
+        return hint
 
     def value(self) -> float | None:
         text = self.currentText().strip()

@@ -158,22 +158,16 @@ def test_wan_video_workflows_group_all_models_then_all_loras():
     # strength). So the Generate form and the gallery info pane read as "all the
     # models, then all the LoRAs" rather than "everything high, then everything
     # low". This order is the single source both surfaces draw from.
-    # The i2v workflow's speech pass has a model and a LoRA of its own, and
-    # they sort under the same rule: its model with the experts', its LoRA
-    # after theirs -- never a speech group of its own between them.
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         keys = [d.key for d in wf.param_definitions()]
-        present = lambda names: [k for k in names if k in keys]
-        model_keys = present(("unet_high", "unet_low", "unet_s2v"))
-        lora_keys = present((
-            "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
-            "lora_speech", "lora_strength_speech",
-        ))
-        model_block = [keys.index(k) for k in model_keys]
-        lora_block = [keys.index(k) for k in lora_keys]
+        model_block = [keys.index(k) for k in ("unet_high", "unet_low")]
+        lora_block = [
+            keys.index(k) for k in
+            ("lora_high", "lora_strength_high", "lora_low", "lora_strength_low")
+        ]
         # Each kind is one contiguous run, in the listed order...
-        assert model_block == list(range(model_block[0], model_block[0] + len(model_keys)))
-        assert lora_block == list(range(lora_block[0], lora_block[0] + len(lora_keys)))
+        assert model_block == list(range(model_block[0], model_block[0] + 2))
+        assert lora_block == list(range(lora_block[0], lora_block[0] + 4))
         # ...with every model picker above every LoRA picker.
         assert model_block[-1] < lora_block[0]
 

@@ -16,6 +16,15 @@ The lines are spoken: a scene with one renders on the speech model, her lips
 on the words, in the voice the Audio section sets (see
 :mod:`origenerator.speech`). A workflow that cannot speak -- the loop -- has no
 lines param, and its cards carry no lines field.
+
+A scene is one thing or the other, and the card says which. The speech model
+renders a talking performance and nothing else: measured on his own recipe, a
+speaking scene moves under half as much as the same scene on the experts, with
+the movement at the head, and driving it with the scene rendered properly
+(control_video, skeletons or frames) lifts that a little without carrying the
+action. So the moment a scene has a line, its two prompts go read-only and
+dim -- a field you can type into that changes nothing is the trap this spent a
+night in. Clearing the line gives them back.
 """
 
 from __future__ import annotations
@@ -43,6 +52,14 @@ from origenerator.workflows.base import ParamDef, chained_frames, scene_prompts,
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 
 LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under Audio"
+# What a prompt's caption gains, and what it says instead of its own help, while
+# the scene it belongs to has a line.
+SPEAKING_NOTE = " — not used while this scene speaks"
+SPEAKING_HELP = ("A scene with a line renders on the speech model, and all that "
+                 "happens in it is her speaking — it will not act a prompt out. "
+                 "Clear Her Lines to write this scene instead.")
+# The prompts a line takes over. Its own field is never one of them.
+SPOKEN_OVER = ("positive_prompt", "negative_prompt")
 
 # The texts a scene carries, by the param each is stored as, with the caption
 # over its field. The prompts are stored as stories (see the module above); the
@@ -91,6 +108,7 @@ class _Scene(QFrame):
         # Captioned, since three fields in a row say nothing about which is which
         # once they hold text; each carries its param's own help.
         self.fields: dict[str, PromptField] = {}
+        self.captions: dict[str, ElidingLabel] = {}
         for key, caption in TEXT_CAPTIONS.items():
             if key == "scene_lines" and not lines:
                 continue
@@ -102,10 +120,39 @@ class _Scene(QFrame):
             field.textChanged.connect(self.changed)
             column.addWidget(field)
             self.fields[key] = field
+            self.captions[key] = label
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
+            # Every path that fills a line -- typing, loading a recipe, a voice
+            # edit -- ends in textChanged, so the card follows all of them.
+            self.fields["scene_lines"].textChanged.connect(self._reflect_speech)
+            self._reflect_speech()
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
+
+    def speaking(self) -> bool:
+        """Whether this scene has a line, and so renders as her speaking."""
+        field = self.fields.get("scene_lines")
+        return field is not None and bool(diff_text.live_text(field).strip())
+
+    def _reflect_speech(self) -> None:
+        """Show which of the two a scene is. With a line, its prompts are read-
+        only, dim and captioned as unused; without one they are ordinary fields
+        again (see the module docstring for why the line wins)."""
+        speaking = self.speaking()
+        for key in SPOKEN_OVER:
+            field = self.fields[key]
+            field.setReadOnly(speaking)
+            field.setProperty("inert", speaking)
+            # A stylesheet property selector is only re-read on a repolish, so
+            # the dimming would otherwise land only on cards built while spoken.
+            field.style().unpolish(field)
+            field.style().polish(field)
+            help_text = SPEAKING_HELP if speaking else param_help(key)
+            field.setToolTip(help_text)
+            self.captions[key].setToolTip(help_text)
+            self.captions[key].setText(
+                TEXT_CAPTIONS[key] + (SPEAKING_NOTE if speaking else ""))
 
     def frames(self) -> int:
         seconds = self.length.value()

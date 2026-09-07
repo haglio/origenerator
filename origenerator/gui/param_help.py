@@ -39,10 +39,11 @@ PARAM_HELP: dict[str, str] = {
         "before it, so the clip is the scenes end to end."
     ),
     "scene_lines": (
-        "What she says in this scene, spoken in the voice set under Audio: the "
-        "scene renders on the speech model, her lips on the words, and its sound "
-        "is her line. Words past the scene's end are cut; a scene left blank "
-        "renders as it always has, soundtrack and all."
+        "What she says in this scene, spoken in the voice set under Audio. A "
+        "scene with a line renders on the speech model, and her speaking is all "
+        "that happens in it — its prompts go unused, so a scene is one or the "
+        "other. Words past the scene's end are cut; a scene left blank renders "
+        "as it always has, prompts and soundtrack and all."
     ),
     "voice": (
         "Whose voice speaks the lines: one of the speech model's preset speakers, "

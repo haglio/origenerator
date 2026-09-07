@@ -75,6 +75,12 @@ def build_stylesheet() -> str:
         border: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
     }}
+    /* A prompt a spoken scene will not use (scenes_editor marks it "inert"):
+       dim, so a field you cannot type into doesn't read as one you simply
+       haven't filled in yet. */
+    QPlainTextEdit[inert="true"] {{
+        color: {_h(TEXT_MUTED)};
+    }}
     QLabel#estimateLabel {{
         color: {_h(TEXT_MUTED)};
     }}

@@ -1239,6 +1239,108 @@ def test_each_box_on_a_card_says_what_it_is(qtbot):
     assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
 
 
+def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
+    # The speech model renders her speaking and nothing else, so a line takes
+    # the scene over: its two prompts go read-only, dim and captioned as unused,
+    # rather than staying fields you can type into that change nothing.
+    from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
+
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    scene = form._widgets["scene_frames"]._scenes[0]
+    assert not scene.speaking()
+    for key in ("positive_prompt", "negative_prompt"):
+        assert not scene.fields[key].isReadOnly()
+        assert not scene.fields[key].property("inert")
+
+    scene.fields["scene_lines"].setPlainText("Come in.")
+    assert scene.speaking()
+    for key, caption in (("positive_prompt", "Positive Prompt"),
+                         ("negative_prompt", "Negative Prompt")):
+        field = scene.fields[key]
+        assert field.isReadOnly()
+        assert field.property("inert") is True
+        assert field.toolTip() == SPEAKING_HELP
+        assert scene.captions[key].text() == caption + SPEAKING_NOTE
+        assert scene.captions[key].toolTip() == SPEAKING_HELP
+
+
+def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
+    # The trade runs both ways: a scene is a spoken one only while it holds a
+    # line, and whitespace is not a line.
+    from origenerator.gui.param_help import param_help
+
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    scene = form._widgets["scene_frames"]._scenes[0]
+    scene.fields["positive_prompt"].setPlainText("she pours a glass")
+    scene.fields["scene_lines"].setPlainText("Come in.")
+    scene.fields["scene_lines"].setPlainText("   ")
+    assert not scene.speaking()
+    for key, caption in (("positive_prompt", "Positive Prompt"),
+                         ("negative_prompt", "Negative Prompt")):
+        assert not scene.fields[key].isReadOnly()
+        assert scene.fields[key].property("inert") is False
+        assert scene.fields[key].toolTip() == param_help(key)
+        assert scene.captions[key].text() == caption
+    # ...and what was typed is still there: the prompts were shut down, not wiped
+    assert scene.fields["positive_prompt"].toPlainText() == "she pours a glass"
+
+
+def test_a_stored_spoken_recipe_opens_with_its_prompts_already_shut_down(qtbot):
+    # Loading a recipe fills the lines through the same textChanged path typing
+    # does, so a story opened from the gallery shows the trade without an edit.
+    from origenerator.workflows.base import story_of
+
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    form.set_values({"positive_prompt": story_of(["a", "b"]), "negative_prompt": "",
+                     "scene_frames": [81, 81], "scene_lines": ["", "Sit."],
+                     "frame_count": 161})
+    silent, spoken = form._widgets["scene_frames"]._scenes
+    assert (silent.speaking(), spoken.speaking()) == (False, True)
+    assert not silent.fields["positive_prompt"].isReadOnly()
+    assert spoken.fields["positive_prompt"].isReadOnly()
+
+
+def test_a_shut_down_prompt_actually_renders_dim(qtbot):
+    # The dimming is a stylesheet property selector, which Qt only re-reads on a
+    # repolish -- so without one the card would go read-only while still looking
+    # like an ordinary field. Rendered rather than asserted on the property:
+    # that is the half a missing repolish breaks.
+    from origenerator.gui.stylesheet import build_stylesheet
+    from origenerator.paths import ensure_shared_ui_on_path
+
+    ensure_shared_ui_on_path()
+    from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
+
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    form.setStyleSheet(build_stylesheet())
+    scene = form._widgets["scene_frames"]._scenes[0]
+    field = scene.fields["positive_prompt"]
+    field.setPlainText("MMMM MMMM MMMM")
+    field.resize(240, 60)
+
+    def colors():
+        image = field.grab().toImage()
+        counts: dict[tuple, int] = {}
+        for y in range(image.height()):
+            for x in range(image.width()):
+                c = image.pixelColor(x, y)
+                key = (c.red(), c.green(), c.blue())
+                counts[key] = counts.get(key, 0) + 1
+        return {rgb for rgb, n in counts.items() if n > 100}
+
+    written = colors()
+    scene.fields["scene_lines"].setPlainText("Come in.")
+    spoken = colors()
+    primary = (TEXT_PRIMARY.red(), TEXT_PRIMARY.green(), TEXT_PRIMARY.blue())
+    muted = (TEXT_MUTED.red(), TEXT_MUTED.green(), TEXT_MUTED.blue())
+    assert primary in written and muted not in written
+    assert muted in spoken and primary not in spoken
+
+
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     # The loop has no lines param, so its cards carry no field for one: a field
     # that nothing reads would be an invitation to type into the void.

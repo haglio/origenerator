@@ -752,6 +752,108 @@ def test_double_clicking_close_does_not_pin_the_neighbor(tabs):
     assert tabs._preview_panel is preview
 
 
+# --- editing a tab keeps it, without the double-click -----------------------
+
+def test_editing_a_field_takes_the_italic_off(tabs):
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+
+    preview._param_form.set_values({"positive_prompt": "a cat wearing a hat"})
+
+    assert tabs._preview_panel is None
+    assert tabs.tabBar()._preview_index == -1
+
+
+def test_an_edited_tab_is_not_replaced_by_the_next_click(tabs):
+    cat, dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    edited = tabs.current_config_panel()
+    edited._param_form.set_values({"positive_prompt": "a cat wearing a hat"})
+
+    tabs.load_selection(dog, [dog])
+
+    assert tabs.count() == 2                      # the next click opened beside it
+    assert tabs.current_config_panel() is not edited
+    assert edited._param_form.get_values_static()["positive_prompt"] == "a cat wearing a hat"
+
+
+def test_changing_the_workflow_takes_the_italic_off(tabs):
+    # The picker is a field like any other, and on a form with nothing to carry
+    # over to the new workflow it is the only signal an edit happened at all.
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+
+    _pick_workflow(preview, "wan22_i2v")
+
+    assert tabs._preview_panel is None
+    assert tabs.tabBar()._preview_index == -1
+
+
+def test_opening_a_generation_does_not_count_as_editing_it(tabs):
+    # An open writes the picker and every field exactly as typing would. If that
+    # counted, no tab would ever stay the preview one and every click would add
+    # one more to the row — the pile-up the italic tab exists to prevent.
+    cat, dog = _two_generations(tabs)
+
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+    tabs.load_selection(dog, [dog])
+
+    assert tabs.count() == 1
+    assert tabs.current_config_panel() is preview
+    assert tabs._preview_panel is preview
+
+
+def test_opening_a_config_by_name_does_not_count_as_editing_it(tabs):
+    # The same for open_config, which prefills rather than showing a saved row.
+    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a cat"))
+    opened = tabs.current_config_panel()
+
+    tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a dog"))
+
+    assert tabs.count() == 1
+    assert tabs.current_config_panel() is opened
+    assert tabs._preview_panel is opened
+
+
+def test_a_restored_session_does_not_come_back_edited(tabs):
+    # restore_state rebuilds each tab by writing its saved config into it. Those
+    # tabs stand on their own already; counting the restore as an edit would only
+    # mean nothing is left for the first click of the session to land in.
+    tabs.restore_state({"tabs": [_config_tab("sdxl_t2i", {"seed": 7})], "current": 0})
+    restored = tabs.current_config_panel()
+
+    assert restored.current_config().params["seed"] == 7
+    assert tabs._preview_panel is None  # a restored tab was never the italic one
+
+
+def test_the_gallery_ticking_random_is_not_an_edit(tabs):
+    # After a press draws a fresh seed the gallery ticks Random on the form. The
+    # tab it does that to is already pinned by its own Generate, but the tick
+    # itself is the app's, not the user's.
+    cat, _dog = _two_generations(tabs)
+    tabs.load_selection(cat, [cat])
+    preview = tabs.current_config_panel()
+
+    preview.use_random_seed()
+
+    assert tabs._preview_panel is preview
+
+
+def test_editing_a_tab_that_was_never_italic_leaves_the_italic_where_it_is(tabs):
+    cat, _dog = _two_generations(tabs)
+    kept = tabs.current_config_panel()
+    kept.prefill("sdxl_t2i", _sdxl_full(positive_prompt="a wizard"))
+    tabs.load_selection(cat, [cat])  # the italic one opens beside it
+    preview = tabs.current_config_panel()
+
+    kept._param_form.set_values({"positive_prompt": "a wizard on a hill"})
+
+    assert tabs._preview_panel is preview
+
+
 # --- session capture / restore ---------------------------------------------
 
 def _config_tab(workflow_name, params=None, seed_is_random=True):

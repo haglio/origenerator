@@ -1,5 +1,6 @@
 import json
 import logging
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 
@@ -141,6 +142,10 @@ class GenerateConfigPanel(QWidget):
 
     title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
     form_edited = pyqtSignal()          # any field changed — every keystroke
+    # A field changed because someone changed it — the workflow picker included,
+    # and never the seeding a load does. What tells the tab strip this tab is
+    # being worked in rather than looked at (see _loading_config).
+    user_edited = pyqtSignal()
     form_replaced = pyqtSignal()        # a new workflow swapped the param form out
     source_activated = pyqtSignal(str)      # the source-image tile was clicked (prompt_id)
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
@@ -210,7 +215,28 @@ class GenerateConfigPanel(QWidget):
         # the RFB's upright column, where a portrait picture stacked over the
         # form pushes every prompt field off the foot (_reflow_for_the_media).
         self._fun_time = fun_time
+        # How deep we are inside a load — a prefill, a restore, a seed the
+        # gallery set. Every one of those writes to the same widgets a person
+        # types in, so the widgets' own signals cannot tell the two apart; this
+        # is what does, and user_edited is silent while it is up. A depth rather
+        # than a flag because the loads nest (restore_config prefills, prefill
+        # re-picks the workflow, which re-seeds the carried-over fields).
+        self._loading_config = 0
         self._build_ui()
+
+    @contextmanager
+    def _loading(self):
+        """Mark everything done inside as a load, not as someone editing."""
+        self._loading_config += 1
+        try:
+            yield
+        finally:
+            self._loading_config -= 1
+
+    def _note_user_edit(self):
+        """Pass on a field change someone made; swallow the ones a load makes."""
+        if not self._loading_config:
+            self.user_edited.emit()
 
     def _build_ui(self):
         """The column, in the order it reads: the preview, then one scroll
@@ -335,6 +361,9 @@ class GenerateConfigPanel(QWidget):
         self._workflow_combo.setPlaceholderText("Select a workflow…")
         self._workflow_combo.setCurrentIndex(-1)
         self._workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
+        # Picking a workflow is an edit as much as typing in a field is, and on a
+        # form with nothing to carry over it is the only signal there is.
+        self._workflow_combo.currentIndexChanged.connect(self._note_user_edit)
         # It shrinks to a short floor when the pane is narrow rather than holding
         # the width of the longest workflow name — see NoWheelComboBox, which every
         # picker in the app inherits that from. It still expands to fill the row.
@@ -549,6 +578,7 @@ class GenerateConfigPanel(QWidget):
         self._detach_form()
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
+        self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self.refresh_modified_notice)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
@@ -726,7 +756,8 @@ class GenerateConfigPanel(QWidget):
         seed that was already generated.
         """
         if self._param_form is not None:
-            self._param_form.set_seed_random(True)
+            with self._loading():  # the gallery ticked this, not the user
+                self._param_form.set_seed_random(True)
 
     def _image_rows(self):
         return [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
@@ -889,25 +920,30 @@ class GenerateConfigPanel(QWidget):
         # of following a run, too: the next frame would land over the picture
         # these settings just put up. (A tab pointed at a run is re-seeded first
         # and told to follow afterwards, so that is not undoing itself either.)
-        self._end_folder_request()
-        self._forget_watch()
-        # Switch to the matching workflow. A registered workflow the picker
-        # normally hides (machinery, selectable False) is added on demand, so
-        # reusing such a row still lands on the right form instead of silently
-        # applying its params to whatever workflow was already selected.
-        index = self._workflow_combo.findData(workflow_name)
-        if index < 0 and workflow_name in WORKFLOW_REGISTRY:
-            self._workflow_combo.addItem(
-                WORKFLOW_REGISTRY[workflow_name].display_name, workflow_name
-            )
+        #
+        # The whole of it under _loading: this writes the workflow picker and
+        # every field, exactly as a person would, and a tab filled by an open is
+        # not a tab someone has worked in.
+        with self._loading():
+            self._end_folder_request()
+            self._forget_watch()
+            # Switch to the matching workflow. A registered workflow the picker
+            # normally hides (machinery, selectable False) is added on demand, so
+            # reusing such a row still lands on the right form instead of silently
+            # applying its params to whatever workflow was already selected.
             index = self._workflow_combo.findData(workflow_name)
-        if index >= 0:
-            self._workflow_combo.setCurrentIndex(index)
-        if self._param_form:
-            self._param_form.set_values(params)
-        # Now that the settings match a real folder, show its newest result (the
-        # workflow may not have changed above, so this doesn't ride on that signal).
-        self.show_recent_preview()
+            if index < 0 and workflow_name in WORKFLOW_REGISTRY:
+                self._workflow_combo.addItem(
+                    WORKFLOW_REGISTRY[workflow_name].display_name, workflow_name
+                )
+                index = self._workflow_combo.findData(workflow_name)
+            if index >= 0:
+                self._workflow_combo.setCurrentIndex(index)
+            if self._param_form:
+                self._param_form.set_values(params)
+            # Now that the settings match a real folder, show its newest result (the
+            # workflow may not have changed above, so this doesn't ride on that signal).
+            self.show_recent_preview()
 
     def restore_config(self, snapshot: ConfigSnapshot):
         """Reapply a snapshot captured by :meth:`current_config`.
@@ -916,9 +952,10 @@ class GenerateConfigPanel(QWidget):
         comes back the way it was left instead of pinned to the stale seed that was
         in its field at save time.
         """
-        self.prefill(snapshot.workflow_name, snapshot.params)
-        if self._param_form:
-            self._param_form.set_seed_random(snapshot.seed_is_random)
+        with self._loading():
+            self.prefill(snapshot.workflow_name, snapshot.params)
+            if self._param_form:
+                self._param_form.set_seed_random(snapshot.seed_is_random)
 
     # --- rewriting a whole folder's prompt ------------------------------------
 

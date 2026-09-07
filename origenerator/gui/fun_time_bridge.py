@@ -9,8 +9,9 @@ shows the way it reaches the players:
   steps the portrait player — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
   and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
   switching INTO origenerator mode, which opens playing rather than empty) and
-  ``CLOSE_SHOWS`` clears them again; ``QUIT`` closes the app the way its own
-  Ctrl+Alt+Q would.
+  ``CLOSE_SHOWS`` clears them again; ``FILTER_ENHANCED`` flips the show's
+  enhanced-only switch, the one its own HUD carries and the session's console
+  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -84,6 +85,9 @@ class FunTimeBridge(QObject):
             # base state opening again underneath it.
             self._gallery.close_the_shows()
             return
+        if verb == "FILTER_ENHANCED":
+            self._filter_enhanced()
+            return
         if verb == "QUIT":
             self._gallery.window().close()
             return
@@ -104,6 +108,21 @@ class FunTimeBridge(QObject):
             logger.warning("Unknown Fun Time verb dropped: %s", verb)
             return
         self._apply_side(side, action)
+
+    def _filter_enhanced(self) -> None:
+        """The session's enhanced-only switch, pressed there and landing here.
+
+        One switch in the session and two regions under it, so the press moves
+        both and reads the pair to decide which way: anything narrowed widens,
+        nothing narrowed narrows.  Flipped side by side they could disagree — a
+        region whose set has nothing enhanced in it refuses the narrowing — and
+        one lit switch cannot say that a room is half narrowed.
+        """
+        shows = [show for show in map(self._gallery.region_show, _SIDES)
+                 if show is not None]
+        enhanced_only = not any(show.hud_enhanced_mode for show in shows)
+        for show in shows:
+            show.set_enhanced_mode(enhanced_only)
 
     def _apply_side(self, side: str, action: str) -> None:
         """One transport verb onto whatever holds *side*.

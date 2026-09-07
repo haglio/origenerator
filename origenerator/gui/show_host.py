@@ -104,6 +104,27 @@ class ShowHost(Protocol):
     def toggle_f_mode(self) -> None:
         """Narrow the set to the favorites, or widen it back."""
 
+    @property
+    def hud_enhanced_mode(self) -> bool:
+        """Whether the set is narrowed to the pictures this app has enhanced —
+        the switch beside F-mode.  No set, no mode."""
+        return False
+
+    def toggle_enhanced_mode(self) -> bool:
+        """Flip that switch — the HUD's own button, and the session console's.
+
+        ``False`` where the switch did not move, which is the answer a host with
+        no set always gives and the answer a set with nothing enhanced in it
+        gives to being narrowed.
+        """
+        return False
+
+    def set_enhanced_mode(self, on: bool) -> bool:
+        """Put that switch a named way rather than flipping it — what a caller
+        moving two regions together needs, since a flip each could leave them
+        disagreeing.  ``False`` where it did not move."""
+        return False
+
     def show_item(self, path, *, hold: bool = False) -> None:
         """Jump to the item the HUD map named; *hold* locks it there."""
 

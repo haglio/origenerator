@@ -10,7 +10,7 @@ from PIL import Image
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
-from tests.test_gallery_view import FakeDB
+from tests.test_gallery_view import FakeDB, _enhanced_image, _image
 
 
 def _session(tmp_path):
@@ -25,8 +25,8 @@ def _session(tmp_path):
     )
 
 
-def _view_with_bridge(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path))
+def _view_with_bridge(qtbot, tmp_path, rows=()):
+    view = GalleryView(FakeDB(list(rows)), fun_time=_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     return view, bridge
@@ -148,6 +148,104 @@ def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
 
     assert not show.isVisible()
     assert view.region_show("portrait") is None
+
+
+def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
+    """Both regions on their base state, each playing the ids named for it —
+    what OPEN_SHOWS puts up, and the arrangement one switch has to move.
+
+    The ids are the fabricated rows' own, so the show can tell which of its
+    items carry an enhancement; the items above carry ids no row has.
+    """
+    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    Image.new("RGB", (200, 100)).save(wide)
+    library = {
+        "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
+        "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
+    }
+    monkeypatch.setattr(view, "_rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    view.fill_the_regions()
+    shows = [view.region_show(side) for side in ("portrait", "landscape")]
+    for show in shows:
+        qtbot.addWidget(show)
+    return shows
+
+
+def _press_filter_enhanced(bridge, tmp_path):
+    (tmp_path / "origenerator_cmd.txt").write_text("FILTER_ENHANCED\n", encoding="utf-8")
+    bridge._tick()
+
+
+def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
+        qtbot, tmp_path, monkeypatch):
+    """The session's console carries the enhanced-only switch a show's own HUD
+    carries, so a press there has to reach the shows here — answered nowhere, it
+    left the console lit over regions still playing all of them."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
+        _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
+    portrait, landscape = _fill_both_regions(
+        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+
+    _press_filter_enhanced(bridge, tmp_path)
+
+    assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [True, True]
+    # Each region down to the one enhanced picture it was playing.
+    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [1, 1]
+
+    _press_filter_enhanced(bridge, tmp_path)
+
+    assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [False, False]
+    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [2, 2]
+
+
+def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
+        qtbot, tmp_path, monkeypatch):
+    """Each region's own HUD carries this switch too, so the two can already
+    disagree when the session's one is pressed.  The press reads the pair to
+    pick its direction — anything narrowed widens — because flipping each in
+    place would only swap which region was narrowed, and one lit switch cannot
+    say that a room is half narrowed."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
+        _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
+    portrait, landscape = _fill_both_regions(
+        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+    portrait.toggle_enhanced_mode()  # narrowed from its own HUD, the other not
+
+    _press_filter_enhanced(bridge, tmp_path)
+
+    assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [False, False]
+
+
+def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
+        qtbot, tmp_path, monkeypatch):
+    """A set with nothing enhanced in it refuses the narrowing rather than
+    emptying itself, exactly as it does when its own HUD button is pressed."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
+        _image("l1", "a boat", 40, 3), _image("l2", "a boat", 40, 4)])
+    portrait, landscape = _fill_both_regions(
+        qtbot, view, monkeypatch, tmp_path, ["p1", "p2"], ["l1", "l2"])
+
+    _press_filter_enhanced(bridge, tmp_path)
+
+    assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [True, False]
+    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [1, 2]
+
+
+def test_filter_enhanced_with_no_show_up_is_dropped(qtbot, tmp_path):
+    """Nothing to narrow and nothing armed for later: the verb comes off the
+    channel like any other and the mode is left as it was."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+
+    _press_filter_enhanced(bridge, tmp_path)
+
+    assert not (tmp_path / "origenerator_cmd.txt").exists()
+    assert view.region_show("portrait") is None
+    assert view.region_show("landscape") is None
 
 
 def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monkeypatch):

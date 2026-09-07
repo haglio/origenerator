@@ -480,11 +480,6 @@ def _build_window(client, db, app_state, fun_time):
 
     window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
     if fun_time is not None:
-        # The session's channels: its verbs onto the region shows, the paused
-        # flag over them, and the occupancy status back.  Parented to the
-        # window so it lives exactly as long as the app.
-        from origenerator.gui.fun_time_bridge import FunTimeBridge
-        FunTimeBridge(fun_time, window._gallery_view, parent=window)
         # Parked until the session's own mode switch restores it: the session
         # may be in player mode, where popping over the RFB would be wrong.
         window.showMinimized()

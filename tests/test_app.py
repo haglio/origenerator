@@ -432,15 +432,14 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("origenerator.gui.fun_time_bridge.FunTimeBridge") as mock_bridge, \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main(["--fun-time", "--x", "5", "--y", "6",
                      "--width", "700", "--height", "900"]) == 0
 
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
-    # The session's channels are wired up on the gallery.
-    assert mock_bridge.call_args.args[0] is session
+    # What the session's channels are wired to is the window's own business
+    # (tests/test_main_window.py); the boot's part is threading the session in.
     # Parked until the session's own mode switch restores it: the session may be
     # in player mode, where popping over the Random Favs Browser is wrong.
     window.showMinimized.assert_called_once()
@@ -465,7 +464,6 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("origenerator.gui.fun_time_bridge.FunTimeBridge"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main(["--fun-time", "--x", "5", "--y", "6",
                      "--width", "700", "--height", "900"]) == 0
@@ -703,7 +701,6 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app._ensure_comfyui_server": DEFAULT,
         "origenerator.gui.loading_screen.LoadingScreen": DEFAULT,
         "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,
-        "origenerator.gui.fun_time_bridge.FunTimeBridge": DEFAULT,
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,

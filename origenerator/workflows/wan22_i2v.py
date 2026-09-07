@@ -16,8 +16,12 @@ from origenerator.workflows.frame_rate import (
     NATIVE_FPS,
     playback_rate,
 )
-from origenerator.workflows.model_arch import WAN, WAN_S2V
-from origenerator.workflows.model_files import list_lora_files, list_model_files
+from origenerator.workflows.model_arch import WAN_S2V
+from origenerator.workflows.model_files import list_model_files
+from origenerator.workflows.wan_experts import (
+    wan_expert_lora_params,
+    wan_expert_model_params,
+)
 
 # A scene with a line renders on WAN 2.2's speech-to-video model: one model in
 # place of the two experts, reading the line as audio and moving her lips to
@@ -112,20 +116,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
-        # Each slot offers only WAN, and only the expert it fills: a file whose
-        # name claims the other half is the one pick that is certainly wrong
-        # here. Names claiming neither stay in both, since nothing inside a
-        # WAN 2.2 file distinguishes the two experts.
-        high = list_model_files(
-            "diffusion_models", [defaults["unet_high"]], accepts=(WAN,), expert="high",
-        )
-        low = list_model_files(
-            "diffusion_models", [defaults["unet_low"]], accepts=(WAN,), expert="low",
-        )
-        loras_high = list_lora_files([defaults["lora_high"]], accepts=(WAN,), expert="high")
-        loras_low = list_lora_files([defaults["lora_low"]], accepts=(WAN,), expert="low")
         # The speech slot takes only the speech model: an expert in it would
-        # render deaf, and the expert slots above never offer it.
+        # render deaf, and the expert slots never offer it.
         speech = list_model_files("diffusion_models", [defaults["unet_s2v"]], accepts=(WAN_S2V,))
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
@@ -151,13 +143,9 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("cfg_low", "Prompt Strength (Low)", "float", defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift_high", "Shift (High)", "float", defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("shift_low", "Shift (Low)", "float", defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("unet_high", "Model (High)", "combo", defaults["unet_high"], options=high),
-            ParamDef("unet_low", "Model (Low)", "combo", defaults["unet_low"], options=low),
+            *wan_expert_model_params(defaults),
             ParamDef("unet_s2v", "Model (Speech)", "combo", defaults["unet_s2v"], options=speech),
-            ParamDef("lora_high", "LoRA (High)", "combo", defaults["lora_high"], options=loras_high),
-            ParamDef("lora_strength_high", "LoRA Strength (High)", "float", defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_low", "LoRA (Low)", "combo", defaults["lora_low"], options=loras_low),
-            ParamDef("lora_strength_low", "LoRA Strength (Low)", "float", defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
+            *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", "float", defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),

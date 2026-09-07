@@ -73,13 +73,11 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # matching the persisted default — not a hidden param the form silently reset
     # to default. Where the pickers sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
-    import origenerator.workflows.wan22_flf2v_loop as flf
-    import origenerator.workflows.wan22_i2v as i2v
+    import origenerator.workflows.wan_experts as experts
     from origenerator.workflows.model_files import NO_LORA
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
-    monkeypatch.setattr(i2v, "list_lora_files", lambda fallback, **terms: options)
-    monkeypatch.setattr(flf, "list_lora_files", lambda fallback, **terms: options)
+    monkeypatch.setattr(experts, "list_lora_files", lambda fallback, **terms: options)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -132,16 +130,14 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
     # installed diffusion_models — selectable, not a hidden default the form
     # silently reset. Where the pickers sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
-    import origenerator.workflows.wan22_flf2v_loop as flf
-    import origenerator.workflows.wan22_i2v as i2v
+    import origenerator.workflows.wan_experts as experts
 
     installed = {
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
         "loras": ["l.safetensors"],
     }
     picker = lambda category, fallback, **terms: installed[category]
-    monkeypatch.setattr(i2v, "list_model_files", picker)
-    monkeypatch.setattr(flf, "list_model_files", picker)
+    monkeypatch.setattr(experts, "list_model_files", picker)
 
     for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
         by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -170,6 +166,31 @@ def test_wan_video_workflows_group_all_models_then_all_loras():
         assert lora_block == list(range(lora_block[0], lora_block[0] + 4))
         # ...with every model picker above every LoRA picker.
         assert model_block[-1] < lora_block[0]
+
+
+def test_the_two_wan_expert_pair_workflows_offer_one_and_the_same_pair(installed_models):
+    # The expert-pair convention is load-bearing (a High slot must never offer
+    # a Low file), and it was spelled out twice -- 26 identical lines in two
+    # workflows with nothing linking them, so a change to the convention had to
+    # be made in both and nothing failed when it was made in one. Same labels,
+    # same filtered options, same strength ranges, or the two forms have quietly
+    # drifted apart.
+    for expert in ("high", "low"):
+        installed_models.add("diffusion_models", f"wan_{expert}_noise.safetensors", arch="wan")
+        installed_models.add("loras", f"wan_{expert}_lora.safetensors", arch="wan", lora=True)
+
+    pair_keys = ("unet_high", "unet_low", "lora_high", "lora_strength_high",
+                 "lora_low", "lora_strength_low")
+    shapes = []
+    for wf in (Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()):
+        by_key = {d.key: d for d in wf.param_definitions()}
+        shapes.append([
+            (key, by_key[key].label, by_key[key].type, by_key[key].options,
+             by_key[key].min_val, by_key[key].max_val, by_key[key].step)
+            for key in pair_keys
+        ])
+    assert shapes[0] == shapes[1]
+    assert "wan_high_noise.safetensors" in dict(zip(pair_keys, shapes[0]))["unet_high"][3]
 
 
 def test_workflows_expose_their_seed_param_keys():

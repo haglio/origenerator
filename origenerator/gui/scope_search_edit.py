@@ -7,6 +7,7 @@ breadcrumb and elides it from the left when the pane is too narrow for all of it
 the tail is the folder itself and its nearest parents, which is the half that
 answers "search where?".
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLineEdit

@@ -1,4 +1,5 @@
 """The shape and caption size every card in a folder's grid shares."""
+from __future__ import annotations
 
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import QApplication, QLabel

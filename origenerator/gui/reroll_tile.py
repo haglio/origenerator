@@ -16,6 +16,7 @@ auto-generating, "Next seed" (see :func:`inflight.discard_run_text`).
 The tile is rebuilt whenever the gallery re-renders, so it reads the job's
 cached state on construction rather than relying solely on future signals.
 """
+from __future__ import annotations
 
 import time
 

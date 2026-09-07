@@ -6,6 +6,7 @@ configuration that made it (so a video can find its frame's settings signature a
 folder name in O(1)), and invert the relation to list the videos an image was
 animated into. The bridge between a video's folders and its start frame's.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

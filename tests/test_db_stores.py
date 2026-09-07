@@ -12,6 +12,8 @@ through the facade every call site still uses. This file covers the seam.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import ast
 import inspect
 from pathlib import Path

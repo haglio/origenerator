@@ -5,6 +5,7 @@ this view now covers because a double-clicked picture opens it at a pace of
 nought: paging a folder in order, stepping an image's versions, following a
 generation that is still being made, and driving the OSR2 off the clip on screen.
 """
+from __future__ import annotations
 
 from io import BytesIO
 from unittest.mock import MagicMock

@@ -4,6 +4,7 @@ One rule across the family, from shared_ui, so a toggled button reads the same
 whichever app it is in -- the apps had each answered it their own way and some
 had not answered it at all.
 """
+from __future__ import annotations
 
 from PyQt6.QtGui import QColor
 from shared_ui.colors import BG_BUTTON, BG_BUTTON_ACTIVE, BLUE

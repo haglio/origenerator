@@ -1,4 +1,5 @@
 """The audio bed — which clip each voice takes, and the players that run them."""
+from __future__ import annotations
 
 from pathlib import Path
 

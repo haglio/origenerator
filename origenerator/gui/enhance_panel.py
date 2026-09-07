@@ -24,6 +24,7 @@ own name and number rather than making zero mean off. A part whose detector
 isn't installed in ComfyUI can't be ticked at all, and says why — the
 alternative being a run that fails on submit.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (

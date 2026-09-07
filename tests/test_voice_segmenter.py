@@ -4,6 +4,7 @@ Buffers frames once they're loud enough and emits a finished utterance when the
 speech is followed by enough quiet frames, discarding blips too short to be a
 command. Pure and frame-driven, so it tests without a microphone.
 """
+from __future__ import annotations
 
 import numpy as np
 

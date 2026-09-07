@@ -1,4 +1,5 @@
 """DropSlot: a kind-gated drop target for a dragged gallery generation."""
+from __future__ import annotations
 
 import pytest
 from PIL import Image

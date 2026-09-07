@@ -7,6 +7,7 @@ thumbnail opened per row per second.  Kept for ever, though, that is a dict with
 an entry for every file the app has looked at since it launched and no way for
 one to leave: a generation deleted an hour ago still holds its slot.
 """
+from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace

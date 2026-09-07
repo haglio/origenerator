@@ -1,4 +1,5 @@
 """The picture stood under a run that hasn't drawn anything yet."""
+from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import QSize

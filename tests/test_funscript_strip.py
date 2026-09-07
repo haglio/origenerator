@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtGui import QColor
 
 from origenerator.funscript import synthesize_actions

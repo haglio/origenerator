@@ -1,5 +1,6 @@
 """Her lines, spoken: a scene with a line renders on the speech model, hearing
 the line, and the line plays over the foley in the file."""
+from __future__ import annotations
 
 import pytest
 

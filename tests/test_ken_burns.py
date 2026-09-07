@@ -1,4 +1,5 @@
 """The slow push into a still — the arithmetic, with no window and no clock."""
+from __future__ import annotations
 
 from pytest import approx
 

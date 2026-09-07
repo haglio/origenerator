@@ -1,4 +1,5 @@
 """The shared "already generated" dialog: which seed(s) it offers to re-roll."""
+from __future__ import annotations
 
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH,

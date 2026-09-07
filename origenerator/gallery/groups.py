@@ -12,6 +12,7 @@ hierarchy. It answers the same walkers, so everything built on them — the
 breadcrumb, the folder tiles, the slideshow's row list — treats it like any
 other folder (see :mod:`origenerator.gallery.custom`).
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

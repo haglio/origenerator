@@ -14,6 +14,7 @@ loop's prompt or matching a "fix …" command — until one ends on the terminat
 Pure and text-driven: no mic, no Qt, no model. :class:`~origenerator.voice.
 steering.VoiceSteering` owns one and feeds it each transcription.
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass

@@ -1,4 +1,5 @@
 """Listener — the captured utterance must survive sounddevice reusing its buffer."""
+from __future__ import annotations
 
 import numpy as np
 

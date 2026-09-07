@@ -1,4 +1,5 @@
 """The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
+from __future__ import annotations
 
 from origenerator.slideshow import LIVE, SlideshowPlaylist, in_order
 

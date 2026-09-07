@@ -10,6 +10,7 @@ revised from, which is why the heading and the badge's media type are settable:
 what a request came from may itself be a video, and it is "requested from"
 rather than a start frame.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap

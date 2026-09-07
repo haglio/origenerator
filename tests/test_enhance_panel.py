@@ -4,6 +4,7 @@ Two small widgets for the two halves of "enhancement is a layer": the subpanel
 edits what a folder enhances at, and the version list shows what an image has
 already received.
 """
+from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QPoint, Qt

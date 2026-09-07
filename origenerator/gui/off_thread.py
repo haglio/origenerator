@@ -16,6 +16,7 @@ pool thread's emit and the delivery a turn later, anything that frees the
 handler leaves Qt to call a function that no longer exists. See
 :func:`run_off_thread`.
 """
+from __future__ import annotations
 
 import logging
 

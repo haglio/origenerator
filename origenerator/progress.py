@@ -37,6 +37,7 @@ these same numbers, and a run whose budget is all spent leaves it nothing to pac
 off. So every sampler that reports progress is budgeted here, and a pass that
 turns up unbudgeted anyway widens the total rather than being clamped away.
 """
+from __future__ import annotations
 
 # --- what a step of each kind of sampler costs -------------------------------
 #
@@ -310,7 +311,7 @@ class ProgressTracker:
     """
 
     @classmethod
-    def for_payload(cls, payload: dict) -> "ProgressTracker":
+    def for_payload(cls, payload: dict) -> ProgressTracker:
         """Build a tracker sized to a workflow payload's sampler passes."""
         return cls(
             expected_sampling_seconds(payload),

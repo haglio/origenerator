@@ -8,6 +8,7 @@ workflow's declared type, and both the preview panel and delete path resolve
 through here. Independent of the folder hierarchy; depends only on the workflow's
 declared output type for the pending-row fallback.
 """
+from __future__ import annotations
 
 import json
 import logging

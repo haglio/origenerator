@@ -11,6 +11,7 @@ from — and a stage message that took the picture's place hid the one thing the
 user opened the pane for. The dimming is what keeps the message readable over
 an arbitrary frame while leaving the frame legible underneath.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel

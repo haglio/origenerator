@@ -13,6 +13,7 @@ full-line size hint without clamping it to the row, so the text runs out past th
 pane's right edge — which is worse than either eliding or scrolling, since nothing
 on screen says it happened.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QPalette

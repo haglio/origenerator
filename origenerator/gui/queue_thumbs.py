@@ -39,6 +39,7 @@ because the pair drawn by
 picture at the same size on the same poll, and a second cache of it would be a
 second full-size decode a second.
 """
+from __future__ import annotations
 
 import os
 

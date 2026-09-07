@@ -18,6 +18,7 @@ All three are deliberately strict about shape: an utterance that matches nothing
 here falls through to prompt steering, so a loose match would silently spend a
 command on rewriting a prompt.
 """
+from __future__ import annotations
 
 import re
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QComboBox

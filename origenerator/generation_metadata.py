@@ -18,6 +18,7 @@ are separate results of one run, not versions of each other).
 Kept Qt-free so the section/item model is unit-testable directly;
 ``gui/metadata_block.py`` does the rendering.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime

@@ -5,6 +5,7 @@ from each workflow's own definitions: the same key means the same thing in every
 workflow that has it, so writing the explanation once is what keeps twelve
 descriptions of ``cfg`` from drifting into twelve different claims.
 """
+from __future__ import annotations
 
 import pytest
 

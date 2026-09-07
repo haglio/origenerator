@@ -6,6 +6,7 @@ name and star, and met with a particular image only when an enhance is launched.
 Each enhance folds in as another level, recording what made it, so an image that
 has been enhanced twice at different settings can show which is which.
 """
+from __future__ import annotations
 
 import json
 

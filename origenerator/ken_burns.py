@@ -26,6 +26,7 @@ size so the picture cannot re-center itself under the same rounding.
 Kept Qt-free, like :mod:`origenerator.slideshow`, so the arithmetic tests
 without a window or a clock.
 """
+from __future__ import annotations
 
 # How much closer the picture is by the time its dwell runs out. Small on
 # purpose — the move has to be something you notice having happened rather than

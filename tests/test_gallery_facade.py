@@ -5,6 +5,7 @@ submodules, reached by the GUI as ``gallery.X``. Splitting a submodule under it
 is meant to be invisible from outside, and these are what say so — the published
 surface held as an equality, and the one rule the package has about itself.
 """
+from __future__ import annotations
 
 import ast
 from pathlib import Path

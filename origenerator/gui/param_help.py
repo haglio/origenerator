@@ -20,6 +20,7 @@ row you cannot change is exactly the one you most want explained. A key in
 no row at all, editable or read-only, so a line written for it could never be
 read by anyone.
 """
+from __future__ import annotations
 
 # Keyed by param name; the value is the whole tooltip. Second person, no
 # trailing period on a single clause, one sentence or two at most — a tooltip

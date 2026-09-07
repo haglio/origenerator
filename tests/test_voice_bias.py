@@ -16,6 +16,7 @@ ratio measured on the real tokenizer — the guard is approximate on purpose, an
 it is the tripwire rather than the answer: a vocabulary addition that fails here
 has not necessarily overflowed, it has spent the margin that says it hasn't.
 """
+from __future__ import annotations
 
 from origenerator.gallery import voice_commands as gallery
 from origenerator.voice.app_commands import app_command_bias

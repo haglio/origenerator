@@ -15,6 +15,7 @@ empty: backlog item 24 read each one and either deleted it or gave it a reader.
 An entry added here from now on says which of those five it is, or it does not
 belong.
 """
+from __future__ import annotations
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
 _.dragMoveEvent  # noqa  # origenerator/gui/drop_slot.py:168, origenerator/gui/enhance_panel.py:454, origenerator/gui/folder_tree.py:242, origenerator/gui/generation_queue.py:633

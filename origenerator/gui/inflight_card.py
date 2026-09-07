@@ -20,6 +20,7 @@ widget stays unaware of where a job comes from or how it is revealed. The galler
 holds the items and calls ``reveal`` on a click; a right-click is handed up the
 same way, for the pane to answer with the run's own menu.
 """
+from __future__ import annotations
 
 import time
 

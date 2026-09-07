@@ -5,6 +5,7 @@ so the flag no longer stands for a database of its own; it stands for the one
 thing a preview leaves to the live app -- ComfyUI's absence work, which would
 outlive the preview in a queue only the app that queued it can cancel.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

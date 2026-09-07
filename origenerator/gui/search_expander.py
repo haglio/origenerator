@@ -10,6 +10,7 @@ Answers are cached by query for the life of the window, because a query gets
 re-asked constantly: backspacing a character and retyping it, or a gallery
 rebuild landing while the same search is open, must not each cost a model call.
 """
+from __future__ import annotations
 
 import logging
 import threading

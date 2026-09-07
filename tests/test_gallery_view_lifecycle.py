@@ -7,6 +7,7 @@ a widget that was never shown is never hidden, so a closed gallery went on
 polling and went on answering the room's keys until the garbage collector got
 round to it.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent

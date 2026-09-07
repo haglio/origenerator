@@ -16,6 +16,8 @@ The schema is :mod:`origenerator.db_schema` and the connection policy
 :mod:`origenerator.db_connection`; tests/test_db_schema.py holds the file on disk
 as a snapshot, because evolver reads it.
 """
+from __future__ import annotations
+
 from pathlib import Path
 
 from origenerator.db_connection import SqliteFile

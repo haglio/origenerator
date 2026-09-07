@@ -1,4 +1,5 @@
 """The stills either side of a slideshow's current item: which still, and where."""
+from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import QRect

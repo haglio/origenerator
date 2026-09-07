@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 from origenerator.trash import Trash, TrashedBatch

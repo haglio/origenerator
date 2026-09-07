@@ -2,6 +2,7 @@
 
 Invented prompts throughout — what is under test is the marking, not any words.
 """
+from __future__ import annotations
 
 from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 

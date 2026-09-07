@@ -1,6 +1,7 @@
 """One reading of a file reference for the whole app: the file a ``LoadImage``
 value names, the key two spellings of one file agree under, and where on disk
 the reference points."""
+from __future__ import annotations
 
 from pathlib import Path
 

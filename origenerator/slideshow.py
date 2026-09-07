@@ -27,6 +27,7 @@ pass back out that way. It is said in generation ids rather than in places,
 because the set the next show plays is not the one this one held — items landed
 while it was away, and anything it culled is gone.
 """
+from __future__ import annotations
 
 import random
 from dataclasses import dataclass

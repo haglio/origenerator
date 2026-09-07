@@ -11,6 +11,7 @@ already does, and comes back through a signal. :class:`RevisionWorker` carries
 one injected ``apply`` callable so the flow unit-tests inline, without a model
 or a server; :class:`ReviseTask` is one run of it on the pool.
 """
+from __future__ import annotations
 
 import logging
 

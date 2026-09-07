@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.db import Database
 from origenerator.experiments.background import (
     BATCH_SIZE,

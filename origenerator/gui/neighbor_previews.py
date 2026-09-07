@@ -9,6 +9,7 @@ surround beside it (anything but a full-width fit), each still sits centered in
 that gutter; where it doesn't, the still sits on top of the media, inset from
 the screen edge.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QPixmap

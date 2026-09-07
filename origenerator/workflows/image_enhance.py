@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.model_arch import SD15, SDXL

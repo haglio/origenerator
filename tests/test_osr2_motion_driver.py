@@ -1,4 +1,5 @@
 """Osr2MotionDriver — broker etiquette and the self-generated position stream."""
+from __future__ import annotations
 
 import threading
 import time

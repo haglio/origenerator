@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui.flow_layout import FlowLayout

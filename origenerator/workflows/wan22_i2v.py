@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from origenerator.speech import VOICE_OPTIONS, VOICE_PRESETS, scene_speech

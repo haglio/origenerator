@@ -29,6 +29,7 @@ mining to videos a looping workflow made.
 The LLM boundary is one function, so the grouping and act-matching logic stays
 unit-testable without a live model, a database, or a widget.
 """
+from __future__ import annotations
 
 import json
 import logging

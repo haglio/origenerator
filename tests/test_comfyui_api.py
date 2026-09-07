@@ -11,6 +11,8 @@ Every call is mocked at urllib: nothing here touches the network.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import io
 import json
 import urllib.error

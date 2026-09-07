@@ -28,6 +28,7 @@ signals — a dropped video versus a picked act, crossed with run-now
 chosen intent. The view owns the database, the slot predicates, the category→recipe
 routing, and both the generation and the generator tab.
 """
+from __future__ import annotations
 
 from collections.abc import Callable, Collection
 

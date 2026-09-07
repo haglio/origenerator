@@ -27,6 +27,7 @@ The logic is split by responsibility, in dependency order:
 This package re-exports the public surface below, so ``from origenerator.gallery
 import X`` and ``gallery.X`` keep working regardless of which submodule owns ``X``.
 """
+from __future__ import annotations
 
 from origenerator.gallery.combine import (
     CYCLE_FRAMES,

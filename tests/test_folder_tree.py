@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QTreeWidgetItem

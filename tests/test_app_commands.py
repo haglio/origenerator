@@ -5,6 +5,7 @@ matcher declines is rewritten into a prompt instead: a loose match here would
 spend a command on a sentence, and a loose miss would put a command word into
 the picture.
 """
+from __future__ import annotations
 
 import pytest
 

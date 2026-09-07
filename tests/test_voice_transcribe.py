@@ -1,4 +1,5 @@
 """Transcriber — local speech-to-text over faster-whisper (model injected)."""
+from __future__ import annotations
 
 import sys
 import types

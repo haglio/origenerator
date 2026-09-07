@@ -12,6 +12,7 @@ prompt is there to be edited by hand and the folder's images fill the preview
 above it — the careful edit a typed request is for, as against a spoken one the
 app has to interpret.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout

@@ -5,6 +5,7 @@ the set. Which versions exist, which picture they belong to, and which of them
 is showing were three fields on the slideshow, read and written from five of its
 methods; they are one small object now, and this is what it promises.
 """
+from __future__ import annotations
 
 import pytest
 

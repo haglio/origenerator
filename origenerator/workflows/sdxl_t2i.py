@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS,
     SCHEDULER_OPTIONS,

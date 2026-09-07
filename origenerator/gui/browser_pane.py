@@ -18,6 +18,7 @@ records of what it may ask the gallery around it (:class:`TreeNavigation`,
 connects them and answers — the info pane on a click, the tree on a drill, the
 delete on a menu.
 """
+from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field

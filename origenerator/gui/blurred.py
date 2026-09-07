@@ -16,6 +16,7 @@ first, so the plate fills edge to edge with no letterboxing.
 Cached by file and size for the life of the session — the shelves and the folder
 grid rebuild on every poll, and this reads a full-size render off disk.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

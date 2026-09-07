@@ -24,6 +24,7 @@ So this module is the one reading of a reference the rest of the app shares:
 Kept free of every other module of this app, so the gallery's row logic and the
 workflow templates can both read from it without one importing the other.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

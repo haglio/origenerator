@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from origenerator.gui import param_sections as ps

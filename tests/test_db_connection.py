@@ -11,6 +11,8 @@ of it to be refused (see origenerator.db_salvage).
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import sqlite3
 
 import pytest

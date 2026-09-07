@@ -1,5 +1,6 @@
 """Spoken show control — which utterances claim to be a command, and which fall
 through to prompt steering."""
+from __future__ import annotations
 
 import pytest
 

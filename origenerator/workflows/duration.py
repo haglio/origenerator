@@ -1,4 +1,5 @@
 """A video's length in seconds, on the frame grid its model can render."""
+from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef
 

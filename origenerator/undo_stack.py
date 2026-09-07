@@ -16,6 +16,7 @@ just came off — the older redos under it are still good.
 Any *new* step does clear it, as everywhere else: once history has forked, the
 branch you left is gone.
 """
+from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass

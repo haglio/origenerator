@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import random
@@ -2325,7 +2327,7 @@ class GalleryView(QWidget):
         finally:
             self._poll_inflight = False
 
-    def _apply_poll_facts(self, jobs, facts: "_PollFacts"):
+    def _apply_poll_facts(self, jobs, facts: _PollFacts):
         """Apply one tick's fetched answers, in the order the inline calls ran.
 
         Reconciling first is load-bearing: finishing a missed completion fires

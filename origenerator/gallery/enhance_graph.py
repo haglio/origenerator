@@ -17,6 +17,7 @@ package can land alongside.
 Every step of the read is guarded, because a graph on a row was written by an
 older version of this app, by ComfyUI, or by hand.
 """
+from __future__ import annotations
 
 import json
 

@@ -3,6 +3,7 @@
 A single source of truth for which file extensions count as images vs videos,
 so the importer and the gallery model classify outputs identically.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

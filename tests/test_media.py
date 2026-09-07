@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.media import media_type_from_filename, sibling_of_type
 
 

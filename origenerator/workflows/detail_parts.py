@@ -26,6 +26,7 @@ recorded detector filename resolves back to the word that captions the level it
 made (:func:`detector_part_label`), and one enhancement's params resolve to the
 passes it actually runs (:func:`detail_fixes_of`, :func:`detail_fix_passes`).
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass

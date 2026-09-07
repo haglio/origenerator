@@ -1,4 +1,5 @@
 """The Fun Time mode contract: the flags Fun Time launches this app with."""
+from __future__ import annotations
 
 from pathlib import Path
 

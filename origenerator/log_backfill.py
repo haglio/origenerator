@@ -6,6 +6,7 @@ can only be tied back to a generation by *when* it happened: the line is
 written the instant the output file lands. This module parses those lines and
 matches each one to the imported row whose file mtime sits closest in time.
 """
+from __future__ import annotations
 
 import logging
 import re

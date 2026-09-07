@@ -33,6 +33,7 @@ sentence and navigate away from it. :class:`~origenerator.voice.steering.
 VoiceSteering` gives this vocabulary its say before a request can open, which is
 what lets the plural through; a bare singular still opens the dictation.
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass

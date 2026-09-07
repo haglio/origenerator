@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,

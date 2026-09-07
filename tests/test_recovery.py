@@ -1,4 +1,5 @@
 """The recovery bin — what the shelf sees, and what the launch reclaims."""
+from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta

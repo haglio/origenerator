@@ -16,6 +16,7 @@ the picked image here rather than waiting for ComfyUI to do it in-graph).
 
 Kept free of any workflow/Qt import so both callers share one implementation.
 """
+from __future__ import annotations
 
 import math
 from pathlib import Path

@@ -9,6 +9,8 @@ An item is stored by tree key, so it drifts when a key formula moves exactly as 
 `folder_meta` bookmark does, and carries the same identity columns for the same
 reason: `origenerator.bookmark_reconcile` re-points it from a generation under it.
 """
+from __future__ import annotations
+
 from origenerator.db_connection import Store
 
 

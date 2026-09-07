@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
 from origenerator.gui.collapsible_section import CollapsibleSection

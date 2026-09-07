@@ -6,6 +6,7 @@ the upscale, so what it ran at can only be recovered from the graph itself. The
 graph is written by an older version of this app, or by ComfyUI, or by hand, so
 every step of the read is guarded; these are the guards.
 """
+from __future__ import annotations
 
 import json
 

@@ -9,6 +9,7 @@ Detection is adaptive: the first frames calibrate the mic's ambient level and th
 speech threshold tracks it (``noise * ratio``), so a faint or noisy mic — where a
 fixed gate sits on top of the background and never endpoints — still works.
 """
+from __future__ import annotations
 
 import logging
 

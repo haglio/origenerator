@@ -3,6 +3,7 @@
 Qt-free so the logic stays unit-testable without a widget toolkit. Shared by
 the gallery (reuse) and the generate view (subtab prefill + strip-click compare).
 """
+from __future__ import annotations
 
 import json
 import random
@@ -38,7 +39,7 @@ class ConfigSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ConfigSnapshot":
+    def from_dict(cls, data: dict) -> ConfigSnapshot:
         """Rebuild from :meth:`to_dict` output, tolerating partial/corrupt data.
 
         A tab saved before a param was renamed comes back on the current key:

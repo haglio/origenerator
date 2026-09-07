@@ -6,6 +6,7 @@ Starred, ...), a search's results, and whichever item is picked in it — and
 Back/Forward return to exactly that view, whether it was a generation reached by
 an i2v's input-image link or the shelf they drilled from.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

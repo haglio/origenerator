@@ -1,4 +1,5 @@
 """Deferring work to the next turn — and what happens when its owner goes first."""
+from __future__ import annotations
 
 from PyQt6.QtCore import QObject, QTimer
 from PyQt6.QtWidgets import QWidget

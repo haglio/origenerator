@@ -10,6 +10,7 @@ dialog offers each on its own (new motion of the same frame, or a new frame with
 the same motion) as well as both. A recipe with one re-rollable seed — a dropped
 frame that was imported rather than generated — keeps the lone "New Random Seed".
 """
+from __future__ import annotations
 
 from PyQt6.QtWidgets import QMessageBox
 

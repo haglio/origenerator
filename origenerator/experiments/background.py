@@ -7,6 +7,7 @@ ones on the Experiments shelf (the startup reconcile finalizes their rows) and
 drops whatever hadn't run yet, so an open app never has an experiment competing
 with the user for the GPU.
 """
+from __future__ import annotations
 
 import logging
 

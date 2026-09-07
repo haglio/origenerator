@@ -8,6 +8,7 @@ and floats the same drive panel
 memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
 I shape, / cruise control, backslash nudges a quarter cycle.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 

@@ -5,6 +5,7 @@ as the input for appears as a looping WebP preview (or its static thumbnail when
 no animation is available), and clicking one navigates to that video. WebP +
 ``QMovie`` keeps many previews moving at once without a video player per tile.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap

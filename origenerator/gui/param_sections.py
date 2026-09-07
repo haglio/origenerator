@@ -9,6 +9,7 @@ passthrough row into the matching section too.
 
 Kept Qt-free so the grouping is unit-testable without a QApplication.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

@@ -67,6 +67,7 @@ Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
 test) :meth:`open_config` is a no-op — but a tab still shows, its form up for
 inspection with Generate disabled.
 """
+from __future__ import annotations
 
 import time
 

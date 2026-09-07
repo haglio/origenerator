@@ -36,6 +36,7 @@ row that makes another at the current settings — dimmed when the image already
 holds one made at exactly those, and hovering the dimmed row lights the level
 it would have duplicated.
 """
+from __future__ import annotations
 
 import json
 

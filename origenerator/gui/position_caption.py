@@ -4,6 +4,7 @@ A show always plays a set — a folder's, a shelf's, or the folder a double-clic
 picture came from — so it always has somewhere in it to be. A suffix carries
 whatever else it has to add: the lock.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget

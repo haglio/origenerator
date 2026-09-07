@@ -3,6 +3,7 @@
 The whisper/LLM calls are injected as plain functions, so the whole pipeline is
 exercised synchronously without a mic, a model, or a server.
 """
+from __future__ import annotations
 
 from origenerator.voice.worker import VoiceWorker
 

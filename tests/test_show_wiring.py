@@ -7,6 +7,7 @@ always all six, and the three go together at every caller that passes any of
 them — so each is one argument now. These pin the two records and the fact that
 the show still reads its wiring off them.
 """
+from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from unittest.mock import MagicMock

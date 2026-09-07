@@ -21,6 +21,7 @@ to be final. The other startup reconcile — resolving in-flight generations
 against ComfyUI — is :mod:`origenerator.inflight`, and shares nothing with this
 but the word.
 """
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass

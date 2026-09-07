@@ -19,6 +19,7 @@ the stack is what the device follows and the dials only report what the sum came
 to; the rest of the time the motion is the single hand-driven wave it has always
 been.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 

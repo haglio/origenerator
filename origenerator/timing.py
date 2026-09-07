@@ -8,6 +8,7 @@ between them is the real generation time, free of queue-wait noise. Those
 measured times are both what a resting estimate is drawn from and what tells a
 job in flight how much of its run is left (:func:`progress_time_label`).
 """
+from __future__ import annotations
 
 import statistics
 

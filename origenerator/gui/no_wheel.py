@@ -14,6 +14,7 @@ elides what it shows. Only the closed field shrinks: Qt opens the list at its
 items' own width, so the names stay whole where they are read — which matters for
 two model files that differ only near the end.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QPalette

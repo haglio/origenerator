@@ -20,6 +20,7 @@ Keys are ``__custom__/<id>``: prefixed like the synthetic shelves so no derived
 folder key can collide with one, and carrying the row id so the saved folder is
 recoverable from the key alone.
 """
+from __future__ import annotations
 
 from origenerator.gallery.groups import CustomGroup, child_groups
 

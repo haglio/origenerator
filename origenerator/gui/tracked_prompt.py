@@ -33,6 +33,7 @@ Undo is off while a field is tracked. The document is rewritten under the typist
 on every settle, so an undo would step back through renders rather than through
 edits, and land the field on text the prompt no longer matches.
 """
+from __future__ import annotations
 
 from contextlib import contextmanager
 

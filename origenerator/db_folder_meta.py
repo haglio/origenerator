@@ -9,6 +9,8 @@ generation under it, and the reconcile re-points it when the key formula moves.
 `folder_meta_map` is the view's half (labels and stars); `folder_meta_full` is
 the reconcile's, and adds those two identity columns.
 """
+from __future__ import annotations
+
 from origenerator.db_connection import Store
 
 

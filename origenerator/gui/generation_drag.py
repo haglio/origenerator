@@ -5,6 +5,7 @@ tab's preview — and by the combine drop slots that read it, so any of them can
 dragged onto a slot with the same contract. Kept in its own module so a plain
 media widget doesn't have to depend on the thumbnail widget just for the type.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QByteArray, QMimeData
 

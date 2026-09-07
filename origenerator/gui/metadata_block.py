@@ -10,6 +10,7 @@ versions, listed with the level that made each. The model lives in
 The block is a titled set of ``label: value`` rows; a row gains a
 copy-to-clipboard button when its item declares copyable text (a filename).
 """
+from __future__ import annotations
 
 from pathlib import Path
 

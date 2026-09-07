@@ -12,6 +12,7 @@ batch outlives the session that made it for as long as it is left alone.
 :meth:`Trash.purge_orphans` is the other half of that — it clears whatever the
 bin does *not* name, which is the only thing left that nothing can reach.
 """
+from __future__ import annotations
 
 import shutil
 import time
@@ -55,7 +56,7 @@ class TrashedBatch:
         }
 
     @classmethod
-    def from_record(cls, record: dict) -> "TrashedBatch":
+    def from_record(cls, record: dict) -> TrashedBatch:
         """Re-make a batch from what :meth:`record` stored — the handle a session
         that never performed the delete needs in order to undo or end it."""
         subdir = (record or {}).get("subdir")

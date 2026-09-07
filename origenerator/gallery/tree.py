@@ -28,6 +28,7 @@ videos — the source image a video animates, i.e. which picture its start frame
 beneath every projection. This module owns the grouping logic with no Qt
 dependency so it can be unit-tested directly.
 """
+from __future__ import annotations
 
 import json
 

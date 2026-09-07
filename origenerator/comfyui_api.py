@@ -15,6 +15,8 @@ with no Qt anywhere.
 
 The websocket half stays where it must: it emits Qt signals from a thread.
 """
+from __future__ import annotations
+
 import json
 import logging
 import time

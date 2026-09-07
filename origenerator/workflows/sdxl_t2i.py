@@ -9,8 +9,6 @@ from origenerator.workflows.base import (
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
-_DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
-
 
 class SdxlT2iWorkflow(WorkflowTemplate):
     """SDXL text-to-image, optionally finished by an upscale/enhance pass.
@@ -56,7 +54,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
             "enhance": False,
-            "upscale_model": _DEFAULT_UPSCALE_MODEL,
+            "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             # Kept low deliberately: at 0.3 the enhance pass re-imagined creases
@@ -70,34 +68,35 @@ class SdxlT2iWorkflow(WorkflowTemplate):
         # SD1.5 alongside SDXL: it carries its own CLIP and runs here, just
         # against the SDXL VAE this graph pairs it with. The video models filed
         # under checkpoints carry no text encoder for node 2/3 to read at all.
+        defaults = self.default_params()
         checkpoints = list_model_files(
-            "checkpoints", ["reapony_v80.safetensors"], accepts=(SDXL, SD15),
+            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
         )
         upscalers = list_model_files(
-            "upscale_models", [_DEFAULT_UPSCALE_MODEL], accepts=ANY,
+            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
         )
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("checkpoint", "Model", "combo", "reapony_v80.safetensors",
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
+            ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
                      options=checkpoints),
-            ParamDef("seed", "Seed", "seed", 0),
-            ParamDef("width", "Width", "int", 1280, min_val=64, max_val=4096, step=64),
-            ParamDef("height", "Height", "int", 720, min_val=64, max_val=4096, step=64),
-            ParamDef("steps", "Steps", "int", 50, min_val=1, max_val=200),
-            ParamDef("cfg", "Prompt Strength", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5),
-            ParamDef("sampler_name", "Sampler", "combo", "euler",
+            ParamDef("seed", "Seed", "seed", defaults["seed"]),
+            ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=4096, step=64),
+            ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=4096, step=64),
+            ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=200),
+            ParamDef("cfg", "Prompt Strength", "float", defaults["cfg"], min_val=0.0, max_val=30.0, step=0.5),
+            ParamDef("sampler_name", "Sampler", "combo", defaults["sampler_name"],
                      options=SAMPLER_OPTIONS),
-            ParamDef("scheduler", "Scheduler", "combo", "normal",
+            ParamDef("scheduler", "Scheduler", "combo", defaults["scheduler"],
                      options=SCHEDULER_OPTIONS),
-            ParamDef("denoise", "Redraw Amount", "float", 1.0, min_val=0.0, max_val=1.0, step=0.01),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
-            ParamDef("upscale_model", "Upscale Model", "combo", _DEFAULT_UPSCALE_MODEL,
+            ParamDef("denoise", "Redraw Amount", "float", defaults["denoise"], min_val=0.0, max_val=1.0, step=0.01),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", defaults["enhance"]),
+            ParamDef("upscale_model", "Upscale Model", "combo", defaults["upscale_model"],
                      options=upscalers),
-            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
+            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

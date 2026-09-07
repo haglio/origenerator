@@ -4,8 +4,6 @@ from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import list_model_files
 
-_DEFAULT_UNET = "ultrarealFineTune_v4_fp16.gguf"
-
 
 class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     """Flux text-to-image on a GGUF-quantized UNET, with a RealESRGAN upscale.
@@ -52,7 +50,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "sampler_name": "euler",
             "scheduler": "simple",
             "denoise": 1.0,
-            "unet": _DEFAULT_UNET,
+            "unet": "ultrarealFineTune_v4_fp16.gguf",
             "clip_name1": "clip_l.safetensors",
             "clip_name2": "t5xxl_fp16.safetensors",
             "vae": "ae.safetensors",
@@ -67,21 +65,22 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         # GGUF Flux models live under diffusion_models, alongside the WAN UNETs
         # and a few bare SDXL and Qwen ones — hence the filter.
-        unets = list_model_files("diffusion_models", [_DEFAULT_UNET], accepts=(FLUX,))
+        defaults = self.default_params()
+        unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(FLUX,))
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("unet", "Model", "combo", _DEFAULT_UNET, options=unets),
-            ParamDef("seed", "Seed", "seed", 0),
-            ParamDef("width", "Width", "int", 720, min_val=64, max_val=4096, step=16),
-            ParamDef("height", "Height", "int", 1280, min_val=64, max_val=4096, step=16),
-            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("guidance", "Prompt Strength", "float", 4.5,
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("unet", "Model", "combo", defaults["unet"], options=unets),
+            ParamDef("seed", "Seed", "seed", defaults["seed"]),
+            ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=4096, step=16),
+            ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=4096, step=16),
+            ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=100),
+            ParamDef("guidance", "Prompt Strength", "float", defaults["guidance"],
                      min_val=0.0, max_val=20.0, step=0.1),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
-            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", defaults["enhance"]),
+            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
+            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

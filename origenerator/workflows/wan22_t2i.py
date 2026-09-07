@@ -59,22 +59,23 @@ class Wan22T2iWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
+        defaults = self.default_params()
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("noise_seed", "Seed (High)", "seed", 0),
-            ParamDef("seed", "Seed (Low)", "seed", 0),
-            ParamDef("width", "Width", "int", 1088, min_val=64, max_val=2048, step=16),
-            ParamDef("height", "Height", "int", 1920, min_val=64, max_val=2048, step=16),
-            ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=50),
-            ParamDef("cfg", "Prompt Strength", "float", 3.5, min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift_high", "Shift (High)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("shift_low", "Shift (Low)", "float", 8.0, min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", False),
-            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
+            ParamDef("noise_seed", "Seed (High)", "seed", defaults["noise_seed"]),
+            ParamDef("seed", "Seed (Low)", "seed", defaults["seed"]),
+            ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=2048, step=16),
+            ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=2048, step=16),
+            ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=50),
+            ParamDef("cfg", "Prompt Strength", "float", defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("shift_high", "Shift (High)", "float", defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("shift_low", "Shift (Low)", "float", defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", defaults["enhance"]),
+            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
+            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

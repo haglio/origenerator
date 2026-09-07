@@ -31,6 +31,10 @@ TRANSPORT = (
 THE_SET = (
     "show_reset", "hud_items", "hud_f_mode", "hud_order_label", "hud_looping",
     "hud_is_favorite", "toggle_f_mode", "show_item", "current_media_path",
+    # The enhanced-only switch beside F-mode: declared here because three
+    # drivers reach for it — the HUD's button, the session console's, and the
+    # spoken word — and it was the last of the switches still being probed for.
+    "hud_enhanced_mode", "toggle_enhanced_mode", "set_enhanced_mode",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so
@@ -95,6 +99,9 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     assert host.show_reset() is None
     assert host.toggle_f_mode() is None
     assert host.show_item("anything", hold=True) is None
+    assert host.hud_enhanced_mode is False
+    assert host.toggle_enhanced_mode() is False
+    assert host.set_enhanced_mode(True) is False
 
 
 def test_a_host_with_no_set_draws_no_hud_map(pace_only):

@@ -294,7 +294,7 @@ class ShowHud(QLabel):
             self._host.toggle_f_mode()
             self._tick()
             return
-        if verb == f"{self._side}_enhanced" and hasattr(self._host, "toggle_enhanced_mode"):
+        if verb == f"{self._side}_enhanced":
             # The switch beside F-mode, and the show's own the same way: keep
             # only the pictures this show has enhanced, or widen back.
             self._host.toggle_enhanced_mode()

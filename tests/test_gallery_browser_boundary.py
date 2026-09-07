@@ -93,9 +93,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     tables stopped naming their handlers as strings. 371 → 372: one folder-key
     derivation replaced the five that were written inline, and it takes a row as
     readily as a config. 372 → 371: the gallery's handle on the config tab's
-    private preview widget is gone, and its two remaining drivers ask the panel. 80: dropping the trash's retention window took the pane's two
-    countdown helpers with it.)"""
+    private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's cards are a join over four
+    sources and no rendering at all, so they are built outside the pane now
+    (`gui/inflight_items.py`) and it keeps a one-line delegation.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 371
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 80
+               for x in _class_def(PANE, "BrowserPane").body) == 77

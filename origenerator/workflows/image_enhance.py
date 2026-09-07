@@ -5,8 +5,6 @@ from origenerator.workflows.derived_size import measure_image_size, override_siz
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
 
-_DEFAULT_CHECKPOINT = "reapony_v80.safetensors"
-_DEFAULT_UPSCALE_MODEL = "4xUltrasharp_4xUltrasharpV10.pt"
 # The first of the node ids the detail pass takes, three per part it fixes —
 # past the twelve this workflow's own graph uses.
 _FIRST_DETAIL_NODE_ID = 13
@@ -63,9 +61,9 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "cfg": 7.5,
             "sampler_name": "euler",
             "scheduler": "normal",
-            "checkpoint": _DEFAULT_CHECKPOINT,
+            "checkpoint": "reapony_v80.safetensors",
             "vae": "sdxl_vae.safetensors",
-            "upscale_model": _DEFAULT_UPSCALE_MODEL,
+            "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
             "enhance_denoise": 0.15,
@@ -74,25 +72,26 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         }
 
     def param_definitions(self) -> list[ParamDef]:
+        defaults = self.default_params()
         checkpoints = list_model_files(
-            "checkpoints", [_DEFAULT_CHECKPOINT], accepts=(SDXL, SD15),
+            "checkpoints", [defaults["checkpoint"]], accepts=(SDXL, SD15),
         )
         upscalers = list_model_files(
-            "upscale_models", [_DEFAULT_UPSCALE_MODEL], accepts=ANY,
+            "upscale_models", [defaults["upscale_model"]], accepts=ANY,
         )
         return [
-            ParamDef("input_image", "Image", "image", ""),
-            ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-            ParamDef("checkpoint", "Model", "combo", _DEFAULT_CHECKPOINT,
+            ParamDef("input_image", "Image", "image", defaults["input_image"]),
+            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
+            ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
                      options=checkpoints),
-            ParamDef("seed", "Seed", "seed", 0),
-            ParamDef("upscale_model", "Upscale Model", "combo", _DEFAULT_UPSCALE_MODEL,
+            ParamDef("seed", "Seed", "seed", defaults["seed"]),
+            ParamDef("upscale_model", "Upscale Model", "combo", defaults["upscale_model"],
                      options=upscalers),
-            ParamDef("enhance_scale", "Upscale Factor", "float", 2.0,
+            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", 20, min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", 0.15,
+            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
             # One denoise per part fixed, keyed by the part's name — the Enhance
             # panel's line of numbers, and the range those spinners take. A
@@ -100,7 +99,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             # runs a real pass, so the floor sits above zero (the detailer node
             # rejects a zero denoise, and a pass that repaints nothing is a
             # slower way of not running one).
-            ParamDef("enhance_detail_fixes", "Fixes", "fixes", {},
+            ParamDef("enhance_detail_fixes", "Fixes", "fixes", defaults["enhance_detail_fixes"],
                      min_val=0.05, max_val=1.0, step=0.05),
         ]
 

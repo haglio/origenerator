@@ -780,6 +780,22 @@ def test_enhance_keys_cover_every_param_only_the_tail_reads():
     assert WORKFLOW_REGISTRY["wan22_i2v"].enhance_keys() == ()
 
 
+def test_a_form_starts_on_the_value_a_stored_recipe_is_normalized_against():
+    # Two readings of one default: `default_params()` is what a stored recipe is
+    # normalized against (gallery.signatures.canonical_settings) while
+    # `ParamDef.default` is what the Generate form starts on. Let them disagree
+    # and a freshly generated row lands in a different folder from an identical
+    # re-roll — silently, because both values are legal on their own.
+    checked = 0
+    for name, wf in WORKFLOW_REGISTRY.items():
+        defaults = wf.default_params()
+        for pd in wf.param_definitions():
+            assert pd.key in defaults, f"{name}.{pd.key} is on the form but has no default"
+            assert pd.default == defaults[pd.key], f"{name}.{pd.key}"
+            checked += 1
+    assert checked > 100, "the registry stopped being walked"
+
+
 # ---- WAN 2.2 FLF2V Loop ----
 
 def test_wan22_default_params_has_required_keys():

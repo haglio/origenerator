@@ -19,7 +19,13 @@ jobs:
     with:
       siblings: "app_support shared_ui player_core"
       python-version: "3.12"
-      timeout-minutes: 38
+      # A pull request's run is one pass; the queue's and main's are two, because
+      # the reverse pass is skipped on a pull request and nowhere else. So the
+      # number that matters here is twice what a PR run reports -- and at 38 the
+      # queue began cancelling its own candidate runs mid-suite, which shows up
+      # as an eviction with no failing test to point at. 55 leaves room under the
+      # queue's own 60-minute ceiling for a check to answer at all.
+      timeout-minutes: 55
       qt-platform: offscreen
       reverse-on-pull-request: false
 
@@ -34,6 +40,6 @@ jobs:
     with:
       siblings: "app_support shared_ui player_core"
       python-version: "3.14"
-      timeout-minutes: 38
+      timeout-minutes: 55
       qt-platform: offscreen
       reverse: false

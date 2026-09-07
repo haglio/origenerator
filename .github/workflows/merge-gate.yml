@@ -22,3 +22,18 @@ jobs:
       timeout-minutes: 38
       qt-platform: offscreen
       reverse-on-pull-request: false
+
+  # What the machine this is developed on would say. It runs 3.14 and the gate
+  # runs 3.12, and the two evaluate annotations differently (PEP 649) -- which is
+  # exactly the divergence this repo wrote a static guard for. On `push` only:
+  # never on a pull request and never in the queue, so this reads without gating
+  # and nothing here can hold up a landing.
+  next-python:
+    if: github.event_name == 'push'
+    uses: haglio/.github/.github/workflows/merge-gate.yml@main
+    with:
+      siblings: "app_support shared_ui player_core"
+      python-version: "3.14"
+      timeout-minutes: 38
+      qt-platform: offscreen
+      reverse: false

@@ -11,6 +11,7 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -819,3 +820,27 @@ def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
     qtbot.addWidget(win)
     win.close()
     assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="
+
+
+def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, tmp_path):
+    # The boot used to build this bridge itself, reaching through the window for
+    # the private attribute holding the gallery -- the only cross-object private
+    # access in the core unit, and it made the window's internals part of the
+    # boot contract. The window owns the gallery and is already handed the
+    # session, so it is the one that can wire them without naming anything
+    # private, and the bridge is parented to it for lifetime either way.
+    session = _fun_time_session()
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=session,
+    )
+    qtbot.addWidget(win)
+
+    bridges = win.findChildren(FunTimeBridge)
+    assert len(bridges) == 1
+    assert bridges[0].parent() is win
+
+
+def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
+    # Nothing to wire: no command file to poll, no status to publish.
+    assert _window(qtbot, tmp_path).findChildren(FunTimeBridge) == []

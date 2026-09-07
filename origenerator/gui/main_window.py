@@ -15,6 +15,7 @@ from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_mode import FunTimeSession
+from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.win32 import place_window_in_device_pixels
@@ -97,6 +98,13 @@ class OrigeneratorWindow(QMainWindow):
         # thumbnail, the re-roll "+", and the combine panel all feed it.
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time)
         self.setCentralWidget(self._gallery_view)
+        if fun_time is not None:
+            # The session's channels: its verbs onto the region shows, the
+            # paused flag over them, and the occupancy status back. Built here
+            # rather than by the boot, which had to reach through this window
+            # for the gallery to hand over. Parented to the window, so it lives
+            # exactly as long as the app.
+            FunTimeBridge(fun_time, self._gallery_view, parent=self)
 
         # Ctrl+Alt+Q quits from anywhere in the app: an application-scoped shortcut
         # fires no matter which widget holds focus. close() runs closeEvent — which

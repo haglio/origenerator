@@ -575,10 +575,10 @@ def _search_for(view, text):
     not yet searched. Nothing under the minimum length searches at all, so that
     case is left to the timer that never fires — as it is in the app.
     """
-    view._search_edit.setText(text)
-    if view._search_timer.isActive():
-        view._search_timer.stop()
-        view._run_pending_search()
+    view._search.field.setText(text)
+    if view._search._timer.isActive():
+        view._search._timer.stop()
+        view._search._run_pending()
 
 
 def test_search_fills_the_browser_pane_with_the_matching_generations(qtbot):
@@ -628,7 +628,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     _search_for(view, "dog")
     assert view.visible_prompt_ids() == ["i2"]
 
-    view._search_edit.setText("")
+    view._search.field.setText("")
 
     assert view.visible_prompt_ids() == ["i2"]   # back in the folder that was open
     assert not view._browser.showing_search()
@@ -662,7 +662,7 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert view._search_edit.text() == "cat"
+    assert view._search.field.text() == "cat"
     assert view._browser.showing_search()
     assert view.visible_prompt_ids() == ["i1"]
 
@@ -745,24 +745,24 @@ def test_the_field_says_what_it_would_search(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
-    view._search_edit.setFixedWidth(2000)  # room for any path, so nothing elides
+    view._search.field.setFixedWidth(2000)  # room for any path, so nothing elides
     view.refresh()
     # The side is part of the path: an All row is one half of the library.
-    assert view._search_edit.placeholderText() == "Search Landscape  ›  All…"
+    assert view._search.field.placeholderText() == "Search Landscape  ›  All…"
 
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
-    assert view._search_edit.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
+    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.breadcrumb(videos)}…"
 
     leaf = videos.child(0).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
-    placeholder = view._search_edit.placeholderText()
+    placeholder = view._search.field.placeholderText()
     assert placeholder == f"Search {view._tree_view.breadcrumb(leaf)}…"
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
-    assert view._search_edit.placeholderText() == "Search Landscape  ›  Latest…"
+    assert view._search.field.placeholderText() == "Search Landscape  ›  Latest…"
 
 
 def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
@@ -776,12 +776,12 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     view._tree.setCurrentItem(leaf)
 
     # Wide enough for the folder's own name and little else.
-    metrics = view._search_edit.fontMetrics()
-    view._search_edit.setFixedWidth(
+    metrics = view._search.field.fontMetrics()
+    view._search.field.setFixedWidth(
         metrics.horizontalAdvance("Search …" + leaf.text(0)) + 24)
 
-    scope = view._search_edit._scope
-    placeholder = view._search_edit.placeholderText()
+    scope = view._search.field._scope
+    placeholder = view._search.field.placeholderText()
     assert placeholder.startswith("Search …")       # said to be cut, at the front
     tail = placeholder[len("Search …"):]
     assert scope.endswith(tail) and len(tail) < len(scope)  # elided from the left
@@ -842,11 +842,11 @@ def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     toc = view._folder_panes.widget(0)
-    assert isinstance(view._search_edit, QLineEdit)
-    assert toc.isAncestorOf(view._search_edit)
+    assert isinstance(view._search.field, QLineEdit)
+    assert toc.isAncestorOf(view._search.field)
     # it leads the pane, above the tree it searches across.
     layout = toc.layout()
-    assert layout.indexOf(view._search_edit) < layout.indexOf(view._tree)
+    assert layout.indexOf(view._search.field) < layout.indexOf(view._tree)
 
 
 def test_search_matches_a_generation_by_its_seed(qtbot):
@@ -879,7 +879,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
 
     view._title.edit_requested.emit()
     view._title.edited.emit("Beach trip")
-    qtbot.waitUntil(lambda: view._search_edit._scope.endswith("Beach trip"))
+    qtbot.waitUntil(lambda: view._search.field._scope.endswith("Beach trip"))
 
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
@@ -1026,7 +1026,7 @@ def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
     _search_for(view, "cat")
     assert view.visible_prompt_ids() == []   # nothing says "cat"
 
-    view._search_expander.expanded.emit("cat", {"cat": ("kitten",)})
+    view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
     assert view.visible_prompt_ids() == ["i1"]
 
@@ -1041,7 +1041,7 @@ def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
     view.refresh()
     _search_for(view, "dog")
 
-    view._search_expander.expanded.emit("cat", {"cat": ("kitten",)})
+    view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
     assert view.visible_prompt_ids() == ["i2"]
 
@@ -1078,8 +1078,8 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
     _search_for(view, "cat")
 
     assert len(view.visible_prompt_ids()) == 200
-    assert "205 results" in view._search_count.text()
-    assert "add a word" in view._search_count.text()
+    assert "205 results" in view._search._count.text()
+    assert "add a word" in view._search._count.text()
 
 
 def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
@@ -1096,7 +1096,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
     assert view.visible_prompt_ids() == []       # no loose thumbnails...
     assert len(view._browser._visible_keys) == 1  # ...one folder standing for all three
-    assert "1 result" in view._search_count.text()
+    assert "1 result" in view._search._count.text()
 
 
 def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
@@ -1123,7 +1123,7 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
 
     view._browser._drill_into(key)   # the path a folder tile's click takes
 
-    assert view._search_edit.text() == ""
+    assert view._search.field.text() == ""
     assert not view._browser.showing_search()
     assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # standing in the folder
 
@@ -1136,13 +1136,13 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._search_edit.setText("cat")
+    view._search.field.setText("cat")
 
     assert not view._browser.showing_search()   # typed, not yet searched
-    assert view._search_timer.isActive()
+    assert view._search._timer.isActive()
 
-    view._search_timer.stop()
-    view._run_pending_search()
+    view._search._timer.stop()
+    view._search._run_pending()
 
     assert view.visible_prompt_ids() == ["i1"]
 
@@ -1156,15 +1156,15 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._search_edit.setText("ca")
+    view._search.field.setText("ca")
 
-    assert not view._search_timer.isActive()
+    assert not view._search._timer.isActive()
     assert not view._browser.showing_search()
 
     _search_for(view, "cat")
     assert view._browser.showing_search()
 
-    view._search_edit.setText("ca")   # back under the floor: the search is over
+    view._search.field.setText("ca")   # back under the floor: the search is over
     assert not view._browser.showing_search()
 
 
@@ -1283,7 +1283,7 @@ def test_ctrl_f_falls_back_to_the_tree_find_with_no_prompts_in_front(qtbot, tmp_
     _press_ctrl_f(view, monkeypatch)
 
     assert not view._find_bar.isVisible()
-    assert view.focusWidget() is view._search_edit
+    assert view.focusWidget() is view._search.field
 
 
 def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, monkeypatch):
@@ -2501,9 +2501,9 @@ def test_the_media_filter_sits_between_the_search_field_and_the_tree(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    column = view._search_edit.parentWidget().layout()
+    column = view._search.field.parentWidget().layout()
     order = [column.itemAt(i).widget() for i in range(column.count())]
-    assert (order.index(view._search_edit)
+    assert (order.index(view._search.field)
             < order.index(view._image_cb.parentWidget())
             < order.index(view._tree))
     assert view._image_cb.parentWidget() is view._video_cb.parentWidget()
@@ -3692,7 +3692,7 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
 
     view.refresh()
     view._poll()
-    view._on_search_sort_changed()
+    view._search._on_sort_changed()
 
     assert len(view._history._stack) == depth
 
@@ -3747,7 +3747,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     view._go_back()
 
     assert view._browser.showing_search()
-    assert view._search_edit.text() == "cat"
+    assert view._search.field.text() == "cat"
     assert view.visible_prompt_ids() == ["i1"]
 
 
@@ -3765,7 +3765,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     view._go_back()
 
     assert view._browser.showing_search()
-    assert view._search_edit.text() == "cat"
+    assert view._search.field.text() == "cat"
 
 
 def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
@@ -6015,7 +6015,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
-    assert caption.bottomLeft().y() <= view._search_edit.mapTo(view, QPoint(0, 0)).y()
+    assert caption.bottomLeft().y() <= view._search.field.mapTo(view, QPoint(0, 0)).y()
 
 
 def test_esc_stops_auto_generate(qtbot, tmp_path):
@@ -11440,7 +11440,7 @@ def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
 def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat, dog])
-    group = view._group_for_key(gallery.custom_folder_key(folder_id))
+    group = view.group_for_key(gallery.custom_folder_key(folder_id))
 
     view._remove_from_custom_folder(group, dog)
 
@@ -11454,7 +11454,7 @@ def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
     folder_id = _make_folder(view, "Keepers", [cat, dog])
     view._confirm = lambda text: True
 
-    view._remove_custom_folder(view._group_for_key(gallery.custom_folder_key(folder_id)))
+    view._remove_custom_folder(view.group_for_key(gallery.custom_folder_key(folder_id)))
 
     assert view._db.list_custom_folders() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}

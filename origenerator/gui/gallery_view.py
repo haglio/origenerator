@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+from contextlib import contextmanager
 from dataclasses import replace
 from functools import partial
 from typing import NamedTuple
@@ -66,7 +67,6 @@ from origenerator.gui import corner_controls, icons
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
-    SEARCH_DRAW_LIMIT,
     BrowserPane,
     BrowserScrollArea,
     PaneHost,
@@ -81,6 +81,7 @@ from origenerator.gui.find_bar import FindBar
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -133,7 +134,6 @@ from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.gui.motion_hud import MOTION_KEY_LEGEND, apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
-from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.orientation import (
     LANDSCAPE as _LANDSCAPE,
@@ -171,7 +171,6 @@ from origenerator.gui.reroll_prompt import (
     offer_reroll,
 )
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -662,23 +661,8 @@ class GalleryView(QWidget):
         # keystroke; the expander widens the query's words through the local LLM
         # once typing stops, and re-runs the search when its answer lands. Both
         # are built before _build_ui, whose field drives them.
-        self._search = search.GallerySearch()
-        self._search_query = ""       # what the field holds, stripped ("" = not searching)
-        self._search_expansions = None  # the widening in force for that query, if any
-        self._search_outcome = search.SearchOutcome((), ())
-        self._search_tiles: list = []   # its hits as the pane draws them
-        self._search_sort = search.SORT_RECENT
-        self._search_collapsed: set[str] = set()  # recipe bands folded shut
-        self._search_expander = search_expander or SearchExpander(self)
-        self._search_expander.expanded.connect(self._on_search_expanded)
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(_SEARCH_DELAY_MS)
-        self._search_timer.timeout.connect(self._run_pending_search)
-        self._search_expand_timer = QTimer(self)
-        self._search_expand_timer.setSingleShot(True)
-        self._search_expand_timer.setInterval(_SEARCH_EXPAND_DELAY_MS)
-        self._search_expand_timer.timeout.connect(self._request_search_expansion)
+        self._search = GallerySearchController(
+            self, parent=self, expander=search_expander)
         # The held deletions the Trash shelf lists, as gallery rows re-pointed at
         # their files in the trash — the rows under everything a deleted item can
         # still do (see :meth:`_row_for`).
@@ -695,7 +679,7 @@ class GalleryView(QWidget):
             TreeNavigation(
                 selected_folder_key=self._selected_folder_key,
                 folder_context=self._folder_context,
-                group_for_key=self._group_for_key,
+                group_for_key=self.group_for_key,
             ),
             # Each answer looks itself up through self at call time, as the
             # pane's old view reads did — so a per-instance stub (tests fake
@@ -1080,30 +1064,9 @@ class GalleryView(QWidget):
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
         toc_column.addWidget(self._voice_status)
-        # The gallery search. It sits over the tree but no longer narrows it: what
-        # it fills is the browser pane, with the matching generations themselves
-        # (see :meth:`_run_search`), because a thumbnail is what the user
-        # recognizes and a folder name — a short code — is not.
-        # Matching is by meaning rather than by letters, so "two women" reaches
-        # "a pair of dolls" and "two tall ladies" alike; a model name, a LoRA
-        # name and a seed are searchable too. Its counterpart is the find strip below
-        # the info pane, which searches *inside* the open tab's prompts.
-        self._search_edit = ScopeSearchEdit()
-        # Its placeholder names the scope — the whole path down to the selected
-        # folder — and is kept current with the tree selection
-        # (_sync_search_placeholder); this is only what it says before the first
-        # selection lands.
-        self._search_edit.set_scope(gallery.ALL_LABEL)
-        self._search_edit.setToolTip(
-            "Search every generation by what it is of — matching related words, "
-            "not just the ones you typed — or by model, LoRA, seed, or a name "
-            "you gave one of the folders holding it. The results "
-            f"fill the middle pane; nothing is searched under {_SEARCH_MIN_CHARS} "
-            "characters."
-        )
-        self._search_edit.setClearButtonEnabled(True)
-        self._search_edit.textChanged.connect(self._on_search_changed)
-        toc_column.addWidget(self._search_edit)
+        # The gallery search: its field over the tree, its results bar over the
+        # browser pane below (:mod:`origenerator.gui.gallery_search`).
+        toc_column.addWidget(self._search.field)
         # The gallery's image/video filter: two ticks saying which kinds of
         # generation the gallery is made of at all, both on so it opens showing
         # everything. It sits between the search field and the tree because it
@@ -1305,32 +1268,6 @@ class GalleryView(QWidget):
             self._toolbar_groups.append((gap, buttons))
         self._sync_toolbar_gaps()
         browser_column.addWidget(self._toolbar_host)
-        # The search results' own controls, riding under the header and appearing
-        # only while a query is running: how many
-        # items answered it, and the order they are laid out in. Recency is one
-        # question ("the one I made recently"); model + LoRA is the other ("which
-        # recipe was that"), and picking it cuts the results into a labelled band
-        # per combination rather than interleaving them.
-        self._search_count = QLabel("")
-        self._search_count.setObjectName("estimateLabel")
-        # No-wheel: it rides directly over the scrolling results, and a wheel
-        # notch that lands on it must scroll them rather than re-sort them.
-        self._search_sort_combo = NoWheelComboBox()
-        for label, mode in _SEARCH_SORTS:
-            self._search_sort_combo.addItem(label, mode)
-        self._search_sort_combo.setToolTip(
-            "Order the results: newest first, or banded under a heading per "
-            "model + LoRA combination — click a heading to fold its band away"
-        )
-        self._search_sort_combo.currentIndexChanged.connect(self._on_search_sort_changed)
-        self._search_bar = QWidget()
-        search_row = QHBoxLayout(self._search_bar)
-        search_row.setContentsMargins(0, 0, 0, 0)
-        search_row.addWidget(self._search_count)
-        search_row.addStretch(1)
-        search_row.addWidget(QLabel("Sort:"))
-        search_row.addWidget(self._search_sort_combo)
-        self._search_bar.hide()  # shown only while a search is running
         # The Experiments shelf's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header, and appears only
         # while that shelf is open.
@@ -1350,7 +1287,7 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()  # shown only on the Experiments shelf
         self._sync_experiments_bar()
         browser_column.addWidget(self._experiments_bar)
-        browser_column.addWidget(self._search_bar)
+        browser_column.addWidget(self._search.bar)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
         self._avg_label.setWordWrap(True)
@@ -1864,7 +1801,7 @@ class GalleryView(QWidget):
         return surfaces
 
 
-    def _group_for_key(self, key: str):
+    def group_for_key(self, key: str):
         """The folder ``key`` names, as the side it is being looked at holds it."""
         item = self._tree_item_for(key)
         return item.data(0, _GROUP_ROLE) if item is not None else None
@@ -2406,8 +2343,8 @@ class GalleryView(QWidget):
         # standing on the Trash shelf and searching it has to find something —
         # a deleted row is out of ``list_generations`` and lives only in the bin.
         # They are reachable only from that shelf: every other scope is a set of
-        # ids drawn from the live tree (see :meth:`_search_scope`).
-        self._search.update(listed + held, gallery.named_folders_by_row(
+        # ids drawn from the live tree (see :meth:`search_scope`).
+        self._search.index.update(listed + held, gallery.named_folders_by_row(
             tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
         # Every side is built from the rows the media filter keeps, so switching
@@ -2465,8 +2402,8 @@ class GalleryView(QWidget):
         # A search running through the rebuild takes the pane back off the folder
         # the restore above just re-drew, and re-runs against the new index — so a
         # generation that lands while a query is open joins its results.
-        if self._search_query:
-            self._run_search()
+        if self._search.query:
+            self._search.run()
         self._update_queue()
         # Re-assert the front tab's Generate-as-progress state against the live jobs.
         # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
@@ -2544,8 +2481,7 @@ class GalleryView(QWidget):
         """
         fields = self._prompt_fields()
         if not fields:
-            self._search_edit.setFocus(Qt.FocusReason.ShortcutFocusReason)
-            self._search_edit.selectAll()
+            self._search.focus_field()
             return
         self._find.set_fields(fields)
         self._find_bar.open_find()
@@ -2596,41 +2532,49 @@ class GalleryView(QWidget):
 
     # --- searching the gallery (the field over the tree) ------------------------
 
-    def _on_search_changed(self, text: str):
-        """A keystroke in the search field: line the search up, don't run it yet.
 
-        Nothing happens under three characters — one or two letters reach a large
-        fraction of any library through stemming alone, so searching them would
-        answer the first keystroke of every query with most of the gallery. Past
-        that the search waits out :data:`_SEARCH_DELAY_MS` of quiet, and the model
-        call waits out a longer one, so a word being typed doesn't churn the pane
-        it is about to fill.
-        """
-        query = (text or "").strip()
-        self._search_timer.stop()
-        self._search_expand_timer.stop()
-        if len(query) < _SEARCH_MIN_CHARS:
-            if self._search_query:
-                self._exit_search()
-            self._search_query = ""
-            return
-        if query != self._search_query:
-            self._search_expansions = None  # last query's widening isn't this one's
-        self._search_query = query
-        self._search_timer.start()
-        self._search_expand_timer.start()
+    def image_config_index(self) -> dict:
+        """The index a folder key is derived against — rebuilt from the image
+        rows, which change only on a rebuild."""
+        return gallery.build_image_config_index(self._image_rows)
 
-    def _run_pending_search(self):
-        """Typing has paused: run the standing query and draw it."""
-        if not self._search_query:
-            return
-        # The cache is consulted, never asked: a query the expander has already
-        # answered (re-typed, or reached again by backspacing) is smart from the
-        # first draw, and one it hasn't waits for _request_search_expansion.
-        self._search_expansions = self._search_expander.cached(self._search_query)
-        self._run_search()
+    def name_search_on_screen(self, query: str, scope: str) -> None:
+        """Say in the header that a search is what the pane is showing, in place
+        of the folder that was there."""
+        self._title.set_display(f"Search: “{query}” in {scope}")
+        self._title.setToolTip("")  # the header is the query now, not a folder
+        self._avg_label.setText("")
+        self._experiments_bar.hide()
 
-    def _search_scope(self) -> _SearchScope:
+    def show_search_results(self, tiles, **terms) -> None:
+        self._browser.show_search_results(tiles, **terms)
+
+    def search_results_drawn(self) -> None:
+        """Results are up: the buttons that fit what the pane holds are re-read,
+        and the pane is somewhere Back returns to — including from a hit opened
+        out of it."""
+        self._sync_slideshow_button()   # a search's hits are playable, like a shelf's
+        self._sync_auto_button()
+        self._sync_enhance_button()
+        self._sync_delete_button()
+        self._record_location()
+
+    def hand_pane_back(self) -> None:
+        """The search is over: the pane belongs to the selected folder again."""
+        self._on_folder_selected(self._tree.currentItem(), None)
+
+    @contextmanager
+    def suppress_history(self):
+        """Hold the history still for a move that is a step on the way rather
+        than somewhere the user went."""
+        recording = self._suppress_history
+        self._suppress_history = True
+        try:
+            yield
+        finally:
+            self._suppress_history = recording
+
+    def search_scope(self) -> _SearchScope:
         """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A shelf
@@ -2664,180 +2608,17 @@ class GalleryView(QWidget):
         return _SearchScope(self._tree_view.breadcrumb(item),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
-    def _sync_search_placeholder(self):
-        """Say in the empty field what a query typed there would search, so the
-        scope is visible before there is a header or a result to name it.
 
-        The whole path goes in; the field shows as much of its tail as it is wide
-        enough for (:class:`ScopeSearchEdit`)."""
-        self._search_edit.set_scope(self._search_scope().path)
 
-    def _run_search(self):
-        """Fill the browser pane with what the standing query matches, within the
-        folder the tree has selected.
 
-        Takes the pane over from that folder — the tree keeps its selection while
-        a search runs, because the selection is the *scope*: picking another
-        folder re-asks the question there rather than ending it, and clearing the
-        field hands the pane straight back to wherever you had got to.
-        """
-        scope = self._search_scope()
-        self._search_outcome = self._search.search(
-            self._search_query, expansions=self._search_expansions, within=scope.ids
-        )
-        self._search_tiles = self._collapse_to_folders(self._search_outcome.results)
-        self._title.set_display(f"Search: “{self._search_query}” in {scope.path}")
-        self._title.setToolTip("")  # the header is the query now, not a folder
-        self._avg_label.setText("")
-        self._experiments_bar.hide()
-        self._search_count.setText(self._search_count_text())
-        self._search_bar.show()
-        self._browser.show_search_results(
-            self._search_tiles, sort_mode=self._search_sort,
-            query=self._search_query, outcome=self._search_outcome,
-            scope=scope.path, collapsed=self._search_collapsed,
-            on_section_toggled=self._on_search_section_toggled,
-        )
-        self._sync_slideshow_button()   # a search's hits are playable, like a shelf's
-        self._sync_auto_button()
-        self._sync_enhance_button()
-        self._sync_delete_button()
-        # Results are what the pane is showing, so they are somewhere Back returns
-        # to — including from a hit that was opened out of them.
-        self._record_location()
-
-    def _collapse_to_folders(self, results) -> list:
-        """The hits as tiles: a folder wherever one answered with several items.
-
-        Every row in a settings folder shares a prompt and settings and differs
-        only by seed, so a prompt match hits all of them — and drawing eight
-        near-copies of one picture buries the other places the query reached.
-        The folder stands for them instead, and a folder's lone hit stays itself.
-        Order is by first hit, so the newest thing found still leads.
-
-        A folder the tree has no row for (a hit whose folder the current model
-        doesn't hold) falls back to its own items rather than vanishing.
-        """
-        image_index = gallery.build_image_config_index(self._image_rows)
-        by_folder: dict[str, list] = {}
-        for result in results:
-            key = gallery.settings_folder_key(result.row, image_index)
-            by_folder.setdefault(key, []).append(result.row)
-        tiles = []
-        for key, rows in by_folder.items():
-            group = self._group_for_key(key) if len(rows) > 1 else None
-            if group is not None:
-                tiles.append(search.SearchTile(row=rows[0], group=group, rows=list(rows)))
-            else:
-                tiles.extend(search.SearchTile(row=row, rows=[row]) for row in rows)
-        return tiles
-
-    def _on_search_section_toggled(self, heading: str, collapsed: bool):
-        """Remember a recipe band's fold state, so a redraw — a rebuild, a landing
-        generation, a widening — doesn't spring open the bands you shut."""
-        if collapsed:
-            self._search_collapsed.add(heading)
-        else:
-            self._search_collapsed.discard(heading)
-
-    def _search_count_text(self) -> str:
-        """How many the query found — and, past what the pane will draw at once,
-        that it is showing a slice and what to do about it. A capped search that
-        said only "2,000 results" would read as 2,000 tiles you could scroll to.
-
-        Counted in tiles, which is what is on screen: a folder standing for its
-        eight seed variants is one result to click, not eight."""
-        count = len(self._search_tiles)
-        text = f"{count:,} result{'s' if count != 1 else ''}"
-        if count > SEARCH_DRAW_LIMIT:
-            text += (f" — showing the newest {SEARCH_DRAW_LIMIT}; "
-                     "add a word to narrow it")
-        return text
-
-    def _exit_search(self):
-        """Put the search away and give the pane back to the selected folder."""
-        self._clear_search_state()
-        self._on_folder_selected(self._tree.currentItem(), None)
-
-    def _clear_search_state(self):
-        """Forget the running query, its results and its bar — the state half of
-        leaving a search, with nothing drawn. Split out because a Back onto a stop
-        that had no search must clear the same state without redrawing the pane
-        twice: :meth:`_restore_location` fills it itself."""
-        self._search_query = ""
-        self._search_expansions = None
-        self._search_outcome = search.SearchOutcome((), ())
-        self._search_tiles = []
-        self._search_timer.stop()
-        self._search_expand_timer.stop()
-        self._search_bar.hide()
-
-    def _leave_search(self, *_args):
-        """Clear the field, if a search is running — what navigating away means.
-
-        This is for gestures that go *to* a result: opening a hit's folder, or
-        following a link out of one. Picking a folder in the tree is not one of
-        them — that re-scopes the search (see :meth:`_on_folder_selected`).
-
-        Takes and ignores whatever the caller passes, so it can be wired straight
-        to those gestures. Clearing the field is what actually ends the search: its
-        ``textChanged`` runs :meth:`_exit_search`, so there is one path out
-        rather than two.
-
-        Off the history, because the folder the field hands the pane back to is a
-        step on the way rather than anywhere the user went: the caller records the
-        result it is opening. Recorded, it would sit between the results and that
-        result, and Back out of a hit would land on a folder instead of on the
-        hits it came from.
-        """
-        if not self._search_query:
-            return
-        recording = self._suppress_history
-        self._suppress_history = True
-        try:
-            self._search_edit.clear()
-        finally:
-            self._suppress_history = recording
-
-    def _on_search_sort_changed(self, _index=0):
-        """Re-lay the results in the newly picked order (a no-op off a search)."""
-        self._search_sort = self._search_sort_combo.currentData() or search.SORT_RECENT
-        if self._search_query:
-            self._run_search()
-
-    def _request_search_expansion(self):
-        """Typing has stopped: ask the local LLM to widen this query's words.
-
-        Nothing is awaited — :meth:`_on_search_expanded` re-runs the search if and
-        when an answer lands, and the table-widened results the user is already
-        looking at stand if one never does.
-        """
-        if self._search_query:
-            self._search_expander.request(self._search_query)
-
-    def _on_search_expanded(self, query: str, expansions):
-        """A widened vocabulary came back: re-run the search on it.
-
-        Only for the query still in the field — a slow answer can land after the
-        user has typed on, and widening results for a query they are no longer
-        running would put items on screen they cannot account for. An empty
-        answer (the endpoint down, or nothing to add) changes nothing, so it
-        doesn't redraw the pane out from under them either.
-        """
-        if expansions and query == self._search_query:
-            self._search_expansions = expansions
-            self._run_search()
 
     def search_sort(self) -> str:
         """The results order in force, for the session state to remember."""
-        return self._search_sort
+        return self._search.sort()
 
     def set_search_sort(self, mode: str | None):
-        """Restore the remembered results order (ignoring anything unrecognized,
-        so a state file from a version that offered a different one still opens)."""
-        index = self._search_sort_combo.findData(mode)
-        if index >= 0:
-            self._search_sort_combo.setCurrentIndex(index)  # its signal sets the mode
+        """Restore the remembered results order."""
+        self._search.set_sort(mode)
 
     def _showing_search(self) -> bool:
         return self._browser.showing_search()
@@ -2845,13 +2626,13 @@ class GalleryView(QWidget):
     def _on_folder_selected(self, current, _previous):
         if self._selection_group is not None:
             return  # a multi-selection owns the panes; the current row is one of many
-        self._sync_search_placeholder()  # the field says what it would search now
+        self._search.sync_placeholder()  # the field says what it would search now
         # A folder picked while a search is running is a new *scope*, not an exit:
         # the same question, asked of somewhere else. Suppressed during a rebuild's
         # restore, where the tree is re-selecting itself and _rebuild re-runs the
         # search once at the end rather than once per step of the restore.
-        if self._search_query and not self._suppress_history:
-            self._run_search()
+        if self._search.query and not self._suppress_history:
+            self._search.run()
             return
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
         self._sync_slideshow_button()  # the slideshow fits any folder holding media
@@ -2938,7 +2719,7 @@ class GalleryView(QWidget):
         folder it drilled into."""
         item = self._tree_item_for(key)
         if item is not None:
-            self._leave_search()
+            self._search.leave()
             self._tree.setCurrentItem(item)
 
     # --- several folders at once: the folder they would make ------------------
@@ -2965,7 +2746,7 @@ class GalleryView(QWidget):
         a grouping, which the tree has nowhere to draw."""
         return [
             group for key in self._tree.selected_folder_keys()
-            if (group := self._group_for_key(key)) is not None
+            if (group := self.group_for_key(key)) is not None
             and not isinstance(group, gallery.CustomGroup)
         ]
 
@@ -3046,7 +2827,7 @@ class GalleryView(QWidget):
     def _on_folders_dropped(self, target_key: str, keys: list):
         """Folders dragged onto a collecting row: Starred stars them (the drag-and-
         drop way to bookmark), a custom folder gathers them."""
-        groups = [g for key in keys if (g := self._group_for_key(key)) is not None]
+        groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _STARRED_KEY:
             for group in groups:
                 self._db.set_folder_starred(group.key, True)
@@ -3086,7 +2867,7 @@ class GalleryView(QWidget):
 
     def _remove_from_custom_folder(self, group, item_key: str):
         """Drop one gathered folder out of the custom folder on screen."""
-        item = self._group_for_key(item_key)
+        item = self.group_for_key(item_key)
         identity = self._item_identity(item) if item is not None else (item_key, None, None)
         self._actions.remove_from_custom_folder(
             group.folder_id, item_key, level=identity[1], ref_prompt_id=identity[2]
@@ -3516,7 +3297,7 @@ class GalleryView(QWidget):
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
             self._reroll.start_prepared(key, working["workflow"], params)
         else:
-            self._reroll.start(key, self._group_for_key(key), self._image_rows)
+            self._reroll.start(key, self.group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         if not from_auto:
             # A no-op if the launch above failed to register. The tile is lit and
@@ -3589,7 +3370,7 @@ class GalleryView(QWidget):
         folder the user has navigated to since is not the one to capture.
         """
         group = (self._current_group() if key == self._selected_folder_key()
-                 else self._group_for_key(key))
+                 else self.group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
         workflow = WORKFLOW_REGISTRY.get(group.rows[0].get("workflow_name") or "")
@@ -5145,7 +4926,7 @@ class GalleryView(QWidget):
         rows = self._browser.rows_for_shelf(location)
         if rows is not None:
             return rows
-        group = self._group_for_key(location)
+        group = self.group_for_key(location)
         return gallery.rows_under(group) if group is not None else []
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
@@ -6217,7 +5998,7 @@ class GalleryView(QWidget):
         folder — so the click landed on the row and the wall of results stayed
         up, which reads as the click doing nothing at all.
         """
-        self._leave_search()
+        self._search.leave()
         item = self._tree_item_for(key)
         if item is None:
             # A folder the tree has not drawn yet: the first run in a brand-new
@@ -7108,7 +6889,7 @@ class GalleryView(QWidget):
             self._group_selection()
 
     def _folder_context_menu(self, key: str, global_pos: QPoint):
-        group = self._group_for_key(key)
+        group = self.group_for_key(key)
         if group is None:
             return
         if isinstance(group, gallery.CustomGroup):
@@ -7171,7 +6952,7 @@ class GalleryView(QWidget):
             self._remove_custom_folder(group)
 
     def _rename_folder(self, key: str):
-        group = self._group_for_key(key)
+        group = self.group_for_key(key)
         current = group.label if group is not None else ""
         # A derived folder's name is an overlay over the one its settings produce,
         # so blank resets it; a custom folder's name is all it has, so it can't.
@@ -7242,13 +7023,13 @@ class GalleryView(QWidget):
     def _toggle_star(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,
         # so starring it on one is starring it.
-        group = self._group_for_key(key)
+        group = self.group_for_key(key)
         self._db.set_folder_starred(_base_of(key), not bool(group and group.starred))
         self.refresh()
 
     def _delete_folder_by_key(self, key: str):
         """Delete the folder a hover-row trash click names."""
-        group = self._group_for_key(key)
+        group = self.group_for_key(key)
         if group is not None:
             self._delete_folder(group)
 
@@ -7331,7 +7112,7 @@ class GalleryView(QWidget):
         opens is drawn straight over by the results the link was clicked among.
         The going itself is the one move every other gesture makes.
         """
-        self._leave_search()
+        self._search.leave()
         self._go_to_generation(prompt_id)
 
     def _go_to_generation(self, prompt_id: str):
@@ -7418,7 +7199,7 @@ class GalleryView(QWidget):
         item = self._selected["prompt_id"] if self._selected else None
         if item is not None and item not in self._browser.visible_prompt_ids():
             item = None  # left by the pane this one replaced
-        return Location(view, self._search_query, item)
+        return Location(view, self._search.query, item)
 
     def _record_location(self, item: str | None = None):
         """Record what the middle pane now shows: the folder or shelf the tree has
@@ -7434,7 +7215,7 @@ class GalleryView(QWidget):
         view = self._selected_folder_key()
         if view is None:
             return  # nothing open: no view to come back to
-        location = Location(view, self._search_query, item)
+        location = Location(view, self._search.query, item)
         current = self._history.current()
         if self._redrawing_the_same_search(location, current):
             # A search results pane redraws for reasons that are not navigations —
@@ -7482,7 +7263,7 @@ class GalleryView(QWidget):
         """
         self._suppress_history = True
         try:
-            self._restore_query(location.query)
+            self._search.restore(location.query)
             # _tree_item_for rather than a bare lookup: a stop recorded before the
             # tree grew sides names a folder key with no side on it, and that key
             # still has to find its row.
@@ -7499,7 +7280,7 @@ class GalleryView(QWidget):
             else:
                 self._tree.setCurrentItem(row)  # whose signal draws it
             if location.query:
-                self._run_search()  # which takes the pane back off the folder again
+                self._search.run()  # which takes the pane back off the folder again
             if location.item is not None:
                 self._reveal_in_pane(location.item)
             else:
@@ -7510,23 +7291,6 @@ class GalleryView(QWidget):
         finally:
             self._suppress_history = False
 
-    def _restore_query(self, query: str):
-        """Put the search field back to what it held at a history stop.
-
-        Set without its typing signals: those debounce and re-run, which would
-        answer a restore with a search a beat later, over whatever the restore had
-        by then moved on to. The expander's cache is consulted so a query that was
-        widened comes back widened, and one it never answered comes back anyway.
-        """
-        self._search_edit.blockSignals(True)
-        try:
-            self._search_edit.setText(query)
-        finally:
-            self._search_edit.blockSignals(False)
-        self._clear_search_state()
-        self._search_query = query
-        if query:
-            self._search_expansions = self._search_expander.cached(query)
 
     def _reveal_in_pane(self, prompt_id: str):
         """Land on an item the pane is already showing: its tile picked and

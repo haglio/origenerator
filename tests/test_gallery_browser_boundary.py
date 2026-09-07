@@ -85,14 +85,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     This is the number the audit said to gate (Q14): the god object measured
     368 methods, and a class this size only ever grows quietly. Shrink it and
     the gate shrinks with you, in the same commit; grow it and this fails,
-    which is the gate doing its job. (380: the hosted-app, room-key, tab and show work that landed on main
-    while this gate was in flight added eight and the merge kept two of the
-    old ones out; the card menus and the enhancement cancel added three, and
-    the in-flight card's menu one to the pane; three more read what a waiting
-    run was made from, so every surface standing for it stands the same pair.
-    80: dropping the trash's retention window took the pane's two countdown
-    helpers with it.)"""
+    which is the gate doing its job. (380 → 372: the search came out as
+    `GallerySearchController`, taking fourteen methods with it and adding six —
+    the five the controller asks of its host, and the history guard those
+    needed. 80: dropping the trash's retention window took the pane's two
+    countdown helpers with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 380
+               for x in _class_def(VIEW, "GalleryView").body) == 372
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 80

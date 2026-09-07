@@ -104,6 +104,26 @@ def test_proposes_nothing_with_no_eligible_rows():
     assert policy.propose(ineligible) is None
 
 
+def test_machinery_is_never_an_experiment_base_whatever_it_is_called():
+    # An enhance is a derivative of a generation, not a recipe worth exploring:
+    # mutating one just re-enhances an existing image. The rule was written as
+    # the one machinery workflow's name, which is the only place in the source
+    # tree that spelled it -- so a second machinery workflow would silently have
+    # become an experiment base, and a rename would have left the guard matching
+    # nothing. The app already models it as `selectable`, which is what the
+    # Generate form's picker reads.
+    machinery = FakeWorkflow()
+    machinery.name = "machine_only"
+    machinery.selectable = False
+    policy = ExperimentPolicy(
+        registry={**REGISTRY, "machine_only": machinery}, rng=random.Random(0))
+
+    only_machinery = [make_row("m-1", workflow_name="machine_only")]
+
+    assert policy.propose(only_machinery) is None
+    assert policy.propose([*only_machinery, make_row("ok-1")]).base_prompt_id == "ok-1"
+
+
 def test_mutated_values_respect_the_dimension_contract():
     base = make_row("base-1")
     policy = make_policy(seed=3)

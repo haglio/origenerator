@@ -18,6 +18,7 @@ out the other's render, both crawling, and the voice steering (which follows the
 loop) with two prompts to answer to. So turning it on somewhere new is also how
 it is turned off where it was.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 

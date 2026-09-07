@@ -1,4 +1,5 @@
 """AutoGenerateController — the gallery re-roll on a loop until stopped."""
+from __future__ import annotations
 
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 

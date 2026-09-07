@@ -27,6 +27,7 @@ row it will run under), so a queue held overnight is still there after a restart
 ones — and so the app closing can hand ComfyUI everything left
 (:meth:`flush_to_server`) rather than take it to the grave.
 """
+from __future__ import annotations
 
 import json
 import logging

@@ -15,6 +15,7 @@ cannot list a folder without answering the question — the call fails outright
 rather than quietly offering everything, which is the failure this exists to
 prevent. :data:`ANY` is the way to say a category genuinely takes anything.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

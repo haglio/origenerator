@@ -10,6 +10,7 @@ picture block, and the pane a combination opens in — draws it through here.
 Alpha is carried across rather than flattened, so a picture with a cut-out edge
 stays cut out instead of gaining a gray square around it.
 """
+from __future__ import annotations
 
 from PyQt6.QtGui import QImage, QPainter, QPixmap
 

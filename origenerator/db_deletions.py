@@ -10,6 +10,8 @@ record goes away when the item is restored or purged, and not otherwise —
 nothing here ages out; the generations row itself is gone the moment it is
 deleted, which is why the row travels here rather than staying gated by a flag.
 """
+from __future__ import annotations
+
 import json
 
 from origenerator.db_connection import Store

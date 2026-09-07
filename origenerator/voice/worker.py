@@ -6,6 +6,7 @@ the pipeline unit-tests inline. :class:`ProcessTask` runs one such call on the
 global thread pool; the worker's signals carry the result back to the UI thread
 that owns it.
 """
+from __future__ import annotations
 
 import logging
 

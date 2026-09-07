@@ -4,6 +4,7 @@ Fun Time speaks to its satellite players through a command file, a paused
 flag and a status file; a hosted Origenerator answers the same idioms so the
 session's hotkeys reach the region shows and its choreography can see them.
 """
+from __future__ import annotations
 
 from PIL import Image
 

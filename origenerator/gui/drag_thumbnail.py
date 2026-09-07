@@ -12,6 +12,7 @@ whole preview pane.
 So the sources ask here instead, and a drag looks the same wherever it started:
 one size, and nothing shown for the one case with genuinely no picture to show.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap

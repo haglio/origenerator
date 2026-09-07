@@ -4,6 +4,7 @@ A prompt graph is ``{node_id: {"class_type": str, "inputs": {...}}}`` where an
 input can be a link ``[source_node_id, slot]``. The importer uses these helpers
 to locate the prompt and conditioning nodes when reading a graph's metadata.
 """
+from __future__ import annotations
 
 _COND_NODES = ("WanImageToVideo", "WanFirstLastFrameToVideo")
 

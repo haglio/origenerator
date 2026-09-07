@@ -14,6 +14,7 @@ lettered: this is a picture of a folder, not a sheet to read filenames off.
 Both grid functions are pure, so how the wall lays out is testable without a
 screen.
 """
+from __future__ import annotations
 
 import math
 from pathlib import Path

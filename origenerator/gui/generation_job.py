@@ -13,6 +13,7 @@ what lets the queue order and gate its own line (see
 :mod:`origenerator.queue_line`) rather than take whatever order the server's
 queue happens to have.
 """
+from __future__ import annotations
 
 import json
 import logging

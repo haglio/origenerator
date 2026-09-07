@@ -18,6 +18,7 @@ reads like is one wording, shared by every surface that has to say it — as is
 away, which three panes each draw, and :func:`stop_loop_text`, the menu entry
 beside it that ends the loop as well as the run.
 """
+from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass

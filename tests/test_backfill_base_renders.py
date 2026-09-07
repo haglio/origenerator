@@ -6,6 +6,7 @@ that pass made, and attaching it gives the row the ``Original`` / ``Enhance 1``
 pair it should have had. The work rides the absence the background experimenter
 uses, since it is a full render per row and there are a great many of them.
 """
+from __future__ import annotations
 
 import json
 

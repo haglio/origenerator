@@ -1,4 +1,5 @@
 """An editable picker of common numeric values that still takes any typed one."""
+from __future__ import annotations
 
 import re
 

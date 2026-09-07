@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_on, format_position
 
 

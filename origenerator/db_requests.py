@@ -16,6 +16,8 @@ nothing heard and no single term -- it says what it wanted by rewriting the
 prompt, which the old/new pair holds -- so `heard` is empty there and
 `term`/`polarity`/`action` are unset.
 """
+from __future__ import annotations
+
 from origenerator.db_connection import Store
 
 

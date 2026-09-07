@@ -4,6 +4,7 @@ The apply callable is injected, so the flow runs inline with no model and no
 server; what is under test is that a result comes back with its context and that
 a failure is answered rather than raised.
 """
+from __future__ import annotations
 
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 

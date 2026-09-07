@@ -6,6 +6,7 @@ Overlay-fed parts are exercised with the same fabricated placeholders the
 committed content example uses — the real vocabulary is library content and
 never appears in these repos.
 """
+from __future__ import annotations
 
 import pytest
 

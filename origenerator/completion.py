@@ -6,6 +6,7 @@ history: the output files, a thumbnail for them, and how long the run took.
 Defining that once here keeps those paths from drifting apart, and keeps it
 Qt-free so the reconciler can use it without a running UI.
 """
+from __future__ import annotations
 
 import logging
 from pathlib import Path

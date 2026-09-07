@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
     NATIVE_FPS,

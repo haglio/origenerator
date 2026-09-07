@@ -21,6 +21,7 @@ not the result.
 Both pictures are square-fit into whatever height the pane has, side by side, so
 the pair reads as one line of arithmetic at any size the pane is dragged to.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

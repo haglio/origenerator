@@ -8,6 +8,7 @@ running app from its poll timer and then killed every relaunch while the gallery
 was still being built. These tests reproduce that shape of damage and pin the
 behavior that answers it: open what is readable, keep the damaged file, carry on.
 """
+from __future__ import annotations
 
 import shutil
 import sqlite3

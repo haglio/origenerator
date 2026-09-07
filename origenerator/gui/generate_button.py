@@ -16,6 +16,7 @@ Its resting caption is the panel's to set: settings that would re-create a past
 generation exactly make the press draw a fresh seed instead, and the button says
 so ("Generate with Random seed") rather than a dialog asking after the click.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QPushButton

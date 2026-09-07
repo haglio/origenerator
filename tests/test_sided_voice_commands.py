@@ -10,6 +10,7 @@ Everything this does NOT match falls through to a prompt rewrite, so the
 misses matter as much as the hits — a sentence mentioning a shelf is a prompt
 edit, not an order to play it.
 """
+from __future__ import annotations
 
 import pytest
 

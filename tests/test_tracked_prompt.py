@@ -1,4 +1,5 @@
 """A prompt field showing what is being typed into it as a change to what it said."""
+from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import Qt, QTimer

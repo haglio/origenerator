@@ -1,4 +1,5 @@
 """The generation drag payload every drag source builds and each drop slot reads."""
+from __future__ import annotations
 
 from origenerator.gui import generation_drag
 

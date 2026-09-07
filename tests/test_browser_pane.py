@@ -10,6 +10,8 @@ its selection model, its shelves, and what each shelf collects.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import json
 
 from PyQt6.QtCore import Qt

@@ -10,6 +10,7 @@ The REST half is :mod:`origenerator.comfyui_api`, which needs no Qt at all;
 already has a client is unaffected and one that needs only HTTP can take the api
 instead.
 """
+from __future__ import annotations
 
 import asyncio
 import json

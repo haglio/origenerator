@@ -5,6 +5,7 @@ its own ✕. Controls only — it holds no matches and touches no prompt; what i
 drives is a :class:`~origenerator.gui.prompt_find.PromptFind`, which the gallery
 view wires to it.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (

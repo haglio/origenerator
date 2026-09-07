@@ -25,6 +25,7 @@ denoise, one the whole-frame pass could never survive; it is one of the settings
 level records, so an image can carry both a plain enhancement and a detail-fixed
 one and show which is which.
 """
+from __future__ import annotations
 
 import json
 import logging

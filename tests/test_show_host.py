@@ -7,6 +7,7 @@ attribute names as strings, sixteen times over three modules, and the three did
 not agree about what a host must provide. These pin the interface itself, both
 of its implementors, and the fact that nothing probes for it any more.
 """
+from __future__ import annotations
 
 import ast
 from pathlib import Path

@@ -20,6 +20,7 @@ front for the same reason the fix commands do it (see
 :mod:`origenerator.workflows.detail_parts`): off a quiet mic a short imperative
 comes back mangled, and telling whisper what to expect is what makes it land.
 """
+from __future__ import annotations
 
 import re
 from enum import Enum

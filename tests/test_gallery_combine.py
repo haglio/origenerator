@@ -1,4 +1,5 @@
 """Pure logic for combining a gallery image + a video's recipe into new params."""
+from __future__ import annotations
 
 import json
 

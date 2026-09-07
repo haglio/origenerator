@@ -34,6 +34,7 @@ It opens about four rows tall — the strip's own height plus the couple of rows
 the main window gets by dragging its handle, which is not a gesture there is
 anywhere to make here.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QWidget

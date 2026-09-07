@@ -27,6 +27,7 @@ unchanged, and a request whose wording can't be read at all comes back as
 Everything but that one function is pure and Qt-free, so the whole policy
 unit-tests without a model or a server.
 """
+from __future__ import annotations
 
 import json
 import logging

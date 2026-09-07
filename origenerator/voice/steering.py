@@ -31,6 +31,7 @@ dictation is back in front, because a command word said mid-sentence belongs to
 the sentence.
 
 """
+from __future__ import annotations
 
 import logging
 import threading

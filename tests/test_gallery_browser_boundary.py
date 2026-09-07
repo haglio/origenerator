@@ -15,6 +15,8 @@ to hide in. A commit that moves a number says so, in the same commit.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import ast
 import re
 from pathlib import Path

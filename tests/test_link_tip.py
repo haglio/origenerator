@@ -1,4 +1,5 @@
 """LinkTip — a tooltip you can click into."""
+from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QEnterEvent

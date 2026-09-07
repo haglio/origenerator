@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.duration import frames_for_seconds, seconds_for_frames
 

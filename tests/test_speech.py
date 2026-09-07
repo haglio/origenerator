@@ -1,4 +1,5 @@
 """Her lines, spoken: which files a story's scenes need and how they are made."""
+from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace

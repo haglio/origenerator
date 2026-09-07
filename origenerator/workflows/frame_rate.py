@@ -16,6 +16,7 @@ at 24 fps plays 1.5x fast. So every rate offered is a multiple, and a typed one
 lands on the nearest (:func:`playback_rate`), up to the ceiling the video writer
 itself imposes (:data:`MAX_PLAYBACK_FPS`).
 """
+from __future__ import annotations
 
 #: Frames per second the models pace their motion at. Both WAN 2.1 and 2.2 were
 #: trained at this rate, and it is the rate every clip is generated at.

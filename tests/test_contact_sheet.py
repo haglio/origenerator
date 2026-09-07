@@ -1,4 +1,5 @@
 """The wall of a folder's pictures that fills a rewrite tab's preview."""
+from __future__ import annotations
 
 from PIL import Image
 

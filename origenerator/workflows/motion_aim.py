@@ -18,6 +18,7 @@ unavailable, nothing detected) returns ``None`` and the caller falls back to
 its manual numbers — auto-aim must never be the reason a generation can't
 build.
 """
+from __future__ import annotations
 
 import logging
 from functools import lru_cache

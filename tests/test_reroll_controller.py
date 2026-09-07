@@ -1,4 +1,5 @@
 """RerollController — launching re-roll jobs: whole-folder, per-seed, and combine."""
+from __future__ import annotations
 
 import json
 import threading

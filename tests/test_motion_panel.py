@@ -4,6 +4,7 @@ The console is player_core's and tested there. What this covers is the two
 things that are this app's: that the picture really is that console (not a
 lookalike), and that each command it posts reaches the right thing here.
 """
+from __future__ import annotations
 
 from player_core import wave_stack
 from player_core.console import console_rows

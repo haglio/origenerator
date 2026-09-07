@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.config import CUSTOM_POSES_DIR
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS,

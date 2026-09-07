@@ -3,6 +3,7 @@
 An injected listener (a fake mic) and an inline worker (faked transcribe/rewrite)
 drive the whole flow synchronously, without audio, a model, or a server.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 

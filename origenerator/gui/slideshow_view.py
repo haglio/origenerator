@@ -86,6 +86,7 @@ stills; a clip that carries a funscript instead offers itself as an
 :meth:`osr2_drive_target`. Being the deliberate foreground view, it plays sound
 — the inline preview stays muted.
 """
+from __future__ import annotations
 
 import logging
 

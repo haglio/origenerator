@@ -1,4 +1,5 @@
 """Draining the color out of a picture shown only for what it configures."""
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QImage, QPixmap

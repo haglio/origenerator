@@ -17,6 +17,7 @@ The state rides on the widget itself (a Qt property and a parented watcher)
 rather than in a table here: a field outlives nothing, and a table keyed by
 widget would hold every form the app ever built.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor

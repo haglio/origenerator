@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import list_model_files

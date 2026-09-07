@@ -5,6 +5,7 @@ below, a ``QFormLayout`` callers fill with ``label: field`` rows. Used by
 :class:`~origenerator.gui.param_form.ParamForm` to group a workflow's params
 into the sections defined in :mod:`origenerator.gui.param_sections`.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QFormLayout, QVBoxLayout, QWidget

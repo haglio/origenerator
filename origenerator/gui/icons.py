@@ -27,6 +27,7 @@ says which state the item is in, and pressing it is what changes that state.
 borrowed from the live style, so a button that closes tabs wears the very ✕ the
 tabs themselves do.
 """
+from __future__ import annotations
 
 from functools import cache
 

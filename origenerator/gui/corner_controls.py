@@ -19,6 +19,7 @@ hover-revealed. Each reacts to the cursor on ITSELF and to nothing else, so
 which one you are about to press is answered by the one that lit, not by a set
 that appeared when you crossed the tile.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import QPushButton, QWidget

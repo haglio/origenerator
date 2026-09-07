@@ -1,4 +1,5 @@
 """The queue's rules: where a job joins the line, and which one may start."""
+from __future__ import annotations
 
 from types import SimpleNamespace
 

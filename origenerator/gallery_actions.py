@@ -21,6 +21,7 @@ and the bin — restored or ended from the gallery's Trash shelf, through
 :meth:`GalleryActions.restore_deleted` and :meth:`GalleryActions.purge_deleted` —
 is the slow one.
 """
+from __future__ import annotations
 
 import logging
 from collections.abc import Callable

@@ -3,6 +3,7 @@
 Invented prompts throughout; what is under test is the marking and, above all,
 that the field's *value* stays the prompt that would generate.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QTextCursor

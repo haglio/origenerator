@@ -1,4 +1,5 @@
 """A job whose story has lines speaks them before it is sent."""
+from __future__ import annotations
 
 import sys
 import threading

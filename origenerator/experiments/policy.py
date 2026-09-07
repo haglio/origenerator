@@ -13,6 +13,7 @@ Deliberately deterministic machinery (no LLM): everything is derived from
 gallery rows and ``param_definitions``, so it works offline and is unit-testable
 with an injected RNG.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 

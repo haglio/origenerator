@@ -18,6 +18,7 @@ glance is one worth naming — every folder here can be renamed in place
 (:meth:`origenerator.db.Database.rename_folder`), which is the whole point of a
 name that starts out generic.
 """
+from __future__ import annotations
 
 import hashlib
 

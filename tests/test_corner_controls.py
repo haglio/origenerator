@@ -1,4 +1,5 @@
 """The three controls a generation's picture wears in its own corners."""
+from __future__ import annotations
 
 import json
 

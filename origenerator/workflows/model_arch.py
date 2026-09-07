@@ -21,6 +21,7 @@ tell", and every caller keeps those. Leaving in an option that turns out not to
 work costs a failed submit; dropping a model that works hides it with no way for
 the user to know why.
 """
+from __future__ import annotations
 
 import json
 import re

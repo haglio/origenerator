@@ -8,6 +8,7 @@ user picks — without touching a Generate tab. The recipe is either a past vide
 overlay's hand-tuned spec for an act (:func:`curated_params`, seeds re-rolled —
 there is no past run to reproduce). Qt-free so it stays unit-testable.
 """
+from __future__ import annotations
 
 from origenerator.content import load_content
 from origenerator.gallery.output import output_file_reference, row_output_files

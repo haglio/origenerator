@@ -5,6 +5,7 @@ built from, and the videos an image was animated into — fed one row at a time.
 They were two attributes and two methods on the config panel, which has a dozen
 other things to be about; here they are one widget answering one question.
 """
+from __future__ import annotations
 
 import logging
 

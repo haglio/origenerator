@@ -4,6 +4,7 @@ Two commands share one mic, so the matcher has to keep them apart and keep both
 away from prompt steering — everything it does not match is rewritten into the
 prompt instead, which is why a loose match would be worse than a miss.
 """
+from __future__ import annotations
 
 from origenerator import gallery
 from origenerator.gallery import voice_commands

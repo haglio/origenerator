@@ -1,4 +1,5 @@
 """Custom folders: the pure grouping model, and the storage under it."""
+from __future__ import annotations
 
 import json
 

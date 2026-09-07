@@ -7,6 +7,7 @@ prompt, "more"/"less" adjust ``(term:weight)`` emphasis — driven by the system
 prompt in ``config``. Message-building and JSON-parsing are split out as pure
 functions so the request shape can be unit-tested without a server.
 """
+from __future__ import annotations
 
 import json
 import urllib.request

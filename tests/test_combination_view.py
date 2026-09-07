@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtCore import QSize
 
 from origenerator.gui.combination_view import combination_pixmap

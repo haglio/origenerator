@@ -1,4 +1,5 @@
 """The gallery search's matching layer, with no Qt and no network in sight."""
+from __future__ import annotations
 
 import json
 

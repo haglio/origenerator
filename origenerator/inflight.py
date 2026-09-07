@@ -21,6 +21,7 @@ this but the word. What it needs is the REST surface --
 :class:`~origenerator.comfyui_api.ComfyUIApi`, which loads no Qt -- and a
 ``ComfyUIClient`` forwards every call of it, so either can be handed in.
 """
+from __future__ import annotations
 
 import json
 import logging

@@ -1,4 +1,5 @@
 """The app icon follows the family's icon spec, and is what icon_design renders."""
+from __future__ import annotations
 
 from PIL import Image
 from shared_ui.app_icon import CANVAS, assert_follows_the_family_spec

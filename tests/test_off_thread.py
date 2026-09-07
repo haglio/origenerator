@@ -1,4 +1,5 @@
 """Handing one slow call to the pool — and what has to survive until it answers."""
+from __future__ import annotations
 
 import gc
 import threading

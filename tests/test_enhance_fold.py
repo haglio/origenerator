@@ -7,6 +7,7 @@ and deletes the transient job row. The startup sweep does the same for
 completions that landed while the app was closed — and retroactively for rows
 recorded back when Image Enhance was presented as its own workflow.
 """
+from __future__ import annotations
 
 import json
 

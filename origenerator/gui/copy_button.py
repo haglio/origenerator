@@ -4,6 +4,7 @@ lifting to the clipboard in one click — a metadata filename, a prompt, a seed.
 The value can be fixed (a string) or live (a zero-arg callable read at click
 time), so the same button serves a read-only label and an editable form field.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon

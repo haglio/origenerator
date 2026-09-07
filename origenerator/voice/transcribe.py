@@ -6,6 +6,7 @@ injectable) so importing this module — and the test suite — never pulls in
 faster-whisper or downloads weights. Captured audio is peak-normalized first:
 a quiet mic (RMS ~0.03) otherwise transcribes as empty.
 """
+from __future__ import annotations
 
 import sys
 

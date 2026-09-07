@@ -28,6 +28,7 @@ persistence outright — that move is the second half of the audit's
 item, since :func:`fold_completed_enhancements` is called from the boot
 sequence.
 """
+from __future__ import annotations
 
 import json
 import logging

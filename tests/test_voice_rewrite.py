@@ -1,5 +1,6 @@
 """rewrite_prompt — turn a spoken instruction into an edited positive/negative
 prompt pair via a local OpenAI-compatible chat endpoint."""
+from __future__ import annotations
 
 import json
 from unittest.mock import patch

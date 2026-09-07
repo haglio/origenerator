@@ -14,6 +14,8 @@ and refuses to judge a scene plainly -- so each prompt says outright that
 explicit content is expected and is to be handled literally rather than
 softened.
 """
+from __future__ import annotations
+
 VOICE_REWRITE_SYSTEM_PROMPT = (
     "You edit Stable Diffusion image-generation prompts from short spoken "
     "instructions. You get the current POSITIVE prompt (what to include) and "

@@ -5,6 +5,7 @@ the muscle memory carries from genau — and so a slip here is a slip on all of
 them at once. Nothing exercised it: giving J the speed-up L has, and taking the
 cruise toggle off `/`, left 184 tests green across the five files that reach it.
 """
+from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import Qt

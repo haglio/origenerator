@@ -1,4 +1,5 @@
 """CombinePanel: two drop slots + a Generate button for the image+video combine."""
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout

@@ -8,6 +8,7 @@ settings, the model, the LoRA). The frame-identity helpers live here too because
 :func:`settings_signature` folds an image-conditioned row's start-frame
 configuration into the settings key.
 """
+from __future__ import annotations
 
 import json
 from functools import cache

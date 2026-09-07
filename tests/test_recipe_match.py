@@ -4,6 +4,7 @@ Each act maps to a single recipe — the most-used model+params among the user's
 videos of that act — resolved fresh from the gallery rows. Pure and Qt-free, so the
 grouping and act-matching logic is exercised without a database or a widget.
 """
+from __future__ import annotations
 
 import json
 

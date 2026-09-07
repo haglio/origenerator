@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import QLabel, QProgressBar
 
 from origenerator.gui.loading_screen import LoadingScreen

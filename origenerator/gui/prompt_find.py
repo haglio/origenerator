@@ -9,6 +9,7 @@ This holds the matches, paints them, and walks between them.
 :class:`~origenerator.gui.find_bar.FindBar` is the strip of controls that drives
 it; neither knows about the other, and the gallery view wires the two together.
 """
+from __future__ import annotations
 
 from PyQt6.QtGui import QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QScrollArea, QTextEdit

@@ -49,6 +49,7 @@ so in place of its caption, and with nothing of ours running the left half says 
 for the whole line. A queue that has stopped moving with the GPU idle is exactly
 the thing a user goes hunting for an explanation of.
 """
+from __future__ import annotations
 
 import time
 

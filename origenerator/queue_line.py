@@ -36,6 +36,7 @@ Pure ordering, no Qt and no server: it works on anything carrying a
 run makes something other than what it makes itself, and a ``source`` — which is
 what makes the queue's behavior testable without a running ComfyUI.
 """
+from __future__ import annotations
 
 # The ``source`` of work the user asked for, as opposed to a background
 # experiment ("experiment") or a repair of an old row ("base_render").

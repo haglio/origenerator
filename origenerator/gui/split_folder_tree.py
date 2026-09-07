@@ -24,6 +24,7 @@ the signals a ``FolderTree`` emits are re-emitted here from whichever half
 fired them, and the handful of methods the view calls resolve to the half that
 owns the row.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (

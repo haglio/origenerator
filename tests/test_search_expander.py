@@ -4,6 +4,7 @@ Everything here is about not making the user wait and not asking the model
 twice: the deterministic results are already on screen by the time this is
 called, so a slow, failing, or repeated request must cost nothing visible.
 """
+from __future__ import annotations
 
 import threading
 

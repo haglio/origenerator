@@ -8,6 +8,8 @@ tests/test_db_schema.py holds all of it as a snapshot: another app reads this
 file (evolver mounts it read-only and selects seven columns off ``generations``
 by name), and every user's database is migrated in place rather than rebuilt.
 """
+from __future__ import annotations
+
 from origenerator.param_keys import migrate_stored_params
 
 SCHEMA = """\

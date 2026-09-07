@@ -1,4 +1,5 @@
 """The pass that follows an output file the user moved."""
+from __future__ import annotations
 
 import json
 

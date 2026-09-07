@@ -7,6 +7,7 @@ All row over the library.  Standing anywhere is standing on one shape, so a
 slideshow started there has exactly one region to go to — and which one is read
 off the key rather than measured back out of the items.
 """
+from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace

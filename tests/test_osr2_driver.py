@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.gui.osr2_driver import Osr2Driver
 
 

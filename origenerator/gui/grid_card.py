@@ -15,6 +15,7 @@ things fix that together: the caption is set a step below the app's font
 long enough to wrap wraps rather than being clipped. The card's height follows
 from the band, so choosing a bigger caption never quietly costs a line again.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QFont, QFontMetrics

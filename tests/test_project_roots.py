@@ -6,6 +6,7 @@ own repos were moved out of the file-synced tree the library stays in. ComfyUI
 is not one of those repos: it did not move, so it stays on ``suite_root`` while
 ``fun_time`` comes from the new setting. That split is the point of these tests.
 """
+from __future__ import annotations
 
 from pathlib import Path
 

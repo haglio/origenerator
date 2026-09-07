@@ -12,6 +12,8 @@ first origenerator import.  A run used to leave a log, arrow PNGs, thumbnails,
 trash and a real recording in the checkout's live state/, and what one run
 left decided what the next one drew.
 """
+from __future__ import annotations
+
 import atexit
 import os
 import shutil

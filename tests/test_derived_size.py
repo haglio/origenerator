@@ -1,4 +1,5 @@
 """The app-side twin of the i2v in-graph size derivation."""
+from __future__ import annotations
 
 import origenerator.workflows.derived_size as ds
 from origenerator.workflows.derived_size import (

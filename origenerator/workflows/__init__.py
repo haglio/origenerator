@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import WorkflowTemplate
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow

@@ -3,6 +3,7 @@
 Every prompt here is invented — plain photographic vocabulary standing in for
 whatever the library's own prompts say, which never appears in this repo.
 """
+from __future__ import annotations
 
 import pytest
 

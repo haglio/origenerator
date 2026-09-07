@@ -17,6 +17,7 @@ One tip per watched widget, set with :meth:`set_html` — empty html turns it of
 which is the state a control is in when it has nothing but ordinary text to say
 (that stays with Qt's tooltip, which handles the ordinary case perfectly well).
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout

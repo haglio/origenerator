@@ -15,6 +15,7 @@ The badge parents to its tile and positions itself; a tile just constructs one
 when it knows its media type. Clicks fall through to the tile beneath it, the way
 the tile's own image and caption do.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget

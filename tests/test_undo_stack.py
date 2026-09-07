@@ -13,6 +13,8 @@ a flag is what stops that fresh entry from clearing the redo stack it came off.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
+from __future__ import annotations
+
 import pytest
 
 from origenerator.undo_stack import UndoEntry, UndoStack

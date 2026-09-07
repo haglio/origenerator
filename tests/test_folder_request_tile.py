@@ -1,4 +1,5 @@
 """The card that opens a folder's prompt for a rewrite."""
+from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QMouseEvent

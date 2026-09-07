@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.gui.editable_header import EditableHeader
 
 

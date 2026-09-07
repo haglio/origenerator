@@ -26,6 +26,7 @@ the hierarchy, so nesting them under it would draw the same folder twice and put
 two rows in ``item_by_key`` for one key. Its contents show as tiles in the browser
 pane instead, exactly as the Starred shelf shows its bookmarked folders.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 

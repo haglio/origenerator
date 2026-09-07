@@ -3,6 +3,7 @@
 Every vocabulary here is invented: the point is the markers and the shape of the
 sentence between them, never any real prompt text.
 """
+from __future__ import annotations
 
 from origenerator.voice.dictation import (
     ABANDONED,

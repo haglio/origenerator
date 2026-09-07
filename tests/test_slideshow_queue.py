@@ -7,6 +7,7 @@ pane and a floating plate: where it sits, that it leaves the screen when there i
 nothing in flight, that it brings its own background, and that pressing anything
 in it doesn't take the arrows away from the slides.
 """
+from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QRect, Qt

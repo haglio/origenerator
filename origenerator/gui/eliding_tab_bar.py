@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QPainter, QPalette, QPixmap
 from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
@@ -66,7 +68,7 @@ class _PreviewTabStyle(QProxyStyle):
     left in place would spread down the row.
     """
 
-    def __init__(self, bar: "ElidingTabBar"):
+    def __init__(self, bar: ElidingTabBar):
         super().__init__()
         self._bar = bar
         # Parented to the bar on purpose. Setting an app stylesheet re-wraps every

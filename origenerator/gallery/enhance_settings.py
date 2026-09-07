@@ -11,6 +11,7 @@ The same keys are what a level is remembered by, so :func:`level_settings` and
 :func:`describe_enhance_params` live here too: what one enhancement ran at, and
 the line the versions list says it in.
 """
+from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
@@ -84,7 +85,7 @@ class EnhanceSettings:
     params: dict = field(default_factory=default_enhance_params)
 
     @classmethod
-    def parse(cls, raw: str | None) -> "EnhanceSettings":
+    def parse(cls, raw: str | None) -> EnhanceSettings:
         """Read back what :meth:`to_json` wrote, tolerating bad or absent data —
         an unconfigured folder is simply the defaults, tick off.
 

@@ -13,6 +13,7 @@ replaced, not as a scatter of altered letters.
 Pure and Qt-free: :func:`diff_spans` is the model, and the two surfaces that
 show a diff paint it themselves with ``QTextCharFormat``.
 """
+from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher

@@ -1,4 +1,5 @@
 """The picture every drag hangs under the cursor, however its source shows it."""
+from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import QSize

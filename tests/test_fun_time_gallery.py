@@ -4,6 +4,7 @@ Fun Time's main player owns the OSR2 for the whole session, so a hosted
 Origenerator must offer no way to reach the device — no toggle, no motion, no
 console — and its layout folds to fit the Random Favs Browser's upright rect.
 """
+from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import Qt

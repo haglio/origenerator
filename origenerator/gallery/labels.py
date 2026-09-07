@@ -9,6 +9,7 @@ A settings folder is *named* by its key rather than from here (see
 :mod:`.keys`); what :func:`settings_label` builds is the description under that
 name, which the tree and the folder tiles show on hover.
 """
+from __future__ import annotations
 
 import json
 

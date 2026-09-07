@@ -9,6 +9,8 @@ export lanes leave on it.
 The DDL and the column list are in :mod:`origenerator.db_schema`; evolver reads
 seven of these columns read-only, so tests/test_db_schema.py holds them.
 """
+from __future__ import annotations
+
 from origenerator.db_connection import Store
 from origenerator.db_schema import GENERATION_COLUMNS
 

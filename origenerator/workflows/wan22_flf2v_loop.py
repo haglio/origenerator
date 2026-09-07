@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,

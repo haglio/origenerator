@@ -998,7 +998,7 @@ def test_wan21_ati_i2v_honors_an_unlocked_size_override():
     # An explicit WxH wins over the input image's derived size, and the motion is
     # rescaled into the overridden space — so an unlock overrides derivation even
     # when the (here nonexistent) image would otherwise be measured or fall back.
-    from origenerator.workflows.wan21_ati_i2v import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), input_image="whatever.png", width=720, height=480)
@@ -1249,11 +1249,8 @@ def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     # fixed 121-point/24fps convention: a 3-point cluster riding the authored
     # sine between motion_ceiling and motion_floor, plus one static point holding
     # the anchor (e.g. a anchor base) in place.
-    from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT,
-        REFERENCE_WIDTH,
-        Wan21AtiI2vWorkflow,
-    )
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     assert wf.__class__ is Wan21AtiI2vWorkflow
@@ -1349,6 +1346,36 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     # Workflows without an authored track say so with None, keeping the
     # metronome fallback for them.
     assert Wan22I2vWorkflow().authored_actions(Wan22I2vWorkflow().default_params()) is None
+
+
+def test_one_seeds_authored_motion_is_the_same_motion_it_has_always_been():
+    # Every ATI clip already in the library carries a funscript written from
+    # this sequence, and the video's pixels were generated from the very same
+    # reversals. So the numbers are an on-disk contract, not an implementation
+    # detail: a change to the wobble, the easing or the shaping point would
+    # leave every stored script describing a motion its video no longer makes.
+    # Pinned exactly, at one seed, so a move or a rewrite has to reproduce it.
+    import json as _json
+
+    wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    params = dict(wf.default_params(), seed=4242, frame_count=81, motion_hz=1.2,
+                  motion_ceiling=200, motion_floor=700, motion_x=240,
+                  anchor_x=210, anchor_y=520)
+
+    actions = wf.authored_actions(params)
+    assert len(actions) == 25
+    assert actions[:6] == [
+        {"at": 0, "pos": 100}, {"at": 262, "pos": 24}, {"at": 477, "pos": 7},
+        {"at": 670, "pos": 78}, {"at": 827, "pos": 93}, {"at": 1044, "pos": 19},
+    ]
+    assert actions[-2:] == [{"at": 4684, "pos": 80}, {"at": 4863, "pos": 94}]
+
+    tracks = _json.loads(_find_node(wf.build_api_payload(params),
+                                    "WanTrackToVideo")["inputs"]["tracks"])
+    assert (len(tracks), len(tracks[0])) == (4, 121)
+    assert [round(point["y"], 6) for point in tracks[0][:5]] == [
+        170.0, 178.873796, 204.81428, 245.830993, 298.776647,
+    ]
 
 
 def test_wan21_ati_i2v_funscript_is_sparse_enough_for_the_osr2_driver():
@@ -1495,11 +1522,8 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatc
     # regardless of the image's aspect ratio.
     import origenerator.workflows.derived_size as ds
     from origenerator.workflows.derived_size import scale_to_total_pixels
-    from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT,
-        REFERENCE_WIDTH,
-        Wan21AtiI2vWorkflow,
-    )
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "square.png", (1024, 1024))
@@ -1533,11 +1557,8 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
     # A missing or unset input image can't be measured, so the size falls back to
     # the 480×864 reference (scale 1.0 → the motion coordinates pass through
     # unchanged) rather than crashing payload build.
-    from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT,
-        REFERENCE_WIDTH,
-        Wan21AtiI2vWorkflow,
-    )
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     wf = Wan21AtiI2vWorkflow()
     for image in ("", "does_not_exist.png"):
@@ -1554,7 +1575,7 @@ def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
     # rescaled into the derived size), so their ranges are that frame's bounds —
     # X params to the reference width, Y params to the reference height — not the
     # old catch-all 4096. This keeps the form's meaning honest about the space.
-    from origenerator.workflows.wan21_ati_i2v import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -1575,11 +1596,8 @@ def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
     import json as _json
 
     import origenerator.workflows.wan21_ati_i2v as ati
-    from origenerator.workflows.wan21_ati_i2v import (
-        REFERENCE_HEIGHT,
-        REFERENCE_WIDTH,
-        Wan21AtiI2vWorkflow,
-    )
+    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
+    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     aim = {"motion_x": 0.5, "motion_ceiling": 0.25, "motion_floor": 0.5,
            "anchor_x": 0.45, "anchor_y": 0.6}

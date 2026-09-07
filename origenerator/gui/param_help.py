@@ -61,6 +61,15 @@ PARAM_HELP: dict[str, str] = {
         "The speech-to-video model a scene with a line renders on, in place of "
         "the two experts; it hears the line and moves her lips to it."
     ),
+    "lora_speech": (
+        "The LoRA the speech model runs under. The lightning one it starts on "
+        "makes a scene render in four steps but only works at Prompt Strength "
+        "(Speech) 1.0; set this to None to raise that strength"
+    ),
+    "lora_strength_speech": (
+        "How hard the speech LoRA pulls. 1.0 is its intended strength; drop it "
+        "toward 0 to let a higher Prompt Strength (Speech) through"
+    ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "
         "by accident. Leaving it empty is fine. In a story each scene keeps out "
@@ -162,6 +171,16 @@ PARAM_HELP: dict[str, str] = {
     "cfg_low": (
         "Prompt strength (the CFG scale underneath) for the low-noise stage, "
         "where the texture is settled."
+    ),
+    "speech_steps": (
+        "How many refinement passes a scene with a line makes. 4 is the "
+        "lightning LoRA's number; without that LoRA it wants 20 or more, and "
+        "each one is time."
+    ),
+    "speech_cfg": (
+        "How strictly a scene with a line obeys the prompt. At 1.0 it obeys "
+        "nothing and she only speaks; 4 to 6 makes the described action happen "
+        "while she talks, but needs LoRA (Speech) off and more Steps (Speech)."
     ),
     "split_step": (
         "Which step the high-noise stage hands over to the low-noise one (the "

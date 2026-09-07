@@ -150,6 +150,76 @@ def test_the_speech_slot_offers_only_the_speech_model_and_the_experts_never_do(i
     assert "speaker.safetensors" not in by_key["unet_low"].options
 
 
+def test_a_speaking_segment_samples_at_the_steps_and_strength_the_recipe_sets():
+    # The speaking pass is sampled on its own terms, not the experts': its
+    # steps and prompt strength are the recipe's, so a run can trade the
+    # lightning LoRA's four unguided steps for real guidance.
+    payload = Wan22I2vWorkflow().build_api_payload(
+        _spoken_params(speech_steps=24, speech_cfg=5.5, steps=20, cfg_high=3.5, cfg_low=3.5))
+    for sampler in _nodes(payload, "KSampler"):
+        assert (sampler["inputs"]["steps"], sampler["inputs"]["cfg"]) == (24, 5.5)
+    # the experts' own numbers are untouched by it
+    for sampler in _nodes(payload, "KSamplerAdvanced"):
+        assert (sampler["inputs"]["steps"], sampler["inputs"]["cfg"]) == (20, 3.5)
+
+
+def test_the_speech_lora_can_be_bypassed_so_the_model_hears_a_real_prompt_strength():
+    # The lightning LoRA is distilled for no guidance, so raising the speech
+    # prompt strength means taking it off: "None" adds no loader and the
+    # speaking samplers run the speech model bare, exactly as the expert slots
+    # bypass theirs. The experts' own LoRAs are untouched.
+    from origenerator.workflows.model_files import NO_LORA
+
+    wf = Wan22I2vWorkflow()
+    on = wf.build_api_payload(_spoken_params())
+    off = wf.build_api_payload(_spoken_params(lora_speech=NO_LORA, speech_cfg=5.0, speech_steps=24))
+    assert _model_chain(on, _nodes(on, "KSampler")[0]) == [
+        "ModelSamplingSD3", "LoraLoaderModelOnly", "UNETLoader"]
+    assert _model_chain(off, _nodes(off, "KSampler")[0]) == ["ModelSamplingSD3", "UNETLoader"]
+    assert len(_nodes(off, "LoraLoaderModelOnly")) == len(_nodes(on, "LoraLoaderModelOnly")) - 1
+    speech_loader = off[off[_nodes(off, "KSampler")[0]["inputs"]["model"][0]]["inputs"]["model"][0]]
+    assert speech_loader["inputs"]["unet_name"] == off["30"]["inputs"]["unet_name"]
+
+
+def test_the_speech_lora_pulls_at_the_strength_the_recipe_sets():
+    payload = Wan22I2vWorkflow().build_api_payload(
+        _spoken_params(lora_speech="quieter.safetensors", lora_strength_speech=0.35))
+    (lora,) = [n for n in _nodes(payload, "LoraLoaderModelOnly")
+               if n["inputs"]["lora_name"] == "quieter.safetensors"]
+    assert lora["inputs"]["strength_model"] == 0.35
+
+
+def test_the_speaking_pass_exposes_its_steps_strength_and_lora_as_fields():
+    # All four are editable rows on the form, the LoRA led by "None" like every
+    # other LoRA picker, and they start at the lightning settings the pass has
+    # always run -- so an untouched recipe builds the graph it always did.
+    from origenerator.workflows.model_files import NO_LORA
+
+    wf = Wan22I2vWorkflow()
+    by_key = {pd.key: pd for pd in wf.param_definitions()}
+    defaults = wf.default_params()
+    assert by_key["speech_steps"].type == "int" and defaults["speech_steps"] == 4
+    assert by_key["speech_cfg"].type == "float" and defaults["speech_cfg"] == 1.0
+    assert by_key["lora_speech"].type == "combo" and by_key["lora_speech"].options[0] == NO_LORA
+    assert by_key["lora_speech"].default == defaults["lora_speech"]
+    assert "lightx2v" in defaults["lora_speech"]
+    assert by_key["lora_strength_speech"].type == "float" and defaults["lora_strength_speech"] == 1.0
+
+
+def test_the_speech_lora_slot_takes_either_wan_family_and_neither_expert_half(installed_models):
+    # The speech model is one model, not half an expert pair, and what runs on
+    # it today is a WAN t2v LoRA -- so the slot offers both families and filters
+    # on neither high nor low.
+    installed_models.add("loras", "lightning_high.safetensors", arch="wan", lora=True)
+    installed_models.add("loras", "lightning_low.safetensors", arch="wan", lora=True)
+    installed_models.add("loras", "talker.safetensors", arch="wan_s2v", lora=True)
+    installed_models.add("loras", "flux_thing.safetensors", arch="flux", lora=True)
+    options = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}["lora_speech"].options
+    assert {"lightning_high.safetensors", "lightning_low.safetensors",
+            "talker.safetensors"} <= set(options)
+    assert "flux_thing.safetensors" not in options
+
+
 def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks():
     by_key = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}
     assert by_key["voice"].type == "combo" and by_key["voice"].options[0] == by_key["voice"].default

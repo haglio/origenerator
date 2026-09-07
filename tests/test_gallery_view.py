@@ -350,7 +350,7 @@ def _top_level(tree, orientation=LANDSCAPE):
 def _selected_folder(view):
     """Which folder the tree has open, with the side stripped — what a test that
     is not about the split itself means by "the selected folder"."""
-    return base_of(view._selected_folder_key())
+    return base_of(view.selected_folder_key())
 
 
 def _shelf(view, key, orientation=LANDSCAPE):
@@ -3580,12 +3580,12 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     view.refresh()
     leaf = _image_workflow(view._tree).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
-    depth = len(view._history._stack)
+    depth = len(view._navigation._history._stack)
 
     view.refresh()
     view._poll()
 
-    assert len(view._history._stack) == depth
+    assert len(view._navigation._history._stack) == depth
 
 
 def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
@@ -3688,13 +3688,13 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
 
     _search_for(view, "cat")
     view._browser._thumb_widgets["i1"].clicked.emit("i1")   # a hit picked among the results
-    depth = len(view._history._stack)
+    depth = len(view._navigation._history._stack)
 
     view.refresh()
     view._poll()
     view._search._on_sort_changed()
 
-    assert len(view._history._stack) == depth
+    assert len(view._navigation._history._stack) == depth
 
 
 def test_back_onto_the_folder_itself_drops_the_pick(qtbot):
@@ -3777,13 +3777,13 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
     view.refresh()
     lora = _image_workflow(view._tree).child(0).child(0)
     view._tree.setCurrentItem(_children_by_detail(lora)["a cat"])
-    depth = len(view._history._stack)
+    depth = len(view._navigation._history._stack)
 
     _search_for(view, "cat")
     _search_for(view, "cat h")
     _search_for(view, "cat hat")
 
-    assert len(view._history._stack) == depth + 1
+    assert len(view._navigation._history._stack) == depth + 1
 
     view._go_back()
     assert view._browser.showing_search() is False

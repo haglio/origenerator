@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import random
-from contextlib import contextmanager
 from dataclasses import replace
 from functools import partial
 from typing import NamedTuple
@@ -81,6 +80,7 @@ from origenerator.gui.find_bar import FindBar
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
+from origenerator.gui.gallery_navigation import NavigationController
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
@@ -176,7 +176,6 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.navigation import Location, NavigationHistory
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
@@ -677,7 +676,7 @@ class GalleryView(QWidget):
         self._browser = BrowserPane(
             self._scroll, db, self._reroll, self._auto,
             TreeNavigation(
-                selected_folder_key=self._selected_folder_key,
+                selected_folder_key=self.selected_folder_key,
                 folder_context=self._folder_context,
                 group_for_key=self.group_for_key,
             ),
@@ -739,8 +738,7 @@ class GalleryView(QWidget):
         # treat them exactly as they treat a derived folder.
         self._custom_folders: list = []
         self._selection_group = None
-        self._history = NavigationHistory()  # back/forward across viewed locations
-        self._suppress_history = False  # true while a rebuild or Back/Forward re-selects
+        self._navigation = NavigationController(self, search=self._search)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
         # What another app has on the shared ComfyUI, re-read on every poll so the
         # lower bar can say the server is busy before a Generate goes in after it.
@@ -755,7 +753,7 @@ class GalleryView(QWidget):
         self._launch_seq = 0
         self._build_ui()
         self._sync_history_buttons()
-        self._sync_nav_buttons()
+        self._navigation.seed()
         self._sync_action_buttons()
         # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
         # Neither keyPressEvent nor a shortcut delivered the key in the running
@@ -909,7 +907,7 @@ class GalleryView(QWidget):
         """
         # The folder's own key, side stripped: a loop belongs to the folder, and
         # both sides of the tree draw the same one.
-        return _Running(osr2=True, auto=_base_of(self._selected_folder_key()),
+        return _Running(osr2=True, auto=_base_of(self.selected_folder_key()),
                         audio=True, show=True)
 
     def _stop_running(self, running: _Running) -> None:
@@ -2378,8 +2376,7 @@ class GalleryView(QWidget):
                   else None) or self._tree_view.default_item()
         # A rebuild restores the prior view; that re-selection isn't a navigation,
         # so keep it off the history (a poll would otherwise pile up duplicates).
-        self._suppress_history = True
-        try:
+        with self._navigation.off_the_record():
             if target is not None:
                 self._tree.setCurrentItem(target)  # shows the folder's thumbnails
                 self._reselect_generation(selected_gen)
@@ -2390,15 +2387,9 @@ class GalleryView(QWidget):
                 self._selected_row = None  # nothing selected
             self._restore_multi_selection(multi_keys)
             self._restore_reroll_selection(reroll_key)
-        finally:
-            self._suppress_history = False
         # Seed history once with wherever the gallery first lands, so Back works
         # even if the user's very first move leaves it.
-        if self._history.current() is None:
-            location = self._current_location()
-            if location is not None:
-                self._history.visit(location)
-                self._sync_nav_buttons()
+        self._navigation.seed()
         # A search running through the rebuild takes the pane back off the folder
         # the restore above just re-drew, and re-runs against the new index — so a
         # generation that lands while a query is open joins its results.
@@ -2557,22 +2548,63 @@ class GalleryView(QWidget):
         self._sync_auto_button()
         self._sync_enhance_button()
         self._sync_delete_button()
-        self._record_location()
+        self._navigation.record()
+
+    def _go_back(self):
+        """The Back button, and the spoken word for it. Named on the view because
+        the voice table reaches its handlers by attribute name (A/design/008)."""
+        self._navigation.go_back()
+
+    def _go_forward(self):
+        self._navigation.go_forward()
+
+    def suppress_history(self):
+        """A search leaving is a step on the way, not a stop — the history's own
+        term for that (:meth:`NavigationController.off_the_record`)."""
+        return self._navigation.off_the_record()
+
+    def selected_prompt_id(self) -> str | None:
+        """The generation picked in the pane, or ``None``."""
+        return self._selected["prompt_id"] if self._selected else None
+
+    def pane_holds(self, prompt_id: str) -> bool:
+        return prompt_id in self._browser.visible_prompt_ids()
+
+    def show_folder(self, key: str) -> bool:
+        """Draw the folder or shelf ``key`` names, saying whether the tree had a
+        row for it at all.
+
+        ``_tree_item_for`` rather than a bare lookup: a stop recorded before the
+        tree grew sides names a folder key with no side on it, and that key still
+        has to find its row. Standing on the row already fires no signal, and the
+        pane would go on holding the search results or the tile highlight the
+        stop was recorded without, so that case is drawn by hand.
+        """
+        row = self._tree_item_for(key)
+        if row is None:
+            return False
+        if self._tree.currentItem() is row:
+            self._on_folder_selected(row, None)
+        else:
+            self._tree.setCurrentItem(row)  # whose signal draws it
+        return True
+
+    def reveal(self, prompt_id: str) -> None:
+        """Pick and scroll to a tile the pane is already showing, and put the
+        item back in the info pane."""
+        self._browser.reveal_tile(prompt_id)
+        self._on_thumbnail_clicked(prompt_id)
+
+    def clear_selection(self) -> None:
+        self._clear_metadata()
+
+    def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None:
+        self._back_btn.setEnabled(can_go_back)
+        self._forward_btn.setEnabled(can_go_forward)
 
     def hand_pane_back(self) -> None:
         """The search is over: the pane belongs to the selected folder again."""
         self._on_folder_selected(self._tree.currentItem(), None)
-
-    @contextmanager
-    def suppress_history(self):
-        """Hold the history still for a move that is a step on the way rather
-        than somewhere the user went."""
-        recording = self._suppress_history
-        self._suppress_history = True
-        try:
-            yield
-        finally:
-            self._suppress_history = recording
 
     def search_scope(self) -> _SearchScope:
         """What the search covers: the path it is scoped to, and what is under it.
@@ -2631,7 +2663,7 @@ class GalleryView(QWidget):
         # the same question, asked of somewhere else. Suppressed during a rebuild's
         # restore, where the tree is re-selecting itself and _rebuild re-runs the
         # search once at the end rather than once per step of the restore.
-        if self._search.query and not self._suppress_history:
+        if self._search.query and not self._navigation.suppressed:
             self._search.run()
             return
         self._sync_auto_button()  # the auto toggle fits only a re-rollable leaf
@@ -2662,7 +2694,7 @@ class GalleryView(QWidget):
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
             # so leaving a shelf for one is a step Back can undo at all.
-            self._record_location()
+            self._navigation.record()
         self._title.set_display(self._tree_view.breadcrumb(current))
         # The path ends in a code, so what the folder holds — the prompt its
         # generations ran, and the settings that set it apart from its siblings —
@@ -2686,7 +2718,7 @@ class GalleryView(QWidget):
             self._sync_delete_button()
         else:
             self._sync_action_buttons()
-        self._record_location()
+        self._navigation.record()
 
     @staticmethod
     def _shelf_title(base: str, orientation: str | None) -> str:
@@ -2880,7 +2912,7 @@ class GalleryView(QWidget):
         recent one still standing. Skipped while a rebuild or Back/Forward is
         re-selecting (suppressed), and consecutive repeats collapse, so it stays a
         genuine visit trail rather than a poll-driven pile-up."""
-        if self._suppress_history or key is None:
+        if self._navigation.suppressed or key is None:
             return
         if not self._folder_history or self._folder_history[-1] != key:
             self._folder_history.append(key)
@@ -2951,7 +2983,7 @@ class GalleryView(QWidget):
     def _leaf_by_id(self) -> dict:
         return self._tree_view.leaf_by_id
 
-    def _selected_folder_key(self) -> str | None:
+    def selected_folder_key(self) -> str | None:
         """The selected row's tree key (or a shelf's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
 
@@ -2963,7 +2995,7 @@ class GalleryView(QWidget):
         as Landscape, the roomier side and the one an unmeasurable item files
         under everywhere else.
         """
-        return _orientation_of(self._selected_folder_key()) or _LANDSCAPE
+        return _orientation_of(self.selected_folder_key()) or _LANDSCAPE
 
     def _tree_item_for(self, key: str):
         """The tree row for ``key`` — a tree key resolves to its own row, and a
@@ -3369,7 +3401,7 @@ class GalleryView(QWidget):
         the tree — Esc resuming a loop is the case where the two differ, and the
         folder the user has navigated to since is not the one to capture.
         """
-        group = (self._current_group() if key == self._selected_folder_key()
+        group = (self._current_group() if key == self.selected_folder_key()
                  else self.group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
@@ -4909,7 +4941,7 @@ class GalleryView(QWidget):
             return shelf
         # The row's own key, not the folder's: which side the folder is being
         # looked at from is what decides the screen a show of it goes to.
-        return (self._selected_folder_key()
+        return (self.selected_folder_key()
                 if self._current_group() is not None else None)
 
     def _rows_at(self, location) -> list[dict]:
@@ -7088,7 +7120,7 @@ class GalleryView(QWidget):
         # looked at: in a folder, on a shelf, or among a search's hits. The view it
         # was picked in goes on the stack with it, so Back returns to the item AND
         # to the pane it was one of — not to some other folder that also holds it.
-        self._record_location(prompt_id)
+        self._navigation.record(prompt_id)
 
     def _select_saved_generation(self, row: dict):
         """Make a saved generation the gallery's selected item, in place of any
@@ -7134,9 +7166,7 @@ class GalleryView(QWidget):
         """
         item = self._folder_row_for(prompt_id)
         if item is not None:
-            recording = self._suppress_history
-            self._suppress_history = True
-            try:
+            with self._navigation.off_the_record():
                 # Setting a row that is already its half's current one fires no
                 # signal, and the pane would go on showing whatever it holds —
                 # the shelf or the search hits the move was made from. So the
@@ -7145,12 +7175,10 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(item)
                 if not drawn_by_the_signal:
                     self._on_folder_selected(item, None)
-            finally:
-                self._suppress_history = recording
         self._on_thumbnail_clicked(prompt_id)   # the arrival: its tab, and its stop
         self._browser.reveal_tile(prompt_id)    # once the folder's tiles are drawn
         logger.info("Went to %s: folder %s, %d tiles drawn, tile shown %s",
-                    prompt_id, self._selected_folder_key(),
+                    prompt_id, self.selected_folder_key(),
                     len(self._browser.visible_prompt_ids()),
                     prompt_id in self._browser.visible_prompt_ids())
 
@@ -7180,130 +7208,12 @@ class GalleryView(QWidget):
     def _current_shelf_key(self) -> str | None:
         """The key of the shelf on screen — one side's Latest, Favorites,
         Experiments, Requests or Trash — or ``None`` off them."""
-        key = self._selected_folder_key()
+        key = self.selected_folder_key()
         base, _orientation = _split_shelf_key(key)
         return key if base in _SHELF_KEYS else None
 
-    def _current_location(self) -> Location | None:
-        """What the middle pane is showing right now, as a history stop: the tree
-        row it is drawn from, any query running over it, and the item picked in it
-        (``None`` with nothing open at all).
-
-        Only for seeding history at startup, where there is no gesture to ask.
-        Every stop after that is recorded by the gesture that made it, which knows
-        which item it picked — see :meth:`_record_location`.
-        """
-        view = self._selected_folder_key()
-        if view is None:
-            return None
-        item = self._selected["prompt_id"] if self._selected else None
-        if item is not None and item not in self._browser.visible_prompt_ids():
-            item = None  # left by the pane this one replaced
-        return Location(view, self._search.query, item)
-
-    def _record_location(self, item: str | None = None):
-        """Record what the middle pane now shows: the folder or shelf the tree has
-        selected, the query running over it, and ``item`` if the gesture picked one.
-
-        Skipped while a rebuild or Back/Forward is what put it there — those move
-        within history rather than onto it. Everything the pane can show is
-        recorded the same way, so Back returns to the view the user was actually
-        looking at, whatever kind of view it was.
-        """
-        if self._suppress_history:
-            return
-        view = self._selected_folder_key()
-        if view is None:
-            return  # nothing open: no view to come back to
-        location = Location(view, self._search.query, item)
-        current = self._history.current()
-        if self._redrawing_the_same_search(location, current):
-            # A search results pane redraws for reasons that are not navigations —
-            # a sort, a widening landing, a generation finishing under a poll — and
-            # a stop per redraw would fill history with the pane already on screen.
-            if current.query == location.query:
-                return
-            # A query being narrowed is that same pane re-asked rather than another
-            # one opened, so each pause overwrites its stop instead of adding one.
-            self._history.replace(location)
-        else:
-            self._history.visit(location)
-        self._sync_nav_buttons()
-
-    @staticmethod
-    def _redrawing_the_same_search(location: Location, current: Location | None) -> bool:
-        """Whether ``location`` is the search stop at ``current`` being drawn again
-        rather than somewhere new: the same folder, a query over it either way, and
-        no item picked (picking a hit is a step within the results, not a redraw of
-        them)."""
-        return bool(location.query and location.item is None
-                    and current is not None and current.query
-                    and current.view == location.view)
-
-    def _go_back(self):
-        location = self._history.back()
-        if location is not None:
-            self._restore_location(location)
-        self._sync_nav_buttons()
-
-    def _go_forward(self):
-        location = self._history.forward()
-        if location is not None:
-            self._restore_location(location)
-        self._sync_nav_buttons()
-
-    def _restore_location(self, location: Location):
-        """Re-show a stop as it stood — its folder or shelf, the query that was
-        running over it, and the item that was picked in it — without recording the
-        move (which walks history rather than adding to it).
-
-        A stop whose row the tree no longer has (a folder emptied by a delete)
-        falls back to showing its item wherever it now lives, rather than leaving
-        the press doing nothing at all.
-        """
-        self._suppress_history = True
-        try:
-            self._search.restore(location.query)
-            # _tree_item_for rather than a bare lookup: a stop recorded before the
-            # tree grew sides names a folder key with no side on it, and that key
-            # still has to find its row.
-            row = self._tree_item_for(location.view)
-            if row is None:
-                if location.item is not None:
-                    self._go_to_generation(location.item)
-                return
-            if self._tree.currentItem() is row:
-                # Already standing on that row, so setting it fires nothing — and
-                # the pane still holds the search results, or the tile highlight,
-                # this stop was recorded without. Draw it again by hand.
-                self._on_folder_selected(row, None)
-            else:
-                self._tree.setCurrentItem(row)  # whose signal draws it
-            if location.query:
-                self._search.run()  # which takes the pane back off the folder again
-            if location.item is not None:
-                self._reveal_in_pane(location.item)
-            else:
-                # Nothing was picked at this stop, so nothing is picked on landing:
-                # a folder still showing the item Back just left would look like the
-                # press had done nothing at all.
-                self._clear_metadata()
-        finally:
-            self._suppress_history = False
 
 
-    def _reveal_in_pane(self, prompt_id: str):
-        """Land on an item the pane is already showing: its tile picked and
-        scrolled to, its preview back in the info pane. Silent if the pane has no
-        tile for it — a Recents page not drawn yet, a row since deleted — which
-        leaves the view itself restored rather than jumping somewhere else."""
-        if prompt_id in self._browser.visible_prompt_ids():
-            self._browser.reveal_tile(prompt_id)
-            self._on_thumbnail_clicked(prompt_id)
-
-    def _sync_nav_buttons(self):
-        self._back_btn.setEnabled(self._history.can_go_back())
-        self._forward_btn.setEnabled(self._history.can_go_forward())
 
     def _sync_action_buttons(self):
         """Re-aim the act-on-this trio together.

@@ -149,7 +149,7 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
         cooking, gallery.build_image_config_index([portrait_image]))
     (row,) = view._queue.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
-    assert view._selected_folder_key() == oriented_key(folder, "landscape")
+    assert view.selected_folder_key() == oriented_key(folder, "landscape")
 
 
 def _rows(tree, orientation) -> list[str]:
@@ -264,11 +264,11 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
     portrait_all = view._item_by_key[oriented_key("__all__", "portrait")]
     landscape_all = view._item_by_key[oriented_key("__all__", "landscape")]
     view._tree.setCurrentItem(portrait_all)
-    assert view._selected_folder_key() == oriented_key("__all__", "portrait")
+    assert view.selected_folder_key() == oriented_key("__all__", "portrait")
 
     view._tree.setCurrentItem(landscape_all)
 
-    assert view._selected_folder_key() == oriented_key("__all__", "landscape")
+    assert view.selected_folder_key() == oriented_key("__all__", "landscape")
     assert view._tree.selected_folder_keys() == [oriented_key("__all__", "landscape")]
     assert view._tree._halves["portrait"].selectedItems() == []
 

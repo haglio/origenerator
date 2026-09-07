@@ -88,9 +88,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     which is the gate doing its job. (380 → 372: the search came out as
     `GallerySearchController`, taking fourteen methods with it and adding six —
     the five the controller asks of its host, and the history guard those
-    needed. 80: dropping the trash's retention window took the pane's two
+    needed. Back and Forward followed as `NavigationController`: nine out,
+    seven host methods and two delegations in, and those two went when the voice
+    tables stopped naming their handlers as strings. 80: dropping the trash's retention window took the pane's two
     countdown helpers with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 372
+               for x in _class_def(VIEW, "GalleryView").body) == 371
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 80

@@ -426,7 +426,7 @@ def test_describe_still_names_a_level_recorded_the_old_way():
 
 
 def _spoken(text):
-    parts = gallery.match_fix_command(text)
+    parts = detail_parts.match_fix_command(text)
     assert parts
     return parts
 

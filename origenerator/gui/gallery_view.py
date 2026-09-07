@@ -199,6 +199,7 @@ from origenerator.voice.steering import VoiceSteering
 from origenerator.win32 import place_window_in_device_pixels
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
+from origenerator.workflows.detail_parts import name_parts
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
@@ -4442,7 +4443,7 @@ class GalleryView(QWidget):
                 self._press_bank_button(self._enhance_btn, self._enhance_selection)
                 return
             wants = (_VOICE_WANTS.get(command.command)
-                     or f"a {gallery.name_parts(command.command)} fix")
+                     or f"a {name_parts(command.command)} fix")
             self._show_voice_status(
                 f"🎤 {wants} needs a picture on screen", transient=True)
             return
@@ -4657,7 +4658,7 @@ class GalleryView(QWidget):
         parts asked for: one with nothing installed to find it is dropped rather
         than taking the rest of the command down with it, and the caption is
         where that shows. Refused outright only when none of them can run."""
-        asked = gallery.name_parts(parts)
+        asked = name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
             return None, f"🎤 only a finished image can get a {asked} fix"
@@ -4667,7 +4668,7 @@ class GalleryView(QWidget):
                           "(ComfyUI models/ultralytics/bbox)")
         if gallery.level_matching_params(row, params) is not None:
             return None, f"🎤 already has this {asked} fix"
-        fixing = gallery.name_parts(
+        fixing = name_parts(
             [part for part in parts if part.name in params["enhance_detail_fixes"]])
         return self._launch_spoken_enhance(row, params, f"{fixing} fix",
                                            f"fixing {fixing}…")

@@ -3001,14 +3001,6 @@ class GalleryView(QWidget):
         showing."""
         return self._selected_row
 
-    @property
-    def _preview(self):
-        """The current config tab's preview — where a selection, a re-roll frame,
-        or a running generation's frames all land. ``None`` only if the pane holds
-        something that isn't a config tab, which nothing builds."""
-        panel = self._info_tabs.current_config_panel()
-        return panel._preview if panel is not None else None
-
     # The folder tree's key→item and prompt→item maps are owned by the GalleryTree
     # renderer; surfaced here for navigation, selection, and rebuild. A shelf's row
     # is reached separately, through _shelf_item.

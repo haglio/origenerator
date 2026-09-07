@@ -565,7 +565,7 @@ class InfoPaneTabs(QTabWidget):
         for panel in self.config_panels():
             row = panel.displayed_row()
             if row is not None and row.get("prompt_id") not in live_ids:
-                panel._preview.clear()
+                panel.clear_preview()
 
     def release_media(self, paths):
         """Let every tab go of any of ``paths`` it's showing — files about to be
@@ -576,7 +576,7 @@ class InfoPaneTabs(QTabWidget):
         video's file open exactly as firmly as the front one does.
         """
         for panel in self.config_panels():
-            panel._preview.release_media(paths)
+            panel.release_media(paths)
 
     def capture_state(self) -> dict:
         """Snapshot every open tab so the session can be restored next launch.

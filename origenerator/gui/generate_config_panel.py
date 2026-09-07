@@ -1576,6 +1576,22 @@ class GenerateConfigPanel(QWidget):
         """Freeze or resume this tab's preview video (the session's OmniPause)."""
         self._preview.set_playback_paused(paused)
 
+    def clear_preview(self) -> None:
+        """Empty this tab's preview — what a generation going away leaves.
+
+        Asked of the panel rather than done to its preview, because the panel is
+        what has to re-assert the corner controls and the drag payload afterwards:
+        a caller reaching past it for the widget is how the preview came to open
+        bare of its corners on every launch (see :meth:`show_selection_media`).
+        """
+        self._preview.clear()
+
+    def release_media(self, paths) -> None:
+        """Let go of any of ``paths`` this tab is showing — files about to be
+        moved or deleted, which Windows will not let go of while a player holds
+        them open."""
+        self._preview.release_media(paths)
+
     def osr2_drive_target(self):
         """``(video_path, player, actions)`` for the shown video, or ``None``.
 

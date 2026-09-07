@@ -24,10 +24,18 @@ selection, a rebuild, a run some other tab is for — which is how a tab used to
 end up showing a picture it was not about.
 
 A double-click on the tab pins it upright, and
-the click after it opens a new preview tab beside it. Opening a configuration by
+the click after it opens a new preview tab beside it. Editing anything in the tab
+pins it the same way, without the double-click: changing the workflow or any
+field is work someone did in that tab, and the next open must land beside it
+rather than throw it away. Opening a configuration by
 name — a history-strip click, a queue row, the combine panel's "Open in
 generator" — lands the same way, since it is the same "show me this" gesture;
 generating from the tab pins it too.
+
+What counts as an edit is what a person did, never what a load did — an open
+writes the picker and every field exactly as typing would, so the panel says
+which is which (:attr:`GenerateConfigPanel.user_edited`) rather than the widgets
+being asked.
 
 The pane's blank resting tab is never left sitting beside real work: whatever
 opens next takes it over rather than appearing next to it.
@@ -160,6 +168,9 @@ class InfoPaneTabs(QTabWidget):
         panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
+        # Editing anything in a tab keeps it, the way a double-click on its name
+        # would: it is being worked in now, not looked at.
+        panel.user_edited.connect(lambda p=panel: self._pin_panel(p))
         panel.generate_requested.connect(  # relay every tab's Generate
             lambda name, params, p=panel: self._on_panel_generate(p, name, params)
         )
@@ -194,7 +205,9 @@ class InfoPaneTabs(QTabWidget):
 
     def _pin_subtab(self, index: int):
         """A double-click on a tab keeps it: the italic comes off, and the next
-        open goes beside it rather than over it.
+        open goes beside it rather than over it. Editing a field in the tab says
+        the same thing, and does the same (see :meth:`_add_subtab`) — the
+        double-click is for keeping a tab you have only read.
 
         The same gesture used to ask for a name. Tabs are named after what they
         show now, so there was nothing left for a typed one to say.
@@ -315,6 +328,10 @@ class InfoPaneTabs(QTabWidget):
         tab, which makes the same promise — nothing has been done in it, so the
         next open lands there. Read rather than stored, so the resting tab loses
         its slant the moment a workflow is picked in it and it becomes work.
+
+        The preview tab loses its own slant the same way, through
+        :meth:`_pin_panel`: an edit to any of its fields makes it a tab someone
+        is working in, and there is nothing left for an open to take over.
         """
         if self._preview_panel is not None:
             return self._preview_panel
@@ -328,7 +345,12 @@ class InfoPaneTabs(QTabWidget):
         self.tabBar().set_preview_index(self.indexOf(panel) if panel is not None else -1)
 
     def _pin_panel(self, panel):
-        """Stop ``panel`` being the tab a later click replaces."""
+        """Stop ``panel`` being the tab a later click replaces.
+
+        A no-op on any other tab, which is what lets every "this tab is being
+        worked in" cue — a double-click, a Generate, an edit to a field — call it
+        without first asking whether the tab was the italic one.
+        """
         if self._preview_panel is panel:
             self._set_preview_panel(None)
 

@@ -361,6 +361,17 @@ def _lower_divider() -> QFrame:
     return line
 
 
+def _all_video(rows) -> bool:
+    """Whether ``rows`` is a set of videos and not empty.
+
+    Empty is not "all video": nothing in front of you is nothing to say, and
+    both callers depend on that — a shelf with no pick must not read as a folder
+    of clips.
+    """
+    rows = list(rows)
+    return bool(rows) and all(gallery.media_type_of_row(row) == "video" for row in rows)
+
+
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
@@ -629,7 +640,7 @@ class GalleryView(QWidget):
         # covers it may end, but the base state comes back under it.
         self._regions_wanted = False
         self._region_shows: dict[str, QWidget | None] = (
-            {"portrait": None, "landscape": None} if fun_time is not None else {}
+            dict.fromkeys(_ORIENTATIONS) if fun_time is not None else {}
         )
         # Whether the hosting session is OmniPaused, remembered so a show
         # opened mid-pause opens frozen (see set_session_paused).
@@ -666,6 +677,7 @@ class GalleryView(QWidget):
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._genau_resolving: set[str] = set()
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
+        self._image_index: dict | None = None  # memo, dropped by every rebuild
         # --- the gallery search (the field over the tree, the results in the middle
         # pane). The index is rebuilt with the gallery and queried on each
         # keystroke; the expander widens the query's words through the local LLM
@@ -2002,15 +2014,28 @@ class GalleryView(QWidget):
             self._sync_history_buttons()
         self.refresh()
 
-    def _folder_key_for(self, workflow_name: str, params: dict) -> str:
+    def _folder_key_for(self, workflow_name: str, params: dict,
+                        workflow_version: str | None = None) -> str:
         """The settings-folder key a config lands in — the key the re-roll
         controller tracks its job under, and the tree leaf it groups into. Shared by
         the Generate launch and the front-tab generating/cancel reconcile so a tab
-        matches the very job its own Generate started."""
-        return gallery.settings_folder_key(
-            {"workflow_name": workflow_name, "params_json": json.dumps(params)},
-            gallery.build_image_config_index(self._image_rows),
-        )
+        matches the very job its own Generate started.
+
+        Five call sites used to build this row dict inline, and they disagreed
+        about what went in it — one left the workflow version out, two put it in,
+        two spread a whole video row — so a reader could not tell which differences
+        were meaningful. They are arguments now, and a caller that already holds a
+        row asks :meth:`_folder_key_of` instead.
+        """
+        row = {"workflow_name": workflow_name, "params_json": json.dumps(params)}
+        if workflow_version is not None:
+            row["workflow_version"] = workflow_version
+        return self._folder_key_of(row)
+
+    def _folder_key_of(self, row: dict) -> str:
+        """The settings-folder key a stored row lands in — the same derivation,
+        for a caller holding the row rather than a config."""
+        return gallery.settings_folder_key(row, self.image_config_index())
 
     def _panel_reroll_key(self, panel) -> str:
         """The settings-folder key the config in ``panel`` would run in."""
@@ -2310,6 +2335,7 @@ class GalleryView(QWidget):
         self._pending_key = None
         self._pending_selection = None
         self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
+        self._image_index = None   # rebuilt on the next ask (image_config_index)
         # An act with no video under it has no recipe to mine, so gray it out rather
         # than let it be picked only to answer "no recipe yet".
         self._combine.set_available_categories(
@@ -2537,9 +2563,16 @@ class GalleryView(QWidget):
 
 
     def image_config_index(self) -> dict:
-        """The index a folder key is derived against — rebuilt from the image
-        rows, which change only on a rebuild."""
-        return gallery.build_image_config_index(self._image_rows)
+        """The index a folder key is derived against.
+
+        Memoized against the image rows it is built from, which change only on a
+        rebuild: it was rebuilt from scratch at eight call sites, several of them
+        on a click's path, and the answer is the same every time between two
+        rebuilds.
+        """
+        if self._image_index is None:
+            self._image_index = gallery.build_image_config_index(self._image_rows)
+        return self._image_index
 
     def name_search_on_screen(self, query: str, scope: str) -> None:
         """Say in the header that a search is what the pane is showing, in place
@@ -3432,8 +3465,7 @@ class GalleryView(QWidget):
         """The settings-folder key the working params now belong to — recomputed as
         voice edits the prompt, so a steered loop can re-home to the matching folder."""
         row = {**working["row"], "params_json": json.dumps(working["params"])}
-        return gallery.settings_folder_key(
-            row, gallery.build_image_config_index(self._image_rows))
+        return self._folder_key_of(row)
 
     def _on_auto_stopped(self, key: str):
         """A folder's loop ended (toggled off, Esc'd, or failed — a cancelled
@@ -3686,11 +3718,8 @@ class GalleryView(QWidget):
     def _selection_is_all_video(self) -> bool:
         """Whether every picked thumbnail is a video — which is why Enhance is
         dark, as opposed to its images being enhanced at these settings already."""
-        rows = [row for pid in self.selected_prompt_ids()
-                if (row := self._db.get_generation(pid)) is not None]
-        return bool(rows) and all(
-            gallery.media_type_of_row(row) == "video" for row in rows
-        )
+        return _all_video(row for pid in self.selected_prompt_ids()
+                          if (row := self._db.get_generation(pid)) is not None)
 
     def _enhance_selection(self):
         """The bank button's action: enhance the picked thumbnails, or every
@@ -3725,9 +3754,7 @@ class GalleryView(QWidget):
         if not rows and not self._browser.selected_ids:
             group = self._current_group()
             rows = gallery.rows_under(group) if group is not None else []
-        return bool(rows) and all(
-            gallery.media_type_of_row(row) == "video" for row in rows
-        )
+        return _all_video(rows)
 
     def _sync_star_button(self):
         """Aim Star like Delete and Enhance: the picked thumbnails, else the
@@ -3844,7 +3871,7 @@ class GalleryView(QWidget):
         controller took only one job per folder; it takes them all now, so the
         buffer had nothing left to do but hide the work.)
         """
-        index = gallery.build_image_config_index(self._image_rows)
+        index = self.image_config_index()
         for row in rows:
             params = gallery.enhance_params_for(row, self._enhance_settings)
             if params is None:
@@ -3863,12 +3890,10 @@ class GalleryView(QWidget):
         cannot diagnose from the screen.
         """
         workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        if index is None:
-            index = gallery.build_image_config_index(self._image_rows)
         key = gallery.settings_folder_key(
             {"workflow_name": workflow.name, "workflow_version": workflow.version,
              "params_json": json.dumps(params)},
-            index,
+            index if index is not None else self.image_config_index(),
         )
         prepared = randomize_seeds(params, workflow.seed_keys())
         prompt_id = self._reroll.start_prepared(key, workflow, prepared)
@@ -4342,7 +4367,7 @@ class GalleryView(QWidget):
         something already up.
         """
         self._regions_wanted = True
-        for side in ("portrait", "landscape"):
+        for side in _ORIENTATIONS:
             if self.region_show(side) is not None:
                 continue
             key = self.region_base_location(side)
@@ -5120,7 +5145,7 @@ class GalleryView(QWidget):
         folder = gallery.config_folder_name(
             row.get("workflow") or "",
             gallery.settings_signature(row.get("workflow"), row.get("params"),
-                               gallery.build_image_config_index(self._image_rows)),
+                               self.image_config_index()),
             self._db.folder_meta_map(),
         )
         return " / ".join(part for part in (folder, item) if part)
@@ -5362,7 +5387,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None:
             return
-        key = gallery.settings_folder_key(row, gallery.build_image_config_index(self._image_rows))
+        key = self._folder_key_of(row)
         if key in self._reroll_jobs:
             return  # this folder already has a re-roll running
         if which == "video":
@@ -5653,11 +5678,9 @@ class GalleryView(QWidget):
         # record), not the recipe video's stored one: the settings key folds the
         # version in, and keying by an old recipe's version would park the reveal
         # on a folder the finished row never joins.
-        key = gallery.settings_folder_key(
+        key = self._folder_key_of(
             {**dict(video_row), "params_json": json.dumps(params),
-             "workflow_version": workflow.version},
-            gallery.build_image_config_index(self._image_rows),
-        )
+             "workflow_version": workflow.version})
         if self._would_reproduce_a_completed_run(workflow, params):
             if send:
                 # Spoken. The dialog below asks which of two seeds to re-roll,
@@ -5836,11 +5859,7 @@ class GalleryView(QWidget):
         workflow, params = built
         logger.info("combine: category=%s intent=%s image=%s -> curated recipe",
                     category, intent, image_id)
-        key = gallery.settings_folder_key(
-            {"workflow_name": workflow.name, "workflow_version": workflow.version,
-             "params_json": json.dumps(params)},
-            gallery.build_image_config_index(self._image_rows),
-        )
+        key = self._folder_key_for(workflow.name, params, workflow.version)
         prompt_id = self._reroll.start_prepared(key, workflow, params)
         if prompt_id:
             # The act, with no video under it: a curated recipe is pinned in the
@@ -7240,8 +7259,7 @@ class GalleryView(QWidget):
         row = self._row_for(prompt_id)
         if row is None:
             return None
-        key = gallery.settings_folder_key(
-            row, gallery.build_image_config_index(self._image_rows))
+        key = self._folder_key_of(row)
         return self._tree_item_for(key) if key else None
 
     # --- back/forward navigation ------------------------------------------

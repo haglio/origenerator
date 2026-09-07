@@ -1959,7 +1959,7 @@ def test_the_trash_shelf_is_a_place_back_returns_to(qtbot):
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._tree.currentItem() is _shelf(view, TRASH_KEY)
 
@@ -2974,9 +2974,9 @@ def test_back_and_forward_walk_the_viewed_generations(qtbot):
     view._browser._thumbnail_clicked("i2")
     assert view._selected["prompt_id"] == "i2"
 
-    view._go_back()
+    view._navigation.go_back()
     assert view._selected["prompt_id"] == "i1"
-    view._go_forward()
+    view._navigation.go_forward()
     assert view._selected["prompt_id"] == "i2"
 
 
@@ -2994,7 +2994,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     view._follow_link("img1")      # follow its input-image link
 
     assert view._selected["prompt_id"] == "img1"
-    view._go_back()
+    view._navigation.go_back()
     assert view._selected["prompt_id"] == "vid1"
 
 
@@ -3010,7 +3010,7 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
 
     for _ in range(3):
-        view._go_back()
+        view._navigation.go_back()
     assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
 
 
@@ -3426,7 +3426,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
 
     view._follow_link("img1")                  # follow its source-image link
     assert view._selected["prompt_id"] == "img1"
-    view._go_back()
+    view._navigation.go_back()
     assert view._selected["prompt_id"] == "vid1"  # Back to where we were
 
 
@@ -3500,14 +3500,14 @@ def test_history_spans_folder_navigation(qtbot):
     view._browser._thumbnail_clicked("i1")                      # view its item
     assert view._selected["prompt_id"] == "i1"
 
-    view._go_back()                                    # the image folder, nothing picked
+    view._navigation.go_back()                                    # the image folder, nothing picked
     assert view._tree.currentItem() is view._leaf_by_id["i1"]
     assert view._selected is None
 
-    view._go_back()                                    # the video folder, on its item
+    view._navigation.go_back()                                    # the video folder, on its item
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
-    view._go_back()                                    # the video folder, nothing picked
+    view._navigation.go_back()                                    # the video folder, nothing picked
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
     assert view._selected is None
 
@@ -3523,10 +3523,10 @@ def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot
     assert view._browser.showing_recents() is False
     assert view._back_btn.isEnabled()                    # the shelf is somewhere to go back to
 
-    view._go_back()
+    view._navigation.go_back()
     assert view._browser.showing_recents()                       # Back returns to the Recents shelf
 
-    view._go_forward()
+    view._navigation.go_forward()
     assert view._browser.showing_recents() is False              # Forward re-opens the folder
     assert view.selected_generation() == "i2"
 
@@ -3547,7 +3547,7 @@ def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
     assert view._browser.showing_recents() is False
     assert view._back_btn.isEnabled()
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._browser.showing_recents()
 
@@ -3562,11 +3562,11 @@ def test_back_walks_folders_the_way_it_walks_generations(qtbot):
     view._tree.setCurrentItem(cat)
     view._tree.setCurrentItem(dog)
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._tree.currentItem() is cat
 
-    view._go_forward()
+    view._navigation.go_forward()
 
     assert view._tree.currentItem() is dog
 
@@ -3601,8 +3601,8 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     view._browser._thumbnail_clicked("i2")                        # view an item there
     assert view._tree.currentItem() is not _shelf(view, STARRED_KEY)
 
-    view._go_back()                                      # the folder drilled into
-    view._go_back()
+    view._navigation.go_back()                                      # the folder drilled into
+    view._navigation.go_back()
     assert view._tree.currentItem() is _shelf(view, STARRED_KEY)  # Back returns to Starred
 
 
@@ -3616,7 +3616,7 @@ def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
     assert view._browser.showing_recents() is False
 
-    view._go_back()
+    view._navigation.go_back()
     assert view._browser.showing_recents()                       # back on the shelf...
     assert view.selected_generation() == "i2"            # ...with i2 previewed again
     assert view._browser._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
@@ -3634,14 +3634,14 @@ def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
     for pid in ("i1", "i2", "i3"):
         view._browser._thumb_widgets[pid].clicked.emit(pid)       # browse a few previews
 
-    view._go_back()
+    view._navigation.go_back()
     assert view._browser.showing_recents()                       # still on the shelf...
     assert view.selected_generation() == "i2"            # ...on the one before
 
-    view._go_back()
+    view._navigation.go_back()
     assert view.selected_generation() == "i1"
 
-    view._go_forward()
+    view._navigation.go_forward()
     assert view.selected_generation() == "i2"
 
 
@@ -3656,7 +3656,7 @@ def test_back_to_a_shelf_item_re_highlights_its_tile(qtbot):
     view._browser._thumb_widgets["i1"].clicked.emit("i1")
     view._browser._thumb_widgets["i2"].clicked.emit("i2")
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._browser._thumb_widgets["i1"].is_selected()
     assert not view._browser._thumb_widgets["i2"].is_selected()
@@ -3671,7 +3671,7 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     view._browser._thumbnail_clicked("i1")
     view._browser._thumbnail_clicked("i2")
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view.selected_generation() == "i1"
     assert view._browser._thumb_widgets["i1"].is_selected()
@@ -3707,7 +3707,7 @@ def test_back_onto_the_folder_itself_drops_the_pick(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     view._browser._thumbnail_clicked("i1")
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._tree.currentItem() is view._leaf_by_id["i1"]  # the same folder...
     assert view._selected is None                              # ...showing nothing
@@ -3725,7 +3725,7 @@ def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
     view._browser._thumb_widgets["i1"].clicked.emit("i1")         # previewed on the shelf
     view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._browser.showing_recents()
     assert view.selected_generation() == "i1"
@@ -3744,7 +3744,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     view._browser._thumb_widgets["i1"].double_clicked.emit("i1")  # open the hit in its folder
     assert view._browser.showing_search() is False
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._browser.showing_search()
     assert view._search.field.text() == "cat"
@@ -3762,7 +3762,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     _search_for(view, "cat")
     view._browser._thumb_widgets["i1"].clicked.emit("i1")
 
-    view._go_back()
+    view._navigation.go_back()
 
     assert view._browser.showing_search()
     assert view._search.field.text() == "cat"
@@ -3785,7 +3785,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
 
     assert len(view._navigation._history._stack) == depth + 1
 
-    view._go_back()
+    view._navigation.go_back()
     assert view._browser.showing_search() is False
 
 
@@ -10754,11 +10754,23 @@ class _SignalMotion(QObject):
     def toggle_cruise(self):
         self.calls.append("cruise")
 
+    def set_cruise(self, on):
+        self.calls.append(("cruise", on))
+
     def quarter_offset(self):
         self.calls.append("nudge")
 
-    def cycle_shape(self):
-        self.calls.append(("shape",))
+    def cycle_shape(self, step=1):
+        self.calls.append(("shape", step))
+
+    def set_speed(self, value):
+        self.calls.append(("set_speed", value))
+
+    def set_amplitude(self, value):
+        self.calls.append(("set_amplitude", value))
+
+    def set_center(self, value):
+        self.calls.append(("set_center", value))
 
     def status_text(self):
         return "OSR2 stub"

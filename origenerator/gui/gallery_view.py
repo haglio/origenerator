@@ -406,7 +406,9 @@ _VOICE_SHELVES = {
 
 # The motion dial each spoken word turns, as (the driver's method, its argument
 # or ``None`` for a method that takes none) — the very moves the keys make (see
-# :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed.
+# :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed. Bound
+# against the driver at construction, so a method renamed there is an error at
+# launch rather than a spoken word that quietly does nothing.
 _VOICE_MOTION = {
     AppCommand.SPEED_UP: ("adjust_speed", 5),
     AppCommand.SPEED_DOWN: ("adjust_speed", -5),
@@ -431,21 +433,24 @@ _VOICE_DIALS = {
     "center": "set_center",
 }
 
-# The app-wide switch each spoken word flips, as (the button's attribute, the
-# state asked for — ``None`` flips whichever way it is standing — and what the
-# answer calls it). Set through the button rather than around it, so a spoken
-# switch and a clicked one are the same event and the bank shows both.
+# The app-wide switch each spoken word flips, as (which of the bank's switches,
+# the state asked for — ``None`` flips whichever way it is standing — and what
+# the answer calls it). Set through the button rather than around it, so a
+# spoken switch and a clicked one are the same event and the bank shows both.
+# The button itself is looked up at construction (GalleryView._init_voice_tables)
+# — spelled here it would be a string no rename and no linter could follow.
+_AUTO, _AUDIO, _DRIVE, _MIC = "auto", "audio", "drive", "mic"
 _VOICE_SWITCHES = {
-    AppCommand.AUTO: ("_auto_btn", None, "auto-generate"),
-    AppCommand.AUTO_ON: ("_auto_btn", True, "auto-generate"),
-    AppCommand.AUTO_OFF: ("_auto_btn", False, "auto-generate"),
-    AppCommand.AUDIO: ("_audio_btn", None, "the audio bed"),
-    AppCommand.AUDIO_ON: ("_audio_btn", True, "the audio bed"),
-    AppCommand.AUDIO_OFF: ("_audio_btn", False, "the audio bed"),
-    AppCommand.DRIVE: ("_osr2_btn", None, "the OSR2"),
-    AppCommand.DRIVE_ON: ("_osr2_btn", True, "the OSR2"),
-    AppCommand.DRIVE_OFF: ("_osr2_btn", False, "the OSR2"),
-    AppCommand.MIC_OFF: ("_mic_btn", False, "the mic"),
+    AppCommand.AUTO: (_AUTO, None, "auto-generate"),
+    AppCommand.AUTO_ON: (_AUTO, True, "auto-generate"),
+    AppCommand.AUTO_OFF: (_AUTO, False, "auto-generate"),
+    AppCommand.AUDIO: (_AUDIO, None, "the audio bed"),
+    AppCommand.AUDIO_ON: (_AUDIO, True, "the audio bed"),
+    AppCommand.AUDIO_OFF: (_AUDIO, False, "the audio bed"),
+    AppCommand.DRIVE: (_DRIVE, None, "the OSR2"),
+    AppCommand.DRIVE_ON: (_DRIVE, True, "the OSR2"),
+    AppCommand.DRIVE_OFF: (_DRIVE, False, "the OSR2"),
+    AppCommand.MIC_OFF: (_MIC, False, "the mic"),
 }
 
 # The bank button each spoken word presses with no show up, as (the button, the
@@ -453,14 +458,20 @@ _VOICE_SWITCHES = {
 # own tooltip, which for most of them already says why: "Nothing to undo",
 # "Nothing here to star"). Only the two whose tips are bare labels, and Group,
 # whose tip explains the button rather than refusing it, carry their own words.
-_VOICE_BANK_ACTIONS = {
-    AppCommand.BACK: ("_back_btn", "_go_back", "nowhere back"),
-    AppCommand.FORWARD: ("_forward_btn", "_go_forward", "nowhere forward"),
-    AppCommand.CULL: ("_delete_btn", "_delete_selection", None),
-    AppCommand.STAR: ("_star_btn", "_star_selection", None),
-    AppCommand.UNDO: ("_undo_btn", "_undo", None),
-    AppCommand.REDO: ("_redo_btn", "_redo", None),
-    AppCommand.GROUP: ("_group_btn", "_group_selection", "pick some folders first"),
+# The refusal each one carries when it cannot run — ``None`` to use the button's
+# own tooltip, which for most of them already says why ("Nothing to undo",
+# "Nothing here to star"). Which button and which action is bound at
+# construction (GalleryView._init_voice_tables): named here as strings, a
+# renamed handler would break the microphone silently, with no import error, no
+# type error and no lint warning.
+_VOICE_BANK_REFUSALS = {
+    AppCommand.BACK: "nowhere back",
+    AppCommand.FORWARD: "nowhere forward",
+    AppCommand.CULL: None,
+    AppCommand.STAR: None,
+    AppCommand.UNDO: None,
+    AppCommand.REDO: None,
+    AppCommand.GROUP: "pick some folders first",
 }
 
 # What a spoken word does to a show's enhanced-only switch — the one beside
@@ -752,6 +763,7 @@ class GalleryView(QWidget):
         self._launching: dict[str, InFlightItem] = {}
         self._launch_seq = 0
         self._build_ui()
+        self._init_voice_tables()
         self._sync_history_buttons()
         self._navigation.seed()
         self._sync_action_buttons()
@@ -1127,8 +1139,8 @@ class GalleryView(QWidget):
         # what's in front of you, and what the app is doing on its own. Grouping
         # is what makes an icon-only bank readable — a button's neighbors say as
         # much about it as its glyph does.
-        self._back_btn = self._tool_button(icons.back_icon(), "Back", self._go_back)
-        self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._go_forward)
+        self._back_btn = self._tool_button(icons.back_icon(), "Back", self._navigation.go_back)
+        self._forward_btn = self._tool_button(icons.forward_icon(), "Forward", self._navigation.go_forward)
         self._undo_btn = self._tool_button(icons.undo_icon(), "Undo", self._undo)
         self._redo_btn = self._tool_button(icons.redo_icon(), "Redo", self._redo)
         self._slideshow_btn = self._tool_button(
@@ -2549,14 +2561,6 @@ class GalleryView(QWidget):
         self._sync_enhance_button()
         self._sync_delete_button()
         self._navigation.record()
-
-    def _go_back(self):
-        """The Back button, and the spoken word for it. Named on the view because
-        the voice table reaches its handlers by attribute name (A/design/008)."""
-        self._navigation.go_back()
-
-    def _go_forward(self):
-        self._navigation.go_forward()
 
     def suppress_history(self):
         """A search leaving is a step on the way, not a stop — the history's own
@@ -4097,6 +4101,46 @@ class GalleryView(QWidget):
         self._tree.setCurrentItem(item)  # whose signal draws it
         self._answer_command(f"🎤 {label}")
 
+    def _init_voice_tables(self):
+        """Bind the spoken vocabulary to the objects it acts on, now that the
+        bank exists.
+
+        The module tables above say which switch, which refusal and which dial;
+        this is where each becomes the button, the bound handler and the bound
+        setter it means. Spelled as attribute names — as they were — a renamed
+        button or handler broke the microphone silently: no import error, no type
+        error, no lint warning, and a spoken word that simply did nothing. Bound
+        here, the same rename is an ``AttributeError`` at launch.
+
+        Hosted by a session, three of the switches are never built at all and
+        the OSR2 driver is not either — the session's main player owns the device
+        for its whole length. Those keys keep a ``None``, so
+        :meth:`_flip_switch` can still answer that the session owns them, and the
+        dial words find nothing to turn rather than a driver that is not there.
+        """
+        self._voice_switches = {
+            _AUTO: self._auto_btn, _AUDIO: self._audio_btn,
+            _DRIVE: self._osr2_btn, _MIC: self._mic_btn,
+        }
+        self._voice_bank_actions = {
+            AppCommand.BACK: (self._back_btn, self._navigation.go_back),
+            AppCommand.FORWARD: (self._forward_btn, self._navigation.go_forward),
+            AppCommand.CULL: (self._delete_btn, self._delete_selection),
+            AppCommand.STAR: (self._star_btn, self._star_selection),
+            AppCommand.UNDO: (self._undo_btn, self._undo),
+            AppCommand.REDO: (self._redo_btn, self._redo),
+            AppCommand.GROUP: (self._group_btn, self._group_selection),
+        }
+        driver = self._osr2_motion
+        self._voice_motion = {
+            command: (getattr(driver, method) if driver else None, argument)
+            for command, (method, argument) in _VOICE_MOTION.items()
+        }
+        self._voice_dials = {
+            dial: getattr(driver, setter) if driver else None
+            for dial, setter in _VOICE_DIALS.items()
+        }
+
     def _flip_switch(self, command: AppCommand):
         """Set one of the app-wide switches, through its button rather than
         around it — a spoken switch is the same event as a clicked one, so the
@@ -4107,8 +4151,8 @@ class GalleryView(QWidget):
         with a show up it lands in the show's corner, where the bank is not
         visible to say it instead.
         """
-        attribute, want, name = _VOICE_SWITCHES[command]
-        button = getattr(self, attribute)
+        switch, want, name = _VOICE_SWITCHES[command]
+        button = self._voice_switches[switch]
         if button is None:  # hosted: the session owns the audio bed and the mic
             self._answer_command(f"🎤 {name} is the session's here")
             return
@@ -4160,8 +4204,7 @@ class GalleryView(QWidget):
         alike, and the dials read the same whether or not the device is running:
         a motion can be set up before it is started, exactly as the panel allows.
         """
-        method, argument = _VOICE_MOTION[command]
-        turn = getattr(self._osr2_motion, method)
+        turn, argument = self._voice_motion[command]
         turn() if argument is None else turn(argument)
         self._answer_command(f"🎤 {self._osr2_motion.status_text()}")
 
@@ -4174,8 +4217,7 @@ class GalleryView(QWidget):
         own clamping, which is why "min speed" can say nought and land on the
         slowest the device actually moves at.
         """
-        put = getattr(self._osr2_motion, _VOICE_DIALS[setting.dial])
-        put(setting.value)
+        self._voice_dials[setting.dial](setting.value)
         self._answer_command(f"🎤 {self._osr2_motion.status_text()}")
 
     def _run_on_show(self, show, command: AppCommand):
@@ -4210,9 +4252,8 @@ class GalleryView(QWidget):
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
             self._answer_command(f"🎤 {command.value} is a slideshow's — none is up")
             return
-        attribute, action, refusal = _VOICE_BANK_ACTIONS[command]
-        self._press_bank_button(getattr(self, attribute), getattr(self, action),
-                                refusal)
+        button, act = self._voice_bank_actions[command]
+        self._press_bank_button(button, act, _VOICE_BANK_REFUSALS[command])
 
     def _press_bank_button(self, button, act, refusal: str | None = None):
         """Do what a bank button does, and answer in that button's own words.

@@ -56,6 +56,30 @@ The near miss that still counts: tightening a signature so an unfamiliar file
 lands in a family rather than in `None` — a confident wrong answer hides the
 model, where the honest shrug only leaves it listed.
 
+## A feature the session can reach is half a feature until Fun Time answers it
+
+This app runs two ways — on its own, and hosted inside a Fun Time session as one
+of the room's managed windows — so anything added here that the session touches
+has a matching half over there, and the two are one piece of work rather than a
+feature and a follow-up. Three shapes it takes: a verb in
+`gui/fun_time_bridge.py` (answered by fun_time's dispatch table and its loop
+branches), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
+`fun_time/tests/test_command_registry.py` holds the dispatcher to), and the
+`--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
+`windows_bridge_sequencer.py`).
+
+One-sided, none of them fails loudly. The console's enhanced-only switch shipped
+on the shared side with nothing on fun_time's side answering the verb it posts,
+so the button lit and the shows played on unchanged — a control that looks live
+and does nothing, found by an audit rather than by a red test (bug 90). Pointed
+the other way it is worse: a flag this app stops accepting is a flag the session
+goes on passing, and the hosted launch dies in argparse before it can log.
+
+The near miss that still counts: writing this side and filing the session's half
+as an item for later. Both branches exist before either is pushed; which repo's
+queue lands first is the only question, and it is answered by which order leaves
+a live session working.
+
 ## The commands in `tools/`, and why each one is not a menu item
 
 Two things live here that the app does not put in front of the user, so a

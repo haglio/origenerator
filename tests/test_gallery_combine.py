@@ -91,10 +91,13 @@ def test_combined_params_payload_derives_the_size_from_the_dropped_image():
 
     payload = _I2V.build_api_payload(gallery.combined_params(video, image, _I2V))
 
-    assert payload["20"]["class_type"] == "ImageScaleToTotalPixels"
-    assert payload["21"]["class_type"] == "GetImageSize"
-    assert payload["14"]["inputs"]["width"] == ["21", 0]
-    assert payload["14"]["inputs"]["height"] == ["21", 1]
+    scaled = next(nid for nid, n in payload.items()
+                  if n["class_type"] == "ImageScaleToTotalPixels")
+    sized = next(nid for nid, n in payload.items() if n["class_type"] == "GetImageSize")
+    assert payload[sized]["inputs"]["image"] == [scaled, 0]
+    reader = next(n for n in payload.values()
+                  if n["inputs"].get("width") == [sized, 0])
+    assert reader["inputs"]["height"] == [sized, 1]
 
 
 def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():

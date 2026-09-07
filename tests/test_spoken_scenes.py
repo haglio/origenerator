@@ -84,7 +84,10 @@ def test_a_speaking_segment_starts_on_the_frame_before_it_and_carries_its_motion
     # frames before it, continues their motion rather than starting still.
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params())
     first, third = _nodes(payload, "WanSoundImageToVideo")
-    assert first["inputs"]["ref_image"] == ["20", 0] and "ref_motion" not in first["inputs"]
+    scaled = next(nid for nid, n in payload.items()
+                  if n["class_type"] == "ImageScaleToTotalPixels")
+    assert first["inputs"]["ref_image"] == [scaled, 0]
+    assert "ref_motion" not in first["inputs"]
     last = payload[third["inputs"]["ref_image"][0]]
     assert (last["class_type"], last["inputs"]["batch_index"]) == ("ImageFromBatch", 80)
     assert third["inputs"]["ref_motion"] == last["inputs"]["image"]

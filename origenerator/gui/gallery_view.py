@@ -70,7 +70,6 @@ from origenerator.gui.browser_pane import (
     BrowserPane,
     BrowserScrollArea,
     PaneHost,
-    SearchTile,
     TreeNavigation,
 )
 from origenerator.gui.combine_panel import CombinePanel
@@ -2728,9 +2727,9 @@ class GalleryView(QWidget):
         for key, rows in by_folder.items():
             group = self._group_for_key(key) if len(rows) > 1 else None
             if group is not None:
-                tiles.append(SearchTile(row=rows[0], group=group, rows=list(rows)))
+                tiles.append(search.SearchTile(row=rows[0], group=group, rows=list(rows)))
             else:
-                tiles.extend(SearchTile(row=row, rows=[row]) for row in rows)
+                tiles.extend(search.SearchTile(row=row, rows=[row]) for row in rows)
         return tiles
 
     def _on_search_section_toggled(self, heading: str, collapsed: bool):

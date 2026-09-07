@@ -21,7 +21,7 @@ delete on a menu.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
@@ -107,26 +107,6 @@ class BrowserScrollArea(QScrollArea):
         super().mousePressEvent(event)
 
 
-@dataclass(frozen=True)
-class SearchTile:
-    """One thing a search draws: a folder, or a single generation.
-
-    Several hits in one settings folder are one answer, not eight — they share a
-    prompt and settings and differ only by seed, so drawing each of them fills
-    the pane with near-copies of the same picture and buries the other places
-    the query reached. So the view collapses them onto their folder (``group``
-    set, ``rows`` the hits it stands for), and leaves a folder's lone hit as
-    itself (``group`` ``None``).
-
-    ``row`` is the newest hit either way: the tile's picture when it stands
-    alone, and what decides the model + LoRA band it lands in when sorted that
-    way — every row in a settings folder ran the same recipe, so any of them
-    answers that.
-    """
-
-    row: dict
-    group: object | None = None
-    rows: list = field(default_factory=list)
 # Vertical breathing room left around a tile a link scrolls to, so it lands with
 # its neighbors in view rather than flush against an edge of the pane.
 _REVEAL_MARGIN = 40
@@ -523,7 +503,7 @@ class BrowserPane(QObject):
         paint(shut)
         return button
 
-    def _add_search_tile(self, flow, tile: SearchTile):
+    def _add_search_tile(self, flow, tile: search.SearchTile):
         """Draw one result — a folder tile or a single item — and record its place.
 
         The shown order matters beyond the drawing: Shift-select and the slideshow

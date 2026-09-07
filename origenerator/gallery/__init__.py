@@ -153,10 +153,6 @@ from origenerator.gallery.voice_commands import (
     match_command,
     recognized_spelling,
 )
-from origenerator.workflows.detail_parts import (
-    match_fix_command,
-    name_parts,
-)
 
 # The surface outside code may import from this package, rather than left to be
 # inferred from the import list above -- which reads to a linter as ninety-odd
@@ -234,11 +230,9 @@ __all__ = [
     "lora_label",
     "lora_signature",
     "match_command",
-    "match_fix_command",
     "media_type_of_row",
     "model_label",
     "model_signature",
-    "name_parts",
     "named_folders_by_row",
     "original_files_of",
     "output_disk_files",

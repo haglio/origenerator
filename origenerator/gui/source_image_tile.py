@@ -24,6 +24,10 @@ ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
 
 _THUMB = 120
+# What the tile says and draws when a showing names neither: a video's start
+# frame, which is what this slot was built for and still shows most often.
+_DEFAULT_HEADING = "From source image"
+_DEFAULT_MEDIA_TYPE = "image"
 
 
 class SourceImageTile(QWidget):
@@ -36,18 +40,15 @@ class SourceImageTile(QWidget):
 
     activated = pyqtSignal(str)
 
-    def __init__(self, parent=None, *, heading: str = "From source image",
-                 media_type: str = "image"):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self._prompt_id: str | None = None
-        self._default_heading = heading
-        self._default_media_type = media_type
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(4)
-        self._heading = QLabel(heading)
+        self._heading = QLabel(_DEFAULT_HEADING)
         self._heading.setStyleSheet("font-weight: 600;")
         column.addWidget(self._heading)
 
@@ -60,7 +61,7 @@ class SourceImageTile(QWidget):
         column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignLeft)
         # A photo (or play) badge in the thumbnail's top-left corner, like the
         # gallery tiles.
-        self._badge = MediaBadge(media_type, self._thumb)
+        self._badge = MediaBadge(_DEFAULT_MEDIA_TYPE, self._thumb)
 
         self._filename = QLabel()
         self._filename.setFixedWidth(_THUMB)  # match the thumb so the caption centers under it
@@ -79,8 +80,8 @@ class SourceImageTile(QWidget):
         per-showing, because the next row put in this slot may be a different
         relation to a different kind of thing."""
         self._prompt_id = prompt_id
-        self._heading.setText(heading or self._default_heading)
-        self._badge.set_media_type(media_type or self._default_media_type)
+        self._heading.setText(heading or _DEFAULT_HEADING)
+        self._badge.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         # A spaceless filename can't wrap, so middle-elide it to the tile width and
         # keep the full name in the tooltip.
         elided = self._filename.fontMetrics().elidedText(

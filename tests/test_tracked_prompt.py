@@ -7,7 +7,6 @@ from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit, QVBoxLayout, QWidget
 
 from origenerator.gui import diff_text, tracked_prompt
-from origenerator.gui.tracked_prompt import SETTLE_MS
 
 
 class _Pair(QWidget):
@@ -37,9 +36,21 @@ def pair(qtbot):
     return widget
 
 
-def _settle(qtbot):
-    """Wait out the pause after which the departed words are put back."""
-    qtbot.wait(SETTLE_MS + 80)
+def _settle_timer(edit: QPlainTextEdit) -> QTimer:
+    """The clock a tracked field puts the departed words back on."""
+    timer, = edit.findChildren(QTimer)
+    return timer
+
+
+def _settle(qtbot, edit: QPlainTextEdit) -> None:
+    """Wait out the pause after which the departed words are put back.
+
+    Until the clock has fired, not for a stretch of time long enough that it
+    probably has. A sleep a hair over the interval is a race every test here
+    would ride on at once: late in a loaded suite the timeout lands after the
+    sleep is over, and everything below reads the field one render early.
+    """
+    qtbot.waitUntil(lambda: not _settle_timer(edit).isActive(), timeout=5000)
 
 
 def _type_over(edit, word: str, replacement: str):
@@ -125,7 +136,7 @@ def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(
 
     _type_over(pair.edit, "cat", "dog")
 
-    settle, = pair.edit.findChildren(QTimer)
+    settle = _settle_timer(pair.edit)
     assert settle.isActive() and settle.isSingleShot()
     assert _marked(pair.edit, "struck") == ""  # nothing put back while typing
     # The number itself, not SETTLE_MS: read back through the constant that sets
@@ -144,7 +155,7 @@ def test_typing_over_a_word_strikes_it_through_without_leaving_the_field(pair, q
     pair.edit.setFocus()
 
     _type_over(pair.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
 
     assert _marked(pair.edit, "struck") == "cat"
     assert _marked(pair.edit, "lit") == "dog"
@@ -157,7 +168,7 @@ def test_the_caret_stays_where_it_was_typed_when_the_strike_arrives(pair, qtbot)
     pair.edit.setFocus()
 
     _type_over(pair.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
 
     # Still just after "dog", which is now further along the document than it is
     # along the prompt — the struck "cat" sits in front of it.
@@ -169,13 +180,13 @@ def test_typing_on_takes_the_strike_back_out_and_keeps_the_prompt_right(pair, qt
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
     _type_over(pair.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
 
     pair.edit.insertPlainText("gy")  # carry on typing: "dog" -> "doggy"
 
     assert pair.edit.toPlainText() == "a doggy on a couch"  # no strike in the way
     assert diff_text.live_text(pair.edit) == "a doggy on a couch"
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
     assert _marked(pair.edit, "struck") == "cat"
     assert diff_text.live_text(pair.edit) == "a doggy on a couch"
 
@@ -185,9 +196,9 @@ def test_a_word_typed_and_taken_back_out_stops_being_marked(pair, qtbot):
     pair.edit.setFocus()
 
     _type_over(pair.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
     _type_over(pair.edit, "dog", "cat")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
 
     assert _marks(pair.edit) == [("a cat on a couch", "plain")]
     assert diff_text.live_text(pair.edit) == "a cat on a couch"
@@ -215,7 +226,7 @@ def test_a_rewrite_across_lines_keeps_the_prompt_whole(qtbot):
     widget.edit.setFocus()
 
     _type_over(widget.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, widget.edit)
 
     assert diff_text.live_text(widget.edit) == "a dog\non a couch"
     assert _marked(widget.edit, "struck") == "cat"
@@ -234,7 +245,7 @@ def test_deleting_a_whole_line_keeps_the_prompt_whole(qtbot):
     cursor.setPosition(len("a cat\non a couch"), QTextCursor.MoveMode.KeepAnchor)
     widget.edit.setTextCursor(cursor)
     widget.edit.insertPlainText("")  # delete the selection
-    _settle(qtbot)
+    _settle(qtbot, widget.edit)
 
     assert diff_text.live_text(widget.edit) == "a cat"
 
@@ -243,14 +254,16 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
     tracked_prompt.track(pair.edit, "a cat on a couch")
     pair.edit.setFocus()
     _type_over(pair.edit, "cat", "dog")
-    _settle(qtbot)
+    _settle(qtbot, pair.edit)
 
     tracked_prompt.untrack(pair.edit)
 
     assert pair.edit.toPlainText() == "a dog on a couch"
-    # And no longer marks anything typed into it.
+    # And no longer marks anything typed into it. There is no waiting to do
+    # here — untracking took the clock with it, which is the whole reason
+    # nothing arrives after this.
+    assert pair.edit.findChildren(QTimer) == []
     pair.edit.setPlainText("a dog on a rug")
-    _settle(qtbot)
     assert _marks(pair.edit) == [("a dog on a rug", "plain")]
 
 

@@ -18,6 +18,7 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     family_palette,
+    hovered,
 )
 
 
@@ -213,8 +214,12 @@ def build_stylesheet() -> str:
         padding: 2px 10px;
         font-weight: bold;
     }}
+    /* Under the pointer a control goes one step LIGHTER than the ground it
+       already has -- the family's one hover rule.  This asked for the overlay
+       tier, which is darker than a button at rest, so every button in the app
+       dimmed at the moment it was reached for. */
     QToolButton:hover {{
-        background-color: {_h(BG_TERTIARY)};
+        background-color: {_h(hovered(BG_BUTTON))};
     }}
     /* A control that is ON sits on a lighter ground than one at rest -- one rule
        across the family, so a toggled button reads the same whichever app it is
@@ -222,6 +227,9 @@ def build_stylesheet() -> str:
        "engaged". */
     QToolButton:checked {{
         background-color: {_h(BG_BUTTON_ACTIVE)};
+    }}
+    QToolButton:checked:hover {{
+        background-color: {_h(hovered(BG_BUTTON_ACTIVE))};
     }}
     QToolButton#iconButton {{
         padding: 4px;
@@ -233,6 +241,9 @@ def build_stylesheet() -> str:
     }}
     QToolButton#dimensionUnlock:checked {{
         background-color: {_h(BLUE)};
+    }}
+    QToolButton#dimensionUnlock:checked:hover {{
+        background-color: {_h(hovered(BLUE))};
     }}
     QToolButton:disabled {{
         background-color: {_h(BG_SECONDARY)};

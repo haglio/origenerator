@@ -455,21 +455,23 @@ class ParamForm(QWidget):
         # those so the free-floating button tracks them even when it unfolds.
         content.installEventFilter(self)
 
-    def _position_swap_button(self):
-        """Center the swap button between the width and height rows, inside a left
-        gutter reserved for it so it sits clear of the "Width"/"Height" labels.
+    def _center_between_dimension_rows(self, btn, top_row, lower_row):
+        """Center ``btn`` between the width and height rows, inside a left gutter
+        reserved for it so it sits clear of the "Width"/"Height" labels.
 
         The gutter is the section's left margin, sized to the button here (its
         final width isn't known until its font and stylesheet apply, after
-        construction) — the same lane the unlock toggle opens on a derived-size
-        form. Squeezing the button into whatever space the labels happened to
-        leave is what put it on top of the words. In the Dimensions content's
-        coordinates, its parent; called on every resize/show/toggle since a free
-        child gets no help from the layout, and a no-op while the section is
-        folded (the button hides with it).
+        construction). Squeezing the button into whatever space the labels
+        happened to leave is what put it on top of the words. In the Dimensions
+        content's coordinates, the button's parent; called on every
+        resize/show/toggle since a free child gets no help from the layout, and
+        a no-op while the section is folded (the button hides with it).
+
+        ``top_row`` and ``lower_row`` are the two rows to sit between, which
+        differ by form: the spinners themselves where the size is typed, and the
+        stacks holding a derived size's plain reading where it is not.
         """
-        btn = self._swap_dimensions_btn
-        if btn is None or self._sections["Dimensions"].is_collapsed():
+        if self._sections["Dimensions"].is_collapsed():
             return
         btn.adjustSize()
         gutter = btn.width() + 10  # room for the button plus a gap to the labels
@@ -479,11 +481,19 @@ class ParamForm(QWidget):
             # with the rows in their new positions.
             form.setContentsMargins(gutter, 2, 0, 4)
             return
-        top = self._widgets["width"].geometry()
-        lower = self._widgets["height"].geometry()
+        top, lower = top_row.geometry(), lower_row.geometry()
         y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
         btn.move(max(0, (gutter - btn.width()) // 2), y)
         btn.raise_()
+
+    def _position_swap_button(self):
+        """Place the swap button, which sits between the two spinners a typed
+        size is entered in. A no-op on a derived-size form, which has none."""
+        if self._swap_dimensions_btn is None:
+            return
+        self._center_between_dimension_rows(
+            self._swap_dimensions_btn,
+            self._widgets["width"], self._widgets["height"])
 
     def eventFilter(self, obj, event):
         # Installed on the Dimensions content: re-place the floating control (swap
@@ -574,30 +584,13 @@ class ParamForm(QWidget):
         self._update_derived_display()
 
     def _position_unlock_button(self):
-        """Center the unlock toggle vertically between the width and height rows,
-        inside a left gutter reserved for it so it sits clear of the "Width"/
-        "Height" labels. The gutter is the section's left margin, sized to the
-        button here (the button's final width isn't known until its font and
-        stylesheet apply, after construction). In the Dimensions content's
-        coordinates (the toggle's parent). A no-op while the section is folded (the
-        toggle hides with it) or on a manual-size form."""
-        btn = self._unlock_btn
-        if btn is None or self._sections["Dimensions"].is_collapsed():
+        """Place the unlock toggle, which sits between the two rows a derived
+        size is read in. A no-op on a manual-size form, which has no toggle."""
+        if self._unlock_btn is None:
             return
-        btn.adjustSize()
-        gutter = btn.width() + 10  # room for the button plus a small gap to the labels
-        form = self._sections["Dimensions"].content_form()
-        if form.contentsMargins().left() != gutter:
-            # Push the labels over to open the gutter; the relayout re-invokes us
-            # with the rows in their new positions.
-            form.setContentsMargins(gutter, 2, 0, 4)
-            return
-        top = self._dim_stacks["width"].geometry()
-        lower = self._dim_stacks["height"].geometry()
-        y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
-        x = max(0, (gutter - btn.width()) // 2)
-        btn.move(x, y)
-        btn.raise_()
+        self._center_between_dimension_rows(
+            self._unlock_btn,
+            self._dim_stacks["width"], self._dim_stacks["height"])
 
     def _dimensions_unlocked(self) -> bool:
         """True when the user has unlocked the derived size to override it."""

@@ -1022,7 +1022,7 @@ class ShowDirector:
         satellite in this family.
         """
         show = self.surface_for(side)
-        if show is None or not hasattr(show, "set_enhanced_mode"):
+        if show is None:
             self._host.say("🎤 the filter needs a show to narrow")
             return
         if not enhanced_only:

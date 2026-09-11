@@ -88,6 +88,8 @@ class FakeShow:
         self.live = False
         self.held = set()
         self.hud_f_mode = False
+        self.hud_enhanced_mode = False
+        self.enhanced_items = []
         self.steps = []
         self.culled = 0
         self.starrable = True
@@ -172,6 +174,17 @@ class FakeShow:
 
     def toggle_f_mode(self):
         self.hud_f_mode = not self.hud_f_mode
+
+    def set_enhanced_mode(self, on):
+        self.hud_enhanced_mode = on and bool(self.enhanced_items)
+        return self.hud_enhanced_mode
+
+    def clear_modes(self):
+        self.hud_f_mode = False
+        self.hud_enhanced_mode = False
+
+    def hud_items(self):
+        return (list(self.enhanced_items), [])
 
     def step(self, delta):
         self.steps.append(delta)
@@ -791,6 +804,52 @@ def test_the_plate_clear_drops_another_apps_work(shows):
     made[0].queue().clear_queue_requested.emit()
 
     assert host.cleared_queue == 1
+
+
+def test_the_spoken_filter_narrows_the_show_and_says_what_is_left(shows):
+    # A speaker who has just narrowed a show wants to know there is still
+    # something in it, and "nothing here is enhanced" is the one answer worth
+    # hearing at once.
+    show = FakeShow()
+    show.enhanced_items = ["a", "b"]
+    director, _host, _made = shows()
+    director._slideshow = show
+
+    director.filter_enhanced(True)
+
+    assert show.said == ["🎤 enhanced only — 2 to play"]
+
+
+def test_a_show_with_nothing_enhanced_in_it_says_so(shows):
+    show = FakeShow()
+    director, _host, _made = shows()
+    director._slideshow = show
+
+    director.filter_enhanced(True)
+
+    assert show.said == ["🎤 nothing here is enhanced"]
+
+
+def test_clearing_the_filter_takes_f_mode_with_it(shows):
+    # "clear filter" is the way out of ALL of the narrowing, on every satellite
+    # in this family.
+    show = FakeShow()
+    show.hud_f_mode = True
+    director, _host, _made = shows()
+    director._slideshow = show
+
+    director.filter_enhanced(False)
+
+    assert show.hud_f_mode is False
+    assert show.said == ["🎤 showing all of them"]
+
+
+def test_the_filter_with_no_show_up_says_there_is_nothing_to_narrow(shows):
+    director, host, _made = shows()
+
+    director.filter_enhanced(True)
+
+    assert host.said == ["🎤 the filter needs a show to narrow"]
 
 
 def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(shows):

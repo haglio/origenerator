@@ -2,8 +2,8 @@
 
 Pure, Qt-free playlist state: what's on screen, how to step through it, and how
 long to dwell on an image before advancing. :class:`SlideshowPlaylist` plays a
-set in a random order, reshuffled each pass, with the shuffle injectable so the
-order is deterministic under test; a lock holds one item against the advance,
+set of :class:`Slide` in a random order, reshuffled each pass, with the shuffle
+injectable so the order is deterministic under test; a lock holds one item against the advance,
 answering Fun Time's padlock. The set grows as generations land in what the show
 is playing (:meth:`SlideshowPlaylist.add`) — a folder that is auto-generating is
 the case that asks for it — and it grows earlier still for one that is only being
@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from typing import NamedTuple
 
 # How long an image holds the screen unless something says otherwise.
 # Genau's console shows this as its clip-seconds pace and sets it from
@@ -43,6 +44,47 @@ DEFAULT_IMAGE_DWELL_MS = 4000
 # a black screen reading "Generating…" is nothing to watch, but the first
 # iterations coming in are the most exciting thing in a folder that is filling.
 LIVE = "live"
+
+
+class Slide(NamedTuple):
+    """One thing a show plays: a file (or the frames of a run still making one),
+    what kind of media it is, the generation it came from, and the still it is
+    drawn as while it is a neighbor rather than the one on screen.
+
+    The last two are absent from a set assembled without them — a lone file, a
+    test's — which is what the defaults say, so every slide has four fields and
+    nothing has to ask how long one is.
+    """
+
+    path: object
+    media_type: str
+    prompt_id: str | None = None
+    still: object | None = None
+
+    @classmethod
+    def of(cls, item) -> Slide:
+        """*item* as a slide, whether it arrives as one or as the bare tuple the
+        assembling caller built."""
+        return item if isinstance(item, cls) else cls(*item)
+
+    @property
+    def is_live(self) -> bool:
+        """Whether this is a run still being made, shown as its newest frame."""
+        return self.media_type == LIVE
+
+    def upgraded(self, path, media_type=None, still=None) -> Slide:
+        """This slide pointing at a better version of itself.
+
+        The new file, its media type (kept as it was when the caller names
+        none), the same id — an enhancement is the same item, not a new one —
+        and the new thumbnail when one came with it: the still it arrived with
+        is of the version this swap just retired.
+        """
+        return self._replace(
+            path=path,
+            media_type=self.media_type if media_type is None else media_type,
+            still=self.still if still is None else still,
+        )
 
 
 @dataclass(frozen=True)
@@ -71,29 +113,10 @@ def in_order(order: list) -> None:
     """
 
 
-def _upgraded(item: tuple, path, media_type=None, still=None) -> tuple:
-    """``item`` pointing at a better version of itself.
-
-    The new file, its media type (kept as it was when the caller names none),
-    the same id — an enhancement is the same item, not a new one — and the new
-    thumbnail when one came with it: the still is what the item is drawn as
-    while it's a neighbor, and the one it arrived with is of the version this
-    swap just retired.
-    """
-    fields = list(item)
-    fields[0] = path
-    if media_type is not None:
-        fields[1] = media_type
-    if still is not None:
-        fields += [None] * (4 - len(fields))
-        fields[3] = still
-    return tuple(fields)
-
-
 class SlideshowPlaylist:
     def __init__(self, items, *, image_dwell_ms=DEFAULT_IMAGE_DWELL_MS,
                  shuffle=random.shuffle, start=None):
-        self._items = list(items)  # each an (path, media_type) pair
+        self._items = [Slide.of(item) for item in items]
         self._shuffle = shuffle
         self._order = list(range(len(self._items)))
         self._shuffle(self._order)  # play in a random order
@@ -164,7 +187,7 @@ class SlideshowPlaylist:
     def order_ids(self) -> list:
         """The pass in ids rather than in places — how a closing show hands its
         order to the next one, over a set that will have moved on."""
-        return [self._id_of(index) for index in self._order]
+        return [self._items[index].prompt_id for index in self._order]
 
     def resume(self, order_ids, current_id) -> bool:
         """Lay the pass back out the way a closed show left it, standing on the
@@ -179,9 +202,9 @@ class SlideshowPlaylist:
         the order the shuffle gave them. They were no part of the pass being
         picked back up, and the next pass reshuffles the lot anyway.
         """
-        places = {pid: index for index, pid in
-                  ((i, self._id_of(i)) for i in range(len(self._items)))
-                  if pid is not None}
+        places = {slide.prompt_id: index
+                  for index, slide in enumerate(self._items)
+                  if slide.prompt_id is not None}
         if current_id not in places:
             return False
         remembered = [places[pid] for pid in order_ids if pid in places]
@@ -190,11 +213,16 @@ class SlideshowPlaylist:
         self._pos = self._order.index(places[current_id])
         return True
 
-    def _id_of(self, index: int):
-        """The id the item at ``index`` was generated under, or ``None`` — a set
-        assembled without ids (a test's) names nothing."""
-        item = self._items[index]
-        return item[2] if len(item) > 2 else None
+    def _made_by(self, prompt_id) -> list:
+        """Where in the set the slides of *prompt_id* sit.
+
+        Nowhere at all when it is ``None``: a set assembled without ids names
+        nothing, so an unnamed generation must not match the unnamed slides.
+        """
+        if prompt_id is None:
+            return []
+        return [index for index, slide in enumerate(self._items)
+                if slide.prompt_id == prompt_id]
 
     def peek(self, offset: int):
         """The item ``offset`` steps away in the running pass, wrapping — what the
@@ -228,27 +256,27 @@ class SlideshowPlaylist:
         watching for the new one — parked after a hundred others it would be an
         hour away. The rest of the pass then carries on where it left off.
         """
-        prompt_id = item[2] if len(item) > 2 else None
-        if prompt_id is not None and self.holds(prompt_id):
+        slide = Slide.of(item)
+        if self.holds(slide.prompt_id):
             return False
-        self._items.append(item)
+        self._items.append(slide)
         self._order.insert(self._pos + 1, len(self._items) - 1)
         return True
 
     def holds(self, prompt_id) -> bool:
         """Whether this set already has a slide for that generation, whatever
         state it is in — frames still coming in, or the file it landed as."""
-        return any(len(item) > 2 and item[2] == prompt_id for item in self._items)
+        return bool(self._made_by(prompt_id))
 
     def live_ids(self) -> list:
         """The generations this set is playing as frames rather than as files —
         who to ask about, when the question is which runs are still going."""
-        return [item[2] for item in self._items
-                if len(item) > 2 and item[1] == LIVE]
+        return [slide.prompt_id for slide in self._items
+                if slide.is_live and slide.prompt_id is not None]
 
     def current_is_live(self) -> bool:
-        item = self.current()
-        return item is not None and item[1] == LIVE
+        slide = self.current()
+        return slide is not None and slide.is_live
 
     def update_live(self, prompt_id, frame) -> bool:
         """Point a slide that is still being made at the newest frame of it.
@@ -258,12 +286,11 @@ class SlideshowPlaylist:
         the tail of it, or a poll a beat late — must not take the finished
         picture back off the screen and put a half-rendered one there.
         """
-        found = False
-        for index, item in enumerate(self._items):
-            if len(item) > 2 and item[2] == prompt_id and item[1] == LIVE:
-                self._items[index] = _upgraded(item, frame)
-                found = True
-        return found
+        live = [index for index in self._made_by(prompt_id)
+                if self._items[index].is_live]
+        for index in live:
+            self._items[index] = self._items[index].upgraded(frame)
+        return bool(live)
 
     def replace_live(self, prompt_id, path, media_type, still=None) -> bool:
         """Swap the frames of a slide still being made for the file it landed as.
@@ -273,8 +300,8 @@ class SlideshowPlaylist:
         hold both the frames it watched arrive and the file they became, and play
         the stale pair of them every pass.
         """
-        if not any(len(item) > 2 and item[2] == prompt_id and item[1] == LIVE
-                   for item in self._items):
+        if not any(self._items[index].is_live
+                   for index in self._made_by(prompt_id)):
             return False
         return self.replace_item(prompt_id, path, media_type, still)
 
@@ -291,10 +318,9 @@ class SlideshowPlaylist:
         has no file coming and its last frame would otherwise sit in the pass
         forever.
         """
-        for index, item in enumerate(self._items):
-            if len(item) > 2 and item[2] == prompt_id:
-                self._remove(index)
-                return True
+        for index in self._made_by(prompt_id):
+            self._remove(index)
+            return True
         return False
 
     def _remove(self, index: int) -> None:
@@ -319,12 +345,10 @@ class SlideshowPlaylist:
         late would leave the pre-enhance file playing every pass for the rest of
         the session.
         """
-        replaced = False
-        for index, item in enumerate(self._items):
-            if len(item) > 2 and item[2] == prompt_id:
-                self._items[index] = _upgraded(item, path, media_type, still)
-                replaced = True
-        return replaced
+        found = self._made_by(prompt_id)
+        for index in found:
+            self._items[index] = self._items[index].upgraded(path, media_type, still)
+        return bool(found)
 
     @property
     def image_dwell_ms(self) -> int:
@@ -384,8 +408,8 @@ class SlideshowPlaylist:
         return self._locked or self._paused
 
     def current_is_video(self) -> bool:
-        item = self.current()
-        return item is not None and item[1] == "video"
+        slide = self.current()
+        return slide is not None and slide.media_type == "video"
 
     def dwell_ms(self):
         """Milliseconds to wait before auto-advancing the current item, or ``None``

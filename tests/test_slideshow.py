@@ -1,7 +1,7 @@
 """The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
 from __future__ import annotations
 
-from origenerator.slideshow import LIVE, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
 
 
 def _playlist(**kw):
@@ -13,9 +13,17 @@ def _playlist(**kw):
 
 def test_current_starts_at_the_first_item():
     playlist = _playlist()
-    assert playlist.current() == ("a.png", "image")
+    assert playlist.current() == Slide("a.png", "image")
     assert len(playlist) == 3
     assert not playlist.is_empty()
+
+
+def test_a_slide_names_its_own_fields():
+    # The set is handed over as bare tuples by whoever assembled it; what the
+    # playlist holds and hands back says what each field is.
+    slide = _playlist().current()
+    assert (slide.path, slide.media_type) == ("a.png", "image")
+    assert slide.prompt_id is None and slide.still is None
 
 
 def test_an_empty_playlist_has_no_current():
@@ -26,15 +34,15 @@ def test_an_empty_playlist_has_no_current():
 
 def test_advance_steps_forward_and_wraps():
     playlist = _playlist()
-    assert playlist.advance() == ("b.mp4", "video")
-    assert playlist.advance() == ("c.png", "image")
-    assert playlist.advance() == ("a.png", "image")  # wrapped to the start
+    assert playlist.advance() == Slide("b.mp4", "video")
+    assert playlist.advance() == Slide("c.png", "image")
+    assert playlist.advance() == Slide("a.png", "image")  # wrapped to the start
 
 
 def test_back_steps_backward_and_wraps():
     playlist = _playlist()
-    assert playlist.back() == ("c.png", "image")     # wrapped to the end
-    assert playlist.back() == ("b.mp4", "video")
+    assert playlist.back() == Slide("c.png", "image")     # wrapped to the end
+    assert playlist.back() == Slide("b.mp4", "video")
 
 
 def test_advance_and_back_on_an_empty_playlist_stay_empty():
@@ -48,9 +56,9 @@ def test_plays_in_a_shuffled_order():
         [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")],
         shuffle=lambda order: order.reverse(),  # a deterministic stand-in for randomness
     )
-    assert playlist.current() == ("c.png", "image")  # shuffled: the last item leads
-    assert playlist.advance() == ("b.mp4", "video")
-    assert playlist.advance() == ("a.png", "image")
+    assert playlist.current() == Slide("c.png", "image")  # shuffled: the last item leads
+    assert playlist.advance() == Slide("b.mp4", "video")
+    assert playlist.advance() == Slide("a.png", "image")
 
 
 def test_reshuffles_each_full_pass():
@@ -122,7 +130,7 @@ def test_a_pass_can_start_on_a_named_item():
     # A double-clicked picture opens on *that* picture, not on whatever the set
     # happens to lead with.
     playlist = _playlist(start=2)
-    assert playlist.current() == ("c.png", "image")
+    assert playlist.current() == Slide("c.png", "image")
     assert playlist.index == 2
 
 
@@ -132,7 +140,7 @@ def test_the_start_item_is_found_wherever_the_shuffle_put_it():
         shuffle=lambda order: order.reverse(),  # order == [2, 1, 0]
         start=2,
     )
-    assert playlist.current() == ("c.png", "image")
+    assert playlist.current() == Slide("c.png", "image")
     assert playlist.index == 0  # which is where the reversed pass begins
 
 
@@ -142,7 +150,7 @@ def test_no_start_leads_with_whatever_the_pass_leads_with():
         [("a.png", "image"), ("b.png", "image"), ("c.png", "image")],
         shuffle=lambda order: order.reverse(),
     )
-    assert playlist.current() == ("c.png", "image")
+    assert playlist.current() == Slide("c.png", "image")
 
 
 def test_an_out_of_range_start_falls_back_to_the_front():
@@ -188,15 +196,15 @@ def test_remove_current_drops_the_item_and_advances():
     )  # order == [0, 1, 2], current == a
     playlist.remove_current()
     assert len(playlist) == 2
-    assert playlist.current() == ("b", "image")  # the next item becomes current
+    assert playlist.current() == Slide("b", "image")  # the next item becomes current
 
 
 def test_peek_names_the_items_either_side_wrapping():
     playlist = SlideshowPlaylist(
         [("a", "image"), ("b", "image"), ("c", "image")], shuffle=lambda order: None,
     )  # order == [0, 1, 2], current == a
-    assert playlist.peek(1) == ("b", "image")
-    assert playlist.peek(-1) == ("c", "image")  # wraps to the end of the pass
+    assert playlist.peek(1) == Slide("b", "image")
+    assert playlist.peek(-1) == Slide("c", "image")  # wraps to the end of the pass
     assert SlideshowPlaylist([]).peek(1) is None
 
 
@@ -363,7 +371,7 @@ def test_a_frame_for_a_slide_that_already_landed_is_ignored():
 
     assert playlist.update_live("id-a", b"frame-late") is False
 
-    assert playlist.current() == ("a.png", "image", "id-a")
+    assert playlist.current() == Slide("a.png", "image", "id-a")
 
 
 def test_a_live_slide_becomes_the_file_it_lands_as():
@@ -380,7 +388,7 @@ def test_a_live_slide_becomes_the_file_it_lands_as():
 def test_an_item_that_was_never_live_is_not_replaced_as_one():
     playlist = _four()
     assert playlist.replace_live("id-a", "other.png", "image") is False
-    assert playlist.current() == ("a.png", "image", "id-a")
+    assert playlist.current() == Slide("a.png", "image", "id-a")
 
 
 def test_a_live_slide_dwells_like_an_image():

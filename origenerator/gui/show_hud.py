@@ -41,6 +41,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.gui.media_overlay import float_over_media
 from origenerator.paths import ensure_player_core_on_path
 from origenerator.ui_scale import (
     to_bitmap_pos,
@@ -164,12 +165,8 @@ class ShowHud(QLabel):
         self._hover_tip = ""
         self._hover_pos = (0, 0)
         self.setMouseTracking(True)  # hover tooltips render into the bitmap
-        # A video surface is a native window on Windows, and a plain sibling
-        # widget cannot paint over one however it is stacked — which is why
-        # this map vanished the moment a show put media on screen (the same
-        # symptom position_caption.py fixed the same way).  Native itself, it
-        # stacks against the media by Z-order like any other window.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        # Its map is clicked and hovered, so the mouse stops here.
+        float_over_media(self, click_through=False)
         # The players' own inset, in DEVICE pixels: this panel swaps in and out
         # with the player's HUD under it, so the two have to sit on the same
         # corner or the swap reads as a jump.  move() takes logical pixels, and

@@ -58,6 +58,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.media_overlay import float_over_media
 from origenerator.ken_burns import ZOOM_SPAN, crop_rect
 
 _PLACEHOLDER = "Select a generation to preview"
@@ -228,8 +229,7 @@ class PreviewWidget(QWidget):
         self._notice = QLabel(media_host)
         self._notice.setStyleSheet(_NOTICE_PLATE)
         self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._notice.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        float_over_media(self._notice)
         self._notice.hide()
 
         # The same three corner controls a gallery thumbnail of this generation

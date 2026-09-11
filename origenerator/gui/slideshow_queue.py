@@ -40,6 +40,7 @@ from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
+from origenerator.gui.media_overlay import float_over_media
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -79,11 +80,8 @@ class SlideshowQueue(GenerationQueue):
             f" border: 1px solid {BORDER_SUBTLE.name()};"
             f" border-radius: 6px; }}"
         )
-        # Native, because a video surface is a native window on Windows and a
-        # plain sibling widget cannot paint over one however it is stacked —
-        # which is what made the position counter vanish over a clip until it
-        # was made native too.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        # Its rows are pressed, so the mouse stops here rather than passing on.
+        float_over_media(self, click_through=False)
         self.hide()  # nothing in flight yet, and an empty plate would claim there was
 
     def set_items(self, items, foreign_queued: int = 0):

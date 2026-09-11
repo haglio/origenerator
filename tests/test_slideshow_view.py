@@ -27,7 +27,7 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
 from origenerator.ken_burns import TICK_MS, ZOOM_SPAN
 from origenerator.motion_engine import Motion
-from origenerator.slideshow import LIVE, in_order
+from origenerator.slideshow import LIVE, Slide, in_order
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -217,24 +217,24 @@ def _fade(view):
 
 def test_opens_on_the_first_item(qtbot):
     view = _view(qtbot)
-    assert view._playlist.current() == ("a.png", "image")
+    assert view._playlist.current() == Slide("a.png", "image")
     assert view._preview.is_showing_video() is False
 
 
 def test_right_and_left_navigate(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Right)
-    assert view._playlist.current() == ("b.mp4", "video")
+    assert view._playlist.current() == Slide("b.mp4", "video")
     assert view._preview.is_showing_video() is True
     _press(view, Qt.Key.Key_Left)
-    assert view._playlist.current() == ("a.png", "image")
+    assert view._playlist.current() == Slide("a.png", "image")
 
 
 def test_a_finished_video_advances_to_the_next(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Right)          # -> the video
     view._preview.video_ended.emit()        # it played through
-    assert view._playlist.current() == ("c.png", "image")
+    assert view._playlist.current() == Slide("c.png", "image")
 
 
 def test_a_locked_video_replays_instead_of_advancing(qtbot):
@@ -242,7 +242,7 @@ def test_a_locked_video_replays_instead_of_advancing(qtbot):
     _press(view, Qt.Key.Key_Right)          # -> the video
     _press(view, Qt.Key.Key_Down)           # lock it: repeat-one, as Fun Time's is
     view._preview.video_ended.emit()
-    assert view._playlist.current() == ("b.mp4", "video")  # stayed put
+    assert view._playlist.current() == Slide("b.mp4", "video")  # stayed put
     assert view._playlist.locked
 
 
@@ -263,13 +263,13 @@ def test_stepping_away_releases_the_lock(qtbot):
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Right)
     assert not view._playlist.locked
-    assert view._playlist.current() == ("b.mp4", "video")
+    assert view._playlist.current() == Slide("b.mp4", "video")
     assert "locked" not in view._counter.text()
 
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Left)           # and back the other way
     assert not view._playlist.locked
-    assert view._playlist.current() == ("a.png", "image")
+    assert view._playlist.current() == Slide("a.png", "image")
 
 
 def test_the_consoles_transport_releases_the_lock_too(qtbot):
@@ -277,7 +277,7 @@ def test_the_consoles_transport_releases_the_lock_too(qtbot):
     _press(view, Qt.Key.Key_Down)
     view.show_step(1)                     # the console's transport, not the key
     assert not view.locked
-    assert view._playlist.current() == ("b.mp4", "video")
+    assert view._playlist.current() == Slide("b.mp4", "video")
 
 
 def test_culling_releases_the_lock(qtbot):
@@ -925,7 +925,7 @@ def test_a_pace_of_nought_holds_the_slide_with_no_timer(qtbot):
 def test_the_arrows_still_move_a_show_held_at_nought(qtbot):
     view = _view(qtbot, image_dwell_ms=0)
     _press(view, Qt.Key.Key_Right)
-    assert view._playlist.current() == ("b.mp4", "video")
+    assert view._playlist.current() == Slide("b.mp4", "video")
 
 
 def test_a_clip_replays_rather_than_advancing_at_nought(qtbot):
@@ -934,7 +934,7 @@ def test_a_clip_replays_rather_than_advancing_at_nought(qtbot):
     view = _view(qtbot, image_dwell_ms=0)
     _press(view, Qt.Key.Key_Right)          # -> the video
     view._preview.video_ended.emit()
-    assert view._playlist.current() == ("b.mp4", "video")
+    assert view._playlist.current() == Slide("b.mp4", "video")
 
 
 def test_turning_the_console_pace_up_sets_a_held_show_going(qtbot):
@@ -972,7 +972,7 @@ def test_the_pace_can_be_wound_back_down_to_nought(qtbot):
 def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
     # Double-clicking the third picture in a folder opens on the third picture.
     view = _view(qtbot, start=2)
-    assert view._playlist.current() == ("c.png", "image")
+    assert view._playlist.current() == Slide("c.png", "image")
     assert view._counter.text().startswith("3 / 3")
 
 

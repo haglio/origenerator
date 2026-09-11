@@ -6,6 +6,9 @@ a failure is answered rather than raised.
 """
 from __future__ import annotations
 
+from PyQt6 import sip
+from PyQt6.QtWidgets import QWidget
+
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 
 
@@ -42,3 +45,21 @@ def test_the_task_runs_one_revision(qtbot):
     ReviseTask(worker, "ctx", "a woman", "", "no hat").run()
 
     assert seen == ["NO HAT"]
+
+
+def test_a_window_closed_mid_request_takes_its_answer_with_it(qtbot):
+    """A request is seconds of network wait by construction, so the window can
+    close while the model is still thinking — and closing it takes the worker's
+    C++ object with it.
+
+    The pool thread is then holding a handle to nothing. Raising there reaches
+    no caller at all: Qt's own handler prints it into whatever is running next,
+    which is how one abandoned request failed an unrelated test three files
+    later."""
+    parent = QWidget()
+    worker = RevisionWorker(lambda pos, neg, req: req.upper(), parent=parent)
+    task = ReviseTask(worker, "ctx", "a woman", "", "no hat")
+    parent.deleteLater()
+    sip.delete(parent)  # the window goes, and its worker with it
+
+    task.run()  # no raise: there is nothing left to answer to

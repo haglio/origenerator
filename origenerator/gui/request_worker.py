@@ -60,5 +60,17 @@ class ReviseTask(QRunnable):
         self._request = request
 
     def run(self):
-        self._worker.revise(self._context, self._positive, self._negative,
-                            self._request)
+        """Work the revision out, and let go of an answer nobody is left to hear.
+
+        The window can close while the model is still thinking — the request is
+        seconds of network wait by construction — and closing it takes the
+        worker's C++ object with it. This thread is then holding a handle to
+        nothing, and the emit raises on a pool thread where nothing catches it:
+        Qt's own handler prints it into whatever is running next, which is how
+        one abandoned request failed an unrelated test three files later.
+        """
+        try:
+            self._worker.revise(self._context, self._positive, self._negative,
+                                self._request)
+        except RuntimeError:
+            logger.info("The request's window closed before its answer came back")

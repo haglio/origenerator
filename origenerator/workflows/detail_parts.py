@@ -28,11 +28,11 @@ passes it actually runs (:func:`detail_fixes_of`, :func:`detail_fix_passes`).
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import PureWindowsPath
 
 from origenerator.content import load_content
+from origenerator.voice.text import sounds_like, words
 from origenerator.workflows.model_files import list_detector_files
 
 # What a fix runs at unless it is given a number of its own — the Enhance
@@ -109,13 +109,7 @@ def _lead_is_fix(word: str) -> bool:
     accepted; the part-word requirement is what keeps this loose lead from
     firing on prose.
     """
-    if word in ("fix", "fixed"):
-        return True
-    return any(
-        len(word) == len(target)
-        and sum(a != b for a, b in zip(word, target)) == 1
-        for target in ("fix", "fixed")
-    )
+    return sounds_like(word, ("fix", "fixed"))
 
 
 def match_fix_command(text: str) -> tuple:
@@ -135,10 +129,10 @@ def match_fix_command(text: str) -> tuple:
     The table's order, whichever order the parts were said in, so one command
     always reads and builds the same way round.
     """
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    if not words or not _lead_is_fix(words[0]) or len(words) > _MAX_COMMAND_WORDS:
+    heard = words(text)
+    if not heard or not _lead_is_fix(heard[0]) or len(heard) > _MAX_COMMAND_WORDS:
         return ()
-    named = set(words[1:])
+    named = set(heard[1:])
     if named & set(ALL_PARTS_WORDS):
         return tuple(DETAIL_PARTS)
     return tuple(part for part in DETAIL_PARTS if named & set(part.spoken))
@@ -155,8 +149,8 @@ def fix_command_spelling(text: str) -> str | None:
     """
     if not match_fix_command(text):
         return None
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    return " ".join(["fix", *words[1:]])
+    heard = words(text)
+    return " ".join(["fix", *heard[1:]])
 
 
 def fix_command_bias() -> str:

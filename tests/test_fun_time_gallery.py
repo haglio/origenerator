@@ -41,8 +41,8 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     switch for either would be a switch over something this window does not
     hold."""
     view = _fun_time_view(qtbot)
-    assert view._audio_btn is None
-    assert view._mic_btn is None
+    assert view._bank.audio is None
+    assert view._bank.mic is None
     view.set_audio_enabled(True)   # a stale standalone session key must not crash
     assert view.audio_enabled() is False
 
@@ -51,7 +51,7 @@ def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
     assert view._osr2_motion is None
     assert view._osr2_driver is None
-    assert view._osr2_btn is None
+    assert view._bank.drive is None
     assert view._motion_panel is None
 
 

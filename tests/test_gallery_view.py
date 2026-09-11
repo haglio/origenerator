@@ -1069,7 +1069,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 
     assert view.current_group() is None
     assert view._current_deletable_folder() is None
-    assert not view._auto_btn.isVisible()
+    assert not view._bank.auto.isVisible()
 
 
 def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
@@ -1188,7 +1188,7 @@ def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
     _search_for(view, "cat")
 
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["i1", "i2"]
-    assert "these results" in view._slideshow_btn.toolTip()
+    assert "these results" in view._bank.slideshow.toolTip()
 
 
 def _press_ctrl_f(view, monkeypatch):
@@ -1521,7 +1521,7 @@ def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
     view._on_experiment_verdict("e1", "reject")
 
     assert [r["prompt_id"] for r in actions.rejected] == ["e1"]
-    assert view._undo_btn.isEnabled()
+    assert view._bank.undo.isEnabled()
 
 
 def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch):
@@ -1922,7 +1922,7 @@ def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
     view._browser.apply_selection("d1", _NO_MOD)
     monkeypatch.setattr(view, "_confirm", lambda text: True)
 
-    assert "Permanently delete 1 item" in view._delete_btn.toolTip()
+    assert "Permanently delete 1 item" in view._bank.delete.toolTip()
     view._delete_selection()
 
     assert actions.purged == [["d1"]]
@@ -1936,7 +1936,7 @@ def test_the_delete_button_is_dark_on_an_unpicked_trash_shelf(qtbot):
 
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
 
-    assert not view._delete_btn.isEnabled()
+    assert not view._bank.delete.isEnabled()
 
 
 def test_a_purge_clears_the_item_off_the_shelf(qtbot, tmp_path, monkeypatch):
@@ -2036,7 +2036,7 @@ def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
 
-    assert not view._slideshow_btn.isHidden()
+    assert not view._bank.slideshow.isHidden()
     view._shows.start()
 
     qtbot.addWidget(view._shows.showing)
@@ -3010,16 +3010,16 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
+    assert not view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
 
     _select_first_leaf(view)   # opening a folder is somewhere to come back from
     view._browser._thumbnail_clicked("i1")
     view._browser._thumbnail_clicked("i2")
-    assert view._back_btn.isEnabled() and not view._forward_btn.isEnabled()
+    assert view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
 
     for _ in range(3):
         view._navigation.go_back()
-    assert not view._back_btn.isEnabled() and view._forward_btn.isEnabled()
+    assert not view._bank.back.isEnabled() and view._bank.forward.isEnabled()
 
 
 def test_toolbar_is_a_group_of_compact_icon_buttons(qtbot):
@@ -3028,7 +3028,7 @@ def test_toolbar_is_a_group_of_compact_icon_buttons(qtbot):
     qtbot.addWidget(view)
     # Back, forward, undo and delete are one group of icon-only tool buttons, not
     # the oversized text buttons that split them across the header.
-    for btn in (view._back_btn, view._forward_btn, view._undo_btn, view._delete_btn):
+    for btn in (view._bank.back, view._bank.forward, view._bank.undo, view._bank.delete):
         assert isinstance(btn, QToolButton)
         assert not btn.icon().isNull()
         assert btn.text() == ""
@@ -3041,13 +3041,13 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
 
     workflow = _image_workflow(view._tree)  # a workflow — not deletable, nothing picked
     view._tree.setCurrentItem(workflow)
-    assert not view._delete_btn.isEnabled()
+    assert not view._bank.delete.isEnabled()
 
     _select_first_leaf(view)                    # a settings folder — deletable
-    assert view._delete_btn.isEnabled()
+    assert view._bank.delete.isEnabled()
 
     view._browser._thumbnail_clicked("i1")               # a picked thumbnail — deletable
-    assert view._delete_btn.isEnabled()
+    assert view._bank.delete.isEnabled()
 
 
 def test_delete_button_deletes_the_picked_thumbnails(qtbot):
@@ -3059,7 +3059,7 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     _select_first_leaf(view)
     view._browser._thumbnail_clicked("i1")
 
-    view._delete_btn.click()
+    view._bank.delete.click()
 
     assert actions.deleted and {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
@@ -3074,15 +3074,15 @@ def test_star_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     _select_first_leaf(view)
     view._browser._thumbnail_clicked("i1")
 
-    assert view._star_btn.isEnabled()
-    assert view._star_btn.toolTip() == "Star 1 item"
-    view._star_btn.click()
+    assert view._bank.star.isEnabled()
+    assert view._bank.star.toolTip() == "Star 1 item"
+    view._bank.star.click()
     assert db.get_generation("i1")["starred"]
 
     # A second press is the other half of the one toggle.
     view._browser._thumbnail_clicked("i1")
-    assert view._star_btn.toolTip() == "Unstar 1 item"
-    view._star_btn.click()
+    assert view._bank.star.toolTip() == "Unstar 1 item"
+    view._bank.star.click()
     assert not db.get_generation("i1")["starred"]
 
 
@@ -3091,10 +3091,10 @@ def test_star_button_falls_back_to_the_folder_on_screen(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)                       # nothing picked inside it
-    assert view._star_btn.isEnabled()
-    assert "folder" in view._star_btn.toolTip()
+    assert view._bank.star.isEnabled()
+    assert "folder" in view._bank.star.toolTip()
 
-    view._star_btn.click()
+    view._bank.star.click()
 
     key = _selected_folder(view)
     assert view._db.folder_meta_map()[key]["starred"]
@@ -3105,8 +3105,8 @@ def test_star_button_is_dark_where_a_star_means_nothing(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))   # a shelf is nobody's folder
-    assert not view._star_btn.isEnabled()
-    assert view._star_btn.toolTip() == "Nothing here to star"
+    assert not view._bank.star.isEnabled()
+    assert view._bank.star.toolTip() == "Nothing here to star"
 
 
 def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):
@@ -3118,8 +3118,8 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     view._enhance.enhance_items = queued.append
 
     view._browser._thumbnail_clicked("g0")
-    assert view._enhance_btn.toolTip().startswith("Enhance 1 item")
-    view._enhance_btn.click()
+    assert view._bank.enhance.toolTip().startswith("Enhance 1 item")
+    view._bank.enhance.click()
 
     assert queued == [["g0"]]  # just the picked one, not the whole folder
 
@@ -3141,11 +3141,11 @@ def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
-    assert not view._enhance_btn.isEnabled()   # the folder holds only videos
+    assert not view._bank.enhance.isEnabled()   # the folder holds only videos
 
     view._browser._thumbnail_clicked("v1")
-    assert not view._enhance_btn.isEnabled()
-    assert "no video enhancer" in view._enhance_btn.toolTip()
+    assert not view._bank.enhance.isEnabled()
+    assert "no video enhancer" in view._bank.enhance.toolTip()
 
 
 def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
@@ -3183,13 +3183,13 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     _select_first_leaf(view)
 
     view._browser._thumbnail_clicked("g0")
-    assert not view._enhance_btn.isEnabled()
-    assert "these settings" in view._enhance_btn.toolTip()
+    assert not view._bank.enhance.isEnabled()
+    assert "these settings" in view._bank.enhance.toolTip()
 
     # The panel edited to something else: that enhancement doesn't exist yet.
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
-    assert view._enhance_btn.isEnabled()
+    assert view._bank.enhance.isEnabled()
 
 
 # --- the controls a tile wears in its own corners -----------------------------
@@ -3318,13 +3318,13 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     _select_first_leaf(view)
     view._browser._thumbnail_clicked("i1")
     view._browser.selected_ids.add("v1")   # as a Ctrl-click across the two
-    view._sync_action_buttons()
+    view._re_aim()
     queued = []
     view._enhance.enhance_items = queued.append
 
-    assert view._enhance_btn.isEnabled()
+    assert view._bank.enhance.isEnabled()
     assert view._enhance.panel.isEnabled()
-    view._enhance_btn.click()
+    view._bank.enhance.click()
 
     assert queued == [["i1"]]
 
@@ -3337,14 +3337,14 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    groups = [buttons for _gap, buttons in view._toolbar_groups]
-    assert groups[0] == (view._back_btn, view._forward_btn)
-    assert groups[1] == (view._undo_btn, view._redo_btn)
-    assert groups[3] == (view._star_btn, view._enhance_btn, view._delete_btn)
-    assert view._osr2_btn in groups[4] and view._auto_btn in groups[4]
+    groups = [buttons for _gap, buttons in view._bank._groups]
+    assert groups[0] == (view._bank.back, view._bank.forward)
+    assert groups[1] == (view._bank.undo, view._bank.redo)
+    assert groups[3] == (view._bank.star, view._bank.enhance, view._bank.delete)
+    assert view._bank.drive in groups[4] and view._bank.auto in groups[4]
     # The mic has a space of its own: the group beside it is what Esc turns off,
     # and the mic is the one switch it leaves listening.
-    assert groups[5] == (view._mic_btn,) and view._mic_btn not in groups[4]
+    assert groups[5] == (view._bank.mic,) and view._bank.mic not in groups[4]
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
@@ -3357,12 +3357,12 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     view.show()
     _select_first_leaf(view)
 
-    gaps = {id(gap): gap for gap, _ in view._toolbar_groups}
-    leading, group_gap = view._toolbar_groups[0][0], view._toolbar_groups[2][0]
+    gaps = {id(gap): gap for gap, _ in view._bank._groups}
+    leading, group_gap = view._bank._groups[0][0], view._bank._groups[2][0]
     assert not leading.isVisible()          # nothing to separate from, at the front
-    assert view._group_btn.isHidden() and not group_gap.isVisible()
-    assert view._toolbar_groups[3][0].isVisible()  # the trio is always there
-    assert len(gaps) == len(view._toolbar_groups)
+    assert view._bank.group.isHidden() and not group_gap.isVisible()
+    assert view._bank._groups[3][0].isVisible()  # the trio is always there
+    assert len(gaps) == len(view._bank._groups)
 
 
 def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot):
@@ -3373,14 +3373,14 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
     qtbot.addWidget(view)
     view.refresh()
     view.show()
-    host = view._toolbar_host
-    wanted = view._back_btn.sizeHint()
+    host = view._bank
+    wanted = view._bank.back.sizeHint()
 
     host.setFixedWidth(wanted.width() * 3)  # far narrower than the whole bank
     host.updateGeometry()
     qtbot.wait(10)
 
-    shown = [b for _gap, group in view._toolbar_groups for b in group
+    shown = [b for _gap, group in view._bank._groups for b in group
              if not b.isHidden()]
     assert len(shown) > 3                       # more buttons than fit on one row
     for button in shown:
@@ -3529,7 +3529,7 @@ def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
     assert view._browser.showing_recents() is False
-    assert view._back_btn.isEnabled()                    # the shelf is somewhere to go back to
+    assert view._bank.back.isEnabled()                    # the shelf is somewhere to go back to
 
     view._navigation.go_back()
     assert view._browser.showing_recents()                       # Back returns to the Recents shelf
@@ -3553,7 +3553,7 @@ def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
         _image_workflow(view._tree).child(0).child(0).child(0)
     )
     assert view._browser.showing_recents() is False
-    assert view._back_btn.isEnabled()
+    assert view._bank.back.isEnabled()
 
     view._navigation.go_back()
 
@@ -4565,7 +4565,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
 
     assert view.selected_prompt_ids() == []
     # And the buttons re-aimed with it: Enhance is the folder's again.
-    assert "folder" in view._enhance_btn.toolTip()
+    assert "folder" in view._bank.enhance.toolTip()
 
 
 def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
@@ -4952,17 +4952,17 @@ def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._undo_btn.isEnabled()  # nothing to undo at rest
+    assert not view._bank.undo.isEnabled()  # nothing to undo at rest
 
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
     view._delete_selection()
-    assert view._undo_btn.isEnabled()
-    assert "Delete" in view._undo_btn.toolTip()
+    assert view._bank.undo.isEnabled()
+    assert "Delete" in view._bank.undo.toolTip()
 
-    view._undo_btn.click()
+    view._bank.undo.click()
     assert actions.undo_count == 1
-    assert not view._undo_btn.isEnabled()
+    assert not view._bank.undo.isEnabled()
 
 
 def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
@@ -4970,19 +4970,19 @@ def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    assert not view._redo_btn.isEnabled()  # nothing undone, so nothing to redo
-    assert view._redo_btn.toolTip() == "Nothing to redo"
+    assert not view._bank.redo.isEnabled()  # nothing undone, so nothing to redo
+    assert view._bank.redo.toolTip() == "Nothing to redo"
 
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
     view._delete_selection()
-    view._undo_btn.click()
+    view._bank.undo.click()
 
-    assert view._redo_btn.isEnabled()
-    assert "Delete" in view._redo_btn.toolTip()
-    view._redo_btn.click()
+    assert view._bank.redo.isEnabled()
+    assert "Delete" in view._bank.redo.toolTip()
+    view._bank.redo.click()
     assert actions.redo_count == 1
-    assert not view._redo_btn.isEnabled() and view._undo_btn.isEnabled()
+    assert not view._bank.redo.isEnabled() and view._bank.undo.isEnabled()
 
 
 def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
@@ -5014,7 +5014,7 @@ def test_renaming_goes_through_the_undoable_actions(qtbot):
     view._apply_rename(key, "Best Models")
 
     assert actions.renamed == [(key, "Best Models")]
-    assert view._undo_btn.isEnabled()  # the rename is now undoable
+    assert view._bank.undo.isEnabled()  # the rename is now undoable
 
 
 def test_inline_rename_is_undoable(qtbot):
@@ -5029,7 +5029,7 @@ def test_inline_rename_is_undoable(qtbot):
     workflow.setText(0, "Renamed")     # committing it routes through actions
 
     assert actions.renamed == [(key, "Renamed")]
-    assert view._undo_btn.isEnabled()
+    assert view._bank.undo.isEnabled()
 
 
 def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
@@ -5478,12 +5478,12 @@ def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._auto_btn.click()  # the header's Auto toggle, switched on
+    view._bank.auto.click()  # the header's Auto toggle, switched on
 
     assert view._auto.is_active(key)
     assert key in view._reroll_jobs          # a first variation is running
     client.submit_job.assert_called_once()
-    assert view._auto_btn.isChecked()
+    assert view._bank.auto.isChecked()
 
 
 def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
@@ -5531,7 +5531,7 @@ def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_
 
     assert view._auto.is_active(second)
     assert not view._auto.is_active(first)
-    assert view._auto_btn.isChecked()  # the switch follows the folder in front
+    assert view._bank.auto.isChecked()  # the switch follows the folder in front
 
 
 def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
@@ -5578,7 +5578,7 @@ def test_cancelling_a_reroll_keeps_the_auto_loop_and_tries_another_seed(qtbot, t
     view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
 
     assert view._auto.is_active(key)          # the loop is still on
-    assert view._auto_btn.isChecked()         # and the toggle still says so
+    assert view._bank.auto.isChecked()         # and the toggle still says so
     assert client.submit_job.call_count == 2  # a fresh seed went out at once
     assert view._reroll_jobs[key].prompt_id != canceled
 
@@ -5828,13 +5828,13 @@ def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._auto_btn.isHidden() and view._auto_btn.isEnabled()
+    assert not view._bank.auto.isHidden() and view._bank.auto.isEnabled()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))  # a workflow, not a leaf
 
-    assert not view._auto_btn.isHidden()   # still there
-    assert not view._auto_btn.isEnabled()  # with nothing to do from here
-    assert "open a settings folder" in view._auto_btn.toolTip()
+    assert not view._bank.auto.isHidden()   # still there
+    assert not view._bank.auto.isEnabled()  # with nothing to do from here
+    assert "open a settings folder" in view._bank.auto.toolTip()
 
 
 def test_the_switchs_tip_takes_you_to_whichever_folder_is_looping(qtbot, tmp_path):
@@ -5849,7 +5849,7 @@ def test_the_switchs_tip_takes_you_to_whichever_folder_is_looping(qtbot, tmp_pat
     view._tree.setCurrentItem(_image_workflow(view._tree))  # look somewhere else
     assert _selected_folder(view) != key
 
-    view._auto_tip.link_activated.emit("looping")
+    view._bank.auto_tip.link_activated.emit("looping")
 
     assert _selected_folder(view) == key
 
@@ -5913,7 +5913,7 @@ def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)  # the mic is the switch; the loop is what it steers
+    view._bank.mic.setChecked(True)  # the mic is the switch; the loop is what it steers
 
     view._toggle_auto(True)
     assert view._voice.listener.started
@@ -5939,7 +5939,7 @@ def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
 
     view._toggle_auto(True)
     view._toggle_auto(False)
@@ -5960,10 +5960,10 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     assert not view._voice.listener.commands_on and not view._voice.listener.started
     view._toggle_auto(False)
 
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     assert view._voice.listener.commands_on
 
-    view._mic_btn.setChecked(False)
+    view._bank.mic.setChecked(False)
     assert not view._voice.listener.commands_on
 
 
@@ -5974,7 +5974,7 @@ def test_arming_the_mic_mid_loop_picks_up_the_steering(qtbot, tmp_path):
     _select_first_leaf(view)
     view._toggle_auto(True)  # running, unheard
 
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
 
     assert view._voice.listener.started  # it steers the loop already in flight
 
@@ -5985,14 +5985,14 @@ def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path
     view.refresh()
     _select_first_leaf(view)
 
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     assert not view._voice.status.isHidden()
     assert "Listening" in view._voice.status.text()
 
     view._voice.listener.heard.emit("no hat")
     assert "no hat" in view._voice.status.text()
 
-    view._mic_btn.setChecked(False)
+    view._bank.mic.setChecked(False)
     assert view._voice.status.isHidden()
 
 
@@ -6003,7 +6003,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     view._voice.listener.heard.emit("no hat")
 
     view._voice._flash_timer.timeout.emit()  # the beat is up
@@ -6011,7 +6011,7 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     assert view._voice.status.text() == "🎤 Listening…"
     assert not view._voice.status.isHidden()
 
-    view._mic_btn.setChecked(False)
+    view._bank.mic.setChecked(False)
     view._voice._show("🎤 nothing here to enhance", transient=True)
 
     view._voice._flash_timer.timeout.emit()
@@ -6028,7 +6028,7 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
 
     view._voice.listener.heard.emit("Gunow it.")
     assert "Genau it" in view._voice.status.text()
@@ -6050,12 +6050,12 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
     view.refresh()
     _select_first_leaf(view)
 
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     view._voice.listener.heard.emit("give her a much longer caption than the idle one")
     qtbot.wait(1)  # let the layout settle around the grown caption
 
     caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())
-    for button in (view._back_btn, view._forward_btn, view._undo_btn, view._delete_btn):
+    for button in (view._bank.back, view._bank.forward, view._bank.undo, view._bank.delete):
         assert not caption.intersects(
             QRect(button.mapTo(view, QPoint(0, 0)), button.size())
         )
@@ -6206,7 +6206,7 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    assert view._slideshow_btn.isHidden()
+    assert view._bank.slideshow.isHidden()
 
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
@@ -6217,20 +6217,20 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._slideshow_btn.isHidden()          # a folder with media offers it
-    assert "this folder" in view._slideshow_btn.toolTip()
+    assert not view._bank.slideshow.isHidden()          # a folder with media offers it
+    assert "this folder" in view._bank.slideshow.toolTip()
 
     # The shelves are collections of media too, so each plays as a folder does...
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
-    assert not view._slideshow_btn.isHidden()
-    assert "Latest" in view._slideshow_btn.toolTip()
+    assert not view._bank.slideshow.isHidden()
+    assert "Latest" in view._bank.slideshow.toolTip()
     view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
-    assert not view._slideshow_btn.isHidden()
-    assert "Favorites" in view._slideshow_btn.toolTip()
+    assert not view._bank.slideshow.isHidden()
+    assert "Favorites" in view._bank.slideshow.toolTip()
 
     # ...while a shelf holding nothing at all doesn't offer one.
     view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
-    assert view._slideshow_btn.isHidden()
+    assert view._bank.slideshow.isHidden()
 
 
 def test_slideshow_plays_the_recents_shelf(qtbot, monkeypatch):
@@ -6263,7 +6263,7 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     view._shows.showing.close()
 
     view._image_cb.setChecked(False)  # nothing left on the shelf to play
-    assert view._slideshow_btn.isHidden()
+    assert view._bank.slideshow.isHidden()
 
 
 def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, monkeypatch):
@@ -6418,7 +6418,7 @@ def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
     assert "needs a show" in view._voice.status.text()
-    assert not view._slideshow_btn.isHidden()   # everything is still there to play
+    assert not view._bank.slideshow.isHidden()   # everything is still there to play
 
 
 def test_the_console_sits_under_the_hud_rather_than_beneath_it(qtbot, monkeypatch):
@@ -6454,8 +6454,8 @@ def test_slideshow_plays_the_experiments_shelf(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
-    assert not view._slideshow_btn.isHidden()
-    assert "Experiments" in view._slideshow_btn.toolTip()
+    assert not view._bank.slideshow.isHidden()
+    assert "Experiments" in view._bank.slideshow.toolTip()
 
     view._shows.start()
 
@@ -9643,9 +9643,9 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._enhance_btn.isHidden()
-    assert view._enhance_btn.isEnabled()          # a plain image awaits
-    assert "1 not-yet-enhanced image" in view._enhance_btn.toolTip()
+    assert not view._bank.enhance.isHidden()
+    assert view._bank.enhance.isEnabled()          # a plain image awaits
+    assert "1 not-yet-enhanced image" in view._bank.enhance.toolTip()
 
     # Once a standalone enhance of that image exists, nothing awaits: the button
     # stays put and goes dark.
@@ -9659,9 +9659,9 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view._tree_item_for(key))
-    assert not view._enhance_btn.isHidden()
-    assert not view._enhance_btn.isEnabled()
-    assert view._enhance_btn.toolTip() == "Nothing here to enhance"
+    assert not view._bank.enhance.isHidden()
+    assert not view._bank.enhance.isEnabled()
+    assert view._bank.enhance.toolTip() == "Nothing here to enhance"
 
 
 def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
@@ -10296,7 +10296,7 @@ def test_the_version_lists_delete_bins_that_level_and_keeps_the_image(qtbot, tmp
     ]
     assert not gallery.is_enhanced_row(updated)   # the badge goes with the level
     assert view._actions.can_undo()
-    assert not view._undo_btn.isHidden()
+    assert not view._bank.undo.isHidden()
 
 
 def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
@@ -10594,10 +10594,10 @@ def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
-    view._osr2_btn.setChecked(True)  # the one global switch, on
+    view._bank.drive.setChecked(True)  # the one global switch, on
     assert driver.started == [("player-A", "actions-A")]
 
-    view._osr2_btn.setChecked(False)  # off
+    view._bank.drive.setChecked(False)  # off
     assert driver.stopped == 1
 
 
@@ -10608,10 +10608,10 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: None  # front tab isn't showing a scripted video
 
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started == [] and view._osr2_motion.active
 
-    view._osr2_btn.setChecked(False)
+    view._bank.drive.setChecked(False)
     assert not view._osr2_motion.active
 
 
@@ -10622,13 +10622,13 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot, monkeypa
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started == [("pA", "aA")] and not view._osr2_motion.active
 
     space = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, _NO_MOD)
     assert view.eventFilter(view, space) is True
 
-    assert not view._osr2_btn.isChecked()      # the switch went off, not the motion
+    assert not view._bank.drive.isChecked()      # the switch went off, not the motion
     assert driver.stopped >= 1 and not view._osr2_motion.active
 
 
@@ -10644,7 +10644,7 @@ def test_a_show_gets_space_wired_to_the_switch(qtbot):
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
     panel.osr2_drive_target = lambda: ("B.mp4", "pB", "aB")
@@ -10655,7 +10655,7 @@ def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
 def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started
 
     view._info_tabs._add_subtab()  # a fresh, blank tab comes to the front
@@ -10666,7 +10666,7 @@ def test_osr2_enabled_state_round_trips_for_persistence(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
     assert view.osr2_enabled() is False
     view.set_osr2_enabled(True)
-    assert view.osr2_enabled() is True and view._osr2_btn.isChecked()
+    assert view.osr2_enabled() is True and view._bank.drive.isChecked()
 
 
 class _FakeAmbientAudio:
@@ -10694,10 +10694,10 @@ def test_the_audio_switch_starts_and_silences_the_bed(qtbot):
     view, bed = _audio_view(qtbot)
     assert (bed.starts, bed.stops) == (0, 0)  # off until asked
 
-    view._audio_btn.setChecked(True)
+    view._bank.audio.setChecked(True)
     assert bed.starts == 1
 
-    view._audio_btn.setChecked(False)
+    view._bank.audio.setChecked(False)
     assert bed.stops == 1
 
 
@@ -10707,7 +10707,7 @@ def test_audio_enabled_state_round_trips_for_persistence(qtbot):
 
     view.set_audio_enabled(True)
 
-    assert view.audio_enabled() is True and view._audio_btn.isChecked()
+    assert view.audio_enabled() is True and view._bank.audio.isChecked()
     assert bed.starts == 1  # restoring the switch actually starts it playing
 
 
@@ -10744,7 +10744,7 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 def test_stepping_a_double_clicked_show_re_aims_the_osr2(qtbot):
     # Stepping to another clip re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     show = _double_click_show(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
@@ -10859,7 +10859,7 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     panel = view._info_tabs.current_config_panel()
     panel.osr2_drive_target = lambda: None
 
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert view._osr2_motion.active and driver.started == []
 
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
@@ -10877,7 +10877,7 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     qtbot.addWidget(view._shows.showing)
     # And its Space reaches the one switch, like every other surface's.
     assert view._shows.showing._actions.drive_toggle == view.toggle_osr2_drive
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     view._shows.showing.close()
     assert view._osr2_motion.active
 
@@ -10888,7 +10888,7 @@ def test_escape_panic_stops_a_running_motion(qtbot, monkeypatch):
     # outright, because which window Qt calls active is ambient in a test process
     # (a fullscreen view another test opened and closed can still hold it).
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert view._osr2_motion.active
     assert view._handle_escape() is True
     assert not view._osr2_motion.active
@@ -10908,7 +10908,7 @@ def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
     # The toggle governs a show as much as the tab preview: double-clicking a clip
     # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
-    assert not view._osr2_btn.isChecked()
+    assert not view._bank.drive.isChecked()
 
     show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
 
@@ -10921,7 +10921,7 @@ def test_turning_the_toggle_on_over_an_open_show_drives_its_video(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
 
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
 
     assert driver.started[-1] == ("pF", "aF")
     show.close()
@@ -10929,11 +10929,11 @@ def test_turning_the_toggle_on_over_an_open_show_drives_its_video(qtbot):
 
 def test_untoggling_while_a_shows_video_drives_stops_the_device(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
-    view._osr2_btn.setChecked(False)
+    view._bank.drive.setChecked(False)
 
     assert driver.stopped >= 1
     show.close()
@@ -10941,7 +10941,7 @@ def test_untoggling_while_a_shows_video_drives_stops_the_device(qtbot):
 
 def test_closing_the_show_stops_driving_with_no_tab_video_behind_it(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
@@ -10955,7 +10955,7 @@ def test_the_shows_video_overrides_the_toggle_target_then_hands_back(qtbot):
     # re-aims the one device at the show's player; closing hands it back.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
     show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
@@ -10970,7 +10970,7 @@ def test_a_show_of_an_image_leaves_the_toggle_driving(qtbot):
     # front-tab video keeps driving uninterrupted — no restart, no stop.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
     show = _double_click_show(view, qtbot)
@@ -10996,13 +10996,13 @@ def test_esc_stops_osr2_driving(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)  # driving the device
+    view._bank.drive.setChecked(True)  # driving the device
     assert driver.started
 
     handled = _press_escape(view)
 
     assert handled is True
-    assert view.osr2_enabled() is False and not view._osr2_btn.isChecked()
+    assert view.osr2_enabled() is False and not view._bank.drive.isChecked()
     assert driver.stopped >= 1
 
 
@@ -11012,7 +11012,7 @@ def test_esc_stops_osr2_even_without_gallery_key_focus(qtbot):
     view, driver, panel = _osr2_view(qtbot)
     _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     view._gallery_owns_keys = lambda: False  # focus is inside a config tab
 
     handled = _press_escape(view)
@@ -11030,7 +11030,7 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     assert view._find_bar.isVisible()
 
     assert view._handle_escape() is False
-    assert not view._audio_btn.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._shows.showing is None
 
 
 def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
@@ -11046,13 +11046,13 @@ def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: positive))
 
     assert view._handle_escape() is False
-    assert not view._audio_btn.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._shows.showing is None
 
 
 def test_osr2_button_tooltip_hints_esc_stops_it(qtbot):
     # The only place the Esc shortcut is discoverable, so keep the hint on the toggle.
     view, _driver, _panel = _osr2_view(qtbot)
-    assert "Esc" in view._osr2_btn.toolTip()
+    assert "Esc" in view._bank.drive.toolTip()
 
 
 def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
@@ -11062,7 +11062,7 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
     from PyQt6.QtWidgets import QApplication
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view._osr2_btn.setChecked(True)
+    view._bank.drive.setChecked(True)
     fullscreen = QWidget()
     qtbot.addWidget(fullscreen)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: fullscreen))
@@ -11119,8 +11119,8 @@ def _stoppable_view(qtbot, tmp_path, monkeypatch):
     leave alone."""
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
     view._toggle_auto(True)
-    view._audio_btn.setChecked(True)
-    view._mic_btn.setChecked(True)
+    view._bank.audio.setChecked(True)
+    view._bank.mic.setChecked(True)
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
     return view, bed, key
@@ -11136,7 +11136,7 @@ def test_esc_turns_off_everything_the_app_is_doing(qtbot, tmp_path, monkeypatch)
 
     assert handled is True
     assert not view._auto.is_active(key)
-    assert not view._audio_btn.isChecked() and bed.stops == 1
+    assert not view._bank.audio.isChecked() and bed.stops == 1
     assert view._shows.showing is None
 
 
@@ -11144,11 +11144,11 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     # The one switch it never touches: speaking is how anything it just stopped
     # gets going again without reaching for the keyboard.
     view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    assert view._mic_btn.isChecked() and view._voice.listener.commands_on
+    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
 
     _press_escape(view)
 
-    assert view._mic_btn.isChecked() and view._voice.listener.commands_on
+    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
 
 
 def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
@@ -11190,13 +11190,13 @@ def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypa
     # one thing to reach for either way, so it starts the room rather than
     # waiting to be taught what the room was by a stop it never saw.
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    assert not view._audio_btn.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._shows.showing is None
 
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
-    assert view._audio_btn.isChecked() and bed.starts == 1
-    assert view._osr2_btn.isChecked()
+    assert view._bank.audio.isChecked() and bed.starts == 1
+    assert view._bank.drive.isChecked()
     assert view._shows.showing is not None
     qtbot.addWidget(view._shows.showing)
 
@@ -11211,8 +11211,8 @@ def test_the_standing_start_is_stopped_by_the_next_press(qtbot, tmp_path, monkey
     assert _press_escape(view) is True
 
     assert not view._auto.is_active(key) and view._shows.showing is None
-    assert not view._audio_btn.isChecked() and bed.stops == 1
-    assert not view._osr2_btn.isChecked()
+    assert not view._bank.audio.isChecked() and bed.stops == 1
+    assert not view._bank.drive.isChecked()
 
 
 def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch):
@@ -11228,7 +11228,7 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
-    assert view._audio_btn.isChecked() and bed.starts == 2
+    assert view._bank.audio.isChecked() and bed.starts == 2
     assert view._shows.showing is not None
     qtbot.addWidget(view._shows.showing)
     assert view._shows.showing.playing_now() == playing  # same set, same picture
@@ -11281,7 +11281,7 @@ def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
 
     assert _press_escape(view) is True
     assert not view._auto.is_active(key)
-    assert not view._audio_btn.isChecked() and bed.stops == 2
+    assert not view._bank.audio.isChecked() and bed.stops == 2
     assert view._shows.showing is None
 
 
@@ -11310,12 +11310,12 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
     # away, and all the one after that puts back.
     view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     _press_escape(view)
-    view._audio_btn.setChecked(True)  # by hand, with everything else still off
+    view._bank.audio.setChecked(True)  # by hand, with everything else still off
 
     _press_escape(view)
     _press_escape(view)
 
-    assert view._audio_btn.isChecked()
+    assert view._bank.audio.isChecked()
     assert not view._auto.is_active(key) and view._shows.showing is None
 
 
@@ -11332,17 +11332,17 @@ def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
     assert not view._osr2_motion.active
 
     _press_escape(view)
-    assert view._osr2_motion.active and not view._osr2_btn.isChecked()
+    assert view._osr2_motion.active and not view._bank.drive.isChecked()
 
 
 def test_esc_stops_the_audio_bed_on_its_own(qtbot):
     # Nothing else running: the switch alone is enough for Esc to have acted.
     view, bed = _audio_view(qtbot)
     _keys_are_the_gallerys(view)
-    view._audio_btn.setChecked(True)
+    view._bank.audio.setChecked(True)
 
     assert _press_escape(view) is True
-    assert not view._audio_btn.isChecked() and bed.stops == 1
+    assert not view._bank.audio.isChecked() and bed.stops == 1
 
 
 # --- folders the user composes: multi-select, group, drop, rename, remove -----
@@ -11376,7 +11376,7 @@ def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
 
     assert view._browser._visible_keys == [cat, dog]  # both, as tiles
     assert "2 folders" in view._title.display_text()
-    assert not view._group_btn.isHidden()  # offering to save the grouping
+    assert not view._bank.group.isHidden()  # offering to save the grouping
 
 
 def test_the_slideshow_of_a_multi_selection_plays_every_picked_folder(qtbot):
@@ -11395,7 +11395,7 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
 
     assert view._selection_group is None
     assert view.visible_prompt_ids() == ["i1"]  # its own thumbnails, not tiles
-    assert view._group_btn.isHidden()
+    assert view._bank.group.isHidden()
 
 
 def test_delete_is_dark_while_several_folders_are_picked(qtbot):
@@ -11405,7 +11405,7 @@ def test_delete_is_dark_while_several_folders_are_picked(qtbot):
     _pick(view, cat, dog)
 
     assert view._current_deletable_folder() is None
-    assert not view._delete_btn.isEnabled()
+    assert not view._bank.delete.isEnabled()
 
 
 def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, monkeypatch):
@@ -12110,7 +12110,7 @@ def test_a_show_opening_and_closing_leaves_the_mic_as_it_found_it(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
 
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
@@ -12145,7 +12145,7 @@ def _fix_show(qtbot, tmp_path, monkeypatch, *detectors):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
     return view
@@ -12214,7 +12214,7 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     return view
 
 
@@ -12357,7 +12357,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     # plumbing, and a matcher would put a local LLM in the middle of both.
     view._voice._revision = RevisionWorker(apply_request, parent=view)
     view._voice._revision.revised.connect(view._voice._on_revised)
-    view._mic_btn.setChecked(True)  # the switch, as the user flips it
+    view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
     view._shows.start()
@@ -13097,7 +13097,7 @@ def _listening(qtbot, tmp_path, db=None):
                        client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._mic_btn.setChecked(True)
+    view._bank.mic.setChecked(True)
     return view
 
 
@@ -13211,13 +13211,13 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
     # speaker who is not looking at the bank needs told back.
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
-    aimed = view._star_btn.toolTip()
+    aimed = view._bank.star.toolTip()
     assert aimed.startswith("Star folder")
 
     view._voice.listener.speak("star")
 
     assert view._voice.status.text() == f"🎤 {aimed}"
-    assert view._star_btn.toolTip().startswith("Unstar folder")
+    assert view._bank.star.toolTip().startswith("Unstar folder")
 
 
 def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
@@ -13242,14 +13242,14 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("drive on")
-    assert view._osr2_btn.isChecked()
+    assert view._bank.drive.isChecked()
     assert view._voice.status.text() == "🎤 the OSR2 on"
 
     view._voice.listener.speak("drive")           # bare: flips whichever way it stands
-    assert not view._osr2_btn.isChecked()
+    assert not view._bank.drive.isChecked()
 
     view._voice.listener.speak("drive off")       # already off: still ends up off
-    assert not view._osr2_btn.isChecked()
+    assert not view._bank.drive.isChecked()
 
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
@@ -13260,7 +13260,7 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
 
     view._voice.listener.speak("mic off")
 
-    assert not view._mic_btn.isChecked()
+    assert not view._bank.mic.isChecked()
     assert not view._voice.listener.commands_on
 
 

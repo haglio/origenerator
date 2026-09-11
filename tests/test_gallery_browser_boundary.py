@@ -107,8 +107,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     with the act it asks for rather than staying with the words. 291 -> 268: the
     standalone enhance came out as `EnhanceController`, owning its settings
     panel -- thirty methods out, eight in, and the bank button now lit from what
-    the controller answers rather than aimed inside the gallery.)"""
+    the controller answers rather than aimed inside the gallery. 268 -> 262: the
+    bank came out as `ToolbarBank`, which builds its sixteen buttons and is
+    written from one `BankState` -- eleven methods out, five in, and the nine
+    hand-written syncs the gallery kept in step by hand collapsed to one
+    `_re_aim`.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 268
+               for x in _class_def(VIEW, "GalleryView").body) == 262
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

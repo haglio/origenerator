@@ -24,7 +24,7 @@ from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
-from origenerator.gui import grid_card
+from origenerator.gui import grid_card, palette
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
@@ -127,7 +127,7 @@ class RerollTile(QFrame):
     def _bind(self, job):
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self._image.setStyleSheet(
-            "background: #2a2a2a; border-radius: 3px; color: #8a8a8a;"
+            f"background: {palette.EMPTY_PLATE}; border-radius: 3px; color: #8a8a8a;"
         )
         self._status.hide()  # the scrim over the picture says the stage now
         self._cancel.show()

@@ -11,8 +11,9 @@ from origenerator.gui import corner_controls, drag_thumbnail, icons
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui.thumbnail_widget import _SELECTED_BG, ThumbnailWidget
+from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 
 def _corners(tile):
@@ -400,7 +401,7 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
         tw.show()
         qtbot.waitExposed(tw)
         img = tw.grab().toImage()
-        fill = QColor(_SELECTED_BG)
+        fill = QColor(SELECTED_FILL)
         assert img.pixelColor(8, 8) == fill     # under the image
         assert img.pixelColor(8, 182) == fill    # under the caption text
     finally:

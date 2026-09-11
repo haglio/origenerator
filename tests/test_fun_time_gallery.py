@@ -850,7 +850,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
                  "wan22_i2v_v1.mp4", thumbnail_path=str(still))]
 
     view = _fun_time_view(qtbot, rows)
-    view._animated_preview = lambda row: str(webp)
+    view.animated_preview = lambda row: str(webp)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
     running = [label for label in view.findChildren(QLabel)

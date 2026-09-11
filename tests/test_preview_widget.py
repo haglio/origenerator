@@ -16,7 +16,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import preview_widget
+from origenerator.gui import drag_thumbnail, preview_widget
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
@@ -674,7 +674,7 @@ def drags(monkeypatch):
         def exec(self, *args, **kwargs):
             return None
 
-    monkeypatch.setattr(preview_widget, "QDrag", _Drag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _Drag)
     return started
 
 

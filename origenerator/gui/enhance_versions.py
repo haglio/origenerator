@@ -41,9 +41,8 @@ from __future__ import annotations
 import json
 
 from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
-from PyQt6.QtGui import QDrag, QPixmap
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QApplication,
     QGraphicsOpacityEffect,
     QGridLayout,
     QHBoxLayout,
@@ -55,7 +54,7 @@ from PyQt6.QtWidgets import (
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.drag_thumbnail import fit_thumbnail, set_drag_thumbnail
+from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.metadata_block import label_column_width, meta_cells
 
 # A dragged enhancement level carries the params that produced it under this
@@ -263,7 +262,7 @@ class _LevelRow(_Row):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
-        self._press_pos = None
+        self._drag = DragOut()
         self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
         # The picture that trails the cursor when this row is dragged, cut once
@@ -316,26 +315,19 @@ class _LevelRow(_Row):
         )
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._press_pos = event.position().toPoint()
+        self._drag.note_press(event)
 
     def mouseMoveEvent(self, event):
         # Only a level that knows its settings is worth dragging: the original
         # was made by no enhancement, so there is nothing for the panel to take.
-        if self._press_pos is None or not self._params:
+        if not self._params or not self._drag.should_start(event):
             return
-        moved = (event.position().toPoint() - self._press_pos).manhattanLength()
-        if moved < QApplication.startDragDistance():
-            return  # still a click, not yet a drag — a thumbnail's own threshold
-        self._press_pos = None
-        drag = QDrag(self)
-        drag.setMimeData(enhance_level_mime(self._params))
-        set_drag_thumbnail(drag, self._drag_picture)  # the version's image trails the cursor
-        drag.exec(Qt.DropAction.CopyAction)
+        # The version's image trails the cursor.
+        self._drag.start(self, enhance_level_mime(self._params), self._drag_picture)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._press_pos is not None:
-            self._press_pos = None
+        if event.button() == Qt.MouseButton.LeftButton and self._drag.pressed:
+            self._drag.forget()
             self.clicked.emit(self._position, event.modifiers())
 
 

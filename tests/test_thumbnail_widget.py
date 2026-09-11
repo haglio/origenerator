@@ -7,7 +7,7 @@ from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
-from origenerator.gui import corner_controls, icons, thumbnail_widget
+from origenerator.gui import corner_controls, drag_thumbnail, icons
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
@@ -89,7 +89,7 @@ def _drag_out(qtbot, tw):
 
 
 def test_a_dragged_still_trails_its_picture(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     still = tmp_path / "i1.jpg"
     Image.new("RGB", (64, 48), (0, 0, 255)).save(still)
@@ -106,7 +106,7 @@ def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeyp
     # A video tile shows a looping WebP, so its label has no pixmap of its own;
     # asked only for that, the drag used to trail nothing at all while an image
     # dragged from the tile beside it trailed a picture.
-    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     tw = ThumbnailWidget("v1", None, "label", movie_path=str(webp))
@@ -120,7 +120,7 @@ def test_a_dragged_video_trails_the_frame_it_is_playing(qtbot, tmp_path, monkeyp
 
 def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
     # No picture is the one case with nothing to show; the drag still goes.
-    monkeypatch.setattr(thumbnail_widget, "QDrag", _RecordingDrag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
     _RecordingDrag.last = None
     tw = ThumbnailWidget("p1", None, "label")  # "No preview"
     qtbot.addWidget(tw)

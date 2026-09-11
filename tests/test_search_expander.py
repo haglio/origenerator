@@ -8,12 +8,32 @@ from __future__ import annotations
 
 import threading
 
+from PyQt6.QtCore import QThreadPool
+
 from origenerator.gui.search_expander import SearchExpander
 
 
 def _settled(expander, qtbot):
     """Wait for every worker the expander has started to have finished."""
     qtbot.waitUntil(lambda: not expander._in_flight, timeout=2000)
+
+
+def test_a_widening_runs_on_the_pool_the_app_drains(qtbot):
+    # On a thread of its own it was killed wherever it happened to be when the
+    # window closed, mid-call, with its signal half-emitted at a receiver that
+    # had gone. Qt waits for this pool on the way out.
+    ran = threading.Event()
+
+    def expand(query):
+        ran.set()
+        return {"tall": ("high",)}
+
+    expander = SearchExpander(expand=expand)
+    expander.request("tall")
+
+    assert QThreadPool.globalInstance().waitForDone(3000)
+    assert ran.is_set()
+    _settled(expander, qtbot)
 
 
 def test_a_request_widens_the_query_and_announces_it(qtbot):

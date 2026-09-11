@@ -22,30 +22,47 @@ from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
 
-# The open editable config tabs (in the gallery's info pane). Kept under its
-# historical key so sessions saved before the Generate/Gallery merge still restore.
-_CONFIG_TABS_KEY = "generate_tabs"
-_GALLERY_FOLDER_KEY = "gallery_folder"
-_GALLERY_SELECTION_KEY = "gallery_selection"
-_GALLERY_COMBINE_KEY = "gallery_combine"
+# Everything the session remembers about the view, as (its key in the state file,
+# what the view is asked for it on the way out, what the view is told on the way
+# back in). One list rather than three: a key used to be declared, then restored
+# by a hand-written line, then saved by another twenty lines away, and a
+# preference restored but never saved — or the reverse — failed silently and
+# stayed that way. The pair is named as the view's own methods rather than by
+# name, so a half-wired preference is an import error and the dead-code gate can
+# still see who calls them.
+#
+# The keys are the state file's public surface and cannot change, "generate_tabs"
+# included: it is from before the Generate and Gallery views merged, and a
+# session saved then still opens.
+#
+# The order is the restore order and is load-bearing: the tabs before the folder
+# before the generation, each later one needing what the earlier ones put up.
+SESSION_PREFS = (
+    ("generate_tabs", GalleryView.capture_config_tabs, GalleryView.restore_config_tabs),
+    ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
+    ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
+    ("gallery_combine", GalleryView.combine_selection, GalleryView.restore_combine_selection),
+    ("osr2_enabled", GalleryView.osr2_enabled, GalleryView.set_osr2_enabled),
+    ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
+    ("audio_enabled", GalleryView.audio_enabled, GalleryView.set_audio_enabled),
+    # The mic switch. Absent from a session saved before it was persisted — and
+    # from a first launch — which is the app's default of on (see set_mic_enabled).
+    ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
+    # The Enhance subpanel's settings. App-wide, so they belong to the session
+    # rather than to any folder's row in the database.
+    ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
+    # How the gallery search lays its results out (newest first, or banded by
+    # model + LoRA). The query itself is deliberately not saved — a search is
+    # something you are doing, not somewhere you were — but which way you like to
+    # read the answer is a preference, and re-picking it every launch is the kind
+    # of small friction that makes a control feel unfinished.
+    ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
+)
+
+# The two the view does not own. Geometry is the window's own, and the prompt
+# heights are a module-level store read before the first form is built (see
+# __init__), so neither is a view getter and neither belongs in the table.
 _GEOMETRY_KEY = "window_geometry"
-_OSR2_ENABLED_KEY = "osr2_enabled"
-_EXPERIMENTS_ENABLED_KEY = "experiments_enabled"
-_AUDIO_ENABLED_KEY = "audio_enabled"
-# The mic switch. Absent from a session saved before it was persisted — and from
-# a first launch — which is the app's default of on (see set_mic_enabled).
-_MIC_ENABLED_KEY = "mic_enabled"
-# The Enhance subpanel's settings. App-wide, so they belong to the session
-# rather than to any folder's row in the database.
-_ENHANCE_SETTINGS_KEY = "enhance_settings"
-# How the gallery search lays its results out (newest first, or banded by model +
-# LoRA). The query itself is deliberately not saved — a search is something you
-# are doing, not somewhere you were — but which way you like to read the answer
-# is a preference, and re-picking it every launch is the kind of small friction
-# that makes a control feel unfinished.
-_SEARCH_SORT_KEY = "search_sort"
-# How tall the user has dragged each prompt field, by param key — app-wide for the
-# same reason, and restored before the first form is built (see __init__).
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 
 
@@ -141,18 +158,8 @@ class OrigeneratorWindow(QMainWindow):
         ``closeEvent``) overwritten."""
         if self._fun_time is None:
             self._restore_geometry()
-        self._gallery_view.restore_config_tabs(self._app_state.get(_CONFIG_TABS_KEY))
-        self._gallery_view.select_folder(self._app_state.get(_GALLERY_FOLDER_KEY))
-        self._gallery_view.select_generation(self._app_state.get(_GALLERY_SELECTION_KEY))
-        self._gallery_view.restore_combine_selection(self._app_state.get(_GALLERY_COMBINE_KEY))
-        self._gallery_view.set_osr2_enabled(self._app_state.get(_OSR2_ENABLED_KEY))
-        self._gallery_view.set_experiments_enabled(
-            self._app_state.get(_EXPERIMENTS_ENABLED_KEY))
-        self._gallery_view.set_audio_enabled(self._app_state.get(_AUDIO_ENABLED_KEY))
-        self._gallery_view.set_mic_enabled(self._app_state.get(_MIC_ENABLED_KEY))
-        self._gallery_view.set_enhance_settings(
-            self._app_state.get(_ENHANCE_SETTINGS_KEY))
-        self._gallery_view.set_search_sort(self._app_state.get(_SEARCH_SORT_KEY))
+        for key, _getter, setter in SESSION_PREFS:
+            setter(self._gallery_view, self._app_state.get(key))
 
     def _restore_geometry(self):
         """Reapply the saved window geometry: screen, size, and maximized state.
@@ -205,18 +212,8 @@ class OrigeneratorWindow(QMainWindow):
                 chore()
             except Exception as e:
                 logger.warning("Close-time %s failed: %s", chore.__name__, e)
-        self._app_state.set(_CONFIG_TABS_KEY, self._gallery_view.capture_config_tabs())
-        self._app_state.set(_GALLERY_FOLDER_KEY, self._gallery_view.selected_folder())
-        self._app_state.set(_GALLERY_SELECTION_KEY, self._gallery_view.selected_generation())
-        self._app_state.set(_GALLERY_COMBINE_KEY, self._gallery_view.combine_selection())
-        self._app_state.set(_OSR2_ENABLED_KEY, self._gallery_view.osr2_enabled())
-        self._app_state.set(
-            _EXPERIMENTS_ENABLED_KEY, self._gallery_view.experiments_enabled())
-        self._app_state.set(_AUDIO_ENABLED_KEY, self._gallery_view.audio_enabled())
-        self._app_state.set(_MIC_ENABLED_KEY, self._gallery_view.mic_enabled())
-        self._app_state.set(
-            _ENHANCE_SETTINGS_KEY, self._gallery_view.enhance_settings())
-        self._app_state.set(_SEARCH_SORT_KEY, self._gallery_view.search_sort())
+        for key, getter, _setter in SESSION_PREFS:
+            self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
         if self._fun_time is None:
             # Hosted, the geometry is the session's to decide, so remembering

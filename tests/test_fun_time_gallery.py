@@ -135,16 +135,16 @@ def _open_slideshow(view, monkeypatch, tmp_path, name, width, height, count=1):
     Image.new("RGB", (width, height)).save(still)
     items = [(str(still), "image", f"id-{name}-{n}", str(still))
              for n in range(count)]
-    monkeypatch.setattr(view, "_slideshow_rows", lambda: [object()])
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(items))
-    monkeypatch.setattr(view, "_slideshow_subject", lambda: name)
-    view._start_slideshow()
+    monkeypatch.setattr(view, "rows_to_play", lambda: [object()])
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view, "slideshow_subject", lambda: name)
+    view._shows.start()
 
 
 def test_slideshow_lands_in_the_region_matching_its_orientation(qtbot, tmp_path, monkeypatch):
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     assert show is not None and show.isVisible()
     assert show.windowTitle() == "Origenerator Portrait"
     assert show.windowFlags() & Qt.WindowType.FramelessWindowHint
@@ -160,8 +160,8 @@ def test_both_regions_can_hold_a_show_at_once(qtbot, tmp_path, monkeypatch):
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
-    portrait = view._region_shows["portrait"]
-    landscape = view._region_shows["landscape"]
+    portrait = view._shows._region_shows["portrait"]
+    landscape = view._shows._region_shows["landscape"]
     assert portrait is not None and portrait.isVisible()
     assert landscape is not None and landscape.isVisible()
     assert portrait is not landscape
@@ -172,9 +172,9 @@ def test_both_regions_can_hold_a_show_at_once(qtbot, tmp_path, monkeypatch):
 def test_a_new_show_replaces_the_regions_current_occupant(qtbot, tmp_path, monkeypatch):
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "first", 100, 200)
-    first = view._region_shows["portrait"]
+    first = view._shows._region_shows["portrait"]
     _open_slideshow(view, monkeypatch, tmp_path, "second", 90, 200)
-    second = view._region_shows["portrait"]
+    second = view._shows._region_shows["portrait"]
     assert second is not first
     assert not first.isVisible()
     assert second.isVisible()
@@ -190,7 +190,7 @@ def test_a_preview_double_click_lands_its_show_on_the_matching_region(qtbot, tmp
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
 
-    show = view._open_slideshow_on_preview((str(wide), "image"), None)
+    show = view._shows.open_on_preview((str(wide), "image"), None)
 
     qtbot.addWidget(show)
     assert view.region_show("landscape") is show
@@ -205,7 +205,7 @@ def test_a_region_show_is_muted_like_every_satellite(qtbot, tmp_path):
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
 
-    show = view._open_slideshow_on_preview((str(wide), "image"), None)
+    show = view._shows.open_on_preview((str(wide), "image"), None)
 
     qtbot.addWidget(show)
     assert show.audio_muted()
@@ -231,7 +231,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     stub.set_session_paused = lambda paused: None
     stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
     stub.hud_items = lambda: ((), 0, False)  # a host with no set draws no map
-    view._present_surface(stub, "portrait")
+    view._shows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
 
@@ -267,7 +267,7 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
     hud, = show.findChildren(ShowHud)
@@ -308,7 +308,7 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
     model = show_hud_model("portrait", show)
@@ -334,11 +334,11 @@ def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatc
     items = [(str(tmp_path / "tall.png"), "image", "id-a", str(tmp_path / "tall.png")),
              (str(still_b), "image", "id-b", str(still_b))]
     Image.new("RGB", (100, 200)).save(tmp_path / "tall.png")
-    monkeypatch.setattr(view, "_slideshow_rows", lambda: [object()])
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(items))
-    monkeypatch.setattr(view, "_slideshow_subject", lambda: "a folder")
-    view._start_slideshow()
-    show = view._region_shows["portrait"]
+    monkeypatch.setattr(view, "rows_to_play", lambda: [object()])
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
+    view._shows.start()
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
     show.show_item(str(still_b), hold=True)
@@ -357,7 +357,7 @@ def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypa
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "_current_shelf_key", lambda: RECENTS_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
     assert show._playlist.order == [0, 1, 2]  # the listing's own order, unshuffled
@@ -372,9 +372,9 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
 
@@ -407,17 +407,17 @@ def test_a_hosted_show_keeps_up_with_its_own_folder(qtbot, tmp_path, monkeypatch
     portrait = view.region_show("portrait")
     qtbot.addWidget(portrait)
     # The show opened from a folder; the browser has since moved off it.
-    view._live_shows = [(portrait, "folder-a")]
+    view._shows._live_shows = [(portrait, "folder-a")]
     landed = {"prompt_id": "new-1"}
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: [landed] if key == "folder-a" else [])
     still = tmp_path / "new.png"
     Image.new("RGB", (100, 200)).save(still)
-    monkeypatch.setattr(view, "_slideshow_items",
+    monkeypatch.setattr(view._shows, "items_of",
                         lambda rows: [(str(still), "image", "new-1", str(still))])
     before = len(portrait.hud_items()[0])
 
-    view._feed_slideshow_finished(landed)
+    view._shows.note_finished(landed)
 
     assert len(portrait.hud_items()[0]) == before + 1
 
@@ -429,17 +429,17 @@ def test_a_landing_reaches_only_the_show_playing_its_folder(qtbot, tmp_path, mon
     portrait, landscape = view.region_show("portrait"), view.region_show("landscape")
     for show in (portrait, landscape):
         qtbot.addWidget(show)
-    view._live_shows = [(portrait, "folder-a"), (landscape, "folder-b")]
+    view._shows._live_shows = [(portrait, "folder-a"), (landscape, "folder-b")]
     landed = {"prompt_id": "new-1"}
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: [landed] if key == "folder-b" else [])
     still = tmp_path / "new.png"
     Image.new("RGB", (200, 100)).save(still)
-    monkeypatch.setattr(view, "_slideshow_items",
+    monkeypatch.setattr(view._shows, "items_of",
                         lambda rows: [(str(still), "image", "new-1", str(still))])
     counts = [len(portrait.hud_items()[0]), len(landscape.hud_items()[0])]
 
-    view._feed_slideshow_finished(landed)
+    view._shows.note_finished(landed)
 
     assert len(portrait.hud_items()[0]) == counts[0]        # not its folder
     assert len(landscape.hud_items()[0]) == counts[1] + 1   # its folder
@@ -458,7 +458,7 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
     rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
     monkeypatch.setattr(view._browser, "rows_for_shelf",
                         lambda key: rows if key == "__recents__::landscape" else [])
-    monkeypatch.setattr(view, "_slideshow_items",
+    monkeypatch.setattr(view._shows, "items_of",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
                                    for row in r])
 
@@ -481,10 +481,10 @@ def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, 
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
     base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(5)]
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: base if key == "__all__::portrait" else [])
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
@@ -517,9 +517,9 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
     base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(4)]
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: base if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
 
     view.fill_the_regions()
 
@@ -541,9 +541,9 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     Image.new("RGB", (100, 200)).save(tall)
     base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(4)]
     library = {"rows": []}
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: library["rows"] if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
 
     view.fill_the_regions()          # asked for too early: nothing to play yet
     assert view.region_show("portrait") is None
@@ -572,7 +572,7 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
@@ -628,15 +628,15 @@ def test_a_lock_on_a_hosted_show_opens_its_generate_tab(qtbot, tmp_path, monkeyp
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     # Landing on the item is what opens its tab, so the link is spied on rather
     # than swallowed: it has to run for the tab to come of it.
-    real_link = view._follow_link
+    real_link = view.follow_link
 
     def follow(prompt_id):
         navigated.append(prompt_id)
         real_link(prompt_id)
 
-    monkeypatch.setattr(view, "_follow_link", follow)
+    monkeypatch.setattr(view, "follow_link", follow)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
     show._toggle_lock()
@@ -661,7 +661,7 @@ def test_a_standalone_show_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
 
-    view._slideshow._toggle_lock()
+    view._shows.showing._toggle_lock()
 
     assert opened == []
 
@@ -672,12 +672,12 @@ def test_closing_the_gallery_closes_the_show_it_opened(qtbot, tmp_path, monkeypa
     view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
-    show = view._slideshow
+    show = view._shows.showing
 
     view.close()
 
     assert not show.isVisible()
-    assert view._live_shows == []
+    assert view._shows._live_shows == []
 
 
 def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
@@ -688,9 +688,9 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
 
@@ -725,9 +725,9 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         "__all__::portrait": [{"prompt_id": "p-1", "thumbnail_path": str(tall)}],
         "__all__::landscape": [{"prompt_id": "l-1", "thumbnail_path": str(wide)}],
     }
-    monkeypatch.setattr(view, "_rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
     monkeypatch.setattr(
-        view, "_slideshow_items",
+        view._shows, "items_of",
         lambda rows: [(row["thumbnail_path"], "image", row["prompt_id"],
                        row["thumbnail_path"]) for row in rows])
 
@@ -743,7 +743,7 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         qtbot.addWidget(show)
     # And each remembers WHERE it plays from, so what lands in the library
     # reaches a region sitting in its base state.
-    assert sorted(where for _show, where in view._live_shows) == [
+    assert sorted(where for _show, where in view._shows._live_shows) == [
         "__all__::landscape", "__all__::portrait"]
 
 
@@ -764,8 +764,8 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
     view = _fun_time_view(qtbot, rows)
     view.refresh()
 
-    portrait = [row["prompt_id"] for row in view._rows_at("__all__::portrait")]
-    landscape = [row["prompt_id"] for row in view._rows_at("__all__::landscape")]
+    portrait = [row["prompt_id"] for row in view._shows.rows_at("__all__::portrait")]
+    landscape = [row["prompt_id"] for row in view._shows.rows_at("__all__::landscape")]
     assert portrait == ["p-1"]
     assert landscape == ["l-1"]
     # And the two halves are the whole of it — there is no un-sided All to ask.
@@ -785,24 +785,24 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
     base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(5)]
-    monkeypatch.setattr(view, "_rows_at",
+    monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: base if key == "__all__::portrait" else [])
     _open_slideshow(view, monkeypatch, tmp_path, "folder", 100, 200, count=2)
     # _open_slideshow stubs the items for the folder it opened; from here the
     # rows the library hands back are the items.
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
     assert len(show.hud_items()[0]) == 2      # the folder it was started on
-    view._live_shows = [(show, "folder-a")]
+    view._shows._live_shows = [(show, "folder-a")]
 
     hud._deliver("portrait_reset")
 
     assert len(show.hud_items()[0]) == len(base)   # the library of its shape
     assert show.hud_order_label == "Shuffle"
     # And it is fed from the library now, not from the folder it left.
-    assert [where for _show, where in view._live_shows] == ["__all__::portrait"]
+    assert [where for _show, where in view._shows._live_shows] == ["__all__::portrait"]
 
 
 def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypatch):
@@ -811,7 +811,7 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._slideshow
+    show = view._shows.showing
     qtbot.addWidget(show)
     show._playlist.jump_to(1)
     show._toggle_lock()
@@ -883,7 +883,7 @@ def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
     """
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._live_shows[0][0]
+    show = view._shows._live_shows[0][0]
     qtbot.addWidget(show)
     monkeypatch.setattr(view, "region_show", lambda side: None)
 
@@ -993,7 +993,7 @@ def test_the_shows_hud_names_the_item_the_way_this_app_does(qtbot):
     row = _image("p1", "a cat", 50, 1)
     view = _fun_time_view(qtbot, rows=[row])
 
-    label = view._show_item_label("p1")
+    label = view._shows._item_label("p1")
 
     assert "seed" in label and "/" in label
     assert "image /" not in label       # never the media type as a folder
@@ -1002,8 +1002,8 @@ def test_the_shows_hud_names_the_item_the_way_this_app_does(qtbot):
 
 def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._show_item_label("nobody") == ""
-    assert view._show_item_label("") == ""
+    assert view._shows._item_label("nobody") == ""
+    assert view._shows._item_label("") == ""
 
 
 def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp_path, monkeypatch):
@@ -1016,9 +1016,9 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
     names = [name for _rect, name in hud._targets.control]
@@ -1043,8 +1043,8 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, 
     it — and F-mode — back off, which is what the phrase means on a satellite."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
-    monkeypatch.setattr(view, "_starred_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
+    monkeypatch.setattr(view._shows, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
@@ -1066,9 +1066,9 @@ def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path
     thing it drops — a reset that left the show narrowed would not be one."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._region_shows["portrait"]
+    show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
     show.toggle_enhanced_mode()
     assert show.hud_enhanced_mode is True

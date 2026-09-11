@@ -798,7 +798,7 @@ class BrowserPane(QObject):
     def _shelf_double_clicked(self, prompt_id: str):
         """A shelf tile's double-click: go to the item's own folder, and keep the
         tab that lands there — its tile picked, highlighted and scrolled to, as
-        if you'd navigated in and clicked it (:meth:`GalleryView._follow_link`
+        if you'd navigated in and clicked it (:meth:`GalleryView.follow_link`
         answers the jump).
 
         Double-click means the same thing everywhere in the pane — this tab is

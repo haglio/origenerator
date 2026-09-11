@@ -95,8 +95,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     readily as a config. 372 → 371: the gallery's handle on the config tab's
     private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's cards are a join over four
     sources and no rendering at all, so they are built outside the pane now
-    (`gui/inflight_items.py`) and it keeps a one-line delegation.)"""
+    (`gui/inflight_items.py`) and it keeps a one-line delegation. 371 -> 341:
+    the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
+    sixteen of what stays renamed to the host contract they now answer, and two
+    new ones for what the shows ask that had no name of its own.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 371
+               for x in _class_def(VIEW, "GalleryView").body) == 341
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

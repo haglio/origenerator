@@ -1067,7 +1067,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 
     _search_for(view, "cat")
 
-    assert view._current_group() is None
+    assert view.current_group() is None
     assert view._current_deletable_folder() is None
     assert not view._auto_btn.isVisible()
 
@@ -3115,7 +3115,7 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     view.refresh()
     _select_first_leaf(view)
     queued = []
-    view.enhance_items = queued.append
+    view._enhance.enhance_items = queued.append
 
     view._browser._thumbnail_clicked("g0")
     assert view._enhance_btn.toolTip().startswith("Enhance 1 item")
@@ -3154,12 +3154,12 @@ def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
     view.refresh()
 
     _video_leaf(view)
-    assert not view._enhance_panel.isEnabled()
-    assert "no video enhancer" in view._enhance_panel.toolTip()
+    assert not view._enhance.panel.isEnabled()
+    assert "no video enhancer" in view._enhance.panel.toolTip()
 
     _select_first_leaf(view)   # back on images, and the settings come back
-    assert view._enhance_panel.isEnabled()
-    assert view._enhance_panel.toolTip() == ""
+    assert view._enhance.panel.isEnabled()
+    assert view._enhance.panel.toolTip() == ""
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
@@ -3187,7 +3187,7 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     assert "these settings" in view._enhance_btn.toolTip()
 
     # The panel edited to something else: that enhancement doesn't exist yet.
-    view._on_enhance_settings_changed(
+    view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
     assert view._enhance_btn.isEnabled()
 
@@ -3301,7 +3301,7 @@ def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp
     _select_first_leaf(view)
     assert view._browser._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_HELD
 
-    view._on_enhance_settings_changed(
+    view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
 
     # Re-read in place: no tile was touched and the pane was never rebuilt.
@@ -3320,10 +3320,10 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     view._browser.selected_ids.add("v1")   # as a Ctrl-click across the two
     view._sync_action_buttons()
     queued = []
-    view.enhance_items = queued.append
+    view._enhance.enhance_items = queued.append
 
     assert view._enhance_btn.isEnabled()
-    assert view._enhance_panel.isEnabled()
+    assert view._enhance.panel.isEnabled()
     view._enhance_btn.click()
 
     assert queued == [["i1"]]
@@ -9671,7 +9671,7 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    view._enhance_all()
+    view._enhance._enhance_all()
 
     # Both images share one source config, so their enhances share one folder —
     # and both go to ComfyUI, which works through them one at a time with the
@@ -9774,7 +9774,7 @@ def test_the_hud_holds_the_left_of_the_lower_row_and_enhance_the_right(qtbot, tm
         _row_index(view, view._motion_panel)
     )
     assert row.itemAt(0).widget() is view._motion_panel
-    assert row.itemAt(1).widget() is view._enhance_panel
+    assert row.itemAt(1).widget() is view._enhance.panel
     assert row.stretch(0) == 0 and row.stretch(1) == 1
 
 
@@ -9811,13 +9811,13 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._enhance_panel.isHidden()
+    assert not view._enhance.panel.isHidden()
 
     for item in (_image_workflow(view._tree), _shelf(view, RECENTS_KEY),
                  _shelf(view, STARRED_KEY), _shelf(view, EXPERIMENTS_KEY),
                  _shelf(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
-        assert not view._enhance_panel.isHidden()
+        assert not view._enhance.panel.isHidden()
 
 
 def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
@@ -9826,7 +9826,7 @@ def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
     _set_enhance(view, auto=True, params={"enhance_scale": 3.0, "enhance_steps": 42,
                                           "enhance_denoise": 0.4})
 
-    shown = view._enhance_panel.settings()
+    shown = view._enhance.panel.settings()
     assert shown.auto is True
     assert shown.params["enhance_scale"] == 3.0
     assert shown.params["enhance_steps"] == 42
@@ -9842,7 +9842,7 @@ def test_editing_the_panel_takes_effect_at_once(qtbot, tmp_path):
 
     # No Apply button: an edit lands straight away, so the settings an enhance
     # launched a moment later runs at are the ones on screen.
-    view._enhance_panel._steps.setValue(33)
+    view._enhance.panel._steps.setValue(33)
 
     assert gallery.EnhanceSettings.parse(
         view.enhance_settings()
@@ -9858,7 +9858,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
                                "enhance_denoise": 0.3})
     _select_first_leaf(view)
 
-    view._enhance_all()
+    view._enhance._enhance_all()
 
     (job,) = view._reroll_jobs.values()
     assert job.params["enhance_scale"] == 1.5
@@ -9980,7 +9980,7 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
         ["image_enhance", "image_enhance"]
     assert len(view._reroll.jobs) == 1
     # The one after it counts too — and reads as queued, since it isn't rendering.
-    assert view.enhancing_run(db.get_generation("g1")).status == "queued"
+    assert view._enhance.run_of(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
     assert first._pending_enhancement == (
@@ -10017,7 +10017,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     # The run ending puts the tile's own picture back: those frames were a
     # partial render of a file that never landed.
     view._reroll._jobs.clear()
-    view._reconcile_pending_enhancements()
+    view._enhance.reconcile()
     assert tile._enhancing is None
 
 

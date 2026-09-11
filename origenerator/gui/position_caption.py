@@ -6,8 +6,9 @@ whatever else it has to add: the lock.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
+
+from origenerator.gui.media_overlay import PLATE_CSS, float_over_media
 
 _LOWER_MARGIN = 24  # how far the plate floats above the lower edge
 
@@ -18,15 +19,9 @@ class PositionCaption(QLabel):
     def __init__(self, host: QWidget):
         super().__init__(host)
         self.setStyleSheet(
-            "color: white; background: rgba(0, 0, 0, 140);"
-            " padding: 4px 10px; border-radius: 4px;"
+            f"color: white; padding: 4px 10px; {PLATE_CSS}"
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        # A video surface is a native window on Windows, and a plain sibling
-        # widget cannot paint over one however it is stacked — which is why this
-        # plate showed over an image and vanished over a clip. Native itself, it
-        # stacks against the video by Z-order like any other window.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        float_over_media(self)
 
     def show_position(self, position: int, total: int, suffix: str = "") -> None:
         """Say the 1-based ``position`` out of ``total``, plus any ``suffix``."""

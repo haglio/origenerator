@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import QPushButton, QWidget
 
 from origenerator import gallery
 from origenerator.gui import icons
+from origenerator.gui.media_overlay import float_over_media
 
 STAR = "star"
 TRASH = "trash"
@@ -93,12 +94,10 @@ class _CornerButton(QPushButton):
         self._render = render  # (armed) -> QIcon
         self._armed = False
         if native:
-            # A video plays on a native surface, which an ordinary sibling widget
-            # cannot paint over -- the same reason the preview's notice plate is
-            # native (see :mod:`origenerator.gui.preview_widget`). Only asked for
-            # where a video can turn up: a native window per button is real cost,
-            # and a wall of thumbnails would be paying it dozens of times over.
-            self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+            # Only where a video can turn up: a native window per button is real
+            # cost, and a wall of thumbnails would pay it dozens of times over.
+            # A button is pressed, so the mouse stops here.
+            float_over_media(self, click_through=False)
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
         self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
         self.setStyleSheet(CHIP_CSS)

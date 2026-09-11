@@ -25,6 +25,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.gui.media_overlay import float_over_media
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -50,12 +51,7 @@ class Toast(QLabel):
         )
         self.setFont(make_font(FONT_UI, SIZE_HEADING, bold=True))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        # A video surface is a native window on Windows, and a plain sibling
-        # widget cannot paint over one however it is stacked — which is why the
-        # position plate and the HUD map are native too. Native itself, this
-        # stacks against the media by Z-order like any other window.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        float_over_media(self)
         self.hide()
 
     def say(self, text: str) -> None:

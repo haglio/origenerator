@@ -15,6 +15,7 @@ from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.gui.media_overlay import PLATE_CSS, float_over_media
 from origenerator.slideshow import Slide
 
 _MARGIN = 12            # gap from the screen edge, and from the media in a gutter
@@ -89,14 +90,8 @@ class NeighborPreviews:
         label = QLabel(host)
         # The same translucent plate the position caption wears, so a still stays
         # legible where it lands over bright media.
-        label.setStyleSheet(
-            "background: rgba(0, 0, 0, 140); padding: 4px; border-radius: 4px;"
-        )
-        label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        # Native, because a video surface is a native window on Windows and a
-        # plain sibling cannot paint over one however it is stacked — which is
-        # why these stills showed beside an image and vanished beside a clip.
-        label.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+        label.setStyleSheet(f"padding: 4px; {PLATE_CSS}")
+        float_over_media(label)
         label.hide()
         return label
 

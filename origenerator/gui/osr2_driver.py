@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from app_support.funscript import read_actions
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import (
@@ -19,7 +20,7 @@ from origenerator.config import (
     OSR2_GENAU_ENABLED_FILE,
     OSR2_TCODE_UDP_PORT,
 )
-from origenerator.funscript import funscript_of, read_actions
+from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
 
 logger = logging.getLogger(__name__)

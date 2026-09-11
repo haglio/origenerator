@@ -105,7 +105,7 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
     # A workflow that authored its motion (ATI) knows the exact motion, so its
     # sidecar comes straight from authored_actions — the metronome synthesizer
     # must not run for it, or the script would drift from the pixels.
-    from origenerator.funscript import read_actions
+    from app_support.funscript import read_actions
 
     ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     out = tmp_path / "out"

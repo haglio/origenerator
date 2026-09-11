@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from app_support.funscript import read_actions
 from PyQt6.QtCore import (
     QEvent,
     QPoint,
@@ -46,7 +47,7 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
-from origenerator.funscript import funscript_of, read_actions
+from origenerator.funscript import funscript_of
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
@@ -689,8 +690,8 @@ class PreviewWidget(QWidget):
         if self._strip is None:
             return
         actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
-                   if video_path else None)
-        self._strip.set_actions(actions or [])
+                   if video_path else [])
+        self._strip.set_actions(actions)
         self._strip.setVisible(bool(actions))
 
     def _hide_strip(self) -> None:

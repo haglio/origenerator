@@ -1,7 +1,9 @@
-"""Synthesize and read the funscript that rides alongside a generated video.
+"""Synthesize the funscript that rides alongside a generated video, and find it.
 
-A ``.funscript`` is a JSON file of ``{"at": <ms>, "pos": 0..100}`` actions describing
-motion for a haptic device (the OSR2). Origenerator's videos carry no explicit
+What a ``.funscript`` document is -- its keys, the metadata block an outside
+player reads, what a document listing no actions answers -- belongs to every app
+in this family that reads or writes one and lives in
+:mod:`app_support.funscript`. Origenerator's videos carry no explicit
 motion track — the diffusion model's motion lives only in the pixels — so rather than
 measuring the finished video, this authors a motion *with* it from what the generation
 already knows: the clip's duration, and whether it loops. The result is a rhythm, not a
@@ -19,15 +21,19 @@ existed, still beside the clip.
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
+
+from app_support.funscript import document, write
 
 logger = logging.getLogger(__name__)
 
 
 #: Where the scripts live, under the ComfyUI output dir.
 FUNSCRIPT_SUBFOLDER = "funscript"
+
+#: This app's name on the scripts it authors.
+CREATOR = "origenerator"
 
 
 def funscript_path_for(video_path, *, output_dir) -> Path:
@@ -89,19 +95,23 @@ def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict
     ]
 
 
-def write_funscript(path, actions: list[dict]) -> None:
-    """Write ``actions`` as a minimal funscript JSON document.
+def write_funscript(path, actions: list[dict], *, duration_seconds: int | None = None) -> None:
+    """Write ``actions`` as the family's funscript document, credited to this app.
 
-    Makes the folder it writes into: the scripts' folder is one this app owns
-    and a user tidying the output dir can leave it out, so every writer would
-    otherwise need the same guard.
+    *duration_seconds* is the clip the script was authored for, which only a
+    caller that measured it knows; without one, the script's own span answers,
+    which is the closest this app can get for a motion it was handed rather
+    than synthesized.
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"version": "1.0", "inverted": False, "range": 100, "actions": actions}),
-        encoding="utf-8",
-    )
+    write(Path(path), document(
+        actions,
+        duration_seconds=_span_seconds(actions) if duration_seconds is None else duration_seconds,
+        creator=CREATOR,
+    ))
+
+
+def _span_seconds(actions: list[dict]) -> int:
+    return round(actions[-1]["at"] / 1000) if actions else 0
 
 
 # Anchor colors for the classic funscript-heatmap feel (mirrors sibling Nau's
@@ -156,25 +166,6 @@ def heatmap_colors(actions: list[dict], buckets: int) -> list[tuple[int, int, in
     return [_speed_to_color(units / bin_s) for units in travel]
 
 
-def read_actions(path) -> list[dict] | None:
-    """The ``actions`` list from a funscript file, or ``None`` if absent/unreadable.
-
-    ``None`` in is ``None`` out, so whatever :func:`funscript_of` answered can be
-    handed straight here without a caller checking first.
-    """
-    if path is None:
-        return None
-    p = Path(path)
-    if not p.exists():
-        return None
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    actions = data.get("actions") if isinstance(data, dict) else None
-    return actions if isinstance(actions, list) else None
-
-
 def video_duration_seconds(video_path) -> float | None:
     """Read a video's duration via OpenCV (frame count / fps), or ``None``.
 
@@ -219,5 +210,5 @@ def ensure_funscript(video_path, *, loop: bool, hz: float, output_dir,
     actions = synthesize_actions(duration, hz=hz, loop=loop)
     if not actions:
         return None
-    write_funscript(dest, actions)
+    write_funscript(dest, actions, duration_seconds=round(duration))
     return dest

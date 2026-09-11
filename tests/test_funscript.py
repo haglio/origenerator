@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app_support.funscript import read_actions
+
 from origenerator.funscript import (
     ensure_funscript,
     funscript_of,
     funscript_path_for,
     heatmap_colors,
-    read_actions,
     synthesize_actions,
     write_funscript,
 )
@@ -55,7 +56,7 @@ def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
 def test_read_actions_passes_a_missing_script_through():
     """``funscript_of`` answers ``None`` for a clip with no script, and that goes
     straight to ``read_actions`` at every call site."""
-    assert read_actions(None) is None
+    assert read_actions(None) == []
 
 
 def test_synthesize_actions_alternates_extremes_at_half_period():
@@ -88,11 +89,13 @@ def test_write_then_read_round_trips_actions(tmp_path):
     assert read_actions(dest) == actions
 
 
-def test_read_actions_returns_none_for_missing_or_bad_file(tmp_path):
-    assert read_actions(tmp_path / "nope.funscript") is None
+def test_a_script_that_is_missing_or_will_not_read_holds_no_actions(tmp_path):
+    """One answer across the family, where this app answered None, a sibling
+    answered an empty list and a third raised."""
+    assert read_actions(tmp_path / "nope.funscript") == []
     bad = tmp_path / "bad.funscript"
     bad.write_text("not json", encoding="utf-8")
-    assert read_actions(bad) is None
+    assert read_actions(bad) == []
 
 
 def test_ensure_funscript_writes_into_the_folder_from_a_probed_duration(tmp_path):

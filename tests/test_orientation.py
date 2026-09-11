@@ -296,7 +296,7 @@ def test_a_shelf_belongs_to_one_side(qtbot, tmp_path):
     assert view._browser.visible_prompt_ids() == ["t1"]
     # The slideshow plays exactly the listing — a homogeneous set, so the
     # hosting session routes the whole show to the portrait region.
-    assert [row["prompt_id"] for row in view._slideshow_rows()] == ["t1"]
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
     # And it is what history remembers, so Back returns to that side's shelf.
     assert view._current_shelf_key() == oriented_key(RECENTS_KEY, "portrait")
 
@@ -314,7 +314,7 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
     view._tree.setCurrentItem(view._item_by_key[oriented_key(STARRED_KEY, "landscape")])
 
     assert view._browser.visible_prompt_ids() == ["w1"]
-    assert [row["prompt_id"] for row in view._slideshow_rows()] == ["w1"]
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]
 
 
 def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
@@ -335,7 +335,7 @@ def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(TRASH_KEY, "portrait")])
     assert view._current_shelf_key() == oriented_key(TRASH_KEY, "portrait")
-    assert [row["prompt_id"] for row in view._slideshow_rows()] == ["t1"]
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
 
     assert view._browser.rows_for_shelf(oriented_key(REQUESTS_KEY, "portrait")) == []
 
@@ -380,7 +380,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     assert drawn == [oriented_key("image/sdxl_t2i", "portrait"),
                      oriented_key("image/sdxl_t2i", "landscape")]
     for key, expected in zip(drawn, (["t1"], ["w1"])):
-        assert [row["prompt_id"] for row in view._rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view._shows.rows_at(key)] == expected
         assert view.group_for_key(key).key == "image/sdxl_t2i"  # its identity is unsplit
 
 
@@ -399,9 +399,9 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         opened.append(kwargs)
         return stub
 
-    view._open_slideshow = record
+    view._shows.open = record
     view._tree.setCurrentItem(view._item_by_key[oriented_key(RECENTS_KEY, "portrait")])
-    view._start_slideshow()
+    view._shows.start()
 
     assert opened and opened[0]["side"] == "portrait"
     assert opened[0]["location"] == oriented_key(RECENTS_KEY, "portrait")
@@ -415,6 +415,6 @@ def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
     view.refresh()
 
     for side, expected in (("portrait", ["t1"]), ("landscape", ["w1"])):
-        key = view.region_base_location(side)
+        key = view._shows.region_base_location(side)
         assert key in view._item_by_key  # a real row, not a synthetic narrowing
-        assert [row["prompt_id"] for row in view._rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view._shows.rows_at(key)] == expected

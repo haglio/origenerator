@@ -65,7 +65,7 @@ _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 # Whether this player_core's HUD knows the enhanced-only switch: the model field
 # that grows the button, and the status line's slot that names it (one change
 # there, so one question here).  Asked rather than assumed, for the reason
-# :func:`~origenerator.gui.gallery_view._shared_hud_widget` asks whether there
+# :func:`~origenerator.gui.show_director._shared_hud_widget` asks whether there
 # is a shared HUD at all: the switch lives in the newest player_core, and a show
 # opened over an older checkout must come up without the button rather than not
 # come up.

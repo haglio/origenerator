@@ -47,7 +47,7 @@ def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
     monkeypatch.setattr(gallery_view, "ReviseTask", lambda *a, **kw: _NeverAnswers())
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     if not showing:
-        view._slideshow.close()  # the request is then this pane's to answer,
+        view._shows.showing.close()  # the request is then this pane's to answer,
         view.select_generation("orig")  # about the picture picked in it
     view._voice.speak("Request.")
     view._voice.speak("no hat. Over.")
@@ -120,7 +120,7 @@ def test_a_flash_while_the_work_goes_on_falls_back_to_the_work(qtbot):
 
 
 def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkeypatch):
-    show = _mid_request(qtbot, tmp_path, monkeypatch)._slideshow
+    show = _mid_request(qtbot, tmp_path, monkeypatch)._shows.showing
     assert "working out" in _corner(show)
 
     _fade(show)
@@ -132,7 +132,7 @@ def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, mon
     """Whisper keeps transcribing while the request is worked out, and the app
     says what it heard. That line is a flash; the work under it is not."""
     view = _mid_request(qtbot, tmp_path, monkeypatch)
-    show = view._slideshow
+    show = view._shows.showing
 
     view._voice.heard.emit("something else entirely")
 

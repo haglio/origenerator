@@ -37,10 +37,10 @@ def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
     still = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(still)
     items = [(str(still), "image", f"id{n}", str(still)) for n in range(count)]
-    monkeypatch.setattr(view, "_slideshow_rows", lambda: [object()])
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(items))
-    monkeypatch.setattr(view, "_slideshow_subject", lambda: "a folder")
-    view._start_slideshow()
+    monkeypatch.setattr(view, "rows_to_play", lambda: [object()])
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
+    view._shows.start()
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     return show
@@ -117,7 +117,7 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
 
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
-    monkeypatch.setattr(view, "_play_shelf_aloud", played.append)
+    monkeypatch.setattr(view._shows, "play_shelf", played.append)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
@@ -165,8 +165,8 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
         "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
     }
-    monkeypatch.setattr(view, "_rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view, "_slideshow_items", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
     view.fill_the_regions()
     shows = [view.region_show(side) for side in ("portrait", "landscape")]
     for show in shows:
@@ -368,7 +368,7 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     played = []
-    monkeypatch.setattr(view, "_play_shelf_aloud", played.append)
+    monkeypatch.setattr(view._shows, "play_shelf", played.append)
     monkeypatch.setattr(view, "_begin_request", lambda *a, **kw: None)
 
     (tmp_path / "origenerator_cmd.txt").write_text(

@@ -64,7 +64,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
 from origenerator.gui.editable_header import EditableHeader
-from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.gui.enhance_controller import EnhanceController
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request_tile import FolderRequestTile
@@ -110,7 +110,6 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.inflight import (
-    EnhancingRun,
     discard_run_text,
     discard_run_tooltip,
     queue_wait_text,
@@ -166,7 +165,6 @@ from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
-from origenerator.workflows.detail_parts import name_parts
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
@@ -205,12 +203,6 @@ _TOOL_ICON_PX = BUTTON_ICON  # the family's icon size — see GalleryView._tool_
 # without a rule drawn there — and it is that ratio rather than a number
 # of its own, so a change to the family's gap carries the grouping with it.
 _TOOLBAR_GROUP_GAP = BUTTON_GROUP_GAP
-# Said the same way by the button and by the settings panel it would run, because
-# both go dark together the moment what's in front of you is a video.
-_NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
-_ALREADY_AT_THESE_SETTINGS = (
-    "Already enhanced at these settings — change one below to make another"
-)
 # The synthetic shelves, as back/forward history locations: each is a place the
 # user can be standing, so a visit to one is recorded and restored by key rather
 # than by the generation that happened to be picked there.
@@ -306,17 +298,6 @@ def _lower_divider() -> QFrame:
     return line
 
 
-def _all_video(rows) -> bool:
-    """Whether ``rows`` is a set of videos and not empty.
-
-    Empty is not "all video": nothing in front of you is nothing to say, and
-    both callers depend on that — a shelf with no pick must not read as a folder
-    of clips.
-    """
-    rows = list(rows)
-    return bool(rows) and all(gallery.media_type_of_row(row) == "video" for row in rows)
-
-
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
@@ -378,7 +359,7 @@ class GalleryView(QWidget):
         self._reroll = RerollController(db, client)
         self._reroll.changed.connect(self._rerender_current_leaf)
         self._reroll.changed.connect(self._reconcile_generating)
-        self._reroll.changed.connect(self._reconcile_pending_enhancements)
+        self._reroll.changed.connect(lambda: self._enhance.reconcile())
         self._reroll.preview.connect(self._on_reroll_preview)
         self._reroll.finished.connect(self._on_reroll_finished)
         self._reroll.failed.connect(self._on_reroll_failed)
@@ -412,7 +393,7 @@ class GalleryView(QWidget):
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
             release_files=self._release_held_media, thumb_dir=THUMB_DIR,
-            cancel_enhancements=self._cancel_enhancements_of,
+            cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
         )
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's
@@ -458,8 +439,8 @@ class GalleryView(QWidget):
                 media_types=lambda: self.media_types(),
                 image_rows=lambda: self._image_rows,
                 animated_preview=lambda row: self.animated_preview(row),
-                enhancing_run=lambda row: self.enhancing_run(row),
-                enhance_settings=lambda: self._enhance_settings,
+                enhancing_run=lambda row: self._enhance.run_of(row),
+                enhance_settings=lambda: self._enhance.settings,
                 experiments_enabled=lambda: self.experiments_enabled(),
                 add_lead_tiles=lambda flow, group: self._add_lead_tiles(flow, group),
             ),
@@ -485,21 +466,6 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
-        # Which image each live enhance is of, by that image's prompt_id — the
-        # stamp its row carries (``enhance_of``), read once per job rather than
-        # on every streamed frame. ``None`` for a run from before the stamp was
-        # recorded, which is matched by the file it reads instead (see
-        # :meth:`_enhance_of_row`).
-        self._enhance_targets: dict[str, str | None] = {}
-        # Which image each running enhance is improving, and the set of runs that
-        # answer was worked out from — recomputed only when that set changes, not
-        # on every frame they stream.
-        self._enhancing_by_prompt: dict[str, object] = {}
-        self._enhancing_signature: tuple = ()
-        # What every enhance runs at, app-wide — the Enhance subpanel's value.
-        # Restored from the session by set_enhance_settings; built before
-        # _build_ui, whose panel opens on it.
-        self._enhance_settings = gallery.EnhanceSettings()
         self._editing_key: str | None = None  # folder being renamed inline
         # The user's own folders, resolved against the live tree on each rebuild,
         # and the throwaway one a multi-selection stands up (None with 0 or 1 row
@@ -522,6 +488,14 @@ class GalleryView(QWidget):
         self._combine = CombineController(
             self, parent=self, db=db, reroll=self._reroll, client=client,
             info_tabs_of=lambda: self._info_tabs, shows=self._shows)
+        # The standalone enhance: its settings panel, what the Enhance button
+        # would run on, and the live run's appearance on every surface showing
+        # the picture it improves
+        # (:mod:`origenerator.gui.enhance_controller`). It builds its own panel,
+        # which _build_ui seats in the footer.
+        self._enhance = EnhanceController(
+            self, db=db, reroll=self._reroll, browser=self._browser,
+            shows=self._shows, info_tabs_of=lambda: self._info_tabs)
         # A thumbnail or a preview picked up anywhere lights the slot it fits,
         # so the drop target is obvious from the start of the gesture.
         self._browser.drag_started.connect(self._combine.drag_started)
@@ -542,7 +516,8 @@ class GalleryView(QWidget):
         self._build_ui()
         self._voice.bind_the_bank(
             auto=self._auto_btn, audio=self._audio_btn, drive=self._osr2_btn,
-            mic=self._mic_btn, enhance=(self._enhance_btn, self._enhance_selection),
+            mic=self._mic_btn,
+            enhance=(self._enhance_btn, self._enhance.enhance_the_selection),
             actions={
                 AppCommand.BACK: (self._back_btn, self._navigation.go_back),
                 AppCommand.FORWARD: (self._forward_btn, self._navigation.go_forward),
@@ -935,7 +910,7 @@ class GalleryView(QWidget):
             icons.star_icon(filled=True), "Star", self._star_selection
         )
         self._enhance_btn = self._tool_button(
-            icons.enhance_icon(), "Enhance", self._enhance_selection
+            icons.enhance_icon(), "Enhance", self._enhance.enhance_the_selection
         )
         # Turn the folders picked in the tree into a folder of their own. Shown
         # only while several are picked — that selection IS the folder, unsaved.
@@ -1143,9 +1118,7 @@ class GalleryView(QWidget):
         # it shows on the shelves as readily as on a settings folder. Deliberately
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
-        self._enhance_panel = EnhancePanel(self._on_enhance_settings_changed)
-        self._enhance_panel.show_settings(self._enhance_settings)
-        footer.addWidget(self._enhance_panel, 1, Qt.AlignmentFlag.AlignTop)
+        footer.addWidget(self._enhance.panel, 1, Qt.AlignmentFlag.AlignTop)
         # A hairline where the browsing stops and these two panels start. Without
         # it the Enhance settings read as the foot of whatever folder is on screen
         # rather than as their own thing — which they are: app-wide settings that
@@ -1293,16 +1266,16 @@ class GalleryView(QWidget):
         panel.displayed_changed.connect(self.reconcile_osr2)
         # A tab that just changed which image it shows needs the live enhance
         # tile for THAT image, not the one it was showing a moment ago.
-        panel.displayed_changed.connect(self._reconcile_pending_enhancements)
+        panel.displayed_changed.connect(lambda: self._enhance.reconcile())
         # Pointing a tab at another generation drops its claim on the run it
         # launched, so its Generate button has to be re-read straight away.
         panel.displayed_changed.connect(self._reconcile_generating)
         # Its version list's "+ Enhance" row runs through the same queue the
         # folder button and the context menu use, and its Delete goes through
         # the same undo stack as every other delete in the gallery.
-        panel.enhance_requested.connect(lambda pid: self.enhance_items([pid]))
+        panel.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
         panel.levels_delete_requested.connect(self.delete_enhance_levels)
-        panel.set_enhance_settings(self._enhance_settings)
+        panel.set_enhance_settings(self._enhance.settings)
         panel.set_fullscreen_factory(self._shows.open_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
         # Dragging the tab's preview out lights the combine slot it fits, like a
@@ -1913,7 +1886,7 @@ class GalleryView(QWidget):
             # And a show's corner, for the same reason and one more: a run
             # starting is not a change to any row, so nothing else here would
             # tell the show its held slide went from waiting to being made.
-            self._feed_slideshow_enhancing()
+            self._enhance.tell_the_shows()
             self._refresh_wait_note()
         finally:
             self._poll_inflight = False
@@ -2676,7 +2649,7 @@ class GalleryView(QWidget):
             return ""
         return self._tree_view.breadcrumb(item.parent())
 
-    def _current_group(self):
+    def current_group(self):
         """The folder on screen, or ``None`` (a shelf, a search, or an empty
         selection).
 
@@ -2714,7 +2687,7 @@ class GalleryView(QWidget):
         job = self._reroll.job_for(group.key)
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
-                          typical_seconds=self._typical_run_seconds(job),
+                          typical_seconds=self.typical_run_seconds(job),
                           source_picture=self._job_source_picture(job),
                           recipe_picture=self._job_recipe_picture(job))
         tile.set_selected(group.key == self._selected_reroll_key)
@@ -2911,7 +2884,7 @@ class GalleryView(QWidget):
         return (self._job_source_picture(job),
                 self.animated_preview(recipe) if recipe is not None else None)
 
-    def _typical_run_seconds(self, job) -> float | None:
+    def typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the
         tile's countdown opens on, before the run has a pace of its own worth
         reading. ``None`` for an idle tile, or a workflow with no history yet."""
@@ -3015,7 +2988,7 @@ class GalleryView(QWidget):
         """
         # The folder's own key, not the row's: a loop is filed with the jobs it
         # launches, and those are keyed by folder wherever it is being watched from.
-        group = self._current_group()
+        group = self.current_group()
         if not checked:
             self._auto.stop_all()
         elif group is not None:
@@ -3041,7 +3014,7 @@ class GalleryView(QWidget):
         the tree — Esc resuming a loop is the case where the two differ, and the
         folder the user has navigated to since is not the one to capture.
         """
-        group = (self._current_group() if key == self.selected_folder_key()
+        group = (self.current_group() if key == self.selected_folder_key()
                  else self.group_for_key(key))
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
@@ -3143,7 +3116,7 @@ class GalleryView(QWidget):
         offers to go there (:attr:`_auto_tip`), and the plain tooltip stands down
         so only one of them appears.
         """
-        group = self._current_group()
+        group = self.current_group()
         available = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)
         looping = self._auto.active_key()
         elsewhere = looping is not None and looping != getattr(group, "key", None)
@@ -3200,7 +3173,7 @@ class GalleryView(QWidget):
         """
         rows = self._browser.shelf_rows()
         if rows is None:
-            group = self._current_group()
+            group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
         return rows
 
@@ -3219,108 +3192,11 @@ class GalleryView(QWidget):
     # --- standalone enhance: the bank button, the selection action, the queue ---
 
     def _sync_enhance_button(self):
-        """Aim Enhance the way Delete is aimed: the picked thumbnails if any are
-        picked, else every image in this folder still waiting for one. It stays
-        in the bank either way, disabled when there is nothing to enhance —
-        a button that comes and goes is one the user has to go looking for.
-
-        Picked items are enhanced whether or not they already have been (that is
-        what picking them says); a whole folder is only its not-yet-enhanced
-        images, so the button doesn't quietly re-run the ones that are done.
-        """
-        if self._browser.selected_ids:
-            ids = self._enhanceable_selection()
-            self._enhance_btn.setEnabled(bool(ids))
-            if ids:
-                self._enhance_btn.setToolTip(
-                    f"Enhance {len(ids)} item{'s' if len(ids) != 1 else ''} "
-                    "(upscale + low-denoise re-sample)"
-                )
-            else:
-                self._enhance_btn.setToolTip(
-                    _NO_VIDEO_ENHANCER if self._selection_is_all_video()
-                    else _ALREADY_AT_THESE_SETTINGS
-                )
-            return
-        group = self._current_group()
-        awaiting = (
-            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
-            if isinstance(group, gallery.SettingsGroup) else []
-        )
-        self._enhance_btn.setEnabled(bool(awaiting))
-        self._enhance_btn.setToolTip(
-            f"Enhance {len(awaiting)} not-yet-enhanced image"
-            f"{'s' if len(awaiting) != 1 else ''} in this folder "
-            "(upscale + low-denoise re-sample)"
-            if awaiting else "Nothing here to enhance"
-        )
-
-    def _enhanceable_selection(self) -> list[str]:
-        """The picked thumbnails this button would actually run on.
-
-        Two things are dropped. Videos, because there is no video enhancer — the
-        workflow under all of this refines a still — and they are picked from
-        the same flow and look no different picked, so a picked clip is nothing
-        to run rather than a run that fails.
-
-        And an image that already holds a version made at exactly the settings
-        on the panel: running it again would spend a generation arriving at the
-        picture that is already there. Judged against what the run would *use*
-        (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
-        source-matched model resolves to this image's own checkpoint before the
-        comparison rather than the panel's raw value. Change any setting and the
-        button comes back, which is what makes it read as "you have this one"
-        rather than as "no".
-        """
-        ids = []
-        for prompt_id in self.selected_prompt_ids():
-            row = self._db.get_generation(prompt_id)
-            if row is None or not gallery.is_enhanceable_row(row):
-                continue
-            if gallery.level_matching_settings(row, self._enhance_settings) is None:
-                ids.append(prompt_id)
-        return ids
-
-    def _selection_is_all_video(self) -> bool:
-        """Whether every picked thumbnail is a video — which is why Enhance is
-        dark, as opposed to its images being enhanced at these settings already."""
-        return _all_video(row for pid in self.selected_prompt_ids()
-                          if (row := self._db.get_generation(pid)) is not None)
-
-    def _enhance_selection(self):
-        """The bank button's action: enhance the picked thumbnails, or every
-        image in this folder that isn't enhanced yet."""
-        if self._browser.selected_ids:
-            ids = self._enhanceable_selection()
-            if ids:
-                self.enhance_items(ids)
-                self._sync_enhance_button()
-            return
-        self._enhance_all()
-
-    def _sync_enhance_panel(self):
-        """Gray the Enhance settings out where nothing they say could ever run.
-
-        The panel is app-wide and follows you rather than the folder, which is
-        why it shows on the shelves as readily as on a settings folder — but a
-        video is the one place with no enhancement to configure at all, and live
-        settings there advertise an action that isn't on offer. A mixed folder
-        keeps them: the images in it are still enhanceable.
-        """
-        self._enhance_panel.set_applicable(
-            not self._showing_only_videos(), _NO_VIDEO_ENHANCER
-        )
-
-    def _showing_only_videos(self) -> bool:
-        """Whether everything in front of us is video — the picked thumbnails if
-        any are picked, else the folder on screen. Nothing in front (a shelf with
-        no pick) is not "only videos": there is simply nothing to say."""
-        rows = [row for pid in self.selected_prompt_ids()
-                if (row := self.row_for(pid)) is not None]
-        if not rows and not self._browser.selected_ids:
-            group = self._current_group()
-            rows = gallery.rows_under(group) if group is not None else []
-        return _all_video(rows)
+        """Light the Enhance button the way the controller aims it: what the act
+        would run on, and the words it says that in."""
+        offer = self._enhance.offer()
+        self._enhance_btn.setEnabled(offer.available)
+        self._enhance_btn.setToolTip(offer.tip)
 
     def _sync_star_button(self):
         """Aim Star like Delete and Enhance: the picked thumbnails, else the
@@ -3353,7 +3229,7 @@ class GalleryView(QWidget):
         the Group button beside this one is for."""
         if self._selection_group is not None:
             return None
-        return self._current_group()
+        return self.current_group()
 
     def _all_starred(self, prompt_ids) -> bool:
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
@@ -3371,126 +3247,6 @@ class GalleryView(QWidget):
         if group is not None:
             self._toggle_star(group.key)
 
-    def enhance_settings(self) -> str:
-        """The app-wide enhancement settings, for the session to persist."""
-        return self._enhance_settings.to_json()
-
-    def set_enhance_settings(self, raw: str | None):
-        """Restore the enhancement settings a previous session left."""
-        self._enhance_settings = gallery.EnhanceSettings.parse(raw)
-        self._enhance_panel.show_settings(self._enhance_settings)
-        self._push_enhance_settings()
-
-    def _push_enhance_settings(self):
-        """Tell every config tab what the ``+ Enhance`` card would run at.
-
-        The panel holds the settings and the tabs hold the images, so the card
-        can only know whether it would be making a duplicate once the two meet —
-        here, on every edit and every rebuild."""
-        for panel in self._info_tabs.config_panels():
-            panel.set_enhance_settings(self._enhance_settings)
-
-    def _on_enhance_settings_changed(self, settings):
-        """Take an edit made in the Enhance subpanel.
-
-        Held app-wide rather than per folder: enhancement is whatever you are
-        doing at the moment, not a property of where you happen to be standing,
-        so switching folders never changes what the next enhance will run at.
-        Written through on each edit rather than on an Apply, so an enhance
-        launched a moment later uses what is on screen."""
-        self._enhance_settings = settings
-        self._push_enhance_settings()
-        # Whether a picked image already holds this exact version is what the
-        # button is answering, so turning a setting is what brings it back.
-        self._sync_enhance_button()
-        # Every picture on screen is answering it too, in its own corner.
-        self._browser.refresh_enhance_corners()
-
-    def _enhance_all(self):
-        """The folder button's action: queue a standalone enhance for every
-        image in it that isn't enhanced yet, at the current settings, then
-        retire the button."""
-        group = self._current_group()
-        if not isinstance(group, gallery.SettingsGroup):
-            return
-        self._enqueue_enhancements(
-            gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
-        )
-        self._sync_enhance_button()
-
-    def enhance_items(self, prompt_ids: list[str]):
-        """Queue a standalone enhance for each picked generation (the thumbnail
-        context menu's action) — a deliberate pick, so already-enhanced images
-        are re-enhanced rather than skipped, landing as a further level beside
-        the ones already there."""
-        rows = [self._db.get_generation(pid) for pid in prompt_ids]
-        self._enqueue_enhancements([r for r in rows if r is not None])
-
-    def _enqueue_enhancements(self, rows: list[dict]):
-        """Launch a standalone enhance of each of ``rows``, at the current settings.
-
-        All of them go to the controller at once: ComfyUI runs one prompt at a
-        time and the queue strip shows the line, so a batch of enhances is a
-        queue the user can watch — and cancel a row out of — rather than a
-        backlog held out of sight in here. (This view did hold one, because
-        enhances of a single folder's images share a settings key and the
-        controller took only one job per folder; it takes them all now, so the
-        buffer had nothing left to do but hide the work.)
-        """
-        index = self.image_config_index()
-        for row in rows:
-            params = gallery.enhance_params_for(row, self._enhance_settings)
-            if params is None:
-                logger.warning("Enhance skipped for %s: no output file to enhance",
-                               row.get("prompt_id"))
-                continue
-            self._launch_enhance(row, params, index)
-
-    def _launch_enhance(self, row: dict, params: dict, index=None) -> bool:
-        """Hand one standalone enhance to the controller, under the folder its
-        settings shape — a batch shares ``index`` so it isn't rebuilt per row.
-
-        Returns whether the run started. Unlaunchable (no client, or the
-        submit was refused) is logged rather than dropped in silence: a
-        request the user made and never saw run is the one failure they
-        cannot diagnose from the screen.
-        """
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        key = gallery.settings_folder_key(
-            {"workflow_name": workflow.name, "workflow_version": workflow.version,
-             "params_json": json.dumps(params)},
-            index if index is not None else self.image_config_index(),
-        )
-        prepared = randomize_seeds(params, workflow.seed_keys())
-        prompt_id = self._reroll.start_prepared(key, workflow, prepared)
-        if prompt_id:
-            # Which image the run is of, by id: the params name only the file it
-            # reads, and a file name can belong to more than one row. Stamped on
-            # the row for the fold and for a restart, and remembered here for
-            # the tile, the version list and the show while it runs — after the
-            # launch's own reconcile, which read the row before the stamp.
-            self._db.set_enhance_target(prompt_id, row.get("prompt_id"))
-            self._enhance_targets[prompt_id] = row.get("prompt_id")
-            self._reconcile_pending_enhancements()
-            logger.info("Enhance launched for %s on %s at %s, under %s",
-                        row.get("prompt_id"), params.get("input_image"),
-                        gallery.describe_enhance_params(params), key)
-            return True
-        logger.warning("Enhance of %s dropped: could not launch under %s",
-                       params.get("input_image"), key)
-        return False
-
-    def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """Holding a slide asked for it to be enhanced. Returns whether a run
-        started — the slideshow shows its corner note only if one did.
-
-        The same ask as a spoken "enhance" over the same picture, so the same
-        decision makes it (:meth:`enhance_it`); a hold has no corner line to
-        fill, so its answer is dropped. The decision is on this side rather than
-        in the slideshow because it is this side that holds the levels — and a
-        video has none to receive."""
-        return self.enhance_it(prompt_id)[0] is not None
-
     def fill_the_regions(self) -> None:
         """Put a show on each satellite region — what entering origenerator
         mode means. The hosting session's bridge asks this window for it.
@@ -3502,73 +3258,6 @@ class GalleryView(QWidget):
         this view going away with shows still up.
         """
         self._shows.close_the_shows()
-
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
-        """Enhance the picture on screen: the id it launched on (``None`` when it
-        didn't) and the line the speaking surface should say.
-
-        Only an image that has received no enhancement gets one, the same gate a
-        fullscreen hold's Down uses — spoken over a show, this is a gesture made
-        with no view of the Enhance panel, and an image already carrying an
-        enhancement someone chose must not be re-derived at whatever the settings
-        happen to say now. Re-enhancing stays a deliberate act made in front of
-        the settings it will use (the thumbnail menu, the ``+ Enhance`` card).
-        """
-        row = self._db.get_generation(prompt_id) if prompt_id else None
-        if row is None or not gallery.is_enhanceable_row(row):
-            return None, "🎤 only a finished image can be enhanced"
-        if gallery.is_enhanced_row(row):
-            return None, "🎤 this one is enhanced already"
-        params = gallery.enhance_params_for(row, self._enhance_settings)
-        if params is None:
-            return None, "🎤 this one has no file to enhance"
-        return self._launch_spoken_enhance(row, params, "enhance", "enhancing…")
-
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
-        """Launch a targeted fix if the image wants one: the id it launched on
-        (``None`` when it didn't) and the line the surface should say about it.
-
-        The run is the image's latest enhancement done again with a detail pass
-        aimed at each part named (:func:`~origenerator.gallery.enhance.
-        fix_params_for`) — so the answer to a bad hand on an already-enhanced
-        image is the same image, same settings, hand redrawn.
-
-        Said back in the parts it is actually redrawing, which is not always the
-        parts asked for: one with nothing installed to find it is dropped rather
-        than taking the rest of the command down with it, and the caption is
-        where that shows. Refused outright only when none of them can run."""
-        asked = name_parts(parts)
-        row = self._db.get_generation(prompt_id) if prompt_id else None
-        if row is None or not gallery.is_enhanceable_row(row):
-            return None, f"🎤 only a finished image can get a {asked} fix"
-        params = gallery.fix_params_for(row, parts, self._enhance_settings)
-        if params is None:
-            return None, (f"🎤 no {asked} detector installed "
-                          "(ComfyUI models/ultralytics/bbox)")
-        if gallery.level_matching_params(row, params) is not None:
-            return None, f"🎤 already has this {asked} fix"
-        fixing = name_parts(
-            [part for part in parts if part.name in params["enhance_detail_fixes"]])
-        return self._launch_spoken_enhance(row, params, f"{fixing} fix",
-                                           f"fixing {fixing}…")
-
-    def _launch_spoken_enhance(self, row: dict, params: dict, what: str,
-                               doing: str) -> tuple[str | None, str]:
-        """The tail both spoken enhancements share: refuse one already cooking,
-        else launch and say so.
-
-        A targeted fix and a plain "enhance" differ in what they refuse and in
-        what they run; from here on they are one act. ``what`` names the run in
-        a refusal ("teeth fix", "enhance"), ``doing`` is what the surface says
-        while it runs.
-        """
-        if self.enhancing_run(row) is not None:
-            return None, "🎤 an enhance of this image is already running"
-        logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
-                    gallery.describe_enhance_params(params))
-        if not self._launch_enhance(row, params):
-            return None, f"🎤 couldn't launch the {what} — see the log"
-        return row["prompt_id"], f"🎤 {doing}"
 
     # --- a spoken request's own generation -----------------------------------
 
@@ -3598,60 +3287,6 @@ class GalleryView(QWidget):
         self.refresh()  # the shelf shows the request the moment it is spoken
         return f"🎤 {revision.describe()} — generating"
 
-    def enhancing_run(self, row: dict) -> EnhancingRun | None:
-        """The standalone enhance being made of this image right now, or ``None``.
-
-        The browser pane's tiles ask as they are built, so a folder generating
-        with the Auto switch on reads honestly: the base render is out, on
-        screen, and something better is on the way. Without it the folder looks
-        like it is turning out plain images and ignoring the switch.
-
-        Every live job is searched, not each folder's leading one: a batch of
-        enhances goes out whole and its jobs share a settings key, so all but
-        the first would read as not-cooking off the folder-facing view."""
-        for job in self._enhance_jobs():
-            if self._enhance_of_row(job, row):
-                return self._enhancing_run(job)
-        return None
-
-    def _enhance_jobs(self) -> list:
-        """Every standalone enhance in flight, across every folder."""
-        return [job for job in self._reroll.all_jobs
-                if job.workflow.name == gallery.ENHANCE_WORKFLOW]
-
-    def _enhance_target(self, job) -> str | None:
-        """The prompt_id of the image a live enhance ``job`` is of — the stamp
-        its row carries (:meth:`Database.set_enhance_target`), read once and
-        kept — or ``None`` for a run from before the stamp was recorded."""
-        if job.prompt_id not in self._enhance_targets:
-            row = self._db.get_generation(job.prompt_id)
-            self._enhance_targets[job.prompt_id] = (row or {}).get("enhance_of")
-        return self._enhance_targets[job.prompt_id]
-
-    def _enhance_of_row(self, job, row: dict) -> bool:
-        """Whether a live enhance ``job`` is an enhance of ``row`` — by the image's
-        id where the run recorded one, else by the file it reads. The one
-        question every surface showing a run on its image asks
-        (:func:`gallery.enhance_run_targets_row`)."""
-        return gallery.enhance_run_targets_row(
-            self._enhance_target(job), job.params.get("input_image"), row)
-
-    def _enhancing_run(self, job) -> EnhancingRun:
-        """One enhance in flight, as the tile of the image it improves sees it:
-        the job's own latest frame — a run that hasn't started has streamed
-        none, so a batch's queued jobs show as queued rather than borrowing
-        the picture of the one being rendered."""
-        rendering = job.state == "running"
-        return EnhancingRun(
-            status="running" if rendering else "queued",
-            frame=job.last_preview,
-            progress=job.last_progress,
-            pass_progress=job.last_pass_progress,
-            stage=job.last_stage,
-            started_at=job.started_at,
-            typical_seconds=self._typical_run_seconds(job),
-        )
-
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.
 
@@ -3676,119 +3311,6 @@ class GalleryView(QWidget):
                     panel.show_completed_result(updated, self._image_rows)
         self._sync_enhance_button()  # an image with no enhancement left awaits one
 
-    def _reconcile_pending_enhancements(self):
-        """Show the enhancement being made wherever the image it improves is.
-
-        The info pane's version list leads with a live row while one is cooking,
-        the tab's own preview streams the same frames, and the image's tile in
-        the middle column streams them under its "Enhancing…" scrim — the same
-        in-flight treatment work gets everywhere else in the app. The jobs are
-        the gallery's, so the match is made here: every running standalone
-        enhance against every tab's displayed row. Cheap enough to re-run on
-        each frame; the panel updates its row in place.
-
-        Every job of every folder, for the same reason :meth:`enhancing_run`
-        reads them all: a batch of enhances shares one settings key, and a tab
-        showing the third image of it must find its own run rather than the
-        first.
-        """
-        running = self._enhance_jobs()
-        for panel in self._info_tabs.config_panels():
-            row = panel.displayed_row()
-            panel.set_pending_enhancement(
-                self._pending_enhancement_for(row, running) if row else None
-            )
-        self._reconcile_enhancing_tiles(running)
-        self._feed_slideshow_enhancing()
-
-    def _feed_slideshow_enhancing(self):
-        """Tell an open show how the enhancements in flight are going.
-
-        A show is where a batch of them gets asked for — every held slide is a
-        run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a hold hears only
-        that a run started, not where in the line it landed. Told, its corner
-        says whether the version is being made or waiting to be.
-
-        Keyed by the mapping the tiles are drawn from, which covers every image
-        in the library rather than the open folder's — a show of a shelf plays
-        items from anywhere. The status is :meth:`_enhancing_run`'s, read off the
-        job rather than its row: the row says "running" from the moment the job
-        is handed to ComfyUI, and the wait on ComfyUI's own queue is exactly the
-        stretch this is here to name.
-        """
-        self._shows.note_enhancing({
-            prompt_id: "running" if job.state == "running" else "queued"
-            for prompt_id, job in self._enhancing_by_prompt.items()
-        })
-
-    def _reconcile_enhancing_tiles(self, running):
-        """Stream each running enhance onto the tile of the image it is enhancing.
-
-        Which image a job targets is worked out only when the set of running
-        enhances changes, not on every streamed frame: the match walks every
-        image row, and the frames arrive several times a second. The set is
-        told by the runs themselves and what each is of, so a run cancelled and
-        launched again on the same image is read afresh rather than off the
-        job that is gone.
-        """
-        live = {job.prompt_id for job in running}
-        self._enhance_targets = {pid: target for pid, target in self._enhance_targets.items()
-                                 if pid in live}
-        signature = tuple(sorted(
-            (job.prompt_id, self._enhance_target(job) or job.params.get("input_image") or "")
-            for job in running
-        ))
-        if signature != self._enhancing_signature:
-            self._enhancing_signature = signature
-            self._enhancing_by_prompt = {
-                row["prompt_id"]: job
-                for job in running
-                for row in self._image_rows
-                if self._enhance_of_row(job, row)
-            }
-        self._browser.show_enhancing({
-            prompt_id: self._enhancing_run(job)
-            for prompt_id, job in self._enhancing_by_prompt.items()
-        })
-
-    def _pending_enhancement_for(self, row: dict, running) -> tuple | None:
-        """``(status, frame, settings)`` of a standalone enhance running on
-        ``row``'s own image, or ``None``.
-
-        The settings ride along so the live tile can name what is being made the
-        way a finished level names what made it — the panel may have moved on
-        since the run was launched, so the job's own params are the only honest
-        answer.
-
-        The frame is the job's own latest, which a run that hasn't started has
-        none of: a batch's queued jobs say "queued" instead — and "queued"
-        covers both waits the same way, whether the job is still in this app's
-        line or already sitting on ComfyUI, since neither has a frame to show."""
-        for job in running:
-            if self._enhance_of_row(job, row):
-                rendering = job.state == "running"
-                return ("running" if rendering else "queued", job.last_preview,
-                        gallery.describe_enhance_params(job.params))
-        return None
-
-    def _auto_enhance_if_wanted(self, row: dict | None):
-        """Enhance a just-finished image while the Auto tick is on.
-
-        The subpanel's standing instruction, app-wide: with it ticked the app
-        turns out finished images rather than raw ones, without pressing Enhance
-        All after every run. The gate is Enhance All's own —
-        :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a
-        video, an already-enhanced image (inline or folded), and an image whose
-        enhance is still cooking are all passed over. That last part is what
-        stops the loop: the enhance this queues folds back onto the row it came
-        from and arrives here already enhanced."""
-        if row is None or not self._enhance_settings.auto:
-            return
-        awaiting = gallery.rows_awaiting_enhancement([row], self._db.list_generations())
-        if awaiting:
-            self._enqueue_enhancements(awaiting)
-
     def show_location(self):
         """Where the view on screen is playing FROM, as something re-askable:
         a shelf key on a shelf, else the open folder's key.
@@ -3803,7 +3325,7 @@ class GalleryView(QWidget):
         # The row's own key, not the folder's: which side the folder is being
         # looked at from is what decides the screen a show of it goes to.
         return (self.selected_folder_key()
-                if self._current_group() is not None else None)
+                if self.current_group() is not None else None)
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and
@@ -3893,6 +3415,35 @@ class GalleryView(QWidget):
         end of a socket thinks for seconds — and both answer through here.
         """
         run_off_thread(work, done)
+
+    def enhance_offer_changed(self) -> None:
+        """Re-aim the Enhance button: what the act would run on has changed."""
+        self._sync_enhance_button()
+
+    def enhance_settings(self) -> str:
+        """The app-wide enhancement settings, for the session to persist."""
+        return self._enhance.settings_json()
+
+    def set_enhance_settings(self, raw: str | None) -> None:
+        """Restore the enhancement settings a previous session left."""
+        self._enhance.restore_settings(raw)
+
+    def enhance_items(self, prompt_ids: list[str]) -> None:
+        """Queue a standalone enhance of each of these generations — what the
+        thumbnail menu and the session's own relayed command ask for."""
+        self._enhance.enhance_items(prompt_ids)
+
+    def enhance_from_slideshow(self, prompt_id: str) -> bool:
+        """A held slide asked to be enhanced; whether a run started."""
+        return self._enhance.enhance_from_slideshow(prompt_id)
+
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+        """The spoken "enhance" over a picture."""
+        return self._enhance.enhance_it(prompt_id)
+
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
+        """The spoken "fix <part>" over a picture."""
+        return self._enhance.fix_parts(prompt_id, parts)
 
     def image_rows(self) -> list[dict]:
         """Every image row the gallery is holding, as its last rebuild read them."""
@@ -4028,7 +3579,7 @@ class GalleryView(QWidget):
         # ``key`` is the folder the job is filed under, so what it is checked
         # against is the folder on screen rather than the row showing it.
         if (key is None or key not in self._reroll_jobs
-                or getattr(self._current_group(), "key", None) != key):
+                or getattr(self.current_group(), "key", None) != key):
             return
         self._enter_reroll_selection(key)
 
@@ -4068,7 +3619,7 @@ class GalleryView(QWidget):
         # An enhance's frames show on the tile of the image being enhanced and in
         # the version list of any tab displaying it — an enhancement isn't a
         # generation taking a preview over.
-        self._reconcile_pending_enhancements()
+        self._enhance.reconcile()
         # And straight onto an open show, which is watching for exactly this.
         self._shows.note_generating(prompt_id, data)
 
@@ -4203,12 +3754,12 @@ class GalleryView(QWidget):
             item = self._tree_item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
-        self._enhance_targets.pop(prompt_id, None)  # a run that is over is nobody's enhance
+        self._enhance.forget(prompt_id)  # a run that is over is nobody's enhance
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
         self._auto.note_finished(key)  # if auto-looping this folder, launch the next
-        self._auto_enhance_if_wanted(finished_row)  # while the Auto switch is on
+        self._enhance.enhance_when_wanted(finished_row)  # while the Auto switch is on
         self._sync_enhance_button()  # a landed enhance may retire the button
-        self._reconcile_pending_enhancements()  # the live tile gives way to the level
+        self._enhance.reconcile()  # the live tile gives way to the level
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
         """After a re-roll finishes, load its result into the tab that launched it
@@ -4257,12 +3808,12 @@ class GalleryView(QWidget):
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
-        self._reconcile_pending_enhancements()  # nothing is cooking for it now
+        self._enhance.reconcile()  # nothing is cooking for it now
         QMessageBox.warning(self, "Generation failed", format_execution_error(message))
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its re-roll tile reflects the job."""
-        group = self._current_group()
+        group = self.current_group()
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)
 
@@ -4483,7 +4034,7 @@ class GalleryView(QWidget):
             enhance_action = menu.addAction(
                 f"Enhance {n} image{'s' if n != 1 else ''}"
             )
-        cooking = self._enhance_jobs_targeting(rows)
+        cooking = self._enhance.jobs_targeting(rows)
         cancel_action = None
         if cooking:
             n = len(cooking)
@@ -4497,9 +4048,9 @@ class GalleryView(QWidget):
         elif chosen is star_action:
             self.set_items_starred([row["prompt_id"] for row in rows], not all_starred)
         elif enhance_action is not None and chosen is enhance_action:
-            self.enhance_items(enhanceable)
+            self._enhance.enhance_items(enhanceable)
         elif cancel_action is not None and chosen is cancel_action:
-            self.cancel_enhancements_of(rows)
+            self._enhance.cancel_for(rows)
         elif chosen is delete_action:
             self._delete_rows(rows)
 
@@ -4530,7 +4081,7 @@ class GalleryView(QWidget):
         elif action == corner_controls.TRASH:
             self._delete_rows([row])
         elif action == corner_controls.ENHANCE:
-            self.enhance_items([prompt_id])
+            self._enhance.enhance_items([prompt_id])
 
     def set_items_starred(self, prompt_ids, starred: bool):
         """Star or unstar the given generations, then rebuild so their tiles pick
@@ -4636,7 +4187,7 @@ class GalleryView(QWidget):
         """The folder on screen if it may be deleted, else ``None`` — which covers
         a multi-selection: its unsaved folder isn't deletable, so Delete stays dark
         rather than quietly wiping whichever one row happens to be current."""
-        group = self._current_group()
+        group = self.current_group()
         return group if _is_deletable_folder(group) else None
 
     def _delete_folder(self, group):
@@ -4696,57 +4247,6 @@ class GalleryView(QWidget):
         """
         self._info_tabs.release_media(paths)
         self._shows.release_media(paths)
-
-    def _enhance_jobs_targeting(self, rows) -> list:
-        """Every standalone enhance in flight whose image is one of ``rows``.
-
-        :meth:`enhancing_run`'s question asked the other way round — over a set
-        of images rather than one — for the two callers that act on a whole
-        selection: the tile menu's Cancel, and the delete about to take those
-        images out from under their runs.
-        """
-        wanted = [row for row in rows if row]
-        return [job for job in self._enhance_jobs()
-                if any(self._enhance_of_row(job, row) for row in wanted)]
-
-    def _cancel_enhancements_of(self, rows):
-        """Stop every standalone enhance still being made of ``rows`` — the items
-        a delete is about to take.
-
-        Wired into :class:`GalleryActions` beside the media release, so it runs
-        for every delete there is: a picked tile, a whole folder, a rejected
-        experiment, a slideshow's Up key.
-
-        Canceling frees the queue — a video-length wait can sit after an
-        enhance nobody wants any more — and takes the run's transient row with
-        it, so no enhanced file lands with no original to be a version of.
-        """
-        for job in self._enhance_jobs_targeting(rows):
-            logger.info("Canceling the enhance of %s: its image is being deleted",
-                        job.params.get("input_image"))
-            self._reroll.cancel_job(job.prompt_id)
-
-    def cancel_enhancements_of(self, rows):
-        """Throw away the enhancements being made of ``rows``, keeping the images.
-
-        The tile menu's Cancel (:meth:`generation_menu`). Everything the delete
-        path's cancel does, minus the delete: the runs stop, their transient rows
-        go with them, and the images they were being made of are left exactly as
-        they were — the picture on screen is the one that was already there.
-
-        Not a re-roll's cancel, which is why it doesn't go through
-        :meth:`_cancel_job`: an auto-generating folder takes that as a discarded
-        seed and launches the next one, and nobody asking to stop an enhancement
-        is asking for a fresh variation. The redraw afterwards is what takes the
-        scrim off the tile and the pending row out of the info pane.
-        """
-        jobs = self._enhance_jobs_targeting(rows)
-        for job in jobs:
-            logger.info("Canceling the enhance of %s: asked to, from its tile",
-                        job.params.get("input_image"))
-            self._reroll.cancel_job(job.prompt_id)
-        if jobs:
-            self._reconcile_pending_enhancements()
 
     def _delete_rows(self, rows):
         if not rows:
@@ -4860,7 +4360,7 @@ class GalleryView(QWidget):
         # Inside a folder the user made, an item tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
         # it isn't in any grouping from there.
-        open_custom = self._current_group()
+        open_custom = self.current_group()
         remove_action = None
         if isinstance(open_custom, gallery.CustomGroup) and open_custom.folder_id is not None \
                 and any(m.key == group.key for m in gallery.child_groups(open_custom)):
@@ -4964,7 +4464,7 @@ class GalleryView(QWidget):
             self._title.begin_edit(group.label)
 
     def _commit_title_rename(self, name: str):
-        group = self._current_group()
+        group = self.current_group()
         if group is None:
             return
         self._actions.rename_folder(group.key, name.strip() or None)
@@ -5147,7 +4647,7 @@ class GalleryView(QWidget):
         target re-read all three at once rather than each on its own."""
         self._sync_star_button()
         self._sync_enhance_button()
-        self._sync_enhance_panel()
+        self._enhance.sync_panel()
         self._sync_delete_button()
         self._sync_toolbar_gaps()
 

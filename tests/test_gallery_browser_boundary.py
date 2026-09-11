@@ -104,8 +104,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     presses now bound to it by keyword rather than looked up by name. 318 -> 291:
     the combine came out as `CombineController`, owning the panel it used to be
     handed -- thirty-five methods out, eight in, and the spoken "genau it" going
-    with the act it asks for rather than staying with the words.)"""
+    with the act it asks for rather than staying with the words. 291 -> 268: the
+    standalone enhance came out as `EnhanceController`, owning its settings
+    panel -- thirty methods out, eight in, and the bank button now lit from what
+    the controller answers rather than aimed inside the gallery.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 291
+               for x in _class_def(VIEW, "GalleryView").body) == 268
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

@@ -54,9 +54,9 @@ from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
-    DETAIL_PARTS,
     detail_fixes_of,
     detector_for_part,
+    part_table,
 )
 
 # Before any shared_ui import: that checkout is a sibling on the path, not a
@@ -281,7 +281,7 @@ class EnhancePanel(QWidget):
         host.setSizePolicy(policy)
         self._fixes = {}
         self._fix_checks = {}
-        for part in DETAIL_PARTS:
+        for part in part_table():
             flow.addWidget(self._fix_field(part))
         return host
 

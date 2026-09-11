@@ -28,7 +28,7 @@ from origenerator.gui.enhance_versions import (
     enhance_level_mime,
     params_from_mime,
 )
-from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, DETAIL_PARTS
+from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
 
@@ -148,7 +148,7 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
     # whether that part is fixed, the number how hard — a mouth wants a harder
     # redraw than a face, and one shared number could never say so.
     panel, edits = _panel(qtbot)
-    assert list(panel._fixes) == [part.name for part in DETAIL_PARTS]
+    assert list(panel._fixes) == [part.name for part in part_table()]
     # Nothing ticked, so nothing pays for a pass it didn't ask for — while the
     # numbers already read as what a fix runs at.
     assert panel.settings().params["enhance_detail_fixes"] == {}

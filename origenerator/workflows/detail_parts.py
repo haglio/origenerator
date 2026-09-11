@@ -68,15 +68,17 @@ _BUILTIN_PARTS = (
 )
 
 
-def _overlay_parts() -> tuple:
+def _overlay_parts(content: dict | None = None) -> tuple:
     """The overlay's own additions, in the built-ins' shape.
 
     Tolerant the way every overlay consumer is: a malformed entry is skipped
     rather than taking voice down with it, and a listed part missing its words
     answers to its own name.
     """
+    if content is None:
+        content = load_content()
     parts = []
-    for entry in load_content().get("detail_fix_parts") or []:
+    for entry in content.get("detail_fix_parts") or []:
         if not isinstance(entry, dict) or not entry.get("name"):
             continue
         name = str(entry["name"])
@@ -86,7 +88,20 @@ def _overlay_parts() -> tuple:
     return tuple(parts)
 
 
-DETAIL_PARTS = _BUILTIN_PARTS + _overlay_parts()
+def part_table(content: dict | None = None) -> tuple:
+    """The whole vocabulary: the four built-in parts, then the overlay's own.
+
+    Asked for rather than built at import. A table built once as the module
+    loaded meant the overlay was baked into the process with no seam to hand a
+    different vocabulary through, so the only way to exercise the overlay path
+    was to reach in and rewrite the constant. The overlay's file read is cached
+    (:func:`origenerator.content.load_content`), so asking each time costs a
+    parse of a small file.
+
+    Table order throughout: the built-ins first, in the order they are declared,
+    so the same fixes always build the same graph.
+    """
+    return _BUILTIN_PARTS + _overlay_parts(content)
 
 # A command is a few words — "fix her teeth, please", "fix hands and mouth" —
 # while anything sentence-shaped is a prompt edit that happens to start with
@@ -133,9 +148,10 @@ def match_fix_command(text: str) -> tuple:
     if not heard or not _lead_is_fix(heard[0]) or len(heard) > _MAX_COMMAND_WORDS:
         return ()
     named = set(heard[1:])
+    table = part_table()
     if named & set(ALL_PARTS_WORDS):
-        return tuple(DETAIL_PARTS)
-    return tuple(part for part in DETAIL_PARTS if named & set(part.spoken))
+        return tuple(table)
+    return tuple(part for part in table if named & set(part.spoken))
 
 
 def fix_command_spelling(text: str) -> str | None:
@@ -163,7 +179,7 @@ def fix_command_bias() -> str:
     word a command may use, overlay parts included.
     """
     words = ["fix", "fixed", *ALL_PARTS_WORDS]
-    for part in DETAIL_PARTS:
+    for part in part_table():
         words += [w for w in part.spoken if w not in words]
     return "Voice commands: " + ", ".join(words) + "."
 
@@ -207,7 +223,7 @@ def detector_part_label(filename: str) -> str:
     is better named oddly than mislabeled as some other part.
     """
     base = _basename(filename)
-    for part in DETAIL_PARTS:
+    for part in part_table():
         if any(fragment in base for fragment in part.matches):
             return part.name
     return PureWindowsPath(str(filename)).stem
@@ -281,7 +297,7 @@ def detail_fix_passes(params: dict) -> list:
     """
     wanted = detail_fixes_of(params)
     passes = []
-    for part in DETAIL_PARTS:
+    for part in part_table():
         denoise = wanted.get(part.name)
         if denoise is None:
             continue

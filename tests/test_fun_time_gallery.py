@@ -589,7 +589,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two shows run and NEITHER is the active
     window, so the side word is the only thing that says which picture."""
     from origenerator.voice.commands import SurfaceCommand
-    from origenerator.workflows.detail_parts import DETAIL_PARTS
+    from origenerator.workflows.detail_parts import part_table
 
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
@@ -605,7 +605,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     for show in (portrait, landscape):
         monkeypatch.setattr(show, "note_voice_run",
                             lambda pid, msg, s=show: fixed.append((s, pid, msg)))
-    teeth = next(p for p in DETAIL_PARTS if p.name == "teeth")
+    teeth = next(p for p in part_table() if p.name == "teeth")
 
     # A fix names one or more parts, so the command carries them as a set.
     view._on_voice_command(SurfaceCommand([teeth], "landscape"))

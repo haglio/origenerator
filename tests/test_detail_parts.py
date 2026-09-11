@@ -60,7 +60,7 @@ def test_one_command_can_ask_for_several_parts(text, parts):
 
 @pytest.mark.parametrize("text", ["fix all", "Fix everything.", "fix all of it"])
 def test_fix_all_asks_for_every_part_there_is(text):
-    assert _named(text) == [part.name for part in detail_parts.DETAIL_PARTS]
+    assert _named(text) == [part.name for part in detail_parts.part_table()]
 
 
 @pytest.mark.parametrize("text", [
@@ -107,7 +107,7 @@ def test_nothing_that_is_not_a_fix_is_respelled_as_one(text):
 
 
 def _part(name):
-    return next(p for p in detail_parts.DETAIL_PARTS if p.name == name)
+    return next(p for p in detail_parts.part_table() if p.name == name)
 
 
 def test_a_part_resolves_to_the_installed_detector_that_finds_it(monkeypatch):
@@ -170,11 +170,9 @@ def test_an_unrecognized_detector_keeps_its_own_name():
 
 
 def _with_overlay(monkeypatch, entries):
-    """Rebuild the table as a load with these overlay entries would have."""
+    """An overlay carrying these entries, for the table to be asked for under."""
     monkeypatch.setattr(detail_parts, "load_content",
                         lambda: {"detail_fix_parts": entries})
-    monkeypatch.setattr(detail_parts, "DETAIL_PARTS",
-                        detail_parts._BUILTIN_PARTS + detail_parts._overlay_parts())
 
 
 def test_overlay_parts_join_the_vocabulary_whole(monkeypatch):
@@ -202,7 +200,7 @@ def test_a_bare_overlay_part_answers_to_its_own_name(monkeypatch):
 def test_malformed_overlay_entries_are_skipped_not_fatal(monkeypatch):
     # A bad line in the overlay must not take voice commands down with it.
     _with_overlay(monkeypatch, ["zeta", {"spoken": ["zeta"]}, {"name": ""}])
-    assert detail_parts.DETAIL_PARTS == detail_parts._BUILTIN_PARTS
+    assert detail_parts.part_table() == detail_parts._BUILTIN_PARTS
 
 
 def test_the_whisper_bias_names_every_spoken_word_once(monkeypatch):

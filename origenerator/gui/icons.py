@@ -35,7 +35,7 @@ from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 
-from origenerator.gui.orientation import PORTRAIT
+from origenerator.gallery.sides import PORTRAIT
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()

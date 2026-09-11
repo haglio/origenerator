@@ -36,9 +36,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from origenerator.gallery.sides import ORIENTATION_LABELS, ORIENTATIONS
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import FolderTree
-from origenerator.gui.orientation import ORIENTATION_LABELS, ORIENTATIONS
 
 # Neither half is allowed to shrink to nothing: a half with no rows visible is
 # a side of the library that looks like it isn't there.

@@ -87,6 +87,36 @@ from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
+def parse_tabs_state(state) -> tuple[list[tuple[ConfigSnapshot, list[str]]], int]:
+    """What survives a saved tab strip: each tab's config with the runs it
+    started, and which tab was in front.
+
+    The state file is written by an earlier run of the app and edited by nobody,
+    which is exactly why none of it is trusted: a corrupt or cross-version blob
+    must degrade to the initial single tab rather than fail the launch. So every
+    shape is checked, entries naming a workflow this app no longer has are
+    dropped, and anything unreadable parses to nothing at all.
+    """
+    if not isinstance(state, dict):
+        return [], 0
+    raw_tabs = state.get("tabs")
+    restored = []
+    for entry in raw_tabs if isinstance(raw_tabs, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        snapshot = ConfigSnapshot.from_dict(entry.get("config") or {})
+        if snapshot.workflow_name not in WORKFLOW_REGISTRY:
+            continue
+        launched = entry.get("launched_runs")
+        restored.append((
+            snapshot,
+            [run for run in launched if isinstance(run, str) and run]
+            if isinstance(launched, list) else [],
+        ))
+    current = state.get("current", 0)
+    return restored, current if isinstance(current, int) else 0
+
+
 class InfoPaneTabs(QTabWidget):
     """A strip of editable config tabs; each tab's Generate becomes a gallery re-roll."""
 
@@ -600,26 +630,12 @@ class InfoPaneTabs(QTabWidget):
     def restore_state(self, state: dict):
         """Rebuild the tabs from a :meth:`capture_state` snapshot.
 
-        Entries for workflows no longer in the registry are skipped, as is any
-        malformed data, so a corrupt or cross-version state file degrades to the
-        initial single tab rather than failing to launch. A no-op without a client.
+        What survives the snapshot is :func:`parse_tabs_state`'s answer; this
+        rebuilds the tabs from it. A no-op without a client.
         """
-        if not isinstance(state, dict) or self._client is None:
+        if self._client is None:
             return
-        raw_tabs = state.get("tabs")
-        restored = []
-        for entry in raw_tabs if isinstance(raw_tabs, list) else []:
-            if not isinstance(entry, dict):
-                continue
-            snapshot = ConfigSnapshot.from_dict(entry.get("config") or {})
-            if snapshot.workflow_name not in WORKFLOW_REGISTRY:
-                continue
-            launched = entry.get("launched_runs")
-            restored.append((
-                snapshot,
-                [r for r in launched if isinstance(r, str) and r]
-                if isinstance(launched, list) else [],
-            ))
+        restored, current = parse_tabs_state(state)
         if not restored:
             return  # keep the initial tab rather than leaving no tabs at all
         self._discard_all_subtabs()  # clear every tab before rebuilding from the snapshot
@@ -630,6 +646,5 @@ class InfoPaneTabs(QTabWidget):
             # reconnects them, and this is how the tab knows they are its own.
             for origin in launched:
                 panel.note_launched(origin)
-        current = state.get("current", 0)
-        if isinstance(current, int) and 0 <= current < self.count():
+        if 0 <= current < self.count():
             self.setCurrentIndex(current)

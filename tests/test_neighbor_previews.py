@@ -6,6 +6,7 @@ from PyQt6.QtCore import QRect
 from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui.neighbor_previews import NeighborPreviews, side_x, still_for
+from origenerator.slideshow import Slide
 
 _HOST_WIDTH = 1000
 
@@ -16,17 +17,17 @@ def _png(path, size=(40, 40)):
 
 
 def test_still_prefers_the_stored_thumbnail():
-    item = ("clip.mp4", "video", "id-v", "thumb.png")
+    item = Slide("clip.mp4", "video", "id-v", "thumb.png")
     assert still_for(item) == "thumb.png"
 
 
 def test_a_thumbnail_less_image_stands_in_for_itself():
-    assert still_for(("frame.png", "image", "id-i")) == "frame.png"
+    assert still_for(Slide("frame.png", "image", "id-i")) == "frame.png"
 
 
 def test_a_thumbnail_less_video_has_no_still():
     # Nothing to draw small without opening the clip, so that side shows nothing.
-    assert still_for(("clip.mp4", "video", "id-v")) is None
+    assert still_for(Slide("clip.mp4", "video", "id-v")) is None
     assert still_for(None) is None
 
 

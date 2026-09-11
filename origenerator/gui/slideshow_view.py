@@ -106,7 +106,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.toast import Toast
 from origenerator.ken_burns import TICK_MS, progress_step, zoom_at
-from origenerator.slideshow import LIVE, ShowState, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, ShowState, Slide, SlideshowPlaylist, in_order
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class SlideshowView(QWidget):
         self._enhanced_mode = False
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`_set_modes`).
-        self._all_items = list(items)
+        self._all_items = [Slide.of(item) for item in items]
         # Holding a slide is also how you ask for it: Down enhances what is on
         # screen if it has never been enhanced, so the one you stopped on is the
         # one that gets the better version — and one that already has a better
@@ -288,15 +288,15 @@ class SlideshowView(QWidget):
             self._update_counter()
             self._update_neighbors()
             return
-        item = self._playlist.current()
-        if item is None:
+        slide = self._playlist.current()
+        if slide is None:
             return
         self._levels.restart()  # a new item, so its own versions from the top
-        if item[1] == LIVE:
+        if slide.is_live:
             # Still being made: what it looks like so far, rather than a file.
-            self._preview.show_frame(item[0])
+            self._preview.show_frame(slide.path)
         else:
-            self._preview.show_media(item[0], item[1])
+            self._preview.show_media(slide.path, slide.media_type)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
@@ -358,7 +358,7 @@ class SlideshowView(QWidget):
             items, image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
             start=index,
         )
-        self._all_items = list(items)
+        self._all_items = [Slide.of(item) for item in items]
         if self._live:
             self._update_counter()
             self._update_neighbors()
@@ -467,8 +467,8 @@ class SlideshowView(QWidget):
             self._starred_ids.add(prompt_id)
         if enhanced:
             self._enhanced_ids.add(prompt_id)
-        item = (path, media_type, prompt_id, still)
-        self._remember(item)
+        slide = Slide(path, media_type, prompt_id, still)
+        self._remember(slide)
         if self._playlist.replace_live(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._show_current()  # the file itself now, and on a clock again
@@ -477,7 +477,7 @@ class SlideshowView(QWidget):
         # Into the pass only past the switches: a show narrowed to its favorites
         # must not fill back up with every unstarred thing the loop makes.  The
         # whole set remembers it either way, for when the switch comes off.
-        if self._passes(item) and self._playlist.add(item):
+        if self._passes(slide) and self._playlist.add(slide):
             self._update_counter()
             self._update_neighbors()
 
@@ -505,7 +505,7 @@ class SlideshowView(QWidget):
         if prompt_id in self._seen_live:
             return
         self._seen_live.add(prompt_id)
-        live = (frame, LIVE, prompt_id, None)
+        live = Slide(frame, LIVE, prompt_id)
         self._remember(live)
         # A run still being made is neither a favorite nor enhanced, so a
         # narrowed show leaves its frames out of the pass and takes them in
@@ -560,8 +560,9 @@ class SlideshowView(QWidget):
         item = self._playlist.current()
         if item is None:
             return
-        if self._actions.delete is not None and len(item) > 2 and item[1] != LIVE:
-            self._actions.delete(item[2])
+        if (self._actions.delete is not None
+                and item.prompt_id is not None and not item.is_live):
+            self._actions.delete(item.prompt_id)
         # Out of the whole set too, so widening a switch back cannot resurrect it.
         self._forget(item)
         self._playlist.remove_current()
@@ -622,7 +623,7 @@ class SlideshowView(QWidget):
         self._playlist = SlideshowPlaylist(
             [media], image_dwell_ms=self._dwell_s * 1000, shuffle=in_order,
         )
-        self._all_items = [media]
+        self._all_items = [Slide.of(media)]
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
@@ -701,7 +702,7 @@ class SlideshowView(QWidget):
         new set, so a new answer.
         """
         self._f_mode = self._enhanced_mode = False
-        self._all_items = list(items)
+        self._all_items = [Slide.of(item) for item in items]
         self._wear(HudFacts(looping=False, starred_ids=self._starred_ids,
                             enhanced_ids=enhanced_ids))
         self._live = not items
@@ -748,10 +749,10 @@ class SlideshowView(QWidget):
         """Bookmark the slide on screen; ``False`` when there is nothing to
         bookmark — a live generation has no row of its own yet."""
         item = self._playlist.current()
-        if self._actions.star is None or item is None or len(item) <= 2:
+        if self._actions.star is None or item is None or item.prompt_id is None:
             return False
-        self._actions.star(item[2])
-        self._starred_ids.add(item[2])  # the star readout and F-mode follow it
+        self._actions.star(item.prompt_id)
+        self._starred_ids.add(item.prompt_id)  # the star readout and F-mode follow it
         return True
 
     # The motion console reaches the three above by its own names: it drives this
@@ -859,7 +860,7 @@ class SlideshowView(QWidget):
         is on leaves it out."""
         f_mode = self._f_mode if f_mode is None else f_mode
         enhanced = self._enhanced_mode if enhanced is None else enhanced
-        prompt_id = item[2] if len(item) > 2 else None
+        prompt_id = item.prompt_id
         if f_mode and prompt_id not in self._starred_ids:
             return False
         if enhanced and prompt_id not in self._enhanced_ids:
@@ -875,9 +876,9 @@ class SlideshowView(QWidget):
         try.  A reset says otherwise — it starts the set over from the top.
         """
         current = self._playlist.current()
-        held = current[2] if keep_slide and current is not None and len(current) > 2 else None
+        held = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
-                      if held is not None and len(item) > 2 and item[2] == held), None)
+                      if held is not None and item.prompt_id == held), None)
         kwargs = {"image_dwell_ms": self._playlist.image_dwell_ms, "start": start}
         if self._shuffle is not None:
             kwargs["shuffle"] = self._shuffle
@@ -896,10 +897,9 @@ class SlideshowView(QWidget):
     # or still gone — when the switch comes off.
 
     @staticmethod
-    def _same(kept, item) -> bool:
-        kept_id = kept[2] if len(kept) > 2 else None
-        item_id = item[2] if len(item) > 2 else None
-        return kept is item or (kept_id is not None and kept_id == item_id)
+    def _same(kept: Slide, item: Slide) -> bool:
+        return kept is item or (kept.prompt_id is not None
+                                and kept.prompt_id == item.prompt_id)
 
     def _remember(self, item) -> None:
         """Take *item* into the whole set, in place of the entry with its id."""
@@ -914,23 +914,19 @@ class SlideshowView(QWidget):
 
     def _forget_id(self, prompt_id) -> None:
         self._all_items = [kept for kept in self._all_items
-                           if not (len(kept) > 2 and kept[2] == prompt_id)]
+                           if kept.prompt_id != prompt_id]
 
     def _live_ids(self) -> list:
         """Every run the whole set holds as frames rather than as a file — in
         the pass or kept out of it by a switch."""
-        return [kept[2] for kept in self._all_items if len(kept) > 2 and kept[1] == LIVE]
+        return [kept.prompt_id for kept in self._all_items if kept.is_live]
 
     def _upgrade_remembered(self, prompt_id, path, media_type, still):
         """Point the whole set's entry for *prompt_id* at a better version of
         itself, and return it — or ``None`` when the set never held it."""
         for index, kept in enumerate(self._all_items):
-            if len(kept) > 2 and kept[2] == prompt_id:
-                fields = list(kept) + [None] * (4 - len(kept))
-                fields[0] = path
-                fields[1] = media_type if media_type is not None else fields[1]
-                fields[3] = still if still is not None else fields[3]
-                self._all_items[index] = tuple(fields)
+            if kept.prompt_id == prompt_id:
+                self._all_items[index] = kept.upgraded(path, media_type, still)
                 return self._all_items[index]
         return None
 
@@ -939,7 +935,7 @@ class SlideshowView(QWidget):
         stable order, the current item's 1-based position in that order, and
         the lock."""
         items = self._playlist.items
-        cells = [(item[0], still_for(item) or "") for item in items]
+        cells = [(item.path, still_for(item) or "") for item in items]
         position = (self._playlist.order[self._playlist.index] + 1) if items else 0
         return cells, position, self._playlist.locked
 
@@ -948,7 +944,7 @@ class SlideshowView(QWidget):
         jump a satellite's map makes; *hold* locks it there (the double-click),
         exactly as it locks a player's clip."""
         for index, item in enumerate(self._playlist.items):
-            if str(item[0]) != str(path):
+            if str(item.path) != str(path):
                 continue
             self._playlist.unlock()
             self._playlist.jump_to(index)
@@ -1175,16 +1171,16 @@ class SlideshowView(QWidget):
         that item's other versions.
         """
         item = self._playlist.current()
-        return item[2] if item is not None and len(item) > 2 else None
+        return item.prompt_id if item is not None else None
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
         are keyed by. Empty for one still being made: its slide is frames rather
         than a file, and nothing is keyed off those."""
         item = self._playlist.current()
-        if item is None or item[1] == LIVE:
+        if item is None or item.is_live:
             return ""
-        return str(item[0])
+        return str(item.path)
 
     def voice_target(self):
         """The generation a spoken order or request is about: the slide on

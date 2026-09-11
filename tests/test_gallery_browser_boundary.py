@@ -98,8 +98,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     (`gui/inflight_items.py`) and it keeps a one-line delegation. 371 -> 341:
     the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
-    new ones for what the shows ask that had no name of its own.)"""
+    new ones for what the shows ask that had no name of its own. 341 -> 318:
+    everything spoken came out as `VoiceRouter` -- the microphone, the caption,
+    and where each word lands -- twenty-five methods out and two in, the bank it
+    presses now bound to it by keyword rather than looked up by name.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 341
+               for x in _class_def(VIEW, "GalleryView").body) == 318
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

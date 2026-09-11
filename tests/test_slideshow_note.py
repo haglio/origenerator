@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 from PyQt6.QtCore import QRunnable
 
-from origenerator.gui import gallery_view
+from origenerator.gui import voice_router
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.test_gallery_view import _requesting_view
 
@@ -44,13 +44,13 @@ class _NeverAnswers(QRunnable):
 def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
     """A gallery that has just been asked for a change, with the working-out
     still going on — over a slideshow, or in the window with none up."""
-    monkeypatch.setattr(gallery_view, "ReviseTask", lambda *a, **kw: _NeverAnswers())
+    monkeypatch.setattr(voice_router, "ReviseTask", lambda *a, **kw: _NeverAnswers())
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     if not showing:
         view._shows.showing.close()  # the request is then this pane's to answer,
         view.select_generation("orig")  # about the picture picked in it
-    view._voice.speak("Request.")
-    view._voice.speak("no hat. Over.")
+    view._voice.listener.speak("Request.")
+    view._voice.listener.speak("no hat. Over.")
     return view
 
 
@@ -134,7 +134,7 @@ def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, mon
     view = _mid_request(qtbot, tmp_path, monkeypatch)
     show = view._shows.showing
 
-    view._voice.heard.emit("something else entirely")
+    view._voice.listener.heard.emit("something else entirely")
 
     assert "heard" in _corner(show)
     _fade(show)
@@ -147,10 +147,10 @@ def test_the_pane_says_it_is_working_too_when_no_show_is_up(qtbot, tmp_path,
     which has one slot and reverted to "Listening…" — an idle line over an app
     still working, which is the same thing the corner was doing."""
     view = _mid_request(qtbot, tmp_path, monkeypatch, showing=False)
-    assert "working out" in view._voice_status.text()
+    assert "working out" in view._voice.status.text()
 
-    view._voice.heard.emit("something else entirely")
-    assert "heard" in view._voice_status.text()
-    view._voice_status_revert()  # what its 4 s timer does when it fires
+    view._voice.listener.heard.emit("something else entirely")
+    assert "heard" in view._voice.status.text()
+    view._voice._revert()  # what its 4 s timer does when it fires
 
-    assert "working out" in view._voice_status.text()
+    assert "working out" in view._voice.status.text()

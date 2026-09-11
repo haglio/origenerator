@@ -11,6 +11,7 @@ from origenerator.voice.dictation import (
     COMPLETED,
     OPENED,
     RequestDictation,
+    RequestState,
     request_bias,
 )
 
@@ -29,6 +30,17 @@ def test_a_whole_request_in_one_breath_completes_at_once():
     assert spoken.state == COMPLETED
     assert spoken.text == "no silver earrings"
     assert not dictation.listening
+
+
+def test_a_state_is_one_of_the_four_named_states_and_not_a_word():
+    # A consumer that compared against a bare word would go on matching a value
+    # this dictation never returns; the states are a closed set, like the two
+    # command vocabularies beside them.
+    spoken = RequestDictation().push("Request, no silver earrings, over.")
+
+    assert isinstance(spoken.state, RequestState)
+    assert spoken.state != "completed"
+    assert spoken.state.listening is False
 
 
 def test_a_request_spoken_across_pauses_is_collected_whole():

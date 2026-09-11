@@ -18,16 +18,36 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 
 from origenerator.voice.text import sounds_like, words
 
-# The states a fed transcription can put the dictation in. OPENED and COLLECTING
-# both mean "still listening"; the caller shows them and waits. COMPLETED carries
-# the whole request; ABANDONED means the terminator never came.
-OPENED = "opened"
-COLLECTING = "collecting"
-COMPLETED = "completed"
-ABANDONED = "abandoned"
+
+class RequestState(Enum):
+    """Where a fed transcription leaves the dictation.
+
+    An Enum like the two vocabularies beside it
+    (:class:`~origenerator.voice.app_commands.AppCommand`,
+    :class:`~origenerator.voice.show_commands.ShowCommand`), so a consumer
+    cannot compare against a literal that was never one of these four.
+    """
+
+    OPENED = "opened"          # the request just started; the caller shows it and waits
+    COLLECTING = "collecting"  # more of the same request; shown and waited on too
+    COMPLETED = "completed"    # the whole request, ready to act on
+    ABANDONED = "abandoned"    # the terminator never came
+
+    @property
+    def listening(self) -> bool:
+        """Whether this state means the dictation is still expecting more."""
+        return self in (RequestState.OPENED, RequestState.COLLECTING)
+
+
+# The four by their bare names, which is how every caller here reads them.
+OPENED = RequestState.OPENED
+COLLECTING = RequestState.COLLECTING
+COMPLETED = RequestState.COMPLETED
+ABANDONED = RequestState.ABANDONED
 
 # What opens a request, as whisper renders it. "Request" is distinctive enough
 # that one substitution is safe (the same tolerance the fix matcher allows its
@@ -71,14 +91,14 @@ class SpokenRequest:
     out wrong shows *why* rather than just being wrong.
     """
 
-    state: str
+    state: RequestState
     text: str
     heard: str
 
     @property
     def listening(self) -> bool:
         """Whether the dictation is still open and expecting more."""
-        return self.state in (OPENED, COLLECTING)
+        return self.state.listening
 
 
 class RequestDictation:

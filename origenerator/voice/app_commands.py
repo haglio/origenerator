@@ -35,9 +35,10 @@ what lets the plural through; a bare singular still opens the dictation.
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from enum import Enum
+
+from origenerator.voice.text import words
 
 
 class AppCommand(Enum):
@@ -266,7 +267,7 @@ def match_app_command(text: str) -> AppCommand | DialSetting | None:
     writes a spoken number either way, so "amp 50" and "amp fifty" are the same
     utterance said once and it is not the speaker who chose which.
     """
-    return _PHRASES.get(" ".join(re.findall(r"[a-z]+|\d+", (text or "").lower())))
+    return _PHRASES.get(" ".join(words(text, keep_digits=True)))
 
 
 # What the bias leaves out. The initial prompt is whisper's hint about the words

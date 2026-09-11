@@ -22,8 +22,9 @@ comes back mangled, and telling whisper what to expect is what makes it land.
 """
 from __future__ import annotations
 
-import re
 from enum import Enum
+
+from origenerator.voice.text import words
 
 
 class ShowCommand(Enum):
@@ -67,10 +68,10 @@ def match_show_command(text: str) -> ShowCommand | None:
     so "stop" alone (which could be anything) and "a slideshow of her" (which is
     a prompt) are both left to fall through.
     """
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    if not words or len(words) > _MAX_COMMAND_WORDS or not _names_the_show(words):
+    heard = words(text)
+    if not heard or len(heard) > _MAX_COMMAND_WORDS or not _names_the_show(heard):
         return None
-    for word in words:
+    for word in heard:
         command = _VERBS.get(word)
         if command is not None:
             return command

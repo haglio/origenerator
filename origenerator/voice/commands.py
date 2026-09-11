@@ -21,7 +21,6 @@ prompt rewrite: a command is a few words, and names something real.
 
 from __future__ import annotations
 
-import re
 from typing import NamedTuple
 
 from origenerator.gallery.voice_commands import command_bias, match_command
@@ -43,6 +42,7 @@ from origenerator.voice.show_commands import (
     match_show_command,
     show_command_bias,
 )
+from origenerator.voice.text import words
 
 SIDES = (PORTRAIT, LANDSCAPE)
 
@@ -123,10 +123,10 @@ def split_side(text: str) -> tuple[str | None, str]:
     matcher here claims them, and the dictation that collects them must not be
     fed the side word as if it were the first word of the request.
     """
-    words = re.findall(r"[a-z']+", (text or "").lower())
-    if words and words[0] in SIDES:
-        return words[0], " ".join(words[1:])
-    return None, " ".join(words)
+    heard = words(text, keep_apostrophes=True)
+    if heard and heard[0] in SIDES:
+        return heard[0], " ".join(heard[1:])
+    return None, " ".join(heard)
 
 
 def sided_app_command(text: str):

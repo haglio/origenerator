@@ -20,8 +20,7 @@ command on rewriting a prompt.
 """
 from __future__ import annotations
 
-import re
-
+from origenerator.voice.text import words
 from origenerator.workflows.detail_parts import (
     fix_command_bias,
     fix_command_spelling,
@@ -72,13 +71,13 @@ def _lead_words(text: str, phrases: tuple[str, ...]) -> list | None:
     the half :func:`recognized_spelling` replaces and the rest is the half it
     keeps.
     """
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    if not words:
+    heard = words(text)
+    if not heard:
         return None
     for phrase in phrases:
         lead = phrase.split()
-        if words[: len(lead)] == lead and len(words) - len(lead) <= _MAX_TRAILING_WORDS:
-            return words[len(lead):]
+        if heard[: len(lead)] == lead and len(heard) - len(lead) <= _MAX_TRAILING_WORDS:
+            return heard[len(lead):]
     return None
 
 

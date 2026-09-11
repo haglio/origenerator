@@ -34,7 +34,7 @@ from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import progress_status_label
+from origenerator.timing import RunTiming
 
 _IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
@@ -173,9 +173,9 @@ class InFlightCard(QWidget):
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has
             # the room for the elapsed count too.
-            progress_status_label(elapsed, self._item.progress,
-                                  self._item.typical_seconds,
-                                  step=self._item.stage, compact=True),
+            RunTiming(elapsed, self._item.progress,
+                      self._item.typical_seconds).status_label(
+                          step=self._item.stage, compact=True),
             self._item.progress if self._item.status == "running" else None,
             self._item.pass_progress if self._item.status == "running" else None,
         )

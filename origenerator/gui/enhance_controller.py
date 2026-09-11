@@ -437,27 +437,47 @@ class EnhanceController:
         return gallery.enhance_run_targets_row(
             self._target_of(job), job.params.get("input_image"), row)
 
+    def _job_for(self, row: dict, running=None):
+        """The standalone enhance being made of this row's image, or ``None``.
+
+        The one walk under every surface that shows a run on the picture it
+        improves. There were three of it, each with its own copy of which job
+        counts and its own restatement of why a queued one has no frame; the two
+        answers they gave differ only in the shape the surface wants, which is
+        what :meth:`run_of` and :meth:`_pending_for` do with what this finds.
+
+        Every live job is searched, not each folder's leading one: a batch of
+        enhances goes out whole and its jobs share a settings key, so all but the
+        first would read as not-cooking off the folder-facing view. ``running``
+        takes a listing the caller already holds -- the reconcile reads one per
+        pass -- and everything else asks for a fresh one, which is what a delete
+        cancelling the runs under it needs.
+        """
+        for job in (self._jobs() if running is None else running):
+            if self._of_row(job, row):
+                return job
+        return None
+
     def run_of(self, row: dict) -> EnhancingRun | None:
-        """The standalone enhance being made of this image right now, or ``None``.
+        """The standalone enhance being made of this image right now, as the
+        image's tile sees it, or ``None``.
 
         The browser pane's tiles ask as they are built, so a folder generating
         with the Auto switch on reads honestly: the base render is out, on
         screen, and something better is on the way. Without it the folder looks
-        like it is turning out plain images and ignoring the switch.
-
-        Every live job is searched, not each folder's leading one: a batch of
-        enhances goes out whole and its jobs share a settings key, so all but
-        the first would read as not-cooking off the folder-facing view."""
-        for job in self._jobs():
-            if self._of_row(job, row):
-                return self._as_run(job)
-        return None
+        like it is turning out plain images and ignoring the switch."""
+        job = self._job_for(row)
+        return self._as_run(job) if job is not None else None
 
     def _as_run(self, job) -> EnhancingRun:
-        """One enhance in flight, as the tile of the image it improves sees it:
-        the job's own latest frame — a run that hasn't started has streamed
-        none, so a batch's queued jobs show as queued rather than borrowing
-        the picture of the one being rendered."""
+        """One enhance in flight, as every surface showing it reads it.
+
+        The frame is the job's own latest, which a run that hasn't started has
+        none of: a batch's queued jobs show as queued rather than borrowing the
+        picture of the one being rendered. "Queued" covers both waits the same
+        way, whether the job is still in this app's line or already sitting on
+        ComfyUI, since neither has a frame to show.
+        """
         rendering = job.state == "running"
         return EnhancingRun(
             status="running" if rendering else "queued",
@@ -545,23 +565,19 @@ class EnhanceController:
 
     def _pending_for(self, row: dict, running) -> tuple | None:
         """``(status, frame, settings)`` of a standalone enhance running on
-        ``row``'s own image, or ``None``.
+        ``row``'s own image, or ``None`` — the version list's live row.
 
-        The settings ride along so the live tile can name what is being made the
-        way a finished level names what made it — the panel may have moved on
+        The settings ride along so the live row can name what is being made the
+        way a finished level names what made it: the panel may have moved on
         since the run was launched, so the job's own params are the only honest
-        answer.
-
-        The frame is the job's own latest, which a run that hasn't started has
-        none of: a batch's queued jobs say "queued" instead — and "queued"
-        covers both waits the same way, whether the job is still in this app's
-        line or already sitting on ComfyUI, since neither has a frame to show."""
-        for job in running:
-            if self._of_row(job, row):
-                rendering = job.state == "running"
-                return ("running" if rendering else "queued", job.last_preview,
-                        gallery.describe_enhance_params(job.params))
-        return None
+        answer. Everything else about which job it is, and why a queued one shows
+        no frame, is :meth:`_job_for`'s and :meth:`_as_run`'s.
+        """
+        job = self._job_for(row, running)
+        if job is None:
+            return None
+        run = self._as_run(job)
+        return run.status, run.frame, gallery.describe_enhance_params(job.params)
 
     def forget(self, prompt_id: str) -> None:
         """A run that is over is nobody's enhance any more."""
@@ -577,9 +593,9 @@ class EnhanceController:
         selection: the tile menu's Cancel, and the delete about to take those
         images out from under their runs.
         """
-        wanted = [row for row in rows if row]
-        return [job for job in self._jobs()
-                if any(self._of_row(job, row) for row in wanted)]
+        running = self._jobs()
+        return [job for job in running
+                if any(self._job_for(row, [job]) is not None for row in rows if row)]
 
     def cancel_for_delete(self, rows) -> None:
         """Stop every standalone enhance still being made of ``rows`` — the items

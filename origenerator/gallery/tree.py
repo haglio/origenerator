@@ -31,6 +31,7 @@ dependency so it can be unit-tested directly.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from origenerator.gallery.enhance import (
     BASE_RENDER_SOURCE,
@@ -407,9 +408,24 @@ def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     ]
 
 
-def _build_settings_groups(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list[SettingsGroup]:
+@dataclass(frozen=True)
+class _Tier:
+    """What every folder level under one workflow is built against.
+
+    The media type and the workflow name are the two halves of every key below;
+    ``folder_meta`` is what the user has renamed and starred; ``image_index``
+    resolves a start frame to the picture it is. All four used to travel as four
+    parameters through five builders that each handed them on untouched, and
+    every builder's `children_for` lambda had to list them again.
+    """
+
+    media_type: str
+    workflow_name: str
+    folder_meta: dict
+    image_index: dict
+
+
+def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]:
     """The settings-group leaves under one model, LoRA, or source-image folder.
 
     Rows collapse by settings signature (all non-instance params, plus an i2v's
@@ -422,18 +438,19 @@ def _build_settings_groups(
     constant here and never re-appears in it.
     """
     grouped = _group_ordered(
-        rows, lambda r: settings_signature(wf_name, r.get("params_json"), image_index,
+        rows, lambda r: settings_signature(tier.workflow_name, r.get("params_json"),
+                                           tier.image_index,
                                            workflow_version=r.get("workflow_version"))
     )
     settings_dicts = [
-        canonical_settings(wf_name, parse_params(sig_rows[0].get("params_json")))
+        canonical_settings(tier.workflow_name, parse_params(sig_rows[0].get("params_json")))
         for _sig, sig_rows in grouped
     ]
     distinguishing = _distinguishing_keys(settings_dicts)
     groups = []
     for i, (sig, sig_rows) in enumerate(grouped):
-        key = settings_key(media_type, wf_name, sig)
-        label, starred = _overlay(folder_id(key), key, folder_meta)
+        key = settings_key(tier.media_type, tier.workflow_name, sig)
+        label, starred = _overlay(folder_id(key), key, tier.folder_meta)
         groups.append(SettingsGroup(
             key, label, sig_rows, starred,
             settings_label(settings_dicts[i], distinguishing),
@@ -441,7 +458,7 @@ def _build_settings_groups(
     return groups
 
 
-def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, children_for, cls):
+def _grouped_folders(tier: _Tier, rows, *, signature, key_for, label_for, children_for, cls):
     """Build one folder level: order rows by ``signature``, then key + label +
     overlay each folder and recurse for its children.
 
@@ -453,44 +470,38 @@ def _grouped_folders(rows, folder_meta, *, signature, key_for, label_for, childr
     for sig, sub_rows in _group_ordered(rows, signature):
         key = key_for(sig)
         params = parse_params(sub_rows[0].get("params_json"))
-        label, starred = _overlay(label_for(params), key, folder_meta)
+        label, starred = _overlay(label_for(params), key, tier.folder_meta)
         groups.append(cls(key, label, children_for(sub_rows), starred))
     return groups
 
 
-def _build_model_groups(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list[ModelGroup]:
+def _build_model_groups(tier: _Tier, rows: list[dict]) -> list[ModelGroup]:
     """The model folders under one workflow, each holding its LoRA folders."""
     return _grouped_folders(
-        rows, folder_meta, cls=ModelGroup,
-        signature=lambda r: model_signature(wf_name, r.get("params_json")),
-        key_for=lambda sig: model_key(media_type, wf_name, sig),
-        label_for=lambda params: model_label(wf_name, params),
-        children_for=lambda sub: _build_lora_groups(media_type, wf_name, sub, folder_meta, image_index),
+        tier, rows, cls=ModelGroup,
+        signature=lambda r: model_signature(tier.workflow_name, r.get("params_json")),
+        key_for=lambda sig: model_key(tier.media_type, tier.workflow_name, sig),
+        label_for=lambda params: model_label(tier.workflow_name, params),
+        children_for=lambda sub: _build_lora_groups(tier, sub),
     )
 
 
-def _build_lora_groups(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list[LoraGroup]:
+def _build_lora_groups(tier: _Tier, rows: list[dict]) -> list[LoraGroup]:
     """The LoRA folders under one model, each holding its leaves.
 
     A workflow with no LoRA keys collapses to a single ``(no LoRA)`` folder — every
     row shares one empty LoRA signature — so a model folder nests the same way
     whether or not the pipeline uses a LoRA."""
     return _grouped_folders(
-        rows, folder_meta, cls=LoraGroup,
-        signature=lambda r: lora_signature(wf_name, r.get("params_json")),
-        key_for=lambda sig: lora_key(media_type, wf_name, sig),
-        label_for=lambda params: lora_label(wf_name, params),
-        children_for=lambda sub: _build_leaves(media_type, wf_name, sub, folder_meta, image_index),
+        tier, rows, cls=LoraGroup,
+        signature=lambda r: lora_signature(tier.workflow_name, r.get("params_json")),
+        key_for=lambda sig: lora_key(tier.media_type, tier.workflow_name, sig),
+        label_for=lambda params: lora_label(tier.workflow_name, params),
+        children_for=lambda sub: _build_leaves(tier, sub),
     )
 
 
-def _build_leaves(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list:
+def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
     """A model or LoRA folder's leaves: source-image folders when the folder holds
     videos an image conditions (each holding its settings leaves), else settings
     leaves directly.
@@ -501,14 +512,12 @@ def _build_leaves(
     which lands in that workflow's image folder and animates nothing, so it is
     grouped like any other image.
     """
-    if media_type == "video" and is_image_conditioned(wf_name):
-        return _build_source_image_groups(media_type, wf_name, rows, folder_meta, image_index)
-    return _build_settings_groups(media_type, wf_name, rows, folder_meta, image_index)
+    if tier.media_type == "video" and is_image_conditioned(tier.workflow_name):
+        return _build_source_image_groups(tier, rows)
+    return _build_settings_groups(tier, rows)
 
 
-def _build_source_image_groups(
-    media_type: str, wf_name: str, rows: list[dict], folder_meta: dict, image_index: dict
-) -> list[SourceImageGroup]:
+def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImageGroup]:
     """The source-image folders under one model/LoRA folder: videos split by the
     picture they animate, each holding its settings leaves.
 
@@ -517,14 +526,14 @@ def _build_source_image_groups(
     theirs — so every settings folder in here explores one frame, and opening any
     of them shows videos of that one image."""
     return _grouped_folders(
-        rows, folder_meta, cls=SourceImageGroup,
+        tier, rows, cls=SourceImageGroup,
         signature=lambda r: _input_image_config(
-            parse_params(r.get("params_json")).get("input_image"), image_index,
+            parse_params(r.get("params_json")).get("input_image"), tier.image_index,
             identify=True,
         ),
-        key_for=lambda sig: source_image_key(media_type, wf_name, sig),
-        label_for=lambda params: _source_image_label(params, image_index),
-        children_for=lambda sub: _build_settings_groups(media_type, wf_name, sub, folder_meta, image_index),
+        key_for=lambda sig: source_image_key(tier.media_type, tier.workflow_name, sig),
+        label_for=lambda params: _source_image_label(params, tier.image_index),
+        children_for=lambda sub: _build_settings_groups(tier, sub),
     )
 
 
@@ -634,9 +643,10 @@ def build_gallery_tree(
         ):
             wf_key = f"{media_type}/{wf_name}"
             wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
+            tier = _Tier(media_type, wf_name, folder_meta, image_index)
             tree.append(WorkflowGroup(
                 wf_key, wf_name, wf_label,
-                _build_model_groups(media_type, wf_name, wf_rows, folder_meta, image_index),
+                _build_model_groups(tier, wf_rows),
                 wf_starred,
             ))
     return tree

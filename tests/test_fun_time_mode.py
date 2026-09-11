@@ -11,6 +11,7 @@ from origenerator.fun_time_mode import (
     region_for_items,
     region_for_size,
 )
+from origenerator.slideshow import Slide
 
 
 def _png(path: Path, width: int, height: int) -> Path:
@@ -67,6 +68,13 @@ def test_region_for_items_takes_the_majority_orientation(tmp_path):
         (str(wide), "image", "c", str(wide)),
     ]
     assert region_for_items(items) == "portrait"
+
+
+def test_region_for_items_routes_a_running_shows_own_slides(tmp_path):
+    # A show already playing asks again when its region has to be re-decided,
+    # and what it holds are slides rather than the tuples the browser built.
+    tall = _png(tmp_path / "tall.png", 100, 200)
+    assert region_for_items([Slide(str(tall), "image", "a", str(tall))]) == "portrait"
 
 
 def test_region_for_items_measures_the_still_when_the_media_is_a_video(tmp_path):

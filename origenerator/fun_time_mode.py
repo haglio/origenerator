@@ -21,6 +21,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from origenerator.slideshow import Slide
+
 logger = logging.getLogger(__name__)
 
 # The window captions Fun Time resolves the shows by (with the process pid), the
@@ -101,8 +103,8 @@ def region_for_size(width: int, height: int) -> str:
     return "portrait" if height > width else "landscape"
 
 
-def _measured_size(item: tuple) -> tuple[int, int] | None:
-    """(width, height) of *item*, or ``None`` when nothing about it measures.
+def _measured_size(slide: Slide) -> tuple[int, int] | None:
+    """(width, height) of *slide*, or ``None`` when nothing about it measures.
 
     The stored thumbnail is preferred — bounded to 256px but aspect-preserving,
     so it answers orientation without opening the full-size file.  An image
@@ -111,9 +113,8 @@ def _measured_size(item: tuple) -> tuple[int, int] | None:
     """
     from PIL import Image  # deferred: this module is imported before the splash
 
-    path, media_type = item[0], item[1]
-    still = item[3] if len(item) > 3 else None
-    for candidate in (still, path if media_type == "image" else None):
+    for candidate in (slide.still,
+                      slide.path if slide.media_type == "image" else None):
         if not candidate:
             continue
         try:
@@ -124,7 +125,7 @@ def _measured_size(item: tuple) -> tuple[int, int] | None:
     return None
 
 
-def _probed_video_size(items: list[tuple]) -> tuple[int, int] | None:
+def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
     """(width, height) of the first openable video's frame, or ``None``.
 
     The backstop for a set whose stills all failed to measure: one decode of
@@ -134,10 +135,10 @@ def _probed_video_size(items: list[tuple]) -> tuple[int, int] | None:
     """
     import cv2  # deferred: this module is imported before the splash
 
-    for item in items:
-        if item[1] != "video":
+    for slide in slides:
+        if slide.media_type != "video":
             continue
-        capture = cv2.VideoCapture(str(item[0]))
+        capture = cv2.VideoCapture(str(slide.path))
         try:
             got_frame, frame = capture.read()
         finally:
@@ -148,26 +149,27 @@ def _probed_video_size(items: list[tuple]) -> tuple[int, int] | None:
     return None
 
 
-def region_for_items(items: list[tuple]) -> str:
-    """The region a set of ``(path, media_type, prompt_id, still)`` items plays in.
+def region_for_items(items) -> str:
+    """The region a set of slides plays in, however the caller assembled them.
 
     Majority orientation over what measures — stills first, one decoded video
     frame as the backstop when no still answered.  A tie, or a set in which
     nothing measures at all, goes to landscape, the roomier region.
     """
+    slides = [Slide.of(item) for item in items]
     votes = {"portrait": 0, "landscape": 0}
-    for item in items:
-        size = _measured_size(item)
+    for slide in slides:
+        size = _measured_size(slide)
         if size is not None:
             votes[region_for_size(*size)] += 1
     if not votes["portrait"] and not votes["landscape"]:
-        probed = _probed_video_size(items)
+        probed = _probed_video_size(slides)
         if probed is not None:
             votes[region_for_size(*probed)] += 1
     side = "portrait" if votes["portrait"] > votes["landscape"] else "landscape"
     logger.info(
         "Show routed to %s (portrait=%d landscape=%d of %d items)",
-        side, votes["portrait"], votes["landscape"], len(items),
+        side, votes["portrait"], votes["landscape"], len(slides),
     )
     return side
 

@@ -462,7 +462,7 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
                                    for row in r])
 
-    view._on_voice_command(ShelfCommand("__recents__", "landscape"))
+    view._voice.on_command(ShelfCommand("__recents__", "landscape"))
 
     show = view.region_show("landscape")
     assert show is not None and show.isVisible()
@@ -577,11 +577,11 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
     show = view.region_show("portrait")
     qtbot.addWidget(show)
 
-    view._on_voice_command(ShelfCommand("__starred__", "portrait"))
+    view._voice.on_command(ShelfCommand("__starred__", "portrait"))
     assert show.hud_f_mode is True
     assert len(show.hud_items()[0]) == 1     # narrowed to the one favorite
 
-    view._on_voice_command(ShelfCommand("__starred__", "portrait"))
+    view._voice.on_command(ShelfCommand("__starred__", "portrait"))
     assert show.hud_f_mode is False          # and the word widens it back
 
 
@@ -599,7 +599,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
         qtbot.addWidget(show)
     fixed = []
     monkeypatch.setattr(
-        view, "_fix_parts",
+        view, "fix_parts",
         lambda prompt_id, parts: (prompt_id,
                                   "fixing " + " ".join(p.name for p in parts)))
     for show in (portrait, landscape):
@@ -608,7 +608,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     teeth = next(p for p in DETAIL_PARTS if p.name == "teeth")
 
     # A fix names one or more parts, so the command carries them as a set.
-    view._on_voice_command(SurfaceCommand([teeth], "landscape"))
+    view._voice.on_command(SurfaceCommand([teeth], "landscape"))
 
     assert [entry[0] for entry in fixed] == [landscape]
     assert fixed[0][2] == "fixing teeth"

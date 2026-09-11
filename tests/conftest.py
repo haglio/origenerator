@@ -257,10 +257,10 @@ class FakeVoiceSteering(QObject):
 
 @pytest.fixture(autouse=True)
 def _no_real_mic(monkeypatch):
-    """Point every gallery's voice steering at the inert stand-in above."""
-    from origenerator.gui import gallery_view
+    """Point every voice router's steering at the inert stand-in above."""
+    from origenerator.gui import voice_router
 
-    monkeypatch.setattr(gallery_view, "VoiceSteering", FakeVoiceSteering)
+    monkeypatch.setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
 
 
 @pytest.fixture(autouse=True)

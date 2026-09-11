@@ -6,7 +6,7 @@ import random
 from functools import partial
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QThreadPool, QTimer
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
@@ -29,7 +29,6 @@ from PyQt6.QtWidgets import (
 from origenerator import (
     evolver_export,
     gallery,
-    prompt_edit,
     recipe_match,
     recovery,
     search,
@@ -49,7 +48,6 @@ from origenerator.config import (
     THUMB_DIR,
     TRASH_DIR,
     VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
-    VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.db import Database
 from origenerator.experiments.background import queue_experiments
@@ -161,7 +159,6 @@ from origenerator.gui.orientation import (
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
 from origenerator.gui.prompt_find import PromptFind
-from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
     REROLL_BOTH,
@@ -174,22 +171,11 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.voice_router import VoiceRouter
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import in_order
 from origenerator.trash import Trash
-from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
-from origenerator.voice.commands import (
-    ShelfCommand,
-    ShowControl,
-    SurfaceCommand,
-    match_voice_command,
-    sided_app_command,
-    split_side,
-    voice_command_bias,
-)
-from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
-from origenerator.voice.steering import VoiceSteering
+from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 from origenerator.workflows.detail_parts import name_parts
@@ -366,113 +352,6 @@ def _is_deletable_folder(group) -> bool:
 # thing that must never appear (:meth:`GalleryView._generate_combination`).
 ALREADY_GENAUD = "🎤 already Genau'd"
 
-# What a spoken command about the picture is asking for, in the words its "no
-# picture on screen" answer names it by. A fix names its own parts instead, and
-# "enhance" never gets here with no show — it is a bank button as well as an
-# order about the picture, and with no picture filling the screen it is the
-# button (see :meth:`GalleryView._on_picture_command`).
-_VOICE_WANTS = {
-    gallery.GENAU_COMMAND: "a Genau clip",
-}
-
-
-# The shelf each spoken shelf name stands you in. What to call it back comes
-# from ``_SHELF_LABELS``, so a row renamed is renamed in one place.
-_VOICE_SHELVES = {
-    AppCommand.RECENTS: _RECENTS_KEY,
-    AppCommand.STARRED: _STARRED_KEY,
-    AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
-    AppCommand.REQUESTS: _REQUESTS_KEY,
-    AppCommand.TRASH: _TRASH_KEY,
-}
-
-# The motion dial each spoken word turns, as (the driver's method, its argument
-# or ``None`` for a method that takes none) — the very moves the keys make (see
-# :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed. Bound
-# against the driver at construction, so a method renamed there is an error at
-# launch rather than a spoken word that quietly does nothing.
-_VOICE_MOTION = {
-    AppCommand.SPEED_UP: ("adjust_speed", 5),
-    AppCommand.SPEED_DOWN: ("adjust_speed", -5),
-    AppCommand.AMP_UP: ("adjust_amplitude", 10),
-    AppCommand.AMP_DOWN: ("adjust_amplitude", -10),
-    AppCommand.CENTER_UP: ("adjust_center", 5),
-    AppCommand.CENTER_DOWN: ("adjust_center", -5),
-    AppCommand.NEXT_SHAPE: ("cycle_shape", 1),
-    AppCommand.PREVIOUS_SHAPE: ("cycle_shape", -1),
-    AppCommand.CRUISE: ("toggle_cruise", None),
-    AppCommand.CRUISE_ON: ("set_cruise", True),
-    AppCommand.CRUISE_OFF: ("set_cruise", False),
-    AppCommand.OFFSET: ("quarter_offset", None),
-}
-
-# The driver's setter for each dial the numeric grid names
-# (:class:`~origenerator.voice.app_commands.DialSetting`), so "amp fifty" puts
-# the dial at fifty rather than walking it there ten at a time.
-_VOICE_DIALS = {
-    "speed": "set_speed",
-    "amp": "set_amplitude",
-    "center": "set_center",
-}
-
-# The app-wide switch each spoken word flips, as (which of the bank's switches,
-# the state asked for — ``None`` flips whichever way it is standing — and what
-# the answer calls it). Set through the button rather than around it, so a
-# spoken switch and a clicked one are the same event and the bank shows both.
-# The button itself is looked up at construction (GalleryView._init_voice_tables)
-# — spelled here it would be a string no rename and no linter could follow.
-_AUTO, _AUDIO, _DRIVE, _MIC = "auto", "audio", "drive", "mic"
-_VOICE_SWITCHES = {
-    AppCommand.AUTO: (_AUTO, None, "auto-generate"),
-    AppCommand.AUTO_ON: (_AUTO, True, "auto-generate"),
-    AppCommand.AUTO_OFF: (_AUTO, False, "auto-generate"),
-    AppCommand.AUDIO: (_AUDIO, None, "the audio bed"),
-    AppCommand.AUDIO_ON: (_AUDIO, True, "the audio bed"),
-    AppCommand.AUDIO_OFF: (_AUDIO, False, "the audio bed"),
-    AppCommand.DRIVE: (_DRIVE, None, "the OSR2"),
-    AppCommand.DRIVE_ON: (_DRIVE, True, "the OSR2"),
-    AppCommand.DRIVE_OFF: (_DRIVE, False, "the OSR2"),
-    AppCommand.MIC_OFF: (_MIC, False, "the mic"),
-}
-
-# The bank button each spoken word presses with no show up, as (the button, the
-# action it runs, what to say when it cannot run — ``None`` to use the button's
-# own tooltip, which for most of them already says why: "Nothing to undo",
-# "Nothing here to star"). Only the two whose tips are bare labels, and Group,
-# whose tip explains the button rather than refusing it, carry their own words.
-# The refusal each one carries when it cannot run — ``None`` to use the button's
-# own tooltip, which for most of them already says why ("Nothing to undo",
-# "Nothing here to star"). Which button and which action is bound at
-# construction (GalleryView._init_voice_tables): named here as strings, a
-# renamed handler would break the microphone silently, with no import error, no
-# type error and no lint warning.
-_VOICE_BANK_REFUSALS = {
-    AppCommand.BACK: "nowhere back",
-    AppCommand.FORWARD: "nowhere forward",
-    AppCommand.CULL: None,
-    AppCommand.STAR: None,
-    AppCommand.UNDO: None,
-    AppCommand.REDO: None,
-    AppCommand.GROUP: "pick some folders first",
-}
-
-# What a spoken word does to a show's enhanced-only switch — the one beside
-# F-mode on its HUD. Both ways round rather than one toggle (see
-# AppCommand.FILTER_ENHANCED); off takes F-mode with it, "clear filter" being
-# the way out of all of the narrowing on every satellite in this family.
-_VOICE_FILTERS = {
-    AppCommand.FILTER_ENHANCED: True,
-    AppCommand.FILTER_OFF: False,
-}
-
-# The words that are about the slide on screen when there is one. The rest of
-# the bank (undo, redo, group) is the gallery's whether or not a show covers it:
-# undoing a cull you regret is exactly a thing to do mid-show.
-_ABOUT_THE_SLIDE = frozenset({
-    AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
-    AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.STAR,
-})
-
 
 class GalleryView(QWidget):
     def __init__(self, db: Database, parent=None, *,
@@ -542,56 +421,6 @@ class GalleryView(QWidget):
         # bias teaches whisper all three vocabularies, without which a quiet
         # mic's "fix <part>" — or the marker words the whole request hangs on —
         # transcribe as other words entirely.
-        self._voice = VoiceSteering(
-            command_matcher=match_voice_command,
-            bare_matcher=sided_app_command,
-            dictation=RequestDictation(),
-            transcribe_bias=(f"{voice_command_bias()} {app_command_bias()} "
-                             f"{request_bias()}"),
-        )
-        self._voice.error.connect(lambda msg: logger.warning("Voice steering: %s", msg))
-        self._voice.heard.connect(self._on_voice_heard)
-        self._voice.edited.connect(self._on_voice_edited)
-        self._voice.error.connect(self._on_voice_error)
-        self._voice.request.connect(self._on_spoken_request)
-        # A finished request is worked out on the pool: the prompt may not
-        # contain the words the speaker used ("no earrings" against a prompt
-        # that says "silver ear studs"), and finding out which of its own terms
-        # they meant is a call to the local LLM.
-        self._revision = RevisionWorker(partial(
-            apply_request,
-            match=partial(prompt_edit.smart_match,
-                          base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL,
-                          system_prompt=VOICE_REQUEST_MATCH_SYSTEM_PROMPT),
-        ), parent=self)
-        self._revision.revised.connect(self._on_request_revised)
-        self._voice_target_key: str | None = None
-        # The generation an open request is about, captured the moment the
-        # request opens rather than when it finishes: a show holds still for the
-        # sentence, but the words take seconds and the item on screen when they
-        # end is not necessarily the one they were about.
-        self._request_target: str | None = None
-        # A caption showing what voice heard and did, so it's visible without reading
-        # the log. It rides at the top of the left pane, taking its own room rather
-        # than floating over the header buttons it used to land on; transient
-        # messages revert to the idle "Listening…" after a moment.
-        self._voice_status = QLabel(self)
-        self._voice_status.setObjectName("voiceStatus")
-        self._voice_status.setWordWrap(True)  # a long utterance grows down, not sideways
-        self._voice_status.setStyleSheet(
-            "#voiceStatus { color: white; background: rgba(20, 20, 20, 225);"
-            " padding: 6px 10px; border-radius: 6px; }"
-        )
-        self._voice_status.hide()
-        self._voice_status_timer = QTimer(self)
-        self._voice_status_timer.setSingleShot(True)
-        self._voice_status_timer.timeout.connect(self._voice_status_revert)
-        # What that caption goes back to saying rather than the idle line: the
-        # request it is still working out, and which request that is. It has one
-        # slot, so a line flashed over the promise has to know what to restore
-        # — the show's corner keeps its own copy of the same pair.
-        self._working_status = ""
-        self._working_request = None
         # The folder whose running re-roll is the gallery's selected item (its
         # tile lit in the middle column), and that tile. Which tab shows the
         # run's frames full size is the tabs' own affair: a tab follows the
@@ -709,6 +538,12 @@ class GalleryView(QWidget):
         self._shows = ShowDirector(
             self, db=db, browser=self._browser, reroll=self._reroll,
             pace=self._pace, motion=self._osr2_motion, fun_time=fun_time)
+        # Everything spoken: the microphone, the caption that says what it heard,
+        # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
+        # caption is placed by _build_ui, and the bank it presses is bound to it
+        # once _build_ui has built one.
+        self._voice = VoiceRouter(self, parent=self, db=db, shows=self._shows,
+                                  client=client, motion=self._osr2_motion)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
         # What another app has on the shared ComfyUI, re-read on every poll so the
         # lower bar can say the server is busy before a Generate goes in after it.
@@ -722,7 +557,19 @@ class GalleryView(QWidget):
         self._launching: dict[str, InFlightItem] = {}
         self._launch_seq = 0
         self._build_ui()
-        self._init_voice_tables()
+        self._voice.bind_the_bank(
+            auto=self._auto_btn, audio=self._audio_btn, drive=self._osr2_btn,
+            mic=self._mic_btn, enhance=(self._enhance_btn, self._enhance_selection),
+            actions={
+                AppCommand.BACK: (self._back_btn, self._navigation.go_back),
+                AppCommand.FORWARD: (self._forward_btn, self._navigation.go_forward),
+                AppCommand.CULL: (self._delete_btn, self._delete_selection),
+                AppCommand.STAR: (self._star_btn, self._star_selection),
+                AppCommand.UNDO: (self._undo_btn, self._undo),
+                AppCommand.REDO: (self._redo_btn, self._redo),
+                AppCommand.GROUP: (self._group_btn, self._group_selection),
+            },
+        )
         self._sync_history_buttons()
         self._navigation.seed()
         self._sync_action_buttons()
@@ -1022,7 +869,7 @@ class GalleryView(QWidget):
         toc_column.setContentsMargins(*_PANE_MARGINS)
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
-        toc_column.addWidget(self._voice_status)
+        toc_column.addWidget(self._voice.status)
         # The gallery search: its field over the tree, its results bar over the
         # browser pane below (:mod:`origenerator.gui.gallery_search`).
         toc_column.addWidget(self._search.field)
@@ -1166,7 +1013,7 @@ class GalleryView(QWidget):
                 "“weird”, “lock”), orders about the picture (“enhance”, “fix "
                 "hands”, “genau it”), and prompt steering while a folder is "
                 "auto-generating (left listening by Esc, which stops everything else)",
-                self._on_mic_toggle, checkable=True,
+                self._voice.mic_toggled, checkable=True,
             )
             self._mic_btn.setStyleSheet(
                 "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"
@@ -3158,8 +3005,7 @@ class GalleryView(QWidget):
             if target != key:
                 self._auto_working[target] = self._auto_working.pop(key)
                 self._auto.rekey(key, target)
-                if self._voice_target_key == key:
-                    self._voice_target_key = target
+                self._voice.re_home(key, target)
                 self._pending_auto_key = target
                 key, working = target, self._auto_working[target]
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
@@ -3224,8 +3070,7 @@ class GalleryView(QWidget):
         self._capture_working(key)
         self._auto.start(key)
         if self._auto.is_active(key):
-            self._voice_target_key = key
-            self._sync_voice()  # steers this folder's prompt, if the mic is on
+            self._voice.steer(key)  # steers this folder's prompt, if the mic is on
         else:
             self._auto_working.pop(key, None)  # the launch didn't take
 
@@ -3248,12 +3093,12 @@ class GalleryView(QWidget):
                 "row": group.rows[0],
             }
 
-    def _working_prompts(self, key: str) -> dict:
+    def working_prompts(self, key: str) -> dict:
         params = self._auto_working.get(key, {}).get("params", {})
         return {"positive": params.get("positive_prompt", ""),
                 "negative": params.get("negative_prompt", "")}
 
-    def _steer_prompts(self, key: str, new_prompts: dict):
+    def steer_prompts(self, key: str, new_prompts: dict):
         """A voice command rewrote the prompts: the loop's next launches use them."""
         working = self._auto_working.get(key)
         if working is not None:
@@ -3276,10 +3121,9 @@ class GalleryView(QWidget):
             # The pane was following this loop between variations; there is no next
             # one to wait for now.
             self._clear_reroll_selection()
-        if key == self._voice_target_key:
-            self._voice_target_key = None
+        if key == self._voice.steering:
+            self._voice.steer(None)
             self._pending_auto_key = None
-            self._sync_voice()
         self._sync_auto_button()
         self._sync_discard_buttons()  # the in-flight run's button is a Cancel again
 
@@ -3296,70 +3140,30 @@ class GalleryView(QWidget):
         self._update_queue()
         self._reconcile_generating()
 
-    # --- voice feedback: a floating caption of what voice heard and did --------
+    # --- what the spoken words ask of this window ----------------------------
 
     def say(self, message: str) -> None:
-        """Flash a line on this pane's caption. What the shows use when there is
-        no show up to put it in the corner of."""
-        self._show_voice_status(message, transient=True)
+        """Flash a line on the voice caption. What the shows use when there is no
+        show up to put it in the corner of."""
+        self._voice.say(message)
 
-    def _show_voice_status(self, text: str, *, transient: bool):
-        self._voice_status.setText(text)
-        self._voice_status.show()
-        if transient:
-            self._voice_status_timer.start(4000)  # then revert to the idle caption
-        else:
-            self._voice_status_timer.stop()
+    def shelf_label(self, key: str) -> str:
+        """A shelf's plain name, for a spoken word to be answered in."""
+        return _SHELF_LABELS[key]
 
-    def _voice_status_revert(self):
-        if self._working_status:
-            # A request is still being worked out, so the caption goes back to
-            # saying so rather than to the idle line: whatever flashed over the
-            # promise, the promise is still the truest thing this pane has to
-            # say, and "Listening…" over an app mid-request reads as a request
-            # that was dropped.
-            self._show_voice_status(self._working_status, transient=False)
-        elif self._listening():  # still listening
-            self._show_voice_status("🎤 Listening…", transient=False)
-        else:
-            self._voice_status.hide()
+    def stand_in_shelf(self, key: str, side: str | None) -> bool:
+        """Select a shelf's row, exactly as clicking it does, and say whether the
+        tree had one — Recents and Starred appear only once there is one."""
+        item = self._tree_item_for(oriented_key(key, side) if side else key)
+        if item is None:
+            return False
+        self._tree.setCurrentItem(item)  # whose signal draws it
+        return True
 
-    def _on_voice_heard(self, text: str):
-        """Say what the mic heard — a command in the words the app knows it by,
-        anything else as it was transcribed.
-
-        Whisper renders a command word a dozen ways and the matcher answers to
-        all of them, so the transcription of one is a misspelling of a word that
-        was understood perfectly well: "gunow it" printed over a caption that
-        then goes and makes a Genau clip. The spelling it was recognized as is
-        the truthful thing to show
-        (:func:`~origenerator.gallery.voice_commands.recognized_spelling`).
-        """
-        if any(char.isalpha() for char in text):
-            self._say_of_voice(f"🎤 heard: “{gallery.recognized_spelling(text) or text}”")
-
-    def _on_voice_edited(self, _new_prompt: str):
-        self._say_of_voice("🎤 ✓ prompt updated")
-
-    def _on_voice_error(self, message: str):
-        self._say_of_voice(f"🎤 {message}")
-
-    def _say_of_voice(self, message: str):
-        """Put what voice heard or hit in front of whoever is listening.
-
-        Both places, because they are different screens: this pane's caption for
-        someone working in the window, and the show's own corner for someone
-        watching a slideshow — who can see nothing of this window at all, and
-        for whom a mic that heard nothing and one that heard the wrong words
-        look exactly alike.
-
-        A spoken line, not an answer to a request — which matters while one is
-        being worked out, because both surfaces are then holding a promise about
-        that work, and a line said over one has to fade back to it rather than
-        take its place.
-        """
-        self._show_voice_status(message, transient=True)
-        self._shows.note_voice_command(message)
+    def run_spoken_command(self, text: str) -> bool:
+        """Run a command the hosting session's own microphone heard, and say
+        whether it was one. The session's bridge posts them here."""
+        return self._voice.run_spoken_command(text)
 
     def _sync_auto_button(self):
         """Keep the auto-generate toggle on screen wherever the user is, lit
@@ -3722,313 +3526,11 @@ class GalleryView(QWidget):
         started — the slideshow shows its corner note only if one did.
 
         The same ask as a spoken "enhance" over the same picture, so the same
-        decision makes it (:meth:`_enhance_it`); a hold has no corner line to
+        decision makes it (:meth:`enhance_it`); a hold has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
         in the slideshow because it is this side that holds the levels — and a
         video has none to receive."""
-        return self._enhance_it(prompt_id)[0] is not None
-
-    # --- spoken commands: "enhance" over a show, "start slideshow" for one ---
-
-    def _listening(self) -> bool:
-        """Whether this app is listening on its own mic.
-
-        Never when hosted: the session owns the microphone there, hears the
-        spoken commands for both of us, and posts this app's on its channel —
-        two listeners on one mic is two transcriptions of every utterance.
-        """
-        return self._mic_btn is not None and self._mic_btn.isChecked()
-
-    def _on_mic_toggle(self, _on: bool):
-        """The microphone switch: the one thing that opens or closes the mic."""
-        self._sync_voice()
-
-    def _sync_voice(self):
-        """Listen, or don't, exactly as the mic button says.
-
-        Nothing else decides. The mic used to come on with the Auto loop and
-        again with a fullscreen show, which made "is it listening?" a question
-        with a derivation rather than an answer — and left "start slideshow"
-        unhearable in the one state it is for, with no show up.
-
-        What is listened *for* still depends on what is running: the spoken
-        commands always, and the prompt steering only while a loop has a folder
-        to steer. That is not a second switch, just nothing to steer.
-        """
-        if not self._listening():
-            self._voice.stop()           # both halves, so the listener closes
-            self._voice.stop_commands()
-            self._voice_status_timer.stop()
-            self._voice_status.hide()
-            return
-        self._voice.start_commands(self._on_voice_command)
-        if self._voice_target_key is not None:
-            self._voice.start(
-                lambda: self._working_prompts(self._voice_target_key),
-                lambda new: self._steer_prompts(self._voice_target_key, new),
-            )
-        else:
-            self._voice.stop()  # no loop to steer; the commands hold the mic open
-        self._show_voice_status("🎤 Listening…", transient=False)
-
-    def run_spoken_command(self, text: str) -> bool:
-        """Run a command the HOSTING session heard, and say whether it was one.
-
-        Fun Time owns the microphone while this app is hosted — one mic, one
-        transcription — so its recognizer hears "landscape favorites", posts the
-        words on this app's channel, and they are matched here against this
-        app's own vocabulary: the session cannot know which shelves this tree
-        has or which detail parts have detectors installed.
-
-        The order is this app's own mic's (``VoiceSteering._interpret``).  A
-        whole-utterance word is that command first — "landscape enhanced only"
-        turns the show's switch, and left to the looser picture matcher it
-        would read as "enhance" with a word after it — so long as no request
-        is being said.  Then the request, which has first refusal over the
-        rest: "Request … over" runs to as many utterances as the speaker takes
-        breaths, so a matcher that only ever saw one at a time could not hear a
-        sentence said in three; while one is open the dictation swallows what
-        it hears, which is what keeps the words of a request from also matching
-        a command.  The side is split off for the dictation — it rides every
-        utterance the session posts, and fed in it would become the first word
-        of the request instead of the region the request is about.
-        """
-        bare = self._voice.bare_command(text)
-        if bare is not None:
-            self._on_voice_command(bare)
-            return True
-        side, rest = split_side(text)
-        spoken = self._voice.push_dictation(rest)
-        if spoken is not None:
-            self._on_spoken_request(spoken, side=side)
-            return True
-        matched = match_voice_command(text)
-        if matched is None:
-            logger.info("Voice (from the session): %r matched no command", text)
-            return False
-        self._on_voice_command(matched)
-        return True
-
-    def _on_voice_command(self, matched):
-        """One recognized utterance: a shelf to play, a show command, a bare
-        word about the app or the slide in front of the speaker, or an order
-        about the picture — each with the side it named, if it named one.
-
-        An order about the picture always arrives wrapped in a
-        :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
-        how the side travels, and the matchers put every one of them in it.
-        """
-        if isinstance(matched, ShelfCommand):
-            self._shows.play_shelf(matched)
-        elif isinstance(matched, ShowControl):
-            self._shows.run_show_command(matched.command, matched.side)
-        elif isinstance(matched, SurfaceCommand):
-            if isinstance(matched.command, AppCommand):
-                self._run_app_command(matched.command, matched.side)
-            else:
-                self._on_picture_command(matched)
-        elif isinstance(matched, AppCommand):
-            self._run_app_command(matched)
-        elif isinstance(matched, DialSetting):
-            self._set_motion_dial(matched)
-        else:
-            # The two matchers between them produce exactly the five above. A
-            # sixth kind arriving is a new matcher nobody wired through to here,
-            # and dropping it silently is how that goes unnoticed for a release.
-            logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
-
-    # --- the bare vocabulary: a shelf, a switch, a dial, or the slide --------
-
-    def _run_app_command(self, command: AppCommand, side: str | None = None):
-        """One bare spoken word.
-
-        Four kinds, and which it is decides where it lands: a shelf name stands
-        the tree in that shelf, a switch word flips one of the app-wide
-        switches, a dial word turns the motion — and everything else is about
-        whatever surface is in front of the speaker, which is the fullscreen
-        show while one is up and the gallery otherwise.
-        """
-        if command in _VOICE_SHELVES:
-            self._go_to_shelf(command, side)
-        elif command in _VOICE_FILTERS:
-            self._shows.filter_enhanced(_VOICE_FILTERS[command], side)
-        elif command in _VOICE_SWITCHES:
-            self._flip_switch(command)
-        elif command in _VOICE_MOTION:
-            self._turn_motion_dial(command)
-        elif self._shows.showing is not None and command in _ABOUT_THE_SLIDE:
-            self._shows.run_on_slide(command)
-        else:
-            self._run_in_gallery(command)
-
-    def _go_to_shelf(self, command: AppCommand, side: str | None = None):
-        """Stand in the shelf a spoken name asks for, exactly as clicking its
-        row does.
-
-        Said over a show it still moves — the tree is under the show, and the
-        move is what the show leaves you standing in — so the answer says which
-        shelf rather than refusing a command whose whole effect is out of sight.
-
-        Every shelf has two rows now, one per side, so the utterance's own side
-        picks which; unsided, _tree_item_for takes the tree's own answer for
-        the folder — the same row a click would have landed on.
-        """
-        key = _VOICE_SHELVES[command]
-        label = _SHELF_LABELS[key]
-        item = self._tree_item_for(oriented_key(key, side) if side else key)
-        if item is None:  # Recents and Starred appear only once there is one
-            self._shows.answer(f"🎤 no {label} shelf yet")
-            return
-        self._tree.setCurrentItem(item)  # whose signal draws it
-        self._shows.answer(f"🎤 {label}")
-
-    def _init_voice_tables(self):
-        """Bind the spoken vocabulary to the objects it acts on, now that the
-        bank exists.
-
-        The module tables above say which switch, which refusal and which dial;
-        this is where each becomes the button, the bound handler and the bound
-        setter it means. Spelled as attribute names — as they were — a renamed
-        button or handler broke the microphone silently: no import error, no type
-        error, no lint warning, and a spoken word that simply did nothing. Bound
-        here, the same rename is an ``AttributeError`` at launch.
-
-        Hosted by a session, three of the switches are never built at all and
-        the OSR2 driver is not either — the session's main player owns the device
-        for its whole length. Those keys keep a ``None``, so
-        :meth:`_flip_switch` can still answer that the session owns them, and the
-        dial words find nothing to turn rather than a driver that is not there.
-        """
-        self._voice_switches = {
-            _AUTO: self._auto_btn, _AUDIO: self._audio_btn,
-            _DRIVE: self._osr2_btn, _MIC: self._mic_btn,
-        }
-        self._voice_bank_actions = {
-            AppCommand.BACK: (self._back_btn, self._navigation.go_back),
-            AppCommand.FORWARD: (self._forward_btn, self._navigation.go_forward),
-            AppCommand.CULL: (self._delete_btn, self._delete_selection),
-            AppCommand.STAR: (self._star_btn, self._star_selection),
-            AppCommand.UNDO: (self._undo_btn, self._undo),
-            AppCommand.REDO: (self._redo_btn, self._redo),
-            AppCommand.GROUP: (self._group_btn, self._group_selection),
-        }
-        driver = self._osr2_motion
-        self._voice_motion = {
-            command: (getattr(driver, method) if driver else None, argument)
-            for command, (method, argument) in _VOICE_MOTION.items()
-        }
-        self._voice_dials = {
-            dial: getattr(driver, setter) if driver else None
-            for dial, setter in _VOICE_DIALS.items()
-        }
-
-    def _flip_switch(self, command: AppCommand):
-        """Set one of the app-wide switches, through its button rather than
-        around it — a spoken switch is the same event as a clicked one, so the
-        bank lights the same way and nothing has to be kept in step.
-
-        "Mic off" is the one with no way back: a shut mic hears nothing, so the
-        button is what turns it on again. Its answer is still worth saying —
-        with a show up it lands in the show's corner, where the bank is not
-        visible to say it instead.
-        """
-        switch, want, name = _VOICE_SWITCHES[command]
-        button = self._voice_switches[switch]
-        if button is None:  # hosted: the session owns the audio bed and the mic
-            self._shows.answer(f"🎤 {name} is the session's here")
-            return
-        if not button.isEnabled():
-            self._shows.answer(f"🎤 {name} can't be switched here")
-            return
-        on = (not button.isChecked()) if want is None else want
-        button.setChecked(on)  # its toggled signal is what does the work
-        self._shows.answer(f"🎤 {name} {'on' if on else 'off'}")
-
-    def _turn_motion_dial(self, command: AppCommand):
-        """Turn one of the motion's dials — the move its key makes.
-
-        The driver is app-wide, so this answers from the gallery and from a show
-        alike, and the dials read the same whether or not the device is running:
-        a motion can be set up before it is started, exactly as the panel allows.
-        """
-        turn, argument = self._voice_motion[command]
-        turn() if argument is None else turn(argument)
-        self._shows.answer(f"🎤 {self._osr2_motion.status_text()}")
-
-    def _set_motion_dial(self, setting: DialSetting):
-        """Put one of the motion's dials where a spoken number asks for it.
-
-        The nudges above are for a motion that is nearly right; this is for one
-        that is not, and it is the same driver either way — so it answers with
-        the same line, and from the gallery and a show alike. The dial does its
-        own clamping, which is why "min speed" can say nought and land on the
-        slowest the device actually moves at.
-        """
-        self._voice_dials[setting.dial](setting.value)
-        self._shows.answer(f"🎤 {self._osr2_motion.status_text()}")
-
-    def _run_in_gallery(self, command: AppCommand):
-        """A word said with no show to take it: the bank button it names, aimed
-        exactly as a click on it would be."""
-        if command in (AppCommand.LOCK, AppCommand.UNLOCK):
-            self._shows.answer(f"🎤 {command.value} is a slideshow's — none is up")
-            return
-        button, act = self._voice_bank_actions[command]
-        self._press_bank_button(button, act, _VOICE_BANK_REFUSALS[command])
-
-    def _press_bank_button(self, button, act, refusal: str | None = None):
-        """Do what a bank button does, and answer in that button's own words.
-
-        Its tip already says what it will do to what is in front of you — "Star
-        3 items", "Undo: delete of 2 items" — which is precisely what a speaker
-        who is not looking at the bank needs told back, and it cannot drift from
-        what the button does. A button that is away or dead says why instead of
-        quietly doing nothing: ``refusal``, or its tip where that already reads
-        as one.
-        """
-        if button.isHidden() or not button.isEnabled():
-            self._shows.answer(f"🎤 {refusal or button.toolTip()}")
-            return
-        said = button.toolTip()  # read first: the action re-aims the bank
-        act()
-        self._shows.answer(f"🎤 {said}")
-
-    def _on_picture_command(self, command):
-        """A spoken command about the picture on screen: a targeted "fix <part>"
-        (or several parts, or "fix all"), "enhance" for the better version of
-        it, or "genau it" to animate it as a Genau clip.
-
-        A named side takes that region's show — hosted, two shows run at once
-        and neither is the active window, so naming one is the only way to say
-        which picture is meant.  Unnamed, it goes to whichever show is up.
-        Answered out of the show's own note — the speaker is looking at it, not
-        at this pane. Said with no show up, "enhance" falls to the bank button of
-        the same name; the other two have no "on screen" to act on, and the
-        utterance has already been claimed as a command by the time it gets here,
-        so the caption says so rather than letting it vanish."""
-        show = self._shows.surface_for(command.side)
-        if show is None:
-            if command.command == gallery.ENHANCE_COMMAND:
-                # The word names a bank button too, and with no picture filling
-                # the screen the button is what it means — aimed the way a click
-                # aims it, at the picked thumbnails else the folder's unenhanced
-                # images. A refusal here would be a dead end where there is a
-                # perfectly good thing to do.
-                self._press_bank_button(self._enhance_btn, self._enhance_selection)
-                return
-            wants = (_VOICE_WANTS.get(command.command)
-                     or f"a {name_parts(command.command)} fix")
-            self._show_voice_status(
-                f"🎤 {wants} needs a picture on screen", transient=True)
-            return
-        target = show.voice_target()
-        if command.command == gallery.GENAU_COMMAND:
-            prompt_id, message = self._genau_it(target)
-        elif command.command == gallery.ENHANCE_COMMAND:
-            prompt_id, message = self._enhance_it(target)
-        else:
-            prompt_id, message = self._fix_parts(target, command.command)
-        show.note_voice_run(prompt_id, message)
+        return self.enhance_it(prompt_id)[0] is not None
 
     def fill_the_regions(self) -> None:
         """Put a show on each satellite region — what entering origenerator
@@ -4042,7 +3544,7 @@ class GalleryView(QWidget):
         """
         self._shows.close_the_shows()
 
-    def _enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
         """Enhance the picture on screen: the id it launched on (``None`` when it
         didn't) and the line the speaking surface should say.
 
@@ -4063,7 +3565,7 @@ class GalleryView(QWidget):
             return None, "🎤 this one has no file to enhance"
         return self._launch_spoken_enhance(row, params, "enhance", "enhancing…")
 
-    def _fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
         (``None`` when it didn't) and the line the surface should say about it.
 
@@ -4109,138 +3611,9 @@ class GalleryView(QWidget):
             return None, f"🎤 couldn't launch the {what} — see the log"
         return row["prompt_id"], f"🎤 {doing}"
 
-    # --- spoken requests: "Request … over" over whatever is on screen ---------
+    # --- a spoken request's own generation -----------------------------------
 
-    def _on_spoken_request(self, spoken, side: str | None = None):
-        """One step of a spoken request — from the mic's dictation, or from the
-        hosting session's channel with the region it was said to.
-
-        While it is still being said the show holds and the corner says so;
-        finished, it queues a revision of the item it was opened over. The
-        target is taken at the opening step and kept, because a request is about
-        the picture that prompted it, not whatever is up when the words run out.
-
-        Hosted, *side* is what makes "the picture" a picture at all: two shows
-        run at once on the satellite regions and neither is the active window,
-        so the region named is the only thing that says which one the words are
-        about.
-        """
-        show = self._shows.surface_for(side)
-        if self._request_target is None:
-            # Taken at the first step of the request, whichever step that is —
-            # "Request, no hat, over" is a whole one in a single breath.
-            self._request_target = self._voice_request_target(show)
-        if spoken.listening:
-            self._hold_for_request(show, spoken)
-            return
-        target = self._request_target
-        self._request_target = None
-        self._hold_for_request(show, spoken)
-        if spoken.state != COMPLETED:  # given up on — the terminator never came
-            self._answer_request(show, "🎤 request dropped — never heard “over”", spoken)
-            return
-        self._begin_request(target, spoken, side)
-
-    def _voice_request_target(self, show) -> str | None:
-        """What a request just opened is about: the slide filling the screen
-        when a show is up, else the generation picked in the gallery."""
-        if show is not None:
-            return show.voice_target()
-        return self.selected_generation()
-
-    def _hold_for_request(self, show, spoken):
-        """Hold (or release) the show while the sentence is being said, and say
-        so — in the show's own corner when one is up, since that is where the
-        speaker is looking, and in this pane's voice caption otherwise."""
-        note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
-        if show is not None:
-            show.hold_for_request(spoken.listening, note)
-        elif spoken.listening:
-            self._show_voice_status(note or "🎤 Request…", transient=False)
-
-    def _answer_request(self, show, message: str, spoken, *,
-                        working: bool = False):
-        """Say what *spoken* did, where the speaker is looking.
-
-        *working* is the one line that is not an answer but a promise of one, so
-        it is held rather than flashed: the working-out may go to the local LLM,
-        and a surface that empties while the app is still at it says the request
-        was dropped. Only that request's own answer takes the promise down —
-        an answer to another one flashes over it and leaves it standing.
-
-        The promise is made on the surface the speaker was looking at, and taken
-        down on both: a show can open while the pool is still working, and the
-        answer then lands somewhere other than where the promise was made.
-        """
-        if working:
-            self._working_status = "" if show is not None else message
-            self._working_request = spoken
-        elif spoken is self._working_request:
-            promised, self._working_status = self._working_status, ""
-            self._working_request = None
-            if promised and self._voice_status.text() == promised:
-                self._voice_status_revert()  # it was still promising this pane
-        if show is not None:
-            show.note_request(message, spoken, working=working)
-        else:
-            self._show_voice_status(message, transient=not working)
-
-    def _begin_request(self, prompt_id: str | None, spoken, side: str | None = None):
-        """Start working out what a finished request changes.
-
-        The working-out goes to the pool because it may have to ask the local
-        LLM which of the prompt's own terms the speaker meant, and a second of
-        network wait on this thread is a second of frozen slideshow — at the one
-        moment the app must not stutter. Whatever can be answered without that
-        (nothing on screen, a recipe this app can't rebuild) is answered here,
-        so a request that was never going to run doesn't wait on a model.
-
-        The side rides the pool's context so the answer comes back to the same
-        region the request was said to — seconds later, with two shows running,
-        it is the only thing that still says which.
-        """
-        row = self._db.get_generation(prompt_id) if prompt_id else None
-        show = self._shows.surface_for(side)
-        if row is None:
-            self._answer_request(
-                show, "🎤 nothing on screen to request a change to", spoken)
-            return
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        if workflow is None or self._client is None:
-            self._answer_request(
-                show, "🎤 this one can't be re-made, so there's nothing to revise",
-                spoken)
-            return
-        params = filled_params(row, workflow)
-        self._answer_request(show, f"🎤 working out “{spoken.text}”…", spoken,
-                             working=True)
-        QThreadPool.globalInstance().start(ReviseTask(
-            self._revision, (row, workflow, params, spoken, side),
-            params.get("positive_prompt", ""), params.get("negative_prompt", ""),
-            spoken.text,
-        ))
-
-    def _on_request_revised(self, context, revision):
-        """The revision came back from the pool: queue it, and say what it did.
-
-        The show is looked up now rather than remembered, so an answer that took
-        a couple of seconds still lands wherever the speaker is looking — on
-        the region the request named, hosted, since two of them are up.
-        """
-        row, workflow, params, spoken, side = context
-        show = self._shows.surface_for(side)
-        if revision is None:
-            self._answer_request(
-                show, f"🎤 didn't catch what to change in “{spoken.text}”", spoken)
-            return
-        if not revision.changed:
-            self._answer_request(
-                show, f"🎤 “{revision.term}” is already how you asked for it", spoken)
-            return
-        self._answer_request(show, self._queue_request(row, workflow, params,
-                                                       spoken, revision), spoken)
-
-    def _queue_request(self, row, workflow, params, spoken, revision) -> str:
+    def queue_request(self, row, workflow, params, spoken, revision) -> str:
         """Launch the revised generation and record the request under it;
         return the line to say about it.
 
@@ -5171,11 +4544,11 @@ class GalleryView(QWidget):
             for other in self._db.list_generations()
         )
 
-    def _genau_it(self, image_id: str | None) -> tuple[str | None, str]:
+    def genau_it(self, image_id: str | None) -> tuple[str | None, str]:
         """Animate an image as a Genau clip: the act read off its own prompt.
 
         Returns the id it launched on (``None`` when it didn't) and the line the
-        speaking surface should say — the same shape as :meth:`_fix_parts`, because
+        speaking surface should say — the same shape as :meth:`fix_parts`, because
         the speaker is looking at the picture, not at this pane.
 
         Nothing is picked and nothing is dropped: the act comes from the image's

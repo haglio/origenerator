@@ -345,7 +345,7 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     begun = []
-    monkeypatch.setattr(view, "_begin_request",
+    monkeypatch.setattr(view._voice, "_begin_request",
                         lambda target, spoken, side=None: begun.append((spoken.text, side)))
 
     (tmp_path / "origenerator_cmd.txt").write_text(
@@ -369,7 +369,7 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     played = []
     monkeypatch.setattr(view._shows, "play_shelf", played.append)
-    monkeypatch.setattr(view, "_begin_request", lambda *a, **kw: None)
+    monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:request no feet\nPORTRAIT_SAY:favorites\nPORTRAIT_SAY:over\n",

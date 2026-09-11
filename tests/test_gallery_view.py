@@ -25,7 +25,7 @@ from origenerator.config import (
 from origenerator.db import Database
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_actions import GalleryActions
-from origenerator.gui import corner_controls, diff_text, icons
+from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
@@ -4067,8 +4067,8 @@ def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
     params = json.loads(row["params_json"])
     version = row["workflow_version"]
 
-    assert view._folder_key_for(row["workflow_name"], params, version)         == view._folder_key_of(row)
-    assert view._folder_key_for(row["workflow_name"], params)         != view._folder_key_of(row)
+    assert view.folder_key_for(row["workflow_name"], params, version)         == view.folder_key_of(row)
+    assert view.folder_key_for(row["workflow_name"], params)         != view.folder_key_of(row)
 
 
 def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
@@ -8630,7 +8630,7 @@ def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "loop", intent=recipe_match.GENAU)
+    view._combine._generate_combination("img", "loop", intent=recipe_match.GENAU)
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
@@ -8656,7 +8656,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
     gallery_view_module.gallery.cycle_shaped = spy
     try:
-        view._generate_combination("img", "loop", intent=recipe_match.GENAU,
+        view._combine._generate_combination("img", "loop", intent=recipe_match.GENAU,
                                    category="beta")
     finally:
         gallery_view_module.gallery.cycle_shaped = real
@@ -8673,7 +8673,7 @@ def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "loop")
+    view._combine._generate_combination("img", "loop")
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["frame_count"] == wf.default_params()["frame_count"]
@@ -8686,7 +8686,7 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     assert len(view._reroll_jobs) == 1
     job = next(iter(view._reroll_jobs.values()))
@@ -8704,7 +8704,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
 
-    view._open_combination("img", "vid")
+    view._combine._open_combination("img", "vid")
 
     assert view._reroll_jobs == {}                 # opened for editing, not launched
     view._client.submit_job.assert_not_called()
@@ -8724,7 +8724,7 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
     tabs = view._info_tabs
     before = tabs.count()
 
-    view._open_combination("img", "vid")
+    view._combine._open_combination("img", "vid")
 
     assert tabs.count() == before  # no "New generation" left standing beside it
     panel = tabs.current_config_panel()
@@ -8736,9 +8736,9 @@ def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_pa
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
 
-    view._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
+    view._combine._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
 
     assert view._reroll_jobs == {}                 # opened for editing, not launched
     view._client.submit_job.assert_not_called()
@@ -8752,13 +8752,13 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     tabs_before = view._info_tabs.count()
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
 
-    view._open_category("img", "epsilon")
+    view._combine._open_category("img", "epsilon")
 
     assert view._info_tabs.count() == tabs_before  # no recipe to open: no tab forked
     assert shown                                   # but tell the user why
@@ -8771,7 +8771,7 @@ def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.open_requested.emit("img", "vid")
+    view._combine.panel.open_requested.emit("img", "vid")
 
     assert view._reroll_jobs == {}
     config = view._info_tabs.current_config_panel().current_config()
@@ -8799,7 +8799,7 @@ def test_combine_duplicate_declined_submits_nothing(qtbot, tmp_path, monkeypatch
     monkeypatch.setattr(gallery_view_module, "offer_reroll",
                         lambda parent, wf, *, can_reroll_image=False: None)
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     assert view._reroll_jobs == {}                    # declined: nothing submitted
     view._client.submit_job.assert_not_called()
@@ -8815,7 +8815,7 @@ def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeyp
     monkeypatch.setattr(gallery_view_module, "offer_reroll",
                         lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"  # the video runs on the same dropped frame
@@ -8833,7 +8833,7 @@ def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path,
     monkeypatch.setattr(gallery_view_module, "offer_reroll",
                         lambda parent, wf, *, can_reroll_image=False: REROLL_IMAGE)
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     # The dropped image is re-drawn first — the tracked job is its SDXL re-roll,
     # not the video — so a fresh frame precedes the (seed-kept) video.
@@ -9149,7 +9149,7 @@ def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vx")  # can't rebuild "mystery"
+    view._combine._generate_combination("img", "vx")  # can't rebuild "mystery"
 
     assert view._reroll_jobs == {}
     view._client.submit_job.assert_not_called()
@@ -9162,7 +9162,7 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     assert view._reroll_jobs == {}
 
@@ -9180,9 +9180,9 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
                     ids=[c.get("prompt_id") for c in candidates])
         return "vid"  # the recipe whose starting scene fits this image
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", fake_smart)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", fake_smart)
 
-    view._generate_category("img", "alpha")
+    view._combine.generate_category("img", "alpha")
 
     assert seen["category"] == "alpha"
     assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
@@ -9199,7 +9199,7 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     called = {}
 
     def fake_best(category, candidates, intent=recipe_match.PLAYERS):
@@ -9207,9 +9207,9 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
         called["intent"] = intent
         return "vid"
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", fake_best)
+    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe", fake_best)
 
-    view._generate_category("img", "alpha")
+    view._combine.generate_category("img", "alpha")
 
     assert called["category"] == "alpha"   # model unavailable → the act's most-used recipe
     job = next(iter(view._reroll_jobs.values()))
@@ -9223,9 +9223,9 @@ def test_category_launches_a_real_recipe_via_the_fallback(qtbot, tmp_path, monke
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
 
-    view._generate_category("img", "dancing")
+    view._combine.generate_category("img", "dancing")
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
@@ -9239,7 +9239,7 @@ def test_refresh_greys_out_the_acts_with_no_video_to_mine(qtbot, tmp_path):
 
     view.refresh()
 
-    combo = view._combine._category
+    combo = view._combine.panel._category
     enabled = {combo.itemText(i) for i in range(1, combo.count())
                if combo.model().item(i).isEnabled()}
     # "dancing" has a video to mine; "gamma" needs none — the example overlay
@@ -9255,10 +9255,10 @@ def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_pat
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe",
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
 
-    view._generate_category("img", "gamma")
+    view._combine.generate_category("img", "gamma")
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
@@ -9278,9 +9278,9 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     qtbot.addWidget(view)
     view.refresh()
     deferred = []
-    monkeypatch.setattr(view, "_after_painting", deferred.append)
+    monkeypatch.setattr(view._combine, "_after_painting", deferred.append)
 
-    view._combine_generate("img", "vid")
+    view._combine._on_generate("img", "vid")
 
     row, = view._queue.rows()
     assert row._note_text == "Starting…"
@@ -9298,9 +9298,9 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view, "_after_painting", lambda work: None)
+    monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine_generate_category("img", "dancing", recipe_match.PLAYERS)
+    view._combine._on_generate_category("img", "dancing", recipe_match.PLAYERS)
 
     item = view._queue._items[0]
     assert item.recipe_category == "dancing"
@@ -9315,9 +9315,9 @@ def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypat
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view, "_after_painting", lambda work: None)
+    monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine_generate("img", "vid")
+    view._combine._on_generate("img", "vid")
 
     item = view._queue._items[0]
     assert item.recipe_thumbnail == "thumbs/vid.jpg"
@@ -9330,10 +9330,10 @@ def test_the_stand_in_row_goes_when_the_act_has_no_recipe(qtbot, tmp_path, monke
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
-    view._combine_generate_category("img", "epsilon", recipe_match.PLAYERS)
+    view._combine._on_generate_category("img", "epsilon", recipe_match.PLAYERS)
 
     assert view._queue.rows() == []
     assert view._reroll_jobs == {}
@@ -9345,7 +9345,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine_generate_category("missing", "dancing", recipe_match.PLAYERS)
+    view._combine._on_generate_category("missing", "dancing", recipe_match.PLAYERS)
 
     assert view._queue.rows() == []
 
@@ -9366,7 +9366,7 @@ def test_a_dropped_recipe_names_the_video_it_came_from(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     row = _launched_row(view)
     assert row["recipe_video_id"] == "vid"
@@ -9377,9 +9377,9 @@ def test_a_picked_act_is_recorded_with_the_recipe_it_resolved_to(qtbot, tmp_path
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
 
-    view._generate_category("img", "dancing")
+    view._combine.generate_category("img", "dancing")
 
     row = _launched_row(view)
     assert row["recipe_category"] == "dancing"
@@ -9393,7 +9393,7 @@ def test_a_curated_act_records_the_act_with_no_video_behind_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_category("img", "gamma")
+    view._combine.generate_category("img", "gamma")
 
     row = _launched_row(view)
     assert row["recipe_category"] == "gamma"
@@ -9405,7 +9405,7 @@ def test_open_in_generator_marks_the_tab_with_where_the_recipe_came_from(qtbot, 
     qtbot.addWidget(view)
     view.refresh()
 
-    view._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid", "dancing")
 
     assert _front_panel(view).recipe_source() == ("dancing", "vid")
 
@@ -9416,8 +9416,8 @@ def test_a_generate_from_an_opened_combination_still_says_what_it_is(qtbot, tmp_
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
-    view._open_category("img", "dancing")
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
+    view._combine._open_category("img", "dancing")
     panel = _front_panel(view)
     panel._param_form.set_values({"positive_prompt": "edited before running"})
 
@@ -9433,7 +9433,7 @@ def test_a_tab_pointed_at_another_generation_drops_the_recipe_mark(qtbot, tmp_pa
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid", "dancing")
     panel = _front_panel(view)
 
     panel.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
@@ -9447,7 +9447,7 @@ def test_a_tab_switched_to_another_workflow_drops_the_recipe_mark(qtbot, tmp_pat
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid", "dancing")
     panel = _front_panel(view)
 
     panel.prefill("sdxl_t2i", _SDXL.default_params())
@@ -9463,7 +9463,7 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
 
-    view._open_combination("img", "vid", "dancing")
+    view._combine._open_combination("img", "vid", "dancing")
 
     preview = _front_panel(view)._preview
     assert preview._stack.currentWidget() is preview._combination
@@ -9474,13 +9474,13 @@ def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypat
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe",
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("curated act must not mine")))
     opened = []
     monkeypatch.setattr(view._info_tabs, "open_config",
                         lambda name, params: opened.append((name, params)))
 
-    view._open_category("img", "gamma")
+    view._combine._open_category("img", "gamma")
 
     (name, params), = opened
     assert name == "wan22_i2v"
@@ -9493,12 +9493,12 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     shown = []
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
                         lambda *a, **k: shown.append(a))
 
-    view._generate_category("img", "epsilon")
+    view._combine.generate_category("img", "epsilon")
 
     assert view._reroll_jobs == {}            # nothing to reuse: launch nothing
     view._client.submit_job.assert_not_called()
@@ -10329,7 +10329,7 @@ def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     assert view._browser.showing_recents()  # brand-new folder: watch it cook on the shelf
     prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
@@ -10354,7 +10354,7 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._generate_combination("img", "vid")
+    view._combine._generate_combination("img", "vid")
 
     expected = view._leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
     assert not view._browser.showing_recents()
@@ -10367,20 +10367,20 @@ def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._combine_accepts_image("img") is True
-    assert view._combine_accepts_image("vid") is False   # a video isn't a start frame
-    assert view._combine_accepts_video("vid") is True
-    assert view._combine_accepts_video("img") is False   # an image isn't an i2v recipe
+    assert view._combine._accepts_image("img") is True
+    assert view._combine._accepts_image("vid") is False   # a video isn't a start frame
+    assert view._combine._accepts_video("vid") is True
+    assert view._combine._accepts_video("img") is False   # an image isn't an i2v recipe
 
 
 def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._combine.image_slot.set_item("img")
-    view._combine.video_slot.set_item("vid")
+    view._combine.panel.image_slot.set_item("img")
+    view._combine.panel.video_slot.set_item("vid")
 
-    view._combine._generate_btn.click()  # the panel's button, wired to the view
+    view._combine.panel._generate_btn.click()  # the panel's button, wired to the view
 
     assert len(view._reroll_jobs) == 1
     job = next(iter(view._reroll_jobs.values()))
@@ -10410,8 +10410,8 @@ def _pick_lane(panel, intent):
 
 def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     view = _combine_view(qtbot, tmp_path)
-    view._combine.image_slot.set_item("img")
-    view._combine.video_slot.set_item("vid")
+    view._combine.panel.image_slot.set_item("img")
+    view._combine.panel.video_slot.set_item("vid")
 
     assert view.combine_selection() == {
         "image": "img", "video": "vid",
@@ -10423,9 +10423,9 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     # All four are choices the user made, and none is recoverable from the
     # others: an act says nothing about which lane answers it.
     view = _combine_view(qtbot, tmp_path)
-    view._combine.image_slot.set_item("img")
-    _pick_lane(view._combine, recipe_match.GENAU)
-    _pick_act(view._combine, "beta")
+    view._combine.panel.image_slot.set_item("img")
+    _pick_lane(view._combine.panel, recipe_match.GENAU)
+    _pick_act(view._combine.panel, "beta")
 
     assert view.combine_selection() == {
         "image": "img", "video": None,
@@ -10438,8 +10438,8 @@ def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
 
     view.restore_combine_selection({"image": "img", "video": "vid"})
 
-    assert view._combine.image_slot.current_id() == "img"
-    assert view._combine.video_slot.current_id() == "vid"
+    assert view._combine.panel.image_slot.current_id() == "img"
+    assert view._combine.panel.video_slot.current_id() == "vid"
 
 
 def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
@@ -10448,9 +10448,9 @@ def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
     view.restore_combine_selection(
         {"image": "img", "intent": recipe_match.GENAU, "category": "beta"})
 
-    assert view._combine.selected_intent() == recipe_match.GENAU
-    assert view._combine.selected_category() == "beta"
-    assert view._combine._generate_btn.isEnabled()  # an image and a recipe: ready
+    assert view._combine.panel.selected_intent() == recipe_match.GENAU
+    assert view._combine.panel.selected_category() == "beta"
+    assert view._combine.panel._generate_btn.isEnabled()  # an image and a recipe: ready
 
 
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
@@ -10463,8 +10463,8 @@ def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
     view.restore_combine_selection(
         {"image": "img", "intent": recipe_match.GENAU, "category": "dancing"})
 
-    assert view._combine.selected_intent() == recipe_match.GENAU
-    assert view._combine.selected_category() == ""
+    assert view._combine.panel.selected_intent() == recipe_match.GENAU
+    assert view._combine.panel.selected_category() == ""
 
 
 def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
@@ -10473,8 +10473,8 @@ def test_restore_combine_selection_reads_the_two_item_list_older_sessions_wrote(
 
     view.restore_combine_selection(["img", "vid"])
 
-    assert view._combine.image_slot.current_id() == "img"
-    assert view._combine.video_slot.current_id() == "vid"
+    assert view._combine.panel.image_slot.current_id() == "img"
+    assert view._combine.panel.video_slot.current_id() == "vid"
 
 
 def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_path):
@@ -10483,8 +10483,8 @@ def test_restore_combine_selection_skips_gone_or_mismatched_items(qtbot, tmp_pat
     # image slot given a deleted id; video slot given an image (wrong kind)
     view.restore_combine_selection({"image": "ghost", "video": "img"})
 
-    assert view._combine.image_slot.current_id() is None   # "ghost" no longer exists
-    assert view._combine.video_slot.current_id() is None   # "img" isn't an i2v recipe
+    assert view._combine.panel.image_slot.current_id() is None   # "ghost" no longer exists
+    assert view._combine.panel.video_slot.current_id() is None   # "img" isn't an i2v recipe
 
 
 def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
@@ -10508,11 +10508,11 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
     view._browser._wire_drag(tw)
 
     tw.drag_started.emit("vid")  # the drag begins — before reaching any slot
-    assert view._combine.video_slot._label.property("dragActive") is True
-    assert view._combine.image_slot._label.property("dragActive") is False
+    assert view._combine.panel.video_slot._label.property("dragActive") is True
+    assert view._combine.panel.image_slot._label.property("dragActive") is False
 
     tw.drag_ended.emit()
-    assert view._combine.video_slot._label.property("dragActive") is False
+    assert view._combine.panel.video_slot._label.property("dragActive") is False
 
 
 def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
@@ -10523,11 +10523,11 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
     panel = view._info_tabs.current_config_panel()
 
     panel.preview_drag_started.emit("vid")  # the drag begins — before reaching a slot
-    assert view._combine.video_slot._label.property("dragActive") is True
-    assert view._combine.image_slot._label.property("dragActive") is False
+    assert view._combine.panel.video_slot._label.property("dragActive") is True
+    assert view._combine.panel.image_slot._label.property("dragActive") is False
 
     panel.preview_drag_ended.emit()
-    assert view._combine.video_slot._label.property("dragActive") is False
+    assert view._combine.panel.video_slot._label.property("dragActive") is False
 
 
 # --- Drive OSR2: one global toggle, following whatever video is in front ----
@@ -12630,14 +12630,14 @@ def _genau_view(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_genau_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     return view
 
 
 def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    view._generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
     job = next(iter(view._reroll_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
@@ -12653,10 +12653,10 @@ def test_the_view_asks_the_players_lane_unless_told_otherwise(qtbot, tmp_path, m
         asked.append(intent)
         return "vid"
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe", spy)
+    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe", spy)
 
-    view._generate_category("img", "dancing")
-    view._generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "dancing")
+    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
     assert asked == [recipe_match.PLAYERS, recipe_match.GENAU]
 
@@ -12670,7 +12670,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     sent = []
     monkeypatch.setattr(evolver_export, "export_video", lambda src, dest: sent.append(src))
 
-    view._generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
     job = next(iter(view._reroll_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
@@ -12773,7 +12773,7 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -12784,7 +12784,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     # there is no row yet to notice it by.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     thinking = []
-    monkeypatch.setattr(view, "_run_off_thread",
+    monkeypatch.setattr(view, "off_thread",
                         lambda work, done: thinking.append((work, done)))
     surface = _VoiceSurface("img_act")
     view._shows._slideshow = surface
@@ -12792,7 +12792,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
     assert len(thinking) == 1
     work, done = thinking[0]
     done(work())  # the match comes back, and the one run it was for goes out
@@ -12803,13 +12803,13 @@ def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, mo
     # A match that found nothing leaves nothing to wait for, so the picture must
     # not stay held — asking again is the whole point once a loop exists.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    monkeypatch.setattr(gallery_view_module.recipe_match, "best_recipe",
+    monkeypatch.setattr(combine_controller.recipe_match, "best_recipe",
                         lambda *a, **k: None)
     view._shows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert view._genau_resolving == set()
+    assert view._combine._genau_resolving == set()
 
 
 def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
@@ -12827,7 +12827,7 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, gallery_view_module.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -12855,7 +12855,7 @@ def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monke
     asked = []
     monkeypatch.setattr(gallery_view_module, "offer_reroll",
                         lambda *a, **k: asked.append(a) or None)
-    monkeypatch.setattr(view, "_would_reproduce_a_completed_run", lambda *a: True)
+    monkeypatch.setattr(view, "would_reproduce_a_completed_run", lambda *a: True)
     surface = _VoiceSurface("img_act")
     notes = []
     surface.note_voice_run = lambda prompt_id, message: notes.append((prompt_id, message))
@@ -12864,7 +12864,7 @@ def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monke
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert asked == []
-    assert (None, gallery_view_module.ALREADY_GENAUD) in notes
+    assert (None, combine_controller.ALREADY_GENAUD) in notes
     assert _spoken_genau_rows(view) == []
 
 
@@ -12873,7 +12873,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # Only a spoken one is stamped, and only a spoken one can be said again into
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    view._generate_category("img_act", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img_act", "dancing", recipe_match.GENAU)
     view._shows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
@@ -13014,7 +13014,7 @@ def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypat
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (clip, "video"))
     sent = []
-    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
+    monkeypatch.setattr(combine_controller.evolver_export, "export_video",
                         lambda src, dest: sent.append((src, dest)) or dest / src.name)
 
     view._on_reroll_finished("k", "loop")
@@ -13030,7 +13030,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
     sent = []
-    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video",
+    monkeypatch.setattr(combine_controller.evolver_export, "export_video",
                         lambda src, dest: sent.append(src))
 
     view._on_reroll_finished("k", "loop")
@@ -13049,7 +13049,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     def boom(src, dest):
         raise OSError("the inbox is not there")
 
-    monkeypatch.setattr(gallery_view_module.evolver_export, "export_video", boom)
+    monkeypatch.setattr(combine_controller.evolver_export, "export_video", boom)
 
     view._on_reroll_finished("k", "loop")  # must not raise
 
@@ -13078,9 +13078,9 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     def slow_match(*a, **k):
         asked_on["thread"] = threading.current_thread().name
 
-    monkeypatch.setattr(gallery_view_module.recipe_match, "smart_recipe", slow_match)
+    monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", slow_match)
 
-    view._generate_category("img", "dancing", recipe_match.GENAU)
+    view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
     qtbot.waitUntil(lambda: bool(view._reroll_jobs), timeout=5000)
     assert asked_on["thread"] != threading.main_thread().name

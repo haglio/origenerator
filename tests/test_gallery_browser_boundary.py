@@ -101,8 +101,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     new ones for what the shows ask that had no name of its own. 341 -> 318:
     everything spoken came out as `VoiceRouter` -- the microphone, the caption,
     and where each word lands -- twenty-five methods out and two in, the bank it
-    presses now bound to it by keyword rather than looked up by name.)"""
+    presses now bound to it by keyword rather than looked up by name. 318 -> 291:
+    the combine came out as `CombineController`, owning the panel it used to be
+    handed -- thirty-five methods out, eight in, and the spoken "genau it" going
+    with the act it asks for rather than staying with the words.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 318
+               for x in _class_def(VIEW, "GalleryView").body) == 291
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

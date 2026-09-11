@@ -728,8 +728,8 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     _seed_combine_db(tmp_path)
     win = _window(qtbot, tmp_path, AppState(path))
-    win._gallery_view._combine.image_slot.set_item("img")
-    win._gallery_view._combine.video_slot.set_item("vid")
+    win._gallery_view._combine.panel.image_slot.set_item("img")
+    win._gallery_view._combine.panel.video_slot.set_item("vid")
 
     win.close()
 
@@ -744,8 +744,8 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
+    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
 
 
 def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
@@ -758,8 +758,8 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.image_slot.current_id() == "img"
-    assert win._gallery_view._combine.video_slot.current_id() == "vid"
+    assert win._gallery_view._combine.panel.image_slot.current_id() == "img"
+    assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
@@ -769,14 +769,14 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.image_slot.set_item("img")
-    first._gallery_view._combine.video_slot.set_item("vid")
-    first._gallery_view._combine._genau_radio.setChecked(True)  # as a click does
+    first._gallery_view._combine.panel.image_slot.set_item("img")
+    first._gallery_view._combine.panel.video_slot.set_item("vid")
+    first._gallery_view._combine.panel._genau_radio.setChecked(True)  # as a click does
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    combine = reopened._gallery_view._combine
+    combine = reopened._gallery_view._combine.panel
     assert combine.image_slot.current_id() == "img"
     assert combine.video_slot.current_id() == "vid"
     assert combine.selected_intent() == recipe_match.GENAU

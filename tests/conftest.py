@@ -436,13 +436,15 @@ def _recipe_match_runs_inline(request, monkeypatch):
     """
     if request.node.get_closest_marker("real_thread_hop"):
         return
+    from origenerator.gui.combine_controller import CombineController
     from origenerator.gui.gallery_view import GalleryView
 
-    monkeypatch.setattr(GalleryView, "_run_off_thread",
+    monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
     # The same deal for the beat the combine's Generate waits out so its stand-in
     # queue row reaches the screen before the launch blocks the thread.
-    monkeypatch.setattr(GalleryView, "_after_painting", lambda self, work: work())
+    monkeypatch.setattr(CombineController, "_after_painting",
+                        lambda self, work: work())
 
 
 @pytest.fixture(autouse=True)

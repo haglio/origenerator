@@ -633,15 +633,19 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     # A show holds still for the sentence, but the words take seconds and the
     # item on screen when they end is not necessarily the one they were about.
     show = FakeShow(target="g1")
-    voice, host, _shows = router(shows=FakeShows(showing=show),
-                                 db=FakeDB([_row("g1")]))
+    voice, _host, _shows = router(shows=FakeShows(showing=show),
+                                  db=FakeDB([_row("g1")]))
+    begun = []
+    # The working-out itself goes to a pool thread, whose answer would land
+    # whenever it landed; what this is about is which picture it is begun on.
+    voice._begin_request = lambda prompt_id, spoken, side=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
     show.target = "g2"
 
     voice.on_spoken_request(Spoken("no hat"))
 
+    assert begun == ["g1"]
     assert voice._request_target is None
-    assert show.requests[-1][1] is True  # a promise, on g1's own recipe
 
 
 def test_a_request_with_no_show_up_is_about_the_picked_generation(router):

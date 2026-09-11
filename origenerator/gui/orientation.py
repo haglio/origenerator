@@ -44,12 +44,16 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
-from origenerator.workflows.derived_size import resolve_input_image_path
 
-PORTRAIT = "portrait"
-LANDSCAPE = "landscape"
-ORIENTATIONS = (PORTRAIT, LANDSCAPE)
-ORIENTATION_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape"}
+# ORIENTATION_LABELS is re-exported for the gallery window, which still
+# imports it from here; every other reader takes it from sides directly.
+from origenerator.gallery.sides import (  # noqa: F401
+    LANDSCAPE,
+    ORIENTATION_LABELS,
+    ORIENTATIONS,
+    PORTRAIT,
+)
+from origenerator.workflows.derived_size import resolve_input_image_path
 
 _SEPARATOR = "::"
 

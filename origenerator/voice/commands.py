@@ -23,8 +23,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from origenerator.gallery.voice_commands import command_bias, match_command
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL,
     RECENTS_KEY,
@@ -36,7 +35,8 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY,
     TRASH_LABEL,
 )
-from origenerator.gui.orientation import LANDSCAPE, PORTRAIT
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.voice_commands import command_bias, match_command
 from origenerator.voice.show_commands import (
     ShowCommand,
     match_show_command,

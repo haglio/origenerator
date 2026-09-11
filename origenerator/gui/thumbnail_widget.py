@@ -22,7 +22,7 @@ from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import progress_status_label
+from origenerator.timing import RunTiming
 
 _IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
 _BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
@@ -283,8 +283,8 @@ class ThumbnailWidget(QWidget):
         elapsed = (None if run.started_at is None
                    else max(0.0, time.time() - run.started_at))
         self._enhancing_bar.show_progress(
-            progress_status_label(elapsed, run.progress, run.typical_seconds,
-                                  step=run.stage, compact=True),
+            RunTiming(elapsed, run.progress, run.typical_seconds).status_label(
+                step=run.stage, compact=True),
             run.progress if run.status == "running" else None,
             run.pass_progress if run.status == "running" else None,
         )

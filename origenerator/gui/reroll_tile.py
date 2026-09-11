@@ -29,7 +29,7 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import progress_status_label
+from origenerator.timing import RunTiming
 
 # The dashed resting outline and the solid selected border are the family look every
 # non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
@@ -189,8 +189,8 @@ class RerollTile(QFrame):
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has
             # the room for the elapsed count too.
-            progress_status_label(elapsed, progress, self._typical_seconds,
-                                  step=self._job.last_stage, compact=True),
+            RunTiming(elapsed, progress, self._typical_seconds).status_label(
+                step=self._job.last_stage, compact=True),
             progress if self._job.state == "running" else None,
             (self._job.last_pass_progress
              if self._job.state == "running" else None),

@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from origenerator.timing import (
+    RunProgress,
+    RunTiming,
     average_label,
     average_seconds,
     clock_duration,
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
-    percent_label,
-    progress_status_label,
-    progress_time_label,
     queue_estimate_label,
-    remaining_label,
-    remaining_seconds,
 )
 
 
@@ -105,23 +102,23 @@ def test_clock_duration_floors_a_negative_at_zero():
 
 def test_remaining_counts_down_from_the_typical_time():
     # Early on, before the run's own pace is worth reading: 724s typical, 100s in.
-    assert remaining_seconds(100.0, (1, 20), 724.0) == 624.0
+    assert RunTiming(100.0, (1, 20), 724.0).remaining_seconds() == 624.0
 
 
 def test_remaining_ignores_the_pace_of_the_first_few_steps():
     # Step one carries the model load, so extrapolating from it would predict a
     # run several times longer than the real one. Only the typical time counts here.
-    assert remaining_seconds(60.0, (1, 20), 700.0) == 640.0
+    assert RunTiming(60.0, (1, 20), 700.0).remaining_seconds() == 640.0
 
 
 def test_remaining_follows_a_run_going_slower_than_usual():
     # 15 of 20 steps in 900s: 300s left by its own pace, while the typical time
     # has already run out. The pace is what's left to believe.
-    assert remaining_seconds(900.0, (15, 20), 724.0) == 300.0
+    assert RunTiming(900.0, (15, 20), 724.0).remaining_seconds() == 300.0
 
 
 def test_remaining_uses_the_pace_alone_with_no_history():
-    assert remaining_seconds(200.0, (10, 20), None) == 200.0
+    assert RunTiming(200.0, (10, 20), None).remaining_seconds() == 200.0
 
 
 def test_remaining_hands_over_to_the_pace_as_the_run_settles():
@@ -131,24 +128,24 @@ def test_remaining_hands_over_to_the_pace_as_the_run_settles():
     # half-way between the two; by the last steps the run's own pace is what
     # decides, so a run faster than its median stops finishing with minutes still
     # on its clock.
-    assert remaining_seconds(90.0, (10, 20), 724.0) == 362.0        # 452 projected
-    assert round(remaining_seconds(180.0, (18, 20), 724.0)) == 72   # 252 projected
-    assert remaining_seconds(200.0, (20, 20), 724.0) == 0.0         # 200: the pace
+    assert RunTiming(90.0, (10, 20), 724.0).remaining_seconds() == 362.0        # 452 projected
+    assert round(RunTiming(180.0, (18, 20), 724.0).remaining_seconds()) == 72   # 252 projected
+    assert RunTiming(200.0, (20, 20), 724.0).remaining_seconds() == 0.0         # 200: the pace
 
 
 def test_remaining_is_zero_through_a_tail_that_reports_no_steps():
     # Every step ComfyUI reports is done and the job is still saving its output.
     # Nothing measures that tail, so the honest reading is zero — which the label
     # says as "finishing" — not the typical time's guess at how long it runs.
-    assert remaining_seconds(600.0, (20, 20), 724.0) == 0.0
+    assert RunTiming(600.0, (20, 20), 724.0).remaining_seconds() == 0.0
 
 
 def test_remaining_is_zero_not_none_once_a_run_is_over_its_time():
-    assert remaining_seconds(900.0, (20, 20), 724.0) == 0.0
+    assert RunTiming(900.0, (20, 20), 724.0).remaining_seconds() == 0.0
 
 
 def test_remaining_is_none_with_nothing_to_go_on():
-    assert remaining_seconds(30.0, None, None) is None
+    assert RunTiming(30.0, None, None).remaining_seconds() is None
 
 
 def test_a_run_past_its_prior_with_no_pace_yet_says_nothing_rather_than_finishing():
@@ -156,31 +153,31 @@ def test_a_run_past_its_prior_with_no_pace_yet_says_nothing_rather_than_finishin
     # prior long before a quarter of it is done, and "finishing" is what the
     # countdown said for the whole middle of it. Nothing has measured how much
     # longer it has, so nothing is what there is to say.
-    assert remaining_seconds(900.0, (1, 20), 724.0) is None
-    assert remaining_label(900.0, (1, 20), 724.0) == ""
-    assert progress_status_label(900.0, (1, 20), 724.0) == "5% · 15:00 elapsed"
+    assert RunTiming(900.0, (1, 20), 724.0).remaining_seconds() is None
+    assert RunTiming(900.0, (1, 20), 724.0).remaining_label() == ""
+    assert RunTiming(900.0, (1, 20), 724.0).status_label() == "5% · 15:00 elapsed"
 
 
-def test_progress_time_label_reads_elapsed_and_left():
+def test_the_live_line_reads_elapsed_and_left():
     # Half the steps done in 83s: the run's own pace is on course for 166s, the
     # workflow's median for 724s, and half-way through the estimate splits them.
-    assert progress_time_label(83.0, (10, 20), 724.0) == "1:23 elapsed · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).time_label() == "1:23 elapsed · ~6:02 left"
 
 
 def test_progress_time_label_is_elapsed_alone_with_no_estimate():
-    assert progress_time_label(83.0, None, None) == "1:23 elapsed"
+    assert RunTiming(83.0, None, None).time_label() == "1:23 elapsed"
 
 
 def test_progress_time_label_says_finishing_rather_than_zero():
     # A run past its usual time with no steps left to pace off: "0:00 left" would
     # read as stuck, and a negative number as broken.
-    assert progress_time_label(900.0, (20, 20), 724.0) == "15:00 elapsed · finishing"
+    assert RunTiming(900.0, (20, 20), 724.0).time_label() == "15:00 elapsed · finishing"
 
 
 def test_progress_time_label_is_empty_before_a_job_starts():
     # A queued job has no elapsed time; a zero counting up beside an unmoved bar
     # would say it was running.
-    assert progress_time_label(None, None, 724.0) == ""
+    assert RunTiming(None, None, 724.0).time_label() == ""
 
 
 def test_a_queued_jobs_estimate_rounds_to_one_unit():
@@ -196,24 +193,24 @@ def test_an_untimed_workflow_admits_it_rather_than_guess():
     assert queue_estimate_label(None) == "~?"
 
 
-def test_percent_label_rounds_down_to_a_whole_percent():
-    assert percent_label((10, 20)) == "50%"
-    assert percent_label((1, 3)) == "33%"
-    assert percent_label((20, 20)) == "100%"
+def test_the_percent_reading_rounds_down_to_a_whole_percent():
+    assert RunProgress(10, 20).percent_label == "50%"
+    assert RunProgress(1, 3).percent_label == "33%"
+    assert RunProgress(20, 20).percent_label == "100%"
 
 
-def test_percent_label_is_empty_with_nothing_to_read_it_off():
+def test_the_percent_reading_is_empty_with_nothing_to_read_it_off():
     # A workflow reporting no step counts, or a job before its first tick: "0%"
     # would be a reading, and there isn't one.
-    assert percent_label(None) == ""
-    assert percent_label((0, 0)) == ""
+    assert RunTiming(None, None, None).status_label() == ""
+    assert RunProgress(0, 0).percent_label == ""
 
 
 def test_progress_status_label_leads_with_how_far_along_it_is():
     # The one line every in-flight surface writes across its bar — the strip's
     # queue, the shelf's cards, a folder's re-roll tile — so one run reads the
     # same wherever it is being watched.
-    assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label() == "50% · 1:23 elapsed · ~6:02 left"
 
 
 def test_the_line_leads_with_the_step_being_taken():
@@ -222,39 +219,39 @@ def test_the_line_leads_with_the_step_being_taken():
     # is the part that says what is happening — and because a caption too wide
     # for its bar elides from the right, so the name has to be leftmost to
     # survive on a tile.
-    assert progress_status_label(83.0, (10, 20), 724.0, step="High noise") ==         "High noise · 50% · 1:23 elapsed · ~6:02 left"
-    assert progress_status_label(83.0, (10, 20), 724.0, step="Audio", compact=True) ==         "Audio · 50% · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="High noise") ==         "High noise · 50% · 1:23 elapsed · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="Audio", compact=True) ==         "Audio · 50% · ~6:02 left"
 
 
 def test_a_run_with_no_step_to_name_reads_as_it_did():
     # A single-pass job has no band and so no name; its line is unchanged.
-    assert progress_status_label(83.0, (10, 20), 724.0) == "50% · 1:23 elapsed · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label() == "50% · 1:23 elapsed · ~6:02 left"
 
 
 def test_the_step_is_what_a_run_past_its_prior_has_left_to_say():
     # The two halves together: the countdown falls silent where nothing has
     # measured how much longer, and the step name is what fills that gap rather
     # than the "finishing" that used to sit there for minutes at a time.
-    assert progress_status_label(900.0, (1, 20), 724.0, step="High noise") ==         "High noise · 5% · 15:00 elapsed"
+    assert RunTiming(900.0, (1, 20), 724.0).status_label(step="High noise") ==         "High noise · 5% · 15:00 elapsed"
 
 
 def test_progress_status_label_drops_whichever_half_is_unknown():
-    assert progress_status_label(83.0, None, None) == "1:23 elapsed"   # no steps reported
-    assert progress_status_label(None, (10, 20), 724.0) == "50%"       # not started yet
-    assert progress_status_label(None, None, 724.0) == ""              # neither
+    assert RunTiming(83.0, None, None).status_label() == "1:23 elapsed"   # no steps reported
+    assert RunTiming(None, (10, 20), 724.0).status_label() == "50%"       # not started yet
+    assert RunTiming(None, None, 724.0).status_label() == ""              # neither
 
 
 def test_the_compact_line_keeps_how_far_along_and_how_much_longer():
     # A gallery tile is a third of the strip's width, and the full line runs half
     # again wider than the tile at the app's own font — so a tile carrying it
     # would elide the countdown away on exactly the long runs worth counting down.
-    assert progress_status_label(83.0, (10, 20), 724.0, compact=True) == "50% · ~6:02 left"
-    assert progress_status_label(900.0, (20, 20), 724.0, compact=True) == "100% · finishing"
-    assert progress_status_label(83.0, None, None, compact=True) == ""
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(compact=True) == "50% · ~6:02 left"
+    assert RunTiming(900.0, (20, 20), 724.0).status_label(compact=True) == "100% · finishing"
+    assert RunTiming(83.0, None, None).status_label(compact=True) == ""
 
 
 def test_remaining_label_is_the_countdown_on_its_own():
-    assert remaining_label(83.0, (10, 20), 724.0) == "~6:02 left"
-    assert remaining_label(900.0, (20, 20), 724.0) == "finishing"
-    assert remaining_label(83.0, None, None) == ""   # nothing to count down from
-    assert remaining_label(None, (10, 20), 724.0) == ""  # not started yet
+    assert RunTiming(83.0, (10, 20), 724.0).remaining_label() == "~6:02 left"
+    assert RunTiming(900.0, (20, 20), 724.0).remaining_label() == "finishing"
+    assert RunTiming(83.0, None, None).remaining_label() == ""   # nothing to count down from
+    assert RunTiming(None, (10, 20), 724.0).remaining_label() == ""  # not started yet

@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.gui import icons
+from origenerator.gui import icons, palette
 
 
 class FolderTile(QFrame):
@@ -37,8 +37,9 @@ class FolderTile(QFrame):
         # A breadcrumb line (used by the Starred shelf) needs a little more height.
         self.setFixedSize(180, 216 if context else 200)
         self.setStyleSheet(
-            "#folderTile { border: 1px solid #3f3f3f; border-radius: 4px; }"
-            "#folderTile:hover { border-color: #6f6f6f; }"
+            f"#folderTile {{ border: 1px solid {palette.CARD_BORDER};"
+            " border-radius: 4px; }"
+            f"#folderTile:hover {{ border-color: {palette.CARD_HOVER_BORDER}; }}"
         )
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
@@ -102,7 +103,8 @@ class FolderTile(QFrame):
         if not previews:
             placeholder = QLabel("empty")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setStyleSheet("color: #6a6a6a; background: #2a2a2a; border-radius: 2px;")
+            placeholder.setStyleSheet(
+                f"color: #6a6a6a; background: {palette.EMPTY_PLATE}; border-radius: 2px;")
             placeholder.setFixedSize(166, 144)
             grid.addWidget(placeholder, 0, 0)
             return collage
@@ -110,7 +112,8 @@ class FolderTile(QFrame):
             cell = QLabel()
             cell.setFixedSize(82, 71)
             cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cell.setStyleSheet("background: #2a2a2a; border-radius: 2px;")
+            cell.setStyleSheet(
+                f"background: {palette.EMPTY_PLATE}; border-radius: 2px;")
             if idx < len(previews):
                 pm = QPixmap(str(previews[idx]))
                 if not pm.isNull():

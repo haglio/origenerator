@@ -28,7 +28,7 @@ from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from origenerator.gui import grid_card
+from origenerator.gui import grid_card, palette
 from origenerator.gui.blurred import blurred_backdrop
 from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
@@ -39,7 +39,7 @@ from origenerator.timing import RunTiming
 _IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
 # A blue "in progress" edge, distinct from a resting tile's.
-_BORDER = f"{_BORDER_PX}px solid #3080e0"
+_BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
 _BAR_HEIGHT = 26  # the bar laid along the frame's foot, the way a player's is
 # How often the card re-reads the clock. Its own timer rather than the gallery's
 # 1.5s poll, which would make a seconds count skip every other tick.

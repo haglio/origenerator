@@ -7,7 +7,7 @@ from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
-from origenerator.gui import grid_card
+from origenerator.gui import grid_card, palette
 from origenerator.gui.corner_controls import (
     CHIP_CSS,
     CORNER_GAP,
@@ -46,10 +46,10 @@ _CORNER_BUTTON_CSS = (
 #     paints them opaque and the fill only peeks through the 4px margin as a
 #     frame (which is what an earlier attempt did).
 # The image also lightens its resting border a touch when selected.
-_SELECTED_BG = "#3a3a3a"
-_SELECTED_TILE_CSS = f"#thumbnailTile {{ background-color: {_SELECTED_BG}; border-radius: 4px; }}"
-_BORDER_UNSELECTED = "2px solid #3f3f3f"
-_BORDER_SELECTED = "2px solid #8a8a8a"
+_SELECTED_TILE_CSS = (
+    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}")
+_BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
+_BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
 class ThumbnailWidget(QWidget):

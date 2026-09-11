@@ -53,6 +53,7 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
+from origenerator.gui import palette
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.metadata_block import label_column_width, meta_cells
@@ -64,7 +65,7 @@ ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 _TILE = 96  # the thumbnail's side; the level's facts sit beside it
 # The in-flight edge the Recents shelf's cards wear, so work in progress reads
 # the same wherever it shows.
-_PENDING_BORDER = "2px solid #3080e0"
+_PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 # The dashed outline of an empty slot waiting to be filled, and the lit edge a level
 # wears while the row that would duplicate it is hovered.
 _ADD_BORDER = "1px dashed #808080"
@@ -84,7 +85,8 @@ _FACT_KEYS = ("Enhancement", "File", "Created")
 # would otherwise appear only in the gaps between them.
 _ROW_CSS = "#levelRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
-    "#levelRow { background-color: #3a3a3a; border-radius: 4px; }" + _ROW_CSS
+    f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}"
+    + _ROW_CSS
 )
 
 

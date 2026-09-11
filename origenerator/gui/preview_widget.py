@@ -33,7 +33,7 @@ from PyQt6.QtCore import (
     QUrl,
     pyqtSignal,
 )
-from PyQt6.QtGui import QDrag, QImageReader, QMovie, QPainter, QPixmap
+from PyQt6.QtGui import QImageReader, QMovie, QPainter, QPixmap
 from PyQt6.QtMultimedia import QAudioOutput, QMediaMetaData, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
@@ -51,9 +51,9 @@ from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
 from origenerator.gui.drag_thumbnail import (
+    DragOut,
     fit_thumbnail,
     label_thumbnail,
-    set_drag_thumbnail,
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
@@ -116,10 +116,10 @@ class PreviewWidget(QWidget):
         self._on_double_click = on_double_click
         # The shown generation's prompt_id when the owner has armed the preview to be
         # dragged out onto a combine slot (like a gallery thumbnail), else None; a
-        # transient view (a live frame, a message) disarms it. _drag_origin holds the
+        # transient view (a live frame, a message) disarms it. _drag holds the
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
-        self._drag_origin: QPoint | None = None
+        self._drag = DragOut()
         # How far into the still this pane is drawn — the fullscreen show's slow
         # push (see set_zoom). 1.0, the whole picture, for every other pane:
         # nothing but a show ever moves it, and a pane that is never pushed into
@@ -710,37 +710,27 @@ class PreviewWidget(QWidget):
         # The media children are transparent to the mouse, so a press over the
         # image or video lands here. Note the origin for a possible drag of the
         # shown generation; a plain click still falls through to the double-click.
-        if event.button() == Qt.MouseButton.LeftButton and self._draggable_id is not None:
-            self._drag_origin = event.position().toPoint()
+        if self._draggable_id is not None:
+            self._drag.note_press(event)
 
     def mouseMoveEvent(self, event) -> None:
         # Drag the shown generation out to a combine slot, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just opens fullscreen on the following double-click.
-        if self._drag_origin is None or not (event.buttons() & Qt.MouseButton.LeftButton):
+        if self._draggable_id is None or not self._drag.should_start(event):
             return
-        if self._draggable_id is None:
-            return
-        moved = (event.position().toPoint() - self._drag_origin).manhattanLength()
-        if moved < QApplication.startDragDistance():
-            return
-        prompt_id = self._draggable_id
-        self._drag_origin = None
-        self._start_drag(prompt_id)
+        self._start_drag(self._draggable_id)
 
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
         slot can read its prompt_id — the same payload a gallery thumbnail drags."""
-        drag = QDrag(self)
-        drag.setMimeData(generation_mime(prompt_id))
-        set_drag_thumbnail(drag, self._drag_picture())  # what is shown trails the cursor
-        # Announce the drag so a combine slot can light the moment it starts —
-        # QDrag.exec is modal, so the highlight is on for the whole gesture.
-        self.drag_started.emit(prompt_id)
-        try:
-            drag.exec(Qt.DropAction.CopyAction)
-        finally:
-            self.drag_ended.emit()
+        self._drag.start(
+            self, generation_mime(prompt_id),
+            self._drag_picture(),  # what is shown trails the cursor
+            # Announce the drag so a combine slot can light the moment it starts.
+            on_started=lambda: self.drag_started.emit(prompt_id),
+            on_ended=self.drag_ended.emit,
+        )
 
     def _drag_picture(self) -> QPixmap:
         """The thumbnail that trails the cursor while this pane's media is dragged.

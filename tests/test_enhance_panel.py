@@ -18,7 +18,7 @@ from origenerator.gallery import (
     EnhanceSettings,
     default_enhance_params,
 )
-from origenerator.gui import enhance_versions as versions_module
+from origenerator.gui import drag_thumbnail
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
     EnhanceVersions,
@@ -706,7 +706,7 @@ def level_drags(monkeypatch):
         def exec(self, _action):
             return None
 
-    monkeypatch.setattr(versions_module, "QDrag", _Drag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _Drag)
     return started
 
 
@@ -778,7 +778,7 @@ def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
         def exec(self, _action):
             return None
 
-    monkeypatch.setattr(versions_module, "QDrag", _RecordingDrag)
+    monkeypatch.setattr(drag_thumbnail, "QDrag", _RecordingDrag)
 
     tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0, None)
     qtbot.addWidget(tile)

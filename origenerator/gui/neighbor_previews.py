@@ -15,7 +15,7 @@ from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.slideshow import LIVE
+from origenerator.slideshow import Slide
 
 _MARGIN = 12            # gap from the screen edge, and from the media in a gutter
 _WIDTH_FRACTION = 0.12  # a still's bounds, as a share of the view's width…
@@ -23,20 +23,19 @@ _HEIGHT_FRACTION = 0.5  # …and of its height
 _MIN_WIDTH = 64         # …but never so narrow it says nothing
 
 
-def still_for(item):
-    """What to draw for a neighboring slideshow item, or ``None`` for nothing.
+def still_for(slide: Slide | None):
+    """What to draw for a neighboring slide, or ``None`` for nothing.
 
-    Its stored thumbnail when the item carries one (a video's only still), else
-    the item itself when that's an image — so a slideshow assembled without
+    Its stored thumbnail when the slide carries one (a video's only still), else
+    the slide itself when that's an image — so a slideshow assembled without
     thumbnails still shows its image neighbors. A generation still being made is
     drawn as the frame it has got to, which is the whole of what there is of it.
     """
-    if item is None:
+    if slide is None:
         return None
-    still = item[3] if len(item) > 3 else None
-    if still:
-        return still
-    return item[0] if item[1] in ("image", LIVE) else None
+    if slide.still:
+        return slide.still
+    return slide.path if slide.media_type == "image" or slide.is_live else None
 
 
 def side_x(side: str, host_width: int, media_rect: QRect, label_width: int) -> int:

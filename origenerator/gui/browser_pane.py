@@ -829,9 +829,6 @@ class BrowserPane(QObject):
         self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
 
-    def showing_experiments(self) -> bool:
-        base, _orientation = split_key(self._tree.selected_folder_key())
-        return base == EXPERIMENTS_KEY
 
     def _experiments_empty_hint(self) -> str:
         if self._host.experiments_enabled():
@@ -876,9 +873,6 @@ class BrowserPane(QObject):
         self.show_widget(container if shown
                          else self._empty_state(self._requests_empty_hint()))
 
-    def showing_requests(self) -> bool:
-        base, _orientation = split_key(self._tree.selected_folder_key())
-        return base == REQUESTS_KEY
 
     @staticmethod
     def _requests_empty_hint() -> str:
@@ -995,9 +989,6 @@ class BrowserPane(QObject):
             "or star a folder from the list, to collect them here."
         ))
 
-    def showing_starred(self) -> bool:
-        base, _orientation = split_key(self._tree.selected_folder_key())
-        return base == STARRED_KEY
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
@@ -1046,19 +1037,13 @@ class BrowserPane(QObject):
         matters during one: a search standing on a shelf is scoped to that
         shelf's items, and the results now on screen are no use for working out
         what those are.
+
+        Asked of the selected row's own key, which is the same key the shelf was
+        rendered for. Written out again here, it was the five answers below a
+        second time over, once against the side the key names and once against
+        the side the render remembered.
         """
-        if self.showing_recents():
-            return self._filtered_recent_rows()
-        if self.showing_starred():
-            return self._combined_starred_rows(self._shelf_orientation)
-        if self.showing_experiments():
-            return filter_rows(self._experiment_rows, self._shelf_orientation)
-        if self.showing_requests():
-            return filter_rows([item["row"] for item in self._request_items],
-                               self._shelf_orientation)
-        if self.showing_trash():
-            return filter_rows(self._trash_rows, self._shelf_orientation)
-        return None
+        return self.rows_for_shelf(self._tree.selected_folder_key())
 
     def rows_for_shelf(self, key: str | None) -> list[dict] | None:
         """What the shelf *key* collects right now — :meth:`shelf_rows` for a

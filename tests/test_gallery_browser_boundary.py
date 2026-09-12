@@ -116,9 +116,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     hand-written syncs the gallery kept in step by hand collapsed to one
     `_re_aim`. 262 -> 267: the one method that built every widget in the screen
     is six -- a pane apiece, and the two arrangers the hosted and standalone
-    shapes differ in -- which is five more methods and 273 hand collapsed to one
-    `_re_aim`.)"""
+    shapes differ in -- which is five more methods and 273 fewer lines in the
+    longest one. 267 -> 270: the constructor names its four steps -- the
+    collaborators handed in, the queue of runs, the slots a rebuild fills, and
+    the panes' own objects -- which takes it under fifty statements for the first
+    time.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 262
+               for x in _class_def(VIEW, "GalleryView").body) == 270
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 74

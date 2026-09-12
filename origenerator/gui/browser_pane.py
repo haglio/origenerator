@@ -59,6 +59,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key
+from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
@@ -250,9 +251,10 @@ class BrowserPane(QObject):
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
         )
-        self._selected_ids: set[str] = set()
-        self._selection_anchor: str | None = None
-        self._visible_ids: list[str] = []   # generations on screen, in shown order
+        # Which tiles are picked, the anchor a Shift-click measures its run
+        # from, and what is on screen in the order it is shown
+        # (:mod:`origenerator.gui.thumbnail_selection`).
+        self._selection = ThumbnailSelection()
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
@@ -310,7 +312,7 @@ class BrowserPane(QObject):
 
     def show_empty(self):
         """Clear the pane to nothing on screen — no folder selected."""
-        self._visible_ids = []
+        self._selection.forget_what_was_shown()
         self._visible_keys = []
         self._forget_recents_paging()
         self.show_widget(QWidget())
@@ -327,7 +329,7 @@ class BrowserPane(QObject):
         self.pane_reset.emit()  # the view drops its re-roll tile with the old pane
         self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
         self._inflight_by_key = {}
-        self._visible_ids = []
+        self._selection.forget_what_was_shown()
         self._visible_keys = []
         self._search_rows = []
         self._showing_search = False
@@ -671,7 +673,7 @@ class BrowserPane(QObject):
         tw.control_triggered.connect(self._on_tile_control)
         self._wire_drag(tw)
         flow.addWidget(tw)
-        self._visible_ids.append(row["prompt_id"])
+        self._selection.note_shown(row["prompt_id"])
         self._thumb_widgets[row["prompt_id"]] = tw
         return tw
 
@@ -937,7 +939,7 @@ class BrowserPane(QObject):
         tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
         tile.context_requested.connect(self._trash_context_menu)
         flow.addWidget(tile)
-        self._visible_ids.append(row["prompt_id"])
+        self._selection.note_shown(row["prompt_id"])
         self._thumb_widgets[row["prompt_id"]] = tile
         return tile
 
@@ -948,7 +950,7 @@ class BrowserPane(QObject):
         first narrows to it, as the gallery's own tile menu does. The menu
         itself is the view's (:meth:`GalleryView._trash_menu`), which owns both
         acts."""
-        if prompt_id not in self._selected_ids:
+        if not self._selection.holds(prompt_id):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self.trash_menu_requested.emit(global_pos)
 
@@ -1106,7 +1108,7 @@ class BrowserPane(QObject):
                 tw.corner_action_triggered.connect(self.seed_reroll_requested)
             self._wire_drag(tw)
             flow.addWidget(tw)
-            self._visible_ids.append(row["prompt_id"])
+            self._selection.note_shown(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
         self.show_widget(container)
 
@@ -1177,7 +1179,7 @@ class BrowserPane(QObject):
         self.folder_open_requested.emit(key)
 
     def visible_prompt_ids(self) -> list[str]:
-        return list(self._visible_ids)
+        return self._selection.shown
 
     # --- multi-selection ---------------------------------------------------
 
@@ -1201,20 +1203,11 @@ class BrowserPane(QObject):
         Ctrl toggles one tile; Shift extends a contiguous run from the anchor;
         a plain click resets to just this tile. Mirrors a typical file browser.
         """
-        ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
-        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
-        if ctrl:
-            self._selected_ids ^= {prompt_id}
-            self._selection_anchor = prompt_id
-        elif shift and self._selection_anchor in self._visible_ids \
-                and prompt_id in self._visible_ids:
-            a = self._visible_ids.index(self._selection_anchor)
-            b = self._visible_ids.index(prompt_id)
-            lo, hi = sorted((a, b))
-            self._selected_ids = set(self._visible_ids[lo:hi + 1])
-        else:
-            self._selected_ids = {prompt_id}
-            self._selection_anchor = prompt_id
+        self._selection.apply(
+            prompt_id,
+            ctrl=bool(modifiers & Qt.KeyboardModifier.ControlModifier),
+            shift=bool(modifiers & Qt.KeyboardModifier.ShiftModifier),
+        )
         self._refresh_selection_highlights()
 
     def reveal_tile(self, prompt_id: str):
@@ -1244,29 +1237,27 @@ class BrowserPane(QObject):
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():
-            widget.set_selected(pid in self._selected_ids)
+            widget.set_selected(self._selection.holds(pid))
         self.selection_changed.emit()
 
     def clear_selection(self):
-        self._selected_ids = set()
-        self._selection_anchor = None
+        self._selection.clear()
         self._thumb_widgets = {}
         self.selection_changed.emit()
 
     def clear_thumbnail_selection(self):
         """Drop the thumbnail multi-selection and its highlights while keeping the
         on-screen tiles (unlike a rebuild), so picking the re-roll deselects them."""
-        self._selected_ids = set()
-        self._selection_anchor = None
+        self._selection.clear()
         self._refresh_selection_highlights()
 
     @property
     def selected_ids(self) -> set:
         """The picked thumbnails' prompt_ids (read-only), for the delete button."""
-        return self._selected_ids
+        return self._selection.picked
 
     def selected_prompt_ids(self) -> list[str]:
-        return [pid for pid in self._visible_ids if pid in self._selected_ids]
+        return self._selection.in_shown_order()
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
         """Right-click menu for a thumbnail: go to its folder, star/unstar,
@@ -1278,7 +1269,7 @@ class BrowserPane(QObject):
         raises the very same one over the very same generation
         (:meth:`~origenerator.gui.gallery_view.GalleryView.generation_menu`).
         """
-        if prompt_id not in self._selected_ids:
+        if not self._selection.holds(prompt_id):
             self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
             self.thumbnail_activated.emit(prompt_id)
         self.menu_requested.emit(self.selected_prompt_ids(), global_pos)

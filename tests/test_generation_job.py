@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -7,7 +8,8 @@ from unittest.mock import MagicMock
 from PIL import Image
 
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.gui.generation_job import GenerationJob
+from origenerator.db import Database
+from origenerator.gui.generation_job import GenerationJob, insert_generation_row
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -46,6 +48,19 @@ def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
     # We submit under our own prompt_id, so ComfyUI's signals key on the same id.
     client.submit_job.assert_called_once_with(job.payload, "comfy-A")
     assert job.state == "queued"
+
+
+def test_a_launched_row_records_which_version_of_its_workflow_ran(qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    job = GenerationJob(_client(), SDXL, _params(),
+                        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs")
+
+    insert_generation_row(db, job)
+
+    block = json.loads(db.get_generation(job.prompt_id)["provenance"])
+    assert (block["app"], block["recipe"], block["recipe_version"],
+            block["recipe_version_basis"]) == ("origenerator", "sdxl_t2i", SDXL.version,
+                                               "recorded")
 
 
 def test_progress_for_our_id_marks_started_and_forwards(qtbot, tmp_path):

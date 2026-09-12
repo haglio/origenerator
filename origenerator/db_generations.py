@@ -28,7 +28,7 @@ LIFECYCLE_COLUMNS = frozenset({
 
 
 class GenerationStore(Store):
-    """The sixteen queries over the `generations` table."""
+    """The queries over the `generations` table."""
 
     def _set(self, prompt_id: str, column: str, value):
         """Write one column outside :data:`LIFECYCLE_COLUMNS`.
@@ -67,17 +67,18 @@ class GenerationStore(Store):
         params_json: str,
         workflow_json: str,
         source: str = "generated",
+        provenance: str | None = None,
     ):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO generations
                    (prompt_id, source, workflow_name, workflow_version,
                     positive_prompt, negative_prompt, seed,
-                    params_json, workflow_json)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    params_json, workflow_json, provenance)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (prompt_id, source, workflow_name, workflow_version,
                  positive_prompt, negative_prompt, seed,
-                 params_json, workflow_json),
+                 params_json, workflow_json, provenance),
             )
 
     def update_generation(self, prompt_id: str, **fields):

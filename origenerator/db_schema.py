@@ -90,7 +90,10 @@ CREATE TABLE IF NOT EXISTS generations (
     -- whole of what the two rows know about each other: a cut's params are its
     -- source's, so it sits in the same settings folder and nothing else on it
     -- says which of that folder's clips it was cut from.
-    trimmed_from TEXT
+    trimmed_from TEXT,
+    -- What made the row, as a JSON block (origenerator.provenance): stamped at
+    -- launch, or worked out later for a row from before launches were stamped.
+    provenance TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -173,7 +176,7 @@ CREATE TABLE IF NOT EXISTS deletions (
 # Columns added to a table after it first shipped, and how the DDL above
 # declares each one. ``CREATE TABLE IF NOT EXISTS`` leaves a user's existing
 # table exactly as it was, so these reach an older database only through
-# ``migrate`` — as data rather than as thirteen copies of one `if`, so that
+# ``migrate`` — as data rather than as a copy of one `if` per column, so that
 # adding a column is one entry rather than a fourth place to remember.
 # tests/test_db_schema.py holds this against the schema from both sides: an
 # older table gains every one of them, and each arrives with the type, NOT NULL
@@ -193,6 +196,7 @@ ADDED_COLUMNS = {
         "recipe_video_id": "TEXT",
         "enhance_of": "TEXT",
         "trimmed_from": "TEXT",
+        "provenance": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -214,7 +218,7 @@ GENERATION_COLUMNS = (
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
     "genau_exported_at", "genau_requested_at", "recipe_category", "recipe_video_id",
-    "enhance_of", "trimmed_from",
+    "enhance_of", "trimmed_from", "provenance",
 )
 
 

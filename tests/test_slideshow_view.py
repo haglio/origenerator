@@ -288,7 +288,7 @@ def test_culling_releases_the_lock(qtbot):
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)             # the held slide is the one condemned
     assert not view._playlist.locked
-    assert view._timer.isActive()           # so the rest keeps rotating
+    assert view._advance_timer.isActive()   # so the rest keeps rotating
 
 
 class _FakeMotion:
@@ -918,7 +918,7 @@ def test_a_pace_of_nought_holds_the_slide_with_no_timer(qtbot):
     # rather than a second full-screen viewer with its own keys to learn.
     view = _view(qtbot, image_dwell_ms=0)
     assert view.dwell_s == 0
-    assert not view._timer.isActive()
+    assert not view._advance_timer.isActive()
     assert view._playlist.dwell_ms() is None
 
 
@@ -947,7 +947,7 @@ def test_turning_the_console_pace_up_sets_a_held_show_going(qtbot):
 
     assert view.dwell_s == 2
     assert pace.seconds == 2
-    assert view._timer.isActive()
+    assert view._advance_timer.isActive()
 
 
 def test_turning_up_to_the_pace_the_app_already_held_still_starts_it(qtbot):
@@ -959,14 +959,14 @@ def test_turning_up_to_the_pace_the_app_already_held_still_starts_it(qtbot):
     view.set_dwell_s(1)
 
     assert view.dwell_s == 1
-    assert view._timer.isActive()
+    assert view._advance_timer.isActive()
 
 
 def test_the_pace_can_be_wound_back_down_to_nought(qtbot):
     view = _view(qtbot, image_dwell_ms=4000)
     view.set_dwell_s(0)
     assert view.dwell_s == 0
-    assert not view._timer.isActive()
+    assert not view._advance_timer.isActive()
 
 
 def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
@@ -1027,8 +1027,7 @@ def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
 
 
 def test_a_pace_of_nought_holds_the_whole_picture(qtbot):
-    # Nought holds one picture until an arrow moves it, and a picture being held
-    # is not a shot being made.
+    # Nought holds one picture until an arrow moves it.
     view = _view(qtbot, image_dwell_ms=0)
     assert not view._zoom_timer.isActive()
 
@@ -1043,15 +1042,58 @@ def test_a_clip_is_its_own_motion(qtbot):
     assert not view._zoom_timer.isActive()
 
 
-def test_holding_a_slide_stops_the_push_where_it_got_to(qtbot):
+def test_holding_a_slide_carries_its_push_on_from_where_it_got_to(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _push_for(view, 1000)
     reached = view._preview._zoom
 
     _press(view, Qt.Key.Key_Down)           # hold it
 
-    assert not view._zoom_timer.isActive()
+    assert view._zoom_timer.isActive()
+    assert not view._advance_timer.isActive()
     assert view._preview._zoom == reached
+
+
+def test_a_held_slide_starts_its_push_over_each_time_it_ends(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Down)
+
+    _push_for(view, 4000 + 1000)
+
+    assert view._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 4, abs=_ONE_TICK)
+
+
+def test_a_show_reopened_on_a_held_slide_pushes_into_it(qtbot):
+    closed = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(closed, Qt.Key.Key_Down)
+
+    reopened = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    reopened.resume(closed.state())
+
+    assert reopened._zoom_timer.isActive()
+    assert not reopened._advance_timer.isActive()
+
+
+def test_a_request_released_over_a_held_slide_carries_its_push_on(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Down)
+    view.hold_for_request(True, "🎤 listening…")
+
+    view.hold_for_request(False)
+
+    assert view._zoom_timer.isActive()
+    assert not view._advance_timer.isActive()
+
+
+def test_the_rooms_resume_carries_a_held_slides_push_on(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Down)
+    view.set_session_paused(True)
+
+    view.set_session_paused(False)
+
+    assert view._zoom_timer.isActive()
+    assert not view._advance_timer.isActive()
 
 
 def test_a_released_request_carries_the_push_on_from_there(qtbot):
@@ -1393,11 +1435,11 @@ def test_stepping_re_aims_the_device(qtbot):
 
 def test_a_request_holds_the_advance_and_says_so(qtbot):
     view = _view(qtbot, _KEYED)
-    assert view._timer.isActive()  # an image, dwelling
+    assert view._advance_timer.isActive()  # an image, dwelling
 
     view.hold_for_request(True, "🎤 Request: no hat…")
 
-    assert not view._timer.isActive()
+    assert not view._advance_timer.isActive()
     assert view._playlist.paused
     assert "Request" in view._note.text()
 
@@ -1408,7 +1450,7 @@ def test_releasing_the_hold_resumes_the_dwell(qtbot):
 
     view.hold_for_request(False)
 
-    assert view._timer.isActive()
+    assert view._advance_timer.isActive()
     assert not view._playlist.paused
     assert view._note.isHidden()
 
@@ -1432,7 +1474,7 @@ def test_releasing_the_hold_leaves_a_locked_slide_locked(qtbot):
     view.hold_for_request(False)
 
     assert view._playlist.locked
-    assert not view._timer.isActive()  # still held — by the lock, now
+    assert not view._advance_timer.isActive()  # still held — by the lock, now
 
 
 def test_a_request_targets_the_slide_on_screen(qtbot):
@@ -1540,7 +1582,7 @@ def test_a_slide_closed_under_a_hold_reopens_under_it(qtbot):
     reopened.resume(state)
 
     assert reopened._playlist.locked
-    assert not reopened._timer.isActive()          # held, so nothing moves it on
+    assert not reopened._advance_timer.isActive()  # held, so nothing moves it on
     assert "locked" in reopened._counter.text()
 
 

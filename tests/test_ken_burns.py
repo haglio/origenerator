@@ -38,15 +38,14 @@ def test_a_longer_dwell_covers_the_same_ground_more_slowly():
 
 
 def test_a_pace_of_nought_never_moves():
-    # Nought means the slide holds until an arrow moves it, and a picture being
-    # held is not a shot being made.
+    # Nought means the slide holds until an arrow moves it.
     assert progress_step(TICK_MS, 0) == 0.0
     assert _run(0, 10_000) == 1.0
 
 
 def test_the_move_stops_at_the_end_of_the_move():
-    # A slide that outlives its dwell — locked part-way through, or ticked late
-    # — stops there rather than carrying on into the picture forever.
+    # A slide that outlives its dwell stops there rather than carrying on into
+    # the picture forever.
     assert zoom_at(5.0) == approx(ZOOM_SPAN)
     assert zoom_at(-1.0) == 1.0
 

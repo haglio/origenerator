@@ -890,7 +890,7 @@ def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
     view.set_session_paused(True)
 
     assert show._session_paused is True
-    assert not show._timer.isActive()
+    assert not show._advance_timer.isActive()
 
 
 def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):

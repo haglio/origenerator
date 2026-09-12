@@ -252,15 +252,15 @@ def test_filter_enhanced_with_no_show_up_is_dropped(qtbot, tmp_path):
 def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert show._timer.isActive()  # an image slide dwells on its timer
+    assert show._advance_timer.isActive()  # an image slide dwells on its timer
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    assert not show._timer.isActive()
+    assert not show._advance_timer.isActive()
 
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
-    assert show._timer.isActive()
+    assert show._advance_timer.isActive()
 
 
 def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
@@ -314,7 +314,7 @@ def test_a_show_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
 
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    assert not show._timer.isActive()  # no dwell armed: it opened frozen
+    assert not show._advance_timer.isActive()  # no dwell armed: it opened frozen
 
 
 def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkeypatch):
@@ -331,7 +331,7 @@ def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkey
     bridge._tick()
 
     assert show._playlist.index == (before + 1) % 3  # the step still lands
-    assert not show._timer.isActive()                # but the slide holds
+    assert not show._advance_timer.isActive()                # but the slide holds
 
 
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):

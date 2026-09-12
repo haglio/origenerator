@@ -12331,7 +12331,7 @@ def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeyp
     assert view._shows.showing is not None
     qtbot.addWidget(view._shows.showing)
     assert view._shows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert view._shows.showing._timer.isActive()
+    assert view._shows.showing._advance_timer.isActive()
     view._shows.showing.close()
 
 
@@ -12356,7 +12356,7 @@ def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
 
     assert view._shows.showing is show          # the open one, not a second window
     assert show.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert show._timer.isActive()
+    assert show._advance_timer.isActive()
     show.close()
 
 
@@ -12369,7 +12369,7 @@ def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
     view._voice.listener.speak_command("pause slideshow")
 
     assert show.dwell_s == 0
-    assert not show._timer.isActive()
+    assert not show._advance_timer.isActive()
     assert view._shows.showing is show  # paused, not closed
     show.close()
 

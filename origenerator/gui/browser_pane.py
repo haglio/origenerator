@@ -210,6 +210,20 @@ class TreeNavigation:
 ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
 
 
+@dataclass(frozen=True)
+class Shelf:
+    """One shelf: what it collects, and how it draws that.
+
+    Five shelves were five parallel places each -- a branch in the renderer's
+    dispatch, a branch in the row gatherer, and a method apiece. Both branches
+    read this instead, so a sixth shelf is one entry rather than an edit in two
+    chains, and neither chain can answer for a shelf the other does not.
+    """
+
+    rows: Callable[[str | None], list[dict]]
+    render: Callable[[], None]
+
+
 class BrowserPane(QObject):
     """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
     owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
@@ -251,6 +265,29 @@ class BrowserPane(QObject):
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
         )
+        # What each shelf collects and how it draws that, bound rather than
+        # named: a renamed renderer is an AttributeError at construction instead
+        # of a shelf that quietly draws nothing.
+        self._shelves = {
+            RECENTS_KEY: Shelf(
+                rows=lambda side: filter_rows(self._recent_rows, side),
+                render=self._render_recents),
+            STARRED_KEY: Shelf(
+                rows=self._combined_starred_rows,
+                render=lambda: self._show_starred(
+                    self._starred_groups.get(self._shelf_orientation, ()),
+                    filter_rows(self._starred_rows, self._shelf_orientation))),
+            EXPERIMENTS_KEY: Shelf(
+                rows=lambda side: filter_rows(self._experiment_rows, side),
+                render=self._render_experiments),
+            REQUESTS_KEY: Shelf(
+                rows=lambda side: filter_rows(
+                    [item["row"] for item in self._request_items], side),
+                render=self._render_requests),
+            TRASH_KEY: Shelf(
+                rows=lambda side: filter_rows(self._trash_rows, side),
+                render=self._render_trash),
+        }
         # Which tiles are picked, the anchor a Shift-click measures its run
         # from, and what is on screen in the order it is shown
         # (:mod:`origenerator.gui.thumbnail_selection`).
@@ -546,17 +583,9 @@ class BrowserPane(QObject):
         (:meth:`GalleryView._open_shelf`); this renders the pane itself.
         """
         self._shelf_orientation = orientation
-        if base == RECENTS_KEY:
-            self._render_recents()
-        elif base == EXPERIMENTS_KEY:
-            self._render_experiments()
-        elif base == REQUESTS_KEY:
-            self._render_requests()
-        elif base == TRASH_KEY:
-            self._render_trash()
-        elif base == STARRED_KEY:
-            self._show_starred(self._starred_groups.get(orientation, ()),
-                               filter_rows(self._starred_rows, orientation))
+        shelf = self._shelves.get(base)
+        if shelf is not None:
+            shelf.render()
 
     def _render_recents(self):
         """The Recents shelf: a card for every in-flight generation (queued or
@@ -1058,18 +1087,8 @@ class BrowserPane(QObject):
         need a shelf's collection asked for by name.
         """
         base, orientation = split_key(key)
-        if base == RECENTS_KEY:
-            return filter_rows(self._recent_rows, orientation)
-        if base == STARRED_KEY:
-            return self._combined_starred_rows(orientation)
-        if base == EXPERIMENTS_KEY:
-            return filter_rows(self._experiment_rows, orientation)
-        if base == REQUESTS_KEY:
-            return filter_rows([item["row"] for item in self._request_items],
-                               orientation)
-        if base == TRASH_KEY:
-            return filter_rows(self._trash_rows, orientation)
-        return None
+        shelf = self._shelves.get(base)
+        return shelf.rows(orientation) if shelf is not None else None
 
     # --- the thumbnail grid: a settings leaf's generations ------------------
 

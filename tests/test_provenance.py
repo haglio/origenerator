@@ -35,10 +35,10 @@ def _file(path):
 
 def _imported(db, prompt_id, *, workflow="sdxl_t2i", file="image/sdxl_t2i_00001_.png",
               completed_at="2026-05-01T12:00:00+00:00", enhanced_from=None,
-              version="imported"):
+              version="imported", graph=None):
     db.insert_generation(prompt_id=prompt_id, workflow_name=workflow,
-                         workflow_version=version, params_json="{}", workflow_json="{}",
-                         source="imported")
+                         workflow_version=version, params_json="{}",
+                         workflow_json=json.dumps(graph or {}), source="imported")
     files = [_file(file)]
     folded = {}
     if enhanced_from:
@@ -46,6 +46,16 @@ def _imported(db, prompt_id, *, workflow="sdxl_t2i", file="image/sdxl_t2i_00001_
         folded["original_files"] = json.dumps([_file(enhanced_from)])
     db.update_generation(prompt_id, status="completed", completed_at=completed_at,
                          output_files=json.dumps(files), **folded)
+
+
+def _ran(db, prompt_id, version, *, launched, finished, trimmed_from=None, graph=None):
+    db.restore_generation({
+        "prompt_id": prompt_id, "source": "generated", "workflow_name": "sdxl_t2i",
+        "workflow_version": version, "status": "completed", "params_json": "{}",
+        "workflow_json": json.dumps(graph or {}), "created_at": launched,
+        "completed_at": finished,
+        "trimmed_from": trimmed_from,
+        "provenance": json.dumps({"recipe": "sdxl_t2i", "recipe_version": version})})
 
 
 def _block(db, prompt_id):
@@ -126,6 +136,92 @@ def test_an_import_with_no_file_date_gets_no_version_and_the_rest_are_still_stam
 
     assert (_known(_block(db, "imp-mu")), _known(_block(db, "imp-nu"))) == (
         ("sdxl_t2i", None, None), ("sdxl_t2i", "v002", "file_date"))
+
+
+def test_an_import_made_while_the_old_version_was_still_being_launched_gets_no_version(
+        tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-old", "v002", launched="2026-06-03 00:00:00",
+         finished="2026-06-03T00:10:00+00:00")
+    _imported(db, "imp-during", completed_at="2026-06-02T12:00:00+00:00")
+    _imported(db, "imp-after", file="image/sdxl_t2i_00002_.png",
+              completed_at="2026-06-10T12:00:00+00:00")
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert (_known(_block(db, "imp-during")), _known(_block(db, "imp-after"))) == (
+        ("sdxl_t2i", None, None), ("sdxl_t2i", "v003", "file_date"))
+
+
+def test_an_import_made_after_a_preview_began_launching_the_next_version_gets_no_version(
+        tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-early", "v003", launched="2026-05-30 00:00:00",
+         finished="2026-05-30T00:10:00+00:00")
+    _imported(db, "imp-before", completed_at="2026-05-20T12:00:00+00:00")
+    _imported(db, "imp-between", file="image/sdxl_t2i_00002_.png",
+              completed_at="2026-05-31T12:00:00+00:00")
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert (_known(_block(db, "imp-before")), _known(_block(db, "imp-between"))) == (
+        ("sdxl_t2i", "v002", "file_date"), ("sdxl_t2i", None, None))
+
+
+def test_a_clip_cut_later_from_an_older_run_is_not_a_launch_of_that_version(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-cut", "v002", launched="2026-06-05 00:00:00",
+         finished="2026-06-05T00:00:05+00:00", trimmed_from="gen-source")
+    _imported(db, "imp-omicron", completed_at="2026-06-02T12:00:00+00:00")
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert _known(_block(db, "imp-omicron")) == ("sdxl_t2i", "v003", "file_date")
+
+
+PLAIN = {"1": {"class_type": "KSampler", "inputs": {}},
+         "2": {"class_type": "SaveImage", "inputs": {}}}
+UPSCALED = {"1": {"class_type": "KSampler", "inputs": {}},
+            "2": {"class_type": "UpscaleModelLoader", "inputs": {}},
+            "3": {"class_type": "SaveImage", "inputs": {}}}
+
+
+def test_an_import_whose_graph_only_ever_ran_under_another_version_gets_no_version(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-plain", "v002", launched="2026-05-01 00:00:00",
+         finished="2026-05-01T00:00:08+00:00", graph=PLAIN)
+    _ran(db, "gen-upscaled", "v003", launched="2026-06-20 00:00:00",
+         finished="2026-06-20T00:00:08+00:00", graph=UPSCALED)
+    _imported(db, "imp-plain", completed_at="2026-06-10T12:00:00+00:00", graph=PLAIN)
+    _imported(db, "imp-upscaled", file="image/sdxl_t2i_00002_.png",
+              completed_at="2026-06-10T12:00:00+00:00", graph=UPSCALED)
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert (_known(_block(db, "imp-plain")), _known(_block(db, "imp-upscaled"))) == (
+        ("sdxl_t2i", None, None), ("sdxl_t2i", "v003", "file_date"))
+
+
+def test_an_import_whose_graph_never_ran_here_keeps_the_version_its_date_gives(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-plain", "v002", launched="2026-05-01 00:00:00",
+         finished="2026-05-01T00:00:08+00:00", graph=PLAIN)
+    _imported(db, "imp-rho", completed_at="2026-06-10T12:00:00+00:00", graph=UPSCALED)
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert _known(_block(db, "imp-rho")) == ("sdxl_t2i", "v003", "file_date")
+
+
+def test_a_file_with_no_graph_in_it_is_no_evidence_either_way(tmp_path):
+    db = Database(tmp_path / "origenerator.db")
+    _ran(db, "gen-bare", "v002", launched="2026-05-01 00:00:00",
+         finished="2026-05-01T00:00:08+00:00")
+    _imported(db, "imp-sigma", completed_at="2026-06-10T12:00:00+00:00")
+
+    provenance.stamp_unstamped(db, history=_history())
+
+    assert _known(_block(db, "imp-sigma")) == ("sdxl_t2i", "v003", "file_date")
 
 
 def test_an_import_saved_under_another_name_is_not_credited_to_the_workflow_it_sits_under(

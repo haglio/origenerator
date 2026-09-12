@@ -85,6 +85,7 @@ SCHEMA = {
         ("recipe_video_id", "TEXT", 0, None, 0),
         ("enhance_of", "TEXT", 0, None, 0),
         ("trimmed_from", "TEXT", 0, None, 0),
+        ("provenance", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

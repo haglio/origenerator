@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
-from origenerator import speech
+from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
 from origenerator.progress import ProgressTracker, stage_names
@@ -60,6 +60,7 @@ def insert_generation_row(db, job):
         params_json=json.dumps(params),
         workflow_json=json.dumps(job.payload),
         source=job.source,
+        provenance=json.dumps(provenance.at_launch(job.workflow)),
     )
 
 

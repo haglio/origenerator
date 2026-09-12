@@ -41,6 +41,17 @@ def test_insert_and_get_generation(tmp_path):
     assert row["source"] == "generated"
 
 
+def test_a_generation_goes_in_with_the_provenance_its_launch_stamped(tmp_path):
+    db = Database(tmp_path / "test.db")
+    block = json.dumps({"recipe": "sdxl_t2i", "recipe_version": "v002"})
+
+    db.insert_generation(prompt_id="prov-001", workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}",
+                         provenance=block)
+
+    assert db.get_generation("prov-001")["provenance"] == block
+
+
 def test_recipe_source_records_where_a_combine_got_its_recipe(tmp_path):
     # Nothing else on the row says it: the params carry the recipe's values, never
     # which video they came from or what the user called the act.

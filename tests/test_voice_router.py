@@ -19,6 +19,7 @@ from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import AppCommand, DialSetting
 from origenerator.voice.commands import ShelfCommand, ShowControl, SurfaceCommand
+from origenerator.voice.dictation import COMPLETED
 from origenerator.voice.show_commands import ShowCommand
 
 
@@ -257,7 +258,7 @@ class FakeHost:
 class Spoken:
     """One step of a dictated request, as the dictation hands it over."""
 
-    def __init__(self, text="no hat", *, listening=False, state="completed",
+    def __init__(self, text="no hat", *, listening=False, state=COMPLETED,
                  heard="Request, no hat, over."):
         self.text = text
         self.listening = listening
@@ -660,7 +661,7 @@ def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
     voice, _host, _shows = router()
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    voice.on_spoken_request(Spoken("no hat", state="given up"))
+    voice.on_spoken_request(Spoken("no hat", state="never got there"))
 
     assert voice.status.text() == "🎤 request dropped — never heard “over”"
 

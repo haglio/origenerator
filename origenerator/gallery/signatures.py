@@ -14,7 +14,7 @@ import json
 from functools import cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import is_no_lora
 
 # Params that identify a specific instance of a recipe rather than the recipe
@@ -77,7 +77,7 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
     ``"unknown"``) — takes the current version, preserving the property that a
     sparse import and a full re-roll of it group together.
     """
-    if workflow_version and workflow_version not in ("imported", "unknown"):
+    if workflow_version and workflow_version not in UNRECORDED_VERSIONS:
         return workflow_version
     wf = _registered(workflow_name)
     return wf.version if wf else ""

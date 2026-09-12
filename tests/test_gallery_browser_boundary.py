@@ -95,7 +95,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     readily as a config. 372 → 371: the gallery's handle on the config tab's
     private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's cards are a join over four
     sources and no rendering at all, so they are built outside the pane now
-    (`gui/inflight_items.py`) and it keeps a one-line delegation. 371 -> 341:
+    (`gui/inflight_items.py`) and it keeps a one-line delegation. 77 -> 74: what
+    the selected shelf collects is asked of its own key, so the five answers
+    written out a second time went, and with them the three predicates only that
+    second copy asked. 371 -> 341:
     the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
     new ones for what the shows ask that had no name of its own. 341 -> 318:
@@ -111,8 +114,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     bank came out as `ToolbarBank`, which builds its sixteen buttons and is
     written from one `BankState` -- eleven methods out, five in, and the nine
     hand-written syncs the gallery kept in step by hand collapsed to one
+    `_re_aim`. 262 -> 267: the one method that built every widget in the screen
+    is six -- a pane apiece, and the two arrangers the hosted and standalone
+    shapes differ in -- which is five more methods and 273 hand collapsed to one
     `_re_aim`.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 262
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 77
+               for x in _class_def(PANE, "BrowserPane").body) == 74

@@ -1594,6 +1594,34 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 
+def test_the_absence_batch_can_be_handed_a_policy_of_its_own(qtbot):
+    """The policy takes an rng precisely so its randomness can be steered, and
+    that seam was closed by its one caller building it inline.
+
+    A test wanting a known batch had to reach for the module's `random` or for
+    `queue_experiments`; it hands in a policy now, the way the client, the motion
+    and the audio bed are handed in.
+    """
+    class NothingToTry:
+        """A policy with no proposal in it, which is answer enough: what is under
+        test is that the batch asked the policy handed in."""
+
+        def __init__(self):
+            self.asked = 0
+
+        def propose(self, rows):
+            self.asked += 1
+
+    policy = NothingToTry()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]),
+                       client=_reroll_client(), experiment_policy=policy)
+    qtbot.addWidget(view)
+    view.set_experiments_enabled(True)
+
+    assert view.queue_experiments_for_absence() == 0
+    assert policy.asked  # the batch came from the policy handed in, not one built here
+
+
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
     # The shelf reads the live install's own rows, so a verdict given in a
     # preview is the verdict: the same items come up for review, and its count

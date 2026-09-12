@@ -291,6 +291,7 @@ class GalleryView(QWidget):
                  osr2_motion: Osr2MotionDriver | None = None,
                  ambient_audio: AmbientAudio | None = None,
                  search_expander: SearchExpander | None = None,
+                 experiment_policy: ExperimentPolicy | None = None,
                  fun_time: FunTimeSession | None = None):
         super().__init__(parent)
         self._db = db
@@ -333,7 +334,7 @@ class GalleryView(QWidget):
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's
         # own work, landing on that shelf for review at the next launch.
-        self._experiment_policy = ExperimentPolicy(
+        self._experiment_policy = experiment_policy or ExperimentPolicy(
             registry=WORKFLOW_REGISTRY, rng=random.Random()
         )
         self._forget_the_listing()

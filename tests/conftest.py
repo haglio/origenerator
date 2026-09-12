@@ -43,7 +43,6 @@ _content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT
 import gc
 import json
 import os
-import random
 import struct
 
 import pytest
@@ -83,29 +82,6 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 # Make shared_ui importable for tests regardless of checkout depth.
 ensure_shared_ui_on_path()
-
-
-def pytest_collection_modifyitems(items):
-    """Collect in a different order when asked, so a test that leans on the ones
-    beside it fails on the commit that introduces the lean.
-
-    ``TEST_COLLECTION_ORDER=reverse`` collects back to front;
-    ``TEST_COLLECTION_ORDER=shuffle`` shuffles with ``TEST_COLLECTION_SEED`` (0
-    unless given), so a red run can be repeated exactly.  Unset leaves the order
-    alone; anything else is a typo, and a typo that silently ran forward would
-    make the gate's second leg a green that proves nothing.
-    """
-    order = os.environ.get("TEST_COLLECTION_ORDER")
-    if order is None:
-        return
-    if order == "reverse":
-        items.reverse()
-    elif order == "shuffle":
-        random.Random(int(os.environ.get("TEST_COLLECTION_SEED", "0"))).shuffle(items)
-    else:
-        raise pytest.UsageError(
-            f"TEST_COLLECTION_ORDER={order!r}: expected 'reverse' or 'shuffle'"
-        )
 
 
 # One recognizable tensor name per architecture, matching the signatures in

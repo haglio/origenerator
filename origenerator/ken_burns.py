@@ -44,7 +44,7 @@ def progress_step(tick_ms: int, dwell_ms: int) -> float:
     """How much of the move one *tick_ms* tick makes on a *dwell_ms* slide.
 
     Nought for a slide with no dwell at all — a pace of nought holds one picture
-    until an arrow moves it, and a picture being held is not a shot being made.
+    until an arrow moves it.
     """
     if dwell_ms <= 0:
         return 0.0
@@ -54,9 +54,8 @@ def progress_step(tick_ms: int, dwell_ms: int) -> float:
 def zoom_at(progress: float, span: float = ZOOM_SPAN) -> float:
     """The zoom factor *progress* of the way through the move.
 
-    Clamped at both ends: a slide that outlives its dwell — one locked part-way
-    through, or a tick that lands late — stops at the end of the move rather
-    than carrying on into the picture forever.
+    Clamped at both ends: a slide that outlives its dwell stops at the end of
+    the move rather than carrying on into the picture forever.
     """
     return 1.0 + (span - 1.0) * max(0.0, min(1.0, progress))
 

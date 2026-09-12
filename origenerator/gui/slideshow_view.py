@@ -57,8 +57,7 @@ An image does not simply sit there while it holds the screen: the view creeps
 into it, ending a tenth of the way in by the time the dwell runs out — the Ken
 Burns move, paced by the dwell rather than by a clock of its own, so turning the
 pace up slows the creep instead of cropping harder
-(see :mod:`origenerator.ken_burns`, and :meth:`SlideshowView._arm_dwell` for the
-one clock the advance and the move share).
+(see :mod:`origenerator.ken_burns`).
 
 Every show wears the players' own HUD (:meth:`SlideshowView.adopt_hud`,
 :mod:`origenerator.gui.show_hud`) — hosted on a satellite region and fullscreen
@@ -252,12 +251,9 @@ class SlideshowView(QWidget):
         self._hud = None
         self._preview.media_resized.connect(self._place_console)
 
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self._advance)
-        # The slow push into the still on screen. It runs on exactly the same
-        # clock as the advance — armed and disarmed together (see _arm_dwell) —
-        # so everything that stops a slide moving on stops the camera moving in.
+        self._advance_timer = QTimer(self)
+        self._advance_timer.setSingleShot(True)
+        self._advance_timer.timeout.connect(self._advance)
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setInterval(TICK_MS)
         self._zoom_timer.timeout.connect(self._zoom_tick)
@@ -304,29 +300,22 @@ class SlideshowView(QWidget):
         if self._session_paused:
             self._preview.set_playback_paused(True)  # arrive holding
             return
-        dwell = self._playlist.dwell_ms()
-        if dwell is not None:
-            self._arm_dwell(dwell)
+        self._arm_dwell()
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     # --- the slide's own clock: the advance, and the push that runs with it ---
 
-    def _arm_dwell(self, dwell_ms: int) -> None:
-        """Start the slide counting down, and the camera creeping in.
-
-        One call rather than two, so the push can only ever be moving while the
-        slide is actually on its way out. A lock, a spoken request, the
-        session's OmniPause and a video all stop the advance, and each of them
-        has to stop the move as well — a picture nothing is going to page off
-        is a picture being looked at, not a shot being made.
-        """
-        self._timer.start(dwell_ms)
-        self._zoom_timer.start()
+    def _arm_dwell(self) -> None:
+        if self._playlist.pace_ms() is not None:
+            self._zoom_timer.start()
+        dwell = self._playlist.dwell_ms()
+        if dwell is not None:
+            self._advance_timer.start(dwell)
 
     def _disarm_dwell(self) -> None:
         """Stop both, leaving the push exactly where it had got to — so a hold
         released mid-slide carries on from there rather than snapping back out."""
-        self._timer.stop()
+        self._advance_timer.stop()
         self._zoom_timer.stop()
 
     def _restart_the_push(self) -> None:
@@ -343,6 +332,8 @@ class SlideshowView(QWidget):
         against the new number instead would jump the picture back out.
         """
         self._zoom_progress += progress_step(TICK_MS, self._playlist.image_dwell_ms)
+        if self._playlist.locked and self._zoom_progress >= 1.0:
+            self._zoom_progress = 0.0
         self._preview.set_zoom(zoom_at(self._zoom_progress))
 
     def set_playlist(self, items, index: int) -> None:
@@ -966,9 +957,7 @@ class SlideshowView(QWidget):
         if paused:
             self._disarm_dwell()
         else:
-            dwell = self._playlist.dwell_ms()
-            if dwell is not None:
-                self._arm_dwell(dwell)
+            self._arm_dwell()
         self._preview.set_playback_paused(paused)
 
     def _on_pace_changed(self, seconds: int) -> None:
@@ -1033,8 +1022,7 @@ class SlideshowView(QWidget):
         else:
             self._request_note = ""
             self._refresh_note()
-            if not self._playlist.locked:
-                self._rearm_dwell()
+            self._arm_dwell()
 
     def note_request(self, message: str, request=None, *,
                      working: bool = False) -> None:
@@ -1061,14 +1049,6 @@ class SlideshowView(QWidget):
         if request is self._working_request:
             self._working_note, self._working_request = "", None
         self._flash_note(message, ms=3000)
-
-    def _rearm_dwell(self) -> None:
-        """Start the dwell timer again for the slide already on screen — a
-        released pause resumes the show rather than restarting the media, which
-        for a video part-way through would send it back to its first frame."""
-        dwell = self._playlist.dwell_ms()
-        if dwell is not None:
-            self._arm_dwell(dwell)
 
     def _hold_current(self):
         """Down: hold the slide, star it, and ask for it to be enhanced.
@@ -1263,7 +1243,7 @@ class SlideshowView(QWidget):
         it twice in two ways.
         """
         if self._playlist.toggle_lock():
-            self._disarm_dwell()  # hold on the current item, and on the push
+            self._advance_timer.stop()
             self.star()
             self._update_counter()
             if self._actions.lock is not None:

@@ -324,6 +324,61 @@ class GalleryView(QWidget):
         # Guards the one reconcile that owns both drive sources: starting or
         # stopping the motion is something it does, not something it reacts to.
         self._reconciling_osr2 = False
+        self._build_the_queue_of_runs(db, client)
+        self._actions = actions or GalleryActions(
+            db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
+            release_files=self._release_held_media, thumb_dir=THUMB_DIR,
+            cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
+        )
+        # Derives the background experiments this gallery hands ComfyUI as the
+        # app closes (the Experiments shelf's switch): variations of the user's
+        # own work, landing on that shelf for review at the next launch.
+        self._experiment_policy = ExperimentPolicy(
+            registry=WORKFLOW_REGISTRY, rng=random.Random()
+        )
+        self._forget_the_listing()
+        self._build_the_panes(db, client, search_expander)
+        # What another app has on the shared ComfyUI, re-read on every poll so the
+        # lower bar can say the server is busy before a Generate goes in after it.
+        self._foreign_queue = ForeignQueue(running=[], pending=[])
+        # What the last Esc took off, for the next one to put back — cleared as
+        # soon as it is put back, so the key goes on alternating.
+        self._stopped_by_escape: _Running | None = None
+        self._build_ui()
+        self._voice.bind_the_bank(
+            auto=self._bank.auto, audio=self._bank.audio, drive=self._bank.drive,
+            mic=self._bank.mic,
+            enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
+            actions={
+                AppCommand.BACK: (self._bank.back, self._navigation.go_back),
+                AppCommand.FORWARD: (self._bank.forward, self._navigation.go_forward),
+                AppCommand.CULL: (self._bank.delete, self._delete_selection),
+                AppCommand.STAR: (self._bank.star, self._star_selection),
+                AppCommand.UNDO: (self._bank.undo, self._undo),
+                AppCommand.REDO: (self._bank.redo, self._redo),
+                AppCommand.GROUP: (self._bank.group, self._group_selection),
+            },
+        )
+        self._re_aim()
+        # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
+        # Neither keyPressEvent nor a shortcut delivered the key in the running
+        # app — a clicked thumbnail's key press never reached the view through
+        # the scroll area — so intercept it before delivery, independent of which
+        # widget holds focus. Taken off again in closeEvent, and re-armed by
+        # showEvent for a view shown after one.
+        self._intercept_the_rooms_keys(True)
+
+        self._poll_inflight = False  # a tick's reads are out; don't stack more
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(_POLL_INTERVAL_MS)
+        self._poll_timer.timeout.connect(self._poll)
+        self._poll_timer.start()
+
+    def _build_the_queue_of_runs(self, db, client):
+        """The generation queue: the controller that owns the live jobs, the loop
+        that keeps one folder generating, and what each of those has to remember
+        between launches.
+        """
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
         self._reroll = RerollController(db, client)
@@ -360,23 +415,29 @@ class GalleryView(QWidget):
         # to it by folder key, never to "the tab in front".
         self._selected_reroll_key: str | None = None
         self._reroll_tile: RerollTile | None = None
-        self._actions = actions or GalleryActions(
-            db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
-            release_files=self._release_held_media, thumb_dir=THUMB_DIR,
-            cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
-        )
-        # Derives the background experiments this gallery hands ComfyUI as the
-        # app closes (the Experiments shelf's switch): variations of the user's
-        # own work, landing on that shelf for review at the next launch.
-        self._experiment_policy = ExperimentPolicy(
-            registry=WORKFLOW_REGISTRY, rng=random.Random()
-        )
+
+    def _forget_the_listing(self):
+        """Empty every slot a rebuild fills in.
+
+        Called once at construction and never again: a rebuild replaces what is
+        here rather than clearing it first, so these are the values a gallery has
+        before its first refresh.
+        """
         self._image_rows: list[dict] = []
         # Pictures whose spoken "genau it" is still choosing a recipe, so a
         # second one said into that wait is refused rather than queued twice
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
         self._image_index: dict | None = None  # memo, dropped by every rebuild
+
+    def _build_the_panes(self, db, client, search_expander):
+        """The three panes' own objects, in the order they need each other: the
+        search over the tree, the browser in the middle, the trail across both,
+        then the shows, the combine, the enhance and the spoken words that all
+        read those.
+
+        Before ``_build_ui``, which places the widgets each of them builds.
+        """
         # --- the gallery search (the field over the tree, the results in the middle
         # pane). The index is rebuilt with the gallery and queried on each
         # keystroke; the expander widens the query's words through the local LLM
@@ -454,7 +515,7 @@ class GalleryView(QWidget):
         # whose slideshow button starts one.
         self._shows = ShowDirector(
             self, db=db, browser=self._browser, reroll=self._reroll,
-            pace=self._pace, motion=self._osr2_motion, fun_time=fun_time)
+            pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time)
         # Combine: a video's recipe run again on a dropped picture, and the
         # spoken "genau it" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
@@ -481,41 +542,6 @@ class GalleryView(QWidget):
         self._voice = VoiceRouter(self, parent=self, db=db, shows=self._shows,
                                   client=client, motion=self._osr2_motion)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
-        # What another app has on the shared ComfyUI, re-read on every poll so the
-        # lower bar can say the server is busy before a Generate goes in after it.
-        self._foreign_queue = ForeignQueue(running=[], pending=[])
-        # What the last Esc took off, for the next one to put back — cleared as
-        # soon as it is put back, so the key goes on alternating.
-        self._stopped_by_escape: _Running | None = None
-        self._build_ui()
-        self._voice.bind_the_bank(
-            auto=self._bank.auto, audio=self._bank.audio, drive=self._bank.drive,
-            mic=self._bank.mic,
-            enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
-            actions={
-                AppCommand.BACK: (self._bank.back, self._navigation.go_back),
-                AppCommand.FORWARD: (self._bank.forward, self._navigation.go_forward),
-                AppCommand.CULL: (self._bank.delete, self._delete_selection),
-                AppCommand.STAR: (self._bank.star, self._star_selection),
-                AppCommand.UNDO: (self._bank.undo, self._undo),
-                AppCommand.REDO: (self._bank.redo, self._redo),
-                AppCommand.GROUP: (self._bank.group, self._group_selection),
-            },
-        )
-        self._re_aim()
-        # Catch Delete/Ctrl+Z application-wide while the Gallery tab is showing.
-        # Neither keyPressEvent nor a shortcut delivered the key in the running
-        # app — a clicked thumbnail's key press never reached the view through
-        # the scroll area — so intercept it before delivery, independent of which
-        # widget holds focus. Taken off again in closeEvent, and re-armed by
-        # showEvent for a view shown after one.
-        self._intercept_the_rooms_keys(True)
-
-        self._poll_inflight = False  # a tick's reads are out; don't stack more
-        self._poll_timer = QTimer(self)
-        self._poll_timer.setInterval(_POLL_INTERVAL_MS)
-        self._poll_timer.timeout.connect(self._poll)
-        self._poll_timer.start()
 
     def _intercept_the_rooms_keys(self, intercepting: bool):
         """Take (or hand back) every key the application delivers.
@@ -740,8 +766,15 @@ class GalleryView(QWidget):
         )
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
+        """Put the three panes on screen, in the order their contents need.
 
+        Each pane builds itself and hands back the widget it built; the two
+        arrangers at the foot are the one place the hosted and standalone shapes
+        differ. Sequence rather than grouping is what this preserves -- the
+        motion, the sound and the device driver must exist before the widgets
+        that wire them, and each pane's own comments say which.
+        """
+        layout = QVBoxLayout(self)
         # The three panes live in splitters, so the divider between each doubles
         # as a drag handle: the TOC pane (folder tree), the browser pane (a
         # folder's contents), and the info pane (preview + metadata).
@@ -770,7 +803,34 @@ class GalleryView(QWidget):
             self._stack = QSplitter(Qt.Orientation.Vertical)
             self._stack.setChildrenCollapsible(False)
             self._stack.setHandleWidth(6)
+        toc = self._build_toc_pane()
+        # Hosted, the tree is the upright column's own left edge rather than a
+        # part of the folder row, so it goes straight into the outer splitter.
+        # Placed here rather than by the arrangers: it is the folder row's first
+        # widget, and a splitter takes them in the order they arrive.
+        (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
+        browser = self._build_browser_pane()
+        self._folder_panes.addWidget(browser)
+        # A strip under those two lists every generation in flight — the app hands
+        # ComfyUI one at a time, so a batch of Generates is a queue — reachable
+        # from any folder or config tab. Fed on every rebuild and poll; a row
+        # dragged to a new place asks the controller to re-line the queue. Its top
+        # edge is this column's splitter handle, so a long queue can be dragged
+        # open at the cost of the folder listing above it.
+        self._queue = GenerationQueue()
+        self._queue.reorder_requested.connect(self._reroll.reorder)
+        self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
+        info_pane = self._build_info_pane()
+        if self._stack is not None:
+            self._arrange_hosted(toc, browser, info_pane)
+        else:
+            self._arrange_standalone(toc, browser, info_pane)
+        layout.addWidget(self._stack if self._stack is not None else self._panes, 1)
 
+    def _build_toc_pane(self):
+        """The left pane: the two folder trees under the voice caption, the
+        search field and the media filter, with the combine panel at their foot.
+        """
         # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
         # -> settings; a LoRA-less workflow collapses the LoRA level to one
         # "(no LoRA)" folder, and the source-image level shows only for
@@ -828,10 +888,13 @@ class GalleryView(QWidget):
         toc_column.addWidget(media_filter)
         toc_column.addWidget(self._tree, 1)  # the trees take the height; combine sits below
         toc_column.addWidget(self._combine.panel)
-        # Hosted, the tree is the upright column's own left edge rather than a
-        # part of the folder row, so it goes straight into the outer splitter.
-        (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
+        return toc
 
+    def _build_browser_pane(self):
+        """The middle pane: the folder's path, the button bank under it, the
+        shelf's own bars, and the flowing contents -- with the two app-wide
+        panels standing at its foot, under a hairline of their own.
+        """
         # Browser pane: a header (the folder's path, then a back/forward/undo
         # toolbar under it) over the flowing contents. Double-clicking the path
         # renames the folder it ends at.
@@ -902,54 +965,6 @@ class GalleryView(QWidget):
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
         browser_column.addWidget(self._scroll, 1)
-        self._folder_panes.addWidget(browser)
-
-        # A strip under those two lists every generation in flight — the app hands
-        # ComfyUI one at a time, so a batch of Generates is a queue — reachable
-        # from any folder or config tab. Fed on every rebuild and poll; a row
-        # dragged to a new place asks the controller to re-line the queue. Its top
-        # edge is this column's splitter handle, so a long queue can be dragged
-        # open at the cost of the folder listing above it.
-        self._queue = GenerationQueue()
-        self._queue.reorder_requested.connect(self._reroll.reorder)
-        self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
-        if self._stack is not None:
-            # Hosted, the queue is not the folder column's strip.  It spans the
-            # whole foot of the rect (added to _stack below), so the corner
-            # under the tree is the queue rather than more tree — which is where
-            # a standalone window's eye finds it, and the upright fold has no
-            # reason to move it.  The folder panes go straight beside the tree.
-            self._panes.addWidget(self._folder_panes)
-        else:
-            self._left_column = QSplitter(Qt.Orientation.Vertical)
-            self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
-            self._left_column.setHandleWidth(6)
-            self._left_column.addWidget(self._folder_panes)
-            self._left_column.addWidget(self._queue)
-            self._panes.addWidget(self._left_column)
-
-
-        # Info pane: a tabbed workspace of identical editable generate panels
-        # (form + Generate). No special or permanent tab — the first opens on
-        # construction, and more fork via the "+" or a thumbnail double-click, all
-        # sharing one run queue. Clicking a browser thumbnail loads that generation
-        # into a tab (its output in the preview, its settings in the form, a footer
-        # for its media type). Each panel's source-image link and animation clicks
-        # surface here as a source link the view follows.
-        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time)
-        # One OSR2 driver for the whole view, under the one global toggle
-        # (self._bank.drive): while that's on it follows whichever video is foreground —
-        # an open slideshow, else whatever scripted video is in the front tab —
-        # and with it off nothing drives on either surface.
-        # Switching tabs/videos or opening/closing a slideshow re-aims it; with
-        # nothing to drive it stops. self._osr2_driving is the (video, player) currently
-        # driven, so a redundant reconcile doesn't churn the device. Built before the
-        # panels are wired, since wiring connects their displayed_changed here.
-        # None where this app may not touch the device at all (hosted by Fun
-        # Time, whose main player owns the OSR2).
-        self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
-        self._osr2_enabled = False
-        self._osr2_driving = None
         # The foot of the center (browser) pane, shared by two panels that each
         # take their own room rather than floating over anyone's buttons: genau's
         # readout, copied, held to the left at its fixed size, and the open
@@ -977,7 +992,33 @@ class GalleryView(QWidget):
         # don't belong to the folder they happen to be sitting under.
         browser_column.addWidget(_lower_divider())
         browser_column.addLayout(footer)
+        return browser
 
+    def _build_info_pane(self):
+        """The right pane: the tabbed workspace of generate panels, with the
+        find strip riding under it.
+        """
+        # Info pane: a tabbed workspace of identical editable generate panels
+        # (form + Generate). No special or permanent tab — the first opens on
+        # construction, and more fork via the "+" or a thumbnail double-click, all
+        # sharing one run queue. Clicking a browser thumbnail loads that generation
+        # into a tab (its output in the preview, its settings in the form, a footer
+        # for its media type). Each panel's source-image link and animation clicks
+        # surface here as a source link the view follows.
+        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time)
+        # One OSR2 driver for the whole view, under the one global toggle
+        # (self._bank.drive): while that's on it follows whichever video is foreground —
+        # an open slideshow, else whatever scripted video is in the front tab —
+        # and with it off nothing drives on either surface.
+        # Switching tabs/videos or opening/closing a slideshow re-aims it; with
+        # nothing to drive it stops. self._osr2_driving is the (video, player) currently
+        # driven, so a redundant reconcile doesn't churn the device. Built before the
+        # panels are wired, since wiring connects their displayed_changed here.
+        # None where this app may not touch the device at all (hosted by Fun
+        # Time, whose main player owns the OSR2).
+        self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
+        self._osr2_enabled = False
+        self._osr2_driving = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs.config_panels():
             self._wire_config_panel(panel)  # the initial tab predates the connection
@@ -1009,65 +1050,81 @@ class GalleryView(QWidget):
         info_column.setContentsMargins(0, 0, 0, 0)
         info_column.addWidget(self._info_tabs, 1)
         info_column.addWidget(self._find_bar)
+        return info_pane
 
-        if self._stack is not None:
-            # The upright arrangement, from the top down: the generate tabs (with
-            # the find bar riding under them), then the browser beside a
-            # collapsible tree, then the queue across the foot.  The generator
-            # leads because it is what the user is doing — a tall rect that
-            # opens on a folder listing puts the form they came to fill below
-            # the fold.  The floors shrink with the column: each floor spans the
-            # stack's whole width, so a side-by-side floor would only fight the
-            # tree for room it no longer shares.
-            self._stack.addWidget(info_pane)
-            self._stack.addWidget(self._panes)
-            self._stack.addWidget(self._queue)
-            self._panes.setCollapsible(0, True)  # the tree may be dragged shut
-            toc.setMinimumWidth(120)
-            browser.setMinimumWidth(210)
-            self._info_tabs.setMinimumWidth(210)
-            info_pane.setMinimumWidth(210)
-            self._panes.setStretchFactor(0, 0)
-            self._panes.setStretchFactor(1, 1)
-            self._panes.setSizes([180, 660])
-            # The strip opens at its own height and stays there, as it does
-            # standalone: a taller rect is more gallery and more form, not more
-            # queue.  The two panes above it split the rest, the browser a
-            # little ahead so the tree it sits beside has room to be read.
-            self._stack.setStretchFactor(0, 2)
-            self._stack.setStretchFactor(1, 3)
-            self._stack.setStretchFactor(2, 0)
-            self._stack.setSizes([440, 640, self._queue.minimumHeight()])
-        else:
-            self._panes.addWidget(info_pane)
-            # The TOC pane holds its width; the browser and info panes both grow
-            # with the window (the browser faster), so the info pane stays
-            # comfortably wide instead of a thin strip on a large screen. Long
-            # metadata values wrap rather than scroll sideways, so these floors
-            # only need to keep the panes readable — kept low enough that the
-            # window can still tile into a monitor third or a portrait-monitor
-            # half.
-            toc.setMinimumWidth(120)
-            browser.setMinimumWidth(210)
-            # No floor of its own on the info pane: the config tab inside it
-            # reports what its settings need (GenerateConfigPanel.minimumSizeHint),
-            # and an explicit minimum here would replace that number rather than
-            # join it — pinning the pane narrower than its contents and putting a
-            # horizontal scroll bar back under the form.
-            self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
-            self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
-            self._folder_panes.setSizes([220, 560])
-            # The strip opens at its own height and stays there: all the growth
-            # goes to the folders above it, so a taller window is more gallery
-            # rather than more queue.
-            self._left_column.setStretchFactor(0, 1)
-            self._left_column.setStretchFactor(1, 0)
-            self._left_column.setSizes([600, self._queue.minimumHeight()])
-            self._panes.setStretchFactor(0, 3)
-            self._panes.setStretchFactor(1, 2)
-            self._panes.setSizes([780, 440])
+    def _arrange_hosted(self, toc, browser, info_pane):
+        """The upright arrangement a Fun Time session's rect asks for."""
+        # Hosted, the queue is not the folder column's strip.  It spans the
+        # whole foot of the rect (added to _stack below), so the corner
+        # under the tree is the queue rather than more tree — which is where
+        # a standalone window's eye finds it, and the upright fold has no
+        # reason to move it.  The folder panes go straight beside the tree.
+        self._panes.addWidget(self._folder_panes)
 
-        layout.addWidget(self._stack if self._stack is not None else self._panes, 1)
+        # The upright arrangement, from the top down: the generate tabs (with
+        # the find bar riding under them), then the browser beside a
+        # collapsible tree, then the queue across the foot.  The generator
+        # leads because it is what the user is doing — a tall rect that
+        # opens on a folder listing puts the form they came to fill below
+        # the fold.  The floors shrink with the column: each floor spans the
+        # stack's whole width, so a side-by-side floor would only fight the
+        # tree for room it no longer shares.
+        self._stack.addWidget(info_pane)
+        self._stack.addWidget(self._panes)
+        self._stack.addWidget(self._queue)
+        self._panes.setCollapsible(0, True)  # the tree may be dragged shut
+        toc.setMinimumWidth(120)
+        browser.setMinimumWidth(210)
+        self._info_tabs.setMinimumWidth(210)
+        info_pane.setMinimumWidth(210)
+        self._panes.setStretchFactor(0, 0)
+        self._panes.setStretchFactor(1, 1)
+        self._panes.setSizes([180, 660])
+        # The strip opens at its own height and stays there, as it does
+        # standalone: a taller rect is more gallery and more form, not more
+        # queue.  The two panes above it split the rest, the browser a
+        # little ahead so the tree it sits beside has room to be read.
+        self._stack.setStretchFactor(0, 2)
+        self._stack.setStretchFactor(1, 3)
+        self._stack.setStretchFactor(2, 0)
+        self._stack.setSizes([440, 640, self._queue.minimumHeight()])
+
+
+    def _arrange_standalone(self, toc, browser, info_pane):
+        """The three panes side by side, as a window of its own opens them."""
+        self._left_column = QSplitter(Qt.Orientation.Vertical)
+        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
+        self._left_column.setHandleWidth(6)
+        self._left_column.addWidget(self._folder_panes)
+        self._left_column.addWidget(self._queue)
+        self._panes.addWidget(self._left_column)
+        self._panes.addWidget(info_pane)
+        # The TOC pane holds its width; the browser and info panes both grow
+        # with the window (the browser faster), so the info pane stays
+        # comfortably wide instead of a thin strip on a large screen. Long
+        # metadata values wrap rather than scroll sideways, so these floors
+        # only need to keep the panes readable — kept low enough that the
+        # window can still tile into a monitor third or a portrait-monitor
+        # half.
+        toc.setMinimumWidth(120)
+        browser.setMinimumWidth(210)
+        # No floor of its own on the info pane: the config tab inside it
+        # reports what its settings need (GenerateConfigPanel.minimumSizeHint),
+        # and an explicit minimum here would replace that number rather than
+        # join it — pinning the pane narrower than its contents and putting a
+        # horizontal scroll bar back under the form.
+        self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
+        self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
+        self._folder_panes.setSizes([220, 560])
+        # The strip opens at its own height and stays there: all the growth
+        # goes to the folders above it, so a taller window is more gallery
+        # rather than more queue.
+        self._left_column.setStretchFactor(0, 1)
+        self._left_column.setStretchFactor(1, 0)
+        self._left_column.setSizes([600, self._queue.minimumHeight()])
+        self._panes.setStretchFactor(0, 3)
+        self._panes.setStretchFactor(1, 2)
+        self._panes.setSizes([780, 440])
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

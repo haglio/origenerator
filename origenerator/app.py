@@ -295,6 +295,14 @@ def _recover_generation_times(library: Library):
         library.db, sorted(library.log_dir.glob("comfyui*.log")))
 
 
+def _record_workflow_versions(library: Library):
+    """Stamp every row that has no provenance yet: the rows from before launches
+    were stamped, a row the bin gives back, and whatever this launch imported."""
+    from origenerator.provenance import stamp_unstamped
+
+    return stamp_unstamped(library.db)
+
+
 def _reconcile_bookmarks(library: Library):
     """Heal stars, custom names and hand-composed folders whose folder key
     drifted after a key formula change, and stamp identity onto live ones so the
@@ -343,6 +351,9 @@ MAINTENANCE = (
     BootPass("Recovering generation times...", _recover_generation_times,
              counted="Backfilled generation time for %d imports from logs",
              failure="Duration backfill failed: %s"),
+    BootPass("Recording workflow versions...", _record_workflow_versions,
+             counted="Recorded the workflow version of %d generation(s)",
+             failure="Recording workflow versions failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
              failure="Folder bookmark reconcile failed: %s"),
 )

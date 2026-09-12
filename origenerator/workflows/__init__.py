@@ -10,6 +10,10 @@ from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
 
+# What an imported row stores as its workflow_version: the file never said.
+# "unknown" is the spelling imports carried before "imported".
+UNRECORDED_VERSIONS = frozenset({"imported", "unknown"})
+
 WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
     "sdxl_t2i": SdxlT2iWorkflow(),
     "sdxl_pose_transfer": SdxlPoseTransferWorkflow(),

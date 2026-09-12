@@ -76,6 +76,9 @@ class Database:
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         return self.generations.set_enhance_target(prompt_id, source_prompt_id)
 
+    def set_provenance(self, blocks: dict[str, str]):
+        return self.generations.set_provenance(blocks)
+
     def set_generation_starred(self, prompt_id: str, starred: bool):
         return self.generations.set_generation_starred(prompt_id, starred)
 

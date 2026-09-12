@@ -156,6 +156,16 @@ class GenerationStore(Store):
                 (source_prompt_id or None, prompt_id),
             )
 
+    def set_provenance(self, blocks: dict[str, str]):
+        """Write each row's provenance block, keyed by prompt_id, in one
+        transaction: the first launch after this shipped writes every row in
+        the library, and a commit apiece took half a minute of it."""
+        with self._connect() as conn:
+            conn.executemany(
+                "UPDATE generations SET provenance = ? WHERE prompt_id = ?",
+                [(block, prompt_id) for prompt_id, block in blocks.items()],
+            )
+
     def set_generation_starred(self, prompt_id: str, starred: bool):
         """Star (or unstar) one generation — the user's per-item bookmark.
 

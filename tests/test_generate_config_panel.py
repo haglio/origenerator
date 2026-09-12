@@ -1095,6 +1095,17 @@ def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
     assert got == [("img1", corner_controls.STAR)]
 
 
+def test_a_starred_preview_stays_starred_through_an_enhance_setting_change(saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+    db.set_generation_starred("img1", True)
+
+    panel.set_enhance_settings(gallery.EnhanceSettings(auto=True))
+
+    assert panel._preview._controls.buttons()[0].toolTip() == "Unstar this item"
+
+
 def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):
     panel, _db = saved_panel
     got = []
@@ -1827,6 +1838,18 @@ def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(requesting):
     requesting.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
     assert requesting._preview._actions_id is None
+
+
+def test_a_settings_push_does_not_re_arm_the_corners_over_an_enhancements_frames(
+        saved_panel, tmp_path):
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+
+    panel.set_enhance_settings(gallery.EnhanceSettings(auto=True))
+
+    assert panel._preview.actions_id() is None
 
 
 def test_a_request_tab_holds_no_generation_of_its_own(requesting):

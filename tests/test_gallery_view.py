@@ -3292,6 +3292,34 @@ def test_a_tiles_plus_corner_queues_an_enhance_of_that_image(qtbot, tmp_path):
     assert job.workflow.name == "image_enhance"
 
 
+def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._browser._thumbnail_clicked("g0")
+    star = view._info_tabs.current_config_panel()._preview._controls.buttons()[0]
+
+    star.click()
+
+    assert star.toolTip() == "Unstar this item"
+
+
+def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    plus = view._info_tabs.current_config_panel()._preview._controls.buttons()[2]
+    plus.click()
+    (job,) = view._reroll.all_jobs
+
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    assert not plus.isEnabled()
+
+
 def test_an_unenhanced_image_offers_its_first_enhancement_in_the_corner(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)

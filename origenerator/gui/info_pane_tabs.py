@@ -584,18 +584,9 @@ class InfoPaneTabs(QTabWidget):
         for panel in self.config_panels():
             panel.refresh_displayed(row, image_rows)
 
-    def drop_previews_of_gone_rows(self, live_ids):
-        """Empty the preview of every tab showing a generation that is no longer
-        there — the deletion (or trashing) a gallery rebuild has just taken in.
-
-        Every tab, and only what has gone: a rebuild happens whenever anything
-        lands, so blanking more than that takes the picture out of a tab the user
-        left open and is looking at.
-        """
+    def reconcile_previews(self, live_ids):
         for panel in self.config_panels():
-            row = panel.displayed_row()
-            if row is not None and row.get("prompt_id") not in live_ids:
-                panel.clear_preview()
+            panel.reconcile_preview(live_ids)
 
     def release_media(self, paths):
         """Let every tab go of any of ``paths`` it's showing — files about to be

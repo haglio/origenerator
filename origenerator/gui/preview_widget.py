@@ -652,6 +652,9 @@ class PreviewWidget(QWidget):
         self._controls.show_for(starred=starred, enhance=enhance)
         self._place_controls()
 
+    def actions_id(self) -> str | None:
+        return self._actions_id
+
     def _on_control(self, action: str) -> None:
         if self._actions_id is not None:
             self.action_triggered.emit(self._actions_id, action)

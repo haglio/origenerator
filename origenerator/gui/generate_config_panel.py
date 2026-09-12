@@ -1258,8 +1258,9 @@ class GenerateConfigPanel(QWidget):
         up without the tab taking it on, and the corners have to be about the
         picture rather than about the row under it.
         """
-        row = (self._displayed_row if prompt_id is None
-               else self._db.get_generation(prompt_id))
+        if prompt_id is None and self._displayed_row is not None:
+            prompt_id = self._displayed_row["prompt_id"]
+        row = self._db.get_generation(prompt_id) if prompt_id is not None else None
         if row is None:
             self._preview.set_actions(None)
             return
@@ -1267,6 +1268,17 @@ class GenerateConfigPanel(QWidget):
             row["prompt_id"], starred=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
         )
+
+    def reconcile_preview(self, live_ids):
+        shown = self._displayed_row
+        if shown is not None and shown.get("prompt_id") not in live_ids:
+            self._preview.clear()
+        self._reread_corners()
+
+    def _reread_corners(self):
+        armed = self._preview.actions_id()
+        if armed is not None:
+            self._arm_preview_actions(armed)
 
     def _note_displayed_config(self):
         """Take the settings a generation arriving in this tab is being shown under
@@ -1409,7 +1421,7 @@ class GenerateConfigPanel(QWidget):
             return
         self._enhance_settings = settings
         self._refresh_versions()
-        self._arm_preview_actions()
+        self._reread_corners()
 
     def _on_enhance_requested(self):
         if self._displayed_row is not None:
@@ -1575,16 +1587,6 @@ class GenerateConfigPanel(QWidget):
     def set_preview_paused(self, paused: bool) -> None:
         """Freeze or resume this tab's preview video (the session's OmniPause)."""
         self._preview.set_playback_paused(paused)
-
-    def clear_preview(self) -> None:
-        """Empty this tab's preview — what a generation going away leaves.
-
-        Asked of the panel rather than done to its preview, because the panel is
-        what has to re-assert the corner controls and the drag payload afterwards:
-        a caller reaching past it for the widget is how the preview came to open
-        bare of its corners on every launch (see :meth:`show_selection_media`).
-        """
-        self._preview.clear()
 
     def release_media(self, paths) -> None:
         """Let go of any of ``paths`` this tab is showing — files about to be

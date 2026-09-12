@@ -1873,7 +1873,7 @@ class GalleryView(QWidget):
         # variation of a running loop. Only what has actually gone (a deleted or
         # trashed item) is taken off a tab now.
         self._selected_row = None
-        self._info_tabs.drop_previews_of_gone_rows(self._live_ids)
+        self._info_tabs.reconcile_previews(self._live_ids)
         # _tree_item_for rather than a bare lookup, so a restore target saved as
         # a folder key — a session from before the tree grew sides — still lands
         # on that folder instead of falling back to the default.
@@ -1956,7 +1956,7 @@ class GalleryView(QWidget):
         variation of a running loop — and a tab is repainted only when the
         generation it shows changes under it or goes (see
         :meth:`InfoPaneTabs.refresh_displayed` and
-        :meth:`InfoPaneTabs.drop_previews_of_gone_rows`). Painting the selection
+        :meth:`InfoPaneTabs.reconcile_previews`). Painting the selection
         into whichever tab was in front is how a tab came to show a picture that
         was not its own."""
         if not prompt_id or prompt_id not in self._browser.visible_prompt_ids():

@@ -1023,7 +1023,7 @@ def test_a_deleted_generation_leaves_every_tab_showing_it_empty(tabs, tmp_path):
     other.show_saved_generation({"prompt_id": "g2", "workflow_name": "sdxl_t2i"}, [])
     other._preview.show_image(kept)
 
-    tabs.drop_previews_of_gone_rows({"g2"})
+    tabs.reconcile_previews({"g2"})
 
     assert not doomed._preview.is_showing_any([gone])
     assert other._preview.is_showing_any([kept])

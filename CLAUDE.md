@@ -128,10 +128,9 @@ generation whichever of them made it, and a delete in one is a delete in all;
 only the window's own state and logs stay in the worktree's `state/`. What a
 preview still leaves to the live app is ComfyUI's absence work — background
 experiments and base re-renders, which would outlive it in a queue only the app
-that queued them can cancel (see `origenerator/branch_session.py`). Two things
-to do before handing one over: **re-copy the primary's `content.local.json`
-into the worktree root every time**, and tell the user to close the live app
-first (two instances contend for ComfyUI).
+that queued them can cancel (see `origenerator/branch_session.py`). Before
+handing one over, **re-copy the primary's `content.local.json` into the worktree
+root every time**.
 
 Re-copy, not copy-once. The overlay is where `project_roots` lives, and the
 primary's library is found through it — a worktree carrying a copy taken weeks

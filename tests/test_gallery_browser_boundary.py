@@ -98,7 +98,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     (`gui/inflight_items.py`) and it keeps a one-line delegation. 77 -> 74: what
     the selected shelf collects is asked of its own key, so the five answers
     written out a second time went, and with them the three predicates only that
-    second copy asked. 371 -> 341:
+    second copy asked. The pane keeps 74 while its three selection fields go: which
+    tiles are picked, the anchor a Shift-click measures from and the order they
+    are shown are a `ThumbnailSelection` now, so what stays are delegations. 371 -> 341:
     the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
     new ones for what the shows ask that had no name of its own. 341 -> 318:

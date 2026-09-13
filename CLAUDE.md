@@ -139,6 +139,18 @@ launch dies opening a database under a path that doesn't exist. The launcher
 log's `Library: …` line names the path it tried; if a preview will not open,
 diff the two `content.local.json` files before looking anywhere else.
 
+A change a Fun Time session reaches gets its hosted half judged too. Make a
+fun_time worktree on fun_time's current `main`, put your Origenerator worktree's
+path in its git-ignored `state/origenerator_dir.txt`, and run
+`python -m fun_time.branch_session --shortcut` from it (fun_time's venv, with
+`PYTHONPATH` at that worktree); the `Verify <branch>.lnk` it leaves in the
+fun_time primary is the second launch link. Bring that worktree up to fun_time's
+`main` again right before every handoff, though it carries no commits: the
+launcher writes the session's config with the fun_time primary's current code,
+so a worktree still on an older `main` dies reading that config before a window
+opens. A key renamed on fun_time's `main` hours earlier did exactly that
+(2026-09-13).
+
 The preview is part of delivering any user-facing change, not an extra: the
 user judges mergability by clicking through the real app, and skipping the
 handoff leaves him "just guessing at whether it's mergable" (his words, from

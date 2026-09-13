@@ -1336,6 +1336,23 @@ def _row_visible(form, key):
     return form._sections[title].content_form().isRowVisible(form._present_keys[title].index(key))
 
 
+def test_an_add_ons_strength_shows_only_while_it_has_an_add_on(qtbot):
+    form = ParamForm([
+        ParamDef("lora_high", "Add-on (First Pass)", "combo", "None",
+                 options=["None", "example_style_high.safetensors"]),
+        ParamDef("lora_strength_high", "Add-on Strength (First Pass)", "float", 1.0,
+                 min_val=0.0, max_val=2.0, step=0.05),
+    ])
+    qtbot.addWidget(form)
+    assert not _row_visible(form, "lora_strength_high")
+
+    form._widgets["lora_high"].setCurrentText("example_style_high.safetensors")
+    assert _row_visible(form, "lora_strength_high")
+
+    form.set_values({"lora_high": "None"})
+    assert not _row_visible(form, "lora_strength_high")
+
+
 def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     # A preset needs no recording, and two fields under it read as a second
     # thing to fill in; they appear when the Voice is the custom one, and go

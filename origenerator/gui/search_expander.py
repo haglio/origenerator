@@ -26,12 +26,9 @@ from PyQt6 import sip
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import search
-from origenerator.config import (
-    LOCAL_LLM_BASE_URL,
-    LOCAL_LLM_MODEL,
-    SEARCH_EXPANSION_SYSTEM_PROMPT,
-)
+from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.gui.off_thread import run_off_thread
+from origenerator.prompts import SEARCH_EXPANSION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 

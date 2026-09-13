@@ -19,11 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from origenerator import config, prompts
-
 PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
-# The four, by name. Each is re-exported from config so no importer had to move.
+# The four, by name.
 SYSTEM_PROMPTS = (
     "SEARCH_EXPANSION_SYSTEM_PROMPT",
     "VIDEO_SCENE_MATCH_SYSTEM_PROMPT",
@@ -69,9 +67,9 @@ def test_each_system_prompt_is_written_in_the_module_that_owns_them(name):
     assert name in _assigned_strings("prompts.py")
 
 
-@pytest.mark.parametrize("name", SYSTEM_PROMPTS)
-def test_config_still_answers_for_every_one_of_them(name):
-    """The re-export, which is what let the move touch no importer: the gui
-    package and the voice package both reach them through config today."""
-    assert getattr(config, name) is getattr(prompts, name)
+def test_config_imports_nothing_from_prompts():
+    tree = ast.parse((PACKAGE / "config.py").read_text(encoding="utf-8"))
+
+    assert not [node for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module == "origenerator.prompts"]
 

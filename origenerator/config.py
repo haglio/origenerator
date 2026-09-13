@@ -201,13 +201,3 @@ WHISPER_MODEL = "small"                           # faster-whisper size: tiny/ba
 VOICE_VAD_THRESHOLD = 0.008                       # minimum speech floor; the gate self-calibrates above your mic's ambient level
 LOCAL_LLM_BASE_URL = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 LOCAL_LLM_MODEL = "dolphin-llama3"                # uncensored (ollama pull dolphin-llama3); a censored model refuses explicit edits
-# --- the LLM's system prompts (see origenerator.prompts) --------------------
-# Re-exported so the twenty-four modules that import config kept working when
-# the prompts moved out; a consumer written from here on should import them from
-# origenerator.prompts directly.
-from origenerator.prompts import (  # noqa: E402,F401
-    SEARCH_EXPANSION_SYSTEM_PROMPT,
-    VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
-    VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
-    VOICE_REWRITE_SYSTEM_PROMPT,
-)

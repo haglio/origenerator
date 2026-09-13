@@ -29,11 +29,7 @@ from PyQt6.QtCore import QObject, QThreadPool, QTimer
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
-from origenerator.config import (
-    LOCAL_LLM_BASE_URL,
-    LOCAL_LLM_MODEL,
-    VOICE_REQUEST_MATCH_SYSTEM_PROMPT,
-)
+from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.generation_config import filled_params
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
@@ -52,6 +48,7 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.prompt_edit import apply_request
+from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
 from origenerator.voice.commands import (
     ShelfCommand,

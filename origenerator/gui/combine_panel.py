@@ -5,7 +5,7 @@ side in the video part: pick an act from the category dropdown and let the app f
 a fitting past video for you, or drop a specific i2v video for a custom action. A
 dropped video shows in gray: it is here for its settings, not as a second picture
 to be made. The two are mutually exclusive: picking an act clears a dropped video
-(and relabels the slot as the override path), and dropping a video wipes the
+and hides the slot until "(custom)" is picked again, and dropping a video wipes the
 dropdown back to "(custom)".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while “Edit…” hands it to a generate tab to change first.
@@ -58,10 +58,7 @@ from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
-# The video slot's prompt when neutral (drop a video to use its recipe) versus when
-# an act is picked (the slot becomes the override — drop a video for a custom action).
 _DROP_PLACEHOLDER = "Drop a video"
-_OVERRIDE_PLACEHOLDER = "use custom action from video"
 
 
 class CombinePanel(QWidget):
@@ -89,6 +86,9 @@ class CombinePanel(QWidget):
         # the image, which is the one thing it is not.
         self.video_slot = DropSlot(MediaType.VIDEO, video_accepts, preview, _DROP_PLACEHOLDER,
                                    grayscale=True)
+        room = self.video_slot.sizePolicy()
+        room.setRetainSizeWhenHidden(True)
+        self.video_slot.setSizePolicy(room)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
@@ -103,7 +103,7 @@ class CombinePanel(QWidget):
         self._category.addItems(CATEGORIES)
         self._category.setToolTip(
             "Pick an act and Generate — the app reuses a fitting past video's recipe "
-            "on the dropped image. Or drop a specific video for a custom action instead."
+            "on the dropped image. Or pick (custom) and drop a specific video instead."
         )
         self._category.currentIndexChanged.connect(self._on_category_changed)
 
@@ -253,15 +253,15 @@ class CombinePanel(QWidget):
     # --- mutual exclusion: an act and a dropped video never coexist -------
 
     def _on_category_changed(self):
-        """A picked act supersedes a dropped video: clear the slot and relabel it as
-        the override path. Going back to "(custom)" restores the plain drop prompt,
-        and the video this lane last had dropped in it."""
-        if self.selected_category():
-            self.video_slot.clear()
-            self.video_slot.set_placeholder(_OVERRIDE_PLACEHOLDER)
-        else:
-            self.video_slot.set_placeholder(_DROP_PLACEHOLDER)
+        """A picked act supersedes a dropped video: clear the slot and hide it, its
+        room kept. Going back to "(custom)" shows it again, holding the video this
+        lane last had dropped in it."""
+        custom = not self.selected_category()
+        if custom:
             self._show_dropped()
+        else:
+            self.video_slot.clear()
+        self.video_slot.setVisible(custom)
         self._sync()
 
     def _on_video_changed(self):
@@ -290,8 +290,7 @@ class CombinePanel(QWidget):
 
     def _sync(self):
         """Both actions go live once a source image sits and a recipe is chosen —
-        either by picking an act or by dropping a video. The video part keeps its
-        size throughout; neither control ever hides the other."""
+        either by picking an act or by dropping a video."""
         has_recipe = bool(self.selected_category() or self.video_slot.current_id())
         ready = bool(self.image_slot.current_id()) and has_recipe
         self._generate_btn.setEnabled(ready)

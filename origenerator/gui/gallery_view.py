@@ -256,15 +256,18 @@ def _is_reusable_workflow(workflow_name) -> bool:
     return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
-def _lower_divider() -> QFrame:
-    """The hairline closing the browser pane off from the panels beneath it.
+def _hairline(orientation: Qt.Orientation) -> QFrame:
+    """A one-pixel rule: under the browsing, and between the panels below it.
 
     Drawn with an explicit background rather than a ``QFrame`` sunken line: the
     app's stylesheet paints every plain widget one flat color, and a frame's
     native shadow line is invisible against it.
     """
     line = QFrame()
-    line.setFixedHeight(1)
+    if orientation == Qt.Orientation.Horizontal:
+        line.setFixedHeight(1)
+    else:
+        line.setFixedWidth(1)
     line.setStyleSheet(f"background-color: {BORDER_SUBTLE.name()};")
     return line
 
@@ -973,9 +976,10 @@ class GalleryView(QWidget):
         # The foot of the center (browser) pane, shared by two panels that each
         # take their own room rather than floating over anyone's buttons: genau's
         # readout, copied, held to the left at its fixed size, and the open
-        # folder's Enhance settings taking the width left beside it.  Hosted by
-        # Fun Time there is no readout — the real console is on the session's
-        # main player — so the Enhance settings take the row alone.
+        # folder's Enhance settings taking the width left beside it, a hairline
+        # between them.  Hosted by Fun Time there is no readout — the real
+        # console is on the session's main player — so the Enhance settings take
+        # the row alone.
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 0, 0, 0)
         footer.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
@@ -983,6 +987,7 @@ class GalleryView(QWidget):
         if self._osr2_motion is not None:
             self._motion_panel = MotionPanel(self._osr2_motion, pace=self._pace)
             footer.addWidget(self._motion_panel, 0, Qt.AlignmentFlag.AlignTop)
+            footer.addWidget(_hairline(Qt.Orientation.Vertical))
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its tick on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
@@ -995,7 +1000,7 @@ class GalleryView(QWidget):
         # it the Enhance settings read as the foot of whatever folder is on screen
         # rather than as their own thing — which they are: app-wide settings that
         # don't belong to the folder they happen to be sitting under.
-        browser_column.addWidget(_lower_divider())
+        browser_column.addWidget(_hairline(Qt.Orientation.Horizontal))
         browser_column.addLayout(footer)
         return browser
 

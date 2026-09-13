@@ -9986,17 +9986,20 @@ def _set_enhance(view, **fields):
     return settings
 
 
-def test_the_hud_holds_the_left_of_the_lower_row_and_enhance_the_right(qtbot, tmp_path):
-    # Both panels share the foot of the center pane: genau's console at its
-    # fixed size on the left, the Enhance settings taking the width beside it.
+def test_the_hud_holds_the_left_of_the_lower_row_a_hairline_apart_from_enhance(qtbot,
+                                                                              tmp_path):
+    from PyQt6.QtWidgets import QFrame
+
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     row = view._motion_panel.parentWidget().layout().itemAt(
         _row_index(view, view._motion_panel)
     )
-    assert row.itemAt(0).widget() is view._motion_panel
-    assert row.itemAt(1).widget() is view._enhance.panel
-    assert row.stretch(0) == 0 and row.stretch(1) == 1
+    hud, hairline, enhance = (row.itemAt(i).widget() for i in range(row.count()))
+    assert hud is view._motion_panel and enhance is view._enhance.panel
+    assert isinstance(hairline, QFrame) and hairline.width() == 1
+    assert "background-color" in hairline.styleSheet()
+    assert [row.stretch(i) for i in range(row.count())] == [0, 0, 1]
 
 
 def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp_path):

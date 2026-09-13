@@ -129,8 +129,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the panes' own objects -- which takes it under fifty statements for the first
     time. 270 -> 267: `ShowDirector` builds a double-clicked item's slides and
     every show's versions from the rows the browser lists, so the three methods
-    that built them here went.)"""
+    that built them here went. 267 -> 266: a folder tile's still of a combine's
+    recipe clip and a config tab's loop of it are one "what this run was made
+    from", asked for once.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 267
+               for x in _class_def(VIEW, "GalleryView").body) == 266
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 75

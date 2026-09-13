@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QMenu
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui.combination import Combination
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs, parse_tabs_state
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -522,9 +523,10 @@ def test_a_run_with_a_picture_behind_it_stands_that_instead_of_a_note(tabs):
     panel._preview.show_combination = MagicMock()
     panel._preview.show_message = MagicMock()
 
-    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
+    panel.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
 
-    panel._preview.show_combination.assert_called_once_with("frame.png", "clip.webp")
+    panel._preview.show_combination.assert_called_once_with(
+        Combination("frame.png", "clip.webp"))
     panel._preview.show_message.assert_not_called()
     # It is not a worded wait, so a changed queue count has nothing to rewrite.
     assert not panel.is_awaiting_frame()
@@ -536,8 +538,8 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
     panel = tabs.currentWidget()
     panel._preview.show_combination = MagicMock()
 
-    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
-    panel.watch_folder("k", None, None, ("frame.png", "clip.webp"))
+    panel.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
+    panel.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
 
     assert panel._preview.show_combination.call_count == 1
 
@@ -547,7 +549,7 @@ def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs):
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
 
-    panel.watch_folder("k", None, None, (None, None))
+    panel.watch_folder("k", None, None, Combination())
 
     panel._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
 

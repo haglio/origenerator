@@ -47,9 +47,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
 
+from origenerator.gui.combination import Combination
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
@@ -142,9 +142,9 @@ def _canvas(cell: int) -> QPixmap:
     return canvas
 
 
-def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
-    """A block holding what a job is being made from: the file at ``path``, and —
-    for a combine's run — the ``recipe`` video whose settings it follows, in gray.
+def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
+    """A block holding what a job is being made from: its picture, and — for a
+    combine's run — the recipe video whose settings it follows, in gray.
 
     ``None`` only when neither file loads, so the caller can fall back rather than
     show an empty block; either alone still draws, each in its own cell, so the
@@ -156,7 +156,8 @@ def source_pixmap(path, cell: int, recipe=None) -> QPixmap | None:
     the frame in full color it reads as a second subject, and the row of a job
     whose frame hasn't rendered yet would read as a job that *is* that clip.
     """
-    parts = (fitted_cell(path, cell), fitted_cell(recipe, cell, gray=True))
+    parts = (fitted_cell(made_from.picture, cell),
+             fitted_cell(made_from.recipe, cell, gray=True))
     if all(part is None for part in parts):
         return None
     canvas = _canvas(cell)
@@ -210,27 +211,21 @@ class QueueThumbs(QLabel):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.hide()  # nothing to show yet, and an empty block would claim there was
 
-    def show_source(self, image_ref, recipe=None) -> bool:
-        """Draw what ``image_ref`` names — a job's start frame, as its
-        ``LoadImage`` reference rather than a path, which is the form every run
-        records it in — and beside it the ``recipe`` video's thumbnail, in gray.
+    def show_source(self, made_from: Combination) -> bool:
+        """Draw what a job is made from: its start frame, and beside it the
+        recipe video's thumbnail, in gray.
 
-        ``False`` only when neither has anything to draw: no reference and no
+        ``False`` only when neither has anything to draw: no picture and no
         recipe, or files that have moved or haven't been rendered yet (a video
         queued after the image it animates is exactly that). The caller falls
         back to the folder view rather than leave a blank block standing where a
         picture was promised — but a frame that hasn't landed no longer costs the
         row its recipe cell, which is about this run either way.
-
-        The frame is resolved on every call rather than remembered: the answer
-        changes the moment it lands, and it is one stat.
         """
-        path = resolve_input_image_path(image_ref) if image_ref else None
-        showing = ("source", str(path) if path else None,
-                   str(recipe) if recipe else None)
+        showing = ("source", made_from)
         if self._showing == showing:
             return True
-        pixmap = source_pixmap(path, self._cell, recipe)
+        pixmap = source_pixmap(made_from, self._cell)
         if pixmap is None:
             return False
         self._showing = showing

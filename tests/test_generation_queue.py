@@ -4,6 +4,7 @@ import time
 
 import pytest
 
+from origenerator.gui.combination import Combination
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
 from origenerator.gui.inflight import InFlightItem
 
@@ -913,7 +914,7 @@ def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", frame, None)
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame))
 
 
 def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
@@ -941,7 +942,7 @@ def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
     queue.set_items([_item(job_kind="Video", source_image=frame, recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", frame, recipe)
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, recipe))
 
 
 def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue, tmp_path):
@@ -952,7 +953,7 @@ def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue
     queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", None, recipe)
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, recipe))
 
 
 def test_a_row_that_is_not_a_job_yet_says_so(queue):

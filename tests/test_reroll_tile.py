@@ -6,6 +6,7 @@ from io import BytesIO
 from PIL import Image
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 
+from origenerator.gui.combination import Combination
 from origenerator.gui.reroll_tile import RerollTile
 
 
@@ -194,7 +195,7 @@ def test_a_running_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     clip = tmp_path / "clip.png"
     Image.new("RGB", (60, 40), (255, 0, 0)).save(clip)
     job = FakeJob(state="running", started_at=time.time() - 5)
-    tile = RerollTile(job, source_picture=str(frame), recipe_picture=str(clip))
+    tile = RerollTile(job, made_from=Combination(str(frame), str(clip)))
     qtbot.addWidget(tile)
 
     picture = tile._image.pixmap()

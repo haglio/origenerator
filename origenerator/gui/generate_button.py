@@ -9,7 +9,7 @@ work to the state of work already going.
 
 It stays pressable throughout, since another press queues another job rather
 than relaunching over the one running. It also flashes a form guard — e.g.
-"select an input image" — when a Generate is blocked, so the panel needs no
+"Select the Start Image" — when a Generate is blocked, so the panel needs no
 standing status line.
 
 Its resting caption is the panel's to set: settings that would re-create a past

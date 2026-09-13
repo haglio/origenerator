@@ -491,7 +491,7 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
     panel._on_generate()
 
     assert requested == []                            # nothing asked of the gallery
-    assert "image" in panel._generate_btn.text().lower()  # the guard flashes on the button
+    assert panel._generate_btn.text() == "Select the Start Image"
     assert panel._db.list_generations() == []         # nothing recorded
 
 

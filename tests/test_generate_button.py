@@ -69,8 +69,8 @@ def test_the_button_tracks_no_run(button):
 
 
 def test_flash_guard_shows_the_message_on_the_button(button):
-    button.flash_guard("Select an input image")
-    assert button.text() == "Select an input image"
+    button.flash_guard("Select the Start Image")
+    assert button.text() == "Select the Start Image"
 
 
 def test_the_caption_is_what_a_flashed_guard_comes_back_to(button):
@@ -80,7 +80,7 @@ def test_the_caption_is_what_a_flashed_guard_comes_back_to(button):
     button.set_caption("Generate with Random seed")
     assert button.text() == "Generate with Random seed"
 
-    button.flash_guard("Select an input image")
+    button.flash_guard("Select the Start Image")
     button._guard_timer.timeout.emit()
 
     assert button.text() == "Generate with Random seed"
@@ -90,10 +90,10 @@ def test_a_new_caption_waits_for_the_guard_message_to_clear(button):
     # The caption is recomputed on every form edit, which is exactly what the user
     # is doing while a guard says what the form still needs — so a caption arriving
     # mid-guard waits its turn rather than wiping the message being read.
-    button.flash_guard("Select an input image")
+    button.flash_guard("Select the Start Image")
 
     button.set_caption("Generate with Random seed")
 
-    assert button.text() == "Select an input image"
+    assert button.text() == "Select the Start Image"
     button._clear_guard()
     assert button.text() == "Generate with Random seed"

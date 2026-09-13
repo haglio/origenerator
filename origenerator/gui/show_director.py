@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
+from functools import partial
 from typing import Protocol
 
 from PyQt6.QtCore import Qt
@@ -36,6 +37,7 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSC
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.gui.fun_time_bridge import ask_for_omnipause
 from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
 )
@@ -345,13 +347,16 @@ class ShowDirector:
                 delete=self._host.trash_generation,
                 enhance=self._host.enhance_from_slideshow,
                 star=self._host.star_generation,
-                # Two of the six are a session's: a lock opens the held item as
-                # a generate tab, and a reset means the REGION's base state.
+                # Three of the seven are a session's: a lock opens the held item
+                # as a generate tab, a reset means the REGION's base state, and a
+                # click on the picture asks the room to pause.
                 lock=(self._open_generate_tab_for
                       if self._fun_time is not None else None),
                 reset=(self.reset_region if self._fun_time is not None else None),
                 # Space reaches the one OSR2 switch, like every other surface's.
                 drive_toggle=self._host.toggle_osr2_drive,
+                omnipause=(partial(ask_for_omnipause, self._session_channel)
+                           if self._session_channel is not None else None),
             ),
             pace=self._pace, motion=self._motion,
             # Which of its items carry an enhancement, for the switch beside
@@ -514,7 +519,7 @@ class ShowDirector:
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
         if self._session_paused:
-            view.set_session_paused(True)
+            view.set_paused(True)
         self._wear_the_hud(view, side)
 
     def _wear_the_hud(self, view, side: str) -> None:
@@ -538,9 +543,12 @@ class ShowDirector:
         # The view is handed the panel itself rather than only told one is on:
         # its console seats itself under the panel and follows it as it resizes.
         view.adopt_hud(hud(view, side=side,
-                           dashboard_cmd_file=(None if self._fun_time is None
-                                               else self._fun_time.dashboard_cmd_file),
+                           dashboard_cmd_file=self._session_channel,
                            label_for=self._item_label))
+
+    @property
+    def _session_channel(self):
+        return None if self._fun_time is None else self._fun_time.dashboard_cmd_file
 
     def _item_label(self, prompt_id: str) -> str:
         """What to call the item on a show's HUD, in this app's vocabulary.
@@ -761,7 +769,7 @@ class ShowDirector:
         # still a show that must not go on playing through a frozen room.
         for show, _where in list(self._live_shows):
             try:
-                show.set_session_paused(paused)
+                show.set_paused(paused)
             except Exception:
                 logger.exception("Freezing a show failed")
 

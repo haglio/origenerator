@@ -9788,8 +9788,8 @@ class _VoiceSurface:
     def hud_f_mode(self):
         return getattr(self, "f_mode", False)
 
-    def set_session_paused(self, paused):
-        self.session_paused = paused
+    def set_paused(self, paused):
+        self.paused = paused
 
     def adopt_hud(self):
         self.adopted = True

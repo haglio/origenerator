@@ -17,6 +17,8 @@ shows the way it reaches the players:
   the open shows, so a show opened mid-pause opens frozen.
 * The status file says which regions are occupied (and by what) — a readout
   for the hosting session's diagnostics.
+* A click on a show asks the room for OmniPause (:func:`ask_for_omnipause`) on
+  the dashboard channel, where a player's click on its picture asks for it.
 """
 
 from __future__ import annotations
@@ -29,12 +31,21 @@ from origenerator.fun_time_mode import FunTimeSession
 from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
-from player_core.file_channel import consume_command_file, publish_whole, read_paused_state
+from player_core.file_channel import (
+    append_command,
+    consume_command_file,
+    publish_whole,
+    read_paused_state,
+)
 
 logger = logging.getLogger(__name__)
 
 _POLL_MS = 150
 _SIDES = ("portrait", "landscape")
+
+
+def ask_for_omnipause(dashboard_cmd_file) -> None:
+    append_command(dashboard_cmd_file, "omnipause_toggle")
 
 
 class FunTimeBridge(QObject):

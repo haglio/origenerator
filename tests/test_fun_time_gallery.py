@@ -228,7 +228,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     # players' HUD: a real one is a SlideshowView, which answers all of that —
     # the last through ShowHost — and the view calls them outright.
     stub.set_audio_muted = lambda muted: None
-    stub.set_session_paused = lambda paused: None
+    stub.set_paused = lambda paused: None
     stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
     stub.hud_items = lambda: ((), 0, False)  # a host with no set draws no map
     view._shows._present_surface(stub, "portrait")
@@ -287,6 +287,21 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     hud._deliver("portrait_minimize")
     posted = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
     assert posted == ["portrait_next"]
+
+
+def test_a_click_on_a_hosted_show_asks_the_room_for_omnipause(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    channel = tmp_path / "dashboard_cmd.txt"
+
+    qtbot.mouseClick(show._preview, Qt.MouseButton.LeftButton)
+
+    qtbot.waitUntil(lambda: channel.exists() and channel.read_text(
+        encoding="utf-8").split() == ["omnipause_toggle"])
+    assert show._paused is False
 
 
 def _session_with_dashboard(tmp_path):
@@ -889,7 +904,7 @@ def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
 
     view.set_session_paused(True)
 
-    assert show._session_paused is True
+    assert show._paused is True
     assert not show._advance_timer.isActive()
 
 

@@ -29,7 +29,7 @@ class ShowActions:
     which lives in a database the show has never seen. Each of these is that
     second half, and each is optional: a show handed none of them still answers
     every key, it just asks nobody. That is what a test's show gets, and what a
-    show standing outside a session gets for the two that are a session's.
+    show standing outside a session gets for the three that are a session's.
 
     ``delete`` and ``star`` take the slide's prompt_id. ``enhance`` takes one
     too and answers whether a run actually started, which is what the corner
@@ -38,6 +38,8 @@ class ShowActions:
     session's too — hosted, "how it started" is the REGION's base state, which
     only the gallery knows. ``drive_toggle`` takes nothing: Space goes to the
     app's one OSR2 switch rather than straight to this show's motion.
+    ``omnipause`` takes nothing and is a session's: hosted, a click on the
+    picture asks the room to pause, where a show on its own pauses itself.
     """
 
     delete: Callable[[str], None] | None = None
@@ -46,6 +48,7 @@ class ShowActions:
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
     drive_toggle: Callable[[], None] | None = None
+    omnipause: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True)

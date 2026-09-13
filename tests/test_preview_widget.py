@@ -451,6 +451,33 @@ def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
     assert called == [True]
 
 
+def test_a_lone_click_waits_out_the_double_click_window_then_runs_the_click_callback(qtbot):
+    clicks = []
+    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
+                      on_click=lambda: clicks.append(True))
+    qtbot.addWidget(w)
+
+    _press(w)
+
+    assert clicks == []
+    qtbot.waitUntil(lambda: clicks == [True])
+
+
+def test_the_first_click_of_a_double_click_is_the_double_clicks_alone(qtbot):
+    clicks, double_clicks = [], []
+    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
+                      on_click=lambda: clicks.append(True),
+                      on_double_click=lambda: double_clicks.append(True))
+    qtbot.addWidget(w)
+
+    _press(w)
+    w.mouseDoubleClickEvent(None)
+    qtbot.wait(QApplication.styleHints().mouseDoubleClickInterval() + 200)
+
+    assert double_clicks == [True]
+    assert clicks == []
+
+
 # --- watching a generation fullscreen while it's still being made -----------
 
 class _FakeFullscreen(QWidget):

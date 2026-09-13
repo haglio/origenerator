@@ -11,8 +11,8 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
-from PyQt6.QtCore import QEvent, QSize, Qt, QUrl
-from PyQt6.QtGui import QKeyEvent, QResizeEvent
+from PyQt6.QtCore import QEvent, QPointF, QSize, Qt, QUrl
+from PyQt6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.funscript import (
@@ -1065,8 +1065,8 @@ def test_the_rooms_freeze_holds_the_push_and_its_resume_carries_it_on(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     heard = _heard_pushes(view)
 
-    view.set_session_paused(True)
-    view.set_session_paused(False)
+    view.set_paused(True)
+    view.set_paused(False)
 
     assert heard == [("pause_push",), ("resume_push",)]
 
@@ -1078,8 +1078,8 @@ def test_a_held_slide_keeps_its_push_through_a_request_and_the_rooms_freeze(qtbo
 
     view.hold_for_request(True, "🎤 listening…")
     view.hold_for_request(False)
-    view.set_session_paused(True)
-    view.set_session_paused(False)
+    view.set_paused(True)
+    view.set_paused(False)
 
     assert heard == [("pause_push",), ("resume_push",), ("pause_push",), ("resume_push",)]
     assert not view._advance_timer.isActive()
@@ -1089,11 +1089,42 @@ def test_a_request_released_under_the_rooms_freeze_leaves_the_push_held(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     heard = _heard_pushes(view)
 
-    view.set_session_paused(True)
+    view.set_paused(True)
     view.hold_for_request(True, "🎤 listening…")
     view.hold_for_request(False)
 
     assert heard == [("pause_push",)]
+
+
+def _click(view):
+    at = QPointF(view._preview.width() / 2, view._preview.height() / 2)
+    view._preview.mousePressEvent(QMouseEvent(
+        QEvent.Type.MouseButtonPress, at, at, Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+
+
+def test_a_click_pauses_a_show_standing_on_its_own_and_a_second_plays_it_again(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    heard = _heard_pushes(view)
+
+    _click(view)
+    qtbot.waitUntil(lambda: not view._advance_timer.isActive())
+    assert heard == [("pause_push",)]
+
+    _click(view)
+    qtbot.waitUntil(view._advance_timer.isActive)
+    assert heard == [("pause_push",), ("resume_push",)]
+
+
+def test_a_click_on_a_hosted_show_asks_the_room_to_pause_instead_of_pausing_itself(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 on_omnipause=lambda: asked.append(True))
+
+    _click(view)
+    qtbot.waitUntil(lambda: asked == [True])
+
+    assert view._advance_timer.isActive()
 
 
 def test_each_slide_opens_on_the_whole_picture(qtbot):

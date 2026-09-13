@@ -172,8 +172,9 @@ forced this flow into existence (2026-08-12):
   comes up clean" rule, which is what produced the failure. The pre-handoff
   check is windowless instead: `python -m pytest tests/test_launch_smoke.py`
   replays the launch's whole import phase in a fresh interpreter under the
-  launcher's own cwd and `PYTHONPATH`, which is precisely what a dead icon fails
-  at — and a launcher that breaks past that, he tells you about in one line.
+  launcher's own cwd, with nothing on `PYTHONPATH`, which is precisely what a
+  dead icon fails at — and a launcher that breaks past that, he tells you about
+  in one line.
   `~/.claude/hooks/block-visible-origenerator.py` blocks the visible launch
   mechanically, so this one does not rest on prose. Same reason his live app
   must never be closed by you — every Origenerator window is a `python` process

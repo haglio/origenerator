@@ -25,6 +25,7 @@ _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:204
 _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_wheel.py:97, origenerator/gui/no_wheel.py:102
+_.requestImage  # noqa  # origenerator/gui/ken_burns_still.py:83, Qt Quick's image loader asking the provider for each picture the scene names
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:204

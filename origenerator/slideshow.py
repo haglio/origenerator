@@ -412,7 +412,7 @@ class SlideshowPlaylist:
         return slide is not None and slide.media_type == "video"
 
     def pace_ms(self):
-        if self._paused or self.current() is None or self.current_is_video():
+        if self.current() is None or self.current_is_video():
             return None
         return self._image_dwell_ms or None
 
@@ -421,5 +421,5 @@ class SlideshowPlaylist:
         when it shouldn't be timer-advanced: an empty, locked or paused playlist, a
         pace of nought (hold this one until an arrow moves it), or a video — which
         advances when it ends, not on a clock."""
-        return None if self._locked else self.pace_ms()
+        return None if self.holding() else self.pace_ms()
 

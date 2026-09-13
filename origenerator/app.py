@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import uuid
 from collections.abc import Callable
@@ -559,6 +560,8 @@ def main(argv: list[str] | None = None) -> int:
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
     _init_windows_taskbar_identity(app_args.taskbar_identity)
     _name_this_process()
+    from origenerator.render_loop import request_threaded_render_loop
+    request_threaded_render_loop(os.environ)
 
     from PyQt6.QtWidgets import QApplication
 

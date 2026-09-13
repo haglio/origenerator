@@ -17,6 +17,7 @@ The websocket half stays where it must: it emits Qt signals from a thread.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import time
@@ -173,7 +174,7 @@ def comfyui_responding(host: str, port: int, timeout: float = 2.0) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read())
-    except Exception:
+    except (OSError, ValueError, http.client.HTTPException):
         return False
     return isinstance(data, dict) and "system" in data
 

@@ -1448,6 +1448,17 @@ def test_stepping_re_aims_the_device(qtbot):
     _press(view, Qt.Key.Key_Right)
     assert changed == [True]
 
+
+def test_stepping_a_paused_show_still_re_aims_the_device(qtbot):
+    view = _view(qtbot)
+    view.set_paused(True)
+    changed = []
+    view.media_changed.connect(lambda: changed.append(True))
+
+    _press(view, Qt.Key.Key_Right)
+
+    assert changed == [True]
+
 # --- the hold a spoken request puts on the show -----------------------------
 
 

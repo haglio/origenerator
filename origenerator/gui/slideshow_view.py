@@ -303,8 +303,8 @@ class SlideshowView(QWidget):
                 self._preview.pause_push()
         if self._paused:
             self._preview.set_playback_paused(True)  # arrive holding
-            return
-        self._arm_advance()
+        else:
+            self._arm_advance()
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     # --- the slide's own clock: the advance, and what holds the push ---------

@@ -352,7 +352,6 @@ class EnhancePanel(QWidget):
         column.addWidget(_SettingsScroll(settings), 1)
 
         self._enhance_button = QPushButton("Enhance")
-        self._enhance_button.setObjectName("enhanceBtn")
         self._enhance_button.clicked.connect(self.enhance_requested)
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)

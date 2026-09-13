@@ -6,7 +6,7 @@ play-once mode) for the actual image/video rendering and a
 :class:`~origenerator.slideshow.SlideshowPlaylist` for the order and pacing.
 Images advance on a dwell timer; videos play once and advance when they end
 (``PreviewWidget.video_ended``). The arrows step, Shift+arrows step the
-enhancement levels of the picture on screen, Up culls, Down locks the slide
+versions of the item on screen, Up culls, Down locks the slide
 against the advance (a locked clip replays, and the hold both stars the slide and
 asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
 for the shown item's own folder (``open_requested``), and Escape closes. Ending
@@ -381,12 +381,12 @@ class SlideshowView(QWidget):
                 self._dwell_s * 1000)
 
     def set_levels(self, levels_by_path: dict) -> None:
-        """Arm Shift+Left/Right to step an image's enhancement levels.
+        """Arm Shift+Left/Right to step an item's versions.
 
-        ``levels_by_path`` maps the file the set shows an image under to that
-        image's versions, newest first, as ``(path, media_type, label)``. Plain
+        ``levels_by_path`` maps the file the set shows an item under to that
+        item's versions, newest first, as ``(path, media_type, label)``. Plain
         Left/Right still steps the set; the shifted pair moves within the one
-        image — its own axis, because a version is not a neighbor.
+        item — its own axis, because a version is not a neighbor.
         """
         self._levels.arm(levels_by_path)
         self._refresh_note()
@@ -586,11 +586,12 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def _step_level(self, delta: int) -> None:
-        """Step ``delta`` enhancement levels within the image on screen.
+        """Step ``delta`` versions within the item on screen: an image's
+        enhancement levels, or a video's Evolver upscale and the video itself.
 
-        A no-op for an image with one version, and for a video — there is
-        nothing to compare it against, and silently doing nothing is better
-        than stepping the set when the shift was the whole point.
+        A no-op for an item with one version — there is nothing to compare it
+        against, and silently doing nothing is better than stepping the set
+        when the shift was the whole point.
         """
         level = self._levels.step(delta, base=self._current_base())
         if level is None:

@@ -27,10 +27,10 @@ class LevelStepper:
         self._index = 0
 
     def arm(self, levels_by_path) -> None:
-        """Take the versions of every image that has more than itself.
+        """Take the versions of every item that has more than itself.
 
-        ``levels_by_path`` maps the file the set shows an image under to that
-        image's versions, newest first, as ``(path, media_type, label)``. The
+        ``levels_by_path`` maps the file the set shows an item under to that
+        item's versions, newest first, as ``(path, media_type, label)``. The
         gallery rebuilds this on every poll and spells its paths either way, so
         the keys are normalized and the lists copied — nothing here goes on
         pointing at what the caller handed over.
@@ -48,9 +48,9 @@ class LevelStepper:
         """Move ``delta`` versions within the picture on screen and answer the
         one to show, or ``None`` when there is nothing to step.
 
-        Nothing to step is an image with one version and a video with none: the
-        caller leaves the set alone rather than paging it, since the shift was
-        the whole point of the press.
+        Nothing to step is an item with one version: the caller leaves the set
+        alone rather than paging it, since the shift was the whole point of the
+        press.
         """
         base = self._base or base
         versions = self._by_path.get(base) or []

@@ -1246,56 +1246,6 @@ class GalleryView(QWidget):
             return panel.osr2_drive_target()
         return None
 
-    def level_playlists(self) -> dict:
-        """Each visible image's versions, keyed by the file the folder shows it
-        under — newest first, matching the strip in the info pane. Each carries
-        its label, so a slideshow can say which one is on screen."""
-        playlists = {}
-        for pid in self._browser.visible_prompt_ids():
-            row = self.row_for(pid)
-            if row is None:
-                continue
-            levels = gallery.enhance_levels(row)
-            if len(levels) < 2:
-                continue  # one version is nothing to step between
-            entries = [
-                (gallery.output_file_path(lvl.file, COMFYUI_OUTPUT_DIR), "image", lvl.label)
-                for lvl in levels
-            ]
-            playlists[str(entries[0][0])] = entries
-        return playlists
-
-    def folder_media_playlist(self):
-        """The visible folder's resolvable media in shown order, and the index of
-        the currently-shown item — what a double-clicked picture's show plays.
-
-        Each entry carries its generation's id alongside the media, so the show's
-        Up and Down can name what to trash and what to bookmark, and its stored
-        thumbnail, which is the only still a video has for the neighbor previews.
-
-        Returns an empty list when the shown item isn't among them, so the show
-        always opens on what's already on screen."""
-        selected_pid = self._selected["prompt_id"] if self._selected else None
-        items, index, found = [], 0, False
-        for entry in self.folder_media():
-            if entry[2] == selected_pid:
-                index, found = len(items), True
-            items.append(entry)
-        return (items, index) if found else ([], 0)
-
-    def folder_media(self) -> list[tuple]:
-        """The visible folder's resolvable media in shown order, each as
-        ``(path, media_type, prompt_id, thumbnail)``. In-flight and output-less
-        rows have nothing to show fullscreen, so they are left out."""
-        media = []
-        for pid in self._browser.visible_prompt_ids():
-            row = self.row_for(pid)
-            preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR) if row else None
-            if preview is not None:
-                media.append((preview[0], preview[1], pid, row.get("thumbnail_path")))
-        return media
-
-
     def group_for_key(self, key: str):
         """The folder ``key`` names, as the side it is being looked at holds it."""
         item = self._tree_item_for(key)

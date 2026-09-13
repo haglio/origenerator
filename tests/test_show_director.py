@@ -317,9 +317,8 @@ class FakeHost:
         self.reconciles = 0
         self.cleared_queue = 0
         self.queue = ([], 0)
-        self.playlists = {"a.png": [("a.png", "image", "v1")]}
-        self.media = [("m.png", "image", "m1", None)]
-        self.media_index = 0
+        self.visible = [row["prompt_id"] for row in self.rows]
+        self.selected = None
         self.types = {"image", "video"}
 
     def show_location(self):
@@ -346,14 +345,11 @@ class FakeHost:
     def image_config_index(self):
         return {}
 
-    def level_playlists(self):
-        return self.playlists
+    def visible_prompt_ids(self):
+        return list(self.visible)
 
-    def folder_media(self):
-        return self.media
-
-    def folder_media_playlist(self):
-        return list(self.media), self.media_index
+    def selected_prompt_id(self):
+        return self.selected
 
     def queue_now(self):
         return self.queue
@@ -550,6 +546,44 @@ def test_a_landed_enhancement_reaches_every_surface(shows, tmp_path, monkeypatch
 
     assert [show.enhanced for show in made] == [
         [("g1", "image", None)], [("g1", "image", None)]]
+
+
+def _evolver_upscaled_video(tmp_path, monkeypatch):
+    """A video row with its file on disk, and the upscale Evolver made of it."""
+    import os
+
+    output = tmp_path / "output"
+    video = output / "clip.mp4"
+    video.parent.mkdir()
+    video.write_bytes(b"video")
+    os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
+    library = tmp_path / "upscaled_by_orientation"
+    upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
+    upscale.parent.mkdir(parents=True)
+    upscale.write_bytes(b"upscale")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(module, "EVOLVER_UPSCALED_DIR", library)
+    return _row("g1", files=("clip.mp4",)), video, upscale
+
+
+def _director():
+    return ShowDirector(FakeHost(), db=FakeDB(), browser=FakeBrowser(),
+                        reroll=FakeReroll(), pace=FakePace(), motion=None,
+                        fun_time=None)
+
+
+def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):
+    row, _video, upscale = _evolver_upscaled_video(tmp_path, monkeypatch)
+
+    assert _director().items_of([row]) == [(upscale, "video", "g1", None)]
+
+
+def test_shift_arrows_step_from_an_upscale_to_the_video_it_was_made_from(tmp_path,
+                                                                        monkeypatch):
+    row, video, upscale = _evolver_upscaled_video(tmp_path, monkeypatch)
+
+    assert _director().versions_of([row]) == {
+        str(upscale): [(upscale, "video", "Evolved"), (video, "video", "Original")]}
 
 
 def test_a_region_reset_re_points_what_feeds_it(shows):

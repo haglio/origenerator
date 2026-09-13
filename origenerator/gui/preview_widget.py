@@ -31,6 +31,7 @@ from PyQt6.QtCore import (
     QRectF,
     QSize,
     Qt,
+    QTimer,
     QUrl,
     pyqtSignal,
 )
@@ -193,6 +194,10 @@ class PreviewWidget(QWidget):
         self._player.setLoops(
             QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
         )
+        self._unplayable_report = QTimer(self)
+        self._unplayable_report.setSingleShot(True)
+        self._unplayable_report.setInterval(0)
+        self._unplayable_report.timeout.connect(self._report_unplayable)
         self._player.mediaStatusChanged.connect(self._on_media_status)
         self._player.errorOccurred.connect(self._on_media_error)
 
@@ -287,6 +292,7 @@ class PreviewWidget(QWidget):
         self._set_movie(None)
         self._pixmap = None
         self._hide_strip()
+        self._unplayable_report.stop()
         if stop_player:
             self._player.stop()
         if not enhancing:
@@ -802,12 +808,16 @@ class PreviewWidget(QWidget):
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.video_ended.emit()
         elif status == QMediaPlayer.MediaStatus.InvalidMedia:
-            self.video_unplayable.emit()
+            self._unplayable_report.start()
 
     def _on_media_error(self, error, _message: str = "") -> None:
         """Same report, from the other direction: the backend can raise the
         error without ever moving the status to InvalidMedia."""
-        if error != QMediaPlayer.Error.NoError and self.is_showing_video():
+        if error != QMediaPlayer.Error.NoError:
+            self._unplayable_report.start()
+
+    def _report_unplayable(self) -> None:
+        if self.is_showing_video():
             self.video_unplayable.emit()
 
     def _release(self) -> None:

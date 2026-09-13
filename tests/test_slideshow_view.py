@@ -1458,18 +1458,15 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_show(qtbot, tmp_path):
     first, second = tmp_path / "a.png", tmp_path / "b.png"
     for path in (first, second):
         Image.new("RGB", (40, 30)).save(path)
-    clip = tmp_path / "broken.mp4"
-    clip.write_bytes(b"not a video")
-    items = [(str(clip), "video", "v-1", None),
+    items = [(str(tmp_path / "broken.mp4"), "video", "v-1", None),
              (str(first), "image", "i-1", None),
              (str(second), "image", "i-2", None)]
-    view = SlideshowView(items, shuffle=in_order)
-    qtbot.addWidget(view)
+    view = _view(qtbot, items, shuffle=in_order)
     assert view._playlist.current()[2] == "v-1"
 
     view._preview._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
 
-    assert view._playlist.current()[2] == "i-1"
+    qtbot.waitUntil(lambda: view._playlist.current()[2] == "i-1")
 
 
 def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
@@ -1480,12 +1477,9 @@ def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
 
     still = tmp_path / "a.png"
     Image.new("RGB", (40, 30)).save(still)
-    clip = tmp_path / "broken.mp4"
-    clip.write_bytes(b"not a video")
-    view = SlideshowView([(str(clip), "video", "v-1", None),
-                          (str(still), "image", "i-1", None)],
-                         shuffle=in_order)
-    qtbot.addWidget(view)
+    view = _view(qtbot, [(str(tmp_path / "broken.mp4"), "video", "v-1", None),
+                         (str(still), "image", "i-1", None)],
+                 shuffle=in_order)
     view._playlist.toggle_lock()
 
     view._preview.video_unplayable.emit()

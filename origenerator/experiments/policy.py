@@ -21,6 +21,7 @@ from origenerator.gallery import parse_params, produced_output
 from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType
+from origenerator.workflows.base import ParamType
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -178,8 +179,8 @@ class ExperimentPolicy:
         for pd in workflow.param_definitions():
             if pd.key == "batch_size":
                 continue
-            if pd.key == "positive_prompt" or (pd.type in ("int", "float") and pd.min_val is not None \
-                    and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == "combo" and pd.options and len(pd.options) > 1):
+            if pd.key == "positive_prompt" or (pd.type in (ParamType.INT, ParamType.FLOAT) and pd.min_val is not None \
+                    and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == ParamType.COMBO and pd.options and len(pd.options) > 1):
                 dims.append(pd)
         return dims
 
@@ -188,7 +189,7 @@ class ExperimentPolicy:
         change was made (a dimension with nothing to change to is a no-op)."""
         if pd.key == "positive_prompt":
             return self._crossover_prompts(params, workflow, rows)
-        if pd.type == "combo":
+        if pd.type == ParamType.COMBO:
             return self._swap_combo(params, pd, workflow, rows)
         return self._jitter_numeric(params, pd, workflow, rows)
 
@@ -256,7 +257,7 @@ class ExperimentPolicy:
         if pd.step:
             value = pd.min_val + round((value - pd.min_val) / pd.step) * pd.step
             value = max(pd.min_val, min(pd.max_val, value))
-        return int(round(value)) if pd.type == "int" else round(value, 4)
+        return int(round(value)) if pd.type == ParamType.INT else round(value, 4)
 
     # --- verdict-driven value weights --------------------------------------
 
@@ -311,7 +312,7 @@ class ExperimentPolicy:
         """The verdict-tally key for a value: numerics pool into coarse bins
         across their range (individual floats would never repeat), everything
         else tallies exactly."""
-        if pd is not None and pd.type in ("int", "float"):
+        if pd is not None and pd.type in (ParamType.INT, ParamType.FLOAT):
             try:
                 span = pd.max_val - pd.min_val
                 return round((float(value) - pd.min_val) / span * _NUMERIC_BUCKETS)

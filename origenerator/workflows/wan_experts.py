@@ -15,7 +15,7 @@ picker to slot in between them.
 """
 from __future__ import annotations
 
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.model_arch import WAN
 from origenerator.workflows.model_files import list_lora_files, list_model_files
 
@@ -25,10 +25,10 @@ def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
     expert. Names claiming neither half stay in both, since nothing inside a
     WAN 2.2 file distinguishes the two."""
     return [
-        ParamDef("unet_high", "Model (First Pass)", "combo", defaults["unet_high"],
+        ParamDef("unet_high", "Model (First Pass)", ParamType.COMBO, defaults["unet_high"],
                  options=list_model_files("diffusion_models", [defaults["unet_high"]],
                                           accepts=(WAN,), expert="high")),
-        ParamDef("unet_low", "Model (Second Pass)", "combo", defaults["unet_low"],
+        ParamDef("unet_low", "Model (Second Pass)", ParamType.COMBO, defaults["unet_low"],
                  options=list_model_files("diffusion_models", [defaults["unet_low"]],
                                           accepts=(WAN,), expert="low")),
     ]
@@ -38,14 +38,14 @@ def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
     """The high/low LoRA pickers, each directly above its own strength — the
     same expert filter as the models, over the LoRA folder."""
     return [
-        ParamDef("lora_high", "Add-on (First Pass)", "combo", defaults["lora_high"],
+        ParamDef("lora_high", "Add-on (First Pass)", ParamType.COMBO, defaults["lora_high"],
                  options=list_lora_files([defaults["lora_high"]],
                                          accepts=(WAN,), expert="high")),
-        ParamDef("lora_strength_high", "Add-on Strength (First Pass)", "float",
+        ParamDef("lora_strength_high", "Add-on Strength (First Pass)", ParamType.FLOAT,
                  defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
-        ParamDef("lora_low", "Add-on (Second Pass)", "combo", defaults["lora_low"],
+        ParamDef("lora_low", "Add-on (Second Pass)", ParamType.COMBO, defaults["lora_low"],
                  options=list_lora_files([defaults["lora_low"]],
                                          accepts=(WAN,), expert="low")),
-        ParamDef("lora_strength_low", "Add-on Strength (Second Pass)", "float",
+        ParamDef("lora_strength_low", "Add-on Strength (Second Pass)", ParamType.FLOAT,
                  defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
     ]

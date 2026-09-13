@@ -29,7 +29,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.speech import CUSTOM_VOICE
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
 from origenerator.workflows.model_files import is_no_lora
 
@@ -173,7 +173,7 @@ class ParamForm(QWidget):
         # A workflow that tells a story in scenes hands both prompts, the scene
         # lengths and the lines to one editor (see origenerator.gui.scenes_editor);
         # None for a workflow with one prompt and one length.
-        scenes_def = next((pd for pd in self._param_defs if pd.type == "scenes"), None)
+        scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
         self._scenes: ScenesEditor | None = None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
@@ -226,7 +226,7 @@ class ParamForm(QWidget):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             if widget is self._scenes:
-                if pd.type == "scenes":  # the editor's one row, under the scenes' own key
+                if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
             field_kind(pd).change_signal(widget).connect(self.changed)

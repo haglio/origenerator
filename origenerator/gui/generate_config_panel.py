@@ -73,6 +73,7 @@ from origenerator.media import MediaType
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import ParamType
 
 ensure_shared_ui_on_path()
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
@@ -678,7 +679,7 @@ class GenerateConfigPanel(QWidget):
 
         missing_images = [
             pd.label for pd in wf.param_definitions()
-            if pd.type == "image" and not str(params.get(pd.key, "")).strip()
+            if pd.type == ParamType.IMAGE and not str(params.get(pd.key, "")).strip()
         ]
         if missing_images:
             self._generate_btn.flash_guard(f"Select the {' and '.join(missing_images)}")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import list_model_files
 
@@ -69,19 +69,19 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         defaults = self.default_params()
         unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(FLUX,))
         return [
-            ParamDef("positive_prompt", "Prompt", "str", defaults["positive_prompt"], multiline=True),
-            ParamDef("unet", "Model", "combo", defaults["unet"], options=unets),
-            ParamDef("seed", "Seed", "seed", defaults["seed"]),
-            ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=4096, step=16),
-            ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=4096, step=16),
-            ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=100),
-            ParamDef("guidance", "Prompt Strength", "float", defaults["guidance"],
+            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=unets),
+            ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
+            ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),
+            ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=16),
+            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100),
+            ParamDef("guidance", "Prompt Strength", ParamType.FLOAT, defaults["guidance"],
                      min_val=0.0, max_val=20.0, step=0.1),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", defaults["enhance"]),
-            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
+            ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
+            ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
+            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

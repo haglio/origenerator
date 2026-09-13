@@ -255,6 +255,11 @@ def test_sdxl_t2i_param_definitions_returns_paramdefs():
     assert "seed" in keys
 
 
+def test_a_setting_of_a_kind_no_form_can_edit_is_refused_where_it_is_declared():
+    with pytest.raises(ValueError):
+        ParamDef("steps", "Steps", "integer", 20)
+
+
 def test_sdxl_t2i_build_api_payload_structure():
     wf = SdxlT2iWorkflow()
     params = wf.default_params()

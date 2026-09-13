@@ -20,7 +20,7 @@ from __future__ import annotations
 # trailing period on a single clause, one sentence or two at most — a tooltip
 # that runs long is one nobody finishes reading.
 PARAM_HELP: dict[str, str] = {
-    # --- prompts and the input picture ---
+    # --- prompts and the picture a run starts from ---
     "positive_prompt": (
         "What you want to see. Comma-separated phrases work best; the earlier a "
         "phrase appears, the more weight it tends to carry. A video can tell a "
@@ -33,8 +33,8 @@ PARAM_HELP: dict[str, str] = {
         "before it, so the clip is the scenes end to end."
     ),
     "scene_lines": (
-        "What she says in this scene, spoken in the voice set under Audio. A "
-        "scene with a line renders on the speech model, and her speaking is all "
+        "What she says in this scene, spoken in the voice set under Sound. A "
+        "scene with lines renders on the speaking model, and her speaking is all "
         "that happens in it — its prompts go unused, so a scene is one or the "
         "other. Words past the scene's end are cut; a scene left blank renders "
         "as it always has, prompts and soundtrack and all."
@@ -53,8 +53,8 @@ PARAM_HELP: dict[str, str] = {
         "recording's manner as well as its timbre; without them only the timbre."
     ),
     "unet_s2v": (
-        "The speech-to-video model a scene with a line renders on, in place of "
-        "the two experts; it hears the line and moves her lips to it."
+        "The model a scene with lines renders on, in place of the two pass "
+        "models; it hears her lines and moves her lips to them."
     ),
     "negative_prompt": (
         "What you want kept out — artifacts, styles, body parts you keep getting "
@@ -72,11 +72,11 @@ PARAM_HELP: dict[str, str] = {
         "same image exactly; Random draws a fresh one on every Generate."
     ),
     "noise_seed": (
-        "The starting noise for the high-noise stage, the first one, which "
-        "settles the composition. Random draws a fresh one on every Generate."
+        "The starting noise for the first pass, which settles the composition. "
+        "Random draws a fresh one on every Generate."
     ),
     "audio_seed": (
-        "The starting noise for the generated audio, separate from the picture's "
+        "The starting noise for the generated sound, separate from the picture's "
         "seed — re-roll it to get a different take of the same scene's sound."
     ),
 
@@ -85,68 +85,69 @@ PARAM_HELP: dict[str, str] = {
         "The model that does the generating. It sets the look more than any other "
         "setting here — style, anatomy, what the prompt words mean to it."
     ),
-    "unet": "The diffusion model file this run generates with.",
+    "unet": "The model file this run generates with.",
     "unet_high": (
-        "The high-noise model: the first stage, which settles composition and "
-        "motion before the low-noise pass refines it."
+        "The model for the first pass (the high-noise expert), which settles "
+        "composition and motion before the second pass refines it."
     ),
     "unet_low": (
-        "The low-noise model: the second stage, which refines detail on what the "
-        "high-noise pass laid down."
+        "The model for the second pass (the low-noise expert), which refines "
+        "detail on what the first pass laid down."
     ),
     "upscale_model": (
-        "The enlarger used before the enhance pass — an ESRGAN-family model that "
-        "reconstructs edges rather than resampling them."
+        "The enlarger the enhancement runs first (an ESRGAN-family model), which "
+        "rebuilds edges rather than stretching them."
     ),
 
-    # --- LoRAs ---
+    # --- add-ons ---
     "lora_high": (
-        "An add-on trained for a specific look or subject, applied to the "
-        "high-noise stage. \"None\" leaves the base model unmodified."
+        "An add-on (a LoRA) trained for a specific look or subject, applied to "
+        "the first pass. \"None\" leaves the model unmodified."
     ),
     "lora_low": (
-        "An add-on trained for a specific look or subject, applied to the "
-        "low-noise stage. \"None\" leaves the base model unmodified."
+        "An add-on (a LoRA) trained for a specific look or subject, applied to "
+        "the second pass. \"None\" leaves the model unmodified."
     ),
     "lora_strength_high": (
-        "How hard the high-noise LoRA pulls. 1.0 is its intended strength; below "
-        "0.5 it barely shows, above 1.2 it tends to take over the picture."
+        "How hard the first pass's add-on pulls. 1.0 is its intended strength; "
+        "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
     ),
     "lora_strength_low": (
-        "How hard the low-noise LoRA pulls. 1.0 is its intended strength; below "
-        "0.5 it barely shows, above 1.2 it tends to take over the picture."
+        "How hard the second pass's add-on pulls. 1.0 is its intended strength; "
+        "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
     ),
 
-    # --- sampling ---
+    # --- drawing ---
     "steps": (
-        "How many refinement passes the model makes. More steps means more "
-        "settled detail and a longer wait, with little gain past the point the "
-        "model has converged."
+        "How many times the model goes over the picture, refining it. More steps "
+        "means more settled detail and a longer wait, with little gain once the "
+        "picture has stopped changing."
     ),
     "cfg": (
         "How strictly the model obeys the prompt (the CFG scale underneath). Too "
         "low drifts off it; too high burns contrast and flattens detail."
     ),
     "cfg_high": (
-        "Prompt strength (the CFG scale underneath) for the high-noise stage, "
-        "where the motion is settled. LoRA authors often publish a different "
-        "number for each stage; where they publish one, put it in both."
+        "Prompt strength for the first pass (the CFG scale underneath), where the "
+        "motion is settled. An add-on's author often publishes a different number "
+        "for each pass; where they publish one, put it in both."
     ),
     "cfg_low": (
-        "Prompt strength (the CFG scale underneath) for the low-noise stage, "
-        "where the texture is settled."
+        "Prompt strength for the second pass (the CFG scale underneath), where "
+        "the texture is settled."
     ),
     "split_step": (
-        "Which step the high-noise stage hands over to the low-noise one (the "
-        "split step) — earlier leaves more of the work to the refining pass. 0 "
-        "splits at half the steps."
+        "The step where the first pass hands over to the second (the split step). "
+        "Earlier leaves more of the work to the second pass; 0 hands over at half "
+        "the steps."
     ),
     "guidance": (
-        "How strictly Flux obeys the prompt (its guidance value). It behaves like "
-        "CFG but wants much smaller numbers — this model's usable range sits low."
+        "How strictly the model obeys the prompt (Flux's guidance value). It wants "
+        "much smaller numbers than prompt strength does elsewhere — this model's "
+        "usable range sits low."
     ),
     "sampler_name": (
-        "The algorithm that walks the noise down to an image. They differ in look "
+        "The method that walks the noise down to a picture. They differ in look "
         "and in how many steps they need to settle."
     ),
     "scheduler": (
@@ -159,11 +160,11 @@ PARAM_HELP: dict[str, str] = {
         "re-imagines the rest."
     ),
     "shift": (
-        "Where this model spends its sampling effort — higher favors composition, "
-        "lower favors fine detail."
+        "Where this model spends its effort — higher favors composition, lower "
+        "favors fine detail."
     ),
-    "shift_high": "Where the high-noise stage spends its effort: higher favors composition.",
-    "shift_low": "Where the low-noise stage spends its effort: lower favors fine detail.",
+    "shift_high": "Where the first pass spends its effort: higher favors composition.",
+    "shift_low": "Where the second pass spends its effort: lower favors fine detail.",
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
@@ -171,8 +172,8 @@ PARAM_HELP: dict[str, str] = {
         "2x is the usual finish; past 3x the pass has to invent a lot."
     ),
     "enhance_steps": (
-        "How many refinement passes the enhance makes over the enlarged picture. "
-        "Around 20 is enough to build texture without redrawing anything."
+        "How many times the enhancement goes over the enlarged picture. Around 20 "
+        "is enough to build texture without redrawing anything."
     ),
     "enhance_denoise": (
         "How far the enhance may stray from the picture it is refining (its "
@@ -193,14 +194,14 @@ PARAM_HELP: dict[str, str] = {
         "Which structure is lifted out of the structure image and held onto: its "
         "depth, or the skeleton of the people in it."
     ),
-    "controlnet": "The ControlNet that applies the structure map to the generation.",
+    "controlnet": "The model that holds the picture to the structure image (a ControlNet).",
     "controlnet_strength": (
         "How firmly the output is held to the structure image. Lower lets the "
         "prompt reshape things; higher traces the source closely."
     ),
     "controlnet_end": (
-        "How far into the sampling the structure keeps being enforced. Releasing "
-        "early lets the last steps add detail the structure map has no opinion on."
+        "How far into the drawing the structure keeps being held. Letting go "
+        "early lets the last steps add detail the structure has no opinion on."
     ),
 
     # --- size and length ---
@@ -222,12 +223,12 @@ PARAM_HELP: dict[str, str] = {
     # --- the authored motion (track-conditioned video) ---
     "motion_hz": "How many cycles per second the generated motion runs at.",
     "motion_x": "The horizontal line the motion travels along, in pixels across the frame.",
-    "motion_ceiling": "The pixel row the motion reaches at the top of its travel.",
-    "motion_floor": "The pixel row the motion reaches at the floor of its travel.",
+    "motion_ceiling": "The pixel row the motion reaches at the high end of its travel.",
+    "motion_floor": "The pixel row the motion reaches at the low end of its travel.",
     "anchor_x": "The horizontal position of the point that stays put while the motion moves.",
     "anchor_y": "The vertical position of the point that stays put while the motion moves.",
 
-    # --- audio ---
+    # --- sound ---
     "audio_prompt": (
         "What the generated soundtrack should be — the sounds themselves, not the "
         "picture. It watches the finished motion while it scores."

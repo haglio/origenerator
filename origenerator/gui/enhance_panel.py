@@ -206,14 +206,14 @@ class EnhancePanel(QWidget):
             "it, so it stays in its own style; pick one to pin it instead."
         )
         self._widgets["checkpoint"] = self._model
-        form.addRow(self._labeled("Model:", self._model), self._model)
+        form.addRow(self._labeled("Model", self._model), self._model)
 
         self._upscaler = NoWheelComboBox()
         self._upscaler.addItems(self._options("upscale_model"))
         self._upscaler.currentIndexChanged.connect(self._emit)
         self._upscaler.setToolTip(param_help("upscale_model"))
         self._widgets["upscale_model"] = self._upscaler
-        form.addRow(self._labeled("Upscaler:", self._upscaler), self._upscaler)
+        form.addRow(self._labeled("Upscaler", self._upscaler), self._upscaler)
 
         # The three numbers on one line: they are read together (how much bigger,
         # how long, how far from the source) and the pane is not wide.

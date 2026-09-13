@@ -65,8 +65,8 @@ SPOKEN_OVER = ("positive_prompt", "negative_prompt")
 # over its field. The prompts are stored as stories (see the module above); the
 # lines as a list, one per scene.
 TEXT_CAPTIONS = {
-    "positive_prompt": "Positive Prompt",
-    "negative_prompt": "Negative Prompt",
+    "positive_prompt": "Prompt",
+    "negative_prompt": "Things to Avoid",
     "scene_lines": "Her Lines",
 }
 

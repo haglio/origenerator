@@ -9,8 +9,8 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
-        "Prompts", "Seed", "Model & LoRA", "Sampling", "Motion",
-        "Dimensions", "Video", "Audio",
+        "Prompts", "Seed", "Models & Add-ons", "Drawing", "Motion",
+        "Size", "Video", "Sound",
     ]
 
 
@@ -28,20 +28,18 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("input_image") == "Prompts"
     assert ps.section_title("seed") == "Seed"
     assert ps.section_title("noise_seed") == "Seed"
-    assert ps.section_title("checkpoint") == "Model & LoRA"
-    assert ps.section_title("lora_high") == "Model & LoRA"
-    assert ps.section_title("vae") == "Model & LoRA"          # passthrough model file
-    assert ps.section_title("steps") == "Sampling"
-    assert ps.section_title("scheduler") == "Sampling"
-    assert ps.section_title("upscale_model") == "Model & LoRA"  # a model file slot
+    assert ps.section_title("checkpoint") == "Models & Add-ons"
+    assert ps.section_title("lora_high") == "Models & Add-ons"
+    assert ps.section_title("steps") == "Drawing"
+    assert ps.section_title("scheduler") == "Drawing"
+    assert ps.section_title("upscale_model") == "Models & Add-ons"
     assert ps.section_title("motion_hz") == "Motion"
     assert ps.section_title("anchor_y") == "Motion"
-    assert ps.section_title("width") == "Dimensions"
+    assert ps.section_title("width") == "Size"
     assert ps.section_title("frame_count") == "Video"
     assert ps.section_title("frame_rate") == "Video"
-    assert ps.section_title("audio_prompt") == "Audio"
-    assert ps.section_title("audio_seed") == "Audio"
-    assert ps.section_title("foley_model") == "Audio"       # passthrough model file
+    assert ps.section_title("audio_prompt") == "Sound"
+    assert ps.section_title("audio_seed") == "Sound"
 
 
 def test_unknown_key_falls_into_the_other_section_sorted_last():

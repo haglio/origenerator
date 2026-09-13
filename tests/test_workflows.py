@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -2624,14 +2625,16 @@ def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
 
 # The graph's names for these stay in the tooltips; the label says what the
 # setting does to the picture.
-_GRAPH_JARGON = ("CFG", "Denoise", "Stage", "Guidance", "Input Image")
+_GRAPH_JARGON = re.compile(
+    r"CFG|Denoise|Stage|Guidance|Input Image|LoRA|ControlNet|Sampler|Scheduler|Shift"
+    r"|\((High|Low|Speech)\)|Positive|Negative|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
+)
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
 def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
     labels = [pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()]
-    jargon = [label for label in labels if any(word in label for word in _GRAPH_JARGON)]
-    assert jargon == []
+    assert [label for label in labels if _GRAPH_JARGON.search(label)] == []
 
 
 def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():

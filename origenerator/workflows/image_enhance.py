@@ -77,12 +77,12 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         )
         return [
             ParamDef("input_image", "Image", "image", defaults["input_image"]),
-            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Things to Avoid", "str", defaults["negative_prompt"], multiline=True),
             ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
                      options=checkpoints),
             ParamDef("seed", "Seed", "seed", defaults["seed"]),
-            ParamDef("upscale_model", "Upscale Model", "combo", defaults["upscale_model"],
+            ParamDef("upscale_model", "Upscaler", "combo", defaults["upscale_model"],
                      options=upscalers),
             ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),

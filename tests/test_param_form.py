@@ -30,7 +30,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form._sections["Model & LoRA"].set_collapsed(False)  # its section starts folded
+    form._sections["Models & Add-ons"].set_collapsed(False)  # its section starts folded
     form.show()
     qtbot.waitExposed(form)
 
@@ -245,7 +245,7 @@ def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
 
 def _row_label(form, key):
     """The "Width"/"Height" word beside a field, as its section's form lays it."""
-    return form._sections["Dimensions"].content_form().labelForField(
+    return form._sections["Size"].content_form().labelForField(
         form._widgets[key])
 
 
@@ -296,7 +296,7 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form._sections["Dimensions"].set_collapsed(False)  # unfold so its rows lay out
+    form._sections["Size"].set_collapsed(False)  # unfold so its rows lay out
     form.resize(400, 320)
     form.show()
     qtbot.waitExposed(form)
@@ -335,8 +335,8 @@ def test_locked_dimensions_render_as_plain_values_not_input_fields(qtbot):
     # Locked, each dimension shows as a plain value (a readonlyParamValue label,
     # like "batch_size 1"), not a spinner — the stack sits on its label page.
     form = _sized_form(qtbot)
-    assert "width" in form._present_keys["Dimensions"]
-    assert "height" in form._present_keys["Dimensions"]
+    assert "width" in form._present_keys["Size"]
+    assert "height" in form._present_keys["Size"]
     assert form._unlock_btn is not None
     assert form._dimensions_hint is not None
     for key in ("width", "height"):
@@ -382,7 +382,7 @@ def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
     # The toggle is a free child of the Dimensions content (like the swap button),
     # not stuffed into a field's cell — so neither field is smooshed to make room.
     form = _sized_form(qtbot)
-    assert form._unlock_btn.parent() is form._sections["Dimensions"].content()
+    assert form._unlock_btn.parent() is form._sections["Size"].content()
     assert _field_cell_of(form, "width") is None    # a plain field, no trailing cell
     assert _field_cell_of(form, "height") is None
 
@@ -393,7 +393,7 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     form = _sized_form(qtbot)
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
-    form._sections["Dimensions"].set_collapsed(False)
+    form._sections["Size"].set_collapsed(False)
     form.resize(420, 380)
     form.show()
     qtbot.waitExposed(form)
@@ -403,7 +403,7 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     lower = form._dim_stacks["height"].geometry()
     assert top.center().y() < btn.center().y() < lower.center().y()
 
-    dim_form = form._sections["Dimensions"].content_form()
+    dim_form = form._sections["Size"].content_form()
     width_label = dim_form.labelForField(form._dim_stacks["width"])
     height_label = dim_form.labelForField(form._dim_stacks["height"])
     # The button is clear of both the labels and the fields — no overlap.
@@ -778,7 +778,7 @@ def test_fields_are_grouped_into_collapsible_sections(qtbot):
     assert isinstance(form._sections["Prompts"], CollapsibleSection)
     assert "positive_prompt" in form._present_keys["Prompts"]
     assert "seed" in form._present_keys["Seed"]
-    assert "steps" in form._present_keys["Sampling"]
+    assert "steps" in form._present_keys["Drawing"]
 
 
 def test_empty_sections_are_hidden(qtbot):
@@ -796,10 +796,10 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
     qtbot.addWidget(form)
     assert form._sections["Prompts"].is_collapsed() is False
     assert form._sections["Seed"].is_collapsed() is False
-    assert form._sections["Model & LoRA"].is_collapsed() is True
-    assert form._sections["Sampling"].is_collapsed() is True
+    assert form._sections["Models & Add-ons"].is_collapsed() is True
+    assert form._sections["Drawing"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
-    assert form._sections["Audio"].is_collapsed() is True
+    assert form._sections["Sound"].is_collapsed() is True
 
 
 def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
@@ -850,7 +850,7 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     qtbot.addWidget(form)
     for key, widget in form._widgets.items():
         assert widget.toolTip() == param_help(key), key
-    section = form._sections["Sampling"].content_form()
+    section = form._sections["Drawing"].content_form()
     label = section.labelForField(form._widgets["steps"])
     assert label.toolTip() == param_help("steps")
 
@@ -882,7 +882,7 @@ def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(
     form.set_values({"unet_high": "example_high.safetensors",
                      "unet_low": "example_low.safetensors"})
 
-    assert form._sections["Model & LoRA"].isHidden() is True
+    assert form._sections["Models & Add-ons"].isHidden() is True
 
 
 def _rate_def(default=24.0):
@@ -1182,7 +1182,7 @@ def test_each_box_on_a_card_says_what_it_is(qtbot):
     qtbot.addWidget(form)
     scene = form._widgets["scene_frames"]._scenes[0]
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
-    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
+    assert {"Prompt", "Things to Avoid", "Her Lines"} <= captions
     assert scene.fields["negative_prompt"].toolTip() == param_help("negative_prompt")
     assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
 
@@ -1203,8 +1203,8 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
 
     scene.fields["scene_lines"].setPlainText("Come in.")
     assert scene.speaking()
-    for key, caption in (("positive_prompt", "Positive Prompt"),
-                         ("negative_prompt", "Negative Prompt")):
+    for key, caption in (("positive_prompt", "Prompt"),
+                         ("negative_prompt", "Things to Avoid")):
         field = scene.fields[key]
         assert field.isReadOnly()
         assert field.property("inert") is True
@@ -1225,8 +1225,8 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     scene.fields["scene_lines"].setPlainText("Come in.")
     scene.fields["scene_lines"].setPlainText("   ")
     assert not scene.speaking()
-    for key, caption in (("positive_prompt", "Positive Prompt"),
-                         ("negative_prompt", "Negative Prompt")):
+    for key, caption in (("positive_prompt", "Prompt"),
+                         ("negative_prompt", "Things to Avoid")):
         assert not scene.fields[key].isReadOnly()
         assert scene.fields[key].property("inert") is False
         assert scene.fields[key].toolTip() == param_help(key)

@@ -7,6 +7,8 @@ descriptions of ``cfg`` from drifting into twelve different claims.
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from origenerator.gallery import ENHANCE_SETTING_KEYS
@@ -50,4 +52,13 @@ def test_the_settings_the_enhance_panel_shows_are_all_explained():
 def test_help_calls_the_picture_a_run_starts_from_what_its_field_is_called():
     stale = sorted(key for key, text in PARAM_HELP.items()
                    if "input picture" in text or "the input's" in text)
+    assert stale == []
+
+
+def test_help_speaks_the_forms_words_outside_its_parentheses():
+    jargon = re.compile(r"high-noise|low-noise|\bLoRA\b|ControlNet|ESRGAN|\bCFG\b"
+                        r"|\bstages?\b|\baudio\b|\bsampling\b|\bexperts?\b",
+                        re.IGNORECASE)
+    stale = sorted(key for key, text in PARAM_HELP.items()
+                   if jargon.search(re.sub(r"\([^)]*\)", "", text)))
     assert stale == []

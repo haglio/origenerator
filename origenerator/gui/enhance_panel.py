@@ -257,7 +257,8 @@ class _FieldGrid(QGridLayout):
 
 
 class _SettingsScroll(QScrollArea):
-    """The settings, scrolling once the panel is squeezed shorter than they are.
+    """The settings, scrolling down once the panel is squeezed shorter than they
+    are, and sideways once it is squeezed narrower.
 
     Asks for their whole height at the width it has: Qt's own scroll area asks
     for their height as though nothing in them had wrapped."""
@@ -267,19 +268,16 @@ class _SettingsScroll(QScrollArea):
         self.setWidget(settings)
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def sizeHint(self) -> QSize:
         settings = self.widget()
+        narrowest = settings.minimumSizeHint().width()
         laid_out = self.testAttribute(Qt.WidgetAttribute.WA_Resized)
         width = self.viewport().width() if laid_out else settings.sizeHint().width()
-        return QSize(settings.sizeHint().width(), settings.heightForWidth(width))
-
-    def minimumSizeHint(self) -> QSize:
-        hint = super().minimumSizeHint()
-        hint.setWidth(self.widget().minimumSizeHint().width()
-                      + self.verticalScrollBar().sizeHint().width())
-        return hint
+        height = settings.heightForWidth(max(width, narrowest))
+        if width < narrowest:
+            height += self.horizontalScrollBar().sizeHint().height()
+        return QSize(settings.sizeHint().width(), height)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

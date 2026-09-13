@@ -26,12 +26,13 @@ alternative being a run that fails on submit.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtWidgets import (
-    QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -83,6 +84,9 @@ _NO_DETECTOR_TOOLTIP = (
 # doesn't complain — it clips a digit off 0.45, which still reads as a number.
 _FIX_FIELD_PADDING = 4
 _FIX_FIELD_CHROME = _FIX_FIELD_PADDING * 2 + 2 + 16
+# The same for a number with its step buttons, measured the same way: at a few
+# pixels less the last digit of 4.00 was cut.
+_NUMBER_FIELD_CHROME = 50
 # Disabling a widget is not the same as it looking disabled: the app's sheet
 # colors every label, picker and spinner outright and names no disabled state,
 # so a panel switched off went on reading exactly as live as before. These mute
@@ -151,6 +155,112 @@ def _enhancer_param_defs() -> dict:
     }
 
 
+def _narrowest(widget: QWidget) -> int:
+    return widget.minimumWidth() or widget.minimumSizeHint().width()
+
+
+class _FieldGrid(QGridLayout):
+    """Fields beside one column of captions: a picker to a line, and the numbers
+    sharing a line while each keeps its width, a line each when they cannot.
+
+    A layout rather than a widget, because Qt asks a widget's layout for its
+    height at a width and never the widget itself."""
+
+    def __init__(self, pickers: list[tuple[QLabel, QWidget]],
+                 numbers: list[tuple[QLabel, QWidget]]):
+        super().__init__()
+        self._pickers = pickers
+        self._numbers = numbers
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setSpacing(4)
+        self._stacked: bool | None = None
+        self._arrange(stacked=False)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        lines = [[pair] for pair in self._pickers]
+        if width < self._one_line_width():
+            lines += [[pair] for pair in self._numbers]
+        else:
+            lines.append(self._numbers)
+        heights = [max(max(label.sizeHint().height(), field.sizeHint().height())
+                       for label, field in line) for line in lines]
+        return sum(heights) + (len(heights) - 1) * self.verticalSpacing()
+
+    def sizeHint(self) -> QSize:
+        width = self._one_line_width()
+        return QSize(width, self.heightForWidth(width))
+
+    def minimumSize(self) -> QSize:
+        pairs = self._pickers + self._numbers
+        narrowest = (max(label.sizeHint().width() for label, _field in pairs)
+                     + self.horizontalSpacing()
+                     + max(_narrowest(field) for _label, field in pairs))
+        return QSize(narrowest, self.heightForWidth(self._one_line_width()))
+
+    def setGeometry(self, rect: QRect) -> None:
+        self._arrange(stacked=rect.width() < self._one_line_width())
+        super().setGeometry(rect)
+
+    def _one_line_width(self) -> int:
+        captions = max(label.sizeHint().width()
+                       for label, _field in self._pickers + self._numbers[:1])
+        return (captions
+                + sum(label.sizeHint().width() for label, _field in self._numbers[1:])
+                + sum(_narrowest(field) for _label, field in self._numbers)
+                + self.horizontalSpacing() * (2 * len(self._numbers) - 1))
+
+    def _arrange(self, stacked: bool) -> None:
+        if stacked == self._stacked:
+            return
+        for column in range(self.columnCount()):
+            self.setColumnStretch(column, 0)
+        span = 1 if stacked else 2 * len(self._numbers) - 1
+        for row, (label, field) in enumerate(self._pickers):
+            self.addWidget(label, row, 0)
+            self.addWidget(field, row, 1, 1, span)
+        below = len(self._pickers)
+        for index, (label, field) in enumerate(self._numbers):
+            row, column = (below + index, 0) if stacked else (below, 2 * index)
+            self.addWidget(label, row, column)
+            self.addWidget(field, row, column + 1)
+            self.setColumnStretch(column + 1, 1)
+        self._stacked = stacked
+
+
+class _SettingsScroll(QScrollArea):
+    """The settings, scrolling once the panel is squeezed shorter than they are.
+
+    Asks for their whole height at the width it has: Qt's own scroll area asks
+    for their height as though nothing in them had wrapped."""
+
+    def __init__(self, settings: QWidget):
+        super().__init__()
+        self.setWidget(settings)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def sizeHint(self) -> QSize:
+        settings = self.widget()
+        laid_out = self.testAttribute(Qt.WidgetAttribute.WA_Resized)
+        width = self.viewport().width() if laid_out else settings.sizeHint().width()
+        return QSize(settings.sizeHint().width(), settings.heightForWidth(width))
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        hint.setWidth(self.widget().minimumSizeHint().width()
+                      + self.verticalScrollBar().sizeHint().width())
+        return hint
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.size().width() != event.oldSize().width():
+            self.updateGeometry()
+
+
 class EnhancePanel(QWidget):
     """The Enhance subpanel: an auto tick over the settings an enhancement runs at.
 
@@ -190,9 +300,10 @@ class EnhancePanel(QWidget):
         title_row.addWidget(self._auto)
         column.addLayout(title_row)
 
-        form = QFormLayout()
-        form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(4)
+        settings = QWidget()
+        settings_column = QVBoxLayout(settings)
+        settings_column.setContentsMargins(0, 0, 0, 0)
+        settings_column.setSpacing(4)
         self._model = NoWheelComboBox()
         # The default leaves the refining model to whatever made the image, which
         # is what keeps an enhanced image in its own style; picking a checkpoint
@@ -206,28 +317,24 @@ class EnhancePanel(QWidget):
             "it, so it stays in its own style; pick one to pin it instead."
         )
         self._widgets["checkpoint"] = self._model
-        form.addRow(self._labeled("Model", self._model), self._model)
 
         self._upscaler = NoWheelComboBox()
         self._upscaler.addItems(self._options("upscale_model"))
         self._upscaler.currentIndexChanged.connect(self._emit)
         self._upscaler.setToolTip(param_help("upscale_model"))
         self._widgets["upscale_model"] = self._upscaler
-        form.addRow(self._labeled("Upscaler", self._upscaler), self._upscaler)
 
-        # The three numbers on one line: they are read together (how much bigger,
-        # how long, how far from the source) and the pane is not wide.
-        numbers = QHBoxLayout()
-        numbers.setContentsMargins(0, 0, 0, 0)
-        numbers.setSpacing(4)
         self._scale = self._number("enhance_scale", NoWheelDoubleSpinBox())
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
-        for label, widget in (("Scale", self._scale), ("Steps", self._steps),
-                              ("Redraw Amount", self._denoise)):
-            numbers.addWidget(self._labeled(label, widget))
-            numbers.addWidget(widget, 1)
-        form.addRow(numbers)
+        settings_column.addLayout(_FieldGrid(
+            pickers=[(self._labeled(label, widget), widget)
+                     for label, widget in (("Model", self._model),
+                                           ("Upscaler", self._upscaler))],
+            numbers=[(self._labeled(label, widget), widget)
+                     for label, widget in (("Scale", self._scale), ("Steps", self._steps),
+                                           ("Redraw Amount", self._denoise))],
+        ))
 
         # The detail pass: a tick and a number per part it can be aimed at, the
         # number being the denoise that part is redrawn at. Their denoise is
@@ -236,11 +343,10 @@ class EnhancePanel(QWidget):
         # is touched, and a mouth wants a harder redraw than a face does.
         fix_heading = QLabel("Fixes")
         fix_heading.setToolTip(param_help("enhance_detail_fixes"))
-        form.addRow(fix_heading)
-        form.addRow(self._fix_row())
-
-        column.addLayout(form)
-        column.addStretch(1)
+        settings_column.addWidget(fix_heading)
+        settings_column.addWidget(self._fix_row())
+        settings_column.addStretch(1)
+        column.addWidget(_SettingsScroll(settings), 1)
 
     def _fix_row(self) -> QWidget:
         """Every fixable part on one line: a tick over its name and the
@@ -411,9 +517,10 @@ class EnhancePanel(QWidget):
                 widget.setDecimals(2)
             widget.setValue(pd.default)
         widget.setToolTip(param_help(key))
-        # Three to a line in a pane that can tile narrow: a floor each, so they
-        # stay readable rather than squeezing down to their arrows.
-        widget.setMinimumWidth(70)
+        widest = max(widget.textFromValue(widget.minimum()),
+                     widget.textFromValue(widget.maximum()), key=len)
+        widget.setMinimumWidth(widget.fontMetrics().horizontalAdvance(widest)
+                               + _NUMBER_FIELD_CHROME)
         widget.valueChanged.connect(self._emit)
         self._widgets[key] = widget
         return widget

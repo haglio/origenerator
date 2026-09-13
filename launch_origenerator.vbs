@@ -1,65 +1,115 @@
+' Rendered from [tool.haglio.launchers."launch_origenerator.vbs"] in pyproject.toml.
+' Change the spec, then run  python -m app_support.launcher --write  in this
+' folder: the suite fails on a launcher that differs from its spec.
+
+Option Explicit
+
+Dim fso, shell, root, app, interpreter, directory, arguments, logPath
+
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+Decide
+If shell.Environment("Process").Item("HAGLIO_LAUNCHER_DRY_RUN") = "1" Then
+  Report
+Else
+  Launch
+End If
 
-projectRoot = fso.GetParentFolderName(WScript.ScriptFullName)
-stateDir = projectRoot & "\state"
-If Not fso.FolderExists(stateDir) Then fso.CreateFolder(stateDir)
-launcherLog = stateDir & "\origenerator_launcher.log"
-
-Function Quote(s)
-  Quote = Chr(34) & s & Chr(34)
-End Function
-
-Sub AppendLog(msg)
-  On Error Resume Next
-  Dim ts
-  Set ts = fso.OpenTextFile(launcherLog, 8, True)
-  ts.WriteLine Now & " " & msg
-  ts.Close
+Sub Decide()
+  app = "Origenerator"
+  logPath = fso.BuildPath(root, "state\origenerator_launcher.log")
+  arguments = "-m origenerator"
+  interpreter = fso.BuildPath(root, ".venv\Scripts\python.exe")
+  If fso.FileExists(fso.BuildPath(root, ".venv\Scripts\Origenerator-Origenerator.exe")) Then interpreter = fso.BuildPath(root, ".venv\Scripts\Origenerator-Origenerator.exe")
+  directory = root
 End Sub
 
-Function FindPythonCommand()
-  Dim venvPython, candidates, i
+Sub Report()
+  WScript.Echo "app: " & app
+  WScript.Echo "interpreter: " & interpreter
+  WScript.Echo "directory: " & directory
+  WScript.Echo "arguments: " & arguments
+  WScript.Echo "log: " & logPath
+  WScript.Echo "command: " & Command()
+End Sub
 
-  ' The copy a previous run left named for this app, then the plain venv
-  ' interpreter.  Windows identifies a process by the file it was started from,
-  ' so a plain python.exe arrives as one more anonymous "Python" among every
-  ' other Python app on the machine; app_support.process_identity makes a copy
-  ' that says Origenerator instead.  The run makes it for the run after, so a
-  ' checkout that has never started launches exactly as it used to.
-  namedPython = projectRoot & "\.venv\Scripts\Origenerator-Origenerator.exe"
-  If fso.FileExists(namedPython) Then
-    FindPythonCommand = Quote(namedPython)
-    Exit Function
+Sub Launch()
+  If Not fso.FileExists(interpreter) Then
+    Refuse app & "'s virtual environment is missing:" & vbCrLf & interpreter, vbCritical
   End If
+  logPath = FreeLog(logPath)
+  Note logPath, "===== " & Now & " launch: " & Command()
+  shell.Run Command(), 0, False
+End Sub
 
-  venvPython = projectRoot & "\.venv\Scripts\python.exe"
-  If fso.FileExists(venvPython) Then
-    FindPythonCommand = Quote(venvPython)
-    Exit Function
+Function Command()
+  Command = "cmd /c cd /d " & Quote(directory) & " && " & Quote(interpreter) & " " & arguments & " >> " & Quote(logPath) & " 2>&1"
+End Function
+
+Function Quote(text)
+  Quote = Chr(34) & text & Chr(34)
+End Function
+
+Sub Tell(message, icon)
+  If LCase(fso.GetFileName(WScript.FullName)) = "cscript.exe" Then
+    WScript.Echo "dialog: " & message
+  Else
+    MsgBox message, icon, app
   End If
+End Sub
 
-  candidates = Array( _
-    "python", _
-    "py -3" _
-  )
-  For i = 0 To UBound(candidates)
-    If shell.Run("cmd /c where " & Split(candidates(i), " ")(0) & " >nul 2>nul", 0, True) = 0 Then
-      FindPythonCommand = candidates(i)
+Sub Refuse(message, icon)
+  Tell message, icon
+  WScript.Quit 1
+End Sub
+
+Function FreeLog(preferred)
+  Dim folder, candidate, index
+  folder = fso.GetParentFolderName(preferred)
+  If Not fso.FolderExists(folder) Then fso.CreateFolder folder
+  For index = 1 To 9
+    candidate = preferred
+    If index > 1 Then
+      candidate = fso.BuildPath(folder, fso.GetBaseName(preferred) & "-" & index & "." & fso.GetExtensionName(preferred))
+    End If
+    RollIfOversize candidate
+    If CanAppend(candidate) Then
+      FreeLog = candidate
       Exit Function
     End If
   Next
-  FindPythonCommand = ""
+  FreeLog = preferred
 End Function
 
-pythonCmd = FindPythonCommand()
-If pythonCmd = "" Then
-  AppendLog "ERROR: Could not find python launcher"
-  MsgBox "Could not find python or py launcher.", vbCritical, "Origenerator"
-  WScript.Quit 1
-End If
+Function CanAppend(path)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  CanAppend = (Err.Number = 0)
+  If CanAppend Then stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Function
 
-parentDir = fso.GetParentFolderName(projectRoot)
-cmd = "cmd /c cd /d " & Quote(projectRoot) & " && set PYTHONPATH=" & parentDir & "&&" & pythonCmd & " -m origenerator 1>>" & Quote(launcherLog) & " 2>&1"
-AppendLog "INFO: Launching with command: " & cmd
-shell.Run cmd, 0, False
+Sub RollIfOversize(path)
+  On Error Resume Next
+  If fso.FileExists(path) Then
+    If fso.GetFile(path).Size > 1000000 Then
+      If fso.FileExists(path & ".1") Then fso.DeleteFile path & ".1"
+      fso.MoveFile path, path & ".1"
+    End If
+  End If
+  Err.Clear
+  On Error GoTo 0
+End Sub
+
+Sub Note(path, line)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  stream.WriteLine line
+  stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Sub

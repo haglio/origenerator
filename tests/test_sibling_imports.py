@@ -5,10 +5,9 @@ dependencies pip installed into whatever interpreter happens to be running.
 The suite hides that: pytest runs on a venv where both are installed editable,
 so ``from shared_ui.spacing import ...`` resolves in any module, wired or not.
 
-The launch does not have that venv.  ``launch_origenerator.vbs`` sets
-PYTHONPATH to the checkouts' parent, and a Fun Time session launches this app
-with the plain system Python it names in ``paths.origenerator_python_exe`` --
-neither of which has a sibling installed.  There, a module that imports a
+A hosted launch need not have that venv: a Fun Time session launches this app
+with the plain system Python it names in ``paths.origenerator_python_exe``,
+which has no sibling installed.  There, a module that imports a
 sibling without calling ``ensure_shared_ui_on_path`` /
 ``ensure_player_core_on_path`` first raises ModuleNotFoundError, and if it does
 so early enough the process dies BEFORE logging is configured: no traceback

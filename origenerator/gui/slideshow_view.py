@@ -207,7 +207,7 @@ class SlideshowView(QWidget):
                                       allow_fullscreen=False,
                                       show_funscript_strip=True, mute_audio=False,
                                       pushes_stills=True, on_double_click=self.close,
-                                      on_click=self._toggle_pause)
+                                      on_press=self._toggle_pause)
         self._preview.video_ended.connect(self._on_video_ended)
         self._preview.video_unplayable.connect(self._on_video_unplayable)
         # The media is refitted a beat after the window resizes (and again when a

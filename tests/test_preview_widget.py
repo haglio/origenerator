@@ -451,31 +451,29 @@ def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
     assert called == [True]
 
 
-def test_a_lone_click_waits_out_the_double_click_window_then_runs_the_click_callback(qtbot):
-    clicks = []
+def test_a_press_runs_the_press_callback_at_once(qtbot):
+    presses = []
     w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
-                      on_click=lambda: clicks.append(True))
+                      on_press=lambda: presses.append(True))
     qtbot.addWidget(w)
 
     _press(w)
 
-    assert clicks == []
-    qtbot.waitUntil(lambda: clicks == [True])
+    assert presses == [True]
 
 
-def test_the_first_click_of_a_double_click_is_the_double_clicks_alone(qtbot):
-    clicks, double_clicks = [], []
+def test_both_presses_of_a_double_click_run_the_press_callback(qtbot):
+    presses, double_clicks = [], []
     w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
-                      on_click=lambda: clicks.append(True),
+                      on_press=lambda: presses.append(True),
                       on_double_click=lambda: double_clicks.append(True))
     qtbot.addWidget(w)
 
     _press(w)
-    w.mouseDoubleClickEvent(None)
-    qtbot.wait(QApplication.styleHints().mouseDoubleClickInterval() + 200)
+    _double_click(w)
 
+    assert presses == [True, True]
     assert double_clicks == [True]
-    assert clicks == []
 
 
 # --- watching a generation fullscreen while it's still being made -----------
@@ -750,6 +748,14 @@ def drags(monkeypatch):
 def _press(w, x=0, y=0):
     w.mousePressEvent(QMouseEvent(
         QEvent.Type.MouseButtonPress, QPointF(x, y), QPointF(x, y),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    ))
+
+
+def _double_click(w, x=0, y=0):
+    w.mouseDoubleClickEvent(QMouseEvent(
+        QEvent.Type.MouseButtonDblClick, QPointF(x, y), QPointF(x, y),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
     ))

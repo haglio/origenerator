@@ -92,7 +92,7 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
                  show_funscript_strip: bool = False, mute_audio: bool = True,
-                 pushes_stills: bool = False, on_double_click=None, on_click=None):
+                 pushes_stills: bool = False, on_double_click=None, on_press=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -117,11 +117,7 @@ class PreviewWidget(QWidget):
         # nothing to open) runs this instead — the slideshow uses it so a second
         # double-click dismisses it.
         self._on_double_click = on_double_click
-        self._on_click = on_click
-        self._click_wait = QTimer(self)
-        self._click_wait.setSingleShot(True)
-        if on_click is not None:
-            self._click_wait.timeout.connect(on_click)
+        self._on_press = on_press
         # The shown generation's prompt_id when the owner has armed the preview to be
         # dragged out onto a combine slot (like a gallery thumbnail), else None; a
         # transient view (a live frame, a message) disarms it. _drag holds the
@@ -718,8 +714,11 @@ class PreviewWidget(QWidget):
         # shown generation; a plain click still falls through to the double-click.
         if self._draggable_id is not None:
             self._drag.note_press(event)
-        if self._on_click is not None and event.button() == Qt.MouseButton.LeftButton:
-            self._click_wait.start(QApplication.styleHints().mouseDoubleClickInterval())
+        self._run_press(event)
+
+    def _run_press(self, event) -> None:
+        if self._on_press is not None and event.button() == Qt.MouseButton.LeftButton:
+            self._on_press()
 
     def mouseMoveEvent(self, event) -> None:
         # Drag the shown generation out to a combine slot, but only once the press
@@ -772,7 +771,7 @@ class PreviewWidget(QWidget):
         # Open fullscreen, or — when this preview can't (it opted out, e.g. the
         # slideshow's own inner preview) — run the double-click callback, so a
         # second double-click that lands here closes the slideshow.
-        self._click_wait.stop()
+        self._run_press(event)
         if self.open_fullscreen() is None and self._on_double_click is not None:
             self._on_double_click()
 

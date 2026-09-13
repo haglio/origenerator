@@ -116,9 +116,9 @@ class EnhanceSettings:
 def describe_enhance_params(params: dict) -> str:
     """A one-line summary of an enhancement's settings, for the levels list.
 
-    Reads as "2.0x · 20 steps · 0.15 denoise" — the three numbers that actually
+    Reads as "2x · 20 steps · 0.15 redraw" — the three numbers that actually
     distinguish one experiment from another, then each part the detail pass
-    redrew at the denoise it redrew it at. A pinned model is named after them;
+    redrew at the amount it redrew it at. A pinned model is named after them;
     the default (source-matched) one says nothing, since it is not a choice —
     and neither does a part left at zero, for the same reason.
     """
@@ -131,8 +131,8 @@ def describe_enhance_params(params: dict) -> str:
         bits.append(f"{steps} steps")
     denoise = params.get("enhance_denoise")
     if denoise is not None:
-        bits.append(f"{float(denoise):g} denoise")
-    # Each part the pass redrew, at its own denoise — "teeth 0.5", or
+        bits.append(f"{float(denoise):g} redraw")
+    # Each part the pass redrew, at its own amount — "teeth 0.5", or
     # "faces 0.45 & hands 0.6" where several ran.
     fixes = detail_fixes_of(params)
     if fixes:

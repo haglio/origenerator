@@ -38,6 +38,7 @@ NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
 ALREADY_AT_THESE_SETTINGS = (
     "Already enhanced at these settings — change one below to make another"
 )
+_WHAT_AN_ENHANCE_DOES = "(upscale + light redraw)"
 
 
 class Offer(NamedTuple):
@@ -186,7 +187,7 @@ class EnhanceController:
             if ids:
                 return Offer(True, f"Enhance {len(ids)} item"
                                    f"{'s' if len(ids) != 1 else ''} "
-                                   "(upscale + low-denoise re-sample)")
+                                   f"{_WHAT_AN_ENHANCE_DOES}")
             return Offer(False, NO_VIDEO_ENHANCER if self._selection_is_all_video()
                          else ALREADY_AT_THESE_SETTINGS)
         group = self._host.current_group()
@@ -198,7 +199,7 @@ class EnhanceController:
             return Offer(False, "Nothing here to enhance")
         return Offer(True, f"Enhance {len(awaiting)} not-yet-enhanced image"
                            f"{'s' if len(awaiting) != 1 else ''} in this folder "
-                           "(upscale + low-denoise re-sample)")
+                           f"{_WHAT_AN_ENHANCE_DOES}")
 
     def enhanceable_selection(self) -> list[str]:
         """The picked thumbnails this button would actually run on.

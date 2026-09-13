@@ -850,12 +850,12 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)),
-                         ("queued", None, "3x · 40 steps · 0.35 denoise"))
+                         ("queued", None, "3x · 40 steps · 0.35 redraw"))
     texts = [lbl.text().replace("\u200b", "")
              for lbl in versions._pending.findChildren(QLabel)]
     assert "Queued…" in texts
-    assert any("40 steps" in t and "0.35 denoise" in t for t in texts)
-    assert "3x · 40 steps · 0.35 denoise" in versions._pending.toolTip()
+    assert any("40 steps" in t and "0.35 redraw" in t for t in texts)
+    assert "3x · 40 steps · 0.35 redraw" in versions._pending.toolTip()
 
 
 def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):

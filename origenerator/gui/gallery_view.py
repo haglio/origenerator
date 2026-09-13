@@ -131,13 +131,12 @@ from origenerator.gui.orientation import (
     base_of as _base_of,
 )
 from origenerator.gui.orientation import (
-    filter_rows,
+    orientation_of as _orientation_of,
+)
+from origenerator.gui.orientation import (
     oriented_key,
     requested_orientation,
     split_rows,
-)
-from origenerator.gui.orientation import (
-    orientation_of as _orientation_of,
 )
 from origenerator.gui.orientation import (
     split_key as _split_shelf_key,
@@ -202,8 +201,8 @@ _SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RE
 # than by the generation that happened to be picked there.
 _SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
                _TRASH_KEY)
-# Their plain names, without the waiting-work counts their tree rows carry —
-# what the search field and header call a shelf it is searching.
+# Their plain names — what the search field and header call a shelf it is
+# searching.
 _SHELF_LABELS = {
     _RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
     _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL, _REQUESTS_KEY: _REQUESTS_LABEL,
@@ -1804,17 +1803,16 @@ class GalleryView(QWidget):
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
         # Every side is built from the rows the media filter keeps, so switching
         # videos off empties both halves of them rather than one.
-        sides, starred_by_side = self._build_sides(listed, meta, unreviewed, held,
-                                                   requested, start_frames)
+        trees = _side_trees(listed, meta, start_frames)
         self._browser.set_model(
             gallery.recent_generations(listed),
-            starred_by_side,
+            {orientation: gallery.starred_folders(tree) for orientation, tree in trees.items()},
             listed,
             unreviewed,
             held,
             requested,
         )
-        self._tree_view.populate(sides, expanded, folder_meta=meta)
+        self._tree_view.populate(self._build_sides(trees), expanded, folder_meta=meta)
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None
@@ -1864,41 +1862,26 @@ class GalleryView(QWidget):
         for panel in self._info_tabs.config_panels():
             panel.refresh_generate_caption()
 
-    def _build_sides(self, rows, meta, unreviewed, held, requested, start_frames):
-        """The two sides of the tree, and the starred folders each one holds.
+    def _build_sides(self, trees):
+        """The two sides of the tree.
 
         A side is the whole table of contents over one shape's rows: its own
-        media/workflow/model/LoRA/settings hierarchy, its own copies of the
-        folders the user composed, and shelves whose counts are its own — a
-        number covering both sides would send you to a shelf that then showed
-        you nothing.  Built from a single deal of the rows, because measuring
-        each row's shape is the expensive part and a rebuild runs on every poll.
-
-        ``start_frames`` is the whole library's, not the side's: what a side
-        holds decides which folders it draws, never what they are called (see
-        :func:`gallery.start_frame_index`).
+        hierarchy, its own copies of the folders the user composed, and shelves
+        whose counts are its own — a number covering both sides would send you
+        to a shelf that then showed you nothing.
         """
-        dealt = split_rows(rows)
         custom_records = self._db.list_custom_folders()
-        request_rows = [item["row"] for item in requested]
         inflight = self._browser.inflight_orientations()
-        sides, starred = [], {}
-        for orientation in _ORIENTATIONS:
-            model = gallery.build_gallery_tree(dealt[orientation], meta,
-                                               image_index=start_frames)
-            starred[orientation] = gallery.starred_folders(model)
-            sides.append(SideModel(
-                orientation=orientation,
-                tree_model=model,
-                custom_folders=gallery.build_custom_folders(model, custom_records),
-                # Recents keeps a side up with no folders yet, so a first-ever
-                # generation of that shape is visible while it runs.
-                show_recents=bool(model) or orientation in inflight,
-                experiment_count=len(filter_rows(unreviewed, orientation)),
-                request_count=len(filter_rows(request_rows, orientation)),
-                trash_count=len(filter_rows(held, orientation)),
-            ))
-        return sides, starred
+        return [SideModel(
+            orientation=orientation,
+            tree_model=tree,
+            custom_folders=gallery.build_custom_folders(tree, custom_records),
+            # Recents keeps a side up with no folders yet, so a first-ever
+            # generation of that shape is visible while it runs.
+            show_recents=bool(tree) or orientation in inflight,
+            shelf_counts={key: _shelf_count(self._browser, key, orientation)
+                          for key in _SHELF_KEYS},
+        ) for orientation, tree in trees.items()]
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-select a generation after a rebuild, if it's still on screen.
@@ -3924,6 +3907,9 @@ class GalleryView(QWidget):
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if starred else 0
+        for orientation in _ORIENTATIONS:
+            self._tree_view.set_shelf_count(
+                _STARRED_KEY, orientation, _shelf_count(self._browser, _STARRED_KEY, orientation))
         if _base_of(self.selected_folder_key() or "") == _STARRED_KEY:
             self._browser.show_shelf(_STARRED_KEY, self.side_in_view())
         else:
@@ -4478,6 +4464,23 @@ class GalleryView(QWidget):
         preview-tab rule. Relayed here because the browser owns the gesture and
         the info pane owns the tabs."""
         self._info_tabs.pin_current_tab()
+
+
+def _side_trees(rows, meta, start_frames) -> dict[str, list]:
+    """Each shape's media/workflow/model/LoRA/settings hierarchy.
+
+    ``start_frames`` is the whole library's, not the side's: what a side
+    holds decides which folders it draws, never what they are called (see
+    :func:`gallery.start_frame_index`).
+    """
+    dealt = split_rows(rows)
+    return {orientation: gallery.build_gallery_tree(dealt[orientation], meta,
+                                                    image_index=start_frames)
+            for orientation in _ORIENTATIONS}
+
+
+def _shelf_count(pane, key: str, orientation: str) -> int:
+    return len(pane.rows_for_shelf(oriented_key(key, orientation)))
 
 
 def _group_workflow(group) -> str | None:

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
-from PyQt6.QtWidgets import QTreeWidgetItem
+from PyQt6.QtWidgets import QStyleOptionViewItem, QTreeWidgetItem
 
 from origenerator.gui import folder_tree
 from origenerator.gui.folder_tree import (
+    COUNT_ROLE,
     DROP_KEY_ROLE,
     FOLDER_KEYS_MIME,
     TREE_KEY_ROLE,
@@ -154,6 +155,27 @@ def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
 
     assert fired == []
     assert tree.currentItem() is leaf  # a normal click still selects the row
+
+
+def _shown(item):
+    tree = item.treeWidget()
+    option = QStyleOptionViewItem()
+    tree.itemDelegate().initStyleOption(option, tree.indexFromItem(item))
+    return option.text
+
+
+def test_a_row_leads_with_how_many_items_it_holds(qtbot):
+    _tree, leaf = _tree_with_leaf(qtbot)
+    leaf.setData(0, COUNT_ROLE, 3)
+
+    assert _shown(leaf) == "(3) A folder"
+
+
+def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
+    _tree, leaf = _tree_with_leaf(qtbot)
+    leaf.setData(0, COUNT_ROLE, 0)
+
+    assert _shown(leaf) == "A folder"
 
 
 # --- picking several folders, and dragging them onto a collecting row ---------

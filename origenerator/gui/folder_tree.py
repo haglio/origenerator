@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon
-from PyQt6.QtWidgets import QAbstractItemView, QTreeWidget
+from PyQt6.QtWidgets import QAbstractItemView, QStyledItemDelegate, QTreeWidget
 
 from origenerator.gui import icons
 
@@ -46,6 +46,7 @@ DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
 # origenerator.gui.orientation). What a folder key alone can't say is which of
 # them you picked, hovered, or dragged.
 TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
+COUNT_ROLE = Qt.ItemDataRole.UserRole + 4
 
 # The dragged folders' keys, newline-joined. A private type, so a drag out of the
 # tree lands nowhere except on a row that collects folders.
@@ -61,6 +62,14 @@ def _action_rects(content: QRect):
     star = QRect(content.left() - _PAD - _ICON, y, _ICON, _ICON)
     delete = QRect(star.left() - _PAD - _ICON, y, _ICON, _ICON)
     return star, delete
+
+
+class _CountBeforeName(QStyledItemDelegate):
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        count = index.data(COUNT_ROLE)
+        if count:
+            option.text = f"({count}) {option.text}"
 
 
 class FolderTree(QTreeWidget):
@@ -79,6 +88,7 @@ class FolderTree(QTreeWidget):
         self._star = icons.star_icon(filled=False)
         self._star_on = icons.star_icon(filled=True)  # a starred leaf's filled star
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
+        self.setItemDelegate(_CountBeforeName(self))
         self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
         # One indentation per level, no wider than the caret that sits in it. The
         # tree is six levels deep by the time it reaches a settings folder and it

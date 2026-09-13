@@ -58,6 +58,7 @@ from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
+from tests.test_folder_tree import _shown
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 _WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -448,6 +449,31 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     assert settings.icon(0).isNull()
     assert settings.toolTip(0).startswith(settings.text(0))
     assert "dance" in settings.toolTip(0)
+
+
+def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
+    view = GalleryView(FakeDB([
+        _image("i1", "a cat", 50, 1),
+        _image("i2", "a cat", 50, 2),
+        _image("i3", "a dog", 50, 1),
+        _i2v_video("v1", "styleA"),
+    ]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    workflow = _image_workflow(view._tree)
+    lora = workflow.child(0).child(0)
+    leaves = [lora.child(i) for i in range(lora.childCount())]
+    (cat,) = [leaf for leaf in leaves if "a cat" in leaf.toolTip(0)]
+    (dog,) = [leaf for leaf in leaves if "a dog" in leaf.toolTip(0)]
+    source = _video_workflow(view._tree).child(0).child(0).child(0)
+
+    assert _shown(_top_level(view._tree)["All"]) == "(4) All"
+    assert _shown(workflow) == f"(3) {workflow.text(0)}"
+    assert _shown(lora) == f"(3) {lora.text(0)}"
+    assert _shown(cat) == f"(2) {cat.text(0)}"
+    assert _shown(dog) == f"(1) {dog.text(0)}"
+    assert _shown(source) == f"(1) {source.text(0)}"
 
 
 def test_the_header_path_carries_what_its_last_code_doesnt_say(qtbot):
@@ -1434,6 +1460,24 @@ def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
     assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
 
 
+def test_latest_and_favorites_lead_with_how_many_items_they_list(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+                 _image("i3", "a dog", 50, 1)])
+    db.set_generation_starred("i1", True)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _image_workflow(view._tree).child(0).child(0)
+    (cat,) = [lora.child(i) for i in range(lora.childCount())
+              if "a cat" in lora.child(i).toolTip(0)]
+
+    view._toggle_star(_key(cat))  # the starred item is in the starred folder
+
+    top = _top_level(view._tree)
+    assert _shown(top["Latest"]) == "(3) Latest"
+    assert _shown(top["Favorites"]) == "(2) Favorites"
+
+
 def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, **extra):
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed},
@@ -1464,7 +1508,7 @@ def test_experiments_shelf_label_counts_the_unreviewed(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _top_level(view._tree)["Experiments (2)"] is not None
+    assert _shown(_top_level(view._tree)["Experiments"]) == "(2) Experiments"
 
 
 def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
@@ -1634,7 +1678,7 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
     qtbot.addWidget(view)
     view.refresh()
 
-    assert "Experiments (2)" in _top_level(view._tree)
+    assert _shown(_top_level(view._tree)["Experiments"]) == "(2) Experiments"
     view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
     assert sorted(view.visible_prompt_ids()) == ["e1", "e2"]
     assert "live app" not in view._browser._experiments_empty_hint()
@@ -1679,7 +1723,7 @@ def test_the_trash_shelf_label_counts_what_it_holds(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _top_level(view._tree)["Trash (2)"] is not None
+    assert _shown(_top_level(view._tree)["Trash"]) == "(2) Trash"
 
 
 def test_the_trash_shelf_lists_deleted_items_newest_first(qtbot):
@@ -3266,6 +3310,36 @@ def test_a_star_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot,
     assert db.get_generation("i1")["starred"]
     assert view._browser._thumb_widgets["i1"]._starred is True
     assert rebuilds == []
+
+
+def test_the_favorites_count_follows_a_star_without_rebuilding_the_gallery(qtbot, monkeypatch):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    rebuilds = []
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: rebuilds.append(rows))
+
+    view.star_generation("i1")
+    assert _shown(_top_level(view._tree)["Favorites"]) == "(1) Favorites"
+
+    view.set_items_starred(["i1"], False)
+    assert _shown(_top_level(view._tree)["Favorites"]) == "Favorites"
+    assert rebuilds == []
+
+
+def test_a_star_landing_during_an_inline_rename_leaves_the_rename_alone(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    leaf = _first_leaf(view)
+    key = _key(leaf)
+
+    view._begin_inline_rename(leaf, 0)
+    view.star_generation("i1")
+
+    assert db.folder_meta_map().get(key, {}).get("custom_name") is None
 
 
 def test_unstarring_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
@@ -11602,6 +11676,14 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
 
 
+def test_a_custom_folder_leads_with_how_many_items_it_gathers_counting_each_once(qtbot):
+    view, leaf, _other = _two_leaf_view(qtbot, extra=[_image("i3", "a cat", 50, 2)])
+    lora = _key(_image_workflow(view._tree).child(0).child(0))
+    _make_folder(view, "Kept", [lora, leaf])
+
+    assert _shown(_top_level(view._tree)["Kept"]) == "(3) Kept"
+
+
 def test_a_custom_folder_is_not_where_the_gallery_lands_by_default(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
@@ -12639,7 +12721,7 @@ def test_the_shelf_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert "Requests (1)" in _top_level(view._tree)
+    assert _shown(_top_level(view._tree)["Requests"]) == "(1) Requests"
 
 
 def test_a_request_that_never_hears_over_says_so_and_resumes(

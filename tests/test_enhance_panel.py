@@ -780,6 +780,58 @@ def test_a_running_enhance_takes_the_add_cards_slot_rather_than_sitting_beside_i
     assert not versions._host.findChildren(_AddRow)
 
 
+def _share_painted(image, color) -> float:
+    painted = sum(1 for y in range(image.height()) for x in range(image.width())
+                  if image.pixelColor(x, y) == color)
+    return painted / max(1, image.width() * image.height())
+
+
+def test_the_add_card_is_a_yellow_slab_you_cannot_miss(qtbot):
+    from shared_ui.colors import AMBER
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.resize(420, 600)
+    versions.show()
+    QApplication.processEvents()
+    (card,) = versions._host.findChildren(_AddRow)
+
+    assert _share_painted(card.grab().toImage(), AMBER) > 0.5
+
+
+def test_the_add_cards_words_are_dark_on_its_yellow(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.resize(420, 600)
+    versions.show()
+    QApplication.processEvents()
+    (card,) = versions._host.findChildren(_AddRow)
+    image = card.grab().toImage()
+
+    light = [(x, y) for y in range(image.height()) for x in range(image.width())
+             if min(image.pixelColor(x, y).getRgb()[:3]) > 200]
+    assert light == []
+
+
+def test_the_add_cards_plus_and_title_outsize_a_levels(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.resize(420, 600)
+    versions.show()
+    QApplication.processEvents()
+    (card,) = versions._host.findChildren(_AddRow)
+    plus = card._picture.pixmap().toImage()  # drawn, like the bank's plus, not typed
+
+    inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
+                if plus.pixelColor(x, y).alpha() > 128)
+    assert inked >= card._picture.width() * card._picture.height() // 12
+    assert (card._title.fontMetrics().height()
+            > versions._rows[0]._title.fontMetrics().height())
+
+
 def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)

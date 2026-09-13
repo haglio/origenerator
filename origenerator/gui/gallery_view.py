@@ -43,7 +43,7 @@ from origenerator.db import Database
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.fun_time_mode import FunTimeSession
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
     randomize_seeds,
@@ -328,8 +328,10 @@ class GalleryView(QWidget):
         self._build_the_queue_of_runs(db, client)
         self._actions = actions or GalleryActions(
             db, COMFYUI_OUTPUT_DIR, Trash(TRASH_DIR),
-            release_files=self._release_held_media, thumb_dir=THUMB_DIR,
-            cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
+            environment=GalleryEnvironment(
+                release_files=self._release_held_media, thumb_dir=THUMB_DIR,
+                cancel_enhancements=lambda rows: self._enhance.cancel_for_delete(rows),
+            ),
         )
         # Derives the background experiments this gallery hands ComfyUI as the
         # app closes (the Experiments shelf's switch): variations of the user's

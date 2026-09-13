@@ -15,6 +15,9 @@ other folder (see :mod:`origenerator.gallery.custom`).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
+
+_HIERARCHY_LEVELS = ("workflow", "model", "lora", "source_image")
 
 
 @dataclass
@@ -27,6 +30,8 @@ class SettingsGroup:
     # settings that set it apart from its siblings. Shown on hover rather than as
     # the name, which is a short code (see :mod:`origenerator.gallery.keys`).
     detail: str = ""
+    level: ClassVar[str] = "settings"
+    children: ClassVar[tuple] = ()
 
 
 @dataclass
@@ -38,6 +43,7 @@ class SourceImageGroup:
     label: str
     children: list[SettingsGroup]
     starred: bool = False
+    level: ClassVar[str] = "source_image"
 
 
 @dataclass
@@ -48,6 +54,7 @@ class LoraGroup:
     # directly — the same conditional the model level applies for the LoRA tier.
     children: list
     starred: bool = False
+    level: ClassVar[str] = "lora"
 
 
 @dataclass
@@ -59,6 +66,7 @@ class ModelGroup:
     # (An image-conditioned workflow grows a source-image level below the LoRA.)
     children: list[LoraGroup]
     starred: bool = False
+    level: ClassVar[str] = "model"
 
 
 @dataclass
@@ -66,8 +74,9 @@ class WorkflowGroup:
     key: str
     workflow_name: str
     label: str
-    model_groups: list[ModelGroup]
+    children: list[ModelGroup]
     starred: bool = False
+    level: ClassVar[str] = "workflow"
 
 
 @dataclass
@@ -85,6 +94,7 @@ class AllGroup:
     label: str
     children: list[WorkflowGroup]
     starred: bool = False
+    level: ClassVar[str] = "all"
 
 
 @dataclass
@@ -103,12 +113,13 @@ class CustomGroup:
     children: list
     folder_id: int | None = None
     starred: bool = False
+    level: ClassVar[str] = "custom"
 
 
 def folder_level(group) -> str | None:
     """Which hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
-    ``"lora"`` or ``"source_image"`` — ``None`` for the All row and the settings
-    leaves.
+    ``"lora"`` or ``"source_image"`` — ``None`` for the All row, the settings
+    leaves and a custom folder.
 
     Powers the lettered chip the gallery draws on tree rows and browser tiles, so
     a folder's place in the hierarchy reads at a glance rather than by counting
@@ -116,13 +127,7 @@ def folder_level(group) -> str | None:
     the All row is everything there is, so neither is a level anything needs
     naming.
     """
-    for cls, level in (
-        (WorkflowGroup, "workflow"), (ModelGroup, "model"),
-        (LoraGroup, "lora"), (SourceImageGroup, "source_image"),
-    ):
-        if isinstance(group, cls):
-            return level
-    return None
+    return group.level if group.level in _HIERARCHY_LEVELS else None
 
 
 def is_renamable(group) -> bool:
@@ -146,12 +151,7 @@ def folder_detail(group) -> str:
 
 def child_groups(group) -> list:
     """The sub-folders directly under a folder (empty for a settings leaf)."""
-    if isinstance(group, WorkflowGroup):
-        return group.model_groups
-    if isinstance(group, (ModelGroup, LoraGroup, SourceImageGroup, CustomGroup,
-                          AllGroup)):
-        return group.children
-    return []
+    return list(group.children)
 
 
 def rows_under(group) -> list[dict]:
@@ -178,16 +178,4 @@ def group_level(group) -> str:
     source_image, custom, or settings. A bookmark records its tier so its key can
     be recomputed from one of its rows under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
-    if isinstance(group, AllGroup):
-        return "all"
-    if isinstance(group, WorkflowGroup):
-        return "workflow"
-    if isinstance(group, ModelGroup):
-        return "model"
-    if isinstance(group, LoraGroup):
-        return "lora"
-    if isinstance(group, SourceImageGroup):
-        return "source_image"
-    if isinstance(group, CustomGroup):
-        return "custom"
-    return "settings"
+    return group.level

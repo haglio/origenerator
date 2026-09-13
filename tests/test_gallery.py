@@ -388,7 +388,7 @@ def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin()
         )
 
     enhanced, plain = render("e1", 1, True), render("p1", 2, False)
-    (lora,) = build_gallery_tree([enhanced, plain])[0].model_groups[0].children
+    (lora,) = build_gallery_tree([enhanced, plain])[0].children[0].children
     (leaf,) = lora.children
     assert {r["prompt_id"] for r in leaf.rows} == {"e1", "p1"}
     assert leaf.detail == "a cat"
@@ -489,7 +489,7 @@ def test_gallery_tree_splits_different_workflow_generations_into_folders():
                output_files=json.dumps([{"filename": "sdxl_t2i_new.png"}]))
     tree = build_gallery_tree([old, new])
     (workflow,) = tree
-    (model,) = workflow.model_groups
+    (model,) = workflow.children
     (lora,) = model.children
     assert len(lora.children) == 2
     assert [{r["prompt_id"] for r in leaf.rows} for leaf in lora.children] \
@@ -823,7 +823,7 @@ def _i2v_frame(prompt_id, frame_file, prompt=""):
 def _i2v_source_folders(rows):
     """The source-image folders of the sole video/workflow/model/LoRA path."""
     workflow = build_gallery_tree(rows)[0]
-    return workflow.model_groups[0].children[0].children
+    return workflow.children[0].children[0].children
 
 
 def _i2v_leaves(rows):
@@ -886,7 +886,7 @@ def test_i2v_source_folder_is_named_by_the_image_it_animates():
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     (source,) = _i2v_source_folders(rows)
     (images,) = [wf for wf in build_gallery_tree(rows) if wf.key.startswith("image/")]
-    (image_leaf,) = images.model_groups[0].children[0].children
+    (image_leaf,) = images.children[0].children[0].children
     assert source.label == f"sdxl_t2i_face.png · {image_leaf.label}"
     assert "smiling" not in source.label
 
@@ -959,7 +959,7 @@ def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
     )
     (workflow,) = build_gallery_tree([still])
     assert workflow.key == "image/wan22_flf2v_loop"  # keyed as an image, not a video
-    (lora,) = workflow.model_groups[0].children
+    (lora,) = workflow.children[0].children
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
@@ -1003,7 +1003,7 @@ def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
         _i2v("v3", "styleB"),           # same base model, different LoRA
     ]
     workflow = build_gallery_tree(rows)[0]
-    (model,) = workflow.model_groups                       # one shared base model
+    (model,) = workflow.children                       # one shared base model
     loras = {lg.label: lg for lg in model.children}
     assert set(loras) == {"styleA_high / styleA_low", "styleB_high / styleB_low"}
 
@@ -1018,7 +1018,7 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
     # gives it, so an in-flight sibling (absent from the tree) can be matched to it.
     from origenerator.gallery import settings_folder_key
     row = _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)
-    (lora,) = build_gallery_tree([row])[0].model_groups[0].children
+    (lora,) = build_gallery_tree([row])[0].children[0].children
     (leaf,) = lora.children
     assert settings_folder_key(row) == leaf.key
 
@@ -1027,7 +1027,7 @@ def test_group_level_names_each_tier():
     from origenerator.gallery import group_level
     rows = [_i2v("v1", "styleA")]  # wan22_i2v -> model -> lora -> source -> settings
     wf = build_gallery_tree(rows)[0]
-    model = wf.model_groups[0]
+    model = wf.children[0]
     lora = model.children[0]
     source = lora.children[0]
     settings = source.children[0]
@@ -1041,7 +1041,7 @@ def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
     from origenerator.gallery import folder_key_at_level, group_level
     rows = [_i2v("v1", "styleA")]
     wf = build_gallery_tree(rows)[0]
-    model = wf.model_groups[0]
+    model = wf.children[0]
     lora = model.children[0]
     source = lora.children[0]
     settings = source.children[0]
@@ -1064,7 +1064,7 @@ def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
     # single "(no add-on)" folder wrapping the settings leaves — so every branch of
     # the tree nests to the same depth whether or not the pipeline uses a LoRA.
     rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
-    (model,) = build_gallery_tree(rows)[0].model_groups
+    (model,) = build_gallery_tree(rows)[0].children
     (lora,) = model.children
     assert isinstance(lora, LoraGroup)
     assert lora.label == "(no add-on)"
@@ -1073,13 +1073,13 @@ def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
 
 def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
     rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
-    model = build_gallery_tree(rows)[0].model_groups[0]
+    model = build_gallery_tree(rows)[0].children[0]
     a, b = model.children
     assert a.key.startswith("video/wan22_i2v/l")  # the LoRA level tags its key with 'l'
     assert a.key != b.key
 
     meta = {b.key: {"custom_name": "Style B", "starred": True}}
-    loras = build_gallery_tree(rows, meta)[0].model_groups[0].children
+    loras = build_gallery_tree(rows, meta)[0].children[0].children
     assert [lora.key for lora in loras] == [a.key, b.key]  # order unchanged — no reshuffle
     assert loras[1].label == "Style B"     # custom name applied in place
     assert loras[1].starred is True
@@ -1090,7 +1090,7 @@ def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
     # Two LoRAs, identical prompt/settings otherwise: the split is at the LoRA
     # level, so neither settings leaf needs the LoRA name in it.
     rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
-    model = build_gallery_tree(rows)[0].model_groups[0]
+    model = build_gallery_tree(rows)[0].children[0]
     for lora in model.children:
         (source,) = lora.children
         (settings,) = source.children
@@ -1106,7 +1106,7 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     ]
     workflow = build_gallery_tree(rows)[0]
 
-    models = {m.label: m for m in workflow.model_groups}
+    models = {m.label: m for m in workflow.children}
     assert set(models) == {"reapony_v80", "dreamshaper"}
 
     reapony = models["reapony_v80"]
@@ -1121,12 +1121,12 @@ def test_model_folders_get_stable_keys_and_apply_custom_names_and_stars():
         _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
         _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
     ]
-    reapony, dream = build_gallery_tree(rows)[0].model_groups
+    reapony, dream = build_gallery_tree(rows)[0].children
     assert reapony.key.startswith("image/sdxl_t2i/")
     assert reapony.key != dream.key
 
     meta = {dream.key: {"custom_name": "Dreamy", "starred": True}}
-    models = build_gallery_tree(rows, meta)[0].model_groups
+    models = build_gallery_tree(rows, meta)[0].children
     assert [m.key for m in models] == [reapony.key, dream.key]  # order unchanged
     assert models[1].label == "Dreamy"     # custom name applied in place
     assert models[1].starred is True
@@ -1141,7 +1141,7 @@ def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
         _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
     ]
     workflow = build_gallery_tree(rows)[0]
-    for model in workflow.model_groups:
+    for model in workflow.children:
         (lora,) = model.children
         (settings,) = lora.children
         assert settings.detail == "a cat"
@@ -1251,14 +1251,14 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
     by_key = {w.key: w for w in tree}
     assert set(by_key) == {"image/sdxl_t2i", "video/wan22_i2v"}
 
-    (model,) = by_key["image/sdxl_t2i"].model_groups  # no checkpoint -> one model
+    (model,) = by_key["image/sdxl_t2i"].children  # no checkpoint -> one model
     (lora,) = model.children                # the single "(no add-on)" level
     settings = lora.children
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
 
-    (video_model,) = by_key["video/wan22_i2v"].model_groups
+    (video_model,) = by_key["video/wan22_i2v"].children
     (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no add-on)" here)
     (video_source,) = video_lora.children   # then a source-image level ("(no start image)")
     assert len(video_source.children) == 1
@@ -1283,9 +1283,9 @@ def test_hiding_images_leaves_a_videos_source_image_folders_untouched():
     face = _img("face", "a smiling face", 30, 1)
     rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
     unfiltered = {w.key: w for w in build_gallery_tree(rows)}["video/wan22_i2v"]
-    both = unfiltered.model_groups[0].children[0].children
+    both = unfiltered.children[0].children[0].children
     videos_only = build_gallery_tree(rows, {}, {"video"})[0] \
-        .model_groups[0].children[0].children
+        .children[0].children[0].children
 
     assert [(f.key, f.label) for f in videos_only] == [(f.key, f.label) for f in both]
 
@@ -1294,7 +1294,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
     workflow = tree[0]
     assert workflow.key == "image/sdxl_t2i"
-    model = workflow.model_groups[0]
+    model = workflow.children[0]
     assert model.key.startswith("image/sdxl_t2i/")
     settings = model.children[0].children[0]     # model -> "(no add-on)" -> settings
     assert settings.key.startswith("image/sdxl_t2i/")
@@ -1302,7 +1302,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     # The model and settings keys are derived from signatures, so they are
     # stable across rebuilds (what lets a rename/star stick to the same folder).
     again_model = build_gallery_tree([_img("i9", "a cat", 50, 7)])[0] \
-        .model_groups[0]
+        .children[0]
     assert again_model.key == model.key
     assert again_model.children[0].children[0].key == settings.key
 
@@ -1310,12 +1310,12 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
 def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_lora = build_gallery_tree(rows)[0] \
-        .model_groups[0].children[0]  # the "(no add-on)" level
+        .children[0].children[0]  # the "(no add-on)" level
     cat, dog = plain_lora.children  # newest-first: cat, dog
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
     settings = build_gallery_tree(rows, meta)[0] \
-        .model_groups[0].children[0].children
+        .children[0].children[0].children
 
     assert [s.key for s in settings] == [cat.key, dog.key]  # order unchanged — no reshuffle
     assert settings[1].label == "Doggos"      # custom name applied in place
@@ -1329,7 +1329,7 @@ def test_a_new_generation_in_an_older_folder_leaves_the_folder_where_it_was():
         _img("dog", "a dog", 50, 1),
         _img("cat1", "a cat", 50, 1),
     ]
-    lora = build_gallery_tree(newest_first)[0].model_groups[0].children[0]
+    lora = build_gallery_tree(newest_first)[0].children[0].children[0]
 
     assert [[r["prompt_id"] for r in leaf.rows] for leaf in lora.children] \
         == [["dog"], ["cat2", "cat1"]]
@@ -1354,7 +1354,7 @@ def test_named_folders_credit_every_row_beneath_them():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     tree = build_gallery_tree(rows)
     workflow = tree[0]
-    cat_leaf = workflow.model_groups[0].children[0].children[0]
+    cat_leaf = workflow.children[0].children[0].children[0]
 
     named = named_folders_by_row(
         tree, {workflow.key: {"custom_name": "Stills"},
@@ -1369,7 +1369,7 @@ def test_a_folder_the_user_composed_names_what_it_gathers():
 
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     tree = build_gallery_tree(rows)
-    cat_leaf = tree[0].model_groups[0].children[0].children[0]
+    cat_leaf = tree[0].children[0].children[0].children[0]
 
     named = named_folders_by_row(
         tree, {}, [CustomGroup("__custom__/1", "Beach trip", [cat_leaf])])
@@ -1389,7 +1389,7 @@ def test_starred_folders_collects_starred_across_every_level():
     # returns both, top-down in tree order, regardless of how deep each sits.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     workflow = build_gallery_tree(rows)[0]
-    cat_leaf = workflow.model_groups[0].children[0].children[0]  # model -> "(no add-on)" -> settings
+    cat_leaf = workflow.children[0].children[0].children[0]  # model -> "(no add-on)" -> settings
 
     meta = {
         workflow.key: {"custom_name": None, "starred": True},
@@ -1593,7 +1593,7 @@ def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     # description under the name.
     prompt = "a cat asleep on a windowsill in the late afternoon sun"
     (lora,) = build_gallery_tree(
-        [_img("i1", prompt, 50, 1)])[0].model_groups[0].children
+        [_img("i1", prompt, 50, 1)])[0].children[0].children
     (leaf,) = lora.children
 
     assert leaf.label == folder_id(leaf.key)
@@ -1607,13 +1607,13 @@ def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
     # folder by, and one that changed as the library grew would be no name at all
     # — and two folders on one screen must never wear the same one.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
-    lora = build_gallery_tree(rows)[0].model_groups[0].children[0]
+    lora = build_gallery_tree(rows)[0].children[0].children[0]
     cat, dog = lora.children
     assert cat.label != dog.label
 
     grown = build_gallery_tree([_img("i3", "a bird", 50, 1), *rows])
     again = {leaf.key: leaf.label
-             for leaf in grown[0].model_groups[0].children[0].children}
+             for leaf in grown[0].children[0].children[0].children}
     assert again[cat.key] == cat.label and again[dog.key] == dog.label
 
 
@@ -1621,9 +1621,9 @@ def test_a_custom_name_replaces_the_code_and_the_description_stays():
     # The code is a starting name, not a fixed one: naming a folder replaces it,
     # and what the folder holds still reads on hover.
     rows = [_img("i1", "a cat", 50, 1)]
-    (leaf,) = build_gallery_tree(rows)[0].model_groups[0].children[0].children
+    (leaf,) = build_gallery_tree(rows)[0].children[0].children[0].children
 
-    named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0].model_groups[0].children[0].children[0]
+    named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0].children[0].children[0].children[0]
     assert named.label == "Cats"
     assert folder_detail(named) == "a cat"
 
@@ -1649,7 +1649,7 @@ def test_settings_group_details_disambiguate_same_prompt_different_params():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 40, 2)])
     details = [sg.detail for sg in
-               tree[0].model_groups[0].children[0].children]
+               tree[0].children[0].children[0].children]
     assert len(details) == 2
     assert details[0] != details[1]
     assert all("a cat" in detail for detail in details)
@@ -1661,7 +1661,7 @@ def test_settings_group_detail_omits_params_when_only_one_group():
     # A lone settings folder needs no disambiguating suffix.
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
                                _img("i2", "a cat", 50, 2)])
-    (lora,) = tree[0].model_groups[0].children
+    (lora,) = tree[0].children[0].children
     (only,) = lora.children
     assert only.detail == "a cat"
 
@@ -1671,7 +1671,7 @@ def test_a_folders_hover_names_what_sets_it_apart_the_way_the_form_does():
                  params_json=json.dumps({"positive_prompt": "a cat", "cfg": cfg, "seed": 1}),
                  output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png"}]))
             for pid, cfg in (("i1", 7.5), ("i2", 5.0))]
-    (lora,) = build_gallery_tree(rows)[0].model_groups[0].children
+    (lora,) = build_gallery_tree(rows)[0].children[0].children
 
     assert sorted(leaf.detail for leaf in lora.children) == [
         "a cat · Prompt Strength 5.0", "a cat · Prompt Strength 7.5"]
@@ -1692,7 +1692,7 @@ def test_a_folders_hover_gives_a_clips_length_in_the_seconds_its_form_shows():
 def test_a_folder_with_no_prompt_to_go_by_is_described_in_the_forms_words():
     rows = [_row(prompt_id="i1", workflow_name="sdxl_t2i", params_json=json.dumps({"seed": 1}),
                  output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))]
-    (lora,) = build_gallery_tree(rows)[0].model_groups[0].children
+    (lora,) = build_gallery_tree(rows)[0].children[0].children
     (leaf,) = lora.children
 
     assert leaf.detail == "1280×720, Steps 50, Prompt Strength 7.5"

@@ -1336,6 +1336,40 @@ def _row_visible(form, key):
     return form._sections[title].content_form().isRowVisible(form._present_keys[title].index(key))
 
 
+def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
+    from origenerator.speech import CUSTOM_VOICE
+
+    form = ParamForm(_scene_defs() + _voice_defs() + [
+        ParamDef("unet_s2v", "Speaking Model", "combo", "example_s2v.safetensors",
+                 options=["example_s2v.safetensors"]),
+    ])
+    qtbot.addWidget(form)
+    form._widgets["voice"].setCurrentText(CUSTOM_VOICE)
+    speaking_rows = ("voice", "voice_sample", "voice_sample_text", "unet_s2v")
+    assert not any(_row_visible(form, key) for key in speaking_rows)
+
+    form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
+
+    assert all(_row_visible(form, key) for key in speaking_rows)
+
+
+def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
+    form = ParamForm(_scene_defs() + [
+        ParamDef("audio_prompt", "Sound Prompt", "str", "", multiline=True),
+        ParamDef("audio_negative_prompt", "Sounds to Avoid", "str", "", multiline=True),
+    ])
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+    editor.fields("scene_lines")[0].setPlainText("Come in.")
+    assert _row_visible(form, "audio_prompt")
+
+    editor.fields("scene_lines")[1].setPlainText("Sit down.")
+
+    assert not _row_visible(form, "audio_prompt")
+    assert not _row_visible(form, "audio_negative_prompt")
+
+
 def test_an_add_ons_strength_shows_only_while_it_has_an_add_on(qtbot):
     form = ParamForm([
         ParamDef("lora_high", "Add-on (First Pass)", "combo", "None",
@@ -1359,8 +1393,9 @@ def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     # with a recipe that stored it.
     from origenerator.speech import CUSTOM_VOICE
 
-    form = ParamForm(_voice_defs())
+    form = ParamForm(_scene_defs() + _voice_defs())
     qtbot.addWidget(form)
+    form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
     assert not _row_visible(form, "voice_sample") and not _row_visible(form, "voice_sample_text")
     form._widgets["voice"].setCurrentText(CUSTOM_VOICE)
     assert _row_visible(form, "voice_sample") and _row_visible(form, "voice_sample_text")

@@ -51,11 +51,23 @@ _SEED_MAX = (1 << 63) - 1
 # scene's length, and each scene's lines.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
 
+def _speaks(lines) -> bool:
+    return any(line.strip() for line in lines)
+
+
+def _all_speak(lines) -> bool:
+    return bool(lines) and all(line.strip() for line in lines)
+
+
 _SHOWN_WHILE = {
-    "voice_sample": ("voice", lambda text: text == CUSTOM_VOICE),
-    "voice_sample_text": ("voice", lambda text: text == CUSTOM_VOICE),
-    "lora_strength_high": ("lora_high", lambda text: not is_no_lora(text)),
-    "lora_strength_low": ("lora_low", lambda text: not is_no_lora(text)),
+    "voice": lambda text, lines: _speaks(lines),
+    "voice_sample": lambda text, lines: _speaks(lines) and text("voice") == CUSTOM_VOICE,
+    "voice_sample_text": lambda text, lines: _speaks(lines) and text("voice") == CUSTOM_VOICE,
+    "unet_s2v": lambda text, lines: _speaks(lines),
+    "audio_prompt": lambda text, lines: not _all_speak(lines),
+    "audio_negative_prompt": lambda text, lines: not _all_speak(lines),
+    "lora_strength_high": lambda text, lines: not is_no_lora(text("lora_high")),
+    "lora_strength_low": lambda text, lines: not is_no_lora(text("lora_low")),
 }
 
 # The locked-dimension spinners span from a stride floor up past any realistic
@@ -209,18 +221,18 @@ class ParamForm(QWidget):
         self._wire_rows_shown_while()
 
     def _wire_rows_shown_while(self):
-        for source in {source for source, _shows in _SHOWN_WHILE.values()}:
-            widget = self._widgets.get(source)
-            if isinstance(widget, QComboBox):
-                widget.currentTextChanged.connect(
-                    lambda _text: self._refresh_rows_shown_while())
+        self.changed.connect(self._refresh_rows_shown_while)
         self._refresh_rows_shown_while()
 
     def _refresh_rows_shown_while(self):
-        for row, (source, shows) in _SHOWN_WHILE.items():
-            widget = self._widgets.get(source)
-            if row in self._widgets and isinstance(widget, QComboBox):
-                self._set_row_visible(row, shows(widget.currentText()))
+        lines = self._scenes.lines() if self._scenes is not None else []
+        for row, shows in _SHOWN_WHILE.items():
+            if row in self._widgets:
+                self._set_row_visible(row, shows(self._combo_text, lines))
+
+    def _combo_text(self, key: str) -> str:
+        widget = self._widgets.get(key)
+        return widget.currentText() if isinstance(widget, QComboBox) else ""
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""

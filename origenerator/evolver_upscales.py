@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator.media import media_type_from_filename
+from origenerator.media import MediaType, media_type_from_filename
 
 UPSCALE_SUFFIX = "_topaz"
 ORIENTATIONS = ("landscape", "portrait")
@@ -31,7 +31,7 @@ class EvolverUpscales:
     def upscale_of(self, video) -> Path | None:
         video = Path(video)
         upscale = self.by_stem.get(video.stem)
-        if (upscale is None or media_type_from_filename(video.name) != "video"
+        if (upscale is None or media_type_from_filename(video.name) != MediaType.VIDEO
                 or not _predates(video, upscale)):
             return None
         return upscale

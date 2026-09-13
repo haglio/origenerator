@@ -84,6 +84,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -445,7 +446,8 @@ class InfoPaneTabs(QTabWidget):
         """The settings folder (workflow + signature) a stored row lands in."""
         workflow_name = row.get("workflow_name", "")
         index = build_image_config_index(
-            [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
+            [r for r in self._db.list_generations()
+             if media_type_of_row(r) == MediaType.IMAGE]
         )
         return workflow_name, settings_signature(workflow_name, row.get("params_json"), index,
                                                  workflow_version=row.get("workflow_version"))

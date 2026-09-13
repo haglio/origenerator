@@ -60,6 +60,7 @@ from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.ken_burns_still import KenBurnsStill
 from origenerator.gui.media_overlay import float_over_media
+from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
 
@@ -296,13 +297,13 @@ class PreviewWidget(QWidget):
 
     def show_media(self, path, media_type: str) -> None:
         """Display ``path`` as an image or video per ``media_type``."""
-        if media_type == "video":
+        if media_type == MediaType.VIDEO:
             self.show_video(path)
         else:
             self.show_image(path)
 
     def show_image(self, path) -> None:
-        self._take_the_pane((path, "image"))
+        self._take_the_pane((path, MediaType.IMAGE))
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._set_movie(QMovie(str(path)), reader.size())
@@ -323,7 +324,7 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._still)
 
     def show_video(self, path) -> None:
-        self._take_the_pane((path, "video"), stop_player=False)
+        self._take_the_pane((path, MediaType.VIDEO), stop_player=False)
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
@@ -702,7 +703,7 @@ class PreviewWidget(QWidget):
     def current_video_path(self):
         """The on-disk video currently shown, or ``None`` for an image/placeholder/
         live frame — what a funscript lookup and device driving key off."""
-        if self._media is not None and self._media[1] == "video":
+        if self._media is not None and self._media[1] == MediaType.VIDEO:
             return self._media[0]
         return None
 

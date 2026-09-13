@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from origenerator.gui import icons
+from origenerator.media import MediaType
 
 
 def _style_tab_close_pixmap():
@@ -60,8 +61,8 @@ def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
 def test_media_type_badges_render_for_image_and_video(qtbot):
     # The Recents shelf marks each tile image-or-video with a small corner badge;
     # both types must draw a non-blank pixmap so neither shows an empty square.
-    image_badge = icons.media_type_badge("image")
-    video_badge = icons.media_type_badge("video")
+    image_badge = icons.media_type_badge(MediaType.IMAGE)
+    video_badge = icons.media_type_badge(MediaType.VIDEO)
     assert not image_badge.isNull() and image_badge.width() > 0
     assert not video_badge.isNull() and video_badge.width() > 0
     # The two glyphs differ, so an image is never mistaken for a video.
@@ -204,8 +205,8 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 
     # The i2v hover controls: a video-seed and an image-seed re-roll glyph, each
     # a non-blank pixmap, and visibly distinct so one isn't mistaken for the other.
-    video = icons.reroll_seed_icon("video")
-    image = icons.reroll_seed_icon("image")
+    video = icons.reroll_seed_icon(MediaType.VIDEO)
+    image = icons.reroll_seed_icon(MediaType.IMAGE)
     size = QSize(24, 24)
     assert not video.pixmap(size).isNull()
     assert not image.pixmap(size).isNull()

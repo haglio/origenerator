@@ -33,6 +33,8 @@ import random
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from origenerator.media import MediaType
+
 # How long an image holds the screen unless something says otherwise.
 # Genau's console shows this as its clip-seconds pace and sets it from
 # there, so the number it opens at has to be the one the slideshow uses.
@@ -409,7 +411,7 @@ class SlideshowPlaylist:
 
     def current_is_video(self) -> bool:
         slide = self.current()
-        return slide is not None and slide.media_type == "video"
+        return slide is not None and slide.media_type == MediaType.VIDEO
 
     def pace_ms(self):
         if self.current() is None or self.current_is_video():

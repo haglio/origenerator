@@ -53,6 +53,7 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.media import MediaType
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
@@ -431,7 +432,7 @@ class ShowDirector:
         for row in rows:
             media_type = gallery.media_type_of_row(row)
             resolved = (gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-                        if media_type == "video" else None)
+                        if media_type == MediaType.VIDEO else None)
             upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
             levels = gallery.displayed_levels(row, upscale)
             if len(levels) < 2:

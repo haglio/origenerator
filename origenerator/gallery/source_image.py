@@ -17,6 +17,7 @@ from origenerator.gallery.signatures import (
     parse_params,
     settings_signature,
 )
+from origenerator.media import MediaType
 
 
 @dataclass
@@ -83,7 +84,7 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
         config = _ImageConfig(
             prompt_id=image.get("prompt_id") or "",
             signature=signature,
-            label=folder_id(settings_key("image", workflow_name, signature)),
+            label=folder_id(settings_key(MediaType.IMAGE, workflow_name, signature)),
         )
         for f in row_output_files(image):
             name = _frame_name(f.get("filename"))

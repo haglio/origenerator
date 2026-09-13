@@ -27,6 +27,7 @@ from origenerator import gallery
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.inflight import EnhancingRun
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts
 
@@ -642,4 +643,4 @@ def _all_video(rows) -> bool:
     """Whether ``rows`` is a non-empty set of videos — the one case with nothing
     to enhance at all, as opposed to nothing picked."""
     rows = list(rows)
-    return bool(rows) and all(gallery.media_type_of_row(row) == "video" for row in rows)
+    return bool(rows) and all(gallery.media_type_of_row(row) == MediaType.VIDEO for row in rows)

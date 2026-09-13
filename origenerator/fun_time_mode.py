@@ -21,6 +21,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ def _measured_size(slide: Slide) -> tuple[int, int] | None:
     from PIL import Image  # deferred: this module is imported before the splash
 
     for candidate in (slide.still,
-                      slide.path if slide.media_type == "image" else None):
+                      slide.path if slide.media_type == MediaType.IMAGE else None):
         if not candidate:
             continue
         try:
@@ -136,7 +137,7 @@ def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
     import cv2  # deferred: this module is imported before the splash
 
     for slide in slides:
-        if slide.media_type != "video":
+        if slide.media_type != MediaType.VIDEO:
             continue
         capture = cv2.VideoCapture(str(slide.path))
         try:

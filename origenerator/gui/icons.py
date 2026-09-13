@@ -36,6 +36,7 @@ from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 
 from origenerator.gallery.sides import PORTRAIT
+from origenerator.media import MediaType
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -237,7 +238,7 @@ def media_type_badge(media_type: str) -> QPixmap:
     a translucent dark chip, so it reads over a thumbnail of any color. Cached and
     pre-scaled to its on-screen size; the same two badges decorate every tile.
     """
-    glyph = "play" if media_type == "video" else "photo"
+    glyph = "play" if media_type == MediaType.VIDEO else "photo"
     return _display_size(_render_chip(_BADGE_CHIP, glyph, _BADGE_GLYPH))
 
 
@@ -250,7 +251,7 @@ def media_type_icon(media_type: str) -> QIcon:
     stands in for the thumbnail a tab has no result to show yet — so the chip
     would be a black square among words.
     """
-    return glyph_icon("play" if media_type == "video" else "photo", size=_SIZE)
+    return glyph_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
 # --- the shape a half of the table of contents holds -----------------------
@@ -448,7 +449,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     # The media identity, drawn large so video vs image reads at a glance...
-    draw_glyph(painter, "play" if media_type == "video" else "photo", _REROLL_GLYPH,
+    draw_glyph(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
                size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
     _draw_regen_badge(painter)
     painter.end()

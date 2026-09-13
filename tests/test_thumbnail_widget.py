@@ -12,8 +12,10 @@ from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
+from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.media import MediaType
 
 
 def _corners(tile):
@@ -24,8 +26,8 @@ def _corners(tile):
 
 def _corner_actions():
     return [
-        ("video", icons.reroll_seed_icon("video"), "Randomize video seed"),
-        ("image", icons.reroll_seed_icon("image"), "Randomize image seed"),
+        (REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO), "Randomize video seed"),
+        (REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE), "Randomize image seed"),
     ]
 
 
@@ -189,7 +191,7 @@ def test_media_badge_appears_only_when_a_type_is_given(qtbot):
     qtbot.addWidget(plain)
     assert plain.findChildren(MediaBadge) == []
     # ...but a Recents tile, which mixes kinds, is told its type and shows a badge.
-    badged = ThumbnailWidget("p2", None, "label", media_type="video")
+    badged = ThumbnailWidget("p2", None, "label", media_type=MediaType.VIDEO)
     qtbot.addWidget(badged)
     assert len(badged.findChildren(MediaBadge)) == 1
 
@@ -243,7 +245,7 @@ def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
 
     tw._corner_buttons[1].click()
 
-    assert fired == [("p1", "image")]  # carries the tile's id and the chosen action
+    assert fired == [("p1", REROLL_IMAGE)]  # carries the tile's id and the chosen action
 
 
 # --- the three corner controls ------------------------------------------------
@@ -337,7 +339,7 @@ def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
     # Star top-right, trash lower-left, plus lower-right — and the media badge
     # keeps the top-left it has always had, so all four can coexist.
     tw = ThumbnailWidget("p1", None, "label", starred=True,
-                         enhance=icons.ENHANCE_HELD, media_type="image")
+                         enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE)
     qtbot.addWidget(tw)
     star, trash, plus = (b.geometry() for b in _corners(tw))
     picture = tw._image_label.geometry()

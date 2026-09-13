@@ -147,6 +147,7 @@ from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
+    REROLL_VIDEO,
     offer_reroll,
 )
 from origenerator.gui.reroll_tile import RerollTile
@@ -162,6 +163,7 @@ from origenerator.gui.toolbar_bank import (
     ToolbarBank,
 )
 from origenerator.gui.voice_router import VoiceRouter
+from origenerator.media import MediaType
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.slideshow import in_order
 from origenerator.trash import Trash
@@ -1756,7 +1758,8 @@ class GalleryView(QWidget):
         reroll_key = self._selected_reroll_key
         self._pending_key = None
         self._pending_selection = None
-        self._image_rows = [r for r in rows if gallery.media_type_of_row(r) == "image"]
+        self._image_rows = [r for r in rows
+                            if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._image_index = None   # rebuilt on the next ask (image_config_index)
         self._combine.offer_the_acts(rows)
         # The Images/Videos ticks narrow everything the gallery shows: which
@@ -3211,7 +3214,7 @@ class GalleryView(QWidget):
         key = self.folder_key_of(row)
         if key in self._reroll_jobs:
             return  # this folder already has a re-roll running
-        if which == "video":
+        if which == REROLL_VIDEO:
             self._reroll.reroll_video_seed(key, row)
         else:
             self._reroll.reroll_image_seed(key, row, self._image_rows)
@@ -3644,9 +3647,9 @@ class GalleryView(QWidget):
         none."""
         types = set()
         if self._image_cb.isChecked():
-            types.add("image")
+            types.add(MediaType.IMAGE)
         if self._video_cb.isChecked():
-            types.add("video")
+            types.add(MediaType.VIDEO)
         return types
 
     def _on_media_filter_changed(self, _checked=False):

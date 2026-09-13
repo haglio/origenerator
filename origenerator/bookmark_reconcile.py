@@ -27,6 +27,7 @@ import logging
 from dataclasses import dataclass
 
 from origenerator import gallery
+from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ def index_folders(db) -> Folders:
     """Read the whole gallery tree once, and index it for both passes."""
     rows_by_id = {r["prompt_id"]: r for r in db.list_generations()}
     image_index = gallery.build_image_config_index(
-        [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == "image"]
+        [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == MediaType.IMAGE]
     )
     current, legacy_keys = _index_current_folders(rows_by_id.values(), image_index)
     return Folders(current, legacy_keys, rows_by_id, image_index)

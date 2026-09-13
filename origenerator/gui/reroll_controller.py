@@ -44,6 +44,7 @@ from origenerator.gui.generation_job import (
     insert_generation_row,
     mark_generation_completed,
 )
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -555,7 +556,8 @@ class RerollController(QObject):
         the current image rows so an i2v row keys to the same leaf the tree gives
         it (see :func:`gallery.build_image_config_index`)."""
         image_rows = [
-            r for r in self._db.list_generations() if gallery.media_type_of_row(r) == "image"
+            r for r in self._db.list_generations()
+            if gallery.media_type_of_row(r) == MediaType.IMAGE
         ]
         return gallery.build_image_config_index(image_rows)
 

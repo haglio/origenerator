@@ -14,6 +14,7 @@ import json
 from functools import cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
+from origenerator.media import MediaType
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import is_no_lora
 
@@ -237,7 +238,7 @@ def _outputs_video(workflow_name: str | None) -> bool:
     """True when a workflow's results are videos — the one kind whose folders grow
     a source-image tier under their LoRA folders."""
     wf = _registered(workflow_name)
-    return wf is not None and wf.output_type == "video"
+    return wf is not None and wf.output_type == MediaType.VIDEO
 
 
 def _input_image_config(input_image: str | None, image_index: dict | None,

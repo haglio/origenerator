@@ -66,6 +66,7 @@ from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.media import MediaType
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -767,7 +768,8 @@ class GenerateConfigPanel(QWidget):
                 self._param_form.set_seed_random(True)
 
     def _image_rows(self):
-        return [r for r in self._db.list_generations() if media_type_of_row(r) == "image"]
+        return [r for r in self._db.list_generations()
+                if media_type_of_row(r) == MediaType.IMAGE]
 
     def settings_key(self) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).
@@ -862,7 +864,8 @@ class GenerateConfigPanel(QWidget):
     def _recent_matching_row(self) -> dict | None:
         """The newest saved generation in this tab's settings folder, or None."""
         rows = self._db.list_generations()  # newest first
-        index = build_image_config_index([r for r in rows if media_type_of_row(r) == "image"])
+        index = build_image_config_index(
+            [r for r in rows if media_type_of_row(r) == MediaType.IMAGE])
         matching = rows_in_settings(rows, self.settings_key(), index)
         return matching[0] if matching else None
 
@@ -1467,7 +1470,7 @@ class GenerateConfigPanel(QWidget):
             self._listed_levels = []
             self._versions.show_levels([])
             return
-        if media_type_of_row(row) != "image":
+        if media_type_of_row(row) != MediaType.IMAGE:
             self._listed_levels = displayed_levels(row, self._upscale_of(row))
             # A video file is no picture, so both versions wear its thumbnail.
             self._versions.show_levels(
@@ -1487,7 +1490,7 @@ class GenerateConfigPanel(QWidget):
 
     def _upscale_of(self, row: dict) -> Path | None:
         """The upscale Evolver has made of the video on display, if it has."""
-        if media_type_of_row(row) != "video":
+        if media_type_of_row(row) != MediaType.VIDEO:
             return None
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
@@ -1543,7 +1546,8 @@ class GenerateConfigPanel(QWidget):
             self._param_form.show_prompt_diff(key, before or "", after or "")
 
     def _video_rows(self) -> list[dict]:
-        return [r for r in self._db.list_generations() if media_type_of_row(r) == "video"]
+        return [r for r in self._db.list_generations()
+                if media_type_of_row(r) == MediaType.VIDEO]
 
     # --- the export lanes: hand a displayed clip to a sibling app -----------
 
@@ -1556,7 +1560,7 @@ class GenerateConfigPanel(QWidget):
         row rather than from the button's own state so it survives a restart.
         ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
-        is_video = preview is not None and preview[1] == "video"
+        is_video = preview is not None and preview[1] == MediaType.VIDEO
         lane.button.setVisible(is_video)
         if not is_video:
             return
@@ -1588,7 +1592,7 @@ class GenerateConfigPanel(QWidget):
         lane.mark(self._db, prompt_id)
         # Re-read so the row (and thus the button) reflects the persisted send.
         self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_export_button(lane, (path, "video"))
+        self._update_export_button(lane, (path, MediaType.VIDEO))
 
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``
@@ -1601,7 +1605,7 @@ class GenerateConfigPanel(QWidget):
         if not self._displayed_row:
             return None
         preview = resolve_preview(self._displayed_row, COMFYUI_OUTPUT_DIR)
-        if preview is None or preview[1] != "video":
+        if preview is None or preview[1] != MediaType.VIDEO:
             return None
         return preview[0]
 

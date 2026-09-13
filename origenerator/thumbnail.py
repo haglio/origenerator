@@ -4,11 +4,13 @@ from pathlib import Path
 
 from PIL import Image
 
+from origenerator.media import MediaType
+
 _THUMB_MAX = 256
 
 
 def generate_thumbnail(
-    source_path: Path, output_type: str, thumb_dir: Path, *, name: str
+    source_path: Path, output_type: MediaType, thumb_dir: Path, *, name: str
 ) -> Path:
     """Render a thumbnail for ``source_path`` into ``thumb_dir / f"{name}.jpg"``.
 
@@ -20,7 +22,7 @@ def generate_thumbnail(
     thumb_dir.mkdir(parents=True, exist_ok=True)
     dest = thumb_dir / f"{name}.jpg"
 
-    if output_type == "video":
+    if output_type == MediaType.VIDEO:
         img = _first_frame_from_video(source_path)
     else:
         img = Image.open(source_path)

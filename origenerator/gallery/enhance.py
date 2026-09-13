@@ -51,6 +51,7 @@ from origenerator.gallery.output import (
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
 from origenerator.generation_state import GenerationSource
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -216,7 +217,7 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
     longer has to list.
     """
     files = row_output_files(row)
-    if media_type_of_row(row) != "image":
+    if media_type_of_row(row) != MediaType.IMAGE:
         if upscale is None or not files:
             return []
         return [EnhanceLevel(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
@@ -273,7 +274,7 @@ def is_enhanceable_row(row: dict) -> bool:
     in view filter to the not-yet-enhanced instead
     (:func:`rows_awaiting_enhancement`, and :func:`is_enhanced_row` for a
     fullscreen hold's Down)."""
-    return media_type_of_row(row) == "image" and produced_output(row)
+    return media_type_of_row(row) == MediaType.IMAGE and produced_output(row)
 
 
 def enhance_target_id(enhance_row: dict, image_rows) -> str | None:
@@ -418,7 +419,7 @@ def enhancement_recency(rows) -> dict[str, int]:
         # :func:`enhance_targets_row` makes one row at a time, indexed. First
         # match wins over the newest-first rows, which is the row
         # :func:`fold_enhancement` will pick when the run lands.
-        if media_type_of_row(row) != "image":
+        if media_type_of_row(row) != MediaType.IMAGE:
             continue
         for stored in row_output_files(row):
             name = _frame_name(stored.get("filename"))

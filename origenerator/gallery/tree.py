@@ -79,6 +79,7 @@ from origenerator.gallery.signatures import (
 )
 from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.media import MediaType
 
 
 def _group_by_creation(newest_first, key):
@@ -504,7 +505,7 @@ def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
     which lands in that workflow's image folder and animates nothing, so it is
     grouped like any other image.
     """
-    if tier.media_type == "video" and is_image_conditioned(tier.workflow_name):
+    if tier.media_type == MediaType.VIDEO and is_image_conditioned(tier.workflow_name):
         return _build_source_image_groups(tier, rows)
     return _build_settings_groups(tier, rows)
 
@@ -579,7 +580,7 @@ def start_frame_index(rows: list[dict]) -> dict:
     """
     return build_image_config_index(
         [row for row in placeable_rows(rows)
-         if media_type_of_row(row) == "image" and produced_output(row)]
+         if media_type_of_row(row) == MediaType.IMAGE and produced_output(row)]
     )
 
 

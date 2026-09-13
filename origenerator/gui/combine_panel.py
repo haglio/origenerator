@@ -52,6 +52,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator.gui.drop_slot import DropSlot
+from origenerator.media import MediaType
 from origenerator.recipe_match import CATEGORIES, GENAU, PLAYERS
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
@@ -80,11 +81,11 @@ class CombinePanel(QWidget):
         parent=None,
     ):
         super().__init__(parent)
-        self.image_slot = DropSlot("image", image_accepts, preview, "Drop an image")
+        self.image_slot = DropSlot(MediaType.IMAGE, image_accepts, preview, "Drop an image")
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
-        self.video_slot = DropSlot("video", video_accepts, preview, _DROP_PLACEHOLDER,
+        self.video_slot = DropSlot(MediaType.VIDEO, video_accepts, preview, _DROP_PLACEHOLDER,
                                    grayscale=True)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)

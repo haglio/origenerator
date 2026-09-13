@@ -34,6 +34,7 @@ from origenerator.gallery import (
 )
 from origenerator.gui.animated_strip import AnimatedVideoStrip
 from origenerator.gui.source_image_tile import SourceImageTile
+from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
 
@@ -122,13 +123,13 @@ class RelatedMedia(QWidget):
             clip = next((v for v in self._video_rows()
                          if v.get("prompt_id") == cut_from), None)
             if clip is not None:
-                return clip, "Trimmed from", "video"
+                return clip, "Trimmed from", MediaType.VIDEO
         source_id = find_source_image_id(row, image_rows)
         if source_id:
             frame = next(
                 (r for r in image_rows if r.get("prompt_id") == source_id), None)
             if frame is not None:
-                return frame, None, "image"
+                return frame, None, MediaType.IMAGE
         if request is not None and request.get("source_row"):
             asked_about = request["source_row"]
             return asked_about, "Requested from", media_type_of_row(asked_about)
@@ -141,7 +142,7 @@ class RelatedMedia(QWidget):
         The library's videos are asked for only past that first test, so showing
         a video costs no read at all.
         """
-        if media_type_of_row(row) != "image":
+        if media_type_of_row(row) != MediaType.IMAGE:
             return []
         videos = videos_from_source_image(row, self._video_rows())
         if len(videos) > ANIMATED_STRIP_LIMIT:

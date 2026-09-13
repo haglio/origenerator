@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from origenerator.media import MediaType
 from origenerator.speech import VOICE_OPTIONS, VOICE_PRESETS, scene_speech
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
@@ -65,7 +66,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     name = "wan22_i2v"
     version = "v007"
     display_name = "WAN 2.2 Image-to-Video"
-    output_type = "video"
+    output_type = MediaType.VIDEO
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")
     lora_keys = ("lora_high", "lora_low")

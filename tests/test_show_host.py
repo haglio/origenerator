@@ -30,8 +30,8 @@ TRANSPORT = (
     "show_step", "show_toggle_hold", "show_cull",
 )
 THE_SET = (
-    "show_reset", "hud_items", "hud_f_mode", "hud_order_label", "hud_looping",
-    "hud_is_favorite", "toggle_f_mode", "show_item", "current_media_path",
+    "show_reset", "hud_items", "hud_favorites_filter", "hud_order_label", "hud_looping",
+    "hud_is_favorite", "toggle_favorites_filter", "show_item", "current_media_path",
     # The enhanced-only switch beside F-mode: declared here because three
     # drivers reach for it — the HUD's button, the session console's, and the
     # spoken word — and it was the last of the switches still being probed for.
@@ -106,7 +106,7 @@ def test_a_host_with_no_set_says_it_has_no_set(pace_only):
     host = pace_only
 
     assert host.hud_items() == ((), 0, True)
-    assert host.hud_f_mode is False
+    assert host.hud_favorites_filter is False
     assert host.hud_order_label == ""
     assert host.hud_looping is True
     assert host.hud_is_favorite is False
@@ -120,7 +120,7 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
 
     assert host.show_reset() is None
     assert host.show_order(latest=True) is None
-    assert host.toggle_f_mode() is None
+    assert host.toggle_favorites_filter() is None
     assert host.show_item("anything", hold=True) is None
     assert host.hud_enhanced_mode is False
     assert host.toggle_enhanced_mode() is False

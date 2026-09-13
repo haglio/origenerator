@@ -112,12 +112,12 @@ def test_both_switches_together_keep_what_answers_both(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
                  starred_ids={"a", "b"}, enhanced_ids={"b", "c"})
 
-    view.toggle_f_mode()
+    view.toggle_favorites_filter()
     view.toggle_enhanced_mode()
 
     assert [item[2] for item in view._playlist._items] == ["b"]
     assert view.clear_modes() is True              # the way out of both at once
-    assert (view.hud_f_mode, view.hud_enhanced_mode) == (False, False)
+    assert (view.hud_favorites_filter, view.hud_enhanced_mode) == (False, False)
     assert len(view._playlist) == 3
 
 
@@ -171,20 +171,20 @@ def test_holding_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path)
 
     assert starred == ["a"]
     assert view.hud_is_favorite is True
-    assert view.set_f_mode(True) is True
+    assert view.set_favorites_filter(True) is True
     assert [item[2] for item in view._playlist._items] == ["a"]
 
 
 def test_reset_drops_both_switches(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
                  starred_ids={"a"}, enhanced_ids={"a"})
-    view.toggle_f_mode()
+    view.toggle_favorites_filter()
     view.toggle_enhanced_mode()
     assert len(view._playlist) == 1
 
     view.reset_in_place()
 
-    assert (view.hud_f_mode, view.hud_enhanced_mode) == (False, False)
+    assert (view.hud_favorites_filter, view.hud_enhanced_mode) == (False, False)
     assert len(view._playlist) == 3
 
 

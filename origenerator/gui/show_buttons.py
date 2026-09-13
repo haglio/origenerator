@@ -76,7 +76,7 @@ RESET_TOOLTIPS = {
 }
 
 
-def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
+def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
               enhanced: bool = False, order: str = "", hosted: bool = False,
               own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
     """The rows a show's HUD draws, for the surface it is drawn on.
@@ -91,7 +91,7 @@ def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
     minimize = own_window and not hosted
     names = [name for group in CONTROL_GROUPS for name in group
              if minimize or name != "minimize"]
-    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced,
+    lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced,
            "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
@@ -123,7 +123,7 @@ def answer(host, action: str, argument: str = "") -> bool:
     elif action in ("shuffle", "latest"):
         host.show_order(latest=action == "latest")
     elif action == "fmode":
-        host.toggle_f_mode()
+        host.toggle_favorites_filter()
     elif action == "enhanced":
         host.toggle_enhanced_mode()
     elif action in ("no_loop", "seed_loop"):

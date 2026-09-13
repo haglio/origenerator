@@ -377,8 +377,8 @@ class PlayerShow(QObject):
         return self._set.is_favorite
 
     @property
-    def hud_f_mode(self) -> bool:
-        return self._set.f_mode
+    def hud_favorites_filter(self) -> bool:
+        return self._set.favorites_filter
 
     @property
     def hud_enhanced_mode(self) -> bool:
@@ -392,20 +392,20 @@ class PlayerShow(QObject):
     def hud_looping(self) -> bool:
         return self._set.looping
 
-    def toggle_f_mode(self) -> bool:
-        return self.set_f_mode(not self._set.f_mode)
+    def toggle_favorites_filter(self) -> bool:
+        return self.set_favorites_filter(not self._set.favorites_filter)
 
-    def set_f_mode(self, on: bool) -> bool:
-        return self._set.set_modes(f_mode=bool(on), enhanced=self._set.enhanced_mode)
+    def set_favorites_filter(self, on: bool) -> bool:
+        return self._set.set_modes(favorites_filter=bool(on), enhanced=self._set.enhanced_mode)
 
     def toggle_enhanced_mode(self) -> bool:
         return self.set_enhanced_mode(not self._set.enhanced_mode)
 
     def set_enhanced_mode(self, on: bool) -> bool:
-        return self._set.set_modes(f_mode=self._set.f_mode, enhanced=bool(on))
+        return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
 
     def clear_modes(self) -> bool:
-        return self._set.set_modes(f_mode=False, enhanced=False)
+        return self._set.set_modes(favorites_filter=False, enhanced=False)
 
     def current_media_path(self) -> str:
         """The file on screen — the player's own answer, which is what the

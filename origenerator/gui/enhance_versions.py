@@ -61,7 +61,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import AMBER, BG_PRIMARY, hovered
+from shared_ui.colors import AMBER, BG_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
 # A dragged enhancement level carries the params that produced it under this
@@ -93,12 +93,7 @@ _SELECTED_ROW_CSS = (
     f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}"
     + _ROW_CSS
 )
-_ADD_INK = f"color: {BG_PRIMARY.name()};"
-_ADD_ROW_CSS = (
-    f"#levelRow {{ background-color: {AMBER.name()}; border-radius: 4px; }}"
-    f"#levelRow:hover {{ background-color: {hovered(AMBER).name()}; }}"
-    f"#levelRow QLabel {{ background-color: transparent; {_ADD_INK} }}"
-)
+_ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"
 
 
 def enhance_level_mime(params: dict) -> QMimeData:
@@ -399,19 +394,10 @@ class _AddRow(_Row):
     def __init__(self, settings: str, duplicate_of: int | None, parent=None):
         super().__init__("Enhance", parent)
         self._enabled = duplicate_of is None
-        self.setStyleSheet(_ADD_ROW_CSS)
+        self._picture.setStyleSheet(_ADD_TILE_CSS)
         self._picture.setPixmap(glyph_pixmap("plus", _PLUS, BG_PRIMARY))
-        # A font set in code, since a stylesheet can only size one in absolute units.
-        self._title.setStyleSheet("background: transparent;")
-        title = self._title.font()
-        title.setPointSizeF(title.pointSizeF() * 1.5)
-        title.setBold(True)
-        self._title.setFont(title)
         if settings:
             self._show_facts([MetaItem("Enhancement", settings)])
-        for cell in self._fact_cells:
-            if isinstance(cell, QLabel):
-                cell.setStyleSheet(_ADD_INK)  # over the metadata block's own light ink
         # Dimmed by opacity rather than by setEnabled: Qt delivers no mouse
         # events to a disabled widget, and the hover is exactly what the dimmed
         # state is for — it is how the row explains why it cannot be pressed.

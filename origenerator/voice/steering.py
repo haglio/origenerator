@@ -40,6 +40,7 @@ from functools import partial
 from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 
 from origenerator import config
+from origenerator.prompts import VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.voice.dictation import SpokenRequest
 from origenerator.voice.listener import Listener
 from origenerator.voice.rewrite import rewrite_prompt
@@ -91,7 +92,7 @@ class VoiceSteering(QObject):
             partial(
                 rewrite_prompt,
                 base_url=config.LOCAL_LLM_BASE_URL, model=config.LOCAL_LLM_MODEL,
-                system_prompt=config.VOICE_REWRITE_SYSTEM_PROMPT,
+                system_prompt=VOICE_REWRITE_SYSTEM_PROMPT,
             ),
         )
 

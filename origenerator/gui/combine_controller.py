@@ -34,7 +34,6 @@ from origenerator.config import (
     EVOLVER_INBOX_DIR,
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
-    VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
@@ -44,6 +43,7 @@ from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 from origenerator.media import MediaType
+from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)

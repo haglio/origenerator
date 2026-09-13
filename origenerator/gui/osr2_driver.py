@@ -14,12 +14,7 @@ import logging
 from app_support.funscript import read_actions
 from PyQt6.QtCore import QObject, QTimer
 
-from origenerator.config import (
-    COMFYUI_OUTPUT_DIR,
-    OSR2_BROKER_HOST,
-    OSR2_GENAU_ENABLED_FILE,
-    OSR2_TCODE_UDP_PORT,
-)
+from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
 
@@ -48,10 +43,7 @@ def drive_target_for(video_path, player):
 class Osr2Driver(QObject):
     def __init__(self, broker=None, *, interval_ms: int = _POLL_INTERVAL_MS, parent=None):
         super().__init__(parent)
-        self._broker = broker or Osr2Broker(
-            OSR2_BROKER_HOST, OSR2_TCODE_UDP_PORT,
-            genau_enabled_file=OSR2_GENAU_ENABLED_FILE,
-        )
+        self._broker = broker or Osr2Broker()
         self._player = None
         self._actions: list[tuple[int, int]] = []  # (at_ms, pos), sorted by time
         self._duration_ms = 0

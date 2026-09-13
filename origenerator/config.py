@@ -4,8 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app_support import ports, siblings
-from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
+from app_support import siblings
 
 from origenerator.content import load_content, overlay_value
 
@@ -163,32 +162,11 @@ GENAU_SOURCE = _CONTENT["genau_source"]
 # library root because that root is private and must stay out of source.
 CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
 
-# --- Funscript / OSR2 -------------------------------------------------------
+# --- Funscript ---------------------------------------------------------------
 # Each generated video gets a funscript synthesized alongside it (see
 # funscript.py). The motion isn't measured from the video — it's a steady motion
 # at this cadence (full cycles per second), phased to the clip's duration/loop.
 MOTION_DEFAULT_HZ = 1.2
-
-# The broker sibling bridges to the OSR2 device (COM4) and forwards raw
-# T-code sent to this UDP port straight to the device (osr2_broker/session.py).
-# origenerator drives the device by streaming T-code here in sync with a playing
-# video. While it drives, it pauses genau auto-mode by writing "0" to the broker's
-# shared enabled-flag file (and restores the prior value after). All harmless
-# no-ops when the broker isn't running.
-OSR2_BROKER_HOST = "127.0.0.1"
-OSR2_TCODE_UDP_PORT = ports.TCODE_UDP
-OSR2_STATE_DIR = project_dir("fun_time") / "state"
-OSR2_GENAU_ENABLED_FILE = OSR2_STATE_DIR / GENAU_ENABLED
-# The broker stamps this with the time the OSR2 last spoke. It is the only
-# evidence that the device is there — the console reads it to say "Off" and grey
-# its readout (see origenerator.osr2.device_on). The broker writes a second stamp
-# for what it last *sent*, deliberately not read here: this app's own motion
-# would keep it fresh against a device that is switched off.
-OSR2_SERIAL_RX_FILE = OSR2_STATE_DIR / OSR2_SERIAL_RX
-# How long the device may stay quiet and still count as on — the broker's own
-# window for the same question (osr2_broker.monitor.MonitorState), so the app and
-# the broker never disagree about whether the OSR2 is there.
-OSR2_RX_STALE_S = 30.0
 
 # --- Voice command → prompt edit ------------------------------------------
 # While a folder auto-generates, the mic listens (always-on); each spoken

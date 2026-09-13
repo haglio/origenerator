@@ -17,9 +17,11 @@ import socket
 import time
 from pathlib import Path
 
+from app_support import ports
 from app_support.file_channel import read_flag, stamp_age, write_flag
+from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
 
-from origenerator import config
+from origenerator.config import project_dir
 from origenerator.paths import ensure_player_core_on_path
 
 # Before any player_core import: that checkout is a sibling on the path, not a
@@ -39,6 +41,17 @@ logger = logging.getLogger(__name__)
 # family's one spelling of it, which the broker parks with too -- so a stopped
 # video leaves the OSR2 where the broker expects it.
 PARK_TCODE = PARK_COMMAND
+
+BROKER_HOST = "127.0.0.1"
+TCODE_UDP_PORT = ports.TCODE_UDP
+# Fun Time's state directory, not this app's and not the broker's: all three
+# look for the files below there.
+SHARED_STATE_DIR = project_dir("fun_time") / "state"
+GENAU_ENABLED_FILE = SHARED_STATE_DIR / GENAU_ENABLED
+SERIAL_RX_FILE = SHARED_STATE_DIR / OSR2_SERIAL_RX
+# The broker's own window for the same question (osr2_broker.monitor.MonitorState),
+# so the app and the broker never disagree about whether the OSR2 is there.
+RX_STALE_S = 30.0
 
 
 def device_on(*, now: float | None = None, rx_file=None,
@@ -61,8 +74,8 @@ def device_on(*, now: float | None = None, rx_file=None,
     as anything here can tell.
     """
     current = time.time() if now is None else now
-    path = Path(rx_file if rx_file is not None else config.OSR2_SERIAL_RX_FILE)
-    window = config.OSR2_RX_STALE_S if stale_s is None else stale_s
+    path = Path(rx_file if rx_file is not None else SERIAL_RX_FILE)
+    window = RX_STALE_S if stale_s is None else stale_s
     age = stamp_age(path, current)
     return age is not None and age < window
 
@@ -86,8 +99,8 @@ class Osr2Broker:
     video fully owns the device. ``sock_factory`` is injectable for tests.
     """
 
-    def __init__(self, host: str, port: int, *, genau_enabled_file,
-                 sock_factory=None):
+    def __init__(self, host: str = BROKER_HOST, port: int = TCODE_UDP_PORT, *,
+                 genau_enabled_file=GENAU_ENABLED_FILE, sock_factory=None):
         self._host = host
         self._port = port
         self._genau_file = Path(genau_enabled_file)

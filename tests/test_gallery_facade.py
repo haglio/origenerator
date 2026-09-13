@@ -50,7 +50,7 @@ PUBLISHED = {
     "produced_output", "recent_generations", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "resolve_preview",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
-    "rows_of_media_types", "rows_under", "selection_group",
+    "rows_of_media_types", "rows_under", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",
     "starred_folders", "starred_generations", "start_frame_index",
     "cycle_shaped",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 
@@ -100,3 +100,33 @@ def test_align_right_pushes_each_row_against_the_right_edge(qtbot):
     assert tiles[0].y() < tiles[1].y()                       # it wrapped
     for tile in tiles:
         assert tile.x() + tile.width() == host.width()       # ...against the edge
+
+
+def test_a_full_row_sits_alone_across_the_whole_width_between_the_rows_of_tiles(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host, spacing=6)
+    above, heading, below = QWidget(), QLabel("scene one"), QWidget()
+    above.setFixedSize(40, 30)
+    below.setFixedSize(40, 30)
+    layout.addWidget(above)
+    layout.add_full_row(heading)
+    layout.addWidget(below)
+    host.resize(300, 200)          # room for all three side by side, were it a tile
+    host.show()
+
+    assert (heading.x(), heading.width()) == (0, 300)
+    assert above.y() < heading.y() < below.y()
+    assert below.x() == 0
+
+
+def test_a_full_row_never_holds_the_layout_wider_than_its_tiles(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = FlowLayout(host)
+    tile = QWidget()
+    tile.setFixedSize(40, 30)
+    layout.addWidget(tile)
+    layout.add_full_row(QLabel("a heading a good deal wider than the one tile under it"))
+
+    assert layout.minimumSize().width() == 40

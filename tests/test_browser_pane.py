@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery
 from origenerator.gui.browser_pane import (
@@ -24,14 +24,21 @@ from origenerator.gui.browser_pane import (
     PaneHost,
     TreeNavigation,
 )
-from origenerator.gui.gallery_tree import RECENTS_KEY, TRASH_KEY
+from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    TRASH_KEY,
+)
+from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
-def _row(prompt_id, seed):
+def _row(prompt_id, seed, created_at=None):
     """One finished, fabricated image row — the least a shelf tile needs."""
     return {
         "prompt_id": prompt_id,
@@ -44,6 +51,7 @@ def _row(prompt_id, seed):
                                      "subfolder": ""}]),
         "thumbnail_path": None,
         "starred": 0,
+        "created_at": created_at,
     }
 
 
@@ -83,7 +91,7 @@ class _StubAuto:
         return False
 
 
-def _pane(qtbot, rows=()):
+def _pane(qtbot, rows=(), add_lead_tiles=lambda flow, group: None):
     scroll = BrowserScrollArea()
     qtbot.addWidget(scroll)
     pane = BrowserPane(
@@ -100,7 +108,7 @@ def _pane(qtbot, rows=()):
             enhancing_run=lambda row: None,
             enhance_settings=lambda: gallery.EnhanceSettings(),
             experiments_enabled=lambda: False,
-            add_lead_tiles=lambda flow, group: None,
+            add_lead_tiles=add_lead_tiles,
         ),
     )
     return pane, scroll
@@ -109,6 +117,19 @@ def _pane(qtbot, rows=()):
 def _open_recents(pane, rows):
     pane.set_model(rows, {}, [], [], [])
     pane.show_shelf(RECENTS_KEY)
+
+
+def _shown_in_order(scroll):
+    layout = scroll.widget().layout()
+    return [_named(layout.itemAt(index).widget()) for index in range(layout.count())]
+
+
+def _named(widget):
+    if isinstance(widget, ThumbnailWidget):
+        return widget.prompt_id
+    if isinstance(widget, QLabel):
+        return widget.text()
+    return type(widget).__name__
 
 
 def test_the_pane_stands_alone_on_six_stubs(qtbot):
@@ -180,6 +201,78 @@ def test_recents_draws_a_page_at_a_time(qtbot):
     # One page of the sixty, newest-first order preserved from the model.
     assert len(pane.visible_prompt_ids()) == 50
     assert pane.visible_prompt_ids()[0] == "g1"
+
+
+def test_latest_heads_each_batch_with_when_it_was_made(qtbot):
+    rows = [_row("g1", 1, "2026-09-12 23:00:00"), _row("g2", 2, "2026-09-12 22:50:00"),
+            _row("g3", 3, "2026-09-12 19:00:00")]
+    pane, scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+
+    first, _, second = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [first, "g1", "g2", second, "g3"]
+
+
+def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_it(
+        qtbot, monkeypatch):
+    rows = [_row("g1", 1, "2026-09-12 23:00:00")]
+    pane, scroll = _pane(qtbot, rows)
+    running = InFlightItem(key="j1", caption="scene one", status="running", frame=None,
+                           reveal=lambda: None, media_type="image")
+    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
+    _open_recents(pane, rows)
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [heading, "InFlightCard", "g1"]
+
+
+def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
+    later = [_row(f"a{n}", n, f"2026-09-12 22:{59 - n:02d}:00") for n in range(55)]
+    earlier = [_row(f"b{n}", n, f"2026-09-12 18:{59 - n:02d}:00") for n in range(5)]
+    rows = later + earlier
+    pane, scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+
+    pane._draw_recents_page(50)
+
+    first, second = [heading for heading in gallery.section_headings(rows) if heading]
+    shown = _shown_in_order(scroll)
+    assert shown[0] == first
+    assert shown[shown.index("a50") - 1] == "a49"   # the batch carries on over the page
+    assert shown[shown.index("b0") - 1] == second
+
+
+def test_a_folders_grid_heads_its_batches_with_its_lead_tiles_under_the_first(qtbot):
+    rows = [_row("g1", 1, "2026-09-12 23:00:00"), _row("g2", 2, "2026-09-12 19:00:00")]
+    pane, scroll = _pane(qtbot, rows,
+                         add_lead_tiles=lambda flow, group: flow.addWidget(QLabel("lead")))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    first, second = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [first, "lead", "g1", second, "g2"]
+
+
+def test_the_experiments_shelf_heads_each_batch_it_collected(qtbot):
+    rows = [_row("e1", 1, "2026-09-12 23:00:00"), _row("e2", 2, "2026-09-12 19:00:00")]
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model([], {}, [], rows, [])
+
+    pane.show_shelf(EXPERIMENTS_KEY)
+
+    first, second = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [first, "e1", second, "e2"]
+
+
+def test_the_requests_shelf_heads_each_batch_of_what_was_asked_for(qtbot):
+    rows = [_row("r1", 1, "2026-09-12 23:00:00"), _row("r2", 2, "2026-09-12 19:00:00")]
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model([], {}, [], [], [], request_items=[{"row": row} for row in rows])
+
+    pane.show_shelf(REQUESTS_KEY)
+
+    first, second = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [first, "r1", second, "r2"]
 
 
 def test_rows_for_shelf_answers_by_name_not_by_what_is_on_screen(qtbot):

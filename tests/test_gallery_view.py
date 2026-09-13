@@ -9986,46 +9986,70 @@ def _set_enhance(view, **fields):
     return settings
 
 
-def test_the_hud_holds_the_left_of_the_lower_row_a_hairline_apart_from_enhance(qtbot,
+def test_a_draggable_divider_parts_the_hud_from_the_enhance_settings(qtbot, tmp_path):
+    from PyQt6.QtWidgets import QSplitter
+
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    divider = view._enhance.panel.parentWidget()
+
+    assert isinstance(divider, QSplitter)
+    assert divider.orientation() == Qt.Orientation.Horizontal
+    assert divider.widget(0).isAncestorOf(view._motion_panel)
+    assert divider.widget(1) is view._enhance.panel
+    assert divider.handleWidth() == view._panes.handleWidth()
+
+
+def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, tmp_path):
+    from PyQt6.QtWidgets import QSplitter
+
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    divider = view._scroll.parentWidget()
+
+    assert isinstance(divider, QSplitter)
+    assert divider.orientation() == Qt.Orientation.Vertical
+    assert divider.widget(0) is view._scroll
+    assert divider.widget(1).isAncestorOf(view._enhance.panel)
+    assert divider.handleWidth() == view._panes.handleWidth()
+
+
+def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tmp_path):
+    from PyQt6.QtWidgets import QApplication, QScrollArea
+
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.resize(1500, 1100)
+    view.show()
+    for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
+        QApplication.processEvents()
+    (settings,) = view._enhance.panel.findChildren(QScrollArea)
+    hud = view._enhance.panel.parentWidget().widget(0)
+
+    assert settings.verticalScrollBar().maximum() == 0
+    assert hud.verticalScrollBar().maximum() == 0
+
+
+def test_squeezed_smaller_than_the_hud_its_section_scrolls_rather_than_spilling(qtbot,
                                                                               tmp_path):
-    from PyQt6.QtWidgets import QFrame
+    from PyQt6.QtWidgets import QApplication, QScrollArea
 
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    row = view._motion_panel.parentWidget().layout().itemAt(
-        _row_index(view, view._motion_panel)
-    )
-    hud, hairline, enhance = (row.itemAt(i).widget() for i in range(row.count()))
-    assert hud is view._motion_panel and enhance is view._enhance.panel
-    assert isinstance(hairline, QFrame) and hairline.width() == 1
-    assert "background-color" in hairline.styleSheet()
-    assert [row.stretch(i) for i in range(row.count())] == [0, 0, 1]
+    view.resize(1500, 900)
+    view.show()
+    QApplication.processEvents()
+    beside = view._enhance.panel.parentWidget()
+    below = view._scroll.parentWidget()
 
+    beside.setSizes([60, beside.width() - 60])
+    below.setSizes([below.height() - 90, 90])
+    QApplication.processEvents()
+    section = beside.widget(0)
 
-def test_a_hairline_closes_the_browser_pane_off_from_the_panels_below(qtbot, tmp_path):
-    # Without it the Enhance settings read as the foot of whatever folder is on
-    # screen, rather than as the app-wide settings they are.
-    from PyQt6.QtWidgets import QFrame
-
-    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    column = view._motion_panel.parentWidget().layout()
-    above = column.itemAt(_row_index(view, view._motion_panel) - 1).widget()
-
-    assert isinstance(above, QFrame)
-    assert above.height() == 1
-    # Painted, not a native sunken line: the app's flat background swallows those.
-    assert "background-color" in above.styleSheet()
-
-
-def _row_index(view, widget):
-    """Which slot of the browser pane's column holds the row ``widget`` sits in."""
-    column = widget.parentWidget().layout()
-    for i in range(column.count()):
-        item = column.itemAt(i)
-        if item.layout() is not None and item.layout().indexOf(widget) >= 0:
-            return i
-    raise AssertionError("the motion panel is not in a row of the browser pane")
+    assert isinstance(section, QScrollArea)
+    assert section.horizontalScrollBar().maximum() > 0
+    assert section.verticalScrollBar().maximum() > 0
 
 
 def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):

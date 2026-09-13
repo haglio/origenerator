@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
     QApplication,
-    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -18,7 +17,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
-    QSplitter,
+    QScrollArea,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -155,6 +154,7 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.splitters import FootSplitter, pane_splitter
 from origenerator.gui.toast import ERROR, NOTICE
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -173,10 +173,6 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
-from shared_ui.colors import BORDER_SUBTLE
-from shared_ui.spacing import (
-    BUTTON_GROUP_GAP,
-)
 from shared_ui.tick_control import TickControl
 
 logger = logging.getLogger(__name__)
@@ -254,22 +250,6 @@ def _is_reusable_workflow(workflow_name) -> bool:
     with a fresh seed, which needs a template to build the graph from.
     """
     return (workflow_name or "") in WORKFLOW_REGISTRY
-
-
-def _hairline(orientation: Qt.Orientation) -> QFrame:
-    """A one-pixel rule: under the browsing, and between the panels below it.
-
-    Drawn with an explicit background rather than a ``QFrame`` sunken line: the
-    app's stylesheet paints every plain widget one flat color, and a frame's
-    native shadow line is invisible against it.
-    """
-    line = QFrame()
-    if orientation == Qt.Orientation.Horizontal:
-        line.setFixedHeight(1)
-    else:
-        line.setFixedWidth(1)
-    line.setStyleSheet(f"background-color: {BORDER_SUBTLE.name()};")
-    return line
 
 
 def _is_deletable_folder(group) -> bool:
@@ -800,17 +780,11 @@ class GalleryView(QWidget):
         # tree and browser as one row under it, and the queue across the foot of
         # all three: hosted, the queue belongs to the window rather than to the
         # folder column, so there is no _left_column at all on that side.
-        self._panes = QSplitter(Qt.Orientation.Horizontal)
-        self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
-        self._panes.setHandleWidth(6)
-        self._folder_panes = QSplitter(Qt.Orientation.Horizontal)
-        self._folder_panes.setChildrenCollapsible(False)
-        self._folder_panes.setHandleWidth(6)
+        self._panes = pane_splitter(Qt.Orientation.Horizontal)
+        self._folder_panes = pane_splitter(Qt.Orientation.Horizontal)
         self._stack = None
         if self._fun_time is not None:
-            self._stack = QSplitter(Qt.Orientation.Vertical)
-            self._stack.setChildrenCollapsible(False)
-            self._stack.setHandleWidth(6)
+            self._stack = pane_splitter(Qt.Orientation.Vertical)
         toc = self._build_toc_pane()
         # Hosted, the tree is the upright column's own left edge rather than a
         # part of the folder row, so it goes straight into the outer splitter.
@@ -972,22 +946,12 @@ class GalleryView(QWidget):
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
-        browser_column.addWidget(self._scroll, 1)
-        # The foot of the center (browser) pane, shared by two panels that each
-        # take their own room rather than floating over anyone's buttons: genau's
-        # readout, copied, held to the left at its fixed size, and the open
-        # folder's Enhance settings taking the width left beside it, a hairline
-        # between them.  Hosted by Fun Time there is no readout — the real
-        # console is on the session's main player — so the Enhance settings take
-        # the row alone.
-        footer = QHBoxLayout()
-        footer.setContentsMargins(0, 0, 0, 0)
-        footer.setSpacing(BUTTON_GROUP_GAP)  # two panels, one group's gap apart
-        self._motion_panel = None
-        if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(self._osr2_motion, pace=self._pace)
-            footer.addWidget(self._motion_panel, 0, Qt.AlignmentFlag.AlignTop)
-            footer.addWidget(_hairline(Qt.Orientation.Vertical))
+        # The foot of the center (browser) pane, under a handle of its own: genau's
+        # readout, copied, on the left, and the Enhance settings beside it, a
+        # handle between them too. Hosted by Fun Time there is no readout — the
+        # real console is on the session's main player — so the Enhance settings
+        # take the foot alone.
+        #
         # What an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its tick on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
@@ -995,13 +959,24 @@ class GalleryView(QWidget):
         # it shows on the shelves as readily as on a settings folder. Deliberately
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
-        footer.addWidget(self._enhance.panel, 1, Qt.AlignmentFlag.AlignTop)
-        # A hairline where the browsing stops and these two panels start. Without
-        # it the Enhance settings read as the foot of whatever folder is on screen
-        # rather than as their own thing — which they are: app-wide settings that
-        # don't belong to the folder they happen to be sitting under.
-        browser_column.addWidget(_hairline(Qt.Orientation.Horizontal))
-        browser_column.addLayout(footer)
+        self._motion_panel = None
+        below = self._enhance.panel
+        if self._osr2_motion is not None:
+            self._motion_panel = MotionPanel(self._osr2_motion, pace=self._pace)
+            hud = QScrollArea()
+            hud.setFrameShape(QScrollArea.Shape.NoFrame)
+            hud.setWidget(self._motion_panel)
+            below = pane_splitter(Qt.Orientation.Horizontal)
+            below.addWidget(hud)
+            below.addWidget(self._enhance.panel)
+            below.setStretchFactor(0, 0)
+            below.setStretchFactor(1, 1)
+        browsing = FootSplitter()
+        browsing.addWidget(self._scroll)
+        browsing.addWidget(below)
+        browsing.setStretchFactor(0, 1)
+        browsing.setStretchFactor(1, 0)
+        browser_column.addWidget(browsing, 1)
         return browser
 
     def _build_info_pane(self):
@@ -1102,9 +1077,7 @@ class GalleryView(QWidget):
 
     def _arrange_standalone(self, toc, browser, info_pane):
         """The three panes side by side, as a window of its own opens them."""
-        self._left_column = QSplitter(Qt.Orientation.Vertical)
-        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
-        self._left_column.setHandleWidth(6)
+        self._left_column = pane_splitter(Qt.Orientation.Vertical)
         self._left_column.addWidget(self._folder_panes)
         self._left_column.addWidget(self._queue)
         self._panes.addWidget(self._left_column)

@@ -129,7 +129,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the panes' own objects -- which takes it under fifty statements for the first
     time. 270 -> 267: `ShowDirector` builds a double-clicked item's slides and
     every show's versions from the rows the browser lists, so the three methods
-    that built them here went.)"""
+    that built them here went. 267 -> 266: the two arrangers came out as
+    `PaneArrangement`, which a Fun Time session taking over an open window also
+    asks to fold the panes into its column, and the gallery keeps the one
+    `become_hosted` for that. 266 -> 267: the session hands that window back
+    when it ends, and `become_standalone` asks the arrangement to unfold them.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)

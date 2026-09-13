@@ -216,7 +216,6 @@ class VoiceRouter(QObject):
         self._db = db
         self._shows = shows
         self._client = client
-        self._motion = motion
         # One listener over three vocabularies: the spoken commands, the prompt
         # steering, and the dictation that collects "Request … over" across as
         # many utterances as it takes. The bias teaches whisper all three,
@@ -279,6 +278,10 @@ class VoiceRouter(QObject):
         self._switches: dict[str, QWidget | None] = {}
         self._bank: dict = {}
         self._enhance = None
+        self._hold_the_motion(motion)
+
+    def _hold_the_motion(self, motion) -> None:
+        self._motion = motion
         self._motion_turns = {
             command: (getattr(motion, method) if motion else None, argument)
             for command, (method, argument) in _MOTION.items()
@@ -287,6 +290,14 @@ class VoiceRouter(QObject):
             dial: getattr(motion, setter) if motion else None
             for dial, setter in _DIALS.items()
         }
+
+    def become_hosted(self) -> None:
+        self._hold_the_motion(None)
+        self._switches.update(dict.fromkeys((_AUDIO, _DRIVE, _MIC)))
+
+    def become_standalone(self, motion, *, audio, drive, mic) -> None:
+        self._hold_the_motion(motion)
+        self._switches.update({_AUDIO: audio, _DRIVE: drive, _MIC: mic})
 
     def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, now that
@@ -579,8 +590,14 @@ class VoiceRouter(QObject):
         a motion can be set up before it is started, exactly as the panel allows.
         """
         turn, argument = self._motion_turns[command]
+        if turn is None:
+            self._say_the_motion_is_the_sessions()
+            return
         turn() if argument is None else turn(argument)
         self._shows.answer(f"🎤 {self._motion.status_text()}")
+
+    def _say_the_motion_is_the_sessions(self) -> None:
+        self._shows.answer("🎤 the motion is the session's here")
 
     def _set_motion_dial(self, setting: DialSetting) -> None:
         """Put one of the motion's dials where a spoken number asks for it.
@@ -591,7 +608,11 @@ class VoiceRouter(QObject):
         own clamping, which is why "min speed" can say nought and land on the
         slowest the device actually moves at.
         """
-        self._dial_setters[setting.dial](setting.value)
+        set_the_dial = self._dial_setters[setting.dial]
+        if set_the_dial is None:
+            self._say_the_motion_is_the_sessions()
+            return
+        set_the_dial(setting.value)
         self._shows.answer(f"🎤 {self._motion.status_text()}")
 
     def _run_in_gallery(self, command: AppCommand) -> None:

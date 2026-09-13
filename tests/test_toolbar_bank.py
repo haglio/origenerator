@@ -10,6 +10,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtWidgets import QToolButton
 
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -58,6 +59,30 @@ def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(bank):
 
 def test_the_device_switch_is_absent_where_the_app_may_not_touch_it(bank):
     assert bank(device=False).drive is None
+
+
+def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
+    taken = bank()
+    built_hosted = bank(hosted=True, device=False)
+
+    taken.become_hosted()
+
+    def shown(made):
+        return sorted(button.toolTip() for button in made.findChildren(QToolButton)
+                      if not button.isHidden())
+
+    assert taken.audio is None and taken.mic is None and taken.drive is None
+    assert shown(taken) == shown(built_hosted)
+
+
+def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
+    taken = bank()
+    taken.become_hosted()
+
+    taken.become_standalone()
+
+    assert all(switch is not None and not switch.isHidden()
+               for switch in (taken.audio, taken.mic, taken.drive))
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):

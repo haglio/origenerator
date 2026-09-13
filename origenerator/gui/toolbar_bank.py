@@ -265,6 +265,21 @@ class ToolbarBank(QWidget):
             self._groups.append((gap, buttons))
         self._show_the_gaps()
 
+    def become_hosted(self) -> None:
+        self._room_switches = (self.audio, self.mic, self.drive)
+        self._show_the_room_switches(False)
+        self.audio = self.mic = self.drive = None
+
+    def become_standalone(self) -> None:
+        self.audio, self.mic, self.drive = self._room_switches
+        self._show_the_room_switches(True)
+
+    def _show_the_room_switches(self, shown: bool) -> None:
+        for switch in self._room_switches:
+            if switch is not None:
+                switch.setVisible(shown)
+        self._show_the_gaps()
+
     def apply(self, state: BankState) -> None:
         """Write the whole bank from one state, then re-space the groups.
 

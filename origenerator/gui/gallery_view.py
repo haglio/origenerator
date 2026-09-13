@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
-    QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -144,6 +143,7 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
+from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
@@ -772,49 +772,15 @@ class GalleryView(QWidget):
     def _build_ui(self):
         """Put the three panes on screen, in the order their contents need.
 
-        Each pane builds itself and hands back the widget it built; the two
-        arrangers at the foot are the one place the hosted and standalone shapes
-        differ. Sequence rather than grouping is what this preserves -- the
-        motion, the sound and the device driver must exist before the widgets
-        that wire them, and each pane's own comments say which.
+        Each pane builds itself and hands back the widget it built; the
+        arrangement they are handed to is the one place the hosted and
+        standalone shapes differ. Sequence rather than grouping is what this
+        preserves -- the motion, the sound and the device driver must exist
+        before the widgets that wire them, and each pane's own comments say which.
         """
         layout = QVBoxLayout(self)
-        # The three panes live in splitters, so the divider between each doubles
-        # as a drag handle: the TOC pane (folder tree), the browser pane (a
-        # folder's contents), and the info pane (preview + metadata).
-        #
-        # Nested rather than flat, because the queue strip belongs to the first
-        # two and not to the third: the tree and the browser sit side by side in
-        # _folder_panes, the strip goes under both of them in _left_column, and
-        # the info pane stands beside that whole column at full height. Its tabs
-        # are where the user reads and edits a generation, and a strip cutting
-        # across their foot would take that height for a queue they can already
-        # see next to it.
-        #
-        # Hosted by Fun Time the rect is an upright column, so the panes fold
-        # into _stack instead of sitting side by side: the info pane on top, the
-        # tree and browser as one row under it, and the queue across the foot of
-        # all three: hosted, the queue belongs to the window rather than to the
-        # folder column, so there is no _left_column at all on that side.
-        self._panes = QSplitter(Qt.Orientation.Horizontal)
-        self._panes.setChildrenCollapsible(False)  # a pane can't be dragged shut
-        self._panes.setHandleWidth(6)
-        self._folder_panes = QSplitter(Qt.Orientation.Horizontal)
-        self._folder_panes.setChildrenCollapsible(False)
-        self._folder_panes.setHandleWidth(6)
-        self._stack = None
-        if self._fun_time is not None:
-            self._stack = QSplitter(Qt.Orientation.Vertical)
-            self._stack.setChildrenCollapsible(False)
-            self._stack.setHandleWidth(6)
         toc = self._build_toc_pane()
-        # Hosted, the tree is the upright column's own left edge rather than a
-        # part of the folder row, so it goes straight into the outer splitter.
-        # Placed here rather than by the arrangers: it is the folder row's first
-        # widget, and a splitter takes them in the order they arrive.
-        (self._panes if self._stack is not None else self._folder_panes).addWidget(toc)
         browser = self._build_browser_pane()
-        self._folder_panes.addWidget(browser)
         # A strip under those two lists every generation in flight — the app hands
         # ComfyUI one at a time, so a batch of Generates is a queue — reachable
         # from any folder or config tab. Fed on every rebuild and poll; a row
@@ -824,12 +790,11 @@ class GalleryView(QWidget):
         self._queue = GenerationQueue()
         self._queue.reorder_requested.connect(self._reroll.reorder)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
-        info_pane = self._build_info_pane()
-        if self._stack is not None:
-            self._arrange_hosted(toc, browser, info_pane)
-        else:
-            self._arrange_standalone(toc, browser, info_pane)
-        layout.addWidget(self._stack if self._stack is not None else self._panes, 1)
+        self._arrangement = PaneArrangement(
+            toc=toc, browser=browser, info_pane=self._build_info_pane(),
+            info_tabs=self._info_tabs, queue=self._queue)
+        layout.addWidget(self._arrangement.hosted() if self._fun_time is not None
+                         else self._arrangement.standalone(), 1)
 
     def _build_toc_pane(self):
         """The left pane: the two folder trees under the voice caption, the
@@ -1056,79 +1021,35 @@ class GalleryView(QWidget):
         info_column.addWidget(self._find_bar)
         return info_pane
 
-    def _arrange_hosted(self, toc, browser, info_pane):
-        """The upright arrangement a Fun Time session's rect asks for."""
-        # Hosted, the queue is not the folder column's strip.  It spans the
-        # whole foot of the rect (added to _stack below), so the corner
-        # under the tree is the queue rather than more tree — which is where
-        # a standalone window's eye finds it, and the upright fold has no
-        # reason to move it.  The folder panes go straight beside the tree.
-        self._panes.addWidget(self._folder_panes)
+    def become_hosted(self, session) -> None:
+        for switch in (self._bank.audio, self._bank.drive, self._bank.mic):
+            if switch is not None:
+                switch.setChecked(False)
+        if self._osr2_motion is not None:
+            self._osr2_motion.stop()
+        self._fun_time = session
+        self._shows.become_hosted(session)
+        self._info_tabs.become_hosted(session)
+        self._voice.become_hosted()
+        self._bank.become_hosted()
+        if self._motion_panel is not None:
+            self._motion_panel.hide()
+        self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
+        self._osr2_motion = self._osr2_driver = self._motion_panel = None
+        self._arrangement.fold_into_the_session_column(self.layout())
 
-        # The upright arrangement, from the top down: the generate tabs (with
-        # the find bar riding under them), then the browser beside a
-        # collapsible tree, then the queue across the foot.  The generator
-        # leads because it is what the user is doing — a tall rect that
-        # opens on a folder listing puts the form they came to fill below
-        # the fold.  The floors shrink with the column: each floor spans the
-        # stack's whole width, so a side-by-side floor would only fight the
-        # tree for room it no longer shares.
-        self._stack.addWidget(info_pane)
-        self._stack.addWidget(self._panes)
-        self._stack.addWidget(self._queue)
-        self._panes.setCollapsible(0, True)  # the tree may be dragged shut
-        toc.setMinimumWidth(120)
-        browser.setMinimumWidth(210)
-        self._info_tabs.setMinimumWidth(210)
-        info_pane.setMinimumWidth(210)
-        self._panes.setStretchFactor(0, 0)
-        self._panes.setStretchFactor(1, 1)
-        self._panes.setSizes([180, 660])
-        # The strip opens at its own height and stays there, as it does
-        # standalone: a taller rect is more gallery and more form, not more
-        # queue.  The two panes above it split the rest, the browser a
-        # little ahead so the tree it sits beside has room to be read.
-        self._stack.setStretchFactor(0, 2)
-        self._stack.setStretchFactor(1, 3)
-        self._stack.setStretchFactor(2, 0)
-        self._stack.setSizes([440, 640, self._queue.minimumHeight()])
-
-
-    def _arrange_standalone(self, toc, browser, info_pane):
-        """The three panes side by side, as a window of its own opens them."""
-        self._left_column = QSplitter(Qt.Orientation.Vertical)
-        self._left_column.setChildrenCollapsible(False)  # the strip keeps its slot
-        self._left_column.setHandleWidth(6)
-        self._left_column.addWidget(self._folder_panes)
-        self._left_column.addWidget(self._queue)
-        self._panes.addWidget(self._left_column)
-        self._panes.addWidget(info_pane)
-        # The TOC pane holds its width; the browser and info panes both grow
-        # with the window (the browser faster), so the info pane stays
-        # comfortably wide instead of a thin strip on a large screen. Long
-        # metadata values wrap rather than scroll sideways, so these floors
-        # only need to keep the panes readable — kept low enough that the
-        # window can still tile into a monitor third or a portrait-monitor
-        # half.
-        toc.setMinimumWidth(120)
-        browser.setMinimumWidth(210)
-        # No floor of its own on the info pane: the config tab inside it
-        # reports what its settings need (GenerateConfigPanel.minimumSizeHint),
-        # and an explicit minimum here would replace that number rather than
-        # join it — pinning the pane narrower than its contents and putting a
-        # horizontal scroll bar back under the form.
-        self._folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
-        self._folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
-        self._folder_panes.setSizes([220, 560])
-        # The strip opens at its own height and stays there: all the growth
-        # goes to the folders above it, so a taller window is more gallery
-        # rather than more queue.
-        self._left_column.setStretchFactor(0, 1)
-        self._left_column.setStretchFactor(1, 0)
-        self._left_column.setSizes([600, self._queue.minimumHeight()])
-        self._panes.setStretchFactor(0, 3)
-        self._panes.setStretchFactor(1, 2)
-        self._panes.setSizes([780, 440])
+    def become_standalone(self) -> None:
+        self.set_session_paused(False)
+        self._osr2_motion, self._osr2_driver, self._motion_panel = self._kept_device
+        if self._motion_panel is not None:
+            self._motion_panel.show()
+        self._fun_time = None
+        self._shows.become_standalone(self._osr2_motion)
+        self._info_tabs.become_standalone()
+        self._bank.become_standalone()
+        self._voice.become_standalone(self._osr2_motion, audio=self._bank.audio,
+                                      drive=self._bank.drive, mic=self._bank.mic)
+        self._arrangement.unfold_from_the_session_column(self.layout())
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

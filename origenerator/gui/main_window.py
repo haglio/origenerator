@@ -3,10 +3,11 @@ from __future__ import annotations
 import base64
 import logging
 
-from PyQt6.QtCore import QByteArray, Qt
+from PyQt6.QtCore import QByteArray, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow
 
+from origenerator import ui_scale
 from origenerator.app_state import AppState
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
@@ -64,9 +65,12 @@ SESSION_PREFS = (
 # __init__), so neither is a view getter and neither belongs in the table.
 _GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
+_SWITCHES_THE_SESSION_OWNS = frozenset({"audio_enabled", "osr2_enabled", "mic_enabled"})
 
 
 class OrigeneratorWindow(QMainWindow):
+    handed_back = pyqtSignal()
+
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  parent=None, *, fun_time: FunTimeSession | None = None):
         super().__init__(parent)
@@ -86,29 +90,10 @@ class OrigeneratorWindow(QMainWindow):
         icon_path = PROJECT_DIR / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
-        if fun_time is not None:
-            # A managed window of the hosting session: frameless so the client
-            # area IS the rect Fun Time named (the Random Favs Browser's), and
-            # in the topmost band where every managed window lives — Fun Time
-            # decides who within the band is in front.
-            self.setWindowFlags(
-                self.windowFlags()
-                | Qt.WindowType.FramelessWindowHint
-                | Qt.WindowType.WindowStaysOnTopHint
-            )
-            rect = fun_time.main_rect
-            # Set here so the window opens near the right size, then pinned to
-            # the exact DEVICE rect once it is shown (see showEvent): a scaled
-            # process cannot say a second monitor's coordinates in Qt's space at
-            # all (origenerator.win32.place_window_in_device_pixels).
-            self.setGeometry(rect.x, rect.y, rect.width, rect.height)
-
         # The rect this window is pinned to once shown, or None standalone.
-        self._device_rect = (
-            (fun_time.main_rect.x, fun_time.main_rect.y,
-             fun_time.main_rect.width, fun_time.main_rect.height)
-            if fun_time is not None else None
-        )
+        self._device_rect = None
+        if fun_time is not None:
+            self._wear_the_session(fun_time)
 
         # One unified view: the gallery, whose info pane now holds the editable
         # config tabs that used to be a separate Generate tab. A clicked
@@ -189,6 +174,56 @@ class OrigeneratorWindow(QMainWindow):
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
 
+    def become_hosted(self, session: FunTimeSession) -> None:
+        self._persist_session()
+        self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())
+        self._fun_time = session
+        self._gallery_view.become_hosted(session)
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        ui_scale.draw_at(ui_scale.hosted_scale())
+        self._wear_the_session(session)
+        self._bridge = FunTimeBridge(session, self._gallery_view, parent=self)
+        self._bridge.released.connect(self.become_standalone)
+        self.showMinimized()
+
+    def become_standalone(self) -> None:
+        geometry, scale, minimized = self._found
+        self._bridge.deleteLater()
+        self._bridge = None
+        self._fun_time = None
+        self._gallery_view.become_standalone()
+        self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
+        self.setWindowFlags(self.windowFlags()
+                            & ~Qt.WindowType.FramelessWindowHint
+                            & ~Qt.WindowType.WindowStaysOnTopHint)
+        self._device_rect = None
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        ui_scale.draw_at(scale)
+        self.restoreGeometry(geometry)
+        if minimized:
+            self.showMinimized()
+        else:
+            self.show()
+        self.handed_back.emit()
+
+    def _wear_the_session(self, session: FunTimeSession) -> None:
+        # A managed window of the hosting session: frameless so the client
+        # area IS the rect Fun Time named (the Random Favs Browser's), and
+        # in the topmost band where every managed window lives — Fun Time
+        # decides who within the band is in front.
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        rect = session.main_rect
+        # Set here so the window opens near the right size, then pinned to
+        # the exact DEVICE rect once it is shown (see showEvent): a scaled
+        # process cannot say a second monitor's coordinates in Qt's space at
+        # all (origenerator.win32.place_window_in_device_pixels).
+        self.setGeometry(rect.x, rect.y, rect.width, rect.height)
+        self._device_rect = (rect.x, rect.y, rect.width, rect.height)
+
     def closeEvent(self, event):
         """Hand ComfyUI the background experiments for the coming absence and
         everything else the queue is still holding, then persist the session (open
@@ -212,7 +247,13 @@ class OrigeneratorWindow(QMainWindow):
                 chore()
             except Exception as e:
                 logger.warning("Close-time %s failed: %s", chore.__name__, e)
+        self._persist_session()
+        super().closeEvent(event)
+
+    def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_PREFS:
+            if self._fun_time is not None and key in _SWITCHES_THE_SESSION_OWNS:
+                continue
             self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
         if self._fun_time is None:
@@ -223,4 +264,3 @@ class OrigeneratorWindow(QMainWindow):
                 base64.b64encode(bytes(self.saveGeometry())).decode("ascii"),
             )
         self._app_state.save()
-        super().closeEvent(event)

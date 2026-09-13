@@ -11,7 +11,8 @@ shows the way it reaches the players:
   switching INTO origenerator mode, which opens playing rather than empty) and
   ``CLOSE_SHOWS`` clears them again; ``FILTER_ENHANCED`` flips the show's
   enhanced-only switch, the one its own HUD carries and the session's console
-  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would.
+  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would, and
+  ``RELEASE`` gives a window the session took over back to standalone.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -25,7 +26,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.paths import ensure_player_core_on_path
@@ -51,12 +52,15 @@ def ask_for_omnipause(dashboard_cmd_file) -> None:
 class FunTimeBridge(QObject):
     """Polls the session's channels and routes them onto the gallery's shows."""
 
+    released = pyqtSignal()
+
     def __init__(self, session: FunTimeSession, gallery, parent=None):
         super().__init__(parent)
         self._session = session
         self._gallery = gallery
         self._paused = False
         self._last_status: str | None = None
+        self._released = False
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._tick)
@@ -64,6 +68,8 @@ class FunTimeBridge(QObject):
 
     def _tick(self) -> None:
         self._drain_commands()
+        if self._released:
+            return
         self._apply_paused()
         self._publish_status()
 
@@ -80,6 +86,8 @@ class FunTimeBridge(QObject):
             return
         for verb in consume_command_file(self._session.command_file, logger=logger,
                                          uppercase=False):
+            if self._released:
+                return
             self._apply(verb.strip())
 
     def _apply(self, verb: str) -> None:
@@ -101,6 +109,11 @@ class FunTimeBridge(QObject):
             return
         if verb == "QUIT":
             self._gallery.window().close()
+            return
+        if verb == "RELEASE":
+            self._released = True
+            self._timer.stop()
+            self.released.emit()
             return
         side, _, action = verb.partition("_")
         side = side.lower()

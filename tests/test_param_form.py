@@ -1146,16 +1146,15 @@ def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
     assert not [scene.remove for scene in editor._scenes][0].isEnabled()
 
 
-def test_the_clip_length_reads_as_the_scenes_total_and_takes_no_typing(qtbot):
+def test_a_story_has_no_length_row_and_still_records_the_scenes_total(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
-    duration = form._widgets["frame_count"]
-    assert isinstance(duration, QLabel)
     editor.add_scene()
     [scene.length for scene in editor._scenes][0].setCurrentText("10")
-    assert duration.text() == "15 s"          # 161 + 80 frames, at 16 fps
-    assert form.get_values()["frame_count"] == 241
+
+    assert "frame_count" not in form._present_keys["Video"]
+    assert form.get_values()["frame_count"] == 241          # 161 + 80 frames
 
 
 def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):

@@ -48,8 +48,9 @@ from shared_ui.tick_control import TickControl
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive
 # prompt), what each scene keeps out (stored as the negative prompt), each
-# scene's length, and each scene's lines.
-_SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
+# scene's length, each scene's lines, and the clip's length they add up to.
+_SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines",
+               "frame_count")
 
 def _speaks(values) -> bool:
     return any(str(line).strip() for line in values.get("scene_lines") or [])
@@ -223,7 +224,6 @@ class ParamForm(QWidget):
                 scenes_def, lambda w, pd=scenes_def: self._grey_out_of_reach(pd, w),
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
-            self._scenes.changed.connect(self._refresh_clip_length)
         self._build(self._param_defs)
         self._wire_rows_shown_while()
 
@@ -284,7 +284,6 @@ class ParamForm(QWidget):
                 self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()
-        self._refresh_clip_length()
         self._refresh_section_visibility()
 
     def _add_row(self, key: str, label: str, field):
@@ -728,11 +727,6 @@ class ParamForm(QWidget):
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
-        if self._scenes is not None and pd.key == "frame_count":
-            # The clip is as long as its scenes add up to: shown, not typed.
-            w = QLabel()
-            w.setObjectName("readonlyParamValue")
-            return w
         if pd.type == "bool":
             # An on/off setting (the enhance toggle): a bare tick, its label
             # provided by the form row like every other field's.
@@ -827,9 +821,9 @@ class ParamForm(QWidget):
                 return w.scene_frames()
             if pd.key == "scene_lines":
                 return w.lines()
+            if pd.key == "frame_count":
+                return w.total_frames()
             return w.story(pd.key)
-        if self._scenes is not None and pd.key == "frame_count":
-            return self._scenes.total_frames()
         if pd.type == "bool":
             return w.isChecked()
         if pd.type == "seed":
@@ -871,11 +865,8 @@ class ParamForm(QWidget):
                 w.set_scene_frames(value)
             elif pd.key == "scene_lines":
                 w.set_lines(value)
-            else:
+            elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
-            return
-        if self._scenes is not None and pd.key == "frame_count":
-            self._refresh_clip_length()
             return
         if pd.type == "bool":
             w.setChecked(bool(value))
@@ -969,14 +960,6 @@ class ParamForm(QWidget):
         """Show a field the value it will emit, once an edit of it has ended."""
         self._write_field(pd, self._read_field(pd, randomize_seed=False))
 
-    def _refresh_clip_length(self) -> None:
-        """Say how long the scenes add up to, in the Duration row a story has."""
-        label = self._widgets.get("frame_count")
-        pd = next((d for d in self._param_defs if d.key == "frame_count"), None)
-        if self._scenes is None or pd is None or not isinstance(label, QLabel):
-            return
-        label.setText(f"{self._shown(pd, self._scenes.total_frames()):g} {pd.unit}".strip())
-
     def _collect(self, randomize_seed: bool) -> dict:
         # Start from the params this form carries without showing — the extras it
         # has no field for, then the deliberately hidden ones (both disjoint from
@@ -1008,7 +991,6 @@ class ParamForm(QWidget):
         for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
-        self._refresh_clip_length()
         # The derived width/height aren't declared params, so apply them here:
         # a saved override unlocks and shows, its absence re-locks onto the size
         # the just-applied input image derives.

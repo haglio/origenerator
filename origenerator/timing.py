@@ -206,7 +206,7 @@ class RunTiming:
 
     def status_label(self, *, step: str = "", compact: bool = False) -> str:
         """The one line every surface writes across a running job's bar:
-        ``"High noise · 45% · 1:23 elapsed · ~4:10 left"``.
+        ``"First pass · 45% · 1:23 elapsed · ~4:10 left"``.
 
         One wording, shared by the lower strip's queue, the shelf's in-flight cards
         and a folder's re-roll tile, so the same run reads the same wherever it is
@@ -225,7 +225,7 @@ class RunTiming:
 
         ``compact`` is that line in a gallery tile's width, which is a third of the
         strip's: it drops the elapsed count and keeps the readings that answer what
-        and how much longer — ``"High noise · 45% · ~4:10 left"``. The full line is a
+        and how much longer — ``"First pass · 45% · ~4:10 left"``. The full line is a
         good half wider than a 180px tile at the app's own font, so a tile carrying it
         would elide the countdown away on exactly the long runs worth counting down.
 

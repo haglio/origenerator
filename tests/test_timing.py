@@ -219,8 +219,8 @@ def test_the_line_leads_with_the_step_being_taken():
     # is the part that says what is happening — and because a caption too wide
     # for its bar elides from the right, so the name has to be leftmost to
     # survive on a tile.
-    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="High noise") ==         "High noise · 50% · 1:23 elapsed · ~6:02 left"
-    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="Audio", compact=True) ==         "Audio · 50% · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="First pass") ==         "First pass · 50% · 1:23 elapsed · ~6:02 left"
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="Sound", compact=True) ==         "Sound · 50% · ~6:02 left"
 
 
 def test_a_run_with_no_step_to_name_reads_as_it_did():
@@ -232,7 +232,7 @@ def test_the_step_is_what_a_run_past_its_prior_has_left_to_say():
     # The two halves together: the countdown falls silent where nothing has
     # measured how much longer, and the step name is what fills that gap rather
     # than the "finishing" that used to sit there for minutes at a time.
-    assert RunTiming(900.0, (1, 20), 724.0).status_label(step="High noise") ==         "High noise · 5% · 15:00 elapsed"
+    assert RunTiming(900.0, (1, 20), 724.0).status_label(step="First pass") ==         "First pass · 5% · 15:00 elapsed"
 
 
 def test_progress_status_label_drops_whichever_half_is_unknown():

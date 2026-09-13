@@ -250,7 +250,7 @@ def backfill_model_and_lora_params(db: Database) -> int:
 
     Early imports stored the embedded graph but not the model filenames it loads,
     so those rows lack the params the gallery's model and LoRA folders group by —
-    they collapse under "(unknown model)" / "(no LoRA)". This re-reads each row's
+    they collapse under "(unknown model)" / "(no add-on)". This re-reads each row's
     stored graph and folds any model file it finds (SDXL checkpoint, Flux GGUF
     UNET, WAN high/low UNET + LoRA) into ``params_json``, filling only keys the
     row is missing so a row that already carries them (or whose graph has none)

@@ -33,7 +33,7 @@ def test_the_editor_is_one_line_and_the_width_of_the_name(qtbot):
     header = EditableHeader()
     qtbot.addWidget(header)
     header.set_display(
-        "All  ›  Images  ›  SDXL Text-to-Image  ›  reapony_v80  ›  (no LoRA)  ›  3A7F2C10"
+        "All  ›  Images  ›  SDXL Text-to-Image  ›  reapony_v80  ›  (no add-on)  ›  3A7F2C10"
     )
     header.setFixedWidth(200)
     header.show()

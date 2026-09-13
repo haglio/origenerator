@@ -58,7 +58,7 @@ from origenerator.recipe_match import CATEGORIES, GENAU, PLAYERS
 _NEUTRAL_LABEL = "-"
 # The video slot's prompt when neutral (drop a video to use its recipe) versus when
 # an act is picked (the slot becomes the override — drop a video for a custom action).
-_DROP_PLACEHOLDER = "Drop an I2V video"
+_DROP_PLACEHOLDER = "Drop a video"
 _OVERRIDE_PLACEHOLDER = "use custom action from video"
 
 

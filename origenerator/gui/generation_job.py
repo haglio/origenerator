@@ -171,7 +171,7 @@ class GenerationJob(QObject):
 
     @property
     def last_stage(self) -> str:
-        """What the app is doing right now — "Loading models", "High noise",
+        """What the app is doing right now — "Loading models", "First pass",
         "Decoding frames".
 
         The bar's caption leads with this. Without it a run said nothing for its

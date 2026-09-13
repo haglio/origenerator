@@ -42,7 +42,7 @@ _DELAY_MS = 300
 # would answer the first keystroke of every query with most of the gallery.
 MIN_CHARS = 3
 # The sort orders the results pane offers, as (label, mode) in menu order.
-_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
+_SORTS = (("Recent", search.SORT_RECENT), ("Model / Add-on", search.SORT_RECIPE))
 
 
 class SearchHost(Protocol):
@@ -107,7 +107,7 @@ class GallerySearchController(QObject):
         # (see :meth:`run`), because a thumbnail is what the user recognizes and a
         # folder name — a short code — is not. Matching is by meaning rather than
         # by letters, so "two women" reaches "a pair of dolls" and "two tall
-        # ladies" alike; a model name, a LoRA name and a seed are searchable too.
+        # ladies" alike; a model name, an add-on's name and a seed are searchable too.
         # Its counterpart is the find strip below the info pane, which searches
         # *inside* the open tab's prompts.
         self.field = ScopeSearchEdit()
@@ -118,7 +118,7 @@ class GallerySearchController(QObject):
         self.field.set_scope(gallery.ALL_LABEL)
         self.field.setToolTip(
             "Search every generation by what it is of — matching related words, "
-            "not just the ones you typed — or by model, LoRA, seed, or a name "
+            "not just the ones you typed — or by model, add-on, seed, or a name "
             "you gave one of the folders holding it. The results "
             f"fill the middle pane; nothing is searched under {MIN_CHARS} "
             "characters."
@@ -128,7 +128,7 @@ class GallerySearchController(QObject):
 
         # How many the query found, and — past what the pane draws at once — that
         # it is showing a slice; beside it, the order the results are laid out in.
-        # Recency is one question ("the one I made recently"); model + LoRA is the
+        # Recency is one question ("the one I made recently"); model + add-on is the
         # other ("which recipe was that"), and picking it cuts the results into a
         # labelled band per combination rather than interleaving them.
         self._count = QLabel("")
@@ -140,7 +140,7 @@ class GallerySearchController(QObject):
             self._sort_combo.addItem(label, mode)
         self._sort_combo.setToolTip(
             "Order the results: newest first, or banded under a heading per "
-            "model + LoRA combination — click a heading to fold its band away"
+            "model + add-on combination — click a heading to fold its band away"
         )
         self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         self.bar = QWidget()

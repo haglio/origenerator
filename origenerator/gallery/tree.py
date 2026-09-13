@@ -21,7 +21,7 @@ image folder and is grouped like any other image.
 
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
-(always), LoRA (always — collapsed to a single "(no LoRA)" folder when the
+(always), LoRA (always — collapsed to a single "(no add-on)" folder when the
 workflow declares no LoRA keys, so every branch nests the same depth), and — for
 videos — the source image a video animates, i.e. which picture its start frame is
 (:func:`_input_image_config`). The settings group is the full key, so it nests
@@ -488,7 +488,7 @@ def _build_model_groups(tier: _Tier, rows: list[dict]) -> list[ModelGroup]:
 def _build_lora_groups(tier: _Tier, rows: list[dict]) -> list[LoraGroup]:
     """The LoRA folders under one model, each holding its leaves.
 
-    A workflow with no LoRA keys collapses to a single ``(no LoRA)`` folder — every
+    A workflow with no LoRA keys collapses to a single ``(no add-on)`` folder — every
     row shares one empty LoRA signature — so a model folder nests the same way
     whether or not the pipeline uses a LoRA."""
     return _grouped_folders(
@@ -611,7 +611,7 @@ def build_gallery_tree(
     right answer only where ``rows`` is the whole library.
 
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
-    it to a single "(no LoRA)" folder. The source-image level appears only under
+    it to a single "(no add-on)" folder. The source-image level appears only under
     a video workflow folder (a still an image-conditioned workflow output is
     grouped like any other image). Which rows are nested at all is
     :func:`placeable_rows`. Folders are placed by the oldest of their rows,

@@ -75,7 +75,7 @@ def test_a_caption_too_long_for_the_bar_scrolls_past_instead_of_being_cut(qtbot)
     narrow = ProgressCaption()
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
-    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
+    narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
 
     assert narrow.scrolling()
     assert narrow.text() == narrow.caption()          # nothing is cut off it
@@ -100,7 +100,7 @@ def test_the_scroll_holds_at_the_top_of_a_lap_then_sets_off(qtbot):
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
-    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
+    narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
 
     for _ in range(progress_caption._HOLD_TICKS):
         narrow._advance()
@@ -117,12 +117,12 @@ def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
-    narrow.show_progress("High noise · 40% · 12:30 elapsed · ~16:02 left", (10, 20))
+    narrow.show_progress("First pass · 40% · 12:30 elapsed · ~16:02 left", (10, 20))
     for _ in range(progress_caption._HOLD_TICKS + 5):
         narrow._advance()
     travelled = narrow.scrolled()
 
-    narrow.show_progress("High noise · 40% · 12:31 elapsed · ~16:01 left", (10, 20))
+    narrow.show_progress("First pass · 40% · 12:31 elapsed · ~16:01 left", (10, 20))
 
     assert narrow.scrolled() == travelled
 
@@ -134,7 +134,7 @@ def test_a_bar_nobody_can_see_stops_scrolling(qtbot):
     qtbot.addWidget(narrow)
     narrow.resize(40, 22)
     narrow.show()
-    narrow.show_progress("High noise · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
+    narrow.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left", (10, 20))
     assert narrow._scroll.isActive()
 
     narrow.hide()

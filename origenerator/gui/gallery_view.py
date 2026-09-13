@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
 from origenerator import (
     gallery,
     recovery,
-    search,
     timing,
 )
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
@@ -194,8 +193,6 @@ _SEARCH_DELAY_MS = 300
 # large fraction of any library through sheer stemming, so an as-you-type search
 # would answer the first keystroke of every query with most of the gallery.
 _SEARCH_MIN_CHARS = 3
-# The sort orders the results pane offers, as (label, mode) in menu order.
-_SEARCH_SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_RECIPE))
 # The synthetic shelves, as back/forward history locations: each is a place the
 # user can be standing, so a visit to one is recorded and restored by key rather
 # than by the generation that happened to be picked there.
@@ -834,7 +831,7 @@ class GalleryView(QWidget):
         """
         # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
         # -> settings; a LoRA-less workflow collapses the LoRA level to one
-        # "(no LoRA)" folder, and the source-image level shows only for
+        # "(no add-on)" folder, and the source-image level shows only for
         # image-conditioned workflows). Folders start collapsed and only expand on
         # the disclosure arrow; double-click renames.
         # One tree per shape, each under a standing label and each scrolling on

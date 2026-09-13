@@ -196,7 +196,7 @@ class WorkflowTemplate(ABC):
     # The param key(s) whose values identify which LoRA(s) a run used. The gallery
     # nests a LoRA folder level beneath each model folder, so runs that differ only
     # in LoRA (same base model) split there. Empty for workflows with no LoRA; the
-    # gallery then collapses that level to a single "(no LoRA)" folder.
+    # gallery then collapses that level to a single "(no add-on)" folder.
     lora_keys: tuple[str, ...] = ()
     # Param keys the enhance tail reads that the ``enhance``/``enhance_*`` naming
     # doesn't already cover, so they join :meth:`enhance_keys` and stay out of the

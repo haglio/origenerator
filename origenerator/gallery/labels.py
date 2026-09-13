@@ -22,7 +22,6 @@ from origenerator.gallery.signatures import (
     _named_loras,
     _registered,
     _unannotated,
-    is_image_conditioned,
     settings_only,
     workflow_lora_keys,
     workflow_model_keys,
@@ -73,12 +72,12 @@ def model_label(workflow_name: str | None, params: dict) -> str:
 def lora_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the LoRA(s) a row used.
 
-    Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
+    Joins each LoRA param's cleaned filename. Falls back to ``"(no add-on)"`` when
     the row recorded no LoRA — none of the values (e.g. an older import that
     didn't carry the LoRA), or the "None" sentinel a run chose to bypass it.
     """
     keys = workflow_lora_keys(workflow_name)
-    return _joined_file_label(keys, _named_loras(keys, params), "(no LoRA)")
+    return _joined_file_label(keys, _named_loras(keys, params), "(no add-on)")
 
 
 def _prompt_headline(params: dict) -> str:
@@ -138,12 +137,11 @@ def config_folder_name(workflow_name: str, signature: str,
 def job_kind_label(workflow_name: str | None) -> str:
     """What kind of work a run of ``workflow_name`` is, in the queue's vocabulary.
 
-    Four answers, because they are what a queued job costs and what it needs
-    before it can start: an "Image" is seconds, a "T2V" is minutes out of words
-    alone, an "I2V" is minutes out of a picture that has to exist first, and an
-    "Enhance" is a second pass over something already made. The workflow's own
-    display name is beside this in the row and answers none of them — "WAN 2.2
-    FLF2V Loop" and "WAN 2.2 I2V" are the same kind of ask, at the same price.
+    Three answers, because they are what a queued job costs: an "Image" is
+    seconds, a "Video" is minutes, and an "Enhance" is a second pass over
+    something already made. The workflow's own display name is beside this in
+    the row and answers none of them — "WAN 2.2 Image-to-Video (Looping)" and
+    "WAN 2.2 Image-to-Video" are the same kind of ask, at the same price.
 
     ``""`` for a workflow this build doesn't have registered — an old import,
     say. A row that says nothing about its kind is read as unknown; one that
@@ -154,9 +152,7 @@ def job_kind_label(workflow_name: str | None) -> str:
     output_type = workflow_output_type(workflow_name)
     if output_type is None:
         return ""
-    if output_type == "video":
-        return "I2V" if is_image_conditioned(workflow_name) else "T2V"
-    return "Image"
+    return "Video" if output_type == "video" else "Image"
 
 
 def _short_value(value) -> str:

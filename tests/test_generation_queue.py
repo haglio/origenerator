@@ -247,7 +247,7 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
     from PyQt6.QtWidgets import QApplication
 
     frame = _picture(tmp_path / "frame.png")
-    queue.set_items([_item(job_kind="I2V", source_image=frame)])
+    queue.set_items([_item(job_kind="Video", source_image=frame)])
     QApplication.processEvents()
     corner = queue._running._frame
 
@@ -263,7 +263,7 @@ def test_the_corner_stands_the_recipe_beside_the_frame_where_there_is_one(queue,
 
     frame = _picture(tmp_path / "frame.png")
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe)])
+    queue.set_items([_item(job_kind="Video", source_image=frame, recipe_thumbnail=recipe)])
     QApplication.processEvents()
     corner = queue._running._frame
 
@@ -275,7 +275,7 @@ def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path
     from PyQt6.QtWidgets import QApplication
 
     frame = _picture(tmp_path / "frame.png")
-    queue.set_items([_item(job_kind="I2V", source_image=frame, frame=_png_bytes())])
+    queue.set_items([_item(job_kind="Video", source_image=frame, frame=_png_bytes())])
     QApplication.processEvents()
     corner = queue._running._frame
 
@@ -284,11 +284,11 @@ def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path
 
 
 def test_a_run_made_from_nothing_leaves_the_corner_empty(queue):
-    # A text-to-video has no picture to its name yet, and a stand-in for one
-    # would be a picture of something that has nothing to do with it.
+    # An image drawn from a prompt has no picture to its name yet, and a stand-in
+    # for one would be a picture of something that has nothing to do with it.
     from PyQt6.QtWidgets import QApplication
 
-    queue.set_items([_item(job_kind="T2V")])
+    queue.set_items([_item(job_kind="Image")])
     QApplication.processEvents()
 
     assert queue._running._frame.pixmap().isNull()
@@ -333,10 +333,10 @@ def test_a_live_frame_updates_the_rows_without_rebuilding_them(queue):
 
     queue.set_items([_item(key="a", typical_seconds=30.0, progress=(3, 10)),
                      _item(key="b", status="queued", typical_seconds=600.0,
-                           job_kind="I2V")])
+                           job_kind="Video")])
 
     assert queue.rows()[1] is row
-    assert row._lead.text() == "~10 min · I2V"
+    assert row._lead.text() == "~10 min · Video"
 
 
 # --- cancel, spelled the way the Generate tab spells it -----------------------
@@ -829,8 +829,8 @@ def test_a_row_leads_with_what_the_job_costs_and_what_it_is(queue):
     # A line of waiting work is read to find out how long the wait is, so the
     # price comes before the recipe — which is the same for every row of a folder
     # being re-rolled and so tells you nothing about the wait.
-    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V")])
-    assert queue.rows()[0]._lead.text() == "~2 min · I2V"
+    queue.set_items([_item(typical_seconds=126.0, job_kind="Video")])
+    assert queue.rows()[0]._lead.text() == "~2 min · Video"
 
 
 def test_a_row_says_when_nobody_typed_its_prompt(queue):
@@ -847,23 +847,23 @@ def test_a_hand_launched_job_says_neither(queue):
 
 
 def test_a_row_names_the_act_it_was_asked_for(queue):
-    # "I2V" says a video is being made from a frame; the act says which video —
+    # The kind says a video is being made; the act says which video —
     # the whole of what the user chose in Combine, and the one thing separating
     # two runs on the same picture.
-    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V",
+    queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
                            recipe_category="dancing")])
-    assert queue.rows()[0]._lead.text() == "~2 min · I2V · dancing"
+    assert queue.rows()[0]._lead.text() == "~2 min · Video · dancing"
 
 
 def test_a_run_nobody_picked_an_act_for_names_none(queue):
     # A dropped video is the recipe itself: there was no dropdown choice to show,
     # and inventing one from its prompt would be a guess the row states as fact.
-    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V")])
-    assert queue.rows()[0]._lead.text() == "~2 min · I2V"
+    queue.set_items([_item(typical_seconds=126.0, job_kind="Video")])
+    assert queue.rows()[0]._lead.text() == "~2 min · Video"
 
 
 def test_the_hover_spells_out_where_the_act_came_from(queue):
-    queue.set_items([_item(typical_seconds=126.0, job_kind="I2V",
+    queue.set_items([_item(typical_seconds=126.0, job_kind="Video",
                            recipe_category="dancing")])
     assert "“dancing” act" in queue.rows()[0]._lead.toolTip()
 
@@ -885,23 +885,23 @@ def test_the_lead_outlives_a_row_that_is_explaining_a_wait(queue):
     # is; why it is held goes in the note beside that, not over the top of it.
     queue.set_items([_item(key="a"),
                      _item(key="b", status="queued", held=True,
-                           typical_seconds=600.0, job_kind="I2V")])
+                           typical_seconds=600.0, job_kind="Video")])
     row = queue.rows()[1]
-    assert row._lead.text() == "~10 min · I2V"
+    assert row._lead.text() == "~10 min · Video"
     assert row._note_text == "Held until the slideshow closes"
 
 
 def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
     # The recipe is worth an answer, just not the row: every row of a folder
-    # being re-rolled carries the same one. "I2V" and a bare "~?" are shorthand
-    # a row has the width for and a first reader has no way to expand, so they
-    # are spelled out in the same place.
+    # being re-rolled carries the same one. A bare "~?" is shorthand a row has the
+    # width for and a first reader has no way to expand, so it is spelled out in
+    # the same place, beside what the video is made from.
     queue.set_items([_item(caption="Alpha Workflow › a kite", typical_seconds=None,
-                           job_kind="I2V", requested=True)])
+                           job_kind="Video", requested=True)])
     tip = queue.rows()[0]._lead.toolTip()
     assert tip.startswith("Alpha Workflow › a kite")
     assert "No timing data" in tip
-    assert "start frame" in tip
+    assert "start image" in tip
     assert "Queued by a request" in tip
 
 
@@ -911,7 +911,7 @@ def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     # Two i2v rows off one recipe carry the same caption; the frame is the whole
     # of what tells them apart.
     frame = _picture(tmp_path / "frame.png")
-    queue.set_items([_item(job_kind="I2V", source_image=frame,
+    queue.set_items([_item(job_kind="Video", source_image=frame,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", frame, None)
 
@@ -928,7 +928,7 @@ def test_a_frame_that_has_not_rendered_yet_falls_back_to_the_folder(queue, tmp_p
     # A video queued after the image it animates names a start frame that isn't
     # on disk. Better its folder than a blank square where a picture was promised.
     mates = (_picture(tmp_path / "mate.png"),)
-    queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
+    queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            folder_thumbnails=mates)])
     assert queue.rows()[0]._thumbs._showing == ("folder", mates)
 
@@ -939,7 +939,7 @@ def test_a_combine_row_shows_the_frame_and_the_recipe_it_follows(queue, tmp_path
     # sits beside it (drawn gray, see queue_thumbs).
     frame = _picture(tmp_path / "frame.png")
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe,
+    queue.set_items([_item(job_kind="Video", source_image=frame, recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "other.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", frame, recipe)
 
@@ -949,7 +949,7 @@ def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue
     # isn't on disk yet. The recipe is about this run either way — better it than
     # the folder, which says only where the result will land.
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
-    queue.set_items([_item(job_kind="I2V", source_image=str(tmp_path / "not-yet.png"),
+    queue.set_items([_item(job_kind="Video", source_image=str(tmp_path / "not-yet.png"),
                            recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", None, recipe)
@@ -958,18 +958,18 @@ def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue
 def test_a_row_that_is_not_a_job_yet_says_so(queue):
     # The press of Generate has an answer on screen before the work that turns it
     # into a job is done — otherwise the button reads as one that did nothing.
-    queue.set_items([_item(status="queued", job_kind="I2V", recipe_category="dancing",
+    queue.set_items([_item(status="queued", job_kind="Video", recipe_category="dancing",
                            cancel=None, starting=True)])
     row = queue.rows()[0]
 
     assert row._note_text == "Starting…"
-    assert row._lead.text() == "~? · I2V · dancing"   # what is known of it already
+    assert row._lead.text() == "~? · Video · dancing"   # what is known of it already
     assert row._cancel.isHidden()               # nothing on the server to stop yet
     assert "Not sent to ComfyUI yet" in row._lead.toolTip()
 
 
 def test_a_started_job_stops_saying_it_is_starting(queue):
-    queue.set_items([_item(status="queued", job_kind="I2V")])
+    queue.set_items([_item(status="queued", job_kind="Video")])
     assert queue.rows()[0]._note_text == ""
 
 

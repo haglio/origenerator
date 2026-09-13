@@ -186,7 +186,7 @@ def workflow_lora_keys(workflow_name: str | None) -> tuple[str, ...]:
     """The param keys whose values name the LoRA(s) a workflow's row ran with.
 
     Empty for a workflow with no LoRA; every row then shares one empty signature,
-    collapsing the model folder's LoRA level to a single "(no LoRA)" folder.
+    collapsing the model folder's LoRA level to a single "(no add-on)" folder.
     """
     wf = _registered(workflow_name)
     return tuple(wf.lora_keys) if wf else ()

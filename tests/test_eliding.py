@@ -65,11 +65,11 @@ def test_an_ampersand_survives_as_a_character_not_a_mnemonic(qtbot):
     # Qt eats a lone "&" as an accelerator marker, so the button's text carries it
     # doubled — and the eliding happens on the raw label, which is what stops a
     # cut landing between the pair.
-    button = ElidingButton("Model & LoRA")
+    button = ElidingButton("Models & Add-ons")
     qtbot.addWidget(button)
 
-    assert button.text() == "Model && LoRA"
-    assert button.display_text(10_000) == "Model & LoRA"
+    assert button.text() == "Models && Add-ons"
+    assert button.display_text(10_000) == "Models & Add-ons"
 
 
 # --- the label ---------------------------------------------------------------

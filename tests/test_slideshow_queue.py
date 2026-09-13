@@ -42,11 +42,11 @@ def test_it_is_the_strip_itself_rows_buttons_and_all(plate):
     # live half and every waiting job carrying its own row.
     plate.set_items([_item("running-one", typical_seconds=30, job_kind="Image"),
                      _item("waiting-one", status="queued", typical_seconds=600,
-                           job_kind="T2V", held=True)])
+                           job_kind="Video", held=True)])
 
     assert plate.keys() == ["running-one", "waiting-one"]
     assert plate._running.key == "running-one"
-    assert plate.rows()[1]._lead.text() == "~10 min · T2V"
+    assert plate.rows()[1]._lead.text() == "~10 min · Video"
     assert plate.rows()[1]._note_text == "Held until the slideshow closes"
     assert plate.rows()[1].findChild(QPushButton) is not None  # its Cancel
 

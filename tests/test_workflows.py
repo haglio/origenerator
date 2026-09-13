@@ -2637,6 +2637,12 @@ def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
     assert [label for label in labels if _GRAPH_JARGON.search(label)] == []
 
 
+@pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
+def test_a_workflow_is_named_in_words_rather_than_model_card_shorthand(name):
+    assert not re.search(r"\b(I2V|T2V|FLF2V|ATI|T2I|I2I|S2V)\b",
+                         WORKFLOW_REGISTRY[name].display_name)
+
+
 def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():
     wf = Wan22I2vWorkflow()
     keys = [pd.key for pd in wf.param_definitions()]

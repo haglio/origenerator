@@ -10143,6 +10143,22 @@ def _row_index(view, widget):
     raise AssertionError("the motion panel is not in a row of the browser pane")
 
 
+def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    button = view._enhance.panel._enhance_button
+
+    assert button.isEnabled() and view._bank.enhance.isEnabled()
+    assert button.toolTip() == view._bank.enhance.toolTip()
+
+    button.click()
+
+    assert view._reroll.all_jobs
+    assert {job.workflow.name for job in view._reroll.all_jobs} == {"image_enhance"}
+
+
 def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     # The settings are the app's, not the folder's: they follow you, so they are
     # as available on the shelves as inside a settings folder.

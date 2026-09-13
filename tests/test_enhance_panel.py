@@ -247,6 +247,34 @@ def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qt
         assert scroll.verticalScrollBar().maximum() == 0, width
 
 
+def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
+    from PyQt6.QtWidgets import QPushButton, QScrollArea
+
+    panel, _ = _panel(qtbot)
+    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
+    (scroll,) = panel.findChildren(QScrollArea)
+    asked = []
+    panel.enhance_requested.connect(lambda: asked.append(True))
+
+    qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+    assert asked == [True]
+    assert not scroll.isAncestorOf(button)
+
+
+def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_do(qtbot):
+    from PyQt6.QtWidgets import QPushButton
+
+    panel, _ = _panel(qtbot)
+    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
+
+    panel.show_offer(True, "Enhance 2 items")
+    assert button.isEnabled() and button.toolTip() == "Enhance 2 items"
+
+    panel.show_offer(False, "Nothing here to enhance")
+    assert not button.isEnabled() and button.toolTip() == "Nothing here to enhance"
+
+
 def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):
     panel, _ = _panel(qtbot)
 

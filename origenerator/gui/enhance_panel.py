@@ -26,12 +26,13 @@ alternative being a run that fails on submit.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QRect, QSize, Qt
+from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -271,6 +272,8 @@ class EnhancePanel(QWidget):
     it where it's needed — so it stays a plain editor.
     """
 
+    enhance_requested = pyqtSignal()
+
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
         self._on_change = on_change
@@ -347,6 +350,15 @@ class EnhancePanel(QWidget):
         settings_column.addWidget(self._fix_row())
         settings_column.addStretch(1)
         column.addWidget(_SettingsScroll(settings), 1)
+
+        self._enhance_button = QPushButton("Enhance")
+        self._enhance_button.setObjectName("enhanceBtn")
+        self._enhance_button.clicked.connect(self.enhance_requested)
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row.addStretch(1)
+        action_row.addWidget(self._enhance_button)
+        column.addLayout(action_row)
 
     def _fix_row(self) -> QWidget:
         """Every fixable part on one line: a tick over its name and the
@@ -474,6 +486,10 @@ class EnhancePanel(QWidget):
         """
         self.setEnabled(applicable)
         self.setToolTip("" if applicable else reason)
+
+    def show_offer(self, available: bool, tip: str) -> None:
+        self._enhance_button.setEnabled(available)
+        self._enhance_button.setToolTip(tip)
 
     def _label_for(self, widget) -> QLabel | None:
         """The caption sitting beside one field, or ``None`` before it has one.

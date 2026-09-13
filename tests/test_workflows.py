@@ -198,8 +198,8 @@ def test_workflows_expose_their_seed_param_keys():
     # seed for the foley pass, so a variation re-scores its audio too — the
     # motion changed, so the old track couldn't fit anyway.
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
-    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "seed", "audio_seed")
-    assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "seed", "audio_seed")
+    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "audio_seed")
+    assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "audio_seed")
 
 
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
@@ -1915,7 +1915,7 @@ def test_wan22_t2i_is_registered_as_an_image_workflow():
     # Two diffusion models (high/low noise) identify the output, like the video
     # Wan workflows; a variation re-rolls both stage seeds.
     assert wf.model_keys == ("unet_high", "unet_low")
-    assert wf.seed_keys() == ("noise_seed", "seed")
+    assert wf.seed_keys() == ("noise_seed",)
 
 
 def test_wan22_t2i_default_params_has_required_keys():
@@ -2649,3 +2649,15 @@ def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():
     assert low["inputs"]["start_at_step"] == 3
     assert high["inputs"]["cfg"] == 2.0
     assert low["inputs"]["cfg"] == 6.0
+
+
+@pytest.mark.parametrize("name", ["wan22_t2i", "wan22_flf2v_loop", "wan22_i2v"])
+def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name):
+    wf = WORKFLOW_REGISTRY[name]
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="example_start.png"))
+    second_passes = [node["inputs"] for node in payload.values()
+                     if node["class_type"] == "KSamplerAdvanced"
+                     and node["inputs"]["add_noise"] == "disable"]
+
+    assert second_passes and all(p["sampler_name"] == "euler" for p in second_passes)
+    assert "seed" not in {pd.key for pd in wf.param_definitions()}

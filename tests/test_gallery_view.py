@@ -7590,7 +7590,7 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     vid_job = view._reroll_jobs[key]
     assert vid_job.workflow.name == "wan22_i2v"
     assert vid_job.params["input_image"] == "image/sdxl_new.png [output]"
-    assert vid_job.params["noise_seed"] != 9 and vid_job.params["seed"] != 3
+    assert vid_job.params["noise_seed"] != 9
 
     client.job_completed.emit(vid_job.prompt_id, _VID_REROLL_HISTORY)
 
@@ -8869,8 +8869,7 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
-    assert job.params["seed"] == 42       # the video's seed, reused (not randomized)
-    assert job.params["noise_seed"] == 99
+    assert job.params["noise_seed"] == 99  # the video's seed, reused (not randomized)
     view._client.submit_job.assert_called_once()
 
 
@@ -8888,7 +8887,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
-    assert config.params["seed"] == 42                               # the video's seed, carried in
+    assert config.params["noise_seed"] == 99                         # the video's seed, carried in
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
@@ -8996,8 +8995,7 @@ def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeyp
 
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"  # the video runs on the same dropped frame
-    assert job.params["seed"] != 42        # a fresh seed, not the duplicate's
-    assert job.params["noise_seed"] != 99  # both dual-noise seeds re-rolled
+    assert job.params["noise_seed"] != 99  # a fresh seed, not the duplicate's
 
 
 def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path, monkeypatch):
@@ -9387,7 +9385,7 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
-    assert job.params["seed"] == 42                               # recipe's seed, reused via the combine path
+    assert job.params["noise_seed"] == 99                         # recipe's seed, reused via the combine path
 
 
 def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tmp_path, monkeypatch):
@@ -10606,7 +10604,7 @@ def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
     assert len(view._reroll_jobs) == 1
     job = next(iter(view._reroll_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
-    assert job.params["seed"] == 42
+    assert job.params["noise_seed"] == 99
 
 
 def _combine_view(qtbot, tmp_path):

@@ -13,6 +13,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import urllib.error
@@ -339,6 +340,20 @@ def test_comfyui_responding_false_for_200_that_is_not_comfyui():
     body = json.dumps({"message": "hello"}).encode()
     with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
         assert comfyui_responding("127.0.0.1", 8188) is False
+
+def test_a_server_that_hangs_up_mid_reply_is_not_comfyui():
+    with patch("urllib.request.urlopen", side_effect=http.client.IncompleteRead(b"{")):
+        assert comfyui_responding("127.0.0.1", 8188) is False
+
+def test_a_reply_that_is_not_json_is_not_comfyui():
+    with patch("urllib.request.urlopen",
+               return_value=_mock_response(200, b"<html>a login page</html>")):
+        assert comfyui_responding("127.0.0.1", 8188) is False
+
+def test_a_mistake_in_the_probe_itself_is_not_passed_off_as_no_comfyui():
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, None)), \
+            pytest.raises(TypeError):
+        comfyui_responding("127.0.0.1", 8188)
 
 
 # --- a submit the server answered too late ----------------------------------------

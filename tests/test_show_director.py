@@ -74,7 +74,7 @@ class FakeShow:
         self.resumed = None
         self.retuned = None
         self.dwell_s = None
-        self.session_paused = None
+        self.paused = None
         self.audio_muted = None
         self.window_title = None
         self.window_flags = Qt.WindowType.Widget
@@ -155,10 +155,10 @@ class FakeShow:
     def set_dwell_s(self, seconds):
         self.dwell_s = seconds
 
-    def set_session_paused(self, paused):
+    def set_paused(self, paused):
         if self.pause_raises:
             raise RuntimeError("this show will not freeze")
-        self.session_paused = paused
+        self.paused = paused
 
     def set_audio_muted(self, muted):
         self.audio_muted = muted
@@ -648,7 +648,7 @@ def test_a_freeze_that_one_show_refuses_still_reaches_the_rest(shows):
 
     director.set_session_paused(True)
 
-    assert made[1].session_paused is True
+    assert made[1].paused is True
 
 
 def test_a_show_opened_while_the_room_is_frozen_opens_frozen(shows):
@@ -659,7 +659,26 @@ def test_a_show_opened_while_the_room_is_frozen_opens_frozen(shows):
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
-    assert made[0].session_paused is True
+    assert made[0].paused is True
+
+
+def test_a_click_on_a_hosted_show_asks_for_omnipause_on_the_sessions_channel(shows, tmp_path):
+    session = FakeSession()
+    session.dashboard_cmd_file = tmp_path / "dashboard_cmd.txt"
+    director, _host, made = shows(fun_time=session)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    made[0].actions.omnipause()
+
+    assert session.dashboard_cmd_file.read_text(encoding="utf-8").split() == [
+        "omnipause_toggle"]
+
+
+def test_a_show_with_no_session_to_ask_is_left_to_pause_itself(shows):
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].actions.omnipause is None
 
 
 def test_the_spoken_close_with_no_show_up_says_so(shows):

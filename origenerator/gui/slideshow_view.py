@@ -206,7 +206,8 @@ class SlideshowView(QWidget):
         self._preview = PreviewWidget(player=player, loop_videos=False,
                                       allow_fullscreen=False,
                                       show_funscript_strip=True, mute_audio=False,
-                                      pushes_stills=True, on_double_click=self.close)
+                                      pushes_stills=True, on_double_click=self.close,
+                                      on_click=self._toggle_pause)
         self._preview.video_ended.connect(self._on_video_ended)
         self._preview.video_unplayable.connect(self._on_video_unplayable)
         # The media is refitted a beat after the window resizes (and again when a
@@ -254,11 +255,12 @@ class SlideshowView(QWidget):
         self._advance_timer = QTimer(self)
         self._advance_timer.setSingleShot(True)
         self._advance_timer.timeout.connect(self._advance)
-        # The hosting session's OmniPause, held here so it survives navigation:
-        # a step lands on a NEW slide (the room being frozen does not un-aim the
-        # transport), but the slide must arrive holding — no dwell armed, its
-        # video paused — rather than playing out from under the freeze.
-        self._session_paused = False
+        # A pause — the hosting session's OmniPause, or a click on a show with no
+        # session — held here so it survives navigation: a step lands on a NEW
+        # slide (the freeze does not un-aim the transport), but the slide must
+        # arrive holding — no dwell armed, its video paused — rather than playing
+        # out from under the freeze.
+        self._paused = False
         # The players' HUD replaces this view's own furnishings (the neighbor
         # stills, the position plate) with its map — see adopt_hud.
         self._hud_dressed = False
@@ -299,7 +301,7 @@ class SlideshowView(QWidget):
             self._preview.start_push(pace, 0.0)
             if self._frozen():
                 self._preview.pause_push()
-        if self._session_paused:
+        if self._paused:
             self._preview.set_playback_paused(True)  # arrive holding
             return
         self._arm_advance()
@@ -313,7 +315,7 @@ class SlideshowView(QWidget):
             self._advance_timer.start(dwell)
 
     def _frozen(self) -> bool:
-        return self._session_paused or self._playlist.paused
+        return self._paused or self._playlist.paused
 
     def _follow_the_freeze(self, was_frozen: bool) -> None:
         if self._frozen() == was_frozen:
@@ -937,8 +939,9 @@ class SlideshowView(QWidget):
                 self._toggle_lock()
             return
 
-    def set_session_paused(self, paused: bool) -> None:
-        """Freeze or resume the show whole — the hosting session's OmniPause.
+    def set_paused(self, paused: bool) -> None:
+        """Freeze or resume the show whole — the hosting session's OmniPause, or
+        a click on a show standing on its own.
 
         Distinct from the lock: a lock holds one slide by choice and replays
         its clip; this stops time itself — the dwell clock and any playing
@@ -947,9 +950,15 @@ class SlideshowView(QWidget):
         must arrive holding too (see :meth:`_show_current`).
         """
         was_frozen = self._frozen()
-        self._session_paused = paused
+        self._paused = paused
         self._follow_the_freeze(was_frozen)
         self._preview.set_playback_paused(paused)
+
+    def _toggle_pause(self) -> None:
+        if self._actions.omnipause is not None:
+            self._actions.omnipause()
+        else:
+            self.set_paused(not self._paused)
 
     def _on_pace_changed(self, seconds: int) -> None:
         """The pace moved — here or in another window — so the slide on screen
@@ -995,11 +1004,11 @@ class SlideshowView(QWidget):
         session.  The item stays in the set — the fault is the backend's, not
         the file's — but the show moves on.
 
-        The session's OmniPause is the one hold this yields to: the room is
-        frozen, and a show that walked its set looking for something playable
-        would be the room moving.  The black rectangle waits for the resume.
+        A pause is the one hold this yields to: the show is frozen, and a show
+        that walked its set looking for something playable would be moving.
+        The black rectangle waits for the resume.
         """
-        if self._session_paused:
+        if self._paused:
             return
         logger.warning("Slideshow: a clip would not play; stepping past it")
         self._advance()

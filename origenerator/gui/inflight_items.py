@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from origenerator import gallery, timing
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.orientation import row_orientation
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
@@ -89,7 +90,7 @@ class InFlightItems:
         thumb_by_id = {r.get("prompt_id"): r.get("thumbnail_path") for r in rows}
         items = []
         for row in rows:
-            if row.get("status") not in ("running", "pending"):
+            if not gallery.is_in_progress(row):
                 continue
             pid = row["prompt_id"]
             tracked = reroll_by_pid.get(pid)
@@ -118,7 +119,8 @@ class InFlightItems:
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
                 status=("speaking" if speaking
-                        else "running" if row.get("status") == "running" else "queued"),
+                        else "running" if row.get("status") == GenerationStatus.RUNNING
+                        else "queued"),
                 frame=frame,
                 reveal=lambda k=folder_key: self._on_reveal(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge

@@ -38,6 +38,7 @@ from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, pyqtSignal
 
 from origenerator import gallery, queue_line
 from origenerator.generation_config import filled_params, prepared_params
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import (
     GenerationJob,
     insert_generation_row,
@@ -418,7 +419,8 @@ class RerollController(QObject):
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
             logger.warning("Re-roll submission failed for %s: %s", key, e)
-            self._db.update_generation(job.prompt_id, status="error", error_message=str(e))
+            self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
+                                       error_message=str(e))
             self._drop(key, job)
             return False
         finally:
@@ -427,7 +429,7 @@ class RerollController(QObject):
             job.cancel()  # canceled while out; the server has it and must not run it
             return False
         self._on_server.append(job)
-        self._db.update_generation(job.prompt_id, status="running")
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.RUNNING)
         return True
 
     def flush_to_server(self) -> int:
@@ -540,9 +542,9 @@ class RerollController(QObject):
         # re-queuing each job in the order it was asked for, so the rules that
         # ordered it the first time order it the same way again.
         for row in reversed(self._db.list_generations()):
-            if row.get("status") == "running":
+            if row.get("status") == GenerationStatus.RUNNING:
                 self._reconnect(row, index)
-            elif row.get("status") == "pending":
+            elif row.get("status") == GenerationStatus.PENDING:
                 self._readopt(row, index)
         self._pump()
         self.changed.emit()
@@ -700,6 +702,7 @@ class RerollController(QObject):
     def _on_failed(self, key, job, message):
         self._drop(key, job)
         self._pump()  # the machine is free: start whatever is next
-        self._db.update_generation(job.prompt_id, status="error", error_message=message)
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
+                                   error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self.failed.emit(key, message)

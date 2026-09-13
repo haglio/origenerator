@@ -9,6 +9,7 @@ import json
 import random
 from dataclasses import dataclass
 
+from origenerator.generation_state import GenerationStatus
 from origenerator.param_keys import renamed as renamed_params
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
@@ -150,7 +151,7 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     if snapshot.seed_is_random:
         return None
     for row in rows:
-        if row.get("status") != "completed":
+        if row.get("status") != GenerationStatus.COMPLETED:
             continue
         if not _recorded_an_output(row):
             continue

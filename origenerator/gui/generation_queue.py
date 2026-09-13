@@ -111,7 +111,8 @@ QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
 
 def _made_from(item) -> Combination:
     frame = resolve_input_image_path(item.source_image)
-    return Combination(str(frame) if frame is not None else None, item.recipe_thumbnail)
+    return Combination(str(frame) if frame is not None else None, item.recipe_thumbnail,
+                       item.recipe_prompt_edited)
 
 
 class OpensAFolder:

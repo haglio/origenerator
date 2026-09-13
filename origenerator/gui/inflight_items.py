@@ -20,6 +20,7 @@ from origenerator.generation_state import GenerationStatus
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.orientation import row_orientation
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 # The kinds whose start frame is what the run is *of*, rather than one input
@@ -84,10 +85,11 @@ class InFlightItems:
         stablemates: dict[str, tuple] = {}  # folder key -> thumbnails already in it
         if rows is None:
             rows = self._db.list_generations()
-        # Every row's thumbnail, so a combine's run can show the video its
-        # settings came from. Off the listing already in hand rather than a query
-        # per job: the recipe video is an ordinary finished row somewhere in it.
-        thumb_by_id = {r.get("prompt_id"): r.get("thumbnail_path") for r in rows}
+        # Every row by id, so a combine's run can show the video its settings
+        # came from, and say whether its words still match that video's. Off the
+        # listing already in hand rather than a query per job: the recipe video
+        # is an ordinary finished row somewhere in it.
+        row_by_id = {r.get("prompt_id"): r for r in rows}
         items = []
         for row in rows:
             if not gallery.is_in_progress(row):
@@ -115,6 +117,9 @@ class InFlightItems:
             workflow_name = row.get("workflow_name") or ""
             params = gallery.parse_params(row.get("params_json"))
             kind = gallery.job_kind_label(workflow_name)
+            recipe = (None if row.get("recipe_category")
+                      else row_by_id.get(row.get("recipe_video_id")))
+            workflow = WORKFLOW_REGISTRY.get(workflow_name)
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
@@ -150,7 +155,7 @@ class InFlightItems:
                 # What to stand under the wait: the image this run was
                 # requested of, else the frame it animates or enhances.
                 source_picture=self._source_picture(
-                    requested.get(pid), thumb_by_id, params, kind),
+                    requested.get(pid), row_by_id, params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, being the recipe
@@ -161,8 +166,10 @@ class InFlightItems:
                 # as a job that is that video. A dropped video *is* the choice,
                 # so there the picture is the only thing saying which.
                 recipe_category=row.get("recipe_category") or "",
-                recipe_thumbnail=(None if row.get("recipe_category")
-                                  else thumb_by_id.get(row.get("recipe_video_id"))),
+                recipe_thumbnail=(recipe or {}).get("thumbnail_path"),
+                recipe_prompt_edited=bool(
+                    recipe and workflow
+                    and gallery.prompts_differ_from(params, recipe, workflow)),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
         place = {pid: i for i, pid in enumerate(self._reroll.queue_order)}
@@ -171,7 +178,7 @@ class InFlightItems:
         return items
 
     @staticmethod
-    def _source_picture(requested_of, thumb_by_id: dict, params: dict,
+    def _source_picture(requested_of, row_by_id: dict, params: dict,
                         kind: str) -> str | None:
         """A file showing what a queued run came from, or ``None``.
 
@@ -180,7 +187,7 @@ class InFlightItems:
         thing it was asked about is the only picture it has. Failing that, the
         start frame a video or an enhance is built on.
         """
-        asked_of = thumb_by_id.get(requested_of) if requested_of else None
+        asked_of = (row_by_id.get(requested_of) or {}).get("thumbnail_path")
         if asked_of:
             return asked_of
         if kind not in SOURCE_FRAME_KINDS:

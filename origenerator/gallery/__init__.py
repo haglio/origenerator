@@ -36,6 +36,7 @@ from origenerator.gallery.combine import (
     combined_params,
     curated_params,
     cycle_shaped,
+    prompts_differ_from,
 )
 from origenerator.gallery.custom import (
     SELECTION_KEY,
@@ -242,6 +243,7 @@ __all__ = [
     "output_file_reference",
     "parse_params",
     "produced_output",
+    "prompts_differ_from",
     "recent_generations",
     "recognized_spelling",
     "remove_enhance_levels",

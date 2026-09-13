@@ -2662,28 +2662,24 @@ class GalleryView(QWidget):
         frame = resolve_input_image_path(job.params.get("input_image"))
         return str(frame) if frame is not None else None
 
-    def _job_recipe_row(self, job) -> dict | None:
-        """The clip whose settings ``job`` follows, as its row — or ``None``.
-
-        The other half of what a combine's run was made from, stood gray beside
-        the frame wherever the run has no picture of its own yet. Only where a
-        *video* was dropped: an act picked off the Combine dropdown names what
-        the run will do rather than a clip, and a picture of some video the user
-        never chose reads as a job that is that video — the same reason the
-        queue's rows leave it out (see BrowserPane).
-        """
-        row = self._db.get_generation(job.prompt_id) if job is not None else None
-        if row is None or row.get("recipe_category"):
-            return None
-        return self._db.get_generation(row.get("recipe_video_id") or "")
-
     def _job_made_from(self, job, recipe_media) -> Combination:
         """What ``job`` was made from, for a surface with no frame of it yet: the
         picture, and the clip whose settings it follows as ``recipe_media`` shows
-        that clip — a still on the folder's tile, a loop in a config tab."""
-        recipe = self._job_recipe_row(job)
-        return Combination(self._job_source_picture(job),
-                           recipe_media(recipe) if recipe is not None else None)
+        that clip — a still on the folder's tile, a loop in a config tab.
+
+        The clip only where a *video* was dropped: an act picked off the Combine
+        dropdown names what the run will do rather than a clip, and a picture of
+        some video the user never chose reads as a job that is that video — the
+        same reason the queue's rows leave it out (see BrowserPane).
+        """
+        row = self._db.get_generation(job.prompt_id) if job is not None else None
+        recipe = (None if row is None or row.get("recipe_category")
+                  else self._db.get_generation(row.get("recipe_video_id") or ""))
+        return Combination(
+            self._job_source_picture(job),
+            recipe_media(recipe) if recipe is not None else None,
+            recipe is not None
+            and gallery.prompts_differ_from(job.params, recipe, job.workflow))
 
     def typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the

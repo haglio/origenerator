@@ -52,3 +52,28 @@ def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
     right = image.pixelColor(image.width() - side // 2, side // 2)
     assert left.blue() > left.red()                      # the frame keeps its color
     assert right.red() == right.green() == right.blue()  # the clip has lost its
+
+
+def _columns_of(image, color):
+    middle = image.height() // 2
+    return [x for x in range(image.width()) if image.pixelColor(x, middle) == color]
+
+
+def _painted(image, left, right):
+    return any(image.pixelColor(x, y).alpha() > 0
+               for x in range(left, right) for y in range(image.height()))
+
+
+def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses(qtbot, tmp_path):
+    frame = _picture(tmp_path / "frame.png", size=(80, 80))
+    clip = _picture(tmp_path / "clip.png", size=(80, 80), color=(255, 0, 0))
+    size = QSize(400, 100)
+    as_made = combination_pixmap(Combination(frame, clip), size).toImage()
+    edited = combination_pixmap(Combination(frame, clip, recipe_prompt_edited=True),
+                                size).toImage()
+    gray_clip = as_made.pixelColor(as_made.width() - 1, as_made.height() // 2)
+
+    clip_as_made, clip_edited = _columns_of(as_made, gray_clip), _columns_of(edited, gray_clip)
+    assert clip_edited[0] > clip_as_made[0]
+    assert _painted(edited, clip_as_made[0], clip_edited[0])
+    assert _painted(edited, clip_edited[-1] + 1, edited.width())

@@ -1160,6 +1160,58 @@ def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, 
     assert w._combination.video_label.isHidden()
 
 
+@pytest.mark.parametrize("edited", [False, True])
+def test_the_clip_stands_in_parentheses_once_its_prompt_was_edited(make_preview, tmp_path,
+                                                                   edited):
+    w = make_preview()
+
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
+                                   _animated_webp(tmp_path / "recipe.webp"), edited))
+
+    parens = (w._combination.open_paren_label, w._combination.close_paren_label)
+    assert [label.isHidden() for label in parens] == [not edited, not edited]
+
+
+@pytest.mark.parametrize("edited", [False, True])
+def test_the_pair_asks_for_no_more_width_than_its_pane_has(qtbot, tmp_path, edited):
+    host = QWidget()
+    qtbot.addWidget(host)
+    host.setFixedSize(440, 320)
+    w = PreviewWidget(player=MagicMock(), parent=host)
+    w.setGeometry(0, 0, 440, 320)
+    host.show()
+
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
+                                   _animated_webp(tmp_path / "recipe.webp"), edited))
+    view = w._combination
+    view.layout().activate()
+
+    assert view.layout().minimumSize().width() <= view.width()
+
+
+def test_a_frame_with_no_clip_beside_it_has_nothing_to_enclose(make_preview, tmp_path):
+    w = make_preview()
+
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"), None, True))
+
+    assert w._combination.open_paren_label.isHidden()
+    assert w._combination.close_paren_label.isHidden()
+
+
+def test_an_edit_marked_on_the_pair_on_screen_encloses_its_clip_without_restarting_it(
+        make_preview, tmp_path):
+    w = make_preview()
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
+                                   _animated_webp(tmp_path / "recipe.webp")))
+    looping = w._combination._movie
+
+    w.mark_recipe_prompt_edited(True)
+
+    assert not w._combination.open_paren_label.isHidden()
+    assert not w._combination.close_paren_label.isHidden()
+    assert w._combination._movie is looping
+
+
 def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
     # Its clip would otherwise keep looping under whatever replaced it.
     w = make_preview()

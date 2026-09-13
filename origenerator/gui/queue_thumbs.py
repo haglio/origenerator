@@ -43,8 +43,8 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter, QPixmap
+from PyQt6.QtCore import QRect, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.combination import Combination
@@ -52,7 +52,7 @@ from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
-from shared_ui.colors import BORDER_SUBTLE
+from shared_ui.colors import BORDER_SUBTLE, TEXT_MUTED
 
 # The gap between cells, in pixels. One is enough to read as separate pictures;
 # two at this size is a visible stripe between them.
@@ -61,6 +61,8 @@ _GAP = 1
 # worth carrying. Four is what fits across without the line's text starting
 # halfway along the strip.
 FOLDER_CELLS = 4
+PAREN_SHARE = 0.25
+_PAREN_HEIGHT_SHARE = 0.8
 
 
 def block_width(cell: int) -> int:
@@ -142,6 +144,33 @@ def _canvas(cell: int) -> QPixmap:
     return canvas
 
 
+def paren_width(side: int) -> int:
+    return max(1, int(side * PAREN_SHARE))
+
+
+def draw_recipe(painter: QPainter, x: int, recipe: QPixmap, prompt_edited: bool) -> None:
+    side = recipe.height()
+    if prompt_edited:
+        paren = paren_width(side)
+        _draw_paren(painter, QRect(x, 0, paren, side), "(")
+        _draw_paren(painter, QRect(x + paren + recipe.width(), 0, paren, side), ")")
+        x += paren
+    painter.drawPixmap(x, 0, recipe)
+
+
+def paren_font(font: QFont, side: int) -> QFont:
+    enclosing = QFont(font)
+    enclosing.setPixelSize(max(1, int(side * _PAREN_HEIGHT_SHARE)))
+    enclosing.setWeight(QFont.Weight.Light)
+    return enclosing
+
+
+def _draw_paren(painter: QPainter, band: QRect, glyph: str) -> None:
+    painter.setFont(paren_font(painter.font(), band.height()))
+    painter.setPen(TEXT_MUTED)
+    painter.drawText(band, Qt.AlignmentFlag.AlignCenter, glyph)
+
+
 def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
     """A block holding what a job is being made from: its picture, and — for a
     combine's run — the recipe video whose settings it follows, in gray.
@@ -156,15 +185,16 @@ def source_pixmap(made_from: Combination, cell: int) -> QPixmap | None:
     the frame in full color it reads as a second subject, and the row of a job
     whose frame hasn't rendered yet would read as a job that *is* that clip.
     """
-    parts = (fitted_cell(made_from.picture, cell),
-             fitted_cell(made_from.recipe, cell, gray=True))
-    if all(part is None for part in parts):
+    frame = fitted_cell(made_from.picture, cell)
+    recipe = fitted_cell(made_from.recipe, cell, gray=True)
+    if frame is None and recipe is None:
         return None
     canvas = _canvas(cell)
     painter = QPainter(canvas)
-    for index, part in enumerate(parts):
-        if part is not None:
-            painter.drawPixmap(index * (cell + _GAP), 0, part)
+    if frame is not None:
+        painter.drawPixmap(0, 0, frame)
+    if recipe is not None:
+        draw_recipe(painter, cell + _GAP, recipe, made_from.recipe_prompt_edited)
     painter.end()
     return canvas
 

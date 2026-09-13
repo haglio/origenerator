@@ -86,6 +86,22 @@ def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
     return params
 
 
+_PROMPT_KEYS = ("positive_prompt", "negative_prompt", "scene_lines",
+                "audio_prompt", "audio_negative_prompt")
+
+
+def prompts_differ_from(params: dict, recipe_row: dict, workflow) -> bool:
+    run = {**workflow.default_params(), **params}
+    recipe = filled_params(recipe_row, workflow)
+    return any(_words(run.get(key)) != _words(recipe.get(key)) for key in _PROMPT_KEYS)
+
+
+def _words(prompt):
+    if isinstance(prompt, (list, tuple)):
+        return [_words(line) for line in prompt]
+    return " ".join(str(prompt or "").split())
+
+
 def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
     """The overlay's hand-tuned act recipe readied to run on ``image_row``'s frame.
 

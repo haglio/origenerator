@@ -104,6 +104,7 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.toast import Toast
+from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, ShowState, Slide, SlideshowPlaylist, in_order
 
 logger = logging.getLogger(__name__)
@@ -1090,7 +1091,7 @@ class SlideshowView(QWidget):
             self._enhancing.add(prompt_id)
             self._refresh_note()
 
-    def note_enhanced(self, prompt_id: str, path, media_type: str = "image",
+    def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
                       still=None) -> None:
         """An enhancement of one of these items landed: the show points at it
         from here on, wherever that item sits in the running order.

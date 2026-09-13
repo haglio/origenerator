@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
@@ -173,7 +174,7 @@ class WorkflowTemplate(ABC):
     name: str
     version: str
     display_name: str
-    output_type: str  # "image" or "video"
+    output_type: MediaType
     # True when the output video loops (returns to its start frame), so the
     # funscript synthesized alongside it is tiled to repeat seamlessly. Only the
     # first-last-frame loop workflow sets this; a one-shot video leaves it False.
@@ -264,7 +265,7 @@ class WorkflowTemplate(ABC):
         The value still fills the field either way, so locking a video's seed is
         one click of Random rather than a number to go and find.
         """
-        return self.output_type != "video"
+        return self.output_type != MediaType.VIDEO
 
     def enhance_keys(self) -> tuple[str, ...]:
         """Param keys that configure the enhancement rather than the recipe.

@@ -17,6 +17,7 @@ from origenerator import config
 from origenerator.db import Database
 from origenerator.funscript import ensure_funscript, funscript_of
 from origenerator.gallery import media_type_of_row, resolve_preview
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,10 @@ def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
     hz = config.MOTION_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "skipped": 0, "missing": 0, "failed": 0}
     for row in db.list_generations():
-        if media_type_of_row(row) != "video":
+        if media_type_of_row(row) != MediaType.VIDEO:
             continue
         preview = resolve(row, output_dir)
-        if preview is None or preview[1] != "video":
+        if preview is None or preview[1] != MediaType.VIDEO:
             result["missing"] += 1
             continue
         path = preview[0]

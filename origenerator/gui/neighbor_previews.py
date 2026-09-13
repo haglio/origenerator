@@ -16,6 +16,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.media_overlay import PLATE_CSS, float_over_media
+from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 
 _MARGIN = 12            # gap from the screen edge, and from the media in a gutter
@@ -36,7 +37,7 @@ def still_for(slide: Slide | None):
         return None
     if slide.still:
         return slide.still
-    return slide.path if slide.media_type == "image" or slide.is_live else None
+    return slide.path if slide.media_type == MediaType.IMAGE or slide.is_live else None
 
 
 def side_x(side: str, host_width: int, media_rect: QRect, label_width: int) -> int:

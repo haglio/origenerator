@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS,
     SCHEDULER_OPTIONS,
@@ -32,7 +33,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
     name = "sdxl_t2i"
     version = "v004"
     display_name = "SDXL Text-to-Image"
-    output_type = "image"
+    output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it
     output_node_id = "7"

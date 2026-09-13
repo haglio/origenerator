@@ -24,7 +24,7 @@ from origenerator.comfy_graph import (
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
 from origenerator.generation_state import GenerationSource, GenerationStatus
-from origenerator.media import media_type_from_filename, sibling_of_type
+from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -75,14 +75,15 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
                 continue
             # A video with a metadata image beside it is represented (and made
             # playable) by that image's entry, so skip the bare video file.
-            if output_type == "video" and sibling_of_type(fpath, "image") is not None:
+            if (output_type == MediaType.VIDEO
+                    and sibling_of_type(fpath, MediaType.IMAGE) is not None):
                 continue
             # An image beside a video is that video's metadata/preview sidecar
             # (VHS_VideoCombine writes one per clip): its entry should play the
             # video, not show the still frame.
             play_path = fpath
-            if output_type == "image":
-                sibling_video = sibling_of_type(fpath, "video")
+            if output_type == MediaType.IMAGE:
+                sibling_video = sibling_of_type(fpath, MediaType.VIDEO)
                 if sibling_video is not None:
                     play_path = sibling_video
 
@@ -146,13 +147,14 @@ def merge_video_sidecar_rows(db: Database) -> int:
     video_by_key: dict[tuple[str, str], dict] = {}
     for row in rows:
         files = row_output_files(row)
-        if files and media_type_from_filename(files[0].get("filename", "")) == "video":
+        if files and media_type_from_filename(files[0].get("filename", "")) == MediaType.VIDEO:
             video_by_key[_sidecar_key(files[0])] = row
 
     merged = 0
     for row in rows:
         files = row_output_files(row)
-        if not files or media_type_from_filename(files[0].get("filename", "")) != "image":
+        if (not files
+                or media_type_from_filename(files[0].get("filename", "")) != MediaType.IMAGE):
             continue
         video = video_by_key.pop(_sidecar_key(files[0]), None)
         if video is None:
@@ -363,7 +365,7 @@ def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
         except Exception:
             return {}
         return _as_graph(prompt_str) if prompt_str else {}
-    if media_type_from_filename(fpath.name) == "video":
+    if media_type_from_filename(fpath.name) == MediaType.VIDEO:
         return _video_prompt_graph(fpath)
     return {}
 

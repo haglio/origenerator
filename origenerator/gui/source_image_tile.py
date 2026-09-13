@@ -17,6 +17,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.media import MediaType
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -27,7 +28,7 @@ _THUMB = 120
 # What the tile says and draws when a showing names neither: a video's start
 # frame, which is what this slot was built for and still shows most often.
 _DEFAULT_HEADING = "From source image"
-_DEFAULT_MEDIA_TYPE = "image"
+_DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 
 
 class SourceImageTile(QWidget):

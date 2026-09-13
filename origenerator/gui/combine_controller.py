@@ -43,6 +43,7 @@ from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,7 @@ class CombineController(QObject):
         video's clip would satisfy that and can't be a start frame)."""
         row = self._db.get_generation(prompt_id)
         return bool(
-            row and gallery.media_type_of_row(row) == "image"
+            row and gallery.media_type_of_row(row) == MediaType.IMAGE
             and gallery.output_file_reference(gallery.row_output_files(row)) is not None
         )
 
@@ -155,7 +156,7 @@ class CombineController(QObject):
         implies the workflow is registered.) The shared gate under both the video
         drop slot and the category dropdown's candidate pool."""
         return bool(
-            row and gallery.media_type_of_row(row) == "video"
+            row and gallery.media_type_of_row(row) == MediaType.VIDEO
             and gallery.is_image_conditioned(row.get("workflow_name") or "")
         )
 
@@ -306,7 +307,7 @@ class CombineController(QObject):
             status="queued",
             frame=None,
             reveal=lambda: None,  # no folder to open yet: it has no settings
-            media_type="video",
+            media_type=MediaType.VIDEO,
             job_kind="Video",
             recipe_category=category,
             # The same rule the finished row follows: a picked act names itself in
@@ -400,7 +401,7 @@ class CombineController(QObject):
         where that is a still, else the stored thumbnail (which a pane this big
         would be enlarging), else nothing."""
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-        if preview is not None and preview[1] == "image":
+        if preview is not None and preview[1] == MediaType.IMAGE:
             return str(preview[0])
         return row.get("thumbnail_path")
 
@@ -722,7 +723,7 @@ class CombineController(QObject):
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
             return
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-        if preview is None or preview[1] != "video":
+        if preview is None or preview[1] != MediaType.VIDEO:
             return
         try:
             evolver_export.export_video(preview[0],
@@ -784,7 +785,7 @@ class CombineController(QObject):
         one the speaker isn't near a keyboard to make.
         """
         row = self._db.get_generation(image_id) if image_id else None
-        if row is None or gallery.media_type_of_row(row) != "image":
+        if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
             return None, "🎤 only a picture can become a Genau clip"
         if self._already_genaud(row):
             return None, ALREADY_GENAUD

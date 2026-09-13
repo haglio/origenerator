@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from origenerator.config import CUSTOM_POSES_DIR
+from origenerator.media import MediaType
 from origenerator.workflows.base import (
     SAMPLER_OPTIONS,
     SCHEDULER_OPTIONS,
@@ -57,7 +58,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     name = "sdxl_pose_transfer"
     version = "v004"
     display_name = "SDXL Pose Transfer"
-    output_type = "image"
+    output_type = MediaType.IMAGE
     derives_size_from_input = True
     model_keys = ("checkpoint",)
     extra_enhance_keys = ("upscale_model",)  # only the tail loads it

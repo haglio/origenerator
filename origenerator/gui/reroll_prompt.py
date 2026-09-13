@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import QMessageBox
 
+from origenerator.media import MediaType
+
 # Which seed(s) the user chose to re-roll (``None`` from :func:`offer_reroll`
 # means they cancelled). REROLL_VIDEO is also the single-seed workflows' choice —
 # their one seed is "the video seed" as far as the caller's re-roll is concerned.
@@ -29,7 +31,8 @@ def _build_reroll_dialog(parent, workflow, can_reroll_image: bool):
     without spinning a modal loop. Buttons absent from the map (Cancel, the close
     dialog) resolve to ``None``.
     """
-    media = workflow.output_type if workflow.output_type in ("image", "video") else "output"
+    media = (workflow.output_type
+             if workflow.output_type in (MediaType.IMAGE, MediaType.VIDEO) else "output")
     dialog = QMessageBox(parent)
     dialog.setIcon(QMessageBox.Icon.Question)
     dialog.setWindowTitle("Already generated")

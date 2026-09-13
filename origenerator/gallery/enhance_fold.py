@@ -45,6 +45,7 @@ from origenerator.gallery.output import (
     row_output_files,
 )
 from origenerator.generation_state import GenerationStatus
+from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def fold_enhancement(db, enhance_row: dict,
     if image_rows is None:
         image_rows = db.list_generations()
     source_id = enhance_target_id(
-        enhance_row, [r for r in image_rows if media_type_of_row(r) == "image"])
+        enhance_row, [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
     if source_id is None:
         return None
     source = db.get_generation(source_id)
@@ -143,7 +144,7 @@ def fold_completed_enhancements(db) -> int:
     graph in the library through memory for each one.
     """
     rows = sorted(db.list_generations(), key=lambda r: r.get("id") or 0)
-    pool = [r for r in rows if media_type_of_row(r) == "image"]
+    pool = [r for r in rows if media_type_of_row(r) == MediaType.IMAGE]
     folded = 0
     for row in rows:
         if row.get("status") != GenerationStatus.COMPLETED:

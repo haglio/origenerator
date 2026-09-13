@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
@@ -37,7 +38,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     name = "wan22_flf2v_loop"
     version = "v009"
     display_name = "WAN 2.2 Image-to-Video (Looping)"
-    output_type = "video"
+    output_type = MediaType.VIDEO
     looping = True
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")

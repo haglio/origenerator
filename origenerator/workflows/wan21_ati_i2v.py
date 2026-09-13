@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
     FRAME_RATE_OPTIONS,
@@ -61,7 +62,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     name = "wan21_ati_i2v"
     version = "v007"
     display_name = "WAN 2.1 Image-to-Video (Motion-Tracked)"
-    output_type = "video"
+    output_type = MediaType.VIDEO
     derives_size_from_input = True
     model_keys = ("unet",)
     lora_keys = ("lora_high", "lora_low")

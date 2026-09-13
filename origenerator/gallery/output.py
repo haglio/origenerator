@@ -16,7 +16,7 @@ from pathlib import Path
 
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
-from origenerator.media import media_type_from_filename, sibling_of_type
+from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_animated_thumbnail
 
 logger = logging.getLogger(__name__)
@@ -61,19 +61,19 @@ def is_in_progress(row: dict) -> bool:
     return row.get("status") in (GenerationStatus.RUNNING, GenerationStatus.PENDING)
 
 
-def media_type_of_row(row: dict) -> str:
-    """Classify a row as ``"image"`` or ``"video"``.
+def media_type_of_row(row: dict) -> MediaType:
+    """Classify a row as an image or a video.
 
     The actual output file is authoritative — a still saved under a video
     workflow's prefix is an image and must not surface among the videos.
     Rows with no file yet (pending) fall back to the workflow's declared type,
-    then to ``"image"``.
+    then to an image.
     """
     for f in row_output_files(row):
         inferred = media_type_from_filename(f.get("filename", ""))
         if inferred:
             return inferred
-    return workflow_output_type(row.get("workflow_name")) or "image"
+    return workflow_output_type(row.get("workflow_name")) or MediaType.IMAGE
 
 
 def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -> list[dict]:
@@ -127,7 +127,7 @@ def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:
 
     thumb = row.get("thumbnail_path")
     if thumb and Path(thumb).exists():
-        return Path(thumb), "image"
+        return Path(thumb), MediaType.IMAGE
 
     return None
 
@@ -142,7 +142,7 @@ def animated_preview_path(row: dict, output_dir: Path, thumb_dir: Path) -> str |
     its moving preview through here.
     """
     preview = resolve_preview(row, output_dir)
-    if preview is None or preview[1] != "video":
+    if preview is None or preview[1] != MediaType.VIDEO:
         return None
     try:
         result = generate_animated_thumbnail(preview[0], thumb_dir, name=row["prompt_id"])
@@ -174,7 +174,8 @@ def output_disk_files(row: dict, output_dir: Path,
         if not full.exists():
             continue
         paths.append(full)
-        other = "video" if media_type_from_filename(filename) == "image" else "image"
+        other = (MediaType.VIDEO if media_type_from_filename(filename) == MediaType.IMAGE
+                 else MediaType.IMAGE)
         sidecar = sibling_of_type(full, other)
         if sidecar is not None:
             paths.append(sidecar)

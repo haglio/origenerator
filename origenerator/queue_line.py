@@ -39,6 +39,7 @@ what makes the queue's behavior testable without a running ComfyUI.
 from __future__ import annotations
 
 from origenerator.generation_state import GenerationSource
+from origenerator.media import MediaType
 
 
 def is_video(job) -> bool:
@@ -50,7 +51,7 @@ def is_video(job) -> bool:
     what it makes itself.
     """
     return (getattr(job, "run_media_type", None)
-            or getattr(job, "media_type", None)) == "video"
+            or getattr(job, "media_type", None)) == MediaType.VIDEO
 
 
 def joins_the_front(job) -> bool:

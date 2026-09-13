@@ -20,6 +20,7 @@ from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
@@ -770,7 +771,7 @@ def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):
 def test_the_mark_falls_back_to_what_the_config_makes(panel):
     # No result yet, so no thumbnail: the plain photo/play mark says which kind
     # of thing this tab would produce.
-    assert panel.tab_icon().cacheKey() == icons.media_type_icon("image").cacheKey()
+    assert panel.tab_icon().cacheKey() == icons.media_type_icon(MediaType.IMAGE).cacheKey()
 
 
 def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):

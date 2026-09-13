@@ -53,6 +53,7 @@ from origenerator.gallery.sides import (  # noqa: F401
     ORIENTATIONS,
     PORTRAIT,
 )
+from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _SEPARATOR = "::"
@@ -151,7 +152,7 @@ def _probe_candidates(row: dict) -> list[Path]:
     if thumb:
         candidates.append(Path(thumb))
     resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
-    if resolved is not None and resolved[1] == "image":
+    if resolved is not None and resolved[1] == MediaType.IMAGE:
         candidates.append(Path(resolved[0]))
     return candidates
 

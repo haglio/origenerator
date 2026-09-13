@@ -18,6 +18,7 @@ from origenerator.funscript import (
     funscript_path_for,
     write_funscript,
 )
+from origenerator.media import MediaType
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 
@@ -67,7 +68,7 @@ def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | No
     idempotent (an existing sidecar is left alone) and swallow-and-log on failure,
     so this can never strand a real completion.
     """
-    if workflow.output_type != "video":
+    if workflow.output_type != MediaType.VIDEO:
         return
     source = _first_output_file(files, output_dir)
     if source is None:

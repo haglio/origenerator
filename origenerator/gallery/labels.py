@@ -27,6 +27,7 @@ from origenerator.gallery.signatures import (
     workflow_model_keys,
     workflow_output_type,
 )
+from origenerator.media import MediaType
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.setting_names import setting_definition, setting_name
 
@@ -128,7 +129,7 @@ def config_folder_name(workflow_name: str, signature: str,
     row, since a tab that has never run has no row to key off — but keys the
     same folder the tree does, so a tab and its folder wear one name.
     """
-    key = settings_key(workflow_output_type(workflow_name) or "image",
+    key = settings_key(workflow_output_type(workflow_name) or MediaType.IMAGE,
                        workflow_name, signature)
     meta = (folder_meta or {}).get(key) or {}
     return meta.get("custom_name") or folder_id(key)
@@ -152,7 +153,7 @@ def job_kind_label(workflow_name: str | None) -> str:
     output_type = workflow_output_type(workflow_name)
     if output_type is None:
         return ""
-    return "Video" if output_type == "video" else "Image"
+    return "Video" if output_type == MediaType.VIDEO else "Image"
 
 
 def _short_value(value) -> str:

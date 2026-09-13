@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.model_arch import SD15, SDXL
@@ -42,7 +43,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
     name = "image_enhance"
     version = "v003"
     display_name = "Image Enhance"
-    output_type = "image"
+    output_type = MediaType.IMAGE
     derives_size_from_input = True
     selectable = False
     model_keys = ("checkpoint",)

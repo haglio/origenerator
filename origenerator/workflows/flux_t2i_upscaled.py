@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, WorkflowTemplate
 from origenerator.workflows.model_arch import FLUX
 from origenerator.workflows.model_files import list_model_files
@@ -31,7 +32,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     name = "flux_t2i_upscaled"
     version = "v002"
     display_name = "Flux Text-to-Image (Upscaled)"
-    output_type = "image"
+    output_type = MediaType.IMAGE
     model_keys = ("unet",)
     output_node_id = "12"
     base_output_node_id = "17"  # the plain 4x upscale, saved when the tail runs

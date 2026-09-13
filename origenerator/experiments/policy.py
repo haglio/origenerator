@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from origenerator.gallery import parse_params, produced_output
 from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus
+from origenerator.media import MediaType
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -116,8 +117,8 @@ class ExperimentPolicy:
 
         Drawn per proposal, so images still get their minority share of
         experiments; a gallery with only one kind keeps its whole pool."""
-        videos = [b for b in bases if b[1].output_type == "video"]
-        stills = [b for b in bases if b[1].output_type != "video"]
+        videos = [b for b in bases if b[1].output_type == MediaType.VIDEO]
+        stills = [b for b in bases if b[1].output_type != MediaType.VIDEO]
         if not videos or not stills:
             return bases
         return videos if self._rng.random() < _VIDEO_SHARE else stills

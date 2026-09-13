@@ -58,8 +58,10 @@ from origenerator.gui.inflight import (
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key
+from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.media import MediaType
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
@@ -776,7 +778,7 @@ class BrowserPane(QObject):
             return ("No media types selected.\n\nCheck Images or Videos over the "
                     "folder list to bring your recent generations back.")
         noun = "generations" if len(media_types) == 2 else (
-            "images" if "image" in media_types else "videos")
+            "images" if MediaType.IMAGE in media_types else "videos")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
                 "gallery re-roll — collect here, newest first.")
 
@@ -1141,7 +1143,7 @@ class BrowserPane(QObject):
         # video seed to offer.
         i2v = bool(group.rows) \
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
-            and gallery.media_type_of_row(group.rows[0]) == "video"
+            and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
         def draw(row):
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
@@ -1229,9 +1231,11 @@ class BrowserPane(QObject):
         """The per-seed re-roll hover controls for an i2v item: always the video
         seed (new motion of the same frame), plus the image seed (a new frame)
         when the item's start frame is itself a re-buildable generation."""
-        actions = [("video", icons.reroll_seed_icon("video"), "Randomize video seed")]
+        actions = [(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
+                    "Randomize video seed")]
         if gallery.find_source_image_id(row, self._host.image_rows()) is not None:
-            actions.append(("image", icons.reroll_seed_icon("image"), "Randomize image seed"))
+            actions.append((REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
+                            "Randomize image seed"))
         return actions
 
     @staticmethod

@@ -67,6 +67,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import (
     discard_run_text,
@@ -106,6 +107,11 @@ _TICK_MS = 1000
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
+
+
+def _made_from(item) -> Combination:
+    frame = resolve_input_image_path(item.source_image)
+    return Combination(str(frame) if frame is not None else None, item.recipe_thumbnail)
 
 
 class OpensAFolder:
@@ -329,9 +335,7 @@ class RunningPreview(OpensAFolder, QWidget):
                                    Qt.TransformationMode.SmoothTransformation)
         else:
             pixmap = None if item is None else combination_pixmap(
-                resolve_input_image_path(item.source_image), item.recipe_thumbnail,
-                QSize(2 * side, side),
-            )
+                _made_from(item), QSize(2 * side, side))
         if pixmap is None:
             self._frame.setFixedSize(side, side)
             self._frame.clear()  # nothing of this run to show — a blank square
@@ -490,8 +494,7 @@ class QueueRow(OpensAFolder, QWidget):
         disk yet, falls back to the folder view; a folder with nothing in it yet
         leaves the block off the row rather than draw an empty grid.
         """
-        if ((item.source_image or item.recipe_thumbnail)
-                and self._thumbs.show_source(item.source_image, item.recipe_thumbnail)):
+        if self._thumbs.show_source(_made_from(item)):
             return
         if item.folder_thumbnails:
             self._thumbs.show_folder(item.folder_thumbnails)

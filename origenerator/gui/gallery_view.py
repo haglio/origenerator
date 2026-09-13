@@ -60,6 +60,7 @@ from origenerator.gui.browser_pane import (
     PaneHost,
     TreeNavigation,
 )
+from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
 from origenerator.gui.editable_header import EditableHeader
@@ -2493,8 +2494,8 @@ class GalleryView(QWidget):
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
                           typical_seconds=self.typical_run_seconds(job),
-                          source_picture=self._job_source_picture(job),
-                          recipe_picture=self._job_recipe_picture(job))
+                          made_from=self._job_made_from(
+                              job, lambda recipe: recipe.get("thumbnail_path")))
         tile.set_selected(group.key == self._selected_reroll_key)
         tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
         tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
@@ -2676,18 +2677,13 @@ class GalleryView(QWidget):
             return None
         return self._db.get_generation(row.get("recipe_video_id") or "")
 
-    def _job_recipe_picture(self, job) -> str | None:
-        """That clip as a still, for the plate on the folder's own tile."""
+    def _job_made_from(self, job, recipe_media) -> Combination:
+        """What ``job`` was made from, for a surface with no frame of it yet: the
+        picture, and the clip whose settings it follows as ``recipe_media`` shows
+        that clip — a still on the folder's tile, a loop in a config tab."""
         recipe = self._job_recipe_row(job)
-        return recipe.get("thumbnail_path") if recipe else None
-
-    def _job_made_from(self, job) -> tuple:
-        """What ``job`` was made from, for a config tab with no frame of it yet:
-        the picture, and the clip looping beside it — the pair a tab draws as a
-        sum, which is what the strip's corner and the tile stand in stills."""
-        recipe = self._job_recipe_row(job)
-        return (self._job_source_picture(job),
-                self.animated_preview(recipe) if recipe is not None else None)
+        return Combination(self._job_source_picture(job),
+                           recipe_media(recipe) if recipe is not None else None)
 
     def typical_run_seconds(self, job) -> float | None:
         """What a whole run of ``job``'s workflow usually takes — the prior the
@@ -3388,7 +3384,7 @@ class GalleryView(QWidget):
                 panel.note_launched(job.origin)  # its Cancel and progress are this run's now
             self._reconcile_generating()
         panel.watch_folder(key, job.last_preview, self._wait_note(key),
-                           self._job_made_from(job))
+                           self._job_made_from(job, self.animated_preview))
         tabs.setCurrentWidget(panel)
 
     def _restore_reroll_selection(self, key: str | None):

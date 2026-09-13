@@ -25,6 +25,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from origenerator.gui import grid_card, palette
+from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
@@ -50,17 +51,15 @@ class RerollTile(QFrame):
     context_requested = pyqtSignal(QPoint)  # global position — only while bound
 
     def __init__(self, job=None, parent=None, *, auto_generating=False,
-                 typical_seconds=None, source_picture=None, recipe_picture=None):
+                 typical_seconds=None, made_from=Combination()):
         """``typical_seconds`` is what this folder's workflow usually takes, so a
         bound job's bar can say how much of its run is left; ``None`` where there
-        is no history to say it from. ``source_picture`` and ``recipe_picture``
-        are what the bound run was made from — the frame it animates and, for a
-        combine, the clip whose settings came with it — stood in the plate until
-        the run streams a frame of its own."""
+        is no history to say it from. ``made_from`` is what the bound run was made
+        from — the frame it animates and, for a combine, the clip whose settings
+        came with it — stood in the plate until the run streams a frame of its own."""
         super().__init__(parent)
         self._job = job
-        self._source_picture = source_picture
-        self._recipe_picture = recipe_picture
+        self._made_from = made_from
         self._selected = False
         self._typical_seconds = typical_seconds
         self.setObjectName("rerollTile")
@@ -144,8 +143,7 @@ class RerollTile(QFrame):
             # being made: the same sum the strip's corner and the config tab
             # stand for this job, rather than three surfaces each with their own
             # idea of the wait (one blurred, one blank, one missing its plus).
-            pair = combination_pixmap(self._source_picture, self._recipe_picture,
-                                      QSize(*_IMAGE_SIZE))
+            pair = combination_pixmap(self._made_from, QSize(*_IMAGE_SIZE))
             if pair is not None:
                 self._image.setPixmap(pair)
         self._render_state()

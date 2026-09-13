@@ -207,60 +207,14 @@ def test_filling_random_seeds_leaves_a_seed_the_params_do_not_carry(qtbot):
     assert (values["noise_seed"], values["seed"]) == (31, 12345)
 
 
-def _readonly_texts(form):
-    return {lbl.text() for lbl in form.findChildren(QLabel)
-            if lbl.objectName() == "readonlyParamValue"}
-
-
-def test_passthrough_params_render_as_readonly_rows(qtbot):
-    # A param the workflow lays out no field for (vae) shows as a read-only row in
-    # the form itself — merged with the editable params, not hidden or in a
-    # separate block — and still round-trips on read-back.
+def test_a_setting_with_no_field_is_kept_for_the_rerun_but_never_shown(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
-    form.set_values({"seed": 5, "vae": "sdxl.vae.safetensors"})
-
-    assert "sdxl.vae.safetensors" in _readonly_texts(form)
-    labels = {lbl.text() for lbl in form.findChildren(QLabel)}
-    assert "vae" in labels  # the key labels the row
-    assert form.get_values_static()["vae"] == "sdxl.vae.safetensors"
-
-
-def test_a_read_only_row_is_named_the_way_the_forms_that_lay_it_out_name_it(qtbot):
-    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
-    qtbot.addWidget(form)
-    form.set_values({"steps": 20, "denoise": 1.0})
+    form.set_values({"seed": 5, "vae": "example.vae.safetensors"})
 
     labels = {lbl.text() for lbl in form.findChildren(QLabel)}
-    assert "Redraw Amount" in labels
-    assert "denoise" not in labels
-
-
-def test_a_read_only_row_that_would_repeat_a_fields_name_is_left_off(qtbot):
-    form = ParamForm([ParamDef("guidance", "Prompt Strength", "float", 4.5)])
-    qtbot.addWidget(form)
-    form.set_values({"guidance": 4.5, "cfg": 1.0})
-
-    assert form._readonly_rows == []
-    assert form.get_values_static()["cfg"] == 1.0
-
-
-def test_readonly_rows_are_replaced_not_stacked(qtbot):
-    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
-    qtbot.addWidget(form)
-    form.set_values({"seed": 5, "vae": "a.safetensors"})
-    form.set_values({"seed": 5, "clip": "b.safetensors"})
-
-    values = _readonly_texts(form)
-    assert "b.safetensors" in values
-    assert "a.safetensors" not in values  # the prior extra row is gone, not stacked
-
-
-def test_no_readonly_rows_when_every_param_has_a_field(qtbot):
-    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
-    qtbot.addWidget(form)
-    form.set_values({"seed": 5})
-    assert _readonly_texts(form) == set()
+    assert "vae" not in labels and "example.vae.safetensors" not in labels
+    assert form.get_values_static()["vae"] == "example.vae.safetensors"
 
 
 def _field_cell_of(form, key):
@@ -877,25 +831,7 @@ def test_shared_sections_appear_in_the_same_order_across_workflows(qtbot):
     assert [t for t in i2v if t in sdxl] == shared
 
 
-def test_passthrough_row_lands_in_its_section_at_the_canonical_position(qtbot):
-    # flux lays out steps and guidance but leaves cfg as a read-only passthrough;
-    # cfg belongs between them in Sampling, so it must insert there, not append.
-    form = ParamForm([
-        ParamDef("steps", "Steps", "int", 20),
-        ParamDef("guidance", "Guidance", "float", 4.5),
-    ])
-    qtbot.addWidget(form)
-    form.set_values(
-        {"steps": 20, "guidance": 4.5, "cfg": 1.0, "vae": "ae.safetensors"}
-    )
-    assert form._present_keys["Sampling"] == ["steps", "cfg", "guidance"]
-    assert form._present_keys["Model & LoRA"] == ["vae"]
-
-
-def test_hidden_params_get_no_field_and_no_read_only_row(qtbot):
-    # The enhance params are off this form on purpose — everything laid out here
-    # decides which gallery folder a run lands in, and an enhancement doesn't.
-    # "Hidden" therefore means gone, not demoted to a read-only row.
+def test_hidden_params_get_no_field(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
@@ -919,16 +855,6 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     assert label.toolTip() == param_help("steps")
 
 
-def test_a_read_only_passthrough_row_is_explained_too(qtbot):
-    from origenerator.gui.param_help import param_help
-
-    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
-    qtbot.addWidget(form)
-    form.set_values({"steps": 20, "vae": "ae.safetensors"})
-    (_title, _key, value_label) = form._readonly_rows[0]
-    assert value_label.toolTip() == param_help("vae")
-
-
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     # Loading an old enhanced run into a tab must not arm its enhancement for
     # the next Generate: enhancement is the Enhance subpanel's, applied
@@ -947,47 +873,16 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     assert "enhance" in values
 
 
-def test_clearing_passthrough_restores_the_editable_only_order(qtbot):
-    form = ParamForm([
-        ParamDef("steps", "Steps", "int", 20),
-        ParamDef("guidance", "Guidance", "float", 4.5),
-    ])
-    qtbot.addWidget(form)
-    form.set_values({"cfg": 1.0})
-    assert form._present_keys["Sampling"] == ["steps", "cfg", "guidance"]
-    form.set_values({})  # a config carrying no passthrough
-    assert form._present_keys["Sampling"] == ["steps", "guidance"]
-
-
-def test_a_passthrough_only_section_appears_when_a_config_supplies_it(qtbot):
-    # wan22_t2i lays out no model field (the UNETs are passthrough). A fresh form
-    # has no Model & LoRA section; loading a config with the UNETs reveals it.
+def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_t2i"].param_definitions())
     qtbot.addWidget(form)
     form.show()
     qtbot.waitExposed(form)
+
+    form.set_values({"unet_high": "example_high.safetensors",
+                     "unet_low": "example_low.safetensors"})
+
     assert form._sections["Model & LoRA"].isHidden() is True
-
-    form.set_values({"unet_high": "hi.safetensors", "unet_low": "lo.safetensors"})
-    assert form._sections["Model & LoRA"].isHidden() is False
-    assert form._present_keys["Model & LoRA"] == ["unet_high", "unet_low"]
-
-
-def test_the_plumbing_params_get_no_row_at_all(qtbot):
-    # Removing their fields alone only demoted them to read-only rows, which is
-    # still an Output section on the form. They round-trip unseen instead.
-    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
-    qtbot.addWidget(form)
-
-    form.set_values({"steps": 30, "batch_size": 4, "filename_prefix": "image/x",
-                     "crf": 19})
-
-    shown = {key for _title, key, _label in form._readonly_rows}
-    assert shown == set()
-    assert "Output" not in form._sections
-    # …and they are still handed back, so a payload built from this form works.
-    values = form.get_values_static()
-    assert values["batch_size"] == 4 and values["filename_prefix"] == "image/x"
 
 
 def _rate_def(default=24.0):

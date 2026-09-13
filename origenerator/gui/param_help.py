@@ -13,12 +13,6 @@ sampler is: each line says what moving the number does to the result, and where
 a value has a practical range or a known trap, it says that too. Kept Qt-free so
 the text is unit-testable, and a guard test keeps every registered workflow's
 params covered — a new param must be explained before it can ship.
-
-An import's extras are here too: the form renders those as read-only rows, and a
-row you cannot change is exactly the one you most want explained. A key in
-:data:`~origenerator.gui.param_sections.HIDDEN_KEYS` is not -- the form gives it
-no row at all, editable or read-only, so a line written for it could never be
-read by anyone.
 """
 from __future__ import annotations
 
@@ -100,32 +94,10 @@ PARAM_HELP: dict[str, str] = {
         "The low-noise model: the second stage, which refines detail on what the "
         "high-noise pass laid down."
     ),
-    "vae": "The decoder that turns the model's latent output into pixels.",
-    "vae_name": "The decoder that turns the model's latent output into pixels.",
-    "clip_name": "The text encoder that turns your prompt into what the model reads.",
-    "clip_name1": "The first of two text encoders this model reads the prompt through.",
-    "clip_name2": "The second of two text encoders this model reads the prompt through.",
-    "clip_vision_name": (
-        "The image encoder that lets the model read the start image the way it "
-        "reads the prompt."
-    ),
     "upscale_model": (
         "The enlarger used before the enhance pass — an ESRGAN-family model that "
         "reconstructs edges rather than resampling them."
     ),
-    "depth_model": (
-        "The model that reads depth out of the structure image, producing the map "
-        "the ControlNet holds the structure to."
-    ),
-    "pose_bbox_detector": "The detector that finds people in the structure image before posing them.",
-    "pose_estimator": "The model that reads the skeleton out of each person it found.",
-    "audio_encoder_name": (
-        "The listener the speech model hears her lines through, so its lips "
-        "follow the words."
-    ),
-    "foley_model": "The model that scores the finished video with sound.",
-    "foley_vae": "The decoder that turns the scoring model's output into audio.",
-    "foley_synchformer": "The model that keeps the generated sound aligned to the motion on screen.",
 
     # --- LoRAs ---
     "lora_high": (
@@ -234,7 +206,6 @@ PARAM_HELP: dict[str, str] = {
     # --- size and length ---
     "width": "The output width in pixels.",
     "height": "The output height in pixels.",
-    "length": "How many frames the model generates for this clip.",
     "frame_count": (
         "How long the clip runs, in seconds — of real motion, at any frame rate. "
         "Pick a length or type one; it is rounded to the frames the model works "

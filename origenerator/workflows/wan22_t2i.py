@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 
 
 class Wan22T2iWorkflow(WorkflowTemplate):
@@ -62,20 +62,20 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         return [
-            ParamDef("positive_prompt", "Prompt", "str", defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", "str", defaults["negative_prompt"], multiline=True),
-            ParamDef("noise_seed", "Seed", "seed", defaults["noise_seed"]),
-            ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=2048, step=16),
-            ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=2048, step=16),
-            ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=50),
-            ParamDef("cfg", "Prompt Strength", "float", defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift_high", "Composition Focus (First Pass)", "float", defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("shift_low", "Composition Focus (Second Pass)", "float", defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("enhance", "Enhance (upscale + re-sample)", "bool", defaults["enhance"]),
-            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
+            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
+            ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=2048, step=16),
+            ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=2048, step=16),
+            ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=50),
+            ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
+            ParamDef("shift_high", "Composition Focus (First Pass)", ParamType.FLOAT, defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("shift_low", "Composition Focus (Second Pass)", ParamType.FLOAT, defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
+            ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
+            ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
+            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
         ]
 

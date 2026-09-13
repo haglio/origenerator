@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -140,11 +141,25 @@ def scene_prompts(text: str) -> list[str]:
     return scenes
 
 
+class ParamType(StrEnum):
+    STR = "str"
+    INT = "int"
+    FLOAT = "float"
+    SEED = "seed"
+    COMBO = "combo"
+    IMAGE = "image"
+    AUDIO = "audio"
+    BOOL = "bool"
+    SCENES = "scenes"
+    LINES = "lines"
+    FIXES = "fixes"
+
+
 @dataclass
 class ParamDef:
     key: str
     label: str
-    type: str  # "str", "int", "float", "seed", "combo", "image", "bool"
+    type: ParamType
     default: Any
     # A "combo" picks one of these; an "int"/"float" with them is an editable
     # dropdown of common values that still takes any typed one.
@@ -168,6 +183,9 @@ class ParamDef:
     # file is played at — the frames are generated at the one and interpolated up
     # to the other, so a clip's seconds don't move when its rate does.
     rate: float | None = None
+
+    def __post_init__(self):
+        self.type = ParamType(self.type)
 
 
 class WorkflowTemplate(ABC):
@@ -246,7 +264,7 @@ class WorkflowTemplate(ABC):
         A workflow with two seeds (e.g. dual-noise video) reports both, in form
         order. Derived from ``param_definitions`` so it stays in sync with the UI.
         """
-        return tuple(pd.key for pd in self.param_definitions() if pd.type == "seed")
+        return tuple(pd.key for pd in self.param_definitions() if pd.type == ParamType.SEED)
 
     def pins_reused_seed(self) -> bool:
         """Whether loading a past generation's settings into a config tab pins its

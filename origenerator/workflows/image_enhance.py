@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, WorkflowTemplate
+from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.model_arch import SD15, SDXL
 from origenerator.workflows.model_files import ANY, list_model_files
@@ -77,18 +77,18 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "upscale_models", [defaults["upscale_model"]], accepts=ANY,
         )
         return [
-            ParamDef("input_image", "Image", "image", defaults["input_image"]),
-            ParamDef("positive_prompt", "Prompt", "str", defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", "str", defaults["negative_prompt"], multiline=True),
-            ParamDef("checkpoint", "Model", "combo", defaults["checkpoint"],
+            ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
-            ParamDef("seed", "Seed", "seed", defaults["seed"]),
-            ParamDef("upscale_model", "Upscaler", "combo", defaults["upscale_model"],
+            ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
+            ParamDef("upscale_model", "Upscaler", ParamType.COMBO, defaults["upscale_model"],
                      options=upscalers),
-            ParamDef("enhance_scale", "Upscale Factor", "float", defaults["enhance_scale"],
+            ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),
-            ParamDef("enhance_steps", "Enhance Steps", "int", defaults["enhance_steps"], min_val=1, max_val=100),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", "float", defaults["enhance_denoise"],
+            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100),
+            ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05),
             # One denoise per part fixed, keyed by the part's name — the Enhance
             # panel's line of numbers, and the range those spinners take. A
@@ -96,7 +96,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             # runs a real pass, so the floor sits above zero (the detailer node
             # rejects a zero denoise, and a pass that repaints nothing is a
             # slower way of not running one).
-            ParamDef("enhance_detail_fixes", "Fixes", "fixes", defaults["enhance_detail_fixes"],
+            ParamDef("enhance_detail_fixes", "Fixes", ParamType.FIXES, defaults["enhance_detail_fixes"],
                      min_val=0.05, max_val=1.0, step=0.05),
         ]
 

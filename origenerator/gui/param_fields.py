@@ -15,7 +15,7 @@ from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoW
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
 
 ensure_shared_ui_on_path()
@@ -211,24 +211,24 @@ class _Choice(FieldKind):
         _select_combo_value(widget, str(value))
 
 
-_KINDS: dict[str, FieldKind] = {
-    "bool": _Tick(),
-    "str": _Line(),
-    "seed": _Seed(),
-    "int": _WholeSpinner(),
-    "float": _DecimalSpinner(),
-    "combo": _Choice(),
-    "image": _ImagePath(),
-    "audio": _AudioPath(),
+_KINDS: dict[ParamType, FieldKind] = {
+    ParamType.BOOL: _Tick(),
+    ParamType.STR: _Line(),
+    ParamType.SEED: _Seed(),
+    ParamType.INT: _WholeSpinner(),
+    ParamType.FLOAT: _DecimalSpinner(),
+    ParamType.COMBO: _Choice(),
+    ParamType.IMAGE: _ImagePath(),
+    ParamType.AUDIO: _AudioPath(),
 }
 _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
 
 def field_kind(pd: ParamDef) -> FieldKind:
-    if pd.type == "str" and pd.multiline:
+    if pd.type == ParamType.STR and pd.multiline:
         return _PROMPT
-    if pd.type in ("int", "float") and pd.options:
+    if pd.type in (ParamType.INT, ParamType.FLOAT) and pd.options:
         return _PRESETS
     return _KINDS[pd.type]
 
@@ -301,4 +301,4 @@ def clamped_number(pd: ParamDef, value):
         value = max(pd.min_val, value)
     if pd.max_val is not None:
         value = min(pd.max_val, value)
-    return int(round(value)) if pd.type == "int" else float(value)
+    return int(round(value)) if pd.type == ParamType.INT else float(value)

@@ -41,7 +41,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.gui.media_overlay import float_over_media
+from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.paths import ensure_player_core_on_path
 from origenerator.ui_scale import (
     to_bitmap_pos,
@@ -190,10 +190,7 @@ class ShowHud(QLabel):
             self._model = model
             self._draw()
         elif self._model is not None:
-            # Media widgets come and go above this map as slides change; the
-            # model often doesn't change with them, so re-assert the Z-order
-            # every tick rather than only on a redraw.
-            self.raise_()
+            raise_over_media(self)
         # A first thumbnail click waits out the double-click window before it
         # posts, exactly as on a player (single switches, double locks).
         due = self._clicks.due(now=time.monotonic())

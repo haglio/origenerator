@@ -7,6 +7,7 @@ import pytest
 
 from origenerator.win32 import (
     force_foreground_window,
+    raise_window_without_activating,
     stamp_pinned_shortcuts,
     window_exists,
 )
@@ -168,3 +169,23 @@ class TestForceForegroundWindow:
                 force_foreground_window(111)
 
         assert user32.AttachThreadInput.call_args_list[-1] == call(7001, 7002, False)
+
+
+class TestRaiseWindowWithoutActivating:
+    def test_puts_the_window_above_its_siblings_without_moving_sizing_or_activating_it(self):
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 1
+
+            raise_window_without_activating(111)
+
+        (hwnd, insert_after, *rect, flags), _kwargs = user32.SetWindowPos.call_args
+        assert (hwnd.value, insert_after, rect) == (111, None, [0, 0, 0, 0])
+        assert flags == 0x0001 | 0x0002 | 0x0010  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+
+    def test_a_dead_handle_is_left_alone(self):
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 0
+
+            assert raise_window_without_activating(111) is False
+
+        user32.SetWindowPos.assert_not_called()

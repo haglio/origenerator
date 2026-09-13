@@ -262,6 +262,24 @@ def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
     assert not scroll.isAncestorOf(button)
 
 
+def test_the_enhance_button_is_yellow_with_dark_words_until_it_goes_dark(qtbot):
+    from PyQt6.QtWidgets import QPushButton
+    from shared_ui.colors import AMBER
+
+    panel, _ = _panel(qtbot)
+    panel.show()
+    QApplication.processEvents()
+    (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
+    image = button.grab().toImage()
+
+    assert _share_painted(image, AMBER) > 0.5
+    assert not any(min(image.pixelColor(x, y).getRgb()[:3]) > 200
+                   for y in range(image.height()) for x in range(image.width()))
+
+    panel.show_offer(False, "Nothing here to enhance")
+    assert _share_painted(button.grab().toImage(), AMBER) == 0
+
+
 def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_do(qtbot):
     from PyQt6.QtWidgets import QPushButton
 

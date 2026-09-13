@@ -29,6 +29,7 @@ from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QColor, QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+from origenerator.gui.combination import Combination
 from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie
 from origenerator.gui.queue_thumbs import fitted_cell
@@ -46,7 +47,7 @@ _PLUS_SHARE = 0.28
 _MIN_PLUS_PT = 12
 
 
-def combination_pixmap(image_path, video_path, size: QSize) -> QPixmap | None:
+def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     """The pair as one still picture, fitted into ``size`` — or ``None`` for a
     run made from nothing, which is a plate the caller leaves alone.
 
@@ -60,9 +61,9 @@ def combination_pixmap(image_path, video_path, size: QSize) -> QPixmap | None:
     from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a picture the
     strip has already scaled this second is not scaled again for the tile.
     """
-    side = _pair_side(size, bool(image_path and video_path))
-    image = fitted_cell(image_path, side)
-    recipe = fitted_cell(video_path, side, gray=True)
+    side = _pair_side(size, bool(combination.picture and combination.recipe))
+    image = fitted_cell(combination.picture, side)
+    recipe = fitted_cell(combination.recipe, side, gray=True)
     parts = [part for part in (image, recipe) if part is not None]
     if not parts:
         return None
@@ -136,16 +137,16 @@ class CombinationView(QWidget):
         for label in (self.image_label, self.plus_label, self.video_label):
             label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
-    def show_pair(self, image_path, video_path) -> None:
-        """Show ``image_path`` beside the looping ``video_path``, in gray.
+    def show_pair(self, combination: Combination) -> None:
+        """Show the picture beside its recipe clip, looping in gray.
 
         Either may be missing — a curated act is pinned in the overlay and has no
         past video under it, and a frame can have moved — and the plus shows only
         when both halves are there, since a lone picture is not a sum.
         """
         self._stop_movie()
-        self._image_path = str(image_path) if image_path else None
-        self._video_path = str(video_path) if video_path else None
+        self._image_path = str(combination.picture) if combination.picture else None
+        self._video_path = str(combination.recipe) if combination.recipe else None
         self._pixmap = _readable(self._image_path)
         if self._pixmap is None:
             self.image_label.clear()

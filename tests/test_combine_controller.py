@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QWidget
 
 from origenerator import recipe_match
 from origenerator.gui import combine_controller as module
+from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 
@@ -173,8 +174,8 @@ class FakeConfigPanel:
     def set_recipe_source(self, category, video_id):
         self.source = (category, video_id)
 
-    def show_combination(self, still, looping):
-        self.combination = (still, looping)
+    def show_combination(self, combination):
+        self.combination = combination
 
 
 class FakeHost:
@@ -606,7 +607,7 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
 
     assert tabs.opened == [(VIDEO_WORKFLOW, {"seed": 7})]
     assert panel.source == ("waving", "clip")
-    assert panel.combination == ("img-thumb.png", "clip.webp")
+    assert panel.combination == Combination("img-thumb.png", "clip.webp")
 
 
 def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
@@ -622,7 +623,7 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
 
     controller._open_category("img", "waving")
 
-    assert panel.combination == ("img-thumb.png", None)
+    assert panel.combination == Combination("img-thumb.png")
 
 
 # --- the spoken "genau it" ---------------------------------------------------

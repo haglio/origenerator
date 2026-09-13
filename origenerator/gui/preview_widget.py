@@ -361,7 +361,7 @@ class PreviewWidget(QWidget):
         if win is not None:
             win.show_frame(data)  # keep a view watching this generation up to date
 
-    def show_combination(self, image_path, video_path) -> None:
+    def show_combination(self, combination) -> None:
         """Show a combination waiting to be run: the frame on the left, a plus,
         and the gray looping clip whose settings go with it
         (:class:`~origenerator.gui.combination_view.CombinationView`).
@@ -373,7 +373,7 @@ class PreviewWidget(QWidget):
         """
         self._take_the_pane(None)
         self._image_label.clear()
-        self._combination.show_pair(image_path, video_path)
+        self._combination.show_pair(combination)
         self._stack.setCurrentWidget(self._combination)
 
     def show_folder(self, paths) -> None:

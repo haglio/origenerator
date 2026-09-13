@@ -17,6 +17,7 @@ from origenerator.funscript import (
     write_funscript,
 )
 from origenerator.gui import drag_thumbnail, preview_widget
+from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.ken_burns_still import KenBurnsStill
@@ -791,7 +792,7 @@ def test_set_draggable_id_arms_the_drag(make_preview, tmp_path):
     lambda w: w.show_frame(_png_bytes()),      # a live in-progress frame
     lambda w: w.show_message("Waiting…"),      # a transient note
     lambda w: w.clear(),                        # back to the placeholder
-    lambda w: w.show_combination(None, None),   # a pair with nothing made from it yet
+    lambda w: w.show_combination(Combination()),   # a pair with nothing made from it yet
 ])
 def test_a_transient_view_disarms_the_drag(make_preview, transient):
     w = make_preview()
@@ -1057,7 +1058,7 @@ def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
     lambda w, tmp: w.show_frame(_png_bytes()),
     lambda w, tmp: w.show_message("Waiting for preview…"),
     lambda w, tmp: w.clear(),
-    lambda w, tmp: w.show_combination(_make_png(tmp / "c.png"), None),
+    lambda w, tmp: w.show_combination(Combination(_make_png(tmp / "c.png"))),
 ])
 def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, show):
     # A notice is about the picture it was set over, so it can never outlive it —
@@ -1129,7 +1130,7 @@ def test_a_combination_shows_the_pair_instead_of_the_placeholder(make_preview, t
     frame = _make_png(tmp_path / "frame.png")
     clip = _animated_webp(tmp_path / "recipe.webp")
 
-    w.show_combination(frame, clip)
+    w.show_combination(Combination(frame, clip))
 
     assert w._stack.currentWidget() is w._combination
     assert not w._combination.image_label.pixmap().isNull()
@@ -1140,8 +1141,8 @@ def test_the_recipe_half_of_a_combination_loops_in_gray(make_preview, tmp_path):
     w = make_preview()
     w.show(); w.resize(400, 200)
 
-    w.show_combination(_make_png(tmp_path / "frame.png"),
-                       _animated_webp(tmp_path / "recipe.webp"))
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
+                                   _animated_webp(tmp_path / "recipe.webp")))
 
     color = w._combination.video_label.pixmap().toImage().pixelColor(1, 1)
     assert color.red() == color.green() == color.blue()  # the recipe, not a result
@@ -1152,7 +1153,7 @@ def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, 
     # under it, so there is no sum to draw a plus in the middle of.
     w = make_preview()
 
-    w.show_combination(_make_png(tmp_path / "frame.png"), None)
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png")))
 
     assert w._stack.currentWidget() is w._combination
     assert w._combination.plus_label.isHidden()
@@ -1162,8 +1163,8 @@ def test_a_combination_with_no_recipe_video_shows_the_frame_alone(make_preview, 
 def test_showing_anything_else_puts_the_combination_down(make_preview, tmp_path):
     # Its clip would otherwise keep looping under whatever replaced it.
     w = make_preview()
-    w.show_combination(_make_png(tmp_path / "frame.png"),
-                       _animated_webp(tmp_path / "recipe.webp"))
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png"),
+                                   _animated_webp(tmp_path / "recipe.webp")))
 
     w.show_image(_make_png(tmp_path / "later.png"))
 
@@ -1339,7 +1340,7 @@ def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
                                                                   tmp_path):
     w = _pane_holding_everything(make_preview(), tmp_path)
 
-    w.show_combination(_make_png(tmp_path / "frame.png"), None)
+    w.show_combination(Combination(_make_png(tmp_path / "frame.png")))
 
     assert w._player.stop.called
     assert w._notice.isHidden()

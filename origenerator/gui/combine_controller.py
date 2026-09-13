@@ -37,6 +37,7 @@ from origenerator.config import (
 )
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
@@ -395,10 +396,10 @@ class CombineController(QObject):
         if panel is None:
             return
         panel.set_recipe_source(category, video_id)
-        panel.show_combination(
+        panel.show_combination(Combination(
             self._still_path(image_row),
             self._host.animated_preview(video_row) if video_row is not None else None,
-        )
+        ))
 
     def _still_path(self, row: dict) -> str | None:
         """The best picture of ``row`` for a pane to show: its full-size output

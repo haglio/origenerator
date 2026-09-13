@@ -143,6 +143,7 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
+from origenerator.gui.panes import FootSplitter, pane, pane_splitter
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
@@ -154,7 +155,6 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.gui.splitters import FootSplitter, pane_splitter
 from origenerator.gui.toast import ERROR, NOTICE
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -179,7 +179,6 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
-_PANE_MARGINS = (8, 8, 8, 8)  # breathing room inside each of the three panes
 # How long the search waits after the last keystroke before asking the local LLM
 # to widen the query. Long enough to be a real pause rather than a gap between
 # two characters — the table-widened results are already on screen throughout, so
@@ -836,9 +835,7 @@ class GalleryView(QWidget):
         self._tree.star_clicked.connect(self._toggle_star)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.folders_dropped.connect(self._on_folders_dropped)
-        toc = QWidget()
-        toc_column = QVBoxLayout(toc)
-        toc_column.setContentsMargins(*_PANE_MARGINS)
+        toc, toc_column = pane()
         # Voice's caption sits above everything else in this pane — the top-left
         # corner of the view, where it obscures no control while it's up.
         toc_column.addWidget(self._voice.status)
@@ -875,14 +872,12 @@ class GalleryView(QWidget):
     def _build_browser_pane(self):
         """The middle pane: the folder's path, the button bank under it, the
         shelf's own bars, and the flowing contents -- with the two app-wide
-        panels standing at its foot, under a hairline of their own.
+        panels standing at its foot, under a handle of their own.
         """
         # Browser pane: a header (the folder's path, then a back/forward/undo
         # toolbar under it) over the flowing contents. Double-clicking the path
         # renames the folder it ends at.
-        browser = QWidget()
-        browser_column = QVBoxLayout(browser)
-        browser_column.setContentsMargins(*_PANE_MARGINS)
+        browser, browser_column = pane()
         self._title = EditableHeader()
         self._title.edit_requested.connect(self._begin_title_rename)
         self._title.edited.connect(self._commit_title_rename)
@@ -946,6 +941,7 @@ class GalleryView(QWidget):
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
+        browser_column.addWidget(self._scroll, 1)
         # The foot of the center (browser) pane, under a handle of its own: genau's
         # readout, copied, on the left, and the Enhance settings beside it, a
         # handle between them too. Hosted by Fun Time there is no readout — the
@@ -960,24 +956,27 @@ class GalleryView(QWidget):
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
         self._motion_panel = None
-        below = self._enhance.panel
+        enhance, enhance_column = pane()
+        enhance_column.addWidget(self._enhance.panel)
+        below = enhance
         if self._osr2_motion is not None:
             self._motion_panel = MotionPanel(self._osr2_motion, pace=self._pace)
-            hud = QScrollArea()
-            hud.setFrameShape(QScrollArea.Shape.NoFrame)
-            hud.setWidget(self._motion_panel)
+            hud_scroll = QScrollArea()
+            hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            hud_scroll.setWidget(self._motion_panel)
+            hud, hud_column = pane()
+            hud_column.addWidget(hud_scroll)
             below = pane_splitter(Qt.Orientation.Horizontal)
             below.addWidget(hud)
-            below.addWidget(self._enhance.panel)
+            below.addWidget(enhance)
             below.setStretchFactor(0, 0)
             below.setStretchFactor(1, 1)
         browsing = FootSplitter()
-        browsing.addWidget(self._scroll)
+        browsing.addWidget(browser)
         browsing.addWidget(below)
         browsing.setStretchFactor(0, 1)
         browsing.setStretchFactor(1, 0)
-        browser_column.addWidget(browsing, 1)
-        return browser
+        return browsing
 
     def _build_info_pane(self):
         """The right pane: the tabbed workspace of generate panels, with the

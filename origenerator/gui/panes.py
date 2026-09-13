@@ -1,7 +1,20 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import QSplitter
+from PyQt6.QtWidgets import QSplitter, QVBoxLayout, QWidget
+
+from origenerator.paths import ensure_shared_ui_on_path
+
+ensure_shared_ui_on_path()
+from shared_ui.spacing import MARGIN_STANDARD
+
+
+def pane() -> tuple[QWidget, QVBoxLayout]:
+    widget = QWidget()
+    column = QVBoxLayout(widget)
+    column.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
+                              MARGIN_STANDARD, MARGIN_STANDARD)
+    return widget, column
 
 
 def _as_panes(splitter: QSplitter) -> QSplitter:

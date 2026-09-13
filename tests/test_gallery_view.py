@@ -9986,17 +9986,46 @@ def _set_enhance(view, **fields):
     return settings
 
 
+def _pane_holding(widget):
+    from PyQt6.QtWidgets import QSplitter
+
+    while not isinstance(widget.parentWidget(), QSplitter):
+        widget = widget.parentWidget()
+    return widget
+
+
+def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot, tmp_path):
+    from PyQt6.QtCore import QMargins
+    from PyQt6.QtWidgets import QApplication, QWidget
+    from shared_ui.spacing import MARGIN_STANDARD
+
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.resize(1500, 900)
+    view.show()
+    for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
+        QApplication.processEvents()
+
+    for inside in (view._tree, view._scroll, view._motion_panel, view._enhance.panel):
+        pane = _pane_holding(inside)
+        room = pane.rect().marginsRemoved(QMargins(*[MARGIN_STANDARD] * 4))
+        for child in pane.findChildren(
+                QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            if child.isVisible():
+                assert room.contains(child.geometry()), (type(inside).__name__, child)
+
+
 def test_a_draggable_divider_parts_the_hud_from_the_enhance_settings(qtbot, tmp_path):
     from PyQt6.QtWidgets import QSplitter
 
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    divider = view._enhance.panel.parentWidget()
+    divider = _pane_holding(view._enhance.panel).parentWidget()
 
     assert isinstance(divider, QSplitter)
     assert divider.orientation() == Qt.Orientation.Horizontal
     assert divider.widget(0).isAncestorOf(view._motion_panel)
-    assert divider.widget(1) is view._enhance.panel
+    assert divider.widget(1).isAncestorOf(view._enhance.panel)
     assert divider.handleWidth() == view._panes.handleWidth()
 
 
@@ -10005,11 +10034,11 @@ def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, t
 
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    divider = view._scroll.parentWidget()
+    divider = _pane_holding(view._scroll).parentWidget()
 
     assert isinstance(divider, QSplitter)
     assert divider.orientation() == Qt.Orientation.Vertical
-    assert divider.widget(0) is view._scroll
+    assert divider.widget(0).isAncestorOf(view._scroll)
     assert divider.widget(1).isAncestorOf(view._enhance.panel)
     assert divider.handleWidth() == view._panes.handleWidth()
 
@@ -10024,7 +10053,7 @@ def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tm
     for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
         QApplication.processEvents()
     (settings,) = view._enhance.panel.findChildren(QScrollArea)
-    hud = view._enhance.panel.parentWidget().widget(0)
+    (hud,) = _pane_holding(view._motion_panel).findChildren(QScrollArea)
 
     assert settings.verticalScrollBar().maximum() == 0
     assert hud.verticalScrollBar().maximum() == 0
@@ -10039,15 +10068,14 @@ def test_squeezed_smaller_than_the_hud_its_section_scrolls_rather_than_spilling(
     view.resize(1500, 900)
     view.show()
     QApplication.processEvents()
-    beside = view._enhance.panel.parentWidget()
-    below = view._scroll.parentWidget()
+    beside = _pane_holding(view._enhance.panel).parentWidget()
+    below = _pane_holding(view._scroll).parentWidget()
 
-    beside.setSizes([60, beside.width() - 60])
-    below.setSizes([below.height() - 90, 90])
+    beside.moveSplitter(60, 1)
+    below.moveSplitter(below.height() - below.handleWidth() - 90, 1)
     QApplication.processEvents()
-    section = beside.widget(0)
+    (section,) = beside.widget(0).findChildren(QScrollArea)
 
-    assert isinstance(section, QScrollArea)
     assert section.horizontalScrollBar().maximum() > 0
     assert section.verticalScrollBar().maximum() > 0
 

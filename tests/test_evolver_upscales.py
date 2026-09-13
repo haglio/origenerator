@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from origenerator.evolver_upscales import EvolverUpscales
 
@@ -43,11 +44,21 @@ def test_a_portrait_video_is_found_under_its_own_shape(tmp_path):
 
 
 def test_a_later_video_that_reuses_an_older_ones_name_is_not_given_its_upscale(tmp_path):
-    upscale = _upscale(tmp_path)
-    os.utime(upscale, _LONG_AGO)
+    _upscale(tmp_path)
     video = _video(tmp_path)
+    an_hour_on = time.time() + 3600
+    os.utime(video, (an_hour_on, an_hour_on))
 
     assert _upscales(tmp_path).upscale_of(video) is None
+
+
+def test_an_upscale_left_with_a_1970_file_date_is_still_matched(tmp_path):
+    video = _video(tmp_path)
+    os.utime(video, _LONG_AGO)
+    upscale = _upscale(tmp_path)
+    os.utime(upscale, (2_000, 2_000))
+
+    assert _upscales(tmp_path).upscale_of(video) == upscale
 
 
 def test_only_a_video_has_an_upscale(tmp_path):

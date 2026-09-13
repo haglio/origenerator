@@ -46,6 +46,9 @@ def original_stem(path) -> str | None:
 
 def _predates(video: Path, upscale: Path) -> bool:
     try:
-        return video.stat().st_mtime <= upscale.stat().st_mtime
+        written, upscaled = video.stat(), upscale.stat()
     except OSError:
         return False
+    # Some upscales leave the encoder dated 1970, so an upscale is timed by when
+    # its file was made rather than by when it was last written.
+    return written.st_mtime <= getattr(upscaled, "st_birthtime", upscaled.st_mtime)

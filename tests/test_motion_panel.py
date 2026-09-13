@@ -90,7 +90,7 @@ def _press(panel, action):
     The painter takes window coordinates and its rects are panel ones, so the
     margin goes back on — the same conversion the widget does with the pointer.
     """
-    rect = next(r for r, b in panel._painter.buttons if b.action == action)
+    rect = next(r for r, b in panel._painter.buttons if b.command == action)
     x, y, w, h = rect
     margin = MotionPanel.MARGIN
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
@@ -103,7 +103,7 @@ def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     panel, _motion, _host = _panel(qtbot)
     panel.render_console()
     for action in ("main_fmode", "genau_filter_enhanced"):
-        assert action not in [b.action for _r, b in panel._painter.buttons]
+        assert action not in [b.command for _r, b in panel._painter.buttons]
 
 
 def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
@@ -169,7 +169,7 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     # three players that row switches between and has none of its own to park.
     panel, motion, host = _panel(qtbot)
     panel.render_console()
-    actions = [b.action for _rect, b in panel._painter.buttons]
+    actions = [b.command for _rect, b in panel._painter.buttons]
     assert "main_minimize" not in actions
     assert not any(a.endswith("_activate") for a in actions)
     for kept in ("genau_prev_clip", "genau_next_clip", "main_lock",
@@ -211,7 +211,7 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     panel, motion, _host = _panel(qtbot)
     panel.render_console()
     marks = [b for _r, b in panel._painter.buttons
-             if b.action.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
+             if b.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
     assert marks and all(b.dim for b in marks)
 
 

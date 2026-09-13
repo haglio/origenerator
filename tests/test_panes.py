@@ -4,7 +4,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.gui.splitters import FootSplitter
+from origenerator.gui.panes import FootSplitter
 
 
 class _Wanting(QWidget):

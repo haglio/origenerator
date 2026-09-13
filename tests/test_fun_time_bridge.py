@@ -438,7 +438,7 @@ def test_a_players_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, m
 
     _press(bridge, tmp_path, "portrait_fmode")
 
-    assert show.hud_f_mode is True
+    assert show.hud_favorites_filter is True
     assert len(show.hud_items()[0]) == 1
 
 

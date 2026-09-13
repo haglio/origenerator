@@ -86,7 +86,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         HudCell(path=str(path), thumb=str(thumb) if thumb else "")
         for path, thumb in cells
     )
-    f_mode = host.hud_f_mode
+    favorites_filter = host.hud_favorites_filter
     enhanced = host.hud_enhanced_mode
     order_label = host.hud_order_label
     # A show someone ASKED for is a loop -- this set, played round and round --
@@ -106,13 +106,13 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         # here to carry.
         lock_label=status_line(playing_set=looping_label("seed") if looping else "",
                                locked=locked, order=order_label,
-                               f_mode=f_mode, enhanced=enhanced),
+                               f_mode=favorites_filter, enhanced=enhanced),
         # The players' favorite star, over the same collection the Favorites
         # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
         # The buttons this show answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
-        rows=show_rows(side, locked=locked, f_mode=f_mode, enhanced=enhanced,
+        rows=show_rows(side, locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
                        order=order_label, hosted=hosted, own_window=own_window),
         corner=hud_cells[0],
         seeds=hud_cells[1:],

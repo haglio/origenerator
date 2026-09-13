@@ -43,8 +43,8 @@ def test_the_switches_light_and_the_things_done_never_do():
     """The hold and the two filters are states the show sits in — the hold and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     picture's own amber; a step, the bin and reset are things done."""
-    band = dict(zip(_names(_band(locked=True, f_mode=True, enhanced=True)),
-                    _band(locked=True, f_mode=True, enhanced=True)))
+    band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
+                    _band(locked=True, favorites_filter=True, enhanced=True)))
 
     assert band["lock"].lit and band["lock"].favorite
     assert band["fmode"].lit and band["fmode"].favorite
@@ -116,7 +116,7 @@ class _Host:
     def show_order(self, *, latest):
         self.calls.append(("order", latest))
 
-    def toggle_f_mode(self):
+    def toggle_favorites_filter(self):
         self.calls.append("fmode")
 
     def toggle_enhanced_mode(self):

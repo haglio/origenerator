@@ -28,6 +28,8 @@ from origenerator.gallery.signatures import (
     workflow_model_keys,
     workflow_output_type,
 )
+from origenerator.workflows.duration import seconds_for_frames
+from origenerator.workflows.setting_names import setting_definition, setting_name
 
 # File extensions stripped from a model filename to make a tidy folder label.
 MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
@@ -162,14 +164,25 @@ def _short_value(value) -> str:
     return text[:24] + ("…" if len(text) > 24 else "")
 
 
-def _settings_fallback(params: dict) -> str:
+def _setting_detail(workflow_name: str | None, key: str, value) -> str:
+    pd = setting_definition(key, workflow_name)
+    lengths = value if isinstance(value, list) else [value]
+    if pd is not None and pd.rate and lengths and all(isinstance(frames, int)
+                                                      for frames in lengths):
+        shown = " + ".join(f"{seconds_for_frames(frames, pd.rate, pd):g} {pd.unit}"
+                           for frames in lengths)
+    else:
+        shown = _short_value(value)
+    return f"{setting_name(key)} {shown}"
+
+
+def _settings_fallback(params: dict, workflow_name: str | None) -> str:
     """A name for a prompt-less, otherwise-undistinguished settings group."""
     bits = []
     if "width" in params and "height" in params:
         bits.append(f"{params['width']}×{params['height']}")
-    for key in ("steps", "cfg"):
-        if key in params:
-            bits.append(f"{key} {params[key]}")
+    bits.extend(_setting_detail(workflow_name, key, params[key])
+                for key in ("steps", "cfg") if key in params)
     return ", ".join(bits) or "(default settings)"
 
 
@@ -187,7 +200,8 @@ def _distinguishing_keys(settings_list: list[dict]) -> set[str]:
     }
 
 
-def settings_label(params: dict, distinguishing_keys=()) -> str:
+def settings_label(params: dict, distinguishing_keys=(),
+                   workflow_name: str | None = None) -> str:
     """A short, human-readable description of a settings group.
 
     Leads with the positive prompt, then appends the settings that set this
@@ -198,9 +212,10 @@ def settings_label(params: dict, distinguishing_keys=()) -> str:
     headline = _prompt_headline(params)
     detail_keys = [k for k in sorted(distinguishing_keys) if k != "positive_prompt"]
     if detail_keys:
-        detail = ", ".join(f"{k} {_short_value(params.get(k))}" for k in detail_keys)
+        detail = ", ".join(_setting_detail(workflow_name, k, params.get(k))
+                           for k in detail_keys)
         return f"{headline} · {detail}" if headline else detail
-    return headline or _settings_fallback(params)
+    return headline or _settings_fallback(params, workflow_name)
 
 
 def _source_image_label(params: dict, image_index: dict) -> str:

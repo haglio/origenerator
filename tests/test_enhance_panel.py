@@ -786,7 +786,7 @@ def _share_painted(image, color) -> float:
     return painted / max(1, image.width() * image.height())
 
 
-def test_the_add_card_is_a_yellow_slab_you_cannot_miss(qtbot):
+def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
     from shared_ui.colors import AMBER
 
     versions = EnhanceVersions()
@@ -796,40 +796,26 @@ def test_the_add_card_is_a_yellow_slab_you_cannot_miss(qtbot):
     versions.show()
     QApplication.processEvents()
     (card,) = versions._host.findChildren(_AddRow)
-
-    assert _share_painted(card.grab().toImage(), AMBER) > 0.5
-
-
-def test_the_add_cards_words_are_dark_on_its_yellow(qtbot):
-    versions = EnhanceVersions()
-    qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
-    versions.resize(420, 600)
-    versions.show()
-    QApplication.processEvents()
-    (card,) = versions._host.findChildren(_AddRow)
     image = card.grab().toImage()
+    tile = card._picture.geometry()
+    beside = image.copy(tile.right() + 1, 0, image.width() - tile.right() - 1,
+                        image.height())
 
-    light = [(x, y) for y in range(image.height()) for x in range(image.width())
-             if min(image.pixelColor(x, y).getRgb()[:3]) > 200]
-    assert light == []
+    assert card._picture.size() == versions._rows[0]._picture.size()
+    assert _share_painted(image.copy(tile), AMBER) > 0.5
+    assert _share_painted(beside, AMBER) == 0
 
 
-def test_the_add_cards_plus_and_title_outsize_a_levels(qtbot):
+def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
-    versions.resize(420, 600)
-    versions.show()
-    QApplication.processEvents()
     (card,) = versions._host.findChildren(_AddRow)
     plus = card._picture.pixmap().toImage()  # drawn, like the bank's plus, not typed
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)
     assert inked >= card._picture.width() * card._picture.height() // 12
-    assert (card._title.fontMetrics().height()
-            > versions._rows[0]._title.fontMetrics().height())
 
 
 def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):

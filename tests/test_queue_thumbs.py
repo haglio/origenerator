@@ -89,6 +89,27 @@ def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path)
     assert follow.blue() > 0 and follow.red() == follow.blue()
 
 
+def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
+    frame = _picture(tmp_path / "frame.png", (255, 0, 0))
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+    as_made = source_pixmap(Combination(frame, recipe), CELL).toImage()
+    edited = source_pixmap(Combination(frame, recipe, recipe_prompt_edited=True),
+                           CELL).toImage()
+    drained = as_made.pixelColor(_middle_of_cell(1), CELL // 2)
+
+    recipe_at = [x for x in range(edited.width())
+                 if edited.pixelColor(x, CELL // 2) == drained]
+
+    assert recipe_at[0] > CELL + 1
+    assert _painted(edited, CELL, recipe_at[0])
+    assert _painted(edited, recipe_at[-1] + 1, block_width(CELL))
+
+
+def _painted(image, left, right):
+    return any(image.pixelColor(x, y).alpha() > 0
+               for x in range(left, right) for y in range(image.height()))
+
+
 def test_neither_half_on_disk_is_still_no_picture(qapp, tmp_path):
     assert source_pixmap(Combination(tmp_path / "gone.png", tmp_path / "also-gone.png"),
                          CELL) is None

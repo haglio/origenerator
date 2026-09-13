@@ -8563,6 +8563,23 @@ def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
     assert item.recipe_thumbnail == "thumbs/recipe.jpg"
 
 
+@pytest.mark.parametrize(("prompt", "stands_apart"), [("dance", False),
+                                                      ("dance in the rain", True)])
+def test_a_combine_whose_words_left_its_recipes_says_so_on_its_row(qtbot, prompt, stands_apart):
+    db = FakeDB([])
+    db.add(_row("recipe", "wan22_i2v", {"positive_prompt": "dance"}, "recipe.mp4",
+                thumbnail_path="thumbs/recipe.jpg"))
+    db.add(_row("rr1", "wan22_i2v",
+                {"positive_prompt": prompt, "input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]", recipe_video_id="recipe"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    assert item.recipe_prompt_edited is stands_apart
+
+
 def test_a_picked_act_shows_no_recipe_picture_at_all(qtbot):
     # The act names what the video will do, which is the whole of what was
     # chosen. The clip its recipe was mined out of answers a question nobody
@@ -9663,6 +9680,89 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
 
     preview = _front_panel(view)._preview
     assert preview._stack.currentWidget() is preview._combination
+
+
+def _combine_view_with_a_looping_recipe(qtbot, tmp_path):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    clip = str(_write_looping_webp(tmp_path / "vid_anim.webp"))
+    view.animated_preview = lambda row: clip
+    return view
+
+
+def _opened_combination(qtbot, tmp_path, intent=recipe_match.PLAYERS):
+    view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
+    view._combine._open_combination("img", "vid", intent=intent)
+    return view, _front_panel(view)
+
+
+def test_a_combination_opened_for_genau_has_its_recipe_in_parentheses_before_any_edit(
+        qtbot, tmp_path):
+    _view, panel = _opened_combination(qtbot, tmp_path, intent=recipe_match.GENAU)
+
+    assert not panel._preview._combination.open_paren_label.isHidden()
+
+
+@pytest.mark.parametrize(("key", "recipes", "edited"), [
+    ("positive_prompt", "dance", "dance in the rain"),
+    ("negative_prompt", "", "blurry"),
+])
+def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_prompt_differs(
+        qtbot, tmp_path, key, recipes, edited):
+    _view, panel = _opened_combination(qtbot, tmp_path)
+    parens = panel._preview._combination.open_paren_label
+    assert parens.isHidden()
+
+    panel._param_form.set_values({key: edited})
+    assert not parens.isHidden()
+
+    panel._param_form.set_values({key: recipes})
+    assert parens.isHidden()
+
+
+def test_a_run_from_an_edited_combination_keeps_its_recipe_in_parentheses_while_it_waits(
+        qtbot, tmp_path):
+    view, panel = _opened_combination(qtbot, tmp_path)
+    panel._param_form.set_values({"positive_prompt": "dance in the rain"})
+
+    panel._on_generate()
+
+    assert _reroll_tile(view)._made_from.recipe_prompt_edited
+    assert panel._live_source.recipe_prompt_edited
+
+
+def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_recipe_in_parentheses(
+        qtbot, tmp_path):
+    view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
+
+    view._combine._generate_combination("img", "vid", intent=recipe_match.GENAU)
+    view._select_reroll(next(iter(view._reroll_jobs)))  # its card on the shelf, clicked
+
+    assert _front_panel(view)._live_source.recipe_prompt_edited
+
+
+@pytest.mark.parametrize(("lane", "stands_apart"), [(recipe_match.PLAYERS, False),
+                                                    (recipe_match.GENAU, True)])
+def test_a_pressed_combine_stands_in_line_with_its_recipe_marked_as_its_run_will_be(
+        qtbot, tmp_path, monkeypatch, lane, stands_apart):
+    view = _combine_view(qtbot, tmp_path)
+    monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
+    _pick_lane(view._combine.panel, lane)
+
+    view._combine._on_generate("img", "vid")
+
+    (standing,) = view._combine.launching_rows()
+    assert standing.recipe_prompt_edited is stands_apart
+
+
+def test_changing_a_setting_other_than_the_prompt_leaves_the_clip_out_of_parentheses(
+        qtbot, tmp_path):
+    _view, panel = _opened_combination(qtbot, tmp_path)
+
+    panel._param_form.set_values({"seed": 7})
+
+    assert panel._preview._combination.open_paren_label.isHidden()
 
 
 @pytest.mark.parametrize(("slot_name", "prompt_id"), [("image_slot", "img"),

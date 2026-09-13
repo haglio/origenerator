@@ -131,8 +131,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     every show's versions from the rows the browser lists, so the three methods
     that built them here went. 267 -> 266: a folder tile's still of a combine's
     recipe clip and a config tab's loop of it are one "what this run was made
-    from", asked for once.)"""
+    from", asked for once. 266 -> 265: that answer compares the run's prompts
+    with its recipe's, so the lookup of the recipe row folds into it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 266
+               for x in _class_def(VIEW, "GalleryView").body) == 265
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 75

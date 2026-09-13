@@ -21,7 +21,7 @@ on a dropped image via the gallery's combine launch.
   image can say what it depicts without the user picking from the dropdown.
 
 Every tier is asked for one *intent* — the long-form video the satellite players
-show (:data:`PLAYERS`), or the short single-cycle loop Genau scrubs against the
+show (:data:`VIDEO`), or the short single-cycle loop Genau scrubs against the
 device's phase (:data:`GENAU`). The same act wants a different recipe for each, so
 the intent chooses both the overlay table consulted and, for ``GENAU``, narrows
 mining to videos a looping workflow made.
@@ -57,7 +57,7 @@ _CATEGORY_KEYWORDS = {
 # device's phase rather than played. Both are "an act on this image", so they share
 # every tier here; what differs is which overlay table is consulted and, for GENAU,
 # that only a looping workflow's videos can be mined.
-PLAYERS = "players"
+VIDEO = "video"
 GENAU = "genau"
 
 # Optional hand-tuned recipes, also overlay vocabulary: an act named here runs
@@ -70,12 +70,12 @@ GENAU = "genau"
 # One table per intent, because the key is the act alone: a single table could
 # hold either the act's long-form recipe or its loop, never both.
 _CURATED_BY_INTENT: dict[str, dict] = {
-    PLAYERS: _CONTENT.get("combine_recipes") or {},
+    VIDEO: _CONTENT.get("combine_recipes") or {},
     GENAU: _CONTENT.get("genau_recipes") or {},
 }
 
 
-def curated_recipe(category: str, intent: str = PLAYERS) -> dict | None:
+def curated_recipe(category: str, intent: str = VIDEO) -> dict | None:
     """The overlay's hand-tuned ``intent`` recipe for ``category``, else ``None``.
 
     A usable entry is a dict naming a ``workflow`` (its ``params`` dict holds
@@ -188,7 +188,7 @@ def category_for_prompt(prompt: str) -> str | None:
     return best
 
 
-def available_categories(video_rows, intent: str = PLAYERS) -> set[str]:
+def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     """The acts a picked dropdown entry can actually answer: those ``video_rows``
     holds at least one usable video of (a recipe can be mined), plus those the
     overlay curates an ``intent`` recipe for (nothing to mine — the recipe is
@@ -206,7 +206,7 @@ def available_categories(video_rows, intent: str = PLAYERS) -> set[str]:
                    for row in video_rows)}
 
 
-def best_recipe(category: str, video_rows, intent: str = PLAYERS) -> str | None:
+def best_recipe(category: str, video_rows, intent: str = VIDEO) -> str | None:
     """The prompt_id of the exemplar for ``category``'s best recipe, or ``None``.
 
     "Best" is the recipe (model + params) under the most of the user's videos of
@@ -301,7 +301,7 @@ def _post_chat(base_url: str, model: str, messages: list, timeout: float) -> dic
 
 def smart_recipe(category: str, image_scene: str, video_rows, *, base_url: str,
                  model: str, system_prompt: str, timeout: float = 20.0,
-                 intent: str = PLAYERS) -> str | None:
+                 intent: str = VIDEO) -> str | None:
     """The prompt_id of the recipe whose starting scene best fits the dropped image,
     or ``None`` when there's nothing to pick or the model can't decide.
 

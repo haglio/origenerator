@@ -22,7 +22,7 @@ def _panel(qtbot):
 
 def _pick_act(panel, act):
     """Choose an act in the dropdown, as a click on its row would; "" is the
-    neutral "-" and so is an act the list does not carry."""
+    neutral "(custom)" and so is an act the list does not carry."""
     index = panel._category.findText(act)
     panel._category.setCurrentIndex(index if index >= 1 else 0)
 
@@ -30,7 +30,7 @@ def _pick_act(panel, act):
 def _pick_lane(panel, intent):
     """Click the lane's radio; the group's exclusivity releases the other."""
     radio = (panel._genau_radio if intent == recipe_match.GENAU
-             else panel._players_radio)
+             else panel._video_radio)
     radio.setChecked(True)
 
 
@@ -101,7 +101,7 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "delta", recipe_match.PLAYERS)]
+    assert opened == [("img1", "delta", recipe_match.VIDEO)]
 
 
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
@@ -120,11 +120,11 @@ def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     assert panel.video_slot._label.property("dragActive") is False
 
 
-def test_neutral_option_is_a_dash_leading_the_acts(qtbot):
+def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     panel = _panel(qtbot)
     assert panel.selected_category() == ""  # neutral by default
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
-    assert items[0] == "-"                              # the neutral choice is a dash, not a prompt
+    assert items[0] == "(custom)"
     assert items[1:] == list(recipe_match.CATEGORIES)   # the six acts follow it
 
 
@@ -140,7 +140,7 @@ def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
     assert _enabled(panel, "beta") and _enabled(panel, "epsilon")
     assert not _enabled(panel, "gamma")  # nothing in the gallery to build a recipe from
     assert not _enabled(panel, "dancing")
-    assert _enabled(panel, "-")            # the neutral option always stays pickable
+    assert _enabled(panel, "(custom)")     # the neutral option always stays pickable
 
 
 def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
@@ -198,7 +198,7 @@ def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
 
     panel.video_slot.set_item("vid1")
 
-    assert panel.selected_category() == ""          # a dropped video wipes the act back to "-"
+    assert panel.selected_category() == ""          # a dropped video wipes the act back to "(custom)"
     assert panel.video_slot.current_id() == "vid1"  # ...and the video is what's kept
 
 
@@ -222,18 +222,19 @@ def test_generate_emits_the_picked_act(qtbot):
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "delta", recipe_match.PLAYERS)]
+    assert cats == [("img1", "delta", recipe_match.VIDEO)]
 
 
-# --- the players/Genau radio: what the result is for --------------------------
+# --- the Video/Genau radio: what the result is for ----------------------------
 
 
-def test_the_lane_defaults_to_players(qtbot):
+def test_the_lane_defaults_to_video(qtbot):
     # The long-standing behavior of this panel, and by far the more common ask, so
     # the Genau clip is the deliberate detour rather than the default.
     panel = _panel(qtbot)
-    assert panel.selected_intent() == recipe_match.PLAYERS
-    assert panel._players_radio.isChecked()
+    assert panel.selected_intent() == recipe_match.VIDEO
+    assert panel._video_radio.text() == "Video"
+    assert panel._video_radio.isChecked()
     assert not panel._genau_radio.isChecked()
 
 
@@ -267,8 +268,8 @@ def test_switching_the_lane_announces_it_once(qtbot):
     _pick_lane(panel, recipe_match.GENAU)
     assert heard == [recipe_match.GENAU]
 
-    _pick_lane(panel, recipe_match.PLAYERS)
-    assert heard == [recipe_match.GENAU, recipe_match.PLAYERS]
+    _pick_lane(panel, recipe_match.VIDEO)
+    assert heard == [recipe_match.GENAU, recipe_match.VIDEO]
 
 
 def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
@@ -277,7 +278,7 @@ def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
-    # An act the players' lane answers happily can still have no loop under it, so
+    # An act the video lane answers happily can still have no loop under it, so
     # the greyed-out reason has to name which lane it is talking about.
     assert "looping" in reason.lower()
 

@@ -44,7 +44,7 @@ class FakePanel:
         self.preview = preview
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
-        self.intent = recipe_match.PLAYERS
+        self.intent = recipe_match.VIDEO
         self.category = ""
         self.available = None
         self.visible = None
@@ -584,7 +584,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller.panel.category_requested.emit("img", "waving", recipe_match.PLAYERS)
+    controller.panel.category_requested.emit("img", "waving", recipe_match.VIDEO)
 
     assert controller.launching_rows() == []
 

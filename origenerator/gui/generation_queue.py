@@ -86,7 +86,7 @@ from origenerator.timing import RunTiming
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
-from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.colors import BLUE
 
 # The strip's opening height, its floor, and so the widest the live thumbnail
 # ever gets: it takes the lower-left corner whole, being the one thing here worth
@@ -553,14 +553,6 @@ class GenerationQueue(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        # An explicit hairline rather than a stylesheet border: the app paints
-        # every plain widget one flat color, and a border drawn under a child's
-        # own background disappears into it. This one is a widget of its own, so
-        # it is there whatever is laid out beneath it.
-        rule = QFrame()
-        rule.setFixedHeight(1)
-        rule.setStyleSheet(f"background-color: {BORDER_SUBTLE.name()};")
-        outer.addWidget(rule)
 
         layout = QHBoxLayout()
         # Flush at the left and both ends, so the live frame fills the strip's

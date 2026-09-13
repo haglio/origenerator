@@ -179,19 +179,19 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
     assert preview._caption.isHidden()  # the plain line stands down for the bar
 
 
-def test_the_thumbnail_fills_the_strips_lower_left_corner(queue):
+def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_corner(queue):
     # The live frame is what the left half is for, so it takes the biggest square
-    # the strip has room for — its height under the top rule — right into its
-    # corner.
+    # the strip has room for, right into its corner. The splitter handle above
+    # the strip is its top border, so no line of the strip's own sits over it.
     from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running")])
     QApplication.processEvents()
     frame = queue._running._frame
-    corner = frame.mapTo(queue, frame.rect().bottomLeft())
+    top_left = frame.mapTo(queue, frame.rect().topLeft())
 
-    assert frame.width() == frame.height() == queue.height() - 1
-    assert (corner.x(), corner.y()) == (0, queue.height() - 1)
+    assert frame.width() == frame.height() == queue.height()
+    assert (top_left.x(), top_left.y()) == (0, 0)
 
 
 def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
@@ -214,17 +214,6 @@ def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
 
     assert queue.minimumHeight() == _STRIP_HEIGHT
     assert queue.maximumHeight() > _STRIP_HEIGHT  # not pinned to its opening height
-
-
-def test_the_strip_carries_its_own_top_rule(queue):
-    # A stylesheet border under a child's own background disappears into the flat
-    # color the app paints everything; this one is a widget of its own.
-    from PyQt6.QtWidgets import QFrame
-
-    rules = [w for w in queue.findChildren(QFrame)
-             if w.height() == 1 and w.parent() is queue]
-    assert len(rules) == 1
-    assert rules[0].y() == 0
 
 
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):

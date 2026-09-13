@@ -429,6 +429,7 @@ class GalleryView(QWidget):
         # second one said into that wait is refused rather than queued twice
         # (:meth:`_already_genaud`). Only until the launch is a row.
         self._live_ids: set[str] = set()  # the gallery's own rows, minus the trash
+        self._listed_rows: list[dict] = []
         self._image_index: dict | None = None  # memo, dropped by every rebuild
 
     def _build_the_panes(self, db, client, search_expander):
@@ -1767,6 +1768,7 @@ class GalleryView(QWidget):
         # folders has to see every image whichever way the ticks stand.
         media_types = self.media_types()
         listed = gallery.rows_of_media_types(rows, media_types)
+        self._listed_rows = listed
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`).
@@ -1807,7 +1809,7 @@ class GalleryView(QWidget):
         self._browser.set_model(
             gallery.recent_generations(listed),
             starred_by_side,
-            gallery.starred_generations(listed),
+            listed,
             unreviewed,
             held,
             requested,
@@ -3916,11 +3918,19 @@ class GalleryView(QWidget):
             self._enhance.enhance_items([prompt_id])
 
     def set_items_starred(self, prompt_ids, starred: bool):
-        """Star or unstar the given generations, then rebuild so their tiles pick
-        up (or drop) the corner star — mirroring how a folder star refreshes."""
         for pid in prompt_ids:
             self._db.set_generation_starred(pid, starred)
-        self.refresh()
+        ids = set(prompt_ids)
+        for row in self._listed_rows:
+            if row["prompt_id"] in ids:
+                row["starred"] = 1 if starred else 0
+        if _base_of(self.selected_folder_key() or "") == _STARRED_KEY:
+            self._browser.show_shelf(_STARRED_KEY, self.side_in_view())
+        else:
+            self._browser.refresh_corners()
+        self._info_tabs.reconcile_previews(self._live_ids)
+        if ids & self._browser.selected_ids:
+            self._re_aim()
 
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked.

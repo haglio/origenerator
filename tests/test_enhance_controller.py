@@ -105,7 +105,7 @@ class FakeBrowser:
     def show_enhancing(self, by_prompt):
         self.enhancing = dict(by_prompt)
 
-    def refresh_enhance_corners(self):
+    def refresh_corners(self):
         self.corner_refreshes += 1
 
 

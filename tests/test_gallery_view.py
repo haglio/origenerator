@@ -2196,7 +2196,7 @@ def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
-    assert view.visible_prompt_ids() == []  # gone from the shelf after the rebuild
+    assert view.visible_prompt_ids() == []  # gone from the shelf at once
 
 
 def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
@@ -2432,7 +2432,7 @@ def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeyp
 
     assert db.get_generation("i1")["starred"]                # persisted
     assert view._browser.showing_recents()                           # still on the shelf
-    assert view._browser._thumb_widgets["i1"]._starred is True    # tile updated on rebuild
+    assert view._browser._thumb_widgets["i1"]._starred is True    # the tile takes the star at once
 
 
 def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_path, monkeypatch):
@@ -3235,7 +3235,7 @@ def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
     view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.STAR)
 
     assert db.get_generation("i2")["starred"]
-    assert view._browser._thumb_widgets["i2"]._starred is True   # redrawn on the rebuild
+    assert view._browser._thumb_widgets["i2"]._starred is True   # the tile takes the star at once
     assert not db.get_generation("i1").get("starred")
 
 
@@ -3250,6 +3250,49 @@ def test_a_starred_tiles_star_corner_takes_the_bookmark_away(qtbot):
     view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
 
     assert not db.get_generation("i1")["starred"]
+
+
+def test_a_star_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    rebuilds = []
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: rebuilds.append(rows))
+
+    view.star_generation("i1")
+
+    assert db.get_generation("i1")["starred"]
+    assert view._browser._thumb_widgets["i1"]._starred is True
+    assert rebuilds == []
+
+
+def test_unstarring_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=2)
+    db.set_generation_starred("g0", True)
+    view = GalleryView(db, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
+    assert view.visible_prompt_ids() == ["g0"]
+
+    view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.STAR)
+
+    assert view.visible_prompt_ids() == []
+
+
+def test_starring_the_picked_items_turns_the_star_button_to_unstar(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._browser._thumbnail_clicked("i1")
+    assert view._bank.star.toolTip() == "Star 1 item"
+
+    view._bank.star.click()
+
+    assert view._bank.star.toolTip() == "Unstar 1 item"
 
 
 def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
@@ -4831,7 +4874,7 @@ def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
     view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
 
     assert db.get_generation("i1")["starred"]           # persisted
-    assert view._browser._thumb_widgets["i1"]._starred is True  # tile updated on rebuild
+    assert view._browser._thumb_widgets["i1"]._starred is True  # the tile takes the star at once
 
 
 def test_right_click_unstar_clears_a_starred_thumbnail(qtbot, monkeypatch):

@@ -93,6 +93,18 @@ def test_clear_on_an_empty_slot_does_not_notify(qtbot):
     assert seen == []  # idempotent: nothing to clear, no spurious change
 
 
+def test_clicking_a_filled_slot_goes_to_its_item_and_keeps_it(qtbot):
+    slot = _slot(qtbot)
+    _drop(slot, "img1")
+    went = []
+    slot.activated.connect(went.append)
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert went == ["img1"]
+    assert slot.current_id() == "img1"
+
+
 def test_a_video_preview_animates(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp))

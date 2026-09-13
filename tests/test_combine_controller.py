@@ -54,6 +54,7 @@ class FakePanel:
         self.open_requested = _Signal()
         self.open_category_requested = _Signal()
         self.intent_changed = _Signal()
+        self.item_activated = _Signal()
 
     def selected_intent(self):
         return self.intent
@@ -213,6 +214,9 @@ class FakeHost:
 
     def reveal_launch(self, key):
         self.revealed.append(key)
+
+    def follow_link(self, prompt_id):
+        pass
 
     def ask_which_seed(self, workflow, *, can_reroll_image):
         self.asked.append(can_reroll_image)

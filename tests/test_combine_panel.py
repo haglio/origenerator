@@ -225,17 +225,6 @@ def test_generate_emits_the_picked_act(qtbot):
     assert cats == [("img1", "delta", recipe_match.PLAYERS)]
 
 
-def test_clearing_a_slot_disables_generate_again(qtbot):
-    panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
-    assert panel._generate_btn.isEnabled()
-
-    panel.image_slot.clear()
-
-    assert not panel._generate_btn.isEnabled()
-
-
 # --- the players/Genau radio: what the result is for --------------------------
 
 

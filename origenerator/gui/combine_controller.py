@@ -256,9 +256,8 @@ class CombineController(QObject):
         they did — so the stand-in row would have appeared only once the work it
         was standing in for was already over.
         """
-        key = self._show_launching(image_id, video_id=video_id)
-
         intent = self.panel.selected_intent()
+        key = self._show_launching(image_id, video_id=video_id, intent=intent)
 
         def run():
             try:
@@ -288,7 +287,8 @@ class CombineController(QObject):
         defer(self, work)
 
     def _show_launching(self, image_id: str, *, category: str = "",
-                        video_id: str | None = None) -> str:
+                        video_id: str | None = None,
+                        intent: str = recipe_match.PLAYERS) -> str:
         """Put a stand-in row at the back of the line for a Generate just pressed,
         and return its key.
 
@@ -306,6 +306,12 @@ class CombineController(QObject):
         key = f"launching-{self._launch_seq}"
         image_row = self._db.get_generation(image_id) or {}
         video_row = self._db.get_generation(video_id) if video_id else None
+        built = (self._combined_params(image_id, video_id, intent)
+                 if video_id and not category else None)
+        edited = False
+        if built is not None:
+            workflow, params, recipe_row, _image_row = built
+            edited = gallery.prompts_differ_from(params, recipe_row, workflow)
         self._launching[key] = InFlightItem(
             key=key,
             caption="A video from Combine, still being started",
@@ -318,6 +324,7 @@ class CombineController(QObject):
             # The same rule the finished row follows: a picked act names itself in
             # the text, and only a dropped video is shown.
             recipe_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
+            recipe_prompt_edited=edited,
             source_image=gallery.output_file_reference(
                 gallery.row_output_files(image_row)),
             starting=True,

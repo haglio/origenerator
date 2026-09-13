@@ -22,7 +22,8 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           progress=None, reveal=None, cancel=None, foreign_ahead=None, held=False,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
-          recipe_category="", recipe_thumbnail=None, starting=False):
+          recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
+          starting=False):
     return InFlightItem(key=key, caption=caption, status=status, frame=frame,
                         reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
                         foreign_ahead=foreign_ahead, held=held, started_at=started_at,
@@ -30,7 +31,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
                         recipe_category=recipe_category, recipe_thumbnail=recipe_thumbnail,
-                        starting=starting)
+                        recipe_prompt_edited=recipe_prompt_edited, starting=starting)
 
 
 def _picture(path, color=(0, 0, 255)):
@@ -954,6 +955,15 @@ def test_a_combine_row_keeps_its_recipe_while_the_frame_is_still_rendering(queue
                            recipe_thumbnail=recipe,
                            folder_thumbnails=(_picture(tmp_path / "mate.png"),))])
     assert queue.rows()[0]._thumbs._showing == ("source", Combination(None, recipe))
+
+
+def test_a_combine_row_whose_prompt_was_edited_draws_its_recipe_in_parentheses(queue,
+                                                                                tmp_path):
+    frame = _picture(tmp_path / "frame.png")
+    recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
+    queue.set_items([_item(job_kind="I2V", source_image=frame, recipe_thumbnail=recipe,
+                           recipe_prompt_edited=True)])
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame, recipe, True))
 
 
 def test_a_row_that_is_not_a_job_yet_says_so(queue):

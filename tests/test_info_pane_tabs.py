@@ -544,12 +544,13 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
     assert panel._preview.show_combination.call_count == 1
 
 
-def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs):
+@pytest.mark.parametrize("made_from", [Combination(), Combination(recipe_prompt_edited=True)])
+def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
     # A text-to-video has no picture to stand, so the words are all there is.
     panel = tabs.currentWidget()
     panel._preview.show_message = MagicMock()
 
-    panel.watch_folder("k", None, None, Combination())
+    panel.watch_folder("k", None, None, made_from)
 
     panel._preview.show_message.assert_called_once_with("Waiting for preview…", live=True)
 

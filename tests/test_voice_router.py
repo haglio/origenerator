@@ -500,6 +500,18 @@ def test_a_spoken_number_puts_a_dial_where_it_says(router):
     assert motion.amplitude == 70
 
 
+def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
+    motion = FakeMotion()
+    voice, _host, shows = router(motion=motion)
+
+    voice.become_hosted()
+    voice.on_command(AppCommand.SPEED_UP)
+    voice.on_command(DialSetting("amp", 70))
+
+    assert (motion.speed, motion.amplitude) == (40, 50)
+    assert shows.answers == ["🎤 the motion is the session's here"] * 2
+
+
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
     # Its tip already says what it will do to what is in front of you, which is
     # what a speaker who is not looking at the bank needs told back.

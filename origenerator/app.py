@@ -662,13 +662,18 @@ def main(argv: list[str] | None = None) -> int:
         # in the Z-order, and unpumped that lands *after* the request below and
         # undoes it.
         app.processEvents()
+    offer = None
     if fun_time is None:
         # Hosted, the session decides what is in front — this window is parked
         # until the satellites switch to origenerator mode, and asking for the
         # foreground here would pull it over the room mid-boot.
         _bring_to_front(window)
+        from origenerator.gui.fun_time_offer import FunTimeOffer
+        offer = FunTimeOffer(STATE_DIR, take_over=window.become_hosted)
 
     exit_code = app.exec()
+    if offer is not None:
+        offer.withdraw()
     client.stop()
     client.wait(3000)
     return exit_code

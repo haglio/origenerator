@@ -174,6 +174,11 @@ class InfoPaneTabs(QTabWidget):
         if callable(refresh):
             refresh()
 
+    def become_hosted(self, session) -> None:
+        self._fun_time = session
+        for panel in self.config_panels():
+            panel.become_hosted(session)
+
     def config_panels(self) -> list[GenerateConfigPanel]:
         """Every open config panel, in tab order."""
         return [

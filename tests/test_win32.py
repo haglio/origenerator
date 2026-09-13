@@ -1,6 +1,7 @@
 """Tests for origenerator.win32 taskbar identity and foreground helpers."""
 from __future__ import annotations
 
+import time
 from unittest.mock import call, patch
 
 import pytest
@@ -9,6 +10,7 @@ from origenerator.win32 import (
     force_foreground_window,
     raise_window_without_activating,
     stamp_pinned_shortcuts,
+    this_process_creation_time,
     window_exists,
 )
 
@@ -189,3 +191,14 @@ class TestRaiseWindowWithoutActivating:
             assert raise_window_without_activating(111) is False
 
         user32.SetWindowPos.assert_not_called()
+
+
+def test_this_process_was_created_in_filetime_ticks_before_now():
+    ticks_per_second = 10_000_000
+    seconds_from_1601_to_1970 = 11_644_473_600
+    now = int((time.time() + seconds_from_1601_to_1970) * ticks_per_second)
+
+    created = this_process_creation_time()
+
+    assert 0 < now - created < 24 * 3600 * ticks_per_second
+    assert this_process_creation_time() == created

@@ -78,16 +78,16 @@ def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):
     # vertical stack: generate tabs on top, the tree-and-browser row under them,
     # the queue across the foot.
     view = _fun_time_view(qtbot)
-    stack = view._stack
+    stack = view._arrangement.stack
     assert isinstance(stack, QSplitter)
     assert stack.orientation() == Qt.Orientation.Vertical
     assert stack.count() == 3
     # Top floor: the info-pane wrapper (tabs + the find bar).
     assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
     # Middle floor: the tree beside the browser.
-    assert stack.widget(1) is view._panes
-    assert view._panes.count() == 2
-    assert view._panes.widget(1) is view._folder_panes
+    assert stack.widget(1) is view._arrangement.panes
+    assert view._arrangement.panes.count() == 2
+    assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
     # The lowest row: the queue, spanning the tree's width too.
     assert stack.widget(2) is view._queue
 
@@ -99,7 +99,7 @@ def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
     view.resize(600, 900)
     view.show()
     qtbot.waitExposed(view)
-    toc = view._panes.widget(0)
+    toc = view._arrangement.panes.widget(0)
     corner = view._queue.mapTo(view, view._queue.rect().bottomLeft())
     tree_foot = toc.mapTo(view, toc.rect().bottomLeft())
     assert tree_foot.y() < corner.y()  # the tree ends before the rect does
@@ -115,7 +115,7 @@ def test_fun_time_gallery_has_no_collapse_toggle_on_its_left_pane(qtbot):
     wants the room."""
     view = _fun_time_view(qtbot)
     assert not hasattr(view, "_toc_toggle")
-    assert view._panes.isCollapsible(0)
+    assert view._arrangement.panes.isCollapsible(0)
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
@@ -123,11 +123,11 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
     with the tree inside that column rather than out on the window's edge."""
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert view._panes.count() == 2
-    assert view._panes.widget(0) is view._left_column
+    assert view._arrangement.panes.count() == 2
+    assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     # The second pane is the info-pane wrapper (tabs + the find bar).
-    assert view._panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
-    assert view._folder_panes.count() == 2  # the tree, then the browser
+    assert view._arrangement.panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
 
 
 def _open_slideshow(view, monkeypatch, tmp_path, name, width, height, count=1):
@@ -959,6 +959,139 @@ def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
 
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
     assert panel._media_split.indexOf(panel._preview) == 0
+
+
+def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_form(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
+
+    panel = GenerateConfigPanel(None, FakeDB([]))
+    qtbot.addWidget(panel)
+    panel._preview._pixmap = QPixmap(400, 900)
+    panel._reflow_for_the_media()
+
+    panel.become_hosted(_session())
+
+    assert panel._media_split.orientation() == Qt.Orientation.Horizontal
+    assert panel._media_split.indexOf(panel._scroll) == 0
+
+
+def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.info_pane_tabs import InfoPaneTabs
+
+    tabs = InfoPaneTabs(None, FakeDB([]))
+    qtbot.addWidget(tabs)
+    first = tabs.currentWidget()
+    first._preview._pixmap = QPixmap(400, 900)
+
+    tabs.become_hosted(_session())
+    later = tabs._add_subtab()
+    later._preview._pixmap = QPixmap(400, 900)
+    later.refresh_media_layout()
+
+    assert first._media_split.orientation() == Qt.Orientation.Horizontal
+    assert later._media_split.orientation() == Qt.Orientation.Horizontal
+
+
+def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+
+    view.become_hosted(_session())
+
+    built = _fun_time_view(qtbot)
+    assert (view._bank.audio, view._bank.mic, view._bank.drive) == (None, None, None)
+    assert (view._osr2_motion, view._osr2_driver, view._motion_panel) == (None, None, None)
+    stack = view._arrangement.stack
+    assert stack.orientation() == Qt.Orientation.Vertical
+    assert stack.count() == built._arrangement.stack.count() == 3
+    assert stack.widget(0).findChild(type(view._info_tabs)) is view._info_tabs
+    assert stack.widget(1) is view._arrangement.panes
+    assert stack.widget(2) is view._queue
+    assert view._arrangement.panes.count() == built._arrangement.panes.count()
+    assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
+    assert view._arrangement.folder_panes.count() == built._arrangement.folder_panes.count()
+
+
+def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
+    from tests.test_gallery_view import _FakeAmbientAudio, _SignalMotion
+
+    bed, motion = _FakeAmbientAudio(), _SignalMotion()
+    view = GalleryView(FakeDB([]), ambient_audio=bed, osr2_motion=motion)
+    qtbot.addWidget(view)
+    view._bank.audio.setChecked(True)
+    view._bank.drive.setChecked(True)
+    view._bank.mic.setChecked(True)
+    listener = view._voice.listener
+    assert motion.active and listener.commands_on
+
+    view.become_hosted(_session())
+
+    assert bed.stops == 1
+    assert not motion.active
+    assert not listener.commands_on
+
+
+def test_a_gallery_taken_into_a_session_opens_its_next_show_on_a_region(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+
+    view.become_hosted(_session())
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+
+    show = view.region_show("portrait")
+    assert show is not None
+    qtbot.addWidget(show)
+    assert show.windowTitle() == "Origenerator Portrait"
+
+
+def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):
+    from origenerator.voice.app_commands import AppCommand
+    from tests.test_gallery_view import _SignalMotion
+
+    motion = _SignalMotion()
+    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    qtbot.addWidget(view)
+
+    view.become_hosted(_session())
+    view._voice.on_command(AppCommand.SPEED_UP)
+
+    assert [call for call in motion.calls if isinstance(call, tuple) and call[0] == "speed"] == []
+
+
+def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions(qtbot, monkeypatch):
+    from PyQt6.QtCore import QCoreApplication, QEvent
+
+    from origenerator.voice.app_commands import AppCommand
+
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    answers = []
+    monkeypatch.setattr(view._shows, "answer", answers.append)
+
+    view.become_hosted(_session())
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    for word in (AppCommand.AUDIO_ON, AppCommand.DRIVE_ON, AppCommand.MIC_OFF):
+        view._voice.on_command(word)
+
+    assert answers == [f"🎤 {name} is the session's here"
+                       for name in ("the audio bed", "the OSR2", "the mic")]
+
+
+def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    tab = view._info_tabs.current_config_panel()
+    tab._preview._pixmap = QPixmap(400, 900)
+
+    view.become_hosted(_session())
+
+    assert tab._media_split.orientation() == Qt.Orientation.Horizontal
 
 
 def test_standalone_never_stands_them_side_by_side(qtbot):

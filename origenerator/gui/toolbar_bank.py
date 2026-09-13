@@ -265,6 +265,18 @@ class ToolbarBank(QWidget):
             self._groups.append((gap, buttons))
         self._show_the_gaps()
 
+    def become_hosted(self) -> None:
+        removed = [button for button in (self.audio, self.mic, self.drive)
+                   if button is not None]
+        for button in removed:
+            self.layout().removeWidget(button)
+            button.hide()
+            button.deleteLater()
+        self.audio = self.mic = self.drive = None
+        self._groups = [(gap, tuple(b for b in buttons if b not in removed))
+                        for gap, buttons in self._groups]
+        self._show_the_gaps()
+
     def apply(self, state: BankState) -> None:
         """Write the whole bank from one state, then re-space the groups.
 

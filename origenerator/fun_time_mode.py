@@ -17,6 +17,7 @@ the channels — lives in :mod:`origenerator.gui.fun_time_bridge`.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -175,19 +176,40 @@ def region_for_items(items) -> str:
     return side
 
 
+def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
+    if not args.fun_time:
+        return None
+    return FunTimeSession(
+        main_rect=_rect(args, ""),
+        portrait_rect=_rect(args, "portrait_"),
+        landscape_rect=_rect(args, "landscape_"),
+        command_file=args.command_file,
+        paused_file=args.paused_file,
+        status_file=args.status_file,
+        dashboard_cmd_file=args.dashboard_cmd_file,
+    )
+
+
 def parse_app_args(argv: list[str]) -> AppArgs:
     """The launch contract, parsed.  ``argv`` excludes the program name."""
     args = build_parser().parse_args(argv)
-    session = None
-    if args.fun_time:
-        session = FunTimeSession(
-            main_rect=_rect(args, ""),
-            portrait_rect=_rect(args, "portrait_"),
-            landscape_rect=_rect(args, "landscape_"),
-            command_file=args.command_file,
-            paused_file=args.paused_file,
-            status_file=args.status_file,
-            dashboard_cmd_file=args.dashboard_cmd_file,
-        )
-    return AppArgs(fun_time=session, taskbar_identity=args.taskbar_identity,
+    return AppArgs(fun_time=_session_of(args), taskbar_identity=args.taskbar_identity,
                    check_launch=args.check_launch)
+
+
+OFFER_NAME = "fun_time_offer.txt"
+TAKEOVER_NAME = "fun_time_takeover.json"
+
+
+def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:
+    takeover = state_dir / TAKEOVER_NAME
+    try:
+        asked = json.loads(takeover.read_text(encoding="utf-8"))
+        if asked["pid"] != pid:
+            return None
+        args, unknown = build_parser().parse_known_args(asked["args"])
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+    finally:
+        takeover.unlink(missing_ok=True)
+    return None if unknown else _session_of(args)

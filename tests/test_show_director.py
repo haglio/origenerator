@@ -465,6 +465,18 @@ def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):
     assert director._reroll.holds == [True, True]
 
 
+def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regions(shows):
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.become_hosted(FakeSession())
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    assert made[0].closes == 1
+    assert director.region_show(PORTRAIT) is made[1]
+    assert made[1].fullscreen == 0
+
+
 def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     # Asked of each show's OWN location rather than of the browser, which has
     # usually moved on by the time a generation lands.

@@ -61,12 +61,15 @@ model, where the honest shrug only leaves it listed.
 This app runs two ways — on its own, and hosted inside a Fun Time session as one
 of the room's managed windows — so anything added here that the session touches
 has a matching half over there, and the two are one piece of work rather than a
-feature and a follow-up. Three shapes it takes: a verb in
+feature and a follow-up. Four shapes it takes: a verb in
 `gui/fun_time_bridge.py` (answered by fun_time's dispatch table and its loop
 branches), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
-`fun_time/tests/test_command_registry.py` holds the dispatcher to), and the
+`fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
-`windows_bridge_sequencer.py`).
+`windows_bridge_sequencer.py`), and the offer and takeover files a standalone
+window is taken into a session through (`fun_time_mode.py` here,
+`standalone_origenerator.py` there) — renamed on one side only, every session
+quietly launches a second copy beside the one already open.
 
 One-sided, none of them fails loudly. The console's enhanced-only switch shipped
 on the shared side with nothing on fun_time's side answering the verb it posts,

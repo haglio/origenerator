@@ -60,6 +60,16 @@ def test_the_device_switch_is_absent_where_the_app_may_not_touch_it(bank):
     assert bank(device=False).drive is None
 
 
+def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
+    taken = bank()
+    built_hosted = bank(hosted=True, device=False)
+
+    taken.become_hosted()
+
+    assert taken.audio is None and taken.mic is None and taken.drive is None
+    assert taken.layout().count() == built_hosted.layout().count()
+
+
 def test_the_bank_opens_with_its_optional_buttons_away(bank):
     # A loop runs until it is stopped, so Auto is never hidden; the slideshow and
     # the grouping are offered only where they mean something.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 
 import pytest
@@ -844,3 +845,44 @@ def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, t
 def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
     # Nothing to wire: no command file to poll, no status to publish.
     assert _window(qtbot, tmp_path).findChildren(FunTimeBridge) == []
+
+
+def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert [bridge.parent() for bridge in win.findChildren(FunTimeBridge)] == [win]
+    assert win._gallery_view._fun_time is not None
+
+
+def test_the_standalone_geometry_is_kept_through_a_session_that_took_the_window(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.setGeometry(100, 120, 900, 700)
+    standalone = base64.b64encode(bytes(win.saveGeometry())).decode("ascii")
+
+    win.become_hosted(_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("window_geometry") == standalone
+
+
+def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    view = win._gallery_view
+    view.set_audio_enabled(True)
+    view.set_osr2_enabled(True)
+    view.set_mic_enabled(True)
+
+    win.become_hosted(_fun_time_session())
+    win.close()
+
+    saved = AppState(path)
+    assert [saved.get(key) for key in ("audio_enabled", "osr2_enabled", "mic_enabled")] == [
+        True, True, True]

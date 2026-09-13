@@ -798,6 +798,10 @@ class GenerateConfigPanel(QWidget):
         """
         self._reflow_for_the_media()
 
+    def become_hosted(self, session) -> None:
+        self._fun_time = session
+        self._reflow_for_the_media()
+
     def _reflow_for_the_media(self) -> None:
         """Stand the picture beside the settings when it is a PORTRAIT one.
 

@@ -878,7 +878,7 @@ def test_search_stays_applied_across_a_rebuild(qtbot):
 def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    toc = view._folder_panes.widget(0)
+    toc = view._arrangement.folder_panes.widget(0)
     assert isinstance(view._search.field, QLineEdit)
     assert toc.isAncestorOf(view._search.field)
     # it leads the pane, above the tree it searches across.
@@ -4060,23 +4060,23 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     qtbot.addWidget(view)
 
     # Every divider drag-resizes, and none of the panes can be dragged shut.
-    for splitter in (view._panes, view._folder_panes, view._left_column):
+    for splitter in (view._arrangement.panes, view._arrangement.folder_panes, view._arrangement.left_column):
         assert isinstance(splitter, QSplitter)
         assert not splitter.childrenCollapsible()
     # The TOC and browser panes sit side by side...
-    assert view._folder_panes.count() == 2
-    assert view._folder_panes.widget(0).isAncestorOf(view._tree)
-    assert view._folder_panes.widget(1).isAncestorOf(view._scroll)
+    assert view._arrangement.folder_panes.count() == 2
+    assert view._arrangement.folder_panes.widget(0).isAncestorOf(view._tree)
+    assert view._arrangement.folder_panes.widget(1).isAncestorOf(view._scroll)
     # ...with the queue strip under both of them, and the info pane beside the
     # whole column at full height — the strip is the folders' foot, not the
     # window's.
-    assert view._left_column.count() == 2
-    assert view._left_column.widget(0) is view._folder_panes
-    assert view._left_column.widget(1) is view._queue
-    assert view._panes.count() == 2
-    assert view._panes.widget(0) is view._left_column
-    assert view._panes.widget(1).isAncestorOf(_preview_of(view))
-    assert not view._panes.widget(1).isAncestorOf(view._queue)
+    assert view._arrangement.left_column.count() == 2
+    assert view._arrangement.left_column.widget(0) is view._arrangement.folder_panes
+    assert view._arrangement.left_column.widget(1) is view._queue
+    assert view._arrangement.panes.count() == 2
+    assert view._arrangement.panes.widget(0) is view._arrangement.left_column
+    assert view._arrangement.panes.widget(1).isAncestorOf(_preview_of(view))
+    assert not view._arrangement.panes.widget(1).isAncestorOf(view._queue)
 
 
 def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
@@ -4088,8 +4088,8 @@ def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
     # join it: too high and the drag stops while there is still room to give, too
     # low and the settings scroll sideways.
     panel = view._info_tabs.current_config_panel()
-    assert view._panes.widget(1).minimumWidth() == 0
-    assert view._panes.widget(1).minimumSizeHint().width() >= panel.minimumSizeHint().width()
+    assert view._arrangement.panes.widget(1).minimumWidth() == 0
+    assert view._arrangement.panes.widget(1).minimumSizeHint().width() >= panel.minimumSizeHint().width()
     assert panel.minimumSizeHint().width() == panel._contents_floor()
 
 
@@ -4105,7 +4105,7 @@ def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
     assert isinstance(view._info_tabs, QTabWidget)
     # The pane is the tabs plus the find strip that searches them, so the splitter
     # holds a wrapper rather than the tab widget itself.
-    assert view._panes.widget(1).isAncestorOf(view._info_tabs)
+    assert view._arrangement.panes.widget(1).isAncestorOf(view._info_tabs)
     assert isinstance(view._info_tabs.widget(0), GenerateConfigPanel)
     assert view._info_tabs.widget(0).isAncestorOf(_preview_of(view))
 

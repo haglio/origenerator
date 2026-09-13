@@ -3190,13 +3190,7 @@ class GalleryView(QWidget):
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
-            # Every tab showing this image, not just the front one — the delete
-            # can come from a tab that isn't in front, and a stale list would
-            # still be offering a version that is gone.
-            for panel in self._info_tabs.config_panels():
-                shown = panel.displayed_row()
-                if shown is not None and shown.get("prompt_id") == prompt_id:
-                    panel.show_completed_result(updated, self._image_rows)
+            self._info_tabs.refresh_displayed(updated, self._image_rows)
         self._re_aim()  # an image with no enhancement left awaits one
 
     def show_location(self):

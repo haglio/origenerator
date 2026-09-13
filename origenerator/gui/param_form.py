@@ -6,15 +6,11 @@ from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox,
-    QDoubleSpinBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPlainTextEdit,
     QPushButton,
-    QSpinBox,
     QStackedWidget,
     QToolButton,
     QVBoxLayout,
@@ -26,20 +22,15 @@ from origenerator.gui import diff_text, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
-from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
+from origenerator.gui.no_wheel import NoWheelSpinBox
+from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
-from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.derived_size import override_size
-from origenerator.workflows.duration import (
-    frames_for_seconds,
-    on_grid,
-    seconds_for_frames,
-)
 from origenerator.workflows.model_files import is_no_lora
 
 ensure_shared_ui_on_path()
@@ -90,41 +81,6 @@ _LOCK_OPEN = "🔓"
 # The padlock renders at this point size regardless of the form's (larger) font,
 # so it stays a compact icon toggle and its width is predictable.
 _UNLOCK_FONT_PT = 11
-
-# Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
-# The metadata block inserts zero-width spaces into displayed paths for on-screen
-# wrapping, so text copied from there carries them; none belongs in a real path.
-# U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+2060 word-joiner, U+FEFF BOM.
-_INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
-
-
-def _clean_image_ref(value: str) -> str:
-    """A ``LoadImage`` path with invisible wrapping characters and stray
-    surrounding whitespace stripped, so a value that looks right actually
-    resolves against ComfyUI's input folder (or as an absolute path)."""
-    return value.translate(_INVISIBLE).strip()
-
-
-def _is_copyable(pd: ParamDef) -> bool:
-    """Which fields earn a copy-to-clipboard button: the seeds (the value most
-    often lifted to reproduce a result) and the prompts (long multiline text).
-    The plain scalars — steps, cfg, dimensions — are quick enough to retype."""
-    return pd.type == "seed" or (pd.type == "str" and pd.multiline)
-
-
-def _select_combo_value(combo: QComboBox, value: str):
-    """Show ``value`` in ``combo``, offering it as a new option if it isn't one.
-
-    A workflow default or a reused choice (e.g. a LoRA whose file is gone) may
-    not be among the scanned options; adding it keeps the combo faithful to the
-    value it was given instead of snapping to whatever sorts first.
-    """
-    idx = combo.findText(value)
-    if idx < 0:
-        combo.addItem(value)
-        idx = combo.findText(value)
-    combo.setCurrentIndex(idx)
-
 
 class ParamForm(QWidget):
     """The editable settings for one workflow, grouped into collapsible sections.
@@ -221,7 +177,7 @@ class ParamForm(QWidget):
         self._scenes: ScenesEditor | None = None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
-                scenes_def, lambda w, pd=scenes_def: self._grey_out_of_reach(pd, w),
+                scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w),
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
         self._build(self._param_defs)
@@ -271,9 +227,9 @@ class ParamForm(QWidget):
             self._widgets[pd.key] = widget
             if widget is self._scenes:
                 if pd.type == "scenes":  # the editor's one row, under the scenes' own key
-                    self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
+                    self._add_row(pd.key, pd.label, widget)
                 continue
-            self._wire_changed(widget)
+            field_kind(pd).change_signal(widget).connect(self.changed)
             if isinstance(widget, PresetComboBox):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
@@ -354,18 +310,19 @@ class ParamForm(QWidget):
 
     def _make_extras(self, pd: ParamDef) -> list[QWidget]:
         # Copy leads so it reads [field] [copy] [Random]/[Browse].
+        kind = field_kind(pd)
         extras: list[QWidget] = []
-        if _is_copyable(pd):
+        if kind.copyable:
             copy = CopyButton(lambda key=pd.key: self._field_text(key))
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
-        if pd.type == "seed":
+        if kind.randomizable:
             cb = TickControl("Random")
             cb.setChecked(True)
             cb.toggled.connect(self.changed)
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
-        if pd.type in ("image", "audio"):
+        if kind.browse_filter:
             # Elides: it is the widest thing on any row, so a plain button would
             # decide how narrow the whole form can be squeezed.
             browse = ElidingButton("Browse...")
@@ -681,13 +638,11 @@ class ParamForm(QWidget):
         a recording is read by the voice from wherever it is.
         """
         pd = next(p for p in self._param_defs if p.key == key)
-        kinds = ("Audio (*.wav *.mp3 *.flac *.m4a *.ogg);;All Files (*)" if pd.type == "audio"
-                 else "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)")
         path, _ = QFileDialog.getOpenFileName(
             self,
             f"Select {pd.label}",
             self._initial_browse_path(self._widgets[key].text().strip(), pd.browse_dir),
-            kinds,
+            field_kind(pd).browse_filter,
         )
         if path:
             self._widgets[key].setText(path)
@@ -711,76 +666,10 @@ class ParamForm(QWidget):
             return str(home)
         return str(COMFYUI_INPUT_DIR)
 
-    def _wire_changed(self, widget: QWidget):
-        """Re-emit ``changed`` whenever this input's value changes."""
-        if isinstance(widget, (QPlainTextEdit, QLineEdit)):
-            widget.textChanged.connect(self.changed)
-        elif isinstance(widget, PresetComboBox):
-            widget.editTextChanged.connect(self.changed)
-        elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-            widget.valueChanged.connect(self.changed)
-        elif isinstance(widget, QComboBox):
-            widget.currentIndexChanged.connect(self.changed)
-        elif isinstance(widget, TickControl):
-            widget.toggled.connect(self.changed)
-
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
-        if pd.type == "bool":
-            # An on/off setting (the enhance toggle): a bare tick, its label
-            # provided by the form row like every other field's.
-            w = TickControl("")
-            w.setChecked(bool(pd.default))
-            return w
-        if pd.type == "str" and pd.multiline:
-            # A prompt is the one field worth more than a few lines of the form,
-            # and how many it wants is the user's call — hence a field whose lower
-            # edge drags, at whatever height this param was last given.
-            w = PromptField(pd.key)
-            w.setPlainText(str(pd.default))
-            return w
-        if pd.type == "str":
-            w = QLineEdit()
-            w.setText(str(pd.default))
-            return w
-        if pd.type == "seed":
-            w = QLineEdit()
-            w.setText(str(pd.default))
-            w.setPlaceholderText("64-bit integer seed")
-            return w
-        if pd.type in ("int", "float") and pd.options:
-            w = PresetComboBox(pd.options, unit=pd.unit)
-            self._grey_out_of_reach(pd, w)
-            if not pd.rate:
-                w.set_value(pd.default)
-            return w
-        if pd.type == "int":
-            w = NoWheelSpinBox()
-            w.setMinimum(int(pd.min_val or 0))
-            w.setMaximum(int(pd.max_val or 999999))
-            w.setSingleStep(int(pd.step or 1))
-            w.setValue(int(pd.default))
-            return w
-        if pd.type == "float":
-            w = NoWheelDoubleSpinBox()
-            w.setMinimum(pd.min_val or 0.0)
-            w.setMaximum(pd.max_val or 999999.0)
-            w.setSingleStep(pd.step or 0.1)
-            w.setDecimals(2)
-            w.setValue(float(pd.default))
-            return w
-        if pd.type == "combo":
-            w = NoWheelComboBox()
-            if pd.options:
-                w.addItems(pd.options)
-            _select_combo_value(w, str(pd.default))
-            return w
-        # An "image" field is a plain path field like any other -- what makes it an
-        # image field is the Browse button beside it, added above.
-        w = QLineEdit()
-        w.setText(str(pd.default))
-        return w
+        return field_kind(pd).make(pd)
 
     def get_values(self) -> dict:
         """Read current values; a seed with its Random tick checked is randomized."""
@@ -824,35 +713,10 @@ class ParamForm(QWidget):
             if pd.key == "frame_count":
                 return w.total_frames()
             return w.story(pd.key)
-        if pd.type == "bool":
-            return w.isChecked()
-        if pd.type == "seed":
-            cb = self._randomize_checks.get(pd.key)
-            if randomize_seed and cb and cb.isChecked():
-                return random.randint(0, _SEED_MAX)
-            try:
-                return int(w.text())
-            except ValueError:
-                return 0
-        if pd.type == "str" and pd.multiline:
-            # Never the raw document: while a request's change is marked in the
-            # field, that document also holds the words the change took out.
-            return diff_text.live_text(w)
-        if pd.type == "image":
-            return _clean_image_ref(w.text())
-        if pd.type in ("str", "audio"):
-            return w.text().strip() if pd.type == "audio" else w.text()
-        if pd.rate:
-            seconds = w.value()
-            return (frames_for_seconds(seconds, pd.rate, pd)
-                    if seconds is not None else pd.default)
-        if isinstance(w, PresetComboBox):
-            return self._clamped_number(pd, w.value())
-        if pd.type in ("int", "float"):
-            return w.value()
-        if pd.type == "combo":
-            return w.currentText()
-        return None
+        tick = self._randomize_checks.get(pd.key)
+        if randomize_seed and tick is not None and tick.isChecked():
+            return random.randint(0, _SEED_MAX)
+        return field_kind(pd).read(pd, w)
 
     def _write_field(self, pd: ParamDef, value) -> None:
         """Apply one value to its widget. A seed's value always fills its field;
@@ -868,93 +732,10 @@ class ParamForm(QWidget):
             elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
             return
-        if pd.type == "bool":
-            w.setChecked(bool(value))
-        elif pd.type == "seed":
-            w.setText(str(int(value)))
-            cb = self._randomize_checks.get(pd.key)
-            if cb and self._pins_reused_seed:
-                cb.setChecked(False)
-        elif pd.type == "str" and pd.multiline:
-            # A written value replaces whatever was there, marked change and all.
-            diff_text.forget(w)
-            w.setPlainText(str(value))
-        elif pd.type in ("str", "image", "audio"):
-            w.setText(str(value))
-        elif pd.rate:
-            frames = self._clamped_number(pd, value)
-            w.set_value(seconds_for_frames(frames, pd.rate, pd))
-        elif isinstance(w, PresetComboBox):
-            w.set_value(self._clamped_number(pd, value))
-        elif pd.type == "int":
-            w.setValue(int(value))
-        elif pd.type == "float":
-            w.setValue(float(value))
-        elif pd.type == "combo":
-            _select_combo_value(w, str(value))
-
-    @classmethod
-    def _grey_out_of_reach(cls, pd: ParamDef, w: PresetComboBox) -> None:
-        """Disable the presets this workflow can't actually produce.
-
-        The Duration dropdown offers the same lengths to every video workflow,
-        and every video model stops well short of the longest of them — 15 s and
-        30 s are out of reach everywhere, and 10 s on the two workflows that
-        render fewer frames. Picked, such a preset just becomes the longest clip
-        the model does render, so the number chosen isn't the number given; the
-        list says which those are instead of quietly substituting.
-
-        Out of reach means the value doesn't survive the round trip the field
-        itself makes — offered, stored, and read back, it comes out as something
-        else. That covers a rate past the writer's ceiling on the same rule.
-        """
-        out_of_reach = [v for v in pd.options if not cls._round_trips(pd, v)]
-        if not out_of_reach:
-            return
-        # Any out-of-reach value stands in for "past the end": stored, it lands
-        # on the largest the workflow does take, which is the number to name.
-        ceiling = cls._shown(pd, cls._stored(pd, max(out_of_reach)))
-        w.set_unavailable(
-            out_of_reach,
-            f"More than this workflow makes — {ceiling:g} {pd.unit}".strip(),
-        )
-
-    @classmethod
-    def _round_trips(cls, pd: ParamDef, shown) -> bool:
-        return cls._shown(pd, cls._stored(pd, shown)) == shown
-
-    @classmethod
-    def _stored(cls, pd: ParamDef, shown):
-        """The param value a number shown in ``pd``'s field stands for."""
-        return (frames_for_seconds(shown, pd.rate, pd) if pd.rate
-                else cls._clamped_number(pd, shown))
-
-    @classmethod
-    def _shown(cls, pd: ParamDef, stored):
-        """The number ``pd``'s field shows for a param value."""
-        return (seconds_for_frames(stored, pd.rate, pd) if pd.rate
-                else cls._clamped_number(pd, stored))
-
-    @staticmethod
-    def _clamped_number(pd: ParamDef, value):
-        """``value`` on ``pd``'s grid and within its range, as its type; the
-        default when there is no value (an emptied field).
-
-        A preset dropdown's grid is what the model can actually take — 4k+1
-        frames, whole multiples of the native frame rate — so a number typed
-        between two steps settles onto the nearer one rather than being handed
-        to a graph that would round it out of sight
-        (:func:`~origenerator.workflows.duration.on_grid`).
-        """
-        if value is None:
-            value = pd.default
-        if pd.step:
-            value = on_grid(value, pd)
-        if pd.min_val is not None:
-            value = max(pd.min_val, value)
-        if pd.max_val is not None:
-            value = min(pd.max_val, value)
-        return int(round(value)) if pd.type == "int" else float(value)
+        field_kind(pd).write(pd, w, value)
+        tick = self._randomize_checks.get(pd.key)
+        if tick is not None and self._pins_reused_seed:
+            tick.setChecked(False)
 
     def _settle(self, pd: ParamDef) -> None:
         """Show a field the value it will emit, once an edit of it has ended."""

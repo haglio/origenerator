@@ -67,7 +67,7 @@ The two switches on that HUD's control band are this show's own narrowing, the
 way F-mode is a player's own: F-mode keeps the favorites and the switch beside
 it keeps the pictures that have been enhanced, each over the whole set the show
 was handed and both at once meaning what answers both
-(:meth:`SlideshowView.toggle_f_mode`, :meth:`SlideshowView.toggle_enhanced_mode`).
+(:meth:`SlideshowView.toggle_favorites_filter`, :meth:`SlideshowView.toggle_enhanced_mode`).
 They start off, and reset drops them.  What the view has left to say for itself,
 it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
 
@@ -794,8 +794,8 @@ class SlideshowView(QWidget):
         return self._set.is_favorite
 
     @property
-    def hud_f_mode(self) -> bool:
-        return self._set.f_mode
+    def hud_favorites_filter(self) -> bool:
+        return self._set.favorites_filter
 
     @property
     def hud_enhanced_mode(self) -> bool:
@@ -803,28 +803,28 @@ class SlideshowView(QWidget):
         — the switch beside F-mode on its HUD."""
         return self._set.enhanced_mode
 
-    def toggle_f_mode(self) -> bool:
+    def toggle_favorites_filter(self) -> bool:
         """Narrow the set to the favorites, or widen it back — the players' own
         F-mode, over the starred items.  ``True`` when the switch moved."""
-        return self.set_f_mode(not self._set.f_mode)
+        return self.set_favorites_filter(not self._set.favorites_filter)
 
     def toggle_enhanced_mode(self) -> bool:
         """Narrow the set to the pictures that have been enhanced, or widen it
         back — the HUD's switch beside F-mode.  ``True`` when the switch moved."""
         return self.set_enhanced_mode(not self._set.enhanced_mode)
 
-    def set_f_mode(self, on: bool) -> bool:
-        return self._set.set_modes(f_mode=bool(on), enhanced=self._set.enhanced_mode)
+    def set_favorites_filter(self, on: bool) -> bool:
+        return self._set.set_modes(favorites_filter=bool(on), enhanced=self._set.enhanced_mode)
 
     def set_enhanced_mode(self, on: bool) -> bool:
         """Said which way rather than flipped — a speaker mid-show is not
         looking at the HUD to see which way it stands."""
-        return self._set.set_modes(f_mode=self._set.f_mode, enhanced=bool(on))
+        return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
 
     def clear_modes(self) -> bool:
         """Both switches off at once — what "clear filter" has to mean once
         there is more than one to clear, and what it means on every satellite."""
-        return self._set.set_modes(f_mode=False, enhanced=False)
+        return self._set.set_modes(favorites_filter=False, enhanced=False)
 
     def hud_items(self):
         """The set for this show's HUD: ``(path, still)`` per item in

@@ -69,6 +69,7 @@ from origenerator.voice.commands import SurfaceCommand
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
+from tests.show_hud_support import hud_button_names
 from tests.test_folder_tree import _shown
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -6400,20 +6401,12 @@ def _standalone_show(qtbot, monkeypatch):
 MODE_VERBS = frozenset(action for action, _label, _mode in MODE_BUTTONS)
 
 
-def hud_button_names(hud) -> list[str]:
-    """What each button on *hud* is for, in drawn order and with the side prefix
-    dropped: "lock", "fmode"; a mode button keeps its whole verb, having no side."""
-    return [button.action.removeprefix(f"{hud._side}_")
-            for _rect, button in hud._targets.buttons]
-
-
 def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
     # Nothing about a show is different for not being inside a session: it is
     # the same set played the same way, so it wears the same panel a region
     # show wears — and the view's own furnishings come off, because the map
     # says all of it.
     from origenerator.gui.show_hud import ShowHud
-    from tests.show_hud_support import hud_button_names
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6430,7 +6423,6 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     # drawn rather than drawn dead.  The window IS this show's, though, so the
     # minimize a hosted one leaves off is on it.
     from origenerator.gui.show_hud import ShowHud
-    from tests.show_hud_support import hud_button_names
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6590,7 +6582,6 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     # The button sits beside F-mode on the HUD every show wears, and pressing it
     # lands on the show itself, hosted or not; the status line names the cut.
     from origenerator.gui.show_hud import ShowHud, show_hud_model
-    from tests.show_hud_support import hud_button_names
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -6654,13 +6645,13 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
     view._shows.start()
     show = view._shows.showing
     qtbot.addWidget(show)
-    show.toggle_f_mode()
+    show.toggle_favorites_filter()
     show.toggle_enhanced_mode()
     assert [item[2] for item in show._playlist._items] == ["i2"]
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
+    assert (show.hud_favorites_filter, show.hud_enhanced_mode) == (False, False)
     assert len(show._playlist) == 2
     show.close()
 
@@ -10045,12 +10036,12 @@ class _VoiceSurface:
     def set_audio_muted(self, muted):
         self.muted = muted
 
-    def toggle_f_mode(self):
-        self.f_mode = not getattr(self, "f_mode", False)
+    def toggle_favorites_filter(self):
+        self.favorites_filter = not getattr(self, "favorites_filter", False)
 
     @property
-    def hud_f_mode(self):
-        return getattr(self, "f_mode", False)
+    def hud_favorites_filter(self):
+        return getattr(self, "favorites_filter", False)
 
     def set_paused(self, paused):
         self.paused = paused

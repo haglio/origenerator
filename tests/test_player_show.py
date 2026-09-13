@@ -209,7 +209,7 @@ def test_narrowing_hands_the_player_what_is_left(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, hud=HudFacts(starred_ids={"id-3"}))
     _sent(show)
 
-    assert show.toggle_f_mode() is True
+    assert show.toggle_favorites_filter() is True
 
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
     assert played == ["three.png"]

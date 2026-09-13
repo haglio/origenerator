@@ -1066,7 +1066,7 @@ class ShowDirector:
         is the half the word meant.  The browser is left where it is: this
         starts a show, it does not go browsing."""
         if command.shelf_key == _STARRED_KEY:
-            self.toggle_f_mode(command.side)
+            self.toggle_favorites_filter(command.side)
             return
         orientation = (command.side if command.side and self._fun_time is not None
                        else self._host.side_in_view())
@@ -1084,7 +1084,7 @@ class ShowDirector:
                          starred_ids=self._starred_prompt_ids()),
         )
 
-    def toggle_f_mode(self, side) -> None:
+    def toggle_favorites_filter(self, side) -> None:
         """The spoken "favorites": the show's own F-mode switch, flipped.
 
         The same thing its HUD button does and the same thing the word does on
@@ -1094,8 +1094,8 @@ class ShowDirector:
         if show is None:
             self._host.say("🎤 F-mode needs a show to narrow")
             return
-        show.toggle_f_mode()
-        self._host.say("🎤 F-mode on" if show.hud_f_mode else "🎤 F-mode off")
+        show.toggle_favorites_filter()
+        self._host.say("🎤 F-mode on" if show.hud_favorites_filter else "🎤 F-mode off")
 
     def filter_enhanced(self, enhanced_only: bool, side: str | None = None):
         """Narrow the show in front of the speaker to its enhanced pictures, or

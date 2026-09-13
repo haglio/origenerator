@@ -90,7 +90,7 @@ class FakeShow:
         self.visible = True
         self.live = False
         self.held = set()
-        self.hud_f_mode = False
+        self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
         self.enhanced_items = []
         self.steps = []
@@ -176,15 +176,15 @@ class FakeShow:
     def osr2_drive_target(self):
         return self.opened_with.get("drive_target")
 
-    def toggle_f_mode(self):
-        self.hud_f_mode = not self.hud_f_mode
+    def toggle_favorites_filter(self):
+        self.hud_favorites_filter = not self.hud_favorites_filter
 
     def set_enhanced_mode(self, on):
         self.hud_enhanced_mode = on and bool(self.enhanced_items)
         return self.hud_enhanced_mode
 
     def clear_modes(self):
-        self.hud_f_mode = False
+        self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
 
     def hud_items(self):
@@ -797,7 +797,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
 
     director.play_shelf(Spoken())
 
-    assert made[0].hud_f_mode is True
+    assert made[0].hud_favorites_filter is True
     assert len(made) == 1  # no second show opened
     assert host.said == ["🎤 F-mode on"]
 
@@ -1000,13 +1000,13 @@ def test_clearing_the_filter_takes_f_mode_with_it(shows):
     # "clear filter" is the way out of ALL of the narrowing, on every satellite
     # in this family.
     show = FakeShow()
-    show.hud_f_mode = True
+    show.hud_favorites_filter = True
     director, _host, _made = shows()
     director._slideshow = show
 
     director.filter_enhanced(False)
 
-    assert show.hud_f_mode is False
+    assert show.hud_favorites_filter is False
     assert show.said == ["🎤 showing all of them"]
 
 

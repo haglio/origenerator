@@ -195,6 +195,18 @@ def test_a_form_that_does_not_pin_still_locks_when_random_is_unticked(qtbot):
     assert form.get_values()["seed"] == 12345
 
 
+def test_filling_random_seeds_leaves_a_seed_the_params_do_not_carry(qtbot):
+    form = ParamForm([ParamDef("noise_seed", "Noise seed", "seed", 0),
+                      ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form._widgets["noise_seed"].setText("31")
+
+    form.fill_random_seeds({"seed": 12345})
+
+    values = form.get_values_static()
+    assert (values["noise_seed"], values["seed"]) == (31, 12345)
+
+
 def _readonly_texts(form):
     return {lbl.text() for lbl in form.findChildren(QLabel)
             if lbl.objectName() == "readonlyParamValue"}

@@ -795,6 +795,11 @@ class ParamForm(QWidget):
         for cb in self._randomize_checks.values():
             cb.setChecked(is_random)
 
+    def fill_random_seeds(self, params: dict):
+        for key, cb in self._randomize_checks.items():
+            if cb.isChecked() and key in params:
+                self._widgets[key].setText(str(int(params[key])))
+
     def _read_field(self, pd: ParamDef, randomize_seed: bool):
         """One field's current value. A seed with its Random tick checked is
         re-rolled when ``randomize_seed``; otherwise it's read from the field."""

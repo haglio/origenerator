@@ -99,6 +99,9 @@ class FakeActions:
     def purge_deleted(self, prompt_ids):
         self.purged.append(list(prompt_ids))
 
+    def delete_enhance_levels(self, row, filenames):
+        return True
+
     def reject_experiment(self, row):
         self.rejected.append(row)
         self._label = "Reject experiment"
@@ -9194,6 +9197,25 @@ def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(q
     assert launched not in (42, first)   # another variation, not the pinned seed
 
 
+def test_unticking_random_after_a_generate_keeps_the_seed_that_made_it(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
+    panel._param_form.set_seed_random(True)
+    panel._on_generate()
+    (made,) = view._reroll_jobs.values()
+    _finish_reroll(view, made)
+
+    panel._param_form.set_seed_random(False)
+    panel._param_form._widgets["positive_prompt"].setPlainText("a brand new prompt, at dusk")
+    panel._on_generate()
+
+    (tweaked,) = view._reroll_jobs.values()
+    assert tweaked.params["seed"] == made.params["seed"]
+
+
 def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
     db = _combine_db(tmp_path)
     db.insert_generation(prompt_id="vx", workflow_name="mystery", workflow_version="v",
@@ -9795,6 +9817,31 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
 
     assert panel.displayed_row()["prompt_id"] == "g1"
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
+
+
+def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):
+    from origenerator.gui.enhance_versions import _LevelRow
+
+    client = _reroll_client()
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=client, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    first_tab = view._info_tabs.current_config_panel()
+    view.enhance_items(["g0"])
+    (job,) = view._reroll.all_jobs
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    assert len(first_tab._versions._host.findChildren(_LevelRow)) == 2
+    view._info_tabs.pin_current_tab()
+    view._info_tabs.open_config("sdxl_t2i", {"positive_prompt": "a dog"})
+    assert view._info_tabs.current_config_panel() is not first_tab
+    db.update_generation("g0", output_files=json.dumps(
+        [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
+
+    view.delete_enhance_levels("g0", ["image_enhance_00001_.png"])
+
+    assert len(first_tab._versions._host.findChildren(_LevelRow)) == 1
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):

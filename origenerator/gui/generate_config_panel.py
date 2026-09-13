@@ -1066,19 +1066,23 @@ class GenerateConfigPanel(QWidget):
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         """Show a generation this tab's own Generate just produced: swap the live
-        preview for the saved output and reveal its footer, leaving the form exactly
-        as the user left it.
+        preview for the saved output and reveal its footer, leaving the form as the
+        user left it but for a seed still on Random, which takes this result's seed.
 
         Unlike :meth:`show_saved_generation`, the form is not re-seeded — the tab
         already holds the settings that made this result, and the user may have kept
         editing the next prompt while the run was in flight. Re-seeding here would
-        wipe those edits, so the completed result touches only the preview and info.
+        wipe those edits, so the completed result touches only the preview, the info
+        and a seed still on Random.
         A tab holding a folder rewrite takes none of it: that tab is about the
         folder, and the batch it launched lands a picture at a time — each one
         would swap the wall of pictures for whichever finished last.
         """
         if self._folder_request is not None:
             return
+        if self._param_form is not None:
+            with self._loading():
+                self._param_form.fill_random_seeds(merge_denormalized(row))
         self._display_result(row, image_rows)
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):

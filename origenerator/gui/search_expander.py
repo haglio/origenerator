@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import threading
 
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import search
@@ -104,6 +105,8 @@ class SearchExpander(QObject):
 
     def _landed(self, query: str, key: str, expansions) -> None:
         """Take the answer in, back on the thread that asked for it."""
+        if sip.isdeleted(self):
+            return
         expansions = expansions or {}
         with self._lock:
             self._cache[key] = expansions

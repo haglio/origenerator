@@ -118,3 +118,9 @@ class TestTheValuesAnotherAppHoldsToo:
         assert config.EVOLVER_INBOX_DIR == (
             config.SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox")
         assert config.EVOLVER_SOURCE == "origenerator"  # how evolver routes ours
+
+    def test_evolver_files_its_upscales_under_this_exact_tree(self):
+        # Mirrors evolver's own OUT_UPSCALED_DIR.
+        assert config.EVOLVER_UPSCALED_DIR == (
+            config.SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "2_outbox"
+            / "upscaled_by_orientation")

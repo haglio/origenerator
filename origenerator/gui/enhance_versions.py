@@ -452,6 +452,7 @@ class EnhanceVersions(QWidget):
         self._section.content_form().addRow(self._host)
         self._pending: _PendingRow | None = None
         self._rows: list[_LevelRow] = []
+        self._deletable = True
         self.hide()
 
     def is_collapsed(self) -> bool:
@@ -462,7 +463,7 @@ class EnhanceVersions(QWidget):
 
     def show_levels(self, items: list[tuple], pending: tuple | None = None,
                     add: tuple | None = None, created_fallback: str = "",
-                    held_days: int | None = None):
+                    held_days: int | None = None, deletable: bool = True):
         """Rebuild the list from ``(level, image_path)`` pairs.
 
         ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` row, which
@@ -482,8 +483,11 @@ class EnhanceVersions(QWidget):
         ``held_days`` is set only for a deleted image, and each level's File line
         leads with how long it has been in the trash.
 
+        ``deletable`` is ``False`` for versions that are not this list's to bin:
+        a video's, which are the video itself and the copy Evolver keeps.
+
         Hidden only when there is nothing at all to show — no versions, nothing
-        running, and no row to press, which is what a video looks like.
+        running, and no row to press.
         """
         # Replace the host wholesale — the same delete-and-rebuild idiom the
         # related-media strips use, so no row outlives the levels it described.
@@ -495,6 +499,7 @@ class EnhanceVersions(QWidget):
         column.setSpacing(6)
         self._pending = None
         self._rows = []
+        self._deletable = deletable
         # One leading slot, held by whichever of the two applies: the run in
         # flight if there is one, else the row that would start it.
         if pending is not None:
@@ -557,18 +562,20 @@ class EnhanceVersions(QWidget):
             # Grayed with the reason on it rather than absent: the answer to
             # "why can't I delete this" is the only thing the menu can offer.
             action.setEnabled(False)
-            action.setText("Delete (this is the image's only version)")
+            action.setText("Delete (this is the image's only version)" if self._deletable
+                           else "Delete (a video's versions can't be deleted here)")
         if menu.exec(global_pos) is action and self._may_delete(picked):
             self.delete_requested.emit(picked)
 
     def _may_delete(self, positions: list[int]) -> bool:
-        """Whether binning ``positions`` would leave the image a version.
+        """Whether these versions are this list's to bin, and binning
+        ``positions`` would leave the image a version.
 
         An image with no file left is a deleted generation, and deleting a
         generation is the gallery's own action, reached from its thumbnail — a
         version list quietly doing it would be a much bigger delete than the one
         that was asked for."""
-        return bool(positions) and len(positions) < len(self._rows)
+        return self._deletable and bool(positions) and len(positions) < len(self._rows)
 
     def keyPressEvent(self, event):
         """Delete or Backspace bins the picked levels — the keys that delete a

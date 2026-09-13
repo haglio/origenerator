@@ -120,15 +120,15 @@ def created_item(file: dict, fallback: str = "", *,
     return MetaItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def basic_section(row: dict) -> MetaSection | None:
+def basic_section(row: dict, upscale: Path | None = None) -> MetaSection | None:
     """The at-a-glance facts kept at the top: what this run produced, when, and
     which workflow version made it.
 
     ``None`` — no block at all — when there is none of that to show: every file
-    the row holds is listed as a version of the image, and no workflow version
-    is recorded yet."""
+    the row holds is listed as one of its versions (a video's among them once
+    Evolver has made its ``upscale``), and no workflow version is recorded yet."""
     listed = {level.file.get("filename")
-              for level in gallery.displayed_levels(row)}
+              for level in gallery.displayed_levels(row, upscale)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
     items = []

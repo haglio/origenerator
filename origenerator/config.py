@@ -136,8 +136,12 @@ COMFYUI_PORT = 8188
 # finalized video dropped under a per-source subfolder. Mirrors evolver's own
 # INBOX_DIR; we write under our own source name so Evolver can route
 # Origenerator's videos distinctly from other inbox sources.
-EVOLVER_INBOX_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox"
+_EVOLVER_AI_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI"
+EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
+# Where Evolver files the upscale it makes of each video sent to it. Mirrors
+# evolver's own OUT_UPSCALED_DIR.
+EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 # A Genau clip goes to the same inbox under its own source name. Evolver routes by
 # that name, so the folder is the whole signal: it upscales the clip on its usual
 # schedule and then delivers the result to Genau's clips folder rather than leaving

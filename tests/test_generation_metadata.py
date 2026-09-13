@@ -61,6 +61,10 @@ def test_every_output_file_gets_its_own_row():
     assert files == ["a.mp4", "b.mp4"]
 
 
+def test_a_video_evolver_upscaled_lists_its_file_with_its_versions_instead(tmp_path):
+    assert basic_section(_row(), upscale=tmp_path / "clip_topaz.mp4") is None
+
+
 def test_file_item_reveals_the_absolute_output_path():
     # The File row carries the on-disk path (output folder + subfolder + name) so
     # a Show-in-Explorer button can reveal it, while its value stays the short

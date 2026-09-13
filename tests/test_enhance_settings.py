@@ -331,6 +331,19 @@ def test_a_video_lists_no_versions():
     assert displayed_levels(video) == []
 
 
+def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video_itself(tmp_path):
+    upscale = tmp_path / "wan_00001_topaz.mp4"
+    video = dict(_source_row(), output_files=json.dumps(
+        [{"filename": "wan_00001.mp4", "subfolder": "video", "type": "output"}]))
+
+    evolved, original = displayed_levels(video, upscale)
+
+    assert (evolved.label, original.label) == ("Evolved", "Original")
+    assert gallery.output_file_path(evolved.file, tmp_path / "output") == upscale
+    assert original.file["filename"] == "wan_00001.mp4"
+    assert evolved.params == {}  # nothing Evolver ran for the Enhance panel to take
+
+
 def _folded(tmp_path, count=1):
     db = Database(tmp_path / "t.db")
     _seed_source(db)

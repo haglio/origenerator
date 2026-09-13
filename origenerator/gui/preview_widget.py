@@ -295,6 +295,7 @@ class PreviewWidget(QWidget):
         self._unplayable_report.stop()
         if stop_player:
             self._player.stop()
+            self._player.setSource(QUrl())
         if not enhancing:
             self.set_notice(None)
             self.set_actions(None)

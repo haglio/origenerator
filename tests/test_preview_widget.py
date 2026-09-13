@@ -163,6 +163,15 @@ def test_clear_resets_to_placeholder(make_preview, tmp_path):
     w._player.stop.assert_called()
 
 
+def test_moving_off_a_clip_releases_it_so_its_next_showing_reads_it_afresh(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "broken.mp4")
+
+    w.show_image(_make_png(tmp_path / "next.png"))
+
+    w._player.setSource.assert_called_with(QUrl())
+
+
 def test_clear_releases_the_video_file(make_preview, tmp_path):
     w = make_preview()
     w.show_video(tmp_path / "clip.mp4")

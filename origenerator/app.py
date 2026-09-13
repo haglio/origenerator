@@ -57,15 +57,22 @@ def _init_windows_taskbar_identity(identity: str | None = None) -> None:
     """
     if sys.platform != "win32":
         return
-    from app_support.win32 import set_app_user_model_id
+    from app_support.win32 import set_app_user_model_id, stamp_pinned_shortcuts
 
-    from origenerator.win32 import APP_USER_MODEL_ID, stamp_pinned_shortcuts
+    from origenerator.win32 import APP_USER_MODEL_ID
     try:
         set_app_user_model_id(identity or APP_USER_MODEL_ID)
     except OSError:
         pass  # Non-fatal — still try to stamp the shortcut below.
     if identity is None:
-        stamp_pinned_shortcuts(APP_USER_MODEL_ID, include="origenerator")
+        import logging
+
+        log = logging.getLogger(__name__)
+        for pin, refusal in stamp_pinned_shortcuts(APP_USER_MODEL_ID, ["Origenerator"]).items():
+            if refusal is None:
+                log.info("Stamped AppUserModelID on %s", pin)
+            else:
+                log.warning("Could not stamp AppUserModelID on %s: %s", pin, refusal)
 
 
 def _bring_to_front(window) -> None:

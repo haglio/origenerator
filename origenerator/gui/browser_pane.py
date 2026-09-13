@@ -149,6 +149,24 @@ def _inflight_signature(items) -> tuple:
     return tuple(sorted(it.key for it in items))
 
 
+def _time_heading(text: str) -> QLabel:
+    heading = QLabel(text)
+    heading.setObjectName("sectionHeading")
+    return heading
+
+
+def _open_on_first_heading(flow, headings):
+    if headings and headings[0]:
+        flow.add_full_row(_time_heading(headings[0]))
+
+
+def _draw_between_headings(flow, rows, headings, draw, *, start=0):
+    for index, row in enumerate(rows, start):
+        if index and headings[index]:
+            flow.add_full_row(_time_heading(headings[index]))
+        draw(row)
+
+
 @dataclass(frozen=True)
 class PaneHost:
     """The questions the pane may ask the gallery it fills, bound to the view's
@@ -484,11 +502,9 @@ class BrowserPane(QObject):
     def _sectioned_results(self, tiles, collapsed, on_toggled) -> QWidget:
         """The tiles under one foldable heading per model + LoRA combination.
 
-        A column of flows rather than one flow with headings in it: a heading has
-        to take the pane's whole width to read as a divider, and a FlowLayout has
-        no notion of a row break — an item that happens to fit would sit beside it.
-        The column is also what makes folding cheap, since a band is one widget to
-        hide rather than a run of tiles to pick out of a shared layout.
+        A column of flows rather than one flow with headings in it, because the
+        column is what makes folding cheap: a band is one widget to hide rather
+        than a run of tiles to pick out of a shared layout.
         """
         container = QWidget()
         column = QVBoxLayout(container)
@@ -608,19 +624,16 @@ class BrowserPane(QObject):
         drawn = self._recents_drawn
         offset = self._scroll_bar().value() if self._recents_flow is not None else 0
         container, flow = self._new_tile_pane()  # which clears both of those
+        rows = self._filtered_recent_rows()
+        _open_on_first_heading(flow, gallery.section_headings(rows))
         items = self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
         for item in items:
-            card = InFlightCard(item)
-            card.clicked.connect(self._on_inflight_clicked)
-            card.context_requested.connect(self._inflight_context_menu)
-            flow.addWidget(card)
-            self._inflight_cards[item.key] = card
-            self._inflight_by_key[item.key] = item
+            self._add_inflight_card(flow, item)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
-        if not (items or self._filtered_recent_rows()):
+        if not (items or rows):
             self.show_widget(self._empty_state(self._recents_empty_hint()))
             return
         self._recents_flow = flow
@@ -636,9 +649,11 @@ class BrowserPane(QObject):
         """Add up to ``count`` more finished items to the open shelf, picking up
         where the last page left off. Short (or empty) at the end of the list."""
         rows = self._filtered_recent_rows()
-        page = rows[self._recents_drawn:self._recents_drawn + count]
-        for row in page:
-            self._add_shelf_thumbnail(self._recents_flow, row)
+        start = self._recents_drawn
+        page = rows[start:start + count]
+        _draw_between_headings(self._recents_flow, page, gallery.section_headings(rows),
+                               lambda row: self._add_shelf_thumbnail(self._recents_flow, row),
+                               start=start)
         self._recents_drawn += len(page)
 
     def grow_recents(self, *_):
@@ -854,9 +869,14 @@ class BrowserPane(QObject):
              "Reject — trash it and steer future experiments away"),
         ]
         rows = filter_rows(self._experiment_rows, self._shelf_orientation)
-        for row in rows:
-            tw = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
-            tw.corner_action_triggered.connect(self.experiment_verdict)
+
+        def draw(row):
+            tile = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
+            tile.corner_action_triggered.connect(self.experiment_verdict)
+
+        headings = gallery.section_headings(rows)
+        _open_on_first_heading(flow, headings)
+        _draw_between_headings(flow, rows, headings, draw)
         self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
 
@@ -889,18 +909,19 @@ class BrowserPane(QObject):
         shown = [item for item in self._request_items
                  if self._shelf_orientation is None
                  or row_orientation(item["row"]) == self._shelf_orientation]
-        for item in shown:
-            row = item["row"]
+        drawn = [item["row"] for item in shown
+                 if item["row"]["prompt_id"] in cooking or gallery.produced_output(item["row"])]
+
+        def draw(row):
             live = cooking.get(row["prompt_id"])
-            if live is not None:
-                card = InFlightCard(live)
-                card.clicked.connect(self._on_inflight_clicked)
-                card.context_requested.connect(self._inflight_context_menu)
-                flow.addWidget(card)
-                self._inflight_cards[live.key] = card
-                self._inflight_by_key[live.key] = live
-            elif gallery.produced_output(row):
+            if live is None:
                 self._add_shelf_thumbnail(flow, row)
+            else:
+                self._add_inflight_card(flow, live)
+
+        headings = gallery.section_headings(drawn)
+        _open_on_first_heading(flow, headings)
+        _draw_between_headings(flow, drawn, headings, draw)
         self.show_widget(container if shown
                          else self._empty_state(self._requests_empty_hint()))
 
@@ -1102,16 +1123,7 @@ class BrowserPane(QObject):
         i2v = bool(group.rows) \
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == "video"
-        # The re-roll tile leads the flow so it sits beside the newest item
-        # (thumbnails are sorted newest-first). A generation running in this folder —
-        # a re-roll, which is also what a tab's Generate now is — is this tile: it
-        # shows the live frame, so the running row is left out of the static grid
-        # below rather than drawn as a broken, output-less thumbnail.
-        self._host.add_lead_tiles(flow, group)
-        self._add_folder_inflight_cards(flow, group)
-        for row in group.rows:
-            if not gallery.produced_output(row):
-                continue  # still in flight — represented by the RerollTile, not a tile
+        def draw(row):
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._host.animated_preview(row),  # videos loop; images stay still
@@ -1130,6 +1142,18 @@ class BrowserPane(QObject):
             flow.addWidget(tw)
             self._selection.note_shown(row["prompt_id"])
             self._thumb_widgets[row["prompt_id"]] = tw
+
+        # The re-roll tile leads the flow so it sits beside the newest item
+        # (thumbnails are sorted newest-first). A generation running in this folder —
+        # a re-roll, which is also what a tab's Generate now is — is this tile: it
+        # shows the live frame, so the running row is left out of the static grid
+        # below rather than drawn as a broken, output-less thumbnail.
+        finished = [row for row in group.rows if gallery.produced_output(row)]
+        headings = gallery.section_headings(finished)
+        _open_on_first_heading(flow, headings)
+        self._host.add_lead_tiles(flow, group)
+        self._add_folder_inflight_cards(flow, group)
+        _draw_between_headings(flow, finished, headings, draw)
         self.show_widget(container)
 
     def _add_folder_inflight_cards(self, flow, group):
@@ -1161,12 +1185,15 @@ class BrowserPane(QObject):
             item = items.get(pid)
             if item is None:
                 continue  # a row no longer in flight by the time this drew
-            card = InFlightCard(item)
-            card.clicked.connect(self._on_inflight_clicked)
-            card.context_requested.connect(self._inflight_context_menu)
-            flow.addWidget(card)
-            self._inflight_cards[item.key] = card
-            self._inflight_by_key[item.key] = item
+            self._add_inflight_card(flow, item)
+
+    def _add_inflight_card(self, flow, item):
+        card = InFlightCard(item)
+        card.clicked.connect(self._on_inflight_clicked)
+        card.context_requested.connect(self._inflight_context_menu)
+        flow.addWidget(card)
+        self._inflight_cards[item.key] = card
+        self._inflight_by_key[item.key] = item
 
     def _seed_reroll_actions(self, row) -> list:
         """The per-seed re-roll hover controls for an i2v item: always the video

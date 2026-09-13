@@ -12,6 +12,8 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.output` — what a generation produced on disk: media type, preview, files.
 * :mod:`.labels` — the human-facing folder and Generate-tab names.
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
+* :mod:`.time_sections` — where a newest-first listing breaks between one sitting
+  and the next, and what each section's heading says about when it was made.
 * :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
 * :mod:`.enhance_settings` — what a folder's enhancement is configured with,
@@ -127,6 +129,7 @@ from origenerator.gallery.source_image import (
     source_image_id_for,
     videos_from_source_image,
 )
+from origenerator.gallery.time_sections import section_headings
 from origenerator.gallery.tree import (
     ALL_KEY,
     ALL_LABEL,
@@ -250,6 +253,7 @@ __all__ = [
     "rows_in_settings",
     "rows_of_media_types",
     "rows_under",
+    "section_headings",
     "selection_group",
     "settings_folder_key",
     "settings_signature",

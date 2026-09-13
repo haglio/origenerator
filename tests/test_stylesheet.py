@@ -263,6 +263,25 @@ def test_the_selected_tab_is_underlined_and_the_others_are_not(qtbot):
     assert image.pixelColor(other.center().x(), low) != BLUE
 
 
+def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot):
+    from PyQt6.QtWidgets import QApplication, QLabel
+    from shared_ui.colors import BORDER_SUBTLE
+
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        heading = QLabel("Sat Sep 12, 7:10 PM – 7:40 PM")
+        heading.setObjectName("sectionHeading")
+        qtbot.addWidget(heading)
+        heading.resize(300, heading.sizeHint().height())
+        image = heading.grab().toImage()
+    finally:
+        app.setStyleSheet(prior)
+
+    assert image.pixelColor(150, 0) == BORDER_SUBTLE
+
+
 def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):
     # The same rule's other edge: it is what says which close mark belongs to
     # which tab, and it is drawn by the declaration the underline shares.

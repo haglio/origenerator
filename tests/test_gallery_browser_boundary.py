@@ -102,7 +102,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     tiles are picked, the anchor a Shift-click measures from and the order they
     are shown are a `ThumbnailSelection` now, so what stays are delegations, and the
     five shelves are one `Shelf` record apiece rather than a branch in each of two
-    chains. 371 -> 341:
+    chains. 74 -> 75: the card for a run still in flight was built by hand on
+    Latest, in a folder and on Requests, and is one method now, so Requests can
+    draw its cards between the time headings that split the shelf into batches.
+    371 -> 341:
     the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
     new ones for what the shows ask that had no name of its own. 341 -> 318:
@@ -130,4 +133,4 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 74
+               for x in _class_def(PANE, "BrowserPane").body) == 75

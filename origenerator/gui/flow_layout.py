@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt
-from PyQt6.QtWidgets import QLayout
+from PyQt6.QtWidgets import QLayout, QWidgetItem
+
+
+class _FullRow(QWidgetItem):
+    def minimumSize(self):
+        return QSize(0, super().minimumSize().height())
 
 
 class FlowLayout(QLayout):
@@ -36,6 +41,10 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):
         self._items.append(item)
+
+    def add_full_row(self, widget):
+        self.addChildWidget(widget)
+        self.addItem(_FullRow(widget))
 
     def count(self):
         return len(self._items)
@@ -85,31 +94,36 @@ class FlowLayout(QLayout):
         area = rect.marginsRemoved(self.contentsMargins())
         margin_height = rect.height() - area.height()
         spacing = self.spacing()
-        rows, row = [], []
-        x, row_height = area.x(), 0
+        rows, row, x = [], [], area.x()
         for item in self._items:
             if item.isEmpty():
                 continue  # a hidden widget takes no slot, and no gap where one was
+            if isinstance(item, _FullRow):
+                if row:
+                    rows.append(row)
+                rows.append([(item, QSize(area.width(), item.sizeHint().height()))])
+                row, x = [], area.x()
+                continue
             hint = item.sizeHint()
-            if x > area.x() and x + hint.width() > area.right():
-                rows.append((row, x - spacing - area.x(), row_height))  # won't fit
-                row, x, row_height = [], area.x(), 0                    # wrap
+            if row and x + hint.width() > area.right():
+                rows.append(row)            # won't fit
+                row, x = [], area.x()       # wrap
             row.append((item, hint))
             x += hint.width() + spacing
-            row_height = max(row_height, hint.height())
         if row:
-            rows.append((row, x - spacing - area.x(), row_height))
+            rows.append(row)
 
         y = area.y()
-        for placed, width, height in rows:
+        for placed in rows:
             x = area.x()
             if self._align_right:
+                width = sum(hint.width() for _item, hint in placed) + spacing * (len(placed) - 1)
                 x += max(0, area.width() - width)
             for item, hint in placed:
                 if place:
                     item.setGeometry(QRect(QPoint(x, y), hint))
                 x += hint.width() + spacing
-            y += height + self._row_spacing
+            y += max(hint.height() for _item, hint in placed) + self._row_spacing
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height

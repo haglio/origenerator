@@ -5351,15 +5351,17 @@ def test_main_view_reflows_to_fill_extra_width(qtbot):
 
 
 def test_add_tile_sits_first_beside_the_newest(qtbot):
-    # Thumbnails are newest-first, so the "new variation" tile leads the flow,
-    # beside the newest item, not trailing the oldest.
+    # Thumbnails are newest-first, so the "new variation" tile leads the tiles,
+    # beside the newest item, not trailing the oldest — under the heading that
+    # says when the newest batch was made.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     layout = view._scroll.widget().layout()
-    assert isinstance(layout.itemAt(0).widget(), RerollTile)
+    assert layout.itemAt(0).widget().objectName() == "sectionHeading"
+    assert isinstance(layout.itemAt(1).widget(), RerollTile)
 
 
 def test_leaf_has_no_add_tile_without_a_client(qtbot):

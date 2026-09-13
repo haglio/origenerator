@@ -185,11 +185,12 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
 def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
+    height = panel._video_part.sizeHint().height()
 
     _pick_act(panel, "alpha")
 
     assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
-    assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
+    assert panel._video_part.sizeHint().height() == height  # hidden, but its room stays put
 
 
 def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
@@ -241,15 +242,15 @@ def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     assert panel.video_slot.current_id() == "vid1"  # ...and the video is what's kept
 
 
-def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
+def test_the_video_slot_shows_only_while_custom_is_picked(qtbot):
     panel = _panel(qtbot)
-    assert panel.video_slot._label.text() == "Drop a video"  # neutral prompt
+    assert not panel.video_slot.isHidden()
 
     _pick_act(panel, "gamma")
-    assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
+    assert panel.video_slot.isHidden()
 
     _pick_act(panel, "")
-    assert panel.video_slot._label.text() == "Drop a video"  # neutral again
+    assert not panel.video_slot.isHidden()
 
 
 def test_generate_emits_the_picked_act(qtbot):

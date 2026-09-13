@@ -199,11 +199,11 @@ def _actions(tmp_path):
 def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
     # At the same id, so a session saved while it was open still finds it.
     db, actions = _actions(tmp_path)
-    folder_id = actions.create_custom_folder(
+    folder_id = actions.custom_folders.create(
         "Favorites", [("a", "settings", "p1"), ("b", "settings", "p2")]
     )
 
-    actions.delete_custom_folder(folder_id)
+    actions.custom_folders.delete(folder_id)
     assert db.list_custom_folders() == []
     actions.undo()
 
@@ -214,10 +214,10 @@ def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
 
 def test_undoing_an_add_leaves_the_items_that_were_already_there(tmp_path):
     db, actions = _actions(tmp_path)
-    folder_id = actions.create_custom_folder("Favorites", [("a", "settings", "p1")])
+    folder_id = actions.custom_folders.create("Favorites", [("a", "settings", "p1")])
 
-    actions.add_to_custom_folder(folder_id, [("a", "settings", "p1"),
-                                             ("b", "settings", "p2")])
+    actions.custom_folders.add_to(folder_id, [("a", "settings", "p1"),
+                                              ("b", "settings", "p2")])
     actions.undo()
 
     (record,) = db.list_custom_folders()
@@ -226,7 +226,7 @@ def test_undoing_an_add_leaves_the_items_that_were_already_there(tmp_path):
 
 def test_renaming_a_custom_folder_is_undoable_and_never_blanks_the_name(tmp_path):
     db, actions = _actions(tmp_path)
-    folder_id = actions.create_custom_folder("Favorites", [])
+    folder_id = actions.custom_folders.create("Favorites", [])
     key = gallery.custom_folder_key(folder_id)
 
     actions.rename_folder(key, "")  # a derived folder resets; this one has nothing to
@@ -242,8 +242,23 @@ def test_renaming_a_custom_folder_writes_no_folder_meta_overlay(tmp_path):
     # Its name is the row itself — an overlay keyed by "__custom__/1" would be a
     # second, silently-winning name.
     db, actions = _actions(tmp_path)
-    folder_id = actions.create_custom_folder("Favorites", [])
+    folder_id = actions.custom_folders.create("Favorites", [])
 
     actions.rename_folder(gallery.custom_folder_key(folder_id), "Best of")
 
     assert db.folder_meta_map() == {}
+
+
+def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
+    # A saved session points at a custom folder by id, so a create that is undone
+    # and redone has to resolve to the same key rather than a fresh one.
+    db, actions = _actions(tmp_path)
+    folder_id = actions.custom_folders.create("Mine", [("image/sdxl_t2i", "model", None)])
+    actions.undo()
+    assert db.list_custom_folders() == []
+
+    actions.redo()
+
+    ((record,),) = (db.list_custom_folders(),)
+    assert record["id"] == folder_id
+    assert record["name"] == "Mine" and record["items"] == ["image/sdxl_t2i"]

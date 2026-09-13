@@ -64,6 +64,7 @@ class GalleryActions:
         # Every mutation below records how to reverse itself here. Generic and
         # entirely unaware of what it is undoing (see origenerator.undo_stack).
         self._history = UndoStack(limit)
+        self.custom_folders = CustomFolderActions(db, self._history)
 
     # --- deletion ----------------------------------------------------------
 
@@ -317,7 +318,7 @@ class GalleryActions:
         so a blank one is refused rather than leaving an unnamed row."""
         folder_id = custom_folder_id(key)
         if folder_id is not None:
-            self._rename_custom_folder(folder_id, name)
+            self.custom_folders.rename(folder_id, name)
             return
         previous = self._db.folder_meta_map().get(key, {}).get("custom_name")
         self._db.rename_folder(key, name)
@@ -325,113 +326,6 @@ class GalleryActions:
             "Rename folder", lambda: self._db.rename_folder(key, previous),
             redo=lambda: self.rename_folder(key, name),
         ))
-
-    def _rename_custom_folder(self, folder_id: int, name: str | None) -> None:
-        if not name:
-            return  # nothing to fall back to — keep the name it has
-        record = self._custom_folder(folder_id)
-        if record is None:
-            return
-        previous = record["name"]
-        self._db.rename_custom_folder(folder_id, name)
-        self._history.push(UndoEntry(
-            "Rename folder",
-            lambda: self._db.rename_custom_folder(folder_id, previous),
-            redo=lambda: self._rename_custom_folder(folder_id, name),
-        ))
-
-    # --- custom folders ----------------------------------------------------
-
-    def create_custom_folder(self, name: str, items: list[tuple]) -> int:
-        """Make a custom folder holding ``items`` — ``(folder_key, level,
-        ref_prompt_id)`` triples — and return its id. Undo removes it again."""
-        folder_id = self._db.create_custom_folder(name)
-        self._db.add_custom_folder_items(folder_id, items)
-        self._record_folder_creation(name, folder_id, items)
-        return folder_id
-
-    def _record_folder_creation(self, name: str, folder_id: int,
-                                items: list[tuple]) -> None:
-        """File a just-made custom folder as one undoable step, and say how to
-        make it again. The redo re-creates it at the id it had rather than
-        letting the database allocate a new one, so the key a saved session
-        points at still resolves after undo-then-redo."""
-        def redo() -> None:
-            self._db.create_custom_folder(name, folder_id)
-            self._db.add_custom_folder_items(folder_id, items)
-            self._record_folder_creation(name, folder_id, items)
-
-        self._history.push(UndoEntry(
-            f"Create folder “{name}”",
-            lambda: self._db.delete_custom_folder(folder_id),
-            redo=redo,
-        ))
-
-    def add_to_custom_folder(self, folder_id: int, items: list[tuple]) -> None:
-        """Add folders to a custom folder, as one undoable step. Items already in
-        it are left alone by the undo — they were there before this add."""
-        record = self._custom_folder(folder_id)
-        if record is None:
-            return
-        held = set(record["items"])
-        added = [m for m in items if m[0] not in held]
-        if not added:
-            return
-        self._db.add_custom_folder_items(folder_id, added)
-
-        def undo() -> str | None:
-            for folder_key, *_ in added:
-                self._db.remove_custom_folder_item(folder_id, folder_key)
-            return None
-
-        self._history.push(UndoEntry(_add_label(len(added), record["name"]), undo,
-                              redo=lambda: self.add_to_custom_folder(folder_id, added)))
-
-    def remove_from_custom_folder(self, folder_id: int, folder_key: str,
-                                  *, level=None, ref_prompt_id=None) -> None:
-        """Drop one gathered folder out of a custom folder. The folder itself and
-        its generations are untouched — only the grouping loses it."""
-        self._db.remove_custom_folder_item(folder_id, folder_key)
-        self._history.push(UndoEntry(
-            "Remove from folder",
-            lambda: self._db.add_custom_folder_items(
-                folder_id, [(folder_key, level, ref_prompt_id)]),
-            redo=lambda: self.remove_from_custom_folder(
-                folder_id, folder_key, level=level, ref_prompt_id=ref_prompt_id),
-        ))
-
-    def delete_custom_folder(self, folder_id: int) -> None:
-        """Remove a custom folder outright. Undo brings it back at the same id —
-        so the key a saved session points at still resolves — with the folders it
-        gathered, in order."""
-        record = self._custom_folder(folder_id)
-        if record is None:
-            return
-        items = [
-            (m["folder_key"], m["level"], m["ref_prompt_id"])
-            for m in self._db.custom_folder_items_full()
-            if m["folder_id"] == folder_id and m["folder_key"] in set(record["items"])
-        ]
-        # Restore in the order the folder listed them, not the order the identity
-        # query happened to return.
-        order = {key: i for i, key in enumerate(record["items"])}
-        items.sort(key=lambda m: order[m[0]])
-        name = record["name"]
-        self._db.delete_custom_folder(folder_id)
-
-        def undo() -> str | None:
-            self._db.create_custom_folder(name, folder_id)
-            self._db.add_custom_folder_items(folder_id, items)
-            return None
-
-        self._history.push(UndoEntry(f"Remove folder “{name}”", undo,
-                              redo=lambda: self.delete_custom_folder(folder_id)))
-
-    def _custom_folder(self, folder_id: int) -> dict | None:
-        for record in self._db.list_custom_folders():
-            if record["id"] == folder_id:
-                return record
-        return None
 
     # --- what the gallery's Undo and Redo drive ----------------------------
 
@@ -455,6 +349,116 @@ class GalleryActions:
     def redo(self) -> None:
         """Re-apply the most recently undone mutation, by running it again."""
         self._history.redo()
+
+
+class CustomFolderActions:
+    def __init__(self, db, history: UndoStack):
+        self._db = db
+        self._history = history
+
+    def create(self, name: str, items: list[tuple]) -> int:
+        """Make a custom folder holding ``items`` — ``(folder_key, level,
+        ref_prompt_id)`` triples — and return its id. Undo removes it again."""
+        folder_id = self._db.create_custom_folder(name)
+        self._db.add_custom_folder_items(folder_id, items)
+        self._record_creation(name, folder_id, items)
+        return folder_id
+
+    def _record_creation(self, name: str, folder_id: int, items: list[tuple]) -> None:
+        """File a just-made custom folder as one undoable step, and say how to
+        make it again. The redo re-creates it at the id it had rather than
+        letting the database allocate a new one, so the key a saved session
+        points at still resolves after undo-then-redo."""
+        def redo() -> None:
+            self._db.create_custom_folder(name, folder_id)
+            self._db.add_custom_folder_items(folder_id, items)
+            self._record_creation(name, folder_id, items)
+
+        self._history.push(UndoEntry(
+            f"Create folder “{name}”",
+            lambda: self._db.delete_custom_folder(folder_id),
+            redo=redo,
+        ))
+
+    def add_to(self, folder_id: int, items: list[tuple]) -> None:
+        """Add folders to a custom folder, as one undoable step. Items already in
+        it are left alone by the undo — they were there before this add."""
+        record = self._find(folder_id)
+        if record is None:
+            return
+        held = set(record["items"])
+        added = [m for m in items if m[0] not in held]
+        if not added:
+            return
+        self._db.add_custom_folder_items(folder_id, added)
+
+        def undo() -> str | None:
+            for folder_key, *_ in added:
+                self._db.remove_custom_folder_item(folder_id, folder_key)
+            return None
+
+        self._history.push(UndoEntry(_add_label(len(added), record["name"]), undo,
+                                     redo=lambda: self.add_to(folder_id, added)))
+
+    def remove_from(self, folder_id: int, folder_key: str,
+                    *, level=None, ref_prompt_id=None) -> None:
+        """Drop one gathered folder out of a custom folder. The folder itself and
+        its generations are untouched — only the grouping loses it."""
+        self._db.remove_custom_folder_item(folder_id, folder_key)
+        self._history.push(UndoEntry(
+            "Remove from folder",
+            lambda: self._db.add_custom_folder_items(
+                folder_id, [(folder_key, level, ref_prompt_id)]),
+            redo=lambda: self.remove_from(
+                folder_id, folder_key, level=level, ref_prompt_id=ref_prompt_id),
+        ))
+
+    def delete(self, folder_id: int) -> None:
+        """Remove a custom folder outright. Undo brings it back at the same id —
+        so the key a saved session points at still resolves — with the folders it
+        gathered, in order."""
+        record = self._find(folder_id)
+        if record is None:
+            return
+        items = [
+            (m["folder_key"], m["level"], m["ref_prompt_id"])
+            for m in self._db.custom_folder_items_full()
+            if m["folder_id"] == folder_id and m["folder_key"] in set(record["items"])
+        ]
+        # Restore in the order the folder listed them, not the order the identity
+        # query happened to return.
+        order = {key: i for i, key in enumerate(record["items"])}
+        items.sort(key=lambda m: order[m[0]])
+        name = record["name"]
+        self._db.delete_custom_folder(folder_id)
+
+        def undo() -> str | None:
+            self._db.create_custom_folder(name, folder_id)
+            self._db.add_custom_folder_items(folder_id, items)
+            return None
+
+        self._history.push(UndoEntry(f"Remove folder “{name}”", undo,
+                                     redo=lambda: self.delete(folder_id)))
+
+    def rename(self, folder_id: int, name: str | None) -> None:
+        if not name:
+            return  # nothing to fall back to — keep the name it has
+        record = self._find(folder_id)
+        if record is None:
+            return
+        previous = record["name"]
+        self._db.rename_custom_folder(folder_id, name)
+        self._history.push(UndoEntry(
+            "Rename folder",
+            lambda: self._db.rename_custom_folder(folder_id, previous),
+            redo=lambda: self.rename(folder_id, name),
+        ))
+
+    def _find(self, folder_id: int) -> dict | None:
+        for record in self._db.list_custom_folders():
+            if record["id"] == folder_id:
+                return record
+        return None
 
 
 def _delete_label(count: int) -> str:

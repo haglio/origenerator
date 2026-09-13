@@ -138,13 +138,24 @@ def test_left_click_emits_clicked_but_right_click_does_not(qtbot):
     tw = ThumbnailWidget("p1", None, "label")
     qtbot.addWidget(tw)
     clicks = []
-    tw.clicked.connect(clicks.append)
+    tw.clicked.connect(lambda prompt_id, modifiers: clicks.append(prompt_id))
 
     qtbot.mouseClick(tw, Qt.MouseButton.RightButton)
     assert clicks == []  # right-click is for the menu; it must not re-select
 
     qtbot.mouseClick(tw, Qt.MouseButton.LeftButton)
     assert clicks == ["p1"]
+
+
+def test_a_click_reports_the_keys_held_during_it(qtbot):
+    tw = ThumbnailWidget("p1", None, "label")
+    qtbot.addWidget(tw)
+    held = []
+    tw.clicked.connect(lambda prompt_id, modifiers: held.append(modifiers))
+
+    qtbot.mouseClick(tw, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.ControlModifier)
+
+    assert held == [Qt.KeyboardModifier.ControlModifier]
 
 
 def test_double_click_emits_double_clicked_for_left_button_only(qtbot):

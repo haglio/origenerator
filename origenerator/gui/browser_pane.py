@@ -26,7 +26,6 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication,
     QLabel,
     QMenu,
     QPushButton,
@@ -1204,8 +1203,8 @@ class BrowserPane(QObject):
 
     # --- multi-selection ---------------------------------------------------
 
-    def _thumbnail_clicked(self, prompt_id: str):
-        self.apply_selection(prompt_id, QApplication.keyboardModifiers())
+    def _thumbnail_clicked(self, prompt_id: str, modifiers: Qt.KeyboardModifier):
+        self.apply_selection(prompt_id, modifiers)
         self.thumbnail_activated.emit(prompt_id)  # the view records the visit itself
 
     def _thumbnail_double_clicked(self, prompt_id: str):

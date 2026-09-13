@@ -130,6 +130,11 @@ class _Scene(QFrame):
         self.length.editTextChanged.connect(self.changed)
         self.length.edited.connect(self._settle)
 
+    def show_text(self, key: str, shown: bool) -> None:
+        if key in self.fields:
+            self.captions[key].setVisible(shown)
+            self.fields[key].setVisible(shown)
+
     def speaking(self) -> bool:
         """Whether this scene has a line, and so renders as her speaking."""
         field = self.fields.get("scene_lines")
@@ -180,6 +185,7 @@ class ScenesEditor(QWidget):
         self._prepare_length = prepare_length
         # Whether the workflow speaks: a card of one that cannot has no lines field.
         self._lines = lines
+        self._hidden_texts: set[str] = set()
         self._scenes: list[_Scene] = []
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -204,12 +210,22 @@ class ScenesEditor(QWidget):
             scene.fields["negative_prompt"].setPlainText(
                 diff_text.live_text(self._scenes[-1].fields["negative_prompt"]))
         scene.set_frames(int(self._pd.default[0]))
+        for key in self._hidden_texts:
+            scene.show_text(key, False)
         scene.changed.connect(self.changed)
         scene.remove_requested.connect(self.remove_scene)
         self._scenes.append(scene)
         self._cards.addWidget(scene)
         self._renumber()
         self.changed.emit()
+
+    def show_text(self, key: str, shown: bool) -> None:
+        if shown:
+            self._hidden_texts.discard(key)
+        else:
+            self._hidden_texts.add(key)
+        for scene in self._scenes:
+            scene.show_text(key, shown)
 
     def remove_scene(self, which) -> None:
         """Take a scene out, by index or by card; the last one stays."""

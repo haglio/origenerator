@@ -7,6 +7,7 @@ from PyQt6.QtCore import QByteArray, Qt
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow
 
+from origenerator import ui_scale
 from origenerator.app_state import AppState
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
@@ -176,6 +177,7 @@ class OrigeneratorWindow(QMainWindow):
         self._fun_time = session
         self._gallery_view.become_hosted(session)
         self.setWindowState(Qt.WindowState.WindowNoState)
+        ui_scale.draw_at(ui_scale.hosted_scale())
         self._wear_the_session(session)
         FunTimeBridge(session, self._gallery_view, parent=self)
         self.showMinimized()

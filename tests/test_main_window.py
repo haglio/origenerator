@@ -7,7 +7,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 
-from origenerator import gallery, recipe_match
+from origenerator import gallery, recipe_match, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -858,6 +858,26 @@ def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names
     assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
     assert [bridge.parent() for bridge in win.findChildren(FunTimeBridge)] == [win]
     assert win._gallery_view._fun_time is not None
+
+
+def test_a_window_taken_into_a_session_draws_at_the_sessions_size(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    win.become_hosted(_fun_time_session())
+    win.showNormal()
+
+    qtbot.waitUntil(lambda: win.devicePixelRatio() == pytest.approx(ui_scale.HOSTED_SCALE))
+    assert ui_scale.active_scale() == pytest.approx(ui_scale.HOSTED_SCALE)
+
+
+def test_a_scale_set_by_hand_is_kept_when_the_window_is_taken_over(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setenv("QT_SCALE_FACTOR", "1.25")
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert ui_scale.active_scale() == 1.25
 
 
 def test_the_standalone_geometry_is_kept_through_a_session_that_took_the_window(qtbot, tmp_path):

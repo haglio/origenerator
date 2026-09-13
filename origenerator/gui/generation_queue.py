@@ -17,7 +17,7 @@ On the right, taking the rest of the strip, *what is queued*: every in-flight jo
 as a row of its own — the one being made at the top — each led by a Cancel, each
 opening its folder on a click or a double-click, and each draggable to a new
 place in the line. A row says what the job will cost and what kind of thing it
-is, and nothing else ("~2 min · I2V · dancing · Auto · Request"): a line of
+is, and nothing else ("~2 min · Video · dancing · Auto · Request"): a line of
 waiting work is read to find out how long the wait is, and the
 workflow-and-prompt name that used to be here is the same on every row of a
 folder being re-rolled. Beside that, a picture — the frame an image-to-video
@@ -358,7 +358,7 @@ class QueueRow(OpensAFolder, QWidget):
     the button that throws it away.
 
     Read left to right: the button, then the job's picture, then what it is —
-    ``"~2 min · I2V · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
+    ``"~2 min · Video · dancing · Auto"`` (:func:`inflight.queue_lead_text`). That
     line is the whole of what the row says about the job. The workflow-and-prompt
     name a Generate tab is titled with used to be here and is not: it answers
     "which recipe", and every row of a folder being re-rolled carries the same

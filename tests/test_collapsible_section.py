@@ -20,16 +20,16 @@ def test_starts_collapsed_hides_its_content(qtbot):
 
 
 def test_header_shows_the_title(qtbot):
-    section = CollapsibleSection("Sampling", collapsed=True)
+    section = CollapsibleSection("Drawing", collapsed=True)
     qtbot.addWidget(section)
-    assert "Sampling" in section._header.text()
+    assert "Drawing" in section._header.text()
 
 
 def test_header_escapes_an_ampersand_instead_of_making_it_a_mnemonic(qtbot):
-    # A raw "&" would be eaten as a QPushButton accelerator, showing "Model  LoRA".
-    section = CollapsibleSection("Model & LoRA", collapsed=True)
+    # A raw "&" would be eaten as a QPushButton accelerator, showing "Models  Add-ons".
+    section = CollapsibleSection("Models & Add-ons", collapsed=True)
     qtbot.addWidget(section)
-    assert "Model && LoRA" in section._header.text()
+    assert "Models && Add-ons" in section._header.text()
 
 
 def test_clicking_the_header_toggles_and_emits(qtbot):

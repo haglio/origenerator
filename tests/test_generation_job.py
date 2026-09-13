@@ -111,7 +111,7 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     # restarting count has to live somewhere.
     assert job.last_pass_progress == (1, 10)
     # …and named, since the band on its own says only that something restarted.
-    assert job.last_stage == "Low noise"
+    assert job.last_stage == "Second pass"
 
 
 def test_a_single_pass_job_reports_no_pass_of_its_own(qtbot, tmp_path):
@@ -410,7 +410,7 @@ def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
     # split. The snapshot predates the recorded pass count; the payload's own
     # (three, for this workflow) stands in.
     assert job.last_pass_progress == (3, 10)
-    assert job.last_stage == "Low noise"
+    assert job.last_stage == "Second pass"
 
     job._on_progress("pid", "16", 4, 10)     # next real tick from ComfyUI
     assert job.last_progress == (567, 818)   # carries on, not back to the pass's own 4

@@ -710,7 +710,7 @@ def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):
     view.resize(1920, 1080)
     QApplication.sendEvent(view, QResizeEvent(QSize(1920, 1080), QSize(640, 480)))
     view.set_queue([_inflight(status="running", typical_seconds=30, job_kind="Image"),
-                    _inflight(key="j2", typical_seconds=600, job_kind="T2V",
+                    _inflight(key="j2", typical_seconds=600, job_kind="Video",
                               held=True)])
 
     plate = view._queue.geometry()

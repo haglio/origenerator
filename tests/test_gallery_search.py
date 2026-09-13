@@ -263,6 +263,14 @@ def test_the_field_says_what_a_query_typed_in_it_would_search(controller):
     assert found.field.placeholderText() == "Search Landscape  ›  Latest…"
 
 
+def test_the_sort_menu_names_the_recipe_order_the_way_the_forms_do(controller):
+    found = controller()
+
+    orders = [found._sort_combo.itemText(i) for i in range(found._sort_combo.count())]
+
+    assert orders == ["Recent", "Model / Add-on"]
+
+
 def _folder_key(row: dict) -> str:
     from origenerator import gallery
     return gallery.settings_folder_key(row, {})

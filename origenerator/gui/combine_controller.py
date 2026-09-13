@@ -305,7 +305,7 @@ class CombineController(QObject):
             frame=None,
             reveal=lambda: None,  # no folder to open yet: it has no settings
             media_type="video",
-            job_kind="I2V",  # the video slot takes nothing else
+            job_kind="Video",
             recipe_category=category,
             # The same rule the finished row follows: a picked act names itself in
             # the text, and only a dropped video is shown.

@@ -166,12 +166,12 @@ def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
     assert tracker.update(20, 20, "b") == (100, 100)
 
 
-def test_each_sampler_pass_is_named_by_what_its_node_is_set_to_do():
-    # A WAN pair splits one schedule between its experts, and the names are the
-    # ones the app's own form uses for them ("Model (High)", "Shift (High)"). The
-    # audio pass that scores the clip is the third.
+def test_each_sampler_pass_is_named_the_way_the_form_names_it():
+    # A WAN pair splits one schedule between its experts, and the bar calls them
+    # what the form does ("Model (First Pass)"). The pass that scores the clip is
+    # the Sound the form's section is named for.
     names = stage_names(_payload("wan22_i2v", steps=20))
-    assert (names["15"], names["16"], names["24"]) == ("High noise", "Low noise", "Audio")
+    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")
 
 
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):

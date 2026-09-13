@@ -176,11 +176,11 @@ def test_the_bar_says_which_pass_is_being_taken(qtbot):
     # one thing a twelve-minute run can report while the countdown is still too
     # early to mean anything.
     job = FakeJob(state="running", last_progress=(405, 818),
-                  last_pass_progress=(1, 10), last_stage="Low noise",
+                  last_pass_progress=(1, 10), last_stage="Second pass",
                   started_at=time.time() - 90.5)
     tile = RerollTile(job, typical_seconds=725.0)
     qtbot.addWidget(tile)
-    assert tile._bar.caption().startswith("Low noise · 49% · ")
+    assert tile._bar.caption().startswith("Second pass · 49% · ")
 
 
 def test_a_running_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):

@@ -204,13 +204,13 @@ def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
 
 def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
     panel = _panel(qtbot)
-    assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral prompt
+    assert panel.video_slot._label.text() == "Drop a video"  # neutral prompt
 
     _pick_act(panel, "gamma")
     assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
 
     _pick_act(panel, "")
-    assert panel.video_slot._label.text() == "Drop an I2V video"  # neutral again
+    assert panel.video_slot._label.text() == "Drop a video"  # neutral again
 
 
 def test_generate_emits_the_picked_act(qtbot):

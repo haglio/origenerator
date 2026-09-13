@@ -55,7 +55,7 @@ class ModelGroup:
     key: str
     label: str
     # Always LoraGroups: a workflow with no LoRA keys collapses to a single
-    # "(no LoRA)" folder rather than skipping the level, so depth stays uniform.
+    # "(no add-on)" folder rather than skipping the level, so depth stays uniform.
     # (An image-conditioned workflow grows a source-image level below the LoRA.)
     children: list[LoraGroup]
     starred: bool = False

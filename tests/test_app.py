@@ -810,7 +810,7 @@ _SPLASH_LINES = (
     "Scanning for new images...",
     "Tidying up video previews...",
     "Updating workflow labels...",
-    "Sorting by model and LoRA...",
+    "Sorting by model and add-on...",
     "Linking videos to their source images...",
     "Folding enhancements into their images...",
     "Repairing thumbnails...",

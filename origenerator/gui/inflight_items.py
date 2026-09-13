@@ -23,7 +23,7 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 
 # The kinds whose start frame is what the run is *of*, rather than one input
 # among several: a video animating a picture, and an enhancement of one.
-SOURCE_FRAME_KINDS = ("I2V", "Enhance")
+SOURCE_FRAME_KINDS = ("Video", "Enhance")
 
 
 class InFlightItems:
@@ -176,7 +176,7 @@ class InFlightItems:
         The image a request was made of comes first: a folder-wide request
         queues a run per image and every one of them animates nothing, so the
         thing it was asked about is the only picture it has. Failing that, the
-        start frame an i2v or an enhance is built on.
+        start frame a video or an enhance is built on.
         """
         asked_of = thumb_by_id.get(requested_of) if requested_of else None
         if asked_of:

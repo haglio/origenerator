@@ -415,14 +415,14 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
                         "Trash", "All"}
     # Media type grows no folder of its own any more; the two ticks over the
     # tree are what says which kinds are listed.
-    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
 
     workflow_node = _image_workflow(view._tree)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
-    # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
+    # workflow -> one model -> its "(no add-on)" level -> one settings folder, into
     # which the two seed variants collapse.
     assert workflow_node.childCount() == 1                    # one model
-    assert workflow_node.child(0).childCount() == 1           # its single "(no LoRA)" level
+    assert workflow_node.child(0).childCount() == 1           # its single "(no add-on)" level
     assert workflow_node.child(0).child(0).childCount() == 1  # the two seeds collapse
 
 
@@ -441,7 +441,7 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
-    assert not lora.icon(0).isNull() and "LoRA" in lora.toolTip(0)
+    assert not lora.icon(0).isNull() and "Add-on" in lora.toolTip(0)
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
     # all, so it carries no chip — and since its name is a code, its tooltip is
@@ -555,7 +555,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
     view._tree.setCurrentItem(lora)
     assert len(view._browser._visible_keys) == 2
@@ -574,7 +574,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     view._tree.setCurrentItem(lora)
     a_tile_key = view._browser._visible_keys[0]  # a settings tile under the LoRA folder
 
@@ -683,7 +683,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["v1"]
-    assert "I2V" in view._title.display_text()  # the header says where it looked
+    assert "Image-to-Video" in view._title.display_text()  # the header says where it looked
 
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
@@ -727,7 +727,7 @@ def test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands(q
 
     all_row = _top_level(view._tree)["All"]
     assert [all_row.child(i).text(0) for i in range(all_row.childCount())] == [
-        "SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"]
+        "SDXL Text-to-Image", "WAN 2.2 Image-to-Video"]
     assert all_row.isExpanded()   # shut, it would be a tree with nothing in it
     assert view._tree.currentItem() is all_row
 
@@ -1375,7 +1375,7 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     cat_key = _key(lora.child(0))
     dog_key = _key(lora.child(1))  # cat is first, dog second
     view._toggle_star(dog_key)
@@ -1434,7 +1434,7 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -2173,7 +2173,7 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)
 
@@ -2216,7 +2216,7 @@ def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
     view._toggle_star(dog_key)  # and a starred folder
 
@@ -2647,7 +2647,7 @@ def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
     view._video_cb.setChecked(True)
     view._image_cb.setChecked(False)
 
-    assert list(_workflow_rows(view._tree)) == ["WAN 2.2 I2V (Image-to-Video)"]
+    assert list(_workflow_rows(view._tree)) == ["WAN 2.2 Image-to-Video"]
 
     view._video_cb.setChecked(False)   # both off: no folders at all
 
@@ -2796,7 +2796,7 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 I2V (Image-to-Video)"}
+    assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
 
 
 def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
@@ -4272,7 +4272,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    # SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
+    # SDXL workflow -> model -> "(no add-on)" -> dog settings leaf (cat is sibling 0).
     dog_leaf = _image_workflow(saved._tree).child(0).child(0).child(1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
@@ -4609,7 +4609,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
 def _open_leaf(view):
     """Select the first settings-group leaf so its thumbnails are showing."""
     workflow = _image_workflow(view._tree)
-    leaf = workflow.child(0).child(0).child(0)  # workflow -> model -> "(no LoRA)" -> settings
+    leaf = workflow.child(0).child(0).child(0)  # workflow -> model -> "(no add-on)" -> settings
     view._tree.setCurrentItem(leaf)
     return leaf
 
@@ -5019,7 +5019,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
 
     view._delete_selection()  # deletes that settings folder
 
-    # The leaf's parent — the "(no LoRA)" folder — survives via its sibling leaf,
+    # The leaf's parent — the "(no add-on)" folder — survives via its sibling leaf,
     # so the tree falls back onto it rather than jumping up to the top.
     current = view._tree.currentItem().data(0, _GROUP_ROLE)
     assert isinstance(current, gallery.LoraGroup)
@@ -5045,7 +5045,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _image_workflow(view._tree).child(0).child(0)  # the (no LoRA) folder
+    lora = _image_workflow(view._tree).child(0).child(0)  # the (no add-on) folder
     first_leaf, second_leaf = lora.child(0), lora.child(1)
     first_key = first_leaf.data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
@@ -5299,7 +5299,7 @@ def _reroll_tile(view):
 
 
 def _select_first_leaf(view):
-    # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
+    # workflow -> model -> "(no add-on)" -> settings (the thumbnail leaf)
     leaf = _image_workflow(view._tree).child(0).child(0).child(0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
@@ -6665,7 +6665,7 @@ def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypat
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _image_workflow(view._tree).child(0).child(0)  # "(no LoRA)"
+    lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     view._toggle_star(_key(lora.child(0)))   # ...and a starred folder (the cat one)
     view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
 
@@ -8463,7 +8463,7 @@ def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
     view.refresh()
 
     item = view._inflight_items()[0]
-    assert item.job_kind == "I2V"
+    assert item.job_kind == "Video"
     assert item.typical_seconds == 120.0
 
 
@@ -11568,7 +11568,7 @@ def test_esc_stops_the_audio_bed_on_its_own(qtbot):
 
 def _two_leaf_view(qtbot, extra=(), actions=None):
     """A view whose Images tree holds two settings folders ("a cat", "a dog")
-    under one "(no LoRA)" parent, plus whatever ``extra`` rows are handed in.
+    under one "(no add-on)" parent, plus whatever ``extra`` rows are handed in.
 
     Returns the two folders by *key*: every rebuild throws its tree items away,
     and these tests all rebuild."""

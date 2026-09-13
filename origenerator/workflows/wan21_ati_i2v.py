@@ -60,7 +60,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
 
     name = "wan21_ati_i2v"
     version = "v007"
-    display_name = "WAN 2.1 ATI (Motion-Tracked I2V)"
+    display_name = "WAN 2.1 Image-to-Video (Motion-Tracked)"
     output_type = "video"
     derives_size_from_input = True
     model_keys = ("unet",)

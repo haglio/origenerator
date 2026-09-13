@@ -48,7 +48,7 @@ class ElidingButton(QPushButton):
         """Set the label, keeping the unescaped copy the eliding paint needs.
 
         Qt reads a lone "&" as an accelerator marker, so a button's text carries
-        it doubled ("Model && LoRA"); eliding that string could cut between the
+        it doubled ("Models && Add-ons"); eliding that string could cut between the
         pair and leave the survivor swallowing the next character. Eliding the raw
         label and doubling afterwards can't. ``text()`` still answers with the
         doubled form, as any other button's does.

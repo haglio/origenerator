@@ -64,7 +64,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
 
     name = "wan22_i2v"
     version = "v007"
-    display_name = "WAN 2.2 I2V (Image-to-Video)"
+    display_name = "WAN 2.2 Image-to-Video"
     output_type = "video"
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")

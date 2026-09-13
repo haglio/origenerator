@@ -36,10 +36,10 @@ def test_level_badge_icons_render_for_each_level(qtbot):
     from PyQt6.QtCore import QSize
 
     # Every badged level maps to a rendered chip: the four folder levels,
-    # workflow -> model -> LoRA -> source image.
+    # workflow -> model -> add-on -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
-    assert icons.LEVEL_LABELS["lora"] == "LoRA"
+    assert icons.LEVEL_LABELS["lora"] == "Add-on"
     assert icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in icons.LEVEL_LABELS:
         icon = icons.level_badge_icon(level)

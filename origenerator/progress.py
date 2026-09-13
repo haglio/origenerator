@@ -215,16 +215,16 @@ def _sampler_stage(class_type: str, inputs: dict) -> str:
     because the node ids a workflow hands its own helpers are the only place
     those names could be kept in step — and a second table of them is a table
     that goes stale. A WAN pair splits one schedule between its two experts and
-    is named the way the app's own form names them ("Model (High)", "Shift
-    (High)"); a still's second sampler is the enhance tail, which is the one that
-    denoises partway rather than from scratch.
+    is named the way the app's own form names them ("Model (First Pass)",
+    "Composition Focus (Second Pass)"); a still's second sampler is the enhance
+    tail, which is the one that denoises partway rather than from scratch.
     """
     if class_type == "HunyuanFoleySampler":
-        return "Audio"
+        return "Sound"
     if class_type == "DetailerForEach":
         return "Detail fix"
     if class_type == "KSamplerAdvanced":
-        return "High noise" if inputs.get("add_noise") == "enable" else "Low noise"
+        return "First pass" if inputs.get("add_noise") == "enable" else "Second pass"
     return "Enhance" if _literal(inputs.get("denoise"), 1.0) < 1.0 else "Render"
 
 

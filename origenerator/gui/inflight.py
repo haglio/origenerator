@@ -45,7 +45,7 @@ class InFlightItem:
     # the foot of that bar. ``None`` for a job of a single pass, which has
     # nothing to say the whole-run reading doesn't.
     pass_progress: tuple[int, int] | None = None
-    # What the app is doing right now ("Loading models", "High noise", "Writing
+    # What the app is doing right now ("Loading models", "First pass", "Writing
     # the video"), which the bar's caption leads with. "" before ComfyUI has
     # named a node — which for a queued job is the whole of its wait.
     stage: str = ""
@@ -63,7 +63,7 @@ class InFlightItem:
     # recent runs say a whole one takes.
     started_at: float | None = None
     typical_seconds: float | None = None
-    # What kind of work this is in one word — "Image", "T2V", "I2V", "Enhance"
+    # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
     # a different question: which recipe, not what it costs to ask for.
@@ -109,14 +109,14 @@ class InFlightItem:
 def queue_lead_text(item: InFlightItem) -> str:
     """The head of a queue row: what the job costs, what it is, and who asked.
 
-    ``"~2 min · I2V · dancing · Auto · Request"``. Everything here is a fact about
+    ``"~2 min · Video · dancing · Auto · Request"``. Everything here is a fact about
     the job that is true before it starts, which is what a line of waiting work is
     read for — the price first, because that is what "how long until my turn" is
     added up out of, and because it is the one figure that makes a queue of four
     videos read differently from a queue of four pictures.
 
     The act follows the kind, for a run the Combine panel launched from its
-    dropdown: "I2V" says a video is being made from a frame, and the act says
+    dropdown: the kind says a video is being made, and the act says
     which video — the whole of what the user chose, and the one thing separating
     two runs on the same picture. It rides through "Edit…" too, so a
     combination edited before launching still says what it was asked for.
@@ -142,8 +142,9 @@ def queue_lead_text(item: InFlightItem) -> str:
 def queue_lead_tooltip(item: InFlightItem) -> str:
     """The hover line spelling out :func:`queue_lead_text`, which is abbreviated.
 
-    "I2V" and a bare "~?" are shorthand a row has the width for and a first-time
-    reader has no way to expand, so the long form lives one hover away.
+    A bare "~?" is shorthand a row has the width for and a first-time reader has
+    no way to expand, so the long form lives one hover away, beside what each
+    kind of job is made from.
     """
     if item.starting:
         lines = ["Not sent to ComfyUI yet — this row stands in until it is"]
@@ -163,12 +164,11 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     return "\n".join(lines)
 
 
-# What each of :func:`gallery.job_kind_label`'s four words means, spelled out for
-# the hover. An unregistered workflow's "" has no entry and contributes no line.
+# What each of :func:`gallery.job_kind_label`'s three words means, spelled out
+# for the hover. An unregistered workflow's "" has no entry and contributes no line.
 _KIND_TOOLTIPS = {
     "Image": "An image",
-    "T2V": "A video from the prompt alone",
-    "I2V": "A video from a start frame",
+    "Video": "A video made from a start image",
     "Enhance": "An enhancement of an image already made",
 }
 

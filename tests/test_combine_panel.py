@@ -192,6 +192,45 @@ def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
 
 
+def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    _pick_act(panel, "alpha")
+
+    _pick_act(panel, "")
+
+    assert panel.video_slot.current_id() == "vid1"
+
+
+def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtbot):
+    fitting = {"vid1"}
+    panel = CombinePanel(image_accepts=lambda pid: True,
+                         video_accepts=lambda pid: pid in fitting,
+                         preview=lambda pid: (None, None))
+    qtbot.addWidget(panel)
+    panel.video_slot.set_item("vid1")
+    _pick_act(panel, "alpha")
+    fitting.clear()  # binned while the act was picked
+
+    _pick_act(panel, "")
+
+    assert panel.video_slot.current_id() is None
+
+
+def test_each_lane_keeps_its_own_dropped_video(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    _pick_lane(panel, recipe_match.GENAU)
+    assert panel.video_slot.current_id() is None
+    panel.video_slot.set_item("vid2")
+
+    _pick_lane(panel, recipe_match.VIDEO)
+    assert panel.video_slot.current_id() == "vid1"
+
+    _pick_lane(panel, recipe_match.GENAU)
+    assert panel.video_slot.current_id() == "vid2"
+
+
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
     panel = _panel(qtbot)
     _pick_act(panel, "delta")

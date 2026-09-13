@@ -1317,6 +1317,31 @@ def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
     assert settings[0].starred is False
 
 
+def test_a_new_generation_in_an_older_folder_leaves_the_folder_where_it_was():
+    newest_first = [
+        _img("cat2", "a cat", 50, 2),
+        _img("dog", "a dog", 50, 1),
+        _img("cat1", "a cat", 50, 1),
+    ]
+    lora = build_gallery_tree(newest_first)[0].model_groups[0].children[0]
+
+    assert [[r["prompt_id"] for r in leaf.rows] for leaf in lora.children] \
+        == [["dog"], ["cat2", "cat1"]]
+
+
+def test_workflow_folders_of_both_kinds_share_one_order_of_when_each_was_made():
+    newest_first = [
+        _row(prompt_id="flux", workflow_name="flux_t2i_upscaled",
+             params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
+             output_files=json.dumps([{"filename": "flux_t2i_upscaled_flux.png"}])),
+        _i2v("v1", "styleA"),
+        _img("i1", "a cat", 50, 1),
+    ]
+
+    assert [w.key for w in build_gallery_tree(newest_first)] \
+        == ["image/flux_t2i_upscaled", "video/wan22_i2v", "image/sdxl_t2i"]
+
+
 def test_named_folders_credit_every_row_beneath_them():
     # A name the user gave a folder belongs to everything inside it, at any
     # depth — that is what makes the name a way of finding those generations.

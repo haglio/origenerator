@@ -55,6 +55,7 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import AppCommand
@@ -916,15 +917,16 @@ class ShowDirector:
         if self._slideshow is not None:
             self._slideshow.set_queue(items, foreign_total)
 
-    def note_voice_command(self, message: str) -> None:
+    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
         """Put a spoken line in the show's own corner, if a show is up."""
         if self._slideshow is not None:
-            self._slideshow.note_voice_command(message)
+            self._slideshow.note_voice_command(message, kind=kind)
 
-    def note_voice_run(self, prompt_id: str | None, message: str) -> None:
+    def note_voice_run(self, prompt_id: str | None, message: str, *,
+                       kind: str = NOTICE) -> None:
         """Put a line about a launched run in the show's own corner."""
         if self._slideshow is not None:
-            self._slideshow.note_voice_run(prompt_id, message)
+            self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
     def drive_target(self):
         """The funscript the show on screen is playing, or ``None`` — what the
@@ -941,13 +943,13 @@ class ShowDirector:
 
     # --- the spoken words about a show --------------------------------------
 
-    def answer(self, message: str) -> None:
+    def answer(self, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken command did, where the speaker is looking — the
         show's own corner while one is up, since the window under it is covered
         by the very thing being talked to, and the gallery's caption otherwise."""
         show = self._slideshow
         if show is not None:
-            show.note_voice_command(message)
+            show.note_voice_command(message, kind=kind)
         else:
             self._host.say(message)
 
@@ -1069,7 +1071,7 @@ class ShowDirector:
             show.note_voice_command(
                 f"🎤 enhanced only — {len(show.hud_items()[0])} to play")
         else:
-            show.note_voice_command("🎤 nothing here is enhanced")
+            show.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
 
     def run_on_slide(self, command: AppCommand) -> None:
         """A word about the slide filling the screen: step off it either way,
@@ -1081,6 +1083,7 @@ class ShowDirector:
         here is a word nobody can use.
         """
         show = self._slideshow
+        kind = NOTICE
         if command is AppCommand.BACK:
             show.step(-1)
             said = "🎤 back"
@@ -1091,12 +1094,15 @@ class ShowDirector:
             show.cull()
             said = "🎤 gone"
         elif command is AppCommand.STAR:
-            said = "🎤 starred" if show.star() else "🎤 nothing here to star"
+            said, kind = (("🎤 starred", FAVORITE) if show.star()
+                          else ("🎤 nothing here to star", WARNING))
         elif command is AppCommand.LOCK:
-            said = "🎤 holding this one" if show.set_held(True) else "🎤 already holding it"
+            said, kind = (("🎤 holding this one", NOTICE) if show.set_held(True)
+                          else ("🎤 already holding it", WARNING))
         else:  # UNLOCK
-            said = "🎤 let go" if show.set_held(False) else "🎤 nothing was held"
-        self.answer(said)
+            said, kind = (("🎤 let go", NOTICE) if show.set_held(False)
+                          else ("🎤 nothing was held", WARNING))
+        self.answer(said, kind=kind)
 
     # --- what the HUD's two switches judge items by -------------------------
 

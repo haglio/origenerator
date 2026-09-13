@@ -19,6 +19,7 @@ from origenerator import recipe_match
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
+from origenerator.gui.toast import NOTICE, WARNING
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -150,8 +151,8 @@ class FakeShows:
         self.showing = showing
         self.runs_said = []
 
-    def note_voice_run(self, prompt_id, message):
-        self.runs_said.append((prompt_id, message))
+    def note_voice_run(self, prompt_id, message, *, kind):
+        self.runs_said.append((prompt_id, message, kind))
 
 
 class FakeTabs:
@@ -546,7 +547,7 @@ def test_that_hint_lands_in_the_shows_corner_rather_than_a_dialog(combine,
 
     assert host.told == []
     assert shows.runs_said == [
-        (None, "🎤 no past looping “waving” clip to base a recipe on yet")]
+        (None, "🎤 no past looping “waving” clip to base a recipe on yet", WARNING)]
 
 
 def test_the_mined_recipe_is_matched_against_its_start_frames_scene(combine,
@@ -634,17 +635,18 @@ def test_genau_it_reads_the_act_off_the_pictures_own_prompt(combine, monkeypatch
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    prompt_id, message = controller.genau_it("img")
+    prompt_id, message, kind = controller.genau_it("img")
 
     assert prompt_id == "img"
     assert message == "🎤 animating as a “waving” loop"
+    assert kind == NOTICE
 
 
 def test_genau_it_declines_a_video(combine):
     controller, _host = combine(db=FakeDB([_video("clip")]))
 
     assert controller.genau_it("clip") == (
-        None, "🎤 only a picture can become a Genau clip")
+        None, "🎤 only a picture can become a Genau clip", WARNING)
 
 
 def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(combine,
@@ -652,10 +654,11 @@ def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(combine,
     monkeypatch.setattr(module.recipe_match, "category_for_prompt", lambda p: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    _prompt_id, message = controller.genau_it("img")
+    _prompt_id, message, kind = controller.genau_it("img")
 
     assert message == (
         "🎤 this prompt doesn't say what's happening — no act to animate")
+    assert kind == WARNING
 
 
 def test_a_second_genau_it_over_a_picture_with_a_clip_coming_is_refused(combine,
@@ -668,7 +671,7 @@ def test_a_second_genau_it_over_a_picture_with_a_clip_coming_is_refused(combine,
     db = FakeDB([_image("img"), _video("clip", status="running", requested="now")])
     controller, _host = combine(db=db)
 
-    assert controller.genau_it("img") == (None, ALREADY_GENAUD)
+    assert controller.genau_it("img") == (None, ALREADY_GENAUD, WARNING)
 
 
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(combine,
@@ -699,7 +702,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(combine,
 
     controller.generate_category("img", "waving", recipe_match.GENAU, send=True)
 
-    assert said == [(None, ALREADY_GENAUD)]
+    assert said == [(None, ALREADY_GENAUD, WARNING)]
 
 
 def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):

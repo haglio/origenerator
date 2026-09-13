@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import gallery
 from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_tree import RECENTS_KEY
+from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import AppCommand, DialSetting
 from origenerator.voice.commands import ShelfCommand, ShowControl, SurfaceCommand
@@ -110,17 +111,17 @@ class FakeShow:
     def voice_target(self):
         return self.target
 
-    def note_voice_command(self, message):
+    def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
 
-    def note_voice_run(self, prompt_id, message):
-        self.runs.append((prompt_id, message))
+    def note_voice_run(self, prompt_id, message, *, kind):
+        self.runs.append((prompt_id, message, kind))
 
     def hold_for_request(self, holding, note):
         self.holds.append((holding, note))
 
-    def note_request(self, message, spoken, *, working=False):
-        self.requests.append((message, working))
+    def note_request(self, message, spoken, *, working=False, kind=NOTICE):
+        self.requests.append((message, working, kind))
 
 
 class FakeShows:
@@ -130,7 +131,9 @@ class FakeShows:
         self.showing = showing
         self.by_side = by_side or {}
         self.answers = []
+        self.answer_kinds = []
         self.said = []
+        self.kinds = []
         self.shelves_played = []
         self.show_commands = []
         self.filters = []
@@ -139,11 +142,13 @@ class FakeShows:
     def surface_for(self, side):
         return self.by_side.get(side) if side is not None else self.showing
 
-    def answer(self, message):
+    def answer(self, message, *, kind=NOTICE):
         self.answers.append(message)
+        self.answer_kinds.append(kind)
 
-    def note_voice_command(self, message):
+    def note_voice_command(self, message, *, kind):
         self.said.append(message)
+        self.kinds.append(kind)
 
     def play_shelf(self, command):
         self.shelves_played.append(command)
@@ -240,19 +245,19 @@ class FakeHost:
 
     def enhance_it(self, prompt_id):
         self.enhanced.append(prompt_id)
-        return prompt_id, "🎤 enhancing…"
+        return prompt_id, "🎤 enhancing…", NOTICE
 
     def fix_parts(self, prompt_id, parts):
         self.fixed.append((prompt_id, parts))
-        return prompt_id, "🎤 fixing hands…"
+        return prompt_id, "🎤 fixing hands…", NOTICE
 
     def genau_it(self, image_id):
         self.genaued.append(image_id)
-        return image_id, "🎤 making a clip…"
+        return image_id, "🎤 making a clip…", NOTICE
 
     def queue_request(self, row, workflow, params, spoken, revision):
         self.queued.append((row["prompt_id"], revision))
-        return "🎤 queued it"
+        return "🎤 queued it", NOTICE
 
 
 class Spoken:
@@ -440,6 +445,7 @@ def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
     voice.on_command(AppCommand.RECENTS)
 
     assert shows.answers == ["🎤 no Latest shelf yet"]
+    assert shows.answer_kinds == [WARNING]
 
 
 def test_a_named_side_picks_that_sides_copy_of_the_shelf(router):
@@ -468,6 +474,7 @@ def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
     voice.on_command(AppCommand.AUDIO)
 
     assert shows.answers == ["🎤 the audio bed is the session's here"]
+    assert shows.answer_kinds == [WARNING]
 
 
 def test_a_switch_that_cannot_be_flipped_here_says_so(router):
@@ -477,6 +484,7 @@ def test_a_switch_that_cannot_be_flipped_here_says_so(router):
     voice.on_command(AppCommand.DRIVE_ON)
 
     assert shows.answers == ["🎤 the OSR2 can't be switched here"]
+    assert shows.answer_kinds == [WARNING]
 
 
 def test_a_dial_word_turns_the_motion_the_way_its_key_does(router):
@@ -512,6 +520,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
 
     assert pressed == [1]
     assert shows.answers == ["🎤 Undo: delete of 2 items"]
+    assert shows.answer_kinds == [NOTICE]
 
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
@@ -522,6 +531,7 @@ def test_a_bank_word_whose_button_is_dead_says_why(router):
     voice.on_command(AppCommand.GROUP)
 
     assert shows.answers == ["🎤 pick some folders first"]
+    assert shows.answer_kinds == [WARNING]
 
 
 def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
@@ -530,6 +540,7 @@ def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
     voice.on_command(AppCommand.LOCK)
 
     assert shows.answers == [f"🎤 {AppCommand.LOCK.value} is a slideshow's — none is up"]
+    assert shows.answer_kinds == [WARNING]
 
 
 def test_a_transport_word_goes_to_the_slide_while_a_show_is_up(router):
@@ -591,7 +602,7 @@ def test_an_order_about_the_picture_goes_to_the_slide_filling_the_screen(router)
     voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, None))
 
     assert host.enhanced == ["g7"]
-    assert show.runs == [("g7", "🎤 enhancing…")]
+    assert show.runs == [("g7", "🎤 enhancing…", NOTICE)]
 
 
 def test_enhance_with_no_show_up_falls_to_the_bank_button_of_that_name(router):
@@ -719,7 +730,27 @@ def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
         (_row("g1"), object(), {}, Spoken("no hat"), "portrait"), Revision())
 
     assert [pid for pid, _rev in host.queued] == ["g1"]
-    assert show.requests[-1] == ("🎤 queued it", False)
+    assert show.requests[-1] == ("🎤 queued it", False, NOTICE)
+
+
+def test_a_request_with_nothing_to_act_on_is_answered_as_a_warning(router):
+    show = FakeShow()
+    voice, host, _shows = router(shows=FakeShows(by_side={"portrait": show}))
+
+    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), "portrait"), None)
+
+    assert host.queued == []
+    assert show.requests[-1] == (
+        "🎤 didn't catch what to change in “no hat”", False, WARNING)
+
+
+def test_a_microphone_that_fails_says_so_as_an_error(router):
+    voice, _host, shows = router()
+
+    voice.listener.error.emit("mic unavailable")
+
+    assert shows.said == ["🎤 mic unavailable"]
+    assert shows.kinds == [ERROR]
 
 
 # --- words the hosting session heard ----------------------------------------

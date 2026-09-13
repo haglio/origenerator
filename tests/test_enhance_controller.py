@@ -19,6 +19,7 @@ from origenerator.gui.enhance_controller import (
     NO_VIDEO_ENHANCER,
     EnhanceController,
 )
+from origenerator.gui.toast import ERROR, NOTICE, WARNING
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
 
@@ -527,7 +528,7 @@ def test_a_spoken_enhance_refuses_a_picture_that_already_has_one(enhance,
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    assert controller.enhance_it("i1") == (None, "🎤 this one is enhanced already")
+    assert controller.enhance_it("i1") == (None, "🎤 this one is enhanced already", WARNING)
 
 
 def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
@@ -536,7 +537,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
     controller, _host = enhance(db=FakeDB([_video("v1")]))
 
     assert controller.enhance_it("v1") == (
-        None, "🎤 only a finished image can be enhanced")
+        None, "🎤 only a finished image can be enhanced", WARNING)
 
 
 def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
@@ -565,10 +566,11 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
                         lambda parts: ", ".join(p.name for p in parts))
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    prompt_id, message = controller.fix_parts("i1", [hands, teeth])
+    prompt_id, message, kind = controller.fix_parts("i1", [hands, teeth])
 
     assert prompt_id == "i1"
     assert message == "🎤 fixing hands…"
+    assert kind == NOTICE
 
 
 def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
@@ -581,10 +583,11 @@ def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
     monkeypatch.setattr(module, "name_parts", lambda parts: "teeth")
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    _prompt_id, message = controller.fix_parts("i1", [Part()])
+    _prompt_id, message, kind = controller.fix_parts("i1", [Part()])
 
     assert message == ("🎤 no teeth detector installed "
                        "(ComfyUI models/ultralytics/bbox)")
+    assert kind == WARNING
 
 
 def test_a_spoken_enhance_over_a_picture_already_cooking_one_is_refused(enhance,
@@ -599,7 +602,22 @@ def test_a_spoken_enhance_over_a_picture_already_cooking_one_is_refused(enhance,
                                 reroll=FakeReroll([FakeJob("run-a")]))
 
     assert controller.enhance_it("i1") == (
-        None, "🎤 an enhance of this image is already running")
+        None, "🎤 an enhance of this image is already running", WARNING)
+
+
+def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch):
+    # Nothing was refused: the run was wanted and its submit failed, so it reads
+    # red rather than the yellow of a picture with nothing to do.
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png"})
+    monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda p: "enhance")
+    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    monkeypatch.setattr(controller, "_launch", lambda row, params: False)
+
+    assert controller.enhance_it("i1") == (
+        None, "🎤 couldn't launch the enhance — see the log", ERROR)
 
 
 def test_a_held_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):

@@ -14,6 +14,7 @@ from PIL import Image
 from PyQt6.QtCore import QEvent, QPointF, QSize, Qt, QUrl
 from PyQt6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
+from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
 from origenerator.funscript import (
     legacy_funscript_path_for,
@@ -23,6 +24,7 @@ from origenerator.funscript import (
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.toast import ERROR, FAVORITE, WARNING, Toast
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
 from origenerator.motion_engine import Motion
 from origenerator.slideshow import LIVE, Slide, in_order
@@ -703,6 +705,24 @@ def test_the_enhancing_note_is_a_toast_across_the_top(qtbot):
     note = view._note.geometry()
     assert note.top() == TOAST_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
+
+
+def test_the_toast_wears_the_color_of_what_it_says(qtbot):
+    # Red only for an error, yellow for a warning, green for the favorites, white
+    # for the rest: the colors Fun Time's own toasts read in, since this is the
+    # same toast.
+    host = QWidget()
+    qtbot.addWidget(host)
+    toast = Toast(host)
+
+    toast.say("a plain line")
+    assert TEXT_PRIMARY.name() in toast.styleSheet()
+    toast.say("nothing to do", kind=WARNING)
+    assert AMBER.name() in toast.styleSheet()
+    toast.say("it broke", kind=ERROR)
+    assert RED.name() in toast.styleSheet()
+    toast.say("starred", kind=FAVORITE)
+    assert GREEN.name() in toast.styleSheet()
 
 
 # --- the queue, in the corner this view leaves empty -------------------------

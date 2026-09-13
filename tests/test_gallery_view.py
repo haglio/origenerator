@@ -49,6 +49,7 @@ from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.motion_engine import Motion
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
@@ -9728,13 +9729,13 @@ class _VoiceSurface:
     def voice_target(self):
         return self._prompt_id
 
-    def note_voice_run(self, prompt_id, message):
-        self.noted = (prompt_id, message)
+    def note_voice_run(self, prompt_id, message, *, kind):
+        self.noted = (prompt_id, message, kind)
 
     def note_enhancing(self, statuses):
         self.enhancing = statuses
 
-    def note_voice_command(self, message):
+    def note_voice_command(self, message, *, kind=NOTICE):
         self.said = message
 
     def step(self, delta):
@@ -12915,10 +12916,11 @@ def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path,
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
     # "img_act"'s own prompt names the act; nothing is picked and nothing is dropped.
-    prompt_id, message = view.genau_it("img_act")
+    prompt_id, message, kind = view.genau_it("img_act")
 
     assert prompt_id == "img_act"
     assert "dancing" in message
+    assert kind == NOTICE
     job = next(iter(view._reroll_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_act.png [output]"
@@ -12929,10 +12931,11 @@ def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path,
 def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    prompt_id, message = view.genau_it("img")  # its prompt is "a dog" — no act
+    prompt_id, message, kind = view.genau_it("img")  # its prompt is "a dog" — no act
 
     assert prompt_id is None
     assert "doesn't say" in message
+    assert kind == WARNING
     assert not view._reroll_jobs  # nothing was launched on a guess
 
 
@@ -12952,20 +12955,22 @@ def test_genau_it_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path, mo
     qtbot.addWidget(view)
     view.refresh()
 
-    prompt_id, message = view.genau_it("img_delta")
+    prompt_id, message, kind = view.genau_it("img_delta")
 
     assert prompt_id is None
     assert "looping" in message
+    assert kind == WARNING
     assert not view._reroll_jobs
 
 
 def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
-    prompt_id, message = view.genau_it("loop")
+    prompt_id, message, kind = view.genau_it("loop")
 
     assert prompt_id is None
     assert "picture" in message
+    assert kind == WARNING
 
 
 def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path, monkeypatch):
@@ -13002,7 +13007,7 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -13021,7 +13026,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(thinking) == 1
     work, done = thinking[0]
     done(work())  # the match comes back, and the one run it was for goes out
@@ -13056,7 +13061,7 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
-    assert surface.noted == (None, combine_controller.ALREADY_GENAUD)
+    assert surface.noted == (None, combine_controller.ALREADY_GENAUD, WARNING)
     assert len(_spoken_genau_rows(view)) == 1
 
 
@@ -13087,13 +13092,14 @@ def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monke
     monkeypatch.setattr(view, "would_reproduce_a_completed_run", lambda *a: True)
     surface = _VoiceSurface("img_act")
     notes = []
-    surface.note_voice_run = lambda prompt_id, message: notes.append((prompt_id, message))
+    surface.note_voice_run = (lambda prompt_id, message, *, kind:
+                              notes.append((prompt_id, message, kind)))
     view._shows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert asked == []
-    assert (None, combine_controller.ALREADY_GENAUD) in notes
+    assert (None, combine_controller.ALREADY_GENAUD, WARNING) in notes
     assert _spoken_genau_rows(view) == []
 
 
@@ -13126,7 +13132,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
     # Answered in the show's own corner: the speaker is looking at the picture.
-    assert surface.noted == ("g0", "🎤 enhancing…")
+    assert surface.noted == ("g0", "🎤 enhancing…", NOTICE)
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
@@ -13147,7 +13153,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_pa
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "🎤 this one is enhanced already")
+    assert surface.noted == (None, "🎤 this one is enhanced already", WARNING)
     assert view._reroll_jobs == {}
 
 
@@ -13163,7 +13169,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "🎤 only a finished image can be enhanced")
+    assert surface.noted == (None, "🎤 only a finished image can be enhanced", WARNING)
     assert view._reroll_jobs == {}
 
 
@@ -13181,7 +13187,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "🎤 this one has no file to enhance")
+    assert surface.noted == (None, "🎤 this one has no file to enhance", WARNING)
     assert view._reroll_jobs == {}
 
 

@@ -196,7 +196,7 @@ def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
     }))
     (level,) = enhance_levels(row)
     assert level.label == "Enhance 1"
-    assert level.settings == "2x · 20 steps · 0.15 denoise"
+    assert level.settings == "2x · 20 steps · 0.15 redraw"
     assert level.file["filename"] == "sdxl_t2i_src.png"
 
 
@@ -236,8 +236,8 @@ def test_each_fold_adds_a_level_naming_the_settings_that_made_it(tmp_path):
     # Most-enhanced first — which is also what the preview opens on.
     assert [lvl.label for lvl in levels] == ["Enhance 2", "Enhance 1", "Original"]
     assert levels[0].file["filename"] == "image_enhance_00002_.png"
-    assert levels[0].settings == "3x · 40 steps · 0.35 denoise"
-    assert levels[1].settings == "2x · 20 steps · 0.15 denoise"
+    assert levels[0].settings == "3x · 40 steps · 0.35 redraw"
+    assert levels[1].settings == "2x · 20 steps · 0.15 redraw"
     assert levels[2].settings == ""      # an original was not enhanced at anything
     assert levels[2].is_original
 
@@ -295,7 +295,7 @@ def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
-    }) == "2x · 20 steps · 0.15 denoise · faces 0.45 & hands 0.6"
+    }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6"
     # A part at zero says nothing: it is the default rather than a choice, the
     # same reason a source-matched model goes unnamed.
     assert describe_enhance_params({
@@ -306,7 +306,7 @@ def test_describe_names_a_pinned_model_but_not_the_source_matching_default():
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "checkpoint": MATCH_SOURCE_MODEL,
-    }) == "2x · 20 steps · 0.15 denoise"
+    }) == "2x · 20 steps · 0.15 redraw"
     assert describe_enhance_params({
         "enhance_scale": 2.0, "checkpoint": "driftwood_v1.safetensors",
     }) == "2x · driftwood_v1.safetensors"
@@ -427,7 +427,7 @@ def test_describe_still_names_a_level_recorded_the_old_way():
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "teeth_yolov8n.pt", "enhance_hand_detector": "",
-    }) == "2x · 20 steps · 0.15 denoise · teeth 0.45"
+    }) == "2x · 20 steps · 0.15 redraw · teeth 0.45"
     assert describe_enhance_params({
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "face_yolov8m.pt",

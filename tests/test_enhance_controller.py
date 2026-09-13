@@ -229,7 +229,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
     offer = controller.offer()
 
     assert offer.available is True
-    assert offer.tip.startswith("Enhance 2 items")
+    assert offer.tip == "Enhance 2 items (upscale + light redraw)"
 
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
@@ -273,6 +273,17 @@ def test_a_shelf_offers_nothing_to_enhance(enhance):
     controller, _host = enhance(FakeHost(group=None))
 
     assert controller.offer() == (False, "Nothing here to enhance")
+
+
+def test_a_whole_folder_offer_says_what_the_enhance_does_in_plain_words(enhance,
+                                                                       monkeypatch):
+    monkeypatch.setattr(module.gallery, "rows_awaiting_enhancement",
+                        lambda rows, everything: list(rows))
+    folder = gallery.SettingsGroup("k", "S", [_image("i1"), _image("i2")])
+    controller, _host = enhance(FakeHost(group=folder))
+
+    assert controller.offer() == (
+        True, "Enhance 2 not-yet-enhanced images in this folder (upscale + light redraw)")
 
 
 # --- what a launch carries ---------------------------------------------------

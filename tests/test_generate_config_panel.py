@@ -1004,7 +1004,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     rows = _level_rows(panel)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
     assert first.startswith("Enhance 1")
-    assert "2x" in first and "20 steps" in first and "0.15 denoise" in first
+    assert "2x" in first and "20 steps" in first and "0.15 redraw" in first
     assert "Original" in _row_texts(rows[1])
 
 
@@ -1037,7 +1037,7 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     panel.show_saved_generation(image, [image])
     assert not panel._versions._host.findChildren(_PendingRow)
 
-    panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 denoise"))
+    panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 redraw"))
 
     assert not panel._versions.isHidden()
     assert panel._versions._host.findChildren(_PendingRow)

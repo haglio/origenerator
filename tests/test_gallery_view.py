@@ -10170,7 +10170,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     assert (status, frame) == ("running", b"a frame")
     # The tile names what is being made, the way a finished level names what
     # made it — read off the job, not the panel, which may have moved on since.
-    assert settings.startswith("2x · 20 steps · 0.15 denoise")
+    assert settings.startswith("2x · 20 steps · 0.15 redraw")
 
     # An enhance of a DIFFERENT image lands in the same settings folder (both
     # images share a recipe), so it is this tab's own run it must keep showing.

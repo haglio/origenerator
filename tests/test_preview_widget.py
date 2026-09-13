@@ -338,6 +338,39 @@ def test_other_media_status_does_not_emit_video_ended(make_preview):
     assert ended == []
 
 
+def test_a_clip_the_backend_reports_twice_is_reported_unplayable_once(make_preview, qtbot, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "broken.mp4")
+    reports = []
+    w.video_unplayable.connect(lambda: reports.append("unplayable"))
+
+    w._on_media_error(QMediaPlayer.Error.FormatError, "Could not open file")
+    w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
+    qtbot.waitUntil(lambda: reports != [])
+    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
+        pass
+
+    assert reports == ["unplayable"]
+
+
+def test_a_report_landing_after_the_pane_moved_off_the_clip_is_not_passed_on(make_preview, qtbot, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "broken.mp4")
+    w.show_image(_make_png(tmp_path / "next.png"))
+
+    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
+        w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
+
+
+def test_a_report_still_waiting_when_the_next_clip_comes_up_is_not_passed_on(make_preview, qtbot, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "broken.mp4")
+    w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
+
+    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
+        w.show_video(tmp_path / "next.mp4")
+
+
 # --- double-click to open the current media fullscreen ----------------------
 
 def _arm(preview, cls=None):

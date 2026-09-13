@@ -2597,15 +2597,15 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
     one question, and if they ever disagreed the field would be advertising a
     rate the file isn't written at — so this walks every rate a person could
     type and holds them to the same answer."""
-    from origenerator.gui.param_form import ParamForm
+    from origenerator.gui.param_fields import clamped_number
 
     rate_def = next(pd for pd in WORKFLOW_REGISTRY[name].param_definitions()
                     if pd.key == "frame_rate")
     for typed in range(200):
-        shown = ParamForm._clamped_number(rate_def, float(typed))
+        shown = clamped_number(rate_def, float(typed))
         assert shown == min(rate_def.max_val, playback_rate(typed)), typed
         # …and a rate already on the grid is left exactly where it is.
-        assert ParamForm._clamped_number(rate_def, shown) == shown
+        assert clamped_number(rate_def, shown) == shown
 
 
 def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():

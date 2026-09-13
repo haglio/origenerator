@@ -27,6 +27,10 @@ _user32.SetWindowPos.argtypes = [
     ctypes.c_int, ctypes.c_int, ctypes.c_uint,
 ]
 _user32.SetWindowPos.restype = ctypes.c_bool
+_SWP_NOSIZE = 0x0001
+_SWP_NOMOVE = 0x0002
+_SWP_NOZORDER = 0x0004
+_SWP_NOACTIVATE = 0x0010
 _kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
 
 APP_USER_MODEL_ID = "FunTime.Origenerator"
@@ -117,11 +121,18 @@ def place_window_in_device_pixels(hwnd: int, x: int, y: int,
     """
     if not window_exists(hwnd):
         return False
-    # SWP_NOZORDER | SWP_NOACTIVATE: banding and focus belong to whoever asked
-    # for them, and a move must not quietly take either.
+    # Banding and focus belong to whoever asked for them, and a move must not
+    # quietly take either.
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
                                      int(x), int(y), int(width), int(height),
-                                     0x0004 | 0x0010))
+                                     _SWP_NOZORDER | _SWP_NOACTIVATE))
+
+
+def raise_window_without_activating(hwnd: int) -> bool:
+    if not window_exists(hwnd):
+        return False
+    return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None, 0, 0, 0, 0,
+                                     _SWP_NOSIZE | _SWP_NOMOVE | _SWP_NOACTIVATE))
 
 
 def force_foreground_window(hwnd: int) -> bool:

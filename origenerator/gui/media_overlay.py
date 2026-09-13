@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 
+from origenerator.win32 import raise_window_without_activating
+
 # What an overlay sits on so light text and small pictures stay readable over
 # whatever the media happens to be showing there. Padding is each caller's
 # own — it is about that overlay's contents, not about being readable.
@@ -34,3 +36,8 @@ def float_over_media(widget, *, click_through: bool = True) -> None:
     if click_through:
         widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     widget.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
+
+
+def raise_over_media(widget) -> None:
+    widget.raise_()
+    raise_window_without_activating(int(widget.winId()))

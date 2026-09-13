@@ -7,6 +7,7 @@ console — and its layout folds to fit the Random Favs Browser's upright rect.
 from __future__ import annotations
 
 from PIL import Image
+from player_core.modes import SatellitesMode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSplitter
 
@@ -332,7 +333,7 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
     position = show._playlist.order[show._playlist.index] + 1
     expected = ("corner", 0) if position == 1 else ("seed", position - 2)
     assert model.playing == expected      # the item on screen is the lit cell
-    assert model.satellites_mode == "origenerator"
+    assert model.satellites_mode is SatellitesMode.ORIGENERATOR
     assert model.locked is False
 
     show.show_toggle_hold()
@@ -395,11 +396,11 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
 
     hud._deliver("portrait_fmode")
 
-    assert show.hud_f_mode is True
+    assert show.hud_favorites_filter is True
     cells, _position, _locked = show.hud_items()
     assert len(cells) == 1  # narrowed to the one favorite
     model = show_hud_model("portrait", show)
-    assert model.f_mode is True and "F-Mode" in model.lock_label
+    assert model.favorites_filter is True and "F-Mode" in model.lock_label
 
     hud._deliver("portrait_fmode")
     cells, _position, _locked = show.hud_items()
@@ -593,11 +594,11 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
     qtbot.addWidget(show)
 
     view._voice.on_command(ShelfCommand("__starred__", "portrait"))
-    assert show.hud_f_mode is True
+    assert show.hud_favorites_filter is True
     assert len(show.hud_items()[0]) == 1     # narrowed to the one favorite
 
     view._voice.on_command(ShelfCommand("__starred__", "portrait"))
-    assert show.hud_f_mode is False          # and the word widens it back
+    assert show.hud_favorites_filter is False          # and the word widens it back
 
 
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
@@ -712,11 +713,11 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     hud._deliver("portrait_fmode")
     show._playlist.jump_to(1)
     show._toggle_lock()
-    assert show.hud_f_mode is True
+    assert show.hud_favorites_filter is True
 
     hud._deliver("portrait_reset")
 
-    assert show.hud_f_mode is False
+    assert show.hud_favorites_filter is False
     cells, _position, locked = show.hud_items()
     assert len(cells) == 3                 # widened back to the whole set
     assert show._playlist.index == 0       # back at the top of the pass
@@ -1069,10 +1070,10 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, 
     assert len(show.hud_items()[0]) == 1
 
     assert view.run_spoken_command("portrait favorites")
-    assert (show.hud_f_mode, show.hud_enhanced_mode) == (True, True)
+    assert (show.hud_favorites_filter, show.hud_enhanced_mode) == (True, True)
 
     assert view.run_spoken_command("portrait clear filter")
-    assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
+    assert (show.hud_favorites_filter, show.hud_enhanced_mode) == (False, False)
     assert len(show.hud_items()[0]) == 3
 
 

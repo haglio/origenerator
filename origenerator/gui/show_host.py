@@ -78,7 +78,7 @@ class ShowHost(Protocol):
         return (), 0, self.locked
 
     @property
-    def hud_f_mode(self) -> bool:
+    def hud_favorites_filter(self) -> bool:
         """Whether the set is narrowed to the favorites. No set, no mode."""
         return False
 
@@ -101,7 +101,7 @@ class ShowHost(Protocol):
         """Whether the item on screen is starred — the players' star readout."""
         return False
 
-    def toggle_f_mode(self) -> None:
+    def toggle_favorites_filter(self) -> None:
         """Narrow the set to the favorites, or widen it back."""
 
     @property

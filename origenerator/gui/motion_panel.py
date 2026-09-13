@@ -37,7 +37,6 @@ ensure_player_core_on_path()
 from player_core import drive_layout  # noqa: E402
 from player_core.console import ConsoleModel  # noqa: E402
 from player_core.console_hud import (  # noqa: E402
-    OSR2_ROBOT_HAND,
     ConsoleHud,
     ConsolePainter,
     ModeHud,
@@ -48,6 +47,7 @@ from player_core.drive_readout import (  # noqa: E402
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
+from player_core.modes import MainMode, Osr2State  # noqa: E402
 from player_core.robot_hand import POSITION_MAX  # noqa: E402
 
 _TRACE_SECONDS = 12.0
@@ -121,8 +121,8 @@ def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
-            mode="genau", active=True, locked=host.locked,
-            osr2=OSR2_ROBOT_HAND if driving else "off",
+            main_mode=MainMode.GENAU, active=True, locked=host.locked,
+            osr2=Osr2State.ROBOT_HAND if driving else Osr2State.OFF,
             cruise=motion.state.cruise.active,
             shape=motion.state.state.shape.value,
             advance_interval=host.dwell_s,

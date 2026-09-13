@@ -67,7 +67,7 @@ The two switches on that HUD's control band are this show's own narrowing, the
 way F-mode is a player's own: F-mode keeps the favorites and the switch beside
 it keeps the pictures that have been enhanced, each over the whole set the show
 was handed and both at once meaning what answers both
-(:meth:`SlideshowView.toggle_f_mode`, :meth:`SlideshowView.toggle_enhanced_mode`).
+(:meth:`SlideshowView.toggle_favorites_filter`, :meth:`SlideshowView.toggle_enhanced_mode`).
 They start off, and reset drops them.  What the view has left to say for itself,
 it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
 
@@ -139,7 +139,7 @@ class SlideshowView(QWidget):
         # a loop someone asked for, and which of its items are favorites (see
         # HudFacts). The first two are read straight off this view by the HUD.
         self._wear(hud if hud is not None else HudFacts())
-        self._f_mode = False
+        self._favorites_filter = False
         self._enhanced_mode = False
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`_set_modes`).
@@ -664,8 +664,8 @@ class SlideshowView(QWidget):
         """This show's own reset: both switches dropped, the hold released, and
         the top of the set it is already playing back on screen."""
         self._playlist.unlock()
-        if self._f_mode or self._enhanced_mode:
-            self._f_mode = self._enhanced_mode = False
+        if self._favorites_filter or self._enhanced_mode:
+            self._favorites_filter = self._enhanced_mode = False
             self._replace_items(self._all_items, keep_slide=False)
             return
         self._playlist.restart()
@@ -688,7 +688,7 @@ class SlideshowView(QWidget):
         ``enhanced_ids`` is which of the new items carry an enhancement — a
         new set, so a new answer.
         """
-        self._f_mode = self._enhanced_mode = False
+        self._favorites_filter = self._enhanced_mode = False
         self._all_items = [Slide.of(item) for item in items]
         self._wear(HudFacts(looping=False, starred_ids=self._starred_ids,
                             enhanced_ids=enhanced_ids))
@@ -789,8 +789,8 @@ class SlideshowView(QWidget):
         return bool(current and len(current) > 2 and current[2] in self._starred_ids)
 
     @property
-    def hud_f_mode(self) -> bool:
-        return self._f_mode
+    def hud_favorites_filter(self) -> bool:
+        return self._favorites_filter
 
     @property
     def hud_enhanced_mode(self) -> bool:
@@ -798,30 +798,30 @@ class SlideshowView(QWidget):
         — the switch beside F-mode on its HUD."""
         return self._enhanced_mode
 
-    def toggle_f_mode(self) -> bool:
+    def toggle_favorites_filter(self) -> bool:
         """Narrow the set to the favorites, or widen it back — the players' own
         F-mode, over the starred items.  ``True`` when the switch moved."""
-        return self.set_f_mode(not self._f_mode)
+        return self.set_favorites_filter(not self._favorites_filter)
 
     def toggle_enhanced_mode(self) -> bool:
         """Narrow the set to the pictures that have been enhanced, or widen it
         back — the HUD's switch beside F-mode.  ``True`` when the switch moved."""
         return self.set_enhanced_mode(not self._enhanced_mode)
 
-    def set_f_mode(self, on: bool) -> bool:
-        return self._set_modes(f_mode=bool(on), enhanced=self._enhanced_mode)
+    def set_favorites_filter(self, on: bool) -> bool:
+        return self._set_modes(favorites_filter=bool(on), enhanced=self._enhanced_mode)
 
     def set_enhanced_mode(self, on: bool) -> bool:
         """Said which way rather than flipped — a speaker mid-show is not
         looking at the HUD to see which way it stands."""
-        return self._set_modes(f_mode=self._f_mode, enhanced=bool(on))
+        return self._set_modes(favorites_filter=self._favorites_filter, enhanced=bool(on))
 
     def clear_modes(self) -> bool:
         """Both switches off at once — what "clear filter" has to mean once
         there is more than one to clear, and what it means on every satellite."""
-        return self._set_modes(f_mode=False, enhanced=False)
+        return self._set_modes(favorites_filter=False, enhanced=False)
 
-    def _set_modes(self, *, f_mode: bool, enhanced: bool) -> bool:
+    def _set_modes(self, *, favorites_filter: bool, enhanced: bool) -> bool:
         """Deal the pass from what answers the switches as asked — both on
         meaning what answers both, the way every pair of filters in this family
         stacks — and say whether anything moved.
@@ -830,25 +830,25 @@ class SlideshowView(QWidget):
         empty show is not a mode, and the HUD's button staying dark is the
         answer.  Widening can never empty a set, so the way back is always open.
         """
-        if (f_mode, enhanced) == (self._f_mode, self._enhanced_mode):
+        if (favorites_filter, enhanced) == (self._favorites_filter, self._enhanced_mode):
             return False
         narrowed = [item for item in self._all_items
-                    if self._passes(item, f_mode=f_mode, enhanced=enhanced)]
+                    if self._passes(item, favorites_filter=favorites_filter, enhanced=enhanced)]
         if not narrowed:
             return False
-        self._f_mode, self._enhanced_mode = f_mode, enhanced
+        self._favorites_filter, self._enhanced_mode = favorites_filter, enhanced
         self._replace_items(narrowed, keep_slide=True)
         return True
 
-    def _passes(self, item, *, f_mode=None, enhanced=None) -> bool:
+    def _passes(self, item, *, favorites_filter=None, enhanced=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
         about a setting the show is not in yet.  An item with no id (a test's,
         or a run's frames) is neither starred nor enhanced, so any switch that
         is on leaves it out."""
-        f_mode = self._f_mode if f_mode is None else f_mode
+        favorites_filter = self._favorites_filter if favorites_filter is None else favorites_filter
         enhanced = self._enhanced_mode if enhanced is None else enhanced
         prompt_id = item.prompt_id
-        if f_mode and prompt_id not in self._starred_ids:
+        if favorites_filter and prompt_id not in self._starred_ids:
             return False
         if enhanced and prompt_id not in self._enhanced_ids:
             return False

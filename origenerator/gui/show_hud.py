@@ -52,6 +52,7 @@ from origenerator.ui_scale import (
 ensure_player_core_on_path()
 from player_core.file_channel import append_command
 from player_core.hud_status import SHUFFLE_LABEL, looping_label, status_line
+from player_core.modes import SatellitesMode
 from player_core.satellite_hud import (
     MARGIN,
     HudCell,
@@ -89,7 +90,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         HudCell(path=str(path), thumb=str(thumb) if thumb else "")
         for path, thumb in cells
     )
-    f_mode = host.hud_f_mode
+    favorites_filter = host.hud_favorites_filter
     enhanced = host.hud_enhanced_mode
     order_label = host.hud_order_label
     order_label = SHUFFLE_LABEL if order_label == "Shuffle" else order_label
@@ -103,7 +104,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
     # satellite browsing its library does.
     line = dict(playing_set=looping_label("seed") if looping else "",
-                locked=locked, order=order_label, f_mode=f_mode)
+                locked=locked, order=order_label, f_mode=favorites_filter)
     switches = {}
     if _HUD_HAS_ENHANCED_SWITCH:
         # Named on or off, never None: a show HAS the switch, so its HUD grows
@@ -112,14 +113,14 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         line["enhanced"] = enhanced
         switches["enhanced_filter"] = enhanced
     return HudModel(
-        side=side,
+        player=side,
         locked=locked,
         lock_label=status_line(**line),
         # The players' favorite star and F-mode, over the same collection the
         # Favorites shelf lists: the star lights when the item on screen is a
         # favorite, and F-mode narrows the set to them.
         is_favorite=host.hud_is_favorite,
-        f_mode=f_mode,
+        favorites_filter=favorites_filter,
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
@@ -132,11 +133,11 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         active_loop="seed" if looping else "",
         # Hosted, a show exists only in this mode, and the pair is the way back
         # to the player under it.  Standalone there is no player under it and no
-        # session to tell, so the row is not drawn at all — the same "" a
+        # session to tell, so the row is not drawn at all — the same None a
         # session with no hosted Origenerator publishes.  Drawing a dead pair
         # would be the one place on this panel where a lit button is a picture
         # of a button.
-        satellites_mode="origenerator" if hosted else "",
+        satellites_mode=SatellitesMode.ORIGENERATOR if hosted else None,
         **switches,
     )
 
@@ -284,7 +285,7 @@ class ShowHud(QLabel):
             # The players' F-mode, meaning here what it means there: narrow
             # the set to the favorites.  Handled on the show itself — the
             # session's player-side F-mode is about a blacked player's browse.
-            self._host.toggle_f_mode()
+            self._host.toggle_favorites_filter()
             self._tick()
             return
         if verb == f"{self._side}_enhanced":

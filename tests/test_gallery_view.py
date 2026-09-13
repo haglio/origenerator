@@ -6318,7 +6318,7 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
 
     hud, = show.findChildren(ShowHud)
     assert hud._targets.modes == []
-    assert hud._model.satellites_mode == ""
+    assert hud._model.satellites_mode is None
     show.close()
 
 
@@ -6533,13 +6533,13 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
     view._shows.start()
     show = view._shows.showing
     qtbot.addWidget(show)
-    show.toggle_f_mode()
+    show.toggle_favorites_filter()
     show.toggle_enhanced_mode()
     assert [item[2] for item in show._playlist._items] == ["i2"]
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
+    assert (show.hud_favorites_filter, show.hud_enhanced_mode) == (False, False)
     assert len(show._playlist) == 2
     show.close()
 
@@ -9781,12 +9781,12 @@ class _VoiceSurface:
     def set_audio_muted(self, muted):
         self.muted = muted
 
-    def toggle_f_mode(self):
-        self.f_mode = not getattr(self, "f_mode", False)
+    def toggle_favorites_filter(self):
+        self.favorites_filter = not getattr(self, "favorites_filter", False)
 
     @property
-    def hud_f_mode(self):
-        return getattr(self, "f_mode", False)
+    def hud_favorites_filter(self):
+        return getattr(self, "favorites_filter", False)
 
     def set_paused(self, paused):
         self.paused = paused

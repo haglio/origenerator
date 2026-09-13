@@ -1653,7 +1653,7 @@ def test_settings_group_details_disambiguate_same_prompt_different_params():
     assert details[0] != details[1]
     assert all("a cat" in detail for detail in details)
     # the distinguishing param is surfaced so the folders are tellable apart
-    assert any("steps" in detail for detail in details)
+    assert any("Steps" in detail for detail in details)
 
 
 def test_settings_group_detail_omits_params_when_only_one_group():
@@ -1663,6 +1663,38 @@ def test_settings_group_detail_omits_params_when_only_one_group():
     (lora,) = tree[0].model_groups[0].children
     (only,) = lora.children
     assert only.detail == "a cat"
+
+
+def test_a_folders_hover_names_what_sets_it_apart_the_way_the_form_does():
+    rows = [_row(prompt_id=pid, workflow_name="sdxl_t2i",
+                 params_json=json.dumps({"positive_prompt": "a cat", "cfg": cfg, "seed": 1}),
+                 output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png"}]))
+            for pid, cfg in (("i1", 7.5), ("i2", 5.0))]
+    (lora,) = build_gallery_tree(rows)[0].model_groups[0].children
+
+    assert sorted(leaf.detail for leaf in lora.children) == [
+        "a cat · Prompt Strength 5.0", "a cat · Prompt Strength 7.5"]
+
+
+def test_a_folders_hover_gives_a_clips_length_in_the_seconds_its_form_shows():
+    rows = [_row(prompt_id=pid, workflow_name="wan22_i2v",
+                 params_json=json.dumps({"positive_prompt": "dance", "frame_count": frames,
+                                         "unet_high": "wan_high.safetensors",
+                                         "unet_low": "wan_low.safetensors", "seed": 1}),
+                 output_files=json.dumps([{"filename": f"wan22_i2v_{pid}.mp4"}]))
+            for pid, frames in (("v1", 81), ("v2", 161))]
+
+    assert sorted(leaf.detail for leaf in _i2v_leaves(rows)) == [
+        "dance · Duration 10 s, Scenes 10 s", "dance · Duration 5 s, Scenes 5 s"]
+
+
+def test_a_folder_with_no_prompt_to_go_by_is_described_in_the_forms_words():
+    rows = [_row(prompt_id="i1", workflow_name="sdxl_t2i", params_json=json.dumps({"seed": 1}),
+                 output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))]
+    (lora,) = build_gallery_tree(rows)[0].model_groups[0].children
+    (leaf,) = lora.children
+
+    assert leaf.detail == "1280×720, Steps 50, Prompt Strength 7.5"
 
 
 def test_resolve_preview_returns_full_image_file(tmp_path):

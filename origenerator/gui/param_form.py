@@ -40,6 +40,7 @@ from origenerator.workflows.duration import (
     on_grid,
     seconds_for_frames,
 )
+from origenerator.workflows.setting_names import setting_name
 
 ensure_shared_ui_on_path()
 from shared_ui.tick_control import TickControl
@@ -1006,14 +1007,19 @@ class ParamForm(QWidget):
             self._apply_dimension_values(params)
 
     def _render_readonly_rows(self, extras: dict):
-        """Show each param the form has no field for as a read-only ``key: value``
-        row, dropped into its section at its canonical position. Replaces any rows
-        a prior ``set_values`` added, so switching generations never stacks them."""
+        """Show each param the form has no field for as a read-only row under the
+        name the forms give it, dropped into its section at its canonical position.
+        Replaces any rows a prior ``set_values`` added, so switching generations
+        never stacks them."""
         for title, key, value_label in self._readonly_rows:
             self._sections[title].content_form().removeRow(value_label)
             self._present_keys[title].remove(key)
         self._readonly_rows = []
+        field_names = {pd.label for pd in self._param_defs}
         for key in sorted(extras, key=param_sections.key_rank):
+            name = setting_name(key)
+            if name in field_names:
+                continue
             display = QLabel(str(extras[key]))
             display.setObjectName("readonlyParamValue")
             display.setWordWrap(True)
@@ -1021,6 +1027,6 @@ class ParamForm(QWidget):
             # A row you cannot change is the one you most want explained, so a
             # passthrough gets the same tooltip an editable field would.
             display.setToolTip(param_help(key))
-            self._add_row(key, key, display)
+            self._add_row(key, name, display)
             self._readonly_rows.append((param_sections.section_title(key), key, display))
         self._refresh_section_visibility()

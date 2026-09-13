@@ -452,7 +452,7 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
         label, starred = _overlay(folder_id(key), key, tier.folder_meta)
         groups.append(SettingsGroup(
             key, label, sig_rows, starred,
-            settings_label(settings_dicts[i], distinguishing),
+            settings_label(settings_dicts[i], distinguishing, tier.workflow_name),
         ))
     return groups
 

@@ -226,6 +226,25 @@ def test_passthrough_params_render_as_readonly_rows(qtbot):
     assert form.get_values_static()["vae"] == "sdxl.vae.safetensors"
 
 
+def test_a_read_only_row_is_named_the_way_the_forms_that_lay_it_out_name_it(qtbot):
+    form = ParamForm([ParamDef("steps", "Steps", "int", 20)])
+    qtbot.addWidget(form)
+    form.set_values({"steps": 20, "denoise": 1.0})
+
+    labels = {lbl.text() for lbl in form.findChildren(QLabel)}
+    assert "Redraw Amount" in labels
+    assert "denoise" not in labels
+
+
+def test_a_read_only_row_that_would_repeat_a_fields_name_is_left_off(qtbot):
+    form = ParamForm([ParamDef("guidance", "Prompt Strength", "float", 4.5)])
+    qtbot.addWidget(form)
+    form.set_values({"guidance": 4.5, "cfg": 1.0})
+
+    assert form._readonly_rows == []
+    assert form.get_values_static()["cfg"] == 1.0
+
+
 def test_readonly_rows_are_replaced_not_stacked(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)

@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 
 from origenerator import gallery
 from origenerator.gui.gallery_tree import (
+    EXPERIMENTS_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
     STARRED_KEY,
@@ -35,6 +36,7 @@ from origenerator.gui.orientation import (
     split_key,
     split_rows,
 )
+from tests.test_folder_tree import _shown
 from tests.test_gallery_view import FakeDB, _image, _row, _side_rows
 from tests.test_icons import (
     _ink_bounds,  # the mark is measured the way the icons' own tests measure one
@@ -330,8 +332,8 @@ def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
     view.refresh()
 
     assert sorted(held["prompt_id"] for held in view._held_rows) == ["t1", "w1"]
-    assert f"{TRASH_LABEL} (1)" in _rows(view._tree, "portrait")
-    assert f"{TRASH_LABEL} (1)" in _rows(view._tree, "landscape")
+    for side in ("portrait", "landscape"):
+        assert _shown(view._item_by_key[oriented_key(TRASH_KEY, side)]) == f"(1) {TRASH_LABEL}"
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(TRASH_KEY, "portrait")])
     assert view._current_shelf_key() == oriented_key(TRASH_KEY, "portrait")
@@ -351,8 +353,8 @@ def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert "Experiments (1)" in _rows(view._tree, "portrait")
-    assert "Experiments (2)" in _rows(view._tree, "landscape")
+    assert _shown(view._item_by_key[oriented_key(EXPERIMENTS_KEY, "portrait")]) == "(1) Experiments"
+    assert _shown(view._item_by_key[oriented_key(EXPERIMENTS_KEY, "landscape")]) == "(2) Experiments"
 
 
 def test_each_half_scrolls_on_its_own(qtbot, tmp_path):

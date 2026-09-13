@@ -47,7 +47,12 @@ from origenerator.gallery.shelves import (
     TRASH_LABEL,
 )
 from origenerator.gui import icons
-from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, DROP_KEY_ROLE, TREE_KEY_ROLE
+from origenerator.gui.folder_tree import (
+    BRANCH_ICON_ROLE,
+    COUNT_ROLE,
+    DROP_KEY_ROLE,
+    TREE_KEY_ROLE,
+)
 from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
@@ -74,9 +79,7 @@ class SideModel:
     tree_model: list                       # this shape's media roots
     custom_folders: list = field(default_factory=list)
     show_recents: bool = False             # anything at all to list yet
-    experiment_count: int = 0
-    request_count: int = 0
-    trash_count: int = 0
+    shelf_counts: dict[str, int] = field(default_factory=dict)  # by shelf key
 
 
 def _row_tip(group) -> str:
@@ -157,11 +160,11 @@ class GalleryTree:
         Each draws its marker in the caret column so its label lines up with the
         folders below."""
         if side.show_recents:
-            self._add_shelf(side_item, RECENTS_LABEL, RECENTS_KEY, side.orientation,
+            self._add_shelf(side_item, RECENTS_LABEL, RECENTS_KEY, side,
                             icons.clock_icon(), "Recently generated")
         if side.tree_model:
             starred = self._add_shelf(
-                side_item, STARRED_LABEL, STARRED_KEY, side.orientation,
+                side_item, STARRED_LABEL, STARRED_KEY, side,
                 icons.star_icon(filled=True),
                 "Your favorite folders and items — drop a folder here to add it"
             )
@@ -170,18 +173,18 @@ class GalleryTree:
             # key is the shelf's plain key.
             starred.setData(0, DROP_KEY_ROLE, STARRED_KEY)
         self._add_shelf(
-            side_item, _counted(EXPERIMENTS_LABEL, side.experiment_count),
-            EXPERIMENTS_KEY, side.orientation, icons.flask_icon(),
+            side_item, EXPERIMENTS_LABEL,
+            EXPERIMENTS_KEY, side, icons.flask_icon(),
             "Background experiments awaiting your review"
         )
         self._add_shelf(
-            side_item, _counted(REQUESTS_LABEL, side.request_count),
-            REQUESTS_KEY, side.orientation, icons.mic_icon(),
+            side_item, REQUESTS_LABEL,
+            REQUESTS_KEY, side, icons.mic_icon(),
             "What you asked for out loud — “Request … over”"
         )
         self._add_shelf(
-            side_item, _counted(TRASH_LABEL, side.trash_count),
-            TRASH_KEY, side.orientation, icons.trash_icon(),
+            side_item, TRASH_LABEL,
+            TRASH_KEY, side, icons.trash_icon(),
             "Deleted items — restorable here until you delete them for good"
         )
 
@@ -213,15 +216,16 @@ class GalleryTree:
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
-    def _add_shelf(self, side_item, label, key, orientation, icon,
+    def _add_shelf(self, side_item, label, key, side, icon,
                    tooltip) -> QTreeWidgetItem:
         """Add a synthetic shelf row (Recents/Favorites/…) leading a side, its
         marker drawn in the caret column so its label aligns with the media
         folders below."""
         item = QTreeWidgetItem([label])
+        item.setData(0, COUNT_ROLE, side.shelf_counts.get(key, 0))
         item.setData(0, BRANCH_ICON_ROLE, icon)  # marker in the caret column
         item.setToolTip(0, tooltip)
-        return self._register(item, oriented_key(key, orientation), side_item,
+        return self._register(item, oriented_key(key, side.orientation), side_item,
                               folder_key=key)
 
     def _add_custom_folder(self, side_item, group, orientation) -> QTreeWidgetItem:
@@ -235,6 +239,7 @@ class GalleryTree:
         item.setToolTip(0, f"{group.label} — {count} item{'s' if count != 1 else ''} "
                            "in a folder you made; drop folders here to add them")
         item.setData(0, GROUP_ROLE, group)
+        item.setData(0, COUNT_ROLE, count)
         item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the side
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         return self._register(item, oriented_key(group.key, orientation), side_item,
@@ -247,6 +252,7 @@ class GalleryTree:
         if gallery.is_renamable(group):
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
+        item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
         # A workflow / model / LoRA / source-image row wears a lettered chip
         # naming its level, so a row's place in the hierarchy reads at a glance
         # rather than by counting indentation; the level joins the tooltip too.
@@ -285,6 +291,13 @@ class GalleryTree:
     def shelf_item(self, shelf_key: str, orientation: str) -> QTreeWidgetItem | None:
         """One side's copy of a shelf row."""
         return self.item_by_key.get(oriented_key(shelf_key, orientation))
+
+    def set_shelf_count(self, shelf_key: str, orientation: str, count: int) -> None:
+        item = self.shelf_item(shelf_key, orientation)
+        if item is not None:
+            blocked = self._tree.blockSignals(True)
+            item.setData(0, COUNT_ROLE, count)
+            self._tree.blockSignals(blocked)
 
     def default_item(self) -> QTreeWidgetItem | None:
         """The folder to land on with no saved target: the first side's All row —
@@ -326,8 +339,3 @@ class GalleryTree:
         if side is not None:
             parts.append(ORIENTATION_LABELS[side])
         return "  ›  ".join(reversed(parts))
-
-
-def _counted(label: str, count: int) -> str:
-    """A shelf's label, wearing its count when it has one to show."""
-    return f"{label} ({count})" if count else label

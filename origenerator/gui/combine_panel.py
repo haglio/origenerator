@@ -93,6 +93,7 @@ class CombinePanel(QWidget):
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
         self.video_slot.activated.connect(self.item_activated)
+        self._dropped: dict[str, str] = {}
 
         # The video part's fast path: pick an act and the view finds a fitting past
         # video for you. A neutral "(custom)" leads the list (index 0, the default) so
@@ -193,6 +194,8 @@ class CombinePanel(QWidget):
         on edge is passed along.
         """
         if checked:
+            if not self.selected_category():
+                self._show_dropped()
             self.intent_changed.emit(self.selected_intent())
 
     # --- category ---------------------------------------------------------
@@ -251,19 +254,39 @@ class CombinePanel(QWidget):
 
     def _on_category_changed(self):
         """A picked act supersedes a dropped video: clear the slot and relabel it as
-        the override path. Going back to "(custom)" restores the plain drop prompt."""
+        the override path. Going back to "(custom)" restores the plain drop prompt,
+        and the video this lane last had dropped in it."""
         if self.selected_category():
             self.video_slot.clear()
             self.video_slot.set_placeholder(_OVERRIDE_PLACEHOLDER)
         else:
             self.video_slot.set_placeholder(_DROP_PLACEHOLDER)
+            self._show_dropped()
         self._sync()
 
     def _on_video_changed(self):
         """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
         if self.video_slot.current_id():
+            self._dropped[self.selected_intent()] = self.video_slot.current_id()
             self._category.setCurrentIndex(0)
         self._sync()
+
+    def _show_dropped(self):
+        lane = self.selected_intent()
+        video = self._dropped.get(lane)
+        if video and self.video_slot.accepts(video):
+            self.video_slot.set_item(video)
+        else:
+            self._dropped.pop(lane, None)
+            self.video_slot.clear()
+
+    def dropped_videos(self) -> dict[str, str]:
+        return dict(self._dropped)
+
+    def set_dropped_videos(self, videos: dict[str, str]):
+        self._dropped = dict(videos)
+        if not self.selected_category():
+            self._show_dropped()
 
     def _sync(self):
         """Both actions go live once a source image sits and a recipe is chosen —

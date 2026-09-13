@@ -10749,7 +10749,7 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
     view._combine.panel.video_slot.set_item("vid")
 
     assert view.combine_selection() == {
-        "image": "img", "video": "vid",
+        "image": "img", "videos": {recipe_match.VIDEO: "vid"},
         "intent": recipe_match.VIDEO, "category": "",
     }
 
@@ -10763,7 +10763,7 @@ def test_combine_selection_carries_the_lane_and_the_act(qtbot, tmp_path):
     _pick_act(view._combine.panel, "beta")
 
     assert view.combine_selection() == {
-        "image": "img", "video": None,
+        "image": "img", "videos": {},
         "intent": recipe_match.GENAU, "category": "beta",
     }
 
@@ -10775,6 +10775,24 @@ def test_restore_combine_selection_refills_the_slots(qtbot, tmp_path):
 
     assert view._combine.panel.image_slot.current_id() == "img"
     assert view._combine.panel.video_slot.current_id() == "vid"
+
+
+def test_a_restored_session_brings_back_the_video_each_lane_last_had(qtbot, tmp_path):
+    first = _combine_view(qtbot, tmp_path)
+    _loop_recipe(first._db)
+    first._combine.panel.video_slot.set_item("vid")
+    _pick_lane(first._combine.panel, recipe_match.GENAU)
+    first._combine.panel.video_slot.set_item("loop")
+    saved = first.combine_selection()
+
+    restored = GalleryView(first._db, client=_reroll_client())
+    qtbot.addWidget(restored)
+    restored.refresh()
+    restored.restore_combine_selection(saved)
+
+    assert restored._combine.panel.video_slot.current_id() == "loop"
+    _pick_lane(restored._combine.panel, recipe_match.VIDEO)
+    assert restored._combine.panel.video_slot.current_id() == "vid"
 
 
 def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
@@ -10838,7 +10856,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
     view.restore_combine_selection(["only-one"])  # malformed
 
     assert view.combine_selection() == {
-        "image": None, "video": None,
+        "image": None, "videos": {},
         "intent": recipe_match.VIDEO, "category": "",
     }
 

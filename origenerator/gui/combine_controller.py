@@ -179,8 +179,8 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def selection(self) -> dict:
-        """Everything the combine panel is holding, for session save: the two
-        slots, the lane and the act.
+        """Everything the combine panel is holding, for session save: the
+        picture, the video each lane last had dropped, the lane and the act.
 
         All four, because all four are choices the user made and none is
         recoverable from the others — an act says nothing about which lane
@@ -189,7 +189,7 @@ class CombineController(QObject):
         """
         return {
             "image": self.panel.image_slot.current_id(),
-            "video": self.panel.video_slot.current_id(),
+            "videos": self.panel.dropped_videos(),
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
         }
@@ -209,13 +209,16 @@ class CombineController(QObject):
             saved = {"image": saved[0], "video": saved[1]}
         if not isinstance(saved, dict):
             return
-        image_id, video_id = saved.get("image"), saved.get("video")
+        image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
             self.panel.image_slot.set_item(image_id)
         self.panel.set_intent(saved.get("intent") or recipe_match.VIDEO)
+        videos = saved.get("videos")
+        if not isinstance(videos, dict):
+            videos = {self.panel.selected_intent(): saved.get("video")}
+        self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
+                                       if video and self._accepts_video(video)})
         self.panel.set_category(saved.get("category") or "")
-        if video_id and self._accepts_video(video_id):
-            self.panel.video_slot.set_item(video_id)
 
     def drag_started(self, prompt_id: str) -> None:
         """A generation began dragging — from a browser thumbnail or a generate tab's

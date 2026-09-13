@@ -46,6 +46,7 @@ class FakePanel:
         self.video_slot = self._Slot()
         self.intent = recipe_match.VIDEO
         self.category = ""
+        self.dropped = {}
         self.available = None
         self.visible = None
         self.lit_for = []
@@ -68,6 +69,14 @@ class FakePanel:
 
     def set_category(self, category):
         self.category = category
+
+    def dropped_videos(self):
+        return dict(self.dropped)
+
+    def set_dropped_videos(self, videos):
+        self.dropped = dict(videos)
+        if not self.category:
+            self.video_slot.set_item(self.dropped.get(self.intent))
 
     def set_available_categories(self, categories):
         self.available = list(categories)
@@ -318,18 +327,29 @@ def test_a_panel_with_no_server_behind_it_hides(combine):
 # --- what a session keeps ---------------------------------------------------
 
 
-def test_the_session_keeps_both_slots_the_lane_and_the_act(combine):
+def test_the_session_keeps_the_picture_each_lanes_video_the_lane_and_the_act(combine):
     # None of the four is recoverable from the others: an act says nothing about
     # which lane answers it.
     controller, _host = combine()
     controller.panel.image_slot.set_item("img")
-    controller.panel.video_slot.set_item("clip")
+    controller.panel.set_dropped_videos({recipe_match.VIDEO: "clip"})
     controller.panel.set_intent(recipe_match.GENAU)
     controller.panel.set_category("waving")
 
     assert controller.selection() == {
-        "image": "img", "video": "clip",
+        "image": "img", "videos": {recipe_match.VIDEO: "clip"},
         "intent": recipe_match.GENAU, "category": "waving"}
+
+
+def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combine):
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip"), _video("loop")]))
+
+    controller.restore({"image": "img", "intent": recipe_match.GENAU,
+                        "videos": {recipe_match.VIDEO: "clip", recipe_match.GENAU: "loop",
+                                   "elsewhere": "gone"}})
+
+    assert controller.panel.dropped == {recipe_match.VIDEO: "clip", recipe_match.GENAU: "loop"}
+    assert controller.panel.video_slot.item == "loop"
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):

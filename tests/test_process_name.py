@@ -4,13 +4,14 @@ Why an app names its processes, and why its own is the one it can only name for
 the run after, is :mod:`app_support.process_identity`'s to say.  What is left
 here is the pair only this repo can be wrong about: that the app makes the copy
 its launcher starts it through, run against a throwaway venv rather than read off
-``app.py``; and that the launcher looks for that copy, read off the ``.vbs``,
-which really is a text file and really does contain the literal.
+``app.py``; and that the launcher's spec names that copy of the interpreter the
+launcher runs.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+from app_support.launcher import launchers
 from app_support.process_identity import ProcessNamer
 from app_support.process_identity_check import assert_the_app_names_its_process
 
@@ -20,22 +21,17 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 APP_NAME = "Origenerator"
 ROLE = "Origenerator"
 
-LAUNCHER = (PROJECT_DIR / "launch_origenerator.vbs").read_text(encoding="utf-8")
+LAUNCHER = next(spec for spec in launchers(PROJECT_DIR) if spec.file == "launch_origenerator.vbs")
 
 
 def test_the_launcher_prefers_the_copy_named_for_this_app():
-    expected = ProcessNamer(APP_NAME).exe_name("python.exe", ROLE)
-
-    assert expected in LAUNCHER, f"the launcher does not look for {expected}"
-    # Ahead of the plain venv interpreter, or it would never be reached.
-    assert LAUNCHER.index(expected) < LAUNCHER.index(r"\.venv\Scripts\python.exe")
+    assert LAUNCHER.named_interpreter == ProcessNamer(APP_NAME).exe_name(LAUNCHER.interpreter, ROLE)
 
 
-def test_the_launcher_still_works_before_any_run_has_named_it():
-    """The naming runs one launch late, so a fresh checkout has no copy to
-    find.  That must cost the name and nothing else."""
-    assert r"venvPython = projectRoot & "'"'r"\.venv\Scripts\python.exe" in LAUNCHER
-    assert "FindPythonCommand = Quote(venvPython)" in LAUNCHER
+def test_the_launcher_runs_the_console_interpreter_its_log_needs():
+    """It redirects the app's output into its log, which a windowed interpreter
+    has none of."""
+    assert LAUNCHER.interpreter == "python.exe"
 
 
 def test_the_app_prepares_that_copy_for_next_time(tmp_path: Path):

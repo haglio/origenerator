@@ -529,6 +529,37 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
     assert form.get_values()["cfg"] == 0.85
 
 
+@pytest.mark.parametrize("pd, written, read_back", [
+    (ParamDef("enhance", "Enhance", "bool", True), False, False),
+    (ParamDef("name", "Name", "str", ""), "a made-up name", "a made-up name"),
+    (ParamDef("positive_prompt", "Prompt", "str", "", multiline=True),
+     "a lighthouse\nat dusk", "a lighthouse\nat dusk"),
+    (ParamDef("seed", "Seed", "seed", 0), 680387713615965, 680387713615965),
+    (ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=200), 42, 42),
+    (ParamDef("cfg", "CFG", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5), 0.85, 0.85),
+    (ParamDef("sampler", "Sampler", "combo", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
+    (ParamDef("input_image", "Input Image", "image", ""), "  frame.png ", "frame.png"),
+    (ParamDef("voice_sample", "Voice Sample", "audio", ""), " sample.wav ", "sample.wav"),
+    (ParamDef("width", "Width", "int", 512, min_val=64, max_val=2048, step=64,
+              options=[512, 768]), 768.0, 768),
+    (ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0,
+              step=1.0, options=[16, 24, 60], unit="fps"), 60, 60.0),
+    (ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
+              options=[1, 5, 10], unit="s", rate=16.0), 21, 21),
+])
+def test_every_kind_of_setting_reads_back_as_the_recipe_stores_it(qtbot, pd, written, read_back):
+    # What a field reads back is what a generation's params_json holds, and
+    # Evolver reads that key by key: the value and its type both.
+    form = ParamForm([pd])
+    qtbot.addWidget(form)
+
+    form.set_values({pd.key: written})
+
+    value = form.get_values_static()[pd.key]
+    assert value == read_back
+    assert type(value) is type(read_back)
+
+
 def test_a_number_field_with_no_stated_ceiling_takes_a_large_value(qtbot):
     # A param that names no maximum is bounded only by the form's fallback, so
     # that fallback is what "unbounded" means here — set low, the field silently

@@ -198,6 +198,10 @@ class ThumbnailWidget(QWidget):
         self._enhance = enhance
         self._sync_controls()
 
+    def set_starred(self, starred: bool):
+        self._starred = starred
+        self._sync_controls()
+
     def _sync_controls(self):
         if self._controls is None:
             return

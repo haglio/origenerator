@@ -146,7 +146,7 @@ class EnhanceController:
         # button is answering, so turning a setting is what brings it back.
         self._host.enhance_offer_changed()
         # Every picture on screen is answering it too, in its own corner.
-        self._browser.refresh_enhance_corners()
+        self._browser.refresh_corners()
 
     def sync_panel(self) -> None:
         """Gray the Enhance settings out where nothing they say could ever run.

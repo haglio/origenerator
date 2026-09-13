@@ -276,7 +276,8 @@ class BrowserPane(QObject):
                 rows=self._combined_starred_rows,
                 render=lambda: self._show_starred(
                     self._starred_groups.get(self._shelf_orientation, ()),
-                    filter_rows(self._starred_rows, self._shelf_orientation))),
+                    filter_rows(gallery.starred_generations(self._listed_rows),
+                                self._shelf_orientation))),
             EXPERIMENTS_KEY: Shelf(
                 rows=lambda side: filter_rows(self._experiment_rows, side),
                 render=self._render_experiments),
@@ -303,7 +304,7 @@ class BrowserPane(QObject):
         # Each side's bookmarked folders, keyed by orientation — a Favorites
         # shelf collects the copies of them its own side holds.
         self._starred_groups: dict = {}
-        self._starred_rows: list[dict] = [] # starred items the Favorites shelf collects
+        self._listed_rows: list[dict] = []
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
@@ -314,7 +315,7 @@ class BrowserPane(QObject):
         # shelf_rows. Every shelf belongs to one side, so on one it is never None.
         self._shelf_orientation: str | None = None
 
-    def set_model(self, recent_rows, starred_groups, starred_rows, experiment_rows,
+    def set_model(self, recent_rows, starred_groups, listed_rows, experiment_rows,
                   trash_rows, request_items=()):
         """Take the newly rebuilt gallery model the shelves render from.
 
@@ -324,7 +325,7 @@ class BrowserPane(QObject):
         """
         self._recent_rows = recent_rows
         self._starred_groups = starred_groups
-        self._starred_rows = starred_rows
+        self._listed_rows = listed_rows
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
         self._request_items = list(request_items)
@@ -997,7 +998,8 @@ class BrowserPane(QObject):
     def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
         """Everything one side's Favorites shelf stands for: its starred items,
         plus the items inside the folders it has bookmarked."""
-        return _unique_rows(filter_rows(self._starred_rows, orientation) + [
+        return _unique_rows(filter_rows(gallery.starred_generations(self._listed_rows),
+                                        orientation) + [
             row for group in self._starred_groups.get(orientation, ())
             for row in gallery.rows_under(group)
         ])
@@ -1307,7 +1309,7 @@ class BrowserPane(QObject):
         Enhance panel's current settings (:func:`corner_controls.enhance_state`)."""
         return enhance_state(row, self._host.enhance_settings())
 
-    def refresh_enhance_corners(self):
+    def refresh_corners(self):
         """Re-read every drawn tile's enhance corner, without rebuilding the pane.
 
         Turning a setting in the Enhance subpanel changes what every picture on
@@ -1319,3 +1321,4 @@ class BrowserPane(QObject):
             row = self._db.get_generation(prompt_id)
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))
+                tile.set_starred(bool(row.get("starred")))

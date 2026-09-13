@@ -37,7 +37,7 @@ from origenerator.config import (
     VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.generation_config import randomize_seeds
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
@@ -459,7 +459,7 @@ class CombineController(QObject):
             image_workflow = WORKFLOW_REGISTRY.get(image_row.get("workflow_name") or "")
             can_reroll_image = (
                 image_workflow is not None
-                and image_row.get("source", "generated") == "generated"
+                and source_of(image_row) == GenerationSource.GENERATED
             )
             choice = self._host.ask_which_seed(
                 workflow, can_reroll_image=can_reroll_image)

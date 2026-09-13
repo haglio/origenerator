@@ -35,6 +35,7 @@ from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
+from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
 )
@@ -842,7 +843,7 @@ class ShowDirector:
                  # Recents by its own rule, having no list of its own to consult.
                  or (self._browser.showing_recents()
                      and not self._browser.showing_search()
-                     and (row.get("source") or "generated") == "generated"
+                     and source_of(row) == GenerationSource.GENERATED
                      and gallery.media_type_of_row(row) in self._host.media_types()))
         )
         if not plays:

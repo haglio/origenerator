@@ -38,9 +38,7 @@ what makes the queue's behavior testable without a running ComfyUI.
 """
 from __future__ import annotations
 
-# The ``source`` of work the user asked for, as opposed to a background
-# experiment ("experiment") or a repair of an old row ("base_render").
-USER_SOURCE = "generated"
+from origenerator.generation_state import GenerationSource
 
 
 def is_video(job) -> bool:
@@ -62,7 +60,8 @@ def joins_the_front(job) -> bool:
     the user never asked for and there can be a great many of them, so they take
     the back of the line like anything else.
     """
-    return not is_video(job) and getattr(job, "source", USER_SOURCE) == USER_SOURCE
+    return (not is_video(job)
+            and getattr(job, "source", GenerationSource.GENERATED) == GenerationSource.GENERATED)
 
 
 def insertion_index(line: list, job) -> int:

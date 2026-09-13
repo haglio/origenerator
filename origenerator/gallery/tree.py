@@ -33,10 +33,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from origenerator.gallery.enhance import (
-    BASE_RENDER_SOURCE,
-    enhancement_recency,
-)
+from origenerator.gallery.enhance import enhancement_recency
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     AllGroup,
@@ -81,6 +78,7 @@ from origenerator.gallery.signatures import (
     settings_signature,
 )
 from origenerator.gallery.source_image import build_image_config_index
+from origenerator.generation_state import GenerationSource, source_of
 
 
 def _group_by_creation(newest_first, key):
@@ -303,11 +301,6 @@ def named_folders_by_row(
     return named
 
 
-#: The one source with a shelf of its own: an experiment is reviewed there, not
-#: listed here. Every other row with a result is on the Recents shelf.
-_SHELVED_ELSEWHERE = frozenset({"experiment"})
-
-
 def recent_generations(rows: list[dict]) -> list[dict]:
     """Every row with a result, newest first — the whole of the Recents shelf's list.
 
@@ -343,7 +336,7 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     """
     listed = [
         row for row in rows
-        if (row.get("source") or "generated") not in _SHELVED_ELSEWHERE
+        if source_of(row) != GenerationSource.EXPERIMENT
         and produced_output(row)
     ]
     # Ids are the order the caller already handed them in, so a row with no
@@ -401,7 +394,7 @@ def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     experiment has nothing to judge, and an in-flight one shows as a live card."""
     return [
         row for row in rows
-        if row.get("source") == "experiment"
+        if row.get("source") == GenerationSource.EXPERIMENT
         and row.get("experiment_verdict") is None
         and produced_output(row)
     ]
@@ -562,7 +555,7 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
         and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
-        and row.get("source") != BASE_RENDER_SOURCE
+        and row.get("source") != GenerationSource.BASE_RENDER
     ]
 
 

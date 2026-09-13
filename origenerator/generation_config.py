@@ -9,7 +9,7 @@ import json
 import random
 from dataclasses import dataclass
 
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.param_keys import renamed as renamed_params
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
@@ -155,7 +155,7 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
             continue
         if not _recorded_an_output(row):
             continue
-        if row.get("source", "generated") != "generated":
+        if source_of(row) != GenerationSource.GENERATED:
             continue
         if row.get("workflow_name", "") != snapshot.workflow_name:
             continue

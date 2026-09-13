@@ -37,9 +37,8 @@ import uuid
 from origenerator import gallery
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
-from origenerator.gallery.enhance import BASE_RENDER_SOURCE as SOURCE
 from origenerator.gallery.output import is_in_progress
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,7 @@ def rows_missing_their_base(rows: list[dict]) -> list[dict]:
     """
     out = []
     for row in rows:
-        if row.get("source") == SOURCE:
+        if row.get("source") == GenerationSource.BASE_RENDER:
             continue  # a repair in flight is not itself something to repair
         if gallery.media_type_of_row(row) != "image":
             continue
@@ -111,7 +110,7 @@ def already_queued(rows: list[dict]) -> set[str]:
     doesn't queue the same repair twice."""
     return {
         gallery.parse_params(r.get("params_json")).get(TARGET_KEY)
-        for r in rows if r.get("source") == SOURCE and is_in_progress(r)
+        for r in rows if r.get("source") == GenerationSource.BASE_RENDER and is_in_progress(r)
     } - {None}
 
 
@@ -267,7 +266,8 @@ def fold_completed_base_renders(db) -> int:
     """
     folded = 0
     for row in db.list_generations():
-        if row.get("source") != SOURCE or row.get("status") != GenerationStatus.COMPLETED:
+        if (row.get("source") != GenerationSource.BASE_RENDER
+                or row.get("status") != GenerationStatus.COMPLETED):
             continue
         if fold_base_render(db, row) is not None:
             folded += 1
@@ -288,7 +288,7 @@ def cancel_base_renders(db, client) -> int:
     """
     rows = [
         r for r in db.list_generations()
-        if r.get("source") == SOURCE and is_in_progress(r)
+        if r.get("source") == GenerationSource.BASE_RENDER and is_in_progress(r)
     ]
     if not rows:
         return 0

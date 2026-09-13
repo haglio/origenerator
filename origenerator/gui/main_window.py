@@ -205,8 +205,8 @@ class OrigeneratorWindow(QMainWindow):
             # actually loses if the close breaks is everything below — the open
             # tabs, the folder they were in, the window's place on its monitor.
             # A typo in one of these chores ate exactly that, silently, for three
-            # days (``gallery.BASE_RENDER_SOURCE``, which the package had never
-            # exported), and the app looked fine the whole time because nothing
+            # days (a name for the base-render source the gallery package had
+            # never exported), and the app looked fine the whole time because nothing
             # a closing window raises is ever shown to anyone.
             try:
                 chore()

@@ -38,7 +38,7 @@ from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, pyqtSignal
 
 from origenerator import gallery, queue_line
 from origenerator.generation_config import filled_params, prepared_params
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
     GenerationJob,
     insert_generation_row,
@@ -199,7 +199,7 @@ class RerollController(QObject):
     def has(self, key: str) -> bool:
         return bool(self._jobs.get(key))
 
-    def _launchable(self, key: str, source: str = "generated") -> bool:
+    def _launchable(self, key: str, source: str = GenerationSource.GENERATED) -> bool:
         """Whether a launch may join ``key``.
 
         User work always may, even into a folder already generating: ComfyUI runs
@@ -209,10 +209,10 @@ class RerollController(QObject):
         being re-rolled together. A background experiment still takes only an idle
         folder, and never stacks; user work preempts one in :meth:`_launch`.
         """
-        return source != "experiment" or not self._jobs.get(key)
+        return source != GenerationSource.EXPERIMENT or not self._jobs.get(key)
 
     def start_prepared(self, key: str, workflow, params: dict, *,
-                       source: str = "generated") -> str | None:
+                       source: str = GenerationSource.GENERATED) -> str | None:
         """Launch a job with already-built ``params`` under folder ``key``.
 
         Unlike :meth:`start`, the caller owns the params — no defaults are filled
@@ -326,7 +326,8 @@ class RerollController(QObject):
         workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
         return (source, workflow) if workflow is not None else None
 
-    def _launch(self, key, workflow, params, on_finished, *, source="generated",
+    def _launch(self, key, workflow, params, on_finished, *,
+                source=GenerationSource.GENERATED,
                 origin=None, run_media_type=None):
         """Build, register and submit one re-roll job, wiring its completion to
         ``on_finished(key, job, files, thumb_path, duration)``.
@@ -364,7 +365,7 @@ class RerollController(QObject):
         # experiment frees the machine and starts whatever is at the front, and
         # the front has to be this job by then or the wait it was preempted for
         # is just handed to something else.
-        if source != "experiment":
+        if source != GenerationSource.EXPERIMENT:
             self._preempt_experiments()
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
@@ -484,7 +485,7 @@ class RerollController(QObject):
         """
         for jobs in list(self._jobs.values()):
             for job in list(jobs):
-                if job.source == "experiment":
+                if job.source == GenerationSource.EXPERIMENT:
                     logger.info(
                         "Preempting background experiment %s for user work", job.prompt_id
                     )
@@ -572,7 +573,7 @@ class RerollController(QObject):
             job = GenerationJob.reconnect(
                 self._client, workflow, params, row["prompt_id"],
                 progress_state=_parse_progress_state(row.get("progress_json")),
-                source=row.get("source") or "generated",
+                source=source_of(row),
             )
         except Exception as e:
             logger.warning("Could not reconnect re-roll for %s: %s", key, e)
@@ -599,7 +600,7 @@ class RerollController(QObject):
                 raise ValueError(f"unknown workflow {row.get('workflow_name')!r}")
             job = GenerationJob.readopt(
                 self._client, workflow, gallery.parse_params(row.get("params_json")),
-                row["prompt_id"], source=row.get("source") or "generated",
+                row["prompt_id"], source=source_of(row),
             )
         except Exception as e:
             logger.warning("Dropping a queued generation we can no longer build: %s", e)

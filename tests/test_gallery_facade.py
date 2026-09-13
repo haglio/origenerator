@@ -20,7 +20,7 @@ _PACKAGE = ROOT / "origenerator" / "gallery"
 # the GUI reaches most of these as gallery.X and nothing else records what the
 # facade owes its callers.
 PUBLISHED = {
-    "ALL_KEY", "ALL_LABEL", "AllGroup", "BASE_RENDER_SOURCE", "CustomGroup",
+    "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
     "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "LoraGroup",
     "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",

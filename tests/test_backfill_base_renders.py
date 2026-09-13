@@ -13,7 +13,6 @@ import json
 from origenerator import base_backfill, gallery
 from origenerator.app_state import AppState
 from origenerator.base_backfill import (
-    SOURCE,
     TARGET_KEY,
     UNTIMED_SECONDS,
     attach_base,
@@ -28,6 +27,7 @@ from origenerator.base_backfill import (
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -92,7 +92,7 @@ def test_a_re_render_in_flight_is_not_itself_something_to_repair(tmp_path):
     _baked(db, "baked")
     _add(db, "repair", params=dict(_SDXL.default_params(), enhance=False,
                                    **{TARGET_KEY: "baked"}),
-         files=None, source=SOURCE, status="running")
+         files=None, source=GenerationSource.BASE_RENDER, status="running")
     assert [r["prompt_id"] for r in rows_missing_their_base(db.list_generations())] \
         == ["baked"]
 
@@ -157,7 +157,7 @@ def test_a_row_already_being_repaired_is_not_queued_again(tmp_path):
     db = Database(tmp_path / "t.db")
     _baked(db, "baked")
     _add(db, "repair", params={TARGET_KEY: "baked"}, files=None,
-         source=SOURCE, status="running")
+         source=GenerationSource.BASE_RENDER, status="running")
 
     assert queue_base_renders(db.list_generations(), lambda wf, p: "p") == 0
 
@@ -194,7 +194,7 @@ def test_folding_drops_the_repair_row_it_came_from(tmp_path):
     db = Database(tmp_path / "t.db")
     _baked(db, "baked", filename="sdxl_t2i_a.png")
     repair = _add(db, "repair", params={TARGET_KEY: "baked"},
-                  files=[_file("sdxl_t2i_a_base.png")], source=SOURCE)
+                  files=[_file("sdxl_t2i_a_base.png")], source=GenerationSource.BASE_RENDER)
 
     assert fold_base_render(db, repair) == "baked"
 
@@ -207,7 +207,7 @@ def test_a_repair_whose_target_is_gone_is_left_alone(tmp_path):
     # so it can be found and cleared by hand.
     db = Database(tmp_path / "t.db")
     repair = _add(db, "repair", params={TARGET_KEY: "vanished"},
-                  files=[_file("orphan_base.png")], source=SOURCE)
+                  files=[_file("orphan_base.png")], source=GenerationSource.BASE_RENDER)
     assert fold_base_render(db, repair) is None
     assert db.get_generation("repair") is not None
 
@@ -217,9 +217,9 @@ def test_the_startup_sweep_folds_the_finished_and_leaves_the_running(tmp_path):
     _baked(db, "one", filename="sdxl_t2i_one.png")
     _baked(db, "two", filename="sdxl_t2i_two.png")
     _add(db, "done", params={TARGET_KEY: "one"},
-         files=[_file("sdxl_t2i_one_base.png")], source=SOURCE)
+         files=[_file("sdxl_t2i_one_base.png")], source=GenerationSource.BASE_RENDER)
     _add(db, "running", params={TARGET_KEY: "two"}, files=None,
-         source=SOURCE, status="running")
+         source=GenerationSource.BASE_RENDER, status="running")
 
     assert fold_completed_base_renders(db) == 1
 
@@ -251,9 +251,9 @@ def test_opening_the_app_drops_what_the_absence_had_not_reached(tmp_path):
     db = Database(tmp_path / "t.db")
     _baked(db, "one")
     _add(db, "queued", params={TARGET_KEY: "one"}, files=None,
-         source=SOURCE, status="pending")
+         source=GenerationSource.BASE_RENDER, status="pending")
     _add(db, "done", params={TARGET_KEY: "one"},
-         files=[_file("sdxl_t2i_one_base.png")], source=SOURCE)
+         files=[_file("sdxl_t2i_one_base.png")], source=GenerationSource.BASE_RENDER)
     client = _FakeClient()
 
     assert cancel_base_renders(db, client) == 1
@@ -268,7 +268,7 @@ def test_one_caught_mid_render_is_interrupted_too(tmp_path):
     db = Database(tmp_path / "t.db")
     _baked(db, "one")
     _add(db, "running", params={TARGET_KEY: "one"}, files=None,
-         source=SOURCE, status="running")
+         source=GenerationSource.BASE_RENDER, status="running")
     client = _FakeClient(running={"running"})
 
     assert cancel_base_renders(db, client) == 1
@@ -282,10 +282,10 @@ def test_a_repair_never_grows_a_folder_of_its_own(tmp_path):
     _baked(db, "one")
     _add(db, "running", params=dict(_SDXL.default_params(), enhance=False,
                                     **{TARGET_KEY: "one"}),
-         files=None, source=SOURCE, status="running")
+         files=None, source=GenerationSource.BASE_RENDER, status="running")
     _add(db, "landed", params=dict(_SDXL.default_params(), enhance=False,
                                    **{TARGET_KEY: "one"}),
-         files=[_file("sdxl_t2i_one_base.png")], source=SOURCE)
+         files=[_file("sdxl_t2i_one_base.png")], source=GenerationSource.BASE_RENDER)
 
     tree = gallery.build_gallery_tree(db.list_generations())
     shown = [r["prompt_id"] for media in tree for r in gallery.rows_under(media)]
@@ -361,8 +361,8 @@ def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
     # The batch runs only from a closing window, where an exception is shown to
     # nobody — so the wiring between the view and the queue is checked here
     # rather than left to the one place it can fail in silence. It failed
-    # exactly that way: the launch adapter named ``gallery.BASE_RENDER_SOURCE``,
-    # which the package never exported, so every close raised before the session
+    # exactly that way: the launch adapter named a base-render source constant
+    # the gallery package never exported, so every close raised before the session
     # was saved. Three days of closes queued no repair at all and lost the open
     # tabs, the gallery folder and the window's place, with nothing in the log.
     #
@@ -378,7 +378,8 @@ def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
 
     assert window._gallery_view.queue_base_renders_for_absence() == 3
 
-    repairs = [r for r in db.list_generations() if r.get("source") == SOURCE]
+    repairs = [r for r in db.list_generations()
+               if r.get("source") == GenerationSource.BASE_RENDER]
     assert {gallery.parse_params(r["params_json"])[TARGET_KEY] for r in repairs} == \
         {"baked0", "baked1", "baked2"}
 

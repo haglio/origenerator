@@ -155,6 +155,7 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.toast import ERROR, NOTICE
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
     BankActs,
@@ -3088,9 +3089,9 @@ class GalleryView(QWidget):
 
     # --- a spoken request's own generation -----------------------------------
 
-    def queue_request(self, row, workflow, params, spoken, revision) -> str:
+    def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         """Launch the revised generation and record the request under it;
-        return the line to say about it.
+        return the line to say about it and its kind.
 
         The revision is the target's own recipe with its prompt pair edited and
         *the same seed* — "the same picture but without X" means the picture, so
@@ -3100,7 +3101,7 @@ class GalleryView(QWidget):
                   "negative_prompt": revision.negative}
         key = self.folder_key_for(row.get("workflow_name") or "", params)
         if not self._reroll.start_prepared(key, workflow, params):
-            return "🎤 couldn't queue the request — see the log"
+            return "🎤 couldn't queue the request — see the log", ERROR
         job = self._reroll.newest_job_for(key)
         logger.info("Request %r on %s: %s", spoken.heard, row.get("prompt_id"),
                     revision.describe())
@@ -3112,7 +3113,7 @@ class GalleryView(QWidget):
             new_negative=revision.negative,
         )
         self.refresh()  # the shelf shows the request the moment it is spoken
-        return f"🎤 {revision.describe()} — generating"
+        return f"🎤 {revision.describe()} — generating", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
         """Bin some of one image's versions, from the info pane's version list.
@@ -3258,11 +3259,11 @@ class GalleryView(QWidget):
         """A held slide asked to be enhanced; whether a run started."""
         return self._enhance.enhance_from_slideshow(prompt_id)
 
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         """The spoken "enhance" over a picture."""
         return self._enhance.enhance_it(prompt_id)
 
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
         """The spoken "fix <part>" over a picture."""
         return self._enhance.fix_parts(prompt_id, parts)
 
@@ -3290,7 +3291,7 @@ class GalleryView(QWidget):
         """Put the combine panel back the way a session left it."""
         self._combine.restore(saved)
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str]:
+    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
         """Animate a picture as a Genau clip — what a spoken "genau it" runs."""
         return self._combine.genau_it(image_id)
 

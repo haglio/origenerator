@@ -27,6 +27,7 @@ from origenerator import gallery
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.inflight import EnhancingRun
+from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts
@@ -338,9 +339,9 @@ class EnhanceController:
 
     # --- said out loud ---------------------------------------------------------
 
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         """Enhance the picture on screen: the id it launched on (``None`` when it
-        didn't) and the line the speaking surface should say.
+        didn't), the line the speaking surface should say, and its kind.
 
         Only an image that has received no enhancement gets one, the same gate a
         fullscreen hold's Down uses — spoken over a show, this is a gesture made
@@ -351,15 +352,15 @@ class EnhanceController:
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, "🎤 only a finished image can be enhanced"
+            return None, "🎤 only a finished image can be enhanced", WARNING
         if gallery.is_enhanced_row(row):
-            return None, "🎤 this one is enhanced already"
+            return None, "🎤 this one is enhanced already", WARNING
         params = gallery.enhance_params_for(row, self._settings)
         if params is None:
-            return None, "🎤 this one has no file to enhance"
+            return None, "🎤 this one has no file to enhance", WARNING
         return self._launch_spoken(row, params, "enhance", "enhancing…")
 
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
         """Launch a targeted fix if the image wants one: the id it launched on
         (``None`` when it didn't) and the line the surface should say about it.
 
@@ -375,19 +376,19 @@ class EnhanceController:
         asked = name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, f"🎤 only a finished image can get a {asked} fix"
+            return None, f"🎤 only a finished image can get a {asked} fix", WARNING
         params = gallery.fix_params_for(row, parts, self._settings)
         if params is None:
             return None, (f"🎤 no {asked} detector installed "
-                          "(ComfyUI models/ultralytics/bbox)")
+                          "(ComfyUI models/ultralytics/bbox)"), WARNING
         if gallery.level_matching_params(row, params) is not None:
-            return None, f"🎤 already has this {asked} fix"
+            return None, f"🎤 already has this {asked} fix", WARNING
         fixing = name_parts(
             [part for part in parts if part.name in params["enhance_detail_fixes"]])
         return self._launch_spoken(row, params, f"{fixing} fix", f"fixing {fixing}…")
 
     def _launch_spoken(self, row: dict, params: dict, what: str,
-                       doing: str) -> tuple[str | None, str]:
+                       doing: str) -> tuple[str | None, str, str]:
         """The tail both spoken enhancements share: refuse one already cooking,
         else launch and say so.
 
@@ -397,12 +398,12 @@ class EnhanceController:
         while it runs.
         """
         if self.run_of(row) is not None:
-            return None, "🎤 an enhance of this image is already running"
+            return None, "🎤 an enhance of this image is already running", WARNING
         logger.info("Voice %s on %s at %s", what, row.get("prompt_id"),
                     gallery.describe_enhance_params(params))
         if not self._launch(row, params):
-            return None, f"🎤 couldn't launch the {what} — see the log"
-        return row["prompt_id"], f"🎤 {doing}"
+            return None, f"🎤 couldn't launch the {what} — see the log", ERROR
+        return row["prompt_id"], f"🎤 {doing}", NOTICE
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Holding a slide asked for it to be enhanced. Returns whether a run

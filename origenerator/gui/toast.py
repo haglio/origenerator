@@ -29,7 +29,7 @@ from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
-from shared_ui.colors import BG_SECONDARY, TEXT_PRIMARY
+from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 
 # The gap from the top edge of the surface, matching
@@ -37,25 +37,31 @@ from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 # when a Fun Time player and a show are side by side.
 TOP_MARGIN = 28
 
+NOTICE = "notice"
+WARNING = "warning"
+ERROR = "error"
+FAVORITE = "favorite"
+_INK = {NOTICE: TEXT_PRIMARY, WARNING: AMBER, ERROR: RED, FAVORITE: GREEN}
+
 
 class Toast(QLabel):
     """One line, centered across the top of the surface it belongs to."""
 
     def __init__(self, host: QWidget):
         super().__init__(host)
-        self.setStyleSheet(
-            f"background-color: {BG_SECONDARY.name()};"
-            f" color: {TEXT_PRIMARY.name()};"
-            f" border: 1px solid {TEXT_PRIMARY.name()};"
-            " padding: 8px 16px; border-radius: 4px;"
-        )
         self.setFont(make_font(FONT_UI, SIZE_HEADING, bold=True))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         float_over_media(self)
         self.hide()
 
-    def say(self, text: str) -> None:
+    def say(self, text: str, *, kind: str = NOTICE) -> None:
         """Put *text* up, and keep it up until something says otherwise."""
+        ink = _INK[kind].name()
+        self.setStyleSheet(
+            f"background-color: {BG_SECONDARY.name()};"
+            f" color: {ink}; border: 1px solid {ink};"
+            " padding: 8px 16px; border-radius: 4px;"
+        )
         self.setText(text)
         self.show()
         self.reposition()

@@ -104,7 +104,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
-from origenerator.gui.toast import Toast
+from origenerator.gui.toast import NOTICE, Toast
 from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, ShowState, Slide, SlideshowPlaylist, in_order
 
@@ -1035,7 +1035,7 @@ class SlideshowView(QWidget):
         self._follow_the_freeze(was_frozen)
 
     def note_request(self, message: str, request=None, *,
-                     working: bool = False) -> None:
+                     working: bool = False, kind: str = NOTICE) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
         *working* means it hasn't done it yet: the corner holds that line
@@ -1058,7 +1058,7 @@ class SlideshowView(QWidget):
             return
         if request is self._working_request:
             self._working_note, self._working_request = "", None
-        self._flash_note(message, ms=3000)
+        self._flash_note(message, ms=3000, kind=kind)
 
     def _hold_current(self):
         """Down: hold the slide, star it, and ask for it to be enhanced.
@@ -1177,20 +1177,20 @@ class SlideshowView(QWidget):
         screen — what the speaker is looking at while saying it."""
         return self._current_prompt_id()
 
-    def note_voice_run(self, prompt_id, message: str) -> None:
+    def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken order did and, when it launched a run
         (``prompt_id``), keep the note on that run once the flash fades — the
         same note a hold's enhance earns, and it reads the same way: where the
         run has got to, not merely that one was asked for."""
         if prompt_id is not None:
             self._enhancing.add(prompt_id)
-        self.note_voice_command(message)
+        self.note_voice_command(message, kind=kind)
 
-    def note_voice_command(self, message: str) -> None:
+    def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken command did. Here rather than in the gallery's own
         caption because the speaker is looking at this — the window under it is
         covered by the very show being talked to."""
-        self._flash_note(message, ms=2500)
+        self._flash_note(message, ms=2500, kind=kind)
 
     def _refresh_note(self):
         """Say what there is to say about the item on screen: the request being
@@ -1233,13 +1233,13 @@ class SlideshowView(QWidget):
         label = levels[index][2] if len(levels[index]) > 2 else f"Version {index + 1}"
         self._show_note(f"{label} — {index + 1} of {len(levels)}")
 
-    def _show_note(self, text: str) -> None:
-        self._note.say(text)
+    def _show_note(self, text: str, *, kind: str = NOTICE) -> None:
+        self._note.say(text, kind=kind)
 
-    def _flash_note(self, text: str, ms: int = 1500):
+    def _flash_note(self, text: str, ms: int = 1500, *, kind: str = NOTICE):
         """Say something for a moment, then fall back to whatever the note would
         otherwise be saying."""
-        self._show_note(text)
+        self._show_note(text, kind=kind)
         self._note_timer.start(ms)
 
     def _reposition_note(self):

@@ -19,6 +19,7 @@ from origenerator import gallery
 from origenerator.gui import show_director as module
 from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
+from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 
@@ -68,6 +69,7 @@ class FakeShow:
         self.in_flight = None
         self.queue_set = None
         self.said = []
+        self.said_kinds = []
         self.runs_said = []
         self.levels = None
         self.playlist = None
@@ -143,10 +145,11 @@ class FakeShow:
     def note_enhancing(self, statuses):
         self.enhancing = dict(statuses)
 
-    def note_voice_command(self, message):
+    def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
+        self.said_kinds.append(kind)
 
-    def note_voice_run(self, prompt_id, message):
+    def note_voice_run(self, prompt_id, message, *, kind=NOTICE):
         self.runs_said.append((prompt_id, message))
 
     def set_queue(self, items, foreign_total):
@@ -711,6 +714,15 @@ def test_a_spoken_word_is_answered_in_the_shows_own_corner(shows):
     assert host.said == []
 
 
+def test_an_answer_keeps_its_kind_in_the_shows_corner(shows):
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.answer("🎤 no Latest shelf yet", kind=WARNING)
+
+    assert made[0].said_kinds == [WARNING]
+
+
 def test_a_spoken_word_with_no_show_up_is_answered_on_the_caption(shows):
     director, host, _made = shows()
 
@@ -771,6 +783,7 @@ def test_the_transport_words_step_the_slide_and_say_which_way(shows):
 
     assert made[0].steps == [1, -1]
     assert made[0].said == ["🎤 next", "🎤 back"]
+    assert made[0].said_kinds == [NOTICE, NOTICE]
 
 
 def test_a_star_over_a_slide_with_nothing_to_star_says_so(shows):
@@ -781,6 +794,17 @@ def test_a_star_over_a_slide_with_nothing_to_star_says_so(shows):
     director.run_on_slide(AppCommand.STAR)
 
     assert made[0].said == ["🎤 nothing here to star"]
+    assert made[0].said_kinds == [WARNING]
+
+
+def test_a_star_that_lands_says_so_in_the_favorites_green(shows):
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    director.run_on_slide(AppCommand.STAR)
+
+    assert made[0].said == ["🎤 starred"]
+    assert made[0].said_kinds == [FAVORITE]
 
 
 def test_leaving_a_show_for_an_item_lands_on_the_item(shows):
@@ -881,6 +905,7 @@ def test_a_show_with_nothing_enhanced_in_it_says_so(shows):
     director.filter_enhanced(True)
 
     assert show.said == ["🎤 nothing here is enhanced"]
+    assert show.said_kinds == [WARNING]
 
 
 def test_clearing_the_filter_takes_f_mode_with_it(shows):

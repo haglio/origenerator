@@ -42,6 +42,7 @@ from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
+from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -490,7 +491,7 @@ class CombineController(QObject):
         — and where :meth:`_say_no_recipe` falls back to a dialog, this one has
         nothing to fall back to: a modal is precisely what it exists to avoid.
         """
-        self._shows.note_voice_run(None, ALREADY_GENAUD)
+        self._shows.note_voice_run(None, ALREADY_GENAUD, kind=WARNING)
 
     # --- finding the recipe an act names --------------------------------------
 
@@ -565,7 +566,7 @@ class CombineController(QObject):
                 else "“%s” video" % category)
         if self._shows.showing is not None:
             self._shows.note_voice_run(
-                None, f"🎤 no past {what} to base a recipe on yet")
+                None, f"🎤 no past {what} to base a recipe on yet", kind=WARNING)
             return
         self._host.tell(
             "No recipe yet",
@@ -768,12 +769,12 @@ class CombineController(QObject):
             for other in self._db.list_generations()
         )
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str]:
+    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
         """Animate an image as a Genau clip: the act read off its own prompt.
 
-        Returns the id it launched on (``None`` when it didn't) and the line the
-        speaking surface should say — the same shape as ``fix_parts``, because
-        the speaker is looking at the picture, not at the gallery's own caption.
+        Returns the id it launched on (``None`` when it didn't), the line the
+        speaking surface should say and its kind — the same shape as ``fix_parts``,
+        because the speaker is looking at the picture, not at the gallery's caption.
 
         Nothing is picked and nothing is dropped: the act comes from the image's
         prompt (:func:`recipe_match.category_for_prompt`), and from there this is
@@ -786,17 +787,18 @@ class CombineController(QObject):
         """
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
-            return None, "🎤 only a picture can become a Genau clip"
+            return None, "🎤 only a picture can become a Genau clip", WARNING
         if self._already_genaud(row):
-            return None, ALREADY_GENAUD
+            return None, ALREADY_GENAUD, WARNING
         category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
         if category is None:
-            return None, "🎤 this prompt doesn't say what's happening — no act to animate"
+            return (None, "🎤 this prompt doesn't say what's happening — no act to animate",
+                    WARNING)
         available = recipe_match.available_categories(
             self.rebuildable_videos(self._db.list_generations()), recipe_match.GENAU,
         )
         if category not in available:
-            return None, f"🎤 no looping “{category}” clip to base a recipe on yet"
+            return None, f"🎤 no looping “{category}” clip to base a recipe on yet", WARNING
         logger.info("genau it: image=%s -> category=%s", image_id, category)
         self.generate_category(image_id, category, recipe_match.GENAU, send=True)
-        return image_id, f"🎤 animating as a “{category}” loop"
+        return image_id, f"🎤 animating as a “{category}” loop", NOTICE

@@ -603,6 +603,7 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two shows run and NEITHER is the active
     window, so the side word is the only thing that says which picture."""
+    from origenerator.gui.toast import NOTICE
     from origenerator.voice.commands import SurfaceCommand
     from origenerator.workflows.detail_parts import part_table
 
@@ -616,10 +617,11 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(
         view, "fix_parts",
         lambda prompt_id, parts: (prompt_id,
-                                  "fixing " + " ".join(p.name for p in parts)))
+                                  "fixing " + " ".join(p.name for p in parts),
+                                  NOTICE))
     for show in (portrait, landscape):
         monkeypatch.setattr(show, "note_voice_run",
-                            lambda pid, msg, s=show: fixed.append((s, pid, msg)))
+                            lambda pid, msg, *, kind, s=show: fixed.append((s, pid, msg)))
     teeth = next(p for p in part_table() if p.name == "teeth")
 
     # A fix names one or more parts, so the command carries them as a set.

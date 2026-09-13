@@ -11,9 +11,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import QRunnable
+from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
 
 from origenerator.gui import voice_router
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.toast import ERROR, WARNING
 from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
@@ -117,6 +119,26 @@ def test_a_flash_while_the_work_goes_on_falls_back_to_the_work(qtbot):
     _fade(view)
 
     assert _corner(view) == _WORKING
+
+
+def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
+    """Every way a line reaches the corner carries what kind of line it is: a
+    warning reads yellow and an error red, and once the flash fades the work
+    under it is plain news again."""
+    view = _view(qtbot)
+    view.note_request(_WORKING, _ASKED, working=True)
+
+    view.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
+    assert AMBER.name() in view._note.styleSheet()
+    view.note_voice_run(None, "🎤 couldn't launch the enhance — see the log", kind=ERROR)
+    assert RED.name() in view._note.styleSheet()
+    view.note_request("🎤 didn't catch what to change in “no beard”", _ASKED_AGAIN,
+                      kind=WARNING)
+    assert AMBER.name() in view._note.styleSheet()
+    _fade(view)
+
+    assert _corner(view) == _WORKING
+    assert TEXT_PRIMARY.name() in view._note.styleSheet()
 
 
 def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkeypatch):

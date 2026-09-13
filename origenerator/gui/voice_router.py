@@ -47,6 +47,7 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
+from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
@@ -191,19 +192,19 @@ class VoiceHost(Protocol):
         """The generation picked in the gallery, for a request said with no show
         covering it."""
 
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str]:
+    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         """Queue the better version of a picture: what it launched on, and the
-        line to say about it."""
+        line to say about it with its kind."""
 
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str]:
+    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
         """Queue a targeted detail fix, the same way."""
 
-    def genau_it(self, image_id: str | None) -> tuple[str | None, str]:
+    def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
         """Animate a picture as a Genau clip, the same way."""
 
-    def queue_request(self, row, workflow, params, spoken, revision) -> str:
+    def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         """Launch a revised generation, record the request under it, and answer
-        with the line to say."""
+        with the line to say and its kind."""
 
 
 class VoiceRouter(QObject):
@@ -418,9 +419,9 @@ class VoiceRouter(QObject):
         self._say_both("🎤 ✓ prompt updated")
 
     def _on_error(self, message: str) -> None:
-        self._say_both(f"🎤 {message}")
+        self._say_both(f"🎤 {message}", kind=ERROR)
 
-    def _say_both(self, message: str) -> None:
+    def _say_both(self, message: str, *, kind: str = NOTICE) -> None:
         """Put what voice heard or hit in front of whoever is listening.
 
         Both places, because they are different screens: this pane's caption for
@@ -435,7 +436,7 @@ class VoiceRouter(QObject):
         take its place.
         """
         self._show(message, transient=True)
-        self._shows.note_voice_command(message)
+        self._shows.note_voice_command(message, kind=kind)
 
     # --- one utterance ------------------------------------------------------
 
@@ -545,7 +546,7 @@ class VoiceRouter(QObject):
         label = self._host.shelf_label(key)
         if not self._host.stand_in_shelf(key, side):
             # Recents and Starred appear only once there is one
-            self._shows.answer(f"🎤 no {label} shelf yet")
+            self._shows.answer(f"🎤 no {label} shelf yet", kind=WARNING)
             return
         self._shows.answer(f"🎤 {label}")
 
@@ -562,10 +563,10 @@ class VoiceRouter(QObject):
         switch, want, name = _SWITCHES[command]
         button = self._switches[switch]
         if button is None:  # hosted: the session owns the audio bed and the mic
-            self._shows.answer(f"🎤 {name} is the session's here")
+            self._shows.answer(f"🎤 {name} is the session's here", kind=WARNING)
             return
         if not button.isEnabled():
-            self._shows.answer(f"🎤 {name} can't be switched here")
+            self._shows.answer(f"🎤 {name} can't be switched here", kind=WARNING)
             return
         on = (not button.isChecked()) if want is None else want
         button.setChecked(on)  # its toggled signal is what does the work
@@ -598,7 +599,8 @@ class VoiceRouter(QObject):
         """A word said with no show to take it: the bank button it names, aimed
         exactly as a click on it would be."""
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
-            self._shows.answer(f"🎤 {command.value} is a slideshow's — none is up")
+            self._shows.answer(f"🎤 {command.value} is a slideshow's — none is up",
+                               kind=WARNING)
             return
         button, act = self._bank[command]
         self._press_bank_button(button, act, _BANK_REFUSALS[command])
@@ -614,7 +616,7 @@ class VoiceRouter(QObject):
         as one.
         """
         if button.isHidden() or not button.isEnabled():
-            self._shows.answer(f"🎤 {refusal or button.toolTip()}")
+            self._shows.answer(f"🎤 {refusal or button.toolTip()}", kind=WARNING)
             return
         said = button.toolTip()  # read first: the action re-aims the bank
         act()
@@ -649,12 +651,12 @@ class VoiceRouter(QObject):
             return
         target = show.voice_target()
         if command.command == gallery.GENAU_COMMAND:
-            prompt_id, message = self._host.genau_it(target)
+            prompt_id, message, kind = self._host.genau_it(target)
         elif command.command == gallery.ENHANCE_COMMAND:
-            prompt_id, message = self._host.enhance_it(target)
+            prompt_id, message, kind = self._host.enhance_it(target)
         else:
-            prompt_id, message = self._host.fix_parts(target, command.command)
-        show.note_voice_run(prompt_id, message)
+            prompt_id, message, kind = self._host.fix_parts(target, command.command)
+        show.note_voice_run(prompt_id, message, kind=kind)
 
     # --- spoken requests: "Request … over" over whatever is on screen --------
 
@@ -706,7 +708,7 @@ class VoiceRouter(QObject):
             self._show(note or "🎤 Request…", transient=False)
 
     def _answer_request(self, show, message: str, spoken, *,
-                        working: bool = False) -> None:
+                        working: bool = False, kind: str = NOTICE) -> None:
         """Say what *spoken* did, where the speaker is looking.
 
         *working* is the one line that is not an answer but a promise of one, so
@@ -728,7 +730,7 @@ class VoiceRouter(QObject):
             if promised and self.status.text() == promised:
                 self._revert()  # it was still promising this pane
         if show is not None:
-            show.note_request(message, spoken, working=working)
+            show.note_request(message, spoken, working=working, kind=kind)
         else:
             self._show(message, transient=not working)
 
@@ -779,11 +781,13 @@ class VoiceRouter(QObject):
         show = self._shows.surface_for(side)
         if revision is None:
             self._answer_request(
-                show, f"🎤 didn't catch what to change in “{spoken.text}”", spoken)
+                show, f"🎤 didn't catch what to change in “{spoken.text}”", spoken,
+                kind=WARNING)
             return
         if not revision.changed:
             self._answer_request(
-                show, f"🎤 “{revision.term}” is already how you asked for it", spoken)
+                show, f"🎤 “{revision.term}” is already how you asked for it", spoken,
+                kind=WARNING)
             return
-        self._answer_request(show, self._host.queue_request(
-            row, workflow, params, spoken, revision), spoken)
+        message, kind = self._host.queue_request(row, workflow, params, spoken, revision)
+        self._answer_request(show, message, spoken, kind=kind)

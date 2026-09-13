@@ -1002,7 +1002,7 @@ def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_notice("modified")
 
-    w.show_frame(_png_bytes(), keep_notice=True)
+    w.show_frame(_png_bytes(), enhancing=True)
 
     assert not w._notice.isHidden()
     assert w._notice.text() == "modified"
@@ -1016,7 +1016,7 @@ def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tm
     w.show_video(tmp_path / "clip.mp4")  # the stack is on the video surface
     w.set_notice("modified")
 
-    w.show_frame(_png_bytes(), keep_notice=True)
+    w.show_frame(_png_bytes(), enhancing=True)
 
     order = w._media_host.children()
     assert order.index(w._notice) > order.index(w._image_label)
@@ -1302,9 +1302,19 @@ def test_frames_of_the_picture_itself_keep_the_notice_they_are_about(make_previe
     # picture is just as true of the version being made, so it stays up.
     w = _pane_holding_everything(make_preview(), tmp_path)
 
-    w.show_frame(_png_bytes(), keep_notice=True)
+    w.show_frame(_png_bytes(), enhancing=True)
 
     assert not w._notice.isHidden()
+
+
+def test_frames_of_the_picture_itself_keep_its_corners(make_preview, tmp_path):
+    w = _pane_holding_everything(make_preview(), tmp_path)
+    star, trash, _plus = _corners(w)
+
+    w.show_frame(_png_bytes(), enhancing=True)
+
+    assert w.actions_id() == "held"
+    assert not star.isHidden() and not trash.isHidden()
 
 
 def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,

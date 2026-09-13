@@ -341,18 +341,12 @@ def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
         assert badge.geometry().intersected(corner).isEmpty()
 
 
-def test_a_tile_with_a_run_cooking_on_it_drops_its_corners(qtbot):
-    # The progress bar is laid along the picture's foot, right over two of them —
-    # a control there would be a button nobody can see and everybody can press.
+def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
     tw = ThumbnailWidget("p1", None, "label", starred=True,
-                         enhance=icons.ENHANCE_HELD, enhancing=_run())
+                         enhance=icons.ENHANCE_OPEN, enhancing=_run())
     qtbot.addWidget(tw)
-    assert all(b.isHidden() for b in _corners(tw))
 
-    tw.set_enhancing(None)  # the run ends and the tile is an item again
-
-    star, _trash, plus = _corners(tw)
-    assert not star.isHidden() and not plus.isHidden()
+    assert all(not b.isHidden() and b.isEnabled() for b in _corners(tw))
 
 
 def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
@@ -508,6 +502,29 @@ def test_the_bar_sits_along_the_foot_of_the_picture(qtbot):
     assert picture.contains(bar)
     assert bar.top() > picture.center().y()
     assert tw.size() == ThumbnailWidget("p2", None, "label").size()
+
+
+def test_an_enhancing_tiles_bar_leaves_its_lower_corners_clear(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN,
+                         enhancing=_run())
+    qtbot.addWidget(tw)
+    _star, trash, plus = _corners(tw)
+    bar = tw._enhancing_bar.geometry()
+
+    assert bar.intersected(trash.geometry()).isEmpty()
+    assert bar.intersected(plus.geometry()).isEmpty()
+
+
+def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN,
+                         enhancing=_run())
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(frame=_png_bytes()))
+
+    order = tw.children()
+    for corner in _corners(tw):
+        assert order.index(corner) > order.index(tw._enhancing_overlay)
 
 
 def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):

@@ -1383,7 +1383,7 @@ class GenerateConfigPanel(QWidget):
         if pending is not None:
             frame = pending[1]
             if frame:
-                self._preview.show_frame(frame, keep_notice=True)
+                self._preview.show_frame(frame, enhancing=True)
         elif was_running:
             self._restore_preview()
         if self._versions.update_pending(pending):

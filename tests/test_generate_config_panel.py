@@ -1025,7 +1025,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     panel._preview.show_media.reset_mock()
 
     panel.set_pending_enhancement(("running", b"\x89PNG-ish", "2x"))
-    panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", keep_notice=True)
+    panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
 
     # ...and when the run ends the pane goes back to the image itself.
     panel.set_pending_enhancement(None)
@@ -1840,16 +1840,27 @@ def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(requesting):
     assert requesting._preview._actions_id is None
 
 
-def test_a_settings_push_does_not_re_arm_the_corners_over_an_enhancements_frames(
+def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
         saved_panel, tmp_path):
     panel, db = saved_panel
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
-    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+    panel.show_live_frame(_frame_bytes(tmp_path))
 
     panel.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
     assert panel._preview.actions_id() is None
+
+
+def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
+        saved_panel, tmp_path):
+    panel, db = saved_panel
+    image = _image_row(db, "img1")
+    panel.show_saved_generation(image, [image])
+
+    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+
+    assert panel._preview.actions_id() == "img1"
 
 
 def test_a_request_tab_holds_no_generation_of_its_own(requesting):

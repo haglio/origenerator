@@ -1103,16 +1103,16 @@ def _click(view):
         Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
 
 
-def test_a_click_pauses_a_show_standing_on_its_own_and_a_second_plays_it_again(qtbot):
+def test_a_click_pauses_a_show_standing_on_its_own_at_once_and_a_second_plays_it(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     heard = _heard_pushes(view)
 
     _click(view)
-    qtbot.waitUntil(lambda: not view._advance_timer.isActive())
+    assert not view._advance_timer.isActive()
     assert heard == [("pause_push",)]
 
     _click(view)
-    qtbot.waitUntil(view._advance_timer.isActive)
+    assert view._advance_timer.isActive()
     assert heard == [("pause_push",), ("resume_push",)]
 
 
@@ -1122,8 +1122,8 @@ def test_a_click_on_a_hosted_show_asks_the_room_to_pause_instead_of_pausing_itse
                  on_omnipause=lambda: asked.append(True))
 
     _click(view)
-    qtbot.waitUntil(lambda: asked == [True])
 
+    assert asked == [True]
     assert view._advance_timer.isActive()
 
 

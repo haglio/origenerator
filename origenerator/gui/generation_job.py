@@ -26,6 +26,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from origenerator import provenance, speech
 from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
+from origenerator.generation_state import GenerationStatus
 from origenerator.progress import ProgressTracker, stage_names
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ def insert_generation_row(db, job):
 def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
     """Update an existing row with a finished job's output files/thumbnail/time."""
     fields = dict(
-        status="completed",
+        status=GenerationStatus.COMPLETED,
         output_files=json.dumps(files),
         thumbnail_path=thumb_path,
         completed_at=datetime.now(UTC).isoformat(),

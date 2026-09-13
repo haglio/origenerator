@@ -30,16 +30,10 @@ from pathlib import Path
 
 from origenerator.completion import extract_completion
 from origenerator.gallery.signatures import parse_params
+from origenerator.generation_state import GenerationStatus
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
-
-# The status of a row whose prompt ComfyUI was given. A ``pending`` row is the
-# other kind of in-flight: one the queue was still holding when the app closed,
-# which the server has never heard of and cannot be asked about — the app takes
-# those back itself (see :meth:`RerollController.reconnect_running`), so checking
-# them here would only delete a queue the user is still waiting on.
-_SENT = ("running",)
 
 
 def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
@@ -47,7 +41,13 @@ def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
 
     Returns a summary ``{"finalized": n, "running": n, "cleared": n}``.
     """
-    rows = [r for r in db.list_generations() if r.get("status") in _SENT]
+    # Only rows whose prompt ComfyUI was given. A ``pending`` row is the other
+    # kind of in-flight: one the queue was still holding when the app closed,
+    # which the server has never heard of and cannot be asked about — the app
+    # takes those back itself (see :meth:`RerollController.reconnect_running`),
+    # so checking them here would only delete a queue the user is still waiting on.
+    rows = [r for r in db.list_generations()
+            if r.get("status") == GenerationStatus.RUNNING]
     summary = {"finalized": 0, "running": 0, "cleared": 0}
     if not rows:
         return summary
@@ -78,7 +78,7 @@ def _reconcile_row(db, client, row, queued, output_dir: Path, thumb_dir: Path) -
         )
         if files:
             fields = dict(
-                status="completed",
+                status=GenerationStatus.COMPLETED,
                 output_files=json.dumps(files),
                 thumbnail_path=thumb,
                 completed_at=datetime.now(UTC).isoformat(),

@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 from origenerator.gallery.signatures import workflow_output_type
+from origenerator.generation_state import GenerationStatus
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_animated_thumbnail
 
@@ -57,7 +58,7 @@ def is_in_progress(row: dict) -> bool:
     for the not-yet-existing thumbnail; a terminal row (completed/error) is judged
     solely by whether it :func:`produced_output`.
     """
-    return row.get("status") in ("running", "pending")
+    return row.get("status") in (GenerationStatus.RUNNING, GenerationStatus.PENDING)
 
 
 def media_type_of_row(row: dict) -> str:

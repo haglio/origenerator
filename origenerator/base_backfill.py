@@ -39,6 +39,7 @@ from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery.enhance import BASE_RENDER_SOURCE as SOURCE
 from origenerator.gallery.output import is_in_progress
+from origenerator.generation_state import GenerationStatus
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ def typical_seconds(rows: list[dict], workflow_name: str) -> float:
     timed = [
         row["duration_seconds"] for row in rows
         if row.get("workflow_name") == workflow_name
-        and row.get("status") == "completed"
+        and row.get("status") == GenerationStatus.COMPLETED
         and row.get("duration_seconds")
     ]
     return statistics.median(timed) if timed else UNTIMED_SECONDS
@@ -266,7 +267,7 @@ def fold_completed_base_renders(db) -> int:
     """
     folded = 0
     for row in db.list_generations():
-        if row.get("source") != SOURCE or row.get("status") != "completed":
+        if row.get("source") != SOURCE or row.get("status") != GenerationStatus.COMPLETED:
             continue
         if fold_base_render(db, row) is not None:
             folded += 1

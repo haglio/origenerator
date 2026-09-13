@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from origenerator.gallery import parse_params, produced_output
 from origenerator.generation_config import filled_params, randomize_seeds
+from origenerator.generation_state import GenerationStatus
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -100,7 +101,7 @@ class ExperimentPolicy:
                 # workflow. Mutating one of its results just re-enhances an
                 # existing image, so there is nothing to explore.
                 continue
-            if row.get("status") != "completed" or not produced_output(row):
+            if row.get("status") != GenerationStatus.COMPLETED or not produced_output(row):
                 continue
             if row.get("source") == "experiment" and row.get("experiment_verdict") != "up":
                 continue
@@ -200,7 +201,7 @@ class ExperimentPolicy:
         for row in rows:
             if (row.get("workflow_name") or "") != workflow.name:
                 continue
-            if row.get("status") != "completed" or not produced_output(row):
+            if row.get("status") != GenerationStatus.COMPLETED or not produced_output(row):
                 continue
             if row.get("source") == "experiment" and row.get("experiment_verdict") != "up":
                 continue

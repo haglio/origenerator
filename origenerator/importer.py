@@ -23,6 +23,7 @@ from origenerator.comfy_graph import (
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
+from origenerator.generation_state import GenerationStatus
 from origenerator.media import media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -115,7 +116,7 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             )
             db.update_generation(
                 prompt_id,
-                status="completed",
+                status=GenerationStatus.COMPLETED,
                 output_files=json.dumps([_output_entry(play_path, output_dir)]),
                 thumbnail_path=thumb_path,
                 completed_at=mtime.isoformat(),

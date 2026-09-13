@@ -44,6 +44,7 @@ from origenerator.gallery.output import (
     parse_file_list,
     row_output_files,
 )
+from origenerator.generation_state import GenerationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ def fold_completed_enhancements(db) -> int:
     pool = [r for r in rows if media_type_of_row(r) == "image"]
     folded = 0
     for row in rows:
-        if row.get("status") != "completed":
+        if row.get("status") != GenerationStatus.COMPLETED:
             continue
         if ((row.get("workflow_name") or "") != ENHANCE_WORKFLOW
                 and not is_enhance_product_row(row)):

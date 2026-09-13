@@ -37,6 +37,7 @@ from origenerator.config import (
     VIDEO_SCENE_MATCH_SYSTEM_PROMPT,
 )
 from origenerator.generation_config import randomize_seeds
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
@@ -224,7 +225,8 @@ class CombineController(QObject):
         recipe is mined from (each carries the prompt it was made from, which names
         its act)."""
         return [row for row in rows
-                if row.get("status") == "completed" and self._rebuildable_video_row(row)]
+                if row.get("status") == GenerationStatus.COMPLETED
+                and self._rebuildable_video_row(row)]
 
     def offer_the_acts(self, rows: list[dict]) -> None:
         """Gray out the acts with no video under them: an act with no recipe to

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from origenerator.db_connection import Store
 from origenerator.db_schema import GENERATION_COLUMNS
+from origenerator.generation_state import GenerationStatus
 
 #: The columns :meth:`GenerationStore.update_generation` writes: a job's
 #: lifecycle, from queued to finished or failed. Everything else on the row is
@@ -219,11 +220,11 @@ class GenerationStore(Store):
             rows = conn.execute(
                 """SELECT duration_seconds FROM generations
                    WHERE workflow_name = ?
-                     AND status = 'completed'
+                     AND status = ?
                      AND duration_seconds IS NOT NULL
                    ORDER BY id DESC
                    LIMIT ?""",
-                (workflow_name, limit),
+                (workflow_name, GenerationStatus.COMPLETED, limit),
             ).fetchall()
             return [r[0] for r in rows]
 
@@ -236,10 +237,11 @@ class GenerationStore(Store):
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT * FROM generations
-                   WHERE status = 'completed'
+                   WHERE status = ?
                      AND duration_seconds IS NULL
                      AND completed_at IS NOT NULL
-                   ORDER BY id"""
+                   ORDER BY id""",
+                (GenerationStatus.COMPLETED,),
             ).fetchall()
             return [dict(r) for r in rows]
 

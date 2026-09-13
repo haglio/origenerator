@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 
+from PyQt6 import sip
 from PyQt6.QtCore import QThreadPool
 
 from origenerator.gui.search_expander import SearchExpander
@@ -121,3 +122,16 @@ def test_a_wordless_query_is_never_sent(qtbot):
     assert expander.request("   ") is None
 
     assert calls == []
+
+
+def test_a_widening_that_lands_after_its_expander_is_gone_is_dropped(qtbot):
+    # A window closed while the model is still thinking: the answer must not be
+    # handed to an expander Qt has already destroyed.
+    release = threading.Event()
+    expander = SearchExpander(expand=lambda q: release.wait(3) and {"cat": ("kitten",)})
+    expander.request("cat")
+    sip.delete(expander)
+
+    release.set()
+    assert QThreadPool.globalInstance().waitForDone(3000)
+    qtbot.wait(50)

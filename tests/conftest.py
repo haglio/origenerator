@@ -44,9 +44,10 @@ import gc
 import json
 import os
 import struct
+import sys
 
 import pytest
-from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication
 
 
@@ -392,10 +393,15 @@ def _collect_widgets_between_tests():
     _deliver_the_deletions_already_scheduled()
 
 
+def _print_qt_message(_kind, _context, message):
+    print(message, file=sys.stderr)
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "real_thread_hop: leave the gallery's off-thread work on its pool thread")
+    qInstallMessageHandler(_print_qt_message)
 
 
 @pytest.fixture(autouse=True)

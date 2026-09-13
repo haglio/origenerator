@@ -150,6 +150,7 @@ class ThumbnailWidget(QWidget):
                 lambda action: self.control_triggered.emit(self.prompt_id, action))
             for button in self._controls.buttons():
                 button.installEventFilter(self)  # an off-tile exit from a control
+        self._sync_controls()
 
         # While an enhancement of this image is cooking, the tile wears the same
         # two overlays an in-flight card does, so work in progress reads the same
@@ -198,20 +199,9 @@ class ThumbnailWidget(QWidget):
         self._sync_controls()
 
     def _sync_controls(self):
-        """Point the corner controls at this tile's current state.
-
-        A tile with a run cooking on it drops them entirely: the bar along the
-        picture's foot is laid over those two corners, so a control there would
-        be a button nobody can see and everybody can press — and what is on the
-        tile meanwhile is a part-drawn frame of a file that does not exist yet,
-        which is nothing to bookmark or bin.
-        """
         if self._controls is None:
             return
-        if self._enhancing is not None:
-            self._controls.hide_all()
-        else:
-            self._controls.show_for(starred=self._starred, enhance=self._enhance)
+        self._controls.show_for(starred=self._starred, enhance=self._enhance)
 
     def set_enhancing(self, run: EnhancingRun | None):
         """Show the enhancement being made of this image, or clear it away.
@@ -257,10 +247,11 @@ class ThumbnailWidget(QWidget):
         picture where it was, but a tile built before its layout ran has none yet.
         """
         run = self._enhancing
-        self._sync_controls()
         self._enhancing_overlay.cover(
             self._image_label, "Enhancing…" if run is not None else None,
             inset=_BORDER_PX)
+        if self._controls is not None:
+            self._controls.place(self._image_label.geometry())
         self._enhancing_bar.setVisible(run is not None)
         if run is None:
             self._enhancing_tick.stop()
@@ -290,17 +281,12 @@ class ThumbnailWidget(QWidget):
         )
 
     def _place_enhancing_bar(self):
-        """Lay the bar along the picture's foot, inside the picture's own border.
-
-        It covers the enhanced badge while it is up, which is the right way
-        round: the badge says this image has an enhancement, and the bar says
-        another is being made right now.
-        """
         picture = self._image_label.geometry()
+        clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
         self._enhancing_bar.setGeometry(QRect(
-            picture.x() + _BORDER_PX,
+            picture.x() + clear_of_a_corner,
             picture.y() + picture.height() - _BORDER_PX - _BAR_HEIGHT,
-            picture.width() - 2 * _BORDER_PX,
+            picture.width() - 2 * clear_of_a_corner,
             _BAR_HEIGHT,
         ))
 

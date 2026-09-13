@@ -260,7 +260,7 @@ class PreviewWidget(QWidget):
                 app.aboutToQuit.connect(self._release)
 
     def _take_the_pane(self, media, *, stop_player: bool = True,
-                       keep_notice: bool = False,
+                       enhancing: bool = False,
                        live: bool = False, live_frame: bytes | None = None) -> None:
         """Put down everything the pane is holding, ready for new content.
 
@@ -280,18 +280,18 @@ class PreviewWidget(QWidget):
 
         The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a clip does not stop the player it is about to hand a
-        new source to. ``keep_notice`` — frames of an enhancement of the picture
-        on screen are the coming state of that picture, so what a notice says
-        about it is just as true of them.
+        new source to. ``enhancing`` — frames of an enhancement of the picture
+        on screen are the coming state of that picture, so its notice and its
+        corners are as true of them and stay.
         """
         self._set_movie(None)
         self._pixmap = None
         self._hide_strip()
         if stop_player:
             self._player.stop()
-        if not keep_notice:
+        if not enhancing:
             self.set_notice(None)
-        self.set_actions(None)
+            self.set_actions(None)
         self._media = media
         self._end_live(media)
         if live:
@@ -326,7 +326,7 @@ class PreviewWidget(QWidget):
             self._player.pause()  # a clip loaded into a frozen room opens held
         self._update_strip(path)  # …and wears its funscript, if it has one
 
-    def show_frame(self, data: bytes, *, keep_notice: bool = False) -> None:
+    def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
 
         ComfyUI streams live previews as encoded images over the websocket
@@ -335,17 +335,18 @@ class PreviewWidget(QWidget):
         view untouched — which is why the decode happens before the pane is put
         down rather than after.
 
-        ``keep_notice`` marks the frames as the coming state of the picture
+        ``enhancing`` marks the frames as the coming state of the picture
         already on display — an enhancement of it — rather than a run of the
         settings beside it. Whatever a notice says about that picture is just as
         true of the version being made, so it stays where it is: cleared by each
         frame and re-asserted by each keystroke, it flickers at the rate the run
-        streams while the form is being typed in.
+        streams while the form is being typed in. The corners stay for the same
+        reason, since what they act on is that picture.
         """
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
-        self._take_the_pane(None, keep_notice=keep_notice, live=True, live_frame=data)
+        self._take_the_pane(None, enhancing=enhancing, live=True, live_frame=data)
         self._pixmap = pixmap
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)

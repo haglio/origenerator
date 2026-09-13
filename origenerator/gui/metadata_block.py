@@ -1,7 +1,8 @@
 """Render a generation's read-only metadata as one compact titled block.
 
 Sits in the info-pane tab's footer, under the editable form, and shows only what
-the form can't: the output file and when the run happened. Everything else the
+the form can't: the output file, when the run happened, and which workflow
+version made it. Everything else the
 block once carried has a better home — a parameter the workflow lays out no
 field for is a read-only row in the form itself, and an image's files are
 versions, listed with the level that made each. The model lives in
@@ -60,10 +61,10 @@ class MetadataBlock(QWidget):
     def show_row(self, row: dict) -> bool:
         """Render this row's section, reporting whether it had one.
 
-        An image usually has none — every file it holds is a version, listed
-        with the enhancement level that made it — and a caller shows this block
-        only when there is something in it, rather than leaving a bare gap above
-        the form."""
+        An image's files are all versions, listed with the enhancement level
+        that made each, so its block holds only the workflow version, and there
+        is none before one is recorded; a caller shows this block only when
+        there is something in it, rather than leaving a bare gap above the form."""
         section = basic_section(row)
         self._render(section)
         return section is not None

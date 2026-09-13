@@ -123,6 +123,18 @@ def test_an_image_renders_no_block(block):
     assert _texts(block) == []
 
 
+def test_an_image_with_a_recorded_workflow_version_shows_that_line(block):
+    shown = block.show_row(_row(
+        workflow_name="sdxl_t2i",
+        output_files=json.dumps([{"filename": "out.png", "subfolder": "image"}]),
+        provenance=json.dumps({"recipe": "sdxl_t2i", "recipe_version": "v004",
+                               "app_commit": None, "app_dirty": None,
+                               "recipe_version_basis": "recorded"})))
+
+    assert (shown, "Workflow version" in _texts(block), "v004" in _texts(block)) == (
+        True, True, True)
+
+
 def test_the_reveal_button_does_not_hold_the_pane_open(block):
     # "Show in Explorer" is the longest label on any file row, so it decided how
     # narrow a pane holding one could be squeezed — and the settings scroll grew a

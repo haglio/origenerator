@@ -734,7 +734,7 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     win.close()
 
     saved = AppState(path).get("gallery_combine")
-    assert saved["image"] == "img" and saved["video"] == "vid"
+    assert saved["image"] == "img" and saved["videos"] == {recipe_match.VIDEO: "vid"}
 
 
 def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
@@ -763,9 +763,10 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
-    # The end-to-end round trip: pick a pair and a lane, close, and a fresh
-    # window restores all of it. The lane matters as much as the slots — it is
-    # which recipes the next Generate is answered from.
+    # The end-to-end round trip: pick a picture, drop a video in one lane, move
+    # to the other, close, and a fresh window restores all of it. The lane
+    # matters as much as the slots — it is which recipes the next Generate is
+    # answered from, and which lane's dropped video the slot shows.
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
@@ -778,8 +779,10 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     combine = reopened._gallery_view._combine.panel
     assert combine.image_slot.current_id() == "img"
-    assert combine.video_slot.current_id() == "vid"
     assert combine.selected_intent() == recipe_match.GENAU
+    assert combine.video_slot.current_id() is None
+    combine._video_radio.setChecked(True)
+    assert combine.video_slot.current_id() == "vid"
 
 
 def _fun_time_session(main=(10, 20, 800, 600)):

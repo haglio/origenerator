@@ -1,23 +1,17 @@
-"""Win32 helpers for Origenerator's pinned shortcut and its window on screen.
+"""Win32 helpers for Origenerator's taskbar identity and its window on screen.
 
 Clicking a pinned taskbar shortcut only activates the running window if the
 shortcut's ``System.AppUserModel.ID`` matches the AppUserModelID the process
-claims for itself (``app_support.win32.set_app_user_model_id``).
-``WScript.Shell``, which wrote the launcher's .lnk, cannot write that property,
-so Windows treats the launched window as a separate app and pops a second
-taskbar button; ``stamp_pinned_shortcuts`` writes it onto the pinned shortcut so
-the two collapse into one.  The rest is the window itself: whether it is still
-there, where it goes, and taking the foreground for it.
+claims for itself, ``APP_USER_MODEL_ID`` below; ``app.py`` claims it and stamps
+the pin through ``app_support.win32``.  The rest is the window itself: whether it
+is still there, where it goes, and taking the foreground for it.
 """
 from __future__ import annotations
 
 import ctypes
 import ctypes.wintypes
 import logging
-import os
 from pathlib import Path
-
-from app_support.win32 import set_shortcut_app_user_model_id
 
 _user32 = ctypes.windll.user32  # type: ignore[attr-defined]
 # HWND/HANDLE argtypes declared so ctypes passes them as 64-bit pointers rather
@@ -38,29 +32,6 @@ _kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
 # raises, so it is this app's name and no one else's. It read
 # "FunTime.Origenerator" until the notifications made that visible.
 APP_USER_MODEL_ID = "Origenerator"
-
-
-def stamp_pinned_shortcuts(app_id: str, *, include: str) -> None:
-    """Stamp pinned taskbar shortcuts whose name contains *include* with *app_id*.
-
-    Searches the user's taskbar pin directory for ``*.lnk`` files whose stem
-    (lowered) contains *include* and writes *app_id* as their AppUserModelID.
-    Failures are logged, never fatal — a missing pin dir or an unstampable
-    shortcut must not stop the app from launching.
-    """
-    _log = logging.getLogger(__name__)
-    appdata = os.environ.get("APPDATA", "")
-    pin_dir = Path(appdata) / "Microsoft" / "Internet Explorer" / "Quick Launch" / "User Pinned" / "TaskBar"
-    if not pin_dir.is_dir():
-        return
-    for lnk in pin_dir.glob("*.lnk"):
-        if include not in lnk.stem.lower():
-            continue
-        try:
-            set_shortcut_app_user_model_id(str(lnk), app_id)
-            _log.info("Stamped AppUserModelID on %s", lnk)
-        except OSError as exc:
-            _log.warning("Could not stamp AppUserModelID on %s: %s", lnk, exc)
 
 
 def _write_string_values(key_path: str, values: dict[str, str]) -> None:

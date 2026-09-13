@@ -75,3 +75,20 @@ def test_a_still_is_never_blown_up_past_its_own_size(qtbot, tmp_path):
 
     # The bounds would be 120x400 at this size; a 24px thumbnail stays 24px.
     assert neighbors._labels[0].pixmap().size().width() == 24
+
+
+def test_each_still_restacks_its_own_window_when_it_lands(qtbot, tmp_path, monkeypatch):
+    raised = []
+    monkeypatch.setattr("origenerator.gui.media_overlay.raise_window_without_activating",
+                        raised.append)
+    host = QWidget()
+    host.resize(_HOST_WIDTH, 800)
+    qtbot.addWidget(host)
+    neighbors = NeighborPreviews(host)
+    host.show()
+
+    neighbors.set_neighbors(_png(tmp_path / "prev.png"), _png(tmp_path / "next.png"),
+                            media_rect=QRect(300, 0, 400, 800))
+
+    left, right = neighbors._labels
+    assert raised == [int(left.winId()), int(right.winId())]

@@ -94,6 +94,7 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator.gui.level_stepper import LevelStepper
+from origenerator.gui.media_overlay import raise_over_media
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
@@ -1315,9 +1316,7 @@ class SlideshowView(QWidget):
         the satellites, two windows with a top-left corner each; a show wears
         both in one window, and two panels in one corner is one panel, the HUD
         re-raising itself over the console every tick.  So the console takes
-        the slot beneath.  Raised as well as moved: the media widgets are
-        native windows that come and go above it as slides change, the same
-        reason the HUD re-asserts its own place on every tick.
+        the slot beneath.
         """
         if self._motion_panel is None:
             return
@@ -1325,7 +1324,7 @@ class SlideshowView(QWidget):
         if self._hud is not None and not self._hud.isHidden():
             below = self._hud.geometry()
         self._motion_panel.reposition(below=below)
-        self._motion_panel.raise_()
+        raise_over_media(self._motion_panel)
 
     def _update_neighbors(self):
         """Draw the items either side of this one — nothing on a set too short

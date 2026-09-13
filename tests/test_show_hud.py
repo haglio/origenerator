@@ -23,3 +23,20 @@ def test_the_hud_restacks_its_own_window_over_the_media_on_every_beat(qtbot, mon
     hud._tick()
 
     assert raised == [int(hud.winId())] * 2
+
+
+def test_the_hud_restacks_its_own_window_when_the_slide_it_lights_changes(qtbot, monkeypatch):
+    raised = []
+    monkeypatch.setattr(media_overlay, "raise_window_without_activating", raised.append)
+    show = SlideshowView([("scene one.png", "image"), ("scene two.mp4", "video")],
+                         player=MagicMock(), shuffle=in_order)
+    qtbot.addWidget(show)
+    show.show()
+    hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+    show.adopt_hud(hud)
+    show.step(1)
+    raised.clear()
+
+    hud._tick()
+
+    assert raised == [int(hud.winId())]

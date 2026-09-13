@@ -40,7 +40,7 @@ from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
-from origenerator.gui.media_overlay import float_over_media
+from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -122,4 +122,4 @@ class SlideshowQueue(GenerationQueue):
         if avoid is not None and not avoid.isEmpty() and avoid.bottomLeft().y() >= top:
             width = min(width, max(0, avoid.left() - GAP - MARGIN))
         self.setGeometry(MARGIN, top, width, height)
-        self.raise_()  # over the media, video surface included
+        raise_over_media(self)

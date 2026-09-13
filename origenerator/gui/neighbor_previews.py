@@ -15,7 +15,7 @@ from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.gui.media_overlay import PLATE_CSS, float_over_media
+from origenerator.gui.media_overlay import PLATE_CSS, float_over_media, raise_over_media
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 
@@ -121,4 +121,4 @@ class NeighborPreviews:
             label.move(side_x(side, host.width(), media_rect, label.width()),
                        max(0, (host.height() - label.height()) // 2))
             label.show()
-            label.raise_()  # over the media, under nothing
+            raise_over_media(label)

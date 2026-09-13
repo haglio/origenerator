@@ -178,7 +178,6 @@ class ShowHud(QLabel):
         self._timer.timeout.connect(self._tick)
         self._timer.start()
         self._tick()
-        self.raise_()
         self.show()
 
     # --- model in, pixels out ---------------------------------------------
@@ -238,7 +237,7 @@ class ShowHud(QLabel):
         pixmap = unscaled_pixmap(QPixmap.fromImage(image))
         self.setPixmap(pixmap)
         self.resize(pixmap.deviceIndependentSize().toSize())
-        self.raise_()
+        raise_over_media(self)
         if self.isHidden():
             self.show()
 

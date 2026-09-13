@@ -60,6 +60,18 @@ def test_it_leaves_the_screen_with_nothing_in_flight(plate):
     assert plate.isHidden()  # a plate over a picture has no slot to hold
 
 
+def test_it_restacks_its_own_window_when_it_re_places(plate, monkeypatch):
+    raised = []
+    monkeypatch.setattr("origenerator.gui.media_overlay.raise_window_without_activating",
+                        raised.append)
+    plate.set_items([_item(typical_seconds=30)])
+    plate.parentWidget().show()
+
+    plate.reposition()
+
+    assert raised == [int(plate.winId())]
+
+
 def test_another_apps_backlog_alone_is_worth_showing(plate):
     # Nothing of ours running, but ComfyUI is busy for someone else — the same
     # thing the docked strip stays up to report, and its Clear with it.

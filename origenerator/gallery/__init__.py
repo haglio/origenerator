@@ -46,7 +46,6 @@ from origenerator.gallery.custom import (
     selection_group,
 )
 from origenerator.gallery.enhance import (
-    BASE_RENDER_SOURCE,
     EnhanceLevel,
     displayed_levels,
     enhance_levels,
@@ -165,7 +164,6 @@ from origenerator.gallery.voice_commands import (
 __all__ = [
     "ALL_KEY",
     "ALL_LABEL",
-    "BASE_RENDER_SOURCE",
     "CYCLE_FRAMES",
     "ENHANCE_COMMAND",
     "ENHANCE_SETTING_KEYS",

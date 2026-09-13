@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from origenerator.db_connection import Store
 from origenerator.db_schema import GENERATION_COLUMNS
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus
 
 #: The columns :meth:`GenerationStore.update_generation` writes: a job's
 #: lifecycle, from queued to finished or failed. Everything else on the row is
@@ -67,7 +67,7 @@ class GenerationStore(Store):
         seed: int | None = None,
         params_json: str,
         workflow_json: str,
-        source: str = "generated",
+        source: str = GenerationSource.GENERATED,
         provenance: str | None = None,
     ):
         with self._connect() as conn:

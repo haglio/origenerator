@@ -28,6 +28,7 @@ from origenerator.db_generations import GenerationStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
+from origenerator.generation_state import GenerationSource
 
 
 class Database:
@@ -52,7 +53,8 @@ class Database:
                           workflow_version: str, positive_prompt: str | None = None,
                           negative_prompt: str | None = None, seed: int | None = None,
                           params_json: str, workflow_json: str,
-                          source: str = "generated", provenance: str | None = None):
+                          source: str = GenerationSource.GENERATED,
+                          provenance: str | None = None):
         return self.generations.insert_generation(
             prompt_id=prompt_id, workflow_name=workflow_name,
             workflow_version=workflow_version, positive_prompt=positive_prompt,

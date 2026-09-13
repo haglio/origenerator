@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 
 from origenerator.gallery.output import is_in_progress
+from origenerator.generation_state import GenerationSource
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ def cancel_experiments(db, client) -> int:
     """
     rows = [
         r for r in db.list_generations()
-        if r.get("source") == "experiment" and is_in_progress(r)
+        if r.get("source") == GenerationSource.EXPERIMENT and is_in_progress(r)
     ]
     if not rows:
         return 0

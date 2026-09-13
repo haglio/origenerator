@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from origenerator.gallery import parse_params, produced_output
 from origenerator.generation_config import filled_params, randomize_seeds
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -103,7 +103,7 @@ class ExperimentPolicy:
                 continue
             if row.get("status") != GenerationStatus.COMPLETED or not produced_output(row):
                 continue
-            if row.get("source") == "experiment" and row.get("experiment_verdict") != "up":
+            if row.get("source") == GenerationSource.EXPERIMENT and row.get("experiment_verdict") != "up":
                 continue
             if "input_image" in workflow.default_params() and \
                     not parse_params(row.get("params_json")).get("input_image"):
@@ -203,7 +203,7 @@ class ExperimentPolicy:
                 continue
             if row.get("status") != GenerationStatus.COMPLETED or not produced_output(row):
                 continue
-            if row.get("source") == "experiment" and row.get("experiment_verdict") != "up":
+            if row.get("source") == GenerationSource.EXPERIMENT and row.get("experiment_verdict") != "up":
                 continue
             donor_params = parse_params(row.get("params_json"))
             positive = donor_params.get("positive_prompt") or row.get("positive_prompt") or ""
@@ -290,7 +290,7 @@ class ExperimentPolicy:
         experiments have recorded for ``key``."""
         tallies: dict = {}
         for row in rows:
-            if row.get("source") != "experiment":
+            if row.get("source") != GenerationSource.EXPERIMENT:
                 continue
             verdict = row.get("experiment_verdict")
             if verdict not in ("up", "down"):

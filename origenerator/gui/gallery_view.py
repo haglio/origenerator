@@ -49,6 +49,7 @@ from origenerator.generation_config import (
     randomize_seeds,
     would_reproduce_a_completed_run,
 )
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls
 from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.auto_generate_controller import AutoGenerateController
@@ -1387,7 +1388,7 @@ class GalleryView(QWidget):
         Returns its prompt_id, or ``None`` when the launch didn't take."""
         key = f"base_render/{params[BASE_RENDER_TARGET_KEY]}"
         if not self._reroll.start_prepared(key, workflow, params,
-                                           source=gallery.BASE_RENDER_SOURCE):
+                                           source=GenerationSource.BASE_RENDER):
             return None
         return self._reroll.jobs[key].prompt_id
 
@@ -1418,7 +1419,7 @@ class GalleryView(QWidget):
         twice explores nothing)."""
         key = self.folder_key_for(proposal.workflow.name, proposal.params)
         if not self._reroll.start_prepared(key, proposal.workflow, proposal.params,
-                                           source="experiment"):
+                                           source=GenerationSource.EXPERIMENT):
             return None
         return self._reroll.job_for(key).prompt_id
 
@@ -3518,7 +3519,8 @@ class GalleryView(QWidget):
                     else self._info_tabs.panel_that_launched(run))
         self._auto_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
-        if finished_row is not None and finished_row.get("source") == "experiment":
+        if (finished_row is not None
+                and finished_row.get("source") == GenerationSource.EXPERIMENT):
             # A background experiment landed: it waits on the Experiments shelf
             # for review rather than moving the user's view — no front-tab load,
             # no slideshow feed, no auto-loop or combine bookkeeping.

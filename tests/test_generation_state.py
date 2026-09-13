@@ -12,7 +12,7 @@ import sqlite3
 from contextlib import closing
 
 from origenerator.db import Database
-from origenerator.generation_state import GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 
 
 def _insert(db: Database, prompt_id: str = "a-generation", **fields) -> None:
@@ -46,3 +46,31 @@ def test_a_status_goes_to_the_database_as_its_plain_string(tmp_path):
 
     assert _stored(db, "status") == ("text", "completed")
     assert db.get_generation("a-generation")["status"] == GenerationStatus.COMPLETED
+
+
+def test_the_sources_are_the_four_strings_rows_have_always_carried():
+    assert {source.value for source in GenerationSource} == {
+        "generated", "imported", "experiment", "base_render"}
+
+
+def test_a_row_inserted_without_a_source_is_the_users_own_work(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _insert(db)
+
+    assert _stored(db, "source") == ("text", GenerationSource.GENERATED.value)
+
+
+def test_a_source_goes_to_the_database_as_its_plain_string(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _insert(db, source=GenerationSource.EXPERIMENT)
+
+    assert _stored(db, "source") == ("text", "experiment")
+
+
+def test_a_row_that_names_no_source_counts_as_the_users_own_work():
+    assert source_of({}) == GenerationSource.GENERATED
+    assert source_of({"source": None}) == GenerationSource.GENERATED
+
+
+def test_an_old_rows_source_comes_back_as_stored_even_with_no_name_for_it():
+    assert source_of({"source": "stroke_trim"}) == "stroke_trim"

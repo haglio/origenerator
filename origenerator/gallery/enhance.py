@@ -50,6 +50,7 @@ from origenerator.gallery.output import (
 )
 from origenerator.gallery.signatures import _frame_name, parse_params
 from origenerator.gallery.source_image import source_image_id_for
+from origenerator.generation_state import GenerationSource
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -58,8 +59,6 @@ from origenerator.workflows.detail_parts import (
 )
 
 logger = logging.getLogger(__name__)
-
-BASE_RENDER_SOURCE = "base_render"
 
 # The workflows that ran the enhance tail unconditionally, before it became a
 # toggle: their rows carry the tail's params but no ``enhance`` flag.
@@ -583,7 +582,7 @@ def is_enhance_product_row(row: dict) -> bool:
     that has been folded into carries. A base-render repair is excluded outright
     — it is the opposite errand, and folds by its own route.
     """
-    if row.get("source") == BASE_RENDER_SOURCE:
+    if row.get("source") == GenerationSource.BASE_RENDER:
         return False
     if original_files_of(row) or parse_file_list(row.get("enhance_history")):
         return False

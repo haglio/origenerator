@@ -124,8 +124,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     longest one. 267 -> 270: the constructor names its four steps -- the
     collaborators handed in, the queue of runs, the slots a rebuild fills, and
     the panes' own objects -- which takes it under fifty statements for the first
-    time.)"""
+    time. 270 -> 267: `ShowDirector` builds a double-clicked item's slides and
+    every show's versions from the rows the browser lists, so the three methods
+    that built them here went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 270
+               for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 74

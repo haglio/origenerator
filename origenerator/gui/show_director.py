@@ -32,7 +32,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator import gallery
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR
+from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
 from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
@@ -112,16 +113,11 @@ class ShowHost(Protocol):
     def image_config_index(self) -> dict:
         """The settings-signature index a folder name is derived against."""
 
-    def level_playlists(self) -> dict:
-        """Each visible image's versions, keyed by the file the folder shows it
-        under -- the axis Shift+Left/Right steps along."""
+    def visible_prompt_ids(self) -> list[str]:
+        """The generations the browser lists, in the order shown."""
 
-    def folder_media(self) -> list[tuple]:
-        """The visible folder's resolvable media, in the order shown."""
-
-    def folder_media_playlist(self) -> tuple[list, int]:
-        """That same media and the index of the item on screen, or ``([], 0)``
-        when the item on screen is not among it."""
+    def selected_prompt_id(self) -> str | None:
+        """The generation picked in the pane, or ``None``."""
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
@@ -297,7 +293,10 @@ class ShowDirector:
         that run's latest, and goes on following it until the pane hands over the
         file it lands as.
         """
-        items, index = self._host.folder_media_playlist()
+        folder = self.items_of(self._folder_rows())
+        selected = self._host.selected_prompt_id()
+        index = next((i for i, item in enumerate(folder) if item[2] == selected), None)
+        items = folder if index is not None else []
         if media is None:  # following a run: it has no place among the files yet
             items, index = [], 0
         elif not items:  # the shown item isn't in the folder listing: play it alone
@@ -309,10 +308,15 @@ class ShowDirector:
         # the panel making something up.
         return self.open(items, start=index, frame=frame,
                          image_dwell_ms=0, shuffle=in_order,
-                         folder_items=self._host.folder_media(),
+                         folder_items=folder,
                          hud=HudFacts(
                              order_label="", looping=False,
                              starred_ids=self._starred_prompt_ids()))
+
+    def _folder_rows(self) -> list[dict]:
+        """The rows the browser lists, in its order."""
+        rows = (self._host.row_for(pid) for pid in self._host.visible_prompt_ids())
+        return [row for row in rows if row is not None]
 
     def open(self, items, *, folder_items=None, location=None,
              side=None, resume=None, **kwargs):
@@ -360,10 +364,10 @@ class ShowDirector:
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
             self._slideshow.set_playlist(folder_items, 0)
-        # Shift+Left/Right gets its own axis: the versions of whichever image is
+        # Shift+Left/Right gets its own axis: the versions of whichever item is
         # on screen, so a level can be compared against the one below it at full
         # size rather than in a thumbnail.
-        self._slideshow.set_levels(self._host.level_playlists())
+        self._slideshow.set_levels(self.versions_of(self._folder_rows()))
         if resume is not None:
             # After the levels: the version a slide was left showing is only a
             # version once they are armed.
@@ -399,20 +403,42 @@ class ShowDirector:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
         order given — the slideshow's playlist. The thumbnail is what the view
         draws for the item while it's a neighbor rather than the one on screen (a
-        video has no other still).
+        video has no other still). A video Evolver has upscaled plays as that
+        upscale.
 
         A row with no file is left out, whether it never got one or is still
         being made: a slide with nothing to look at is a gap between pictures,
         and one still cooking joins the running show the moment it lands (see
         :meth:`note_finished`)."""
+        upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
         items = []
         for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
             if resolved is None:
                 continue  # nothing to look at yet, or ever
-            items.append((resolved[0], resolved[1], row["prompt_id"],
+            path, media_type = resolved
+            items.append((upscales.upscale_of(path) or path, media_type, row["prompt_id"],
                           row.get("thumbnail_path")))
         return items
+
+    def versions_of(self, rows) -> dict:
+        """Each of ``rows``' versions, newest first, keyed by the file its slide
+        plays -- the axis Shift+Left/Right steps along. One with a single version
+        has nothing to step between and is left out."""
+        upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
+        playlists = {}
+        for row in rows:
+            media_type = gallery.media_type_of_row(row)
+            resolved = (gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
+                        if media_type == "video" else None)
+            upscale = upscales.upscale_of(resolved[0]) if resolved is not None else None
+            levels = gallery.displayed_levels(row, upscale)
+            if len(levels) < 2:
+                continue
+            entries = [(gallery.output_file_path(level.file, COMFYUI_OUTPUT_DIR),
+                        media_type, level.label) for level in levels]
+            playlists[str(entries[0][0])] = entries
+        return playlists
 
     def rows_at(self, location) -> list[dict]:
         """What a show opened at *location* would play if it opened now.

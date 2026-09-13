@@ -12125,7 +12125,8 @@ def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
     # Keyed by the file the folder shows the image under, which is not the one
     # the show happens to have opened on, so the key comes from the same place
     # the show's did — and asking the show for it proves it took them.
-    (key, computed), = view.level_playlists().items()
+    (key, computed), = view._shows.versions_of(
+        [view.row_for(pid) for pid in view.visible_prompt_ids()]).items()
     levels = show._levels.levels(base=key)
     assert levels == computed
     assert [p.name for p, _kind, _label in levels] == \

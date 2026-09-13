@@ -51,23 +51,30 @@ _SEED_MAX = (1 << 63) - 1
 # scene's length, and each scene's lines.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
 
-def _speaks(lines) -> bool:
-    return any(line.strip() for line in lines)
+def _speaks(values) -> bool:
+    return any(str(line).strip() for line in values.get("scene_lines") or [])
 
 
-def _all_speak(lines) -> bool:
-    return bool(lines) and all(line.strip() for line in lines)
+def _all_speak(values) -> bool:
+    lines = values.get("scene_lines") or []
+    return bool(lines) and all(str(line).strip() for line in lines)
+
+
+def _pushes_the_prompt(values) -> bool:
+    strengths = [values[key] for key in ("cfg", "cfg_high", "cfg_low") if key in values]
+    return not strengths or any(float(strength) != 1.0 for strength in strengths)
 
 
 _SHOWN_WHILE = {
-    "voice": lambda text, lines: _speaks(lines),
-    "voice_sample": lambda text, lines: _speaks(lines) and text("voice") == CUSTOM_VOICE,
-    "voice_sample_text": lambda text, lines: _speaks(lines) and text("voice") == CUSTOM_VOICE,
-    "unet_s2v": lambda text, lines: _speaks(lines),
-    "audio_prompt": lambda text, lines: not _all_speak(lines),
-    "audio_negative_prompt": lambda text, lines: not _all_speak(lines),
-    "lora_strength_high": lambda text, lines: not is_no_lora(text("lora_high")),
-    "lora_strength_low": lambda text, lines: not is_no_lora(text("lora_low")),
+    "negative_prompt": _pushes_the_prompt,
+    "voice": _speaks,
+    "voice_sample": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
+    "voice_sample_text": lambda values: _speaks(values) and values.get("voice") == CUSTOM_VOICE,
+    "unet_s2v": _speaks,
+    "audio_prompt": lambda values: not _all_speak(values),
+    "audio_negative_prompt": lambda values: not _all_speak(values),
+    "lora_strength_high": lambda values: not is_no_lora(values.get("lora_high")),
+    "lora_strength_low": lambda values: not is_no_lora(values.get("lora_low")),
 }
 
 # The locked-dimension spinners span from a stride floor up past any realistic
@@ -225,14 +232,14 @@ class ParamForm(QWidget):
         self._refresh_rows_shown_while()
 
     def _refresh_rows_shown_while(self):
-        lines = self._scenes.lines() if self._scenes is not None else []
+        values = {pd.key: self._read_field(pd, randomize_seed=False) for pd in self._param_defs}
         for row, shows in _SHOWN_WHILE.items():
-            if row in self._widgets:
-                self._set_row_visible(row, shows(self._combo_text, lines))
-
-    def _combo_text(self, key: str) -> str:
-        widget = self._widgets.get(key)
-        return widget.currentText() if isinstance(widget, QComboBox) else ""
+            if row not in self._widgets:
+                continue
+            if self._widgets[row] is self._scenes:
+                self._scenes.show_text(row, shows(values))
+            else:
+                self._set_row_visible(row, shows(values))
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""

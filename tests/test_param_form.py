@@ -1370,6 +1370,54 @@ def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
     assert not _row_visible(form, "audio_negative_prompt")
 
 
+def test_the_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
+    form = ParamForm([
+        ParamDef("negative_prompt", "Things to Avoid", "str", "", multiline=True),
+        ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
+    ])
+    qtbot.addWidget(form)
+    assert not _row_visible(form, "negative_prompt")
+
+    form._widgets["cfg"].setValue(3.5)
+
+    assert _row_visible(form, "negative_prompt")
+
+
+def test_the_things_to_avoid_show_while_either_pass_pushes_the_prompt(qtbot):
+    form = ParamForm([
+        ParamDef("negative_prompt", "Things to Avoid", "str", "", multiline=True),
+        ParamDef("cfg_high", "Prompt Strength (First Pass)", "float", 1.0,
+                 min_val=0.0, max_val=30.0, step=0.1),
+        ParamDef("cfg_low", "Prompt Strength (Second Pass)", "float", 1.0,
+                 min_val=0.0, max_val=30.0, step=0.1),
+    ])
+    qtbot.addWidget(form)
+    assert not _row_visible(form, "negative_prompt")
+
+    form._widgets["cfg_low"].setValue(2.0)
+
+    assert _row_visible(form, "negative_prompt")
+
+
+def test_a_scenes_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
+    form = ParamForm(_scene_defs() + [
+        ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
+    ])
+    qtbot.addWidget(form)
+    editor = form._widgets["scene_frames"]
+    editor.add_scene()
+
+    def avoid_parts_hidden():
+        return [(scene.fields["negative_prompt"].isHidden(),
+                 scene.captions["negative_prompt"].isHidden()) for scene in editor._scenes]
+
+    assert avoid_parts_hidden() == [(True, True), (True, True)]
+
+    form._widgets["cfg"].setValue(3.5)
+
+    assert avoid_parts_hidden() == [(False, False), (False, False)]
+
+
 def test_an_add_ons_strength_shows_only_while_it_has_an_add_on(qtbot):
     form = ParamForm([
         ParamDef("lora_high", "Add-on (First Pass)", "combo", "None",

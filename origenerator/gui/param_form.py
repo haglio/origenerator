@@ -40,7 +40,6 @@ from origenerator.workflows.duration import (
     on_grid,
     seconds_for_frames,
 )
-from origenerator.workflows.setting_names import setting_name
 
 ensure_shared_ui_on_path()
 from shared_ui.tick_control import TickControl
@@ -108,10 +107,10 @@ class ParamForm(QWidget):
     order — so every workflow presents the same kinds of settings in the same
     sections, in the same place. Params a config carries but this workflow lays no
     field for (its hidden VAE/CLIP, an import's extras) round-trip untouched and
-    show as read-only rows dropped into the matching section.
+    are never shown.
 
     ``hidden_keys`` are params this form deliberately doesn't present at all —
-    no field, no read-only row, and no value absorbed from a loaded config: they
+    no field, and no value absorbed from a loaded config: they
     are pinned at the workflow's own defaults, so what the form emits for them
     is always the same. This is how the enhance params stay off a form whose
     every other setting decides which gallery folder a run lands in. They belong
@@ -179,20 +178,12 @@ class ParamForm(QWidget):
         self._swap_dimensions_btn: QPushButton | None = None
         # Params a config carries but this form has no widget for — the workflow's
         # remaining hidden settings (VAE, CLIP…), or an import's extras. The form
-        # round-trips whatever value it was given (so reusing a generation
-        # reproduces them) and shows them as read-only rows in the matching section.
+        # round-trips whatever value it was given, so reusing a generation
+        # reproduces them, without showing them.
         self._passthrough: dict = {}
-        # The read-only rows currently rendered: (section title, key, value label),
-        # so a later set_values can drop them cleanly and re-place the new ones.
-        self._readonly_rows: list[tuple[str, str, QLabel]] = []
-        # Every section, in display order, built up front (even those a fresh form
-        # leaves empty) so a passthrough-only section still appears in its fixed
-        # place once a config supplies it.
         self._sections: dict[str, CollapsibleSection] = {}
         self._section_order: list[str] = []
-        # The keys currently occupying each section, in row order — editable fields
-        # plus any read-only rows — so a passthrough row inserts at its canonical
-        # slot rather than merely appending after the editable fields.
+        # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         # A workflow that tells a story in scenes hands both prompts, the scene
@@ -975,20 +966,13 @@ class ParamForm(QWidget):
         return result
 
     def set_values(self, params: dict):
-        # Retain any params without a field so they survive the read-back, and show
-        # them as read-only rows in the matching section; the rest are applied to
-        # their widgets. A hidden key is dropped entirely — neither shown nor
+        # Retain any params without a field so they survive the read-back; the rest
+        # are applied to their widgets. A hidden key is dropped entirely — never
         # absorbed — so the form keeps emitting the workflow's default for it.
         self._passthrough = {
             k: v for k, v in params.items()
             if k not in self._widgets and k not in self._hidden_keys
         }
-        # The plumbing params are the other way round: kept for the round-trip at
-        # whatever the config held, but given no row — see param_sections.HIDDEN_KEYS.
-        self._render_readonly_rows(
-            {k: v for k, v in self._passthrough.items()
-             if k not in param_sections.HIDDEN_KEYS}
-        )
         if (self._scenes is not None and "frame_count" in params
                 and len(params.get("scene_frames") or []) < 2):
             # A lone scene is the whole clip and runs for the clip length, which
@@ -1005,28 +989,3 @@ class ParamForm(QWidget):
         # the just-applied input image derives.
         if self._size_deriver is not None:
             self._apply_dimension_values(params)
-
-    def _render_readonly_rows(self, extras: dict):
-        """Show each param the form has no field for as a read-only row under the
-        name the forms give it, dropped into its section at its canonical position.
-        Replaces any rows a prior ``set_values`` added, so switching generations
-        never stacks them."""
-        for title, key, value_label in self._readonly_rows:
-            self._sections[title].content_form().removeRow(value_label)
-            self._present_keys[title].remove(key)
-        self._readonly_rows = []
-        field_names = {pd.label for pd in self._param_defs}
-        for key in sorted(extras, key=param_sections.key_rank):
-            name = setting_name(key)
-            if name in field_names:
-                continue
-            display = QLabel(str(extras[key]))
-            display.setObjectName("readonlyParamValue")
-            display.setWordWrap(True)
-            display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            # A row you cannot change is the one you most want explained, so a
-            # passthrough gets the same tooltip an editable field would.
-            display.setToolTip(param_help(key))
-            self._add_row(key, name, display)
-            self._readonly_rows.append((param_sections.section_title(key), key, display))
-        self._refresh_section_visibility()

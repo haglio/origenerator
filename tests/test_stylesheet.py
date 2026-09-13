@@ -131,7 +131,7 @@ def _radio_image(qtbot, checked: bool):
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
     try:
-        radio = QRadioButton("Players")
+        radio = QRadioButton("Video")
         qtbot.addWidget(radio)
         radio.setChecked(checked)
         radio.resize(radio.sizeHint())
@@ -147,7 +147,7 @@ def _lightness(image, x: int) -> int:
 
 def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
     # The whole failure: under the app sheet the platform painted the selected
-    # mark dark on this dark ground, so picking Players or Genau left nothing on
+    # mark dark on this dark ground, so picking Video or Genau left nothing on
     # screen saying which lane was picked. The disc has to stop short of the ring
     # as well -- one filling it edge to edge is a blob, not a radio button.
     centre = 8  # the middle of a 16px indicator, which sits at the widget's left

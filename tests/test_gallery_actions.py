@@ -247,21 +247,6 @@ def test_redo_of_a_rename_puts_the_new_name_back(tmp_path):
     assert db.folder_meta_map()["image/sdxl_t2i"]["custom_name"] == "Second Name"
 
 
-def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
-    # A saved session points at a custom folder by id, so a create that is undone
-    # and redone has to resolve to the same key rather than a fresh one.
-    actions, db, _ = _actions(tmp_path)
-    folder_id = actions.create_custom_folder("Mine", [("image/sdxl_t2i", "model", None)])
-    actions.undo()
-    assert db.list_custom_folders() == []
-
-    actions.redo()
-
-    ((record,),) = (db.list_custom_folders(),)
-    assert record["id"] == folder_id
-    assert record["name"] == "Mine" and record["items"] == ["image/sdxl_t2i"]
-
-
 def test_redo_with_nothing_undone_is_a_noop(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")

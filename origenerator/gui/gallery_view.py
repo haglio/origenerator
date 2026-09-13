@@ -2260,7 +2260,7 @@ class GalleryView(QWidget):
         )
         if not ok or not name.strip():
             return
-        folder_id = self._actions.create_custom_folder(
+        folder_id = self._actions.custom_folders.create(
             name.strip(), [self._item_identity(f) for f in folders]
         )
         self._open_custom_folder(folder_id)
@@ -2295,7 +2295,7 @@ class GalleryView(QWidget):
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
             return
-        self._actions.add_to_custom_folder(
+        self._actions.custom_folders.add_to(
             folder_id, [self._item_identity(g) for g in groups]
         )
         self._open_custom_folder(folder_id)
@@ -2305,7 +2305,7 @@ class GalleryView(QWidget):
         for when the folders to fill it with are easier dragged in than picked."""
         name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
         if ok and name.strip():
-            self._open_custom_folder(self._actions.create_custom_folder(name.strip(), []))
+            self._open_custom_folder(self._actions.custom_folders.create(name.strip(), []))
 
     def _remove_custom_folder(self, group):
         """Delete a folder the user made. Only the grouping goes — its gathered
@@ -2318,7 +2318,7 @@ class GalleryView(QWidget):
             f"The {count} folder{plural} it holds, and their items, are kept."
         ):
             return
-        self._actions.delete_custom_folder(group.folder_id)
+        self._actions.custom_folders.delete(group.folder_id)
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
@@ -2328,7 +2328,7 @@ class GalleryView(QWidget):
         """Drop one gathered folder out of the custom folder on screen."""
         item = self.group_for_key(item_key)
         identity = self._item_identity(item) if item is not None else (item_key, None, None)
-        self._actions.remove_from_custom_folder(
+        self._actions.custom_folders.remove_from(
             group.folder_id, item_key, level=identity[1], ref_prompt_id=identity[2]
         )
         self.refresh()

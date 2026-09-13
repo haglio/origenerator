@@ -53,7 +53,7 @@ _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
 class ThumbnailWidget(QWidget):
-    clicked = pyqtSignal(str)  # prompt_id
+    clicked = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the click
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
     drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
@@ -369,7 +369,7 @@ class ThumbnailWidget(QWidget):
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag.note_press(event)
-            self.clicked.emit(self.prompt_id)
+            self.clicked.emit(self.prompt_id, event.modifiers())
 
     def mouseMoveEvent(self, event):
         # Drag the generation out to a combine drop slot, but only once the press

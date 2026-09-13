@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.gui.browser_pane import (
@@ -130,6 +131,20 @@ def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot):
 
     pane.apply_selection("g1", _CTRL)          # toggles it back off
     assert pane.selected_prompt_ids() == ["g3"]
+
+
+def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot):
+    rows = [_row("g1", 1), _row("g2", 2)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+    elsewhere = QWidget()
+    qtbot.addWidget(elsewhere)
+    qtbot.keyClick(elsewhere, Qt.Key.Key_Z, _CTRL)  # Qt Test leaves Ctrl down app-wide
+
+    pane._thumb_widgets["g1"].clicked.emit("g1", _NO_MOD)
+    pane._thumb_widgets["g2"].clicked.emit("g2", _NO_MOD)
+
+    assert pane.selected_prompt_ids() == ["g2"]
 
 
 def test_shift_extends_a_contiguous_run_from_the_anchor(qtbot):

@@ -795,7 +795,7 @@ class GenerateConfigPanel(QWidget):
         return [r for r in self._db.list_generations()
                 if media_type_of_row(r) == MediaType.IMAGE]
 
-    def settings_key(self) -> tuple[str, str] | None:
+    def settings_key(self, image_index: dict | None = None) -> tuple[str, str] | None:
         """The gallery settings-folder this config maps to: (workflow, signature).
 
         The signature is normalized against the workflow's defaults (see
@@ -808,8 +808,9 @@ class GenerateConfigPanel(QWidget):
         if wf is None or self._param_form is None:
             return None
         params = self._param_form.get_values_static()
-        index = build_image_config_index(self._image_rows())
-        return key, settings_signature(key, json.dumps(params), index)
+        if image_index is None:
+            image_index = build_image_config_index(self._image_rows())
+        return key, settings_signature(key, json.dumps(params), image_index)
 
     def settings_folder_key(self) -> str | None:
         """The gallery folder this tab's settings have been generating into, by
@@ -905,7 +906,7 @@ class GenerateConfigPanel(QWidget):
         rows = self._db.list_generations()  # newest first
         index = build_image_config_index(
             [r for r in rows if media_type_of_row(r) == MediaType.IMAGE])
-        matching = rows_in_settings(rows, self.settings_key(), index)
+        matching = rows_in_settings(rows, self.settings_key(index), index)
         return matching[0] if matching else None
 
     def current_config(self) -> ConfigSnapshot:

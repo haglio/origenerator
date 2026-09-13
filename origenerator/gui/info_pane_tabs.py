@@ -462,14 +462,12 @@ class InfoPaneTabs(QTabWidget):
         super().tabRemoved(index)
         self._sync_preview_tab()  # ...and back left
 
-    def _row_settings_key(self, row: dict):
+    @staticmethod
+    def _row_settings_key(row: dict, image_index: dict):
         """The settings folder (workflow + signature) a stored row lands in."""
         workflow_name = row.get("workflow_name", "")
-        index = build_image_config_index(
-            [r for r in self._db.list_generations()
-             if media_type_of_row(r) == MediaType.IMAGE]
-        )
-        return workflow_name, settings_signature(workflow_name, row.get("params_json"), index,
+        return workflow_name, settings_signature(workflow_name, row.get("params_json"),
+                                                 image_index,
                                                  workflow_version=row.get("workflow_version"))
 
     def open_config(self, workflow_name: str, params: dict) -> GenerateConfigPanel | None:
@@ -526,9 +524,12 @@ class InfoPaneTabs(QTabWidget):
         ``request`` is the spoken request that made this row, when one did, so the
         tab can mark what it changed and link back to what it was asked about.
         """
-        key = self._row_settings_key(row)
+        image_index = build_image_config_index(
+            [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
+        key = self._row_settings_key(row, image_index)
         cur = self.current_config_panel()
-        if cur is not None and not cur.is_blank() and cur.settings_key() == key:
+        if (cur is not None and not cur.is_blank()
+                and cur.settings_key(image_index) == key):
             target = cur  # already this generation's own tab, pinned or not
         else:
             target = self._landing_panel()

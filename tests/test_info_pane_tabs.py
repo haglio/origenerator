@@ -375,6 +375,23 @@ def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):
     assert tabs.current_config_panel()._displayed_row is dog
 
 
+def test_a_click_reads_the_table_no_more_than_the_tab_it_lands_in(tabs):
+    params = _sdxl_full(positive_prompt="a wizard", seed=1)
+    a = _complete_gen(tabs._db, "a", params, "sdxl_a.png")
+    b = _complete_gen(tabs._db, "b", dict(params, seed=2), "sdxl_b.png")
+    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.load_selection(a, [a, b])
+    panel = tabs.current_config_panel()
+
+    with patch.object(tabs._db, "list_generations", wraps=tabs._db.list_generations) as reads:
+        panel.show_saved_generation(b, [a, b])
+    shown_alone = reads.call_count
+    with patch.object(tabs._db, "list_generations", wraps=tabs._db.list_generations) as reads:
+        tabs.load_selection(b, [a, b])
+
+    assert reads.call_count == shown_alone
+
+
 # --- the preview tab: one click borrows it, a double-click keeps it ---------
 
 def _two_generations(tabs):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 from origenerator import gallery
 
@@ -54,3 +54,18 @@ def test_the_database_keeps_times_in_utc_and_the_heading_shows_them_on_the_viewe
 
     assert gallery.section_headings(rows, zone=pacific_daylight, today=_TODAY) \
         == ["Sat Sep 12, 7:10 PM – 7:39 PM", None]
+
+
+def test_new_work_opens_a_section_of_its_own_once_two_hours_have_passed_since_the_newest_row():
+    rows = [{"prompt_id": "g1", "created_at": "2026-09-12 19:00:00"}]
+    two_hours_on = datetime(2026, 9, 12, 21, 0, tzinfo=UTC)
+
+    assert gallery.new_work_opens_a_section(rows, now=two_hours_on)
+    assert not gallery.new_work_opens_a_section(rows, now=two_hours_on - timedelta(minutes=1))
+
+
+def test_new_work_opens_no_section_where_nothing_says_when_it_was_made():
+    much_later = datetime(2027, 1, 1, tzinfo=UTC)
+
+    assert not gallery.new_work_opens_a_section([], now=much_later)
+    assert not gallery.new_work_opens_a_section([{"prompt_id": "g1"}], now=much_later)

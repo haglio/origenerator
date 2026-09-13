@@ -13,6 +13,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
@@ -21,6 +22,7 @@ from origenerator import gallery
 from origenerator.gui.browser_pane import (
     BrowserPane,
     BrowserScrollArea,
+    LeadTiles,
     PaneHost,
     TreeNavigation,
 )
@@ -53,6 +55,10 @@ def _row(prompt_id, seed, created_at=None):
         "starred": 0,
         "created_at": created_at,
     }
+
+
+def _ago(**elapsed):
+    return (datetime.now(UTC) - timedelta(**elapsed)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class _StubDB:
@@ -91,7 +97,7 @@ class _StubAuto:
         return False
 
 
-def _pane(qtbot, rows=(), add_lead_tiles=lambda flow, group: None):
+def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles()):
     scroll = BrowserScrollArea()
     qtbot.addWidget(scroll)
     pane = BrowserPane(
@@ -108,7 +114,7 @@ def _pane(qtbot, rows=(), add_lead_tiles=lambda flow, group: None):
             enhancing_run=lambda row: None,
             enhance_settings=lambda: gallery.EnhanceSettings(),
             experiments_enabled=lambda: False,
-            add_lead_tiles=add_lead_tiles,
+            lead_tiles=lead_tiles,
         ),
     )
     return pane, scroll
@@ -215,7 +221,7 @@ def test_latest_heads_each_batch_with_when_it_was_made(qtbot):
 
 def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_it(
         qtbot, monkeypatch):
-    rows = [_row("g1", 1, "2026-09-12 23:00:00")]
+    rows = [_row("g1", 1, _ago(minutes=5))]
     pane, scroll = _pane(qtbot, rows)
     running = InFlightItem(key="j1", caption="scene one", status="running", frame=None,
                            reveal=lambda: None, media_type="image")
@@ -224,6 +230,19 @@ def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_i
 
     [heading] = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == [heading, "InFlightCard", "g1"]
+
+
+def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section(
+        qtbot, monkeypatch):
+    rows = [_row("g1", 1, _ago(hours=5))]
+    pane, scroll = _pane(qtbot, rows)
+    running = InFlightItem(key="j1", caption="scene one", status="running", frame=None,
+                           reveal=lambda: None, media_type="image")
+    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
+    _open_recents(pane, rows)
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
 
 
 def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
@@ -242,15 +261,84 @@ def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot):
     assert shown[shown.index("b0") - 1] == second
 
 
-def test_a_folders_grid_heads_its_batches_with_its_lead_tiles_under_the_first(qtbot):
+def test_a_folders_grid_heads_its_batches_with_when_they_were_made(qtbot):
     rows = [_row("g1", 1, "2026-09-12 23:00:00"), _row("g2", 2, "2026-09-12 19:00:00")]
-    pane, scroll = _pane(qtbot, rows,
-                         add_lead_tiles=lambda flow, group: flow.addWidget(QLabel("lead")))
+    pane, scroll = _pane(qtbot, rows)
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
     first, second = gallery.section_headings(rows)
-    assert _shown_in_order(scroll) == [first, "lead", "g1", second, "g2"]
+    assert _shown_in_order(scroll) == [first, "g1", second, "g2"]
+
+
+def test_a_folder_last_made_a_long_while_ago_gives_its_new_tile_a_section_of_its_own(qtbot):
+    rows = [_row("g1", 1, _ago(hours=5))]
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == ["Now", "new", heading, "g1"]
+
+
+def test_a_folder_made_lately_keeps_its_new_tile_in_the_newest_section(qtbot):
+    rows = [_row("g1", 1, _ago(minutes=5))]
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [heading, "new", "g1"]
+
+
+def test_the_request_tile_stands_above_a_folders_sections_when_it_has_several(qtbot):
+    rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
+    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    first, second = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == ["request", first, "new", "g1", second, "g2"]
+
+
+def test_a_now_section_counts_toward_putting_the_request_tile_above_the_sections(qtbot):
+    rows = [_row("g1", 1, _ago(hours=5))]
+    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == ["request", "Now", "new", heading, "g1"]
+
+
+def test_the_request_tile_stays_with_a_folders_only_section(qtbot):
+    rows = [_row("g1", 1, _ago(minutes=5))]
+    tiles = LeadTiles(reroll=QLabel("new"), request=QLabel("request"))
+    pane, scroll = _pane(qtbot, rows, lead_tiles=lambda group: tiles)
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    [heading] = gallery.section_headings(rows)
+    assert _shown_in_order(scroll) == [heading, "new", "request", "g1"]
+
+
+def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
+        qtbot, monkeypatch):
+    running = dict(_row("r1", 2, _ago(minutes=1)), status="running",
+                   output_files=json.dumps([]))
+    finished = _row("g1", 1, _ago(hours=5))
+    pane, scroll = _pane(qtbot, [running, finished])
+    card = InFlightItem(key="r1", caption="scene one", status="running", frame=None,
+                        reveal=lambda: None, media_type="image")
+    monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [card])
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one",
+                                               rows=[running, finished]))
+
+    [heading] = gallery.section_headings([finished])
+    assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
 
 
 def test_the_experiments_shelf_heads_each_batch_it_collected(qtbot):

@@ -155,9 +155,17 @@ def _time_heading(text: str) -> QLabel:
     return heading
 
 
-def _open_on_first_heading(flow, headings):
+_NOW_HEADING = "Now"
+
+
+def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None):
+    if opens_now:
+        flow.add_full_row(_time_heading(_NOW_HEADING))
+        draw_leading()
     if headings and headings[0]:
         flow.add_full_row(_time_heading(headings[0]))
+    if not opens_now:
+        draw_leading()
 
 
 def _draw_between_headings(flow, rows, headings, draw, *, start=0):
@@ -168,9 +176,15 @@ def _draw_between_headings(flow, rows, headings, draw, *, start=0):
 
 
 @dataclass(frozen=True)
+class LeadTiles:
+    reroll: QWidget | None = None
+    request: QWidget | None = None
+
+
+@dataclass(frozen=True)
 class PaneHost:
     """The questions the pane may ask the gallery it fills, bound to the view's
-    answers at construction — plus the one favor it grants back.
+    answers at construction.
 
     Callables rather than pushed values so each is read at the moment a tile is
     built: the media filter, the enhance settings and the in-flight runs all
@@ -191,9 +205,9 @@ class PaneHost:
     enhance_settings: Callable[[], object]
     # Whether the background experimenter is on (the empty shelf teaches off it).
     experiments_enabled: Callable[[], bool]
-    # The favor: lead a settings folder's grid with the view's own tiles — the
-    # live re-roll tile and its request mirror — before the finished pictures.
-    add_lead_tiles: Callable[[object, object], None]
+    # A settings folder's own tiles from the view — the live re-roll tile and its
+    # request mirror, each None where the folder has none — for the pane to place.
+    lead_tiles: Callable[[object], LeadTiles]
 
 
 @dataclass(frozen=True)
@@ -625,13 +639,18 @@ class BrowserPane(QObject):
         offset = self._scroll_bar().value() if self._recents_flow is not None else 0
         container, flow = self._new_tile_pane()  # which clears both of those
         rows = self._filtered_recent_rows()
-        _open_on_first_heading(flow, gallery.section_headings(rows))
         items = self._visible_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
         self._inflight_by_key = {}
-        for item in items:
-            self._add_inflight_card(flow, item)
+
+        def draw_leading():
+            for item in items:
+                self._add_inflight_card(flow, item)
+
+        _open_sections(flow, gallery.section_headings(rows),
+                       opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
+                       draw_leading=draw_leading)
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         if not (items or rows):
             self.show_widget(self._empty_state(self._recents_empty_hint()))
@@ -875,7 +894,7 @@ class BrowserPane(QObject):
             tile.corner_action_triggered.connect(self.experiment_verdict)
 
         headings = gallery.section_headings(rows)
-        _open_on_first_heading(flow, headings)
+        _open_sections(flow, headings)
         _draw_between_headings(flow, rows, headings, draw)
         self.show_widget(container if rows
                          else self._empty_state(self._experiments_empty_hint()))
@@ -920,7 +939,7 @@ class BrowserPane(QObject):
                 self._add_inflight_card(flow, live)
 
         headings = gallery.section_headings(drawn)
-        _open_on_first_heading(flow, headings)
+        _open_sections(flow, headings)
         _draw_between_headings(flow, drawn, headings, draw)
         self.show_widget(container if shown
                          else self._empty_state(self._requests_empty_hint()))
@@ -1150,14 +1169,28 @@ class BrowserPane(QObject):
         # below rather than drawn as a broken, output-less thumbnail.
         finished = [row for row in group.rows if gallery.produced_output(row)]
         headings = gallery.section_headings(finished)
-        _open_on_first_heading(flow, headings)
-        self._host.add_lead_tiles(flow, group)
-        self._add_folder_inflight_cards(flow, group)
+        lead = self._host.lead_tiles(group)
+        cards = self._folder_inflight_items(group)
+        opens_now = ((lead.reroll is not None or bool(cards))
+                     and gallery.new_work_opens_a_section(finished))
+        sections = opens_now + sum(1 for heading in headings if heading)
+        request_above = lead.request is not None and sections > 1
+        if request_above:
+            flow.addWidget(lead.request)
+
+        def draw_leading():
+            for tile in (lead.reroll, None if request_above else lead.request):
+                if tile is not None:
+                    flow.addWidget(tile)
+            for item in cards:
+                self._add_inflight_card(flow, item)
+
+        _open_sections(flow, headings, opens_now=opens_now, draw_leading=draw_leading)
         _draw_between_headings(flow, finished, headings, draw)
         self.show_widget(container)
 
-    def _add_folder_inflight_cards(self, flow, group):
-        """A card for every other run still cooking in this folder.
+    def _folder_inflight_items(self, group) -> list[InFlightItem]:
+        """Every other run still cooking in this folder, for a card each.
 
         The re-roll tile shows the one in front, and used to be the whole of
         what a folder said about work in flight — so a request over a folder,
@@ -1179,13 +1212,10 @@ class BrowserPane(QObject):
                    if not gallery.produced_output(row)
                    and row["prompt_id"] != in_front]
         if not waiting:
-            return
+            return []
         items = {item.key: item for item in self._visible_inflight_items()}
-        for pid in waiting:
-            item = items.get(pid)
-            if item is None:
-                continue  # a row no longer in flight by the time this drew
-            self._add_inflight_card(flow, item)
+        # A row no longer in flight by the time this drew has no item, and no card.
+        return [items[pid] for pid in waiting if pid in items]
 
     def _add_inflight_card(self, flow, item):
         card = InFlightCard(item)

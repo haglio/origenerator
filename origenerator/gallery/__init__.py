@@ -129,7 +129,7 @@ from origenerator.gallery.source_image import (
     source_image_id_for,
     videos_from_source_image,
 )
-from origenerator.gallery.time_sections import section_headings
+from origenerator.gallery.time_sections import new_work_opens_a_section, section_headings
 from origenerator.gallery.tree import (
     ALL_KEY,
     ALL_LABEL,
@@ -237,6 +237,7 @@ __all__ = [
     "model_label",
     "model_signature",
     "named_folders_by_row",
+    "new_work_opens_a_section",
     "original_files_of",
     "output_disk_files",
     "output_file_path",

@@ -55,6 +55,7 @@ from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     BrowserPane,
     BrowserScrollArea,
+    LeadTiles,
     PaneHost,
     TreeNavigation,
 )
@@ -471,7 +472,7 @@ class GalleryView(QWidget):
                 enhancing_run=lambda row: self._enhance.run_of(row),
                 enhance_settings=lambda: self._enhance.settings,
                 experiments_enabled=lambda: self.experiments_enabled(),
-                add_lead_tiles=lambda flow, group: self._add_lead_tiles(flow, group),
+                lead_tiles=lambda group: self._lead_tiles(group),
             ),
         )
         self._browser.pane_reset.connect(self._forget_reroll_tile)
@@ -2465,22 +2466,22 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         return item.data(0, _GROUP_ROLE) if item else None
 
-    def _add_lead_tiles(self, flow, group):
-        """Lead a settings folder's grid with the view's own tiles — the live
-        re-roll tile and, beside it, its mirror (the same seeds again, said
-        differently) — when the folder supports each. The pane grants the spot
-        (:attr:`~origenerator.gui.browser_pane.PaneHost.add_lead_tiles`)."""
-        if self._can_reroll(group):
-            self._add_reroll_tile(flow, group)
-        if self._can_request_changes(group):
-            self._add_folder_request_tile(flow, group)
+    def _lead_tiles(self, group) -> LeadTiles:
+        """A settings folder's own tiles — the live re-roll tile and its mirror
+        (the same seeds again, said differently) — where the folder supports
+        each, for the pane to place
+        (:attr:`~origenerator.gui.browser_pane.PaneHost.lead_tiles`)."""
+        return LeadTiles(
+            reroll=self._reroll_tile_for(group) if self._can_reroll(group) else None,
+            request=(self._folder_request_tile_for(group)
+                     if self._can_request_changes(group) else None))
 
     def _forget_reroll_tile(self):
         """The pane is dropping what it holds, the re-roll tile with it — it is
         re-created only when a re-rolling folder is next rendered."""
         self._reroll_tile = None
 
-    def _add_reroll_tile(self, flow, group):
+    def _reroll_tile_for(self, group) -> RerollTile:
         job = self._reroll.job_for(group.key)
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
@@ -2493,8 +2494,8 @@ class GalleryView(QWidget):
         tile.context_requested.connect(
             lambda pos, k=group.key: self._reroll_tile_menu(k, pos))
         tile.selected.connect(lambda k=group.key: self._select_reroll(k))
-        flow.addWidget(tile)
         self._reroll_tile = tile
+        return tile
 
     def _reroll_tile_menu(self, key: str, global_pos):
         """Right-click a folder's live tile: throw away the run it is showing.
@@ -2551,10 +2552,10 @@ class GalleryView(QWidget):
             return []
         return [row for row in group.rows if gallery.produced_output(row)]
 
-    def _add_folder_request_tile(self, flow, group):
+    def _folder_request_tile_for(self, group) -> FolderRequestTile:
         tile = FolderRequestTile()
         tile.clicked.connect(lambda g=group: self._open_folder_request(g))
-        flow.addWidget(tile)
+        return tile
 
     def _open_folder_request(self, group):
         """Open this folder's prompt in a tab, ready to be rewritten.

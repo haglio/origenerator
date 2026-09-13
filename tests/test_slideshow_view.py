@@ -14,7 +14,6 @@ from PIL import Image
 from PyQt6.QtCore import QEvent, QSize, Qt, QUrl
 from PyQt6.QtGui import QKeyEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
-from pytest import approx
 
 from origenerator.funscript import (
     legacy_funscript_path_for,
@@ -25,7 +24,6 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
-from origenerator.ken_burns import TICK_MS, ZOOM_SPAN
 from origenerator.motion_engine import Motion
 from origenerator.slideshow import LIVE, Slide, in_order
 
@@ -977,160 +975,144 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
 
 
 # --- the slow push into the still on screen ----------------------------------
+# Drawn on Qt Quick's render thread (origenerator.gui.ken_burns_still), so the
+# show's part is what it asks of its pane, and when.
 
-# A whole tick of the standard dwell — what any of these can be out by, since a
-# tick count is a whole number and a stretch of milliseconds need not divide by
-# one.  Far below anything an eye reads off the screen.
-_ONE_TICK = (ZOOM_SPAN - 1) * TICK_MS / 4000
-
-
-def _push_for(view, ms):
-    """Tick the push as if *ms* of the slide's dwell had gone by."""
-    for _ in range(round(ms / TICK_MS)):
-        view._zoom_tick()
+_PUSH_COMMANDS = ("start_push", "pause_push", "resume_push", "retime_push", "stop_push")
 
 
-def test_a_dwelling_slide_creeps_into_the_picture(qtbot):
-    view = _view(qtbot, image_dwell_ms=4000)
-    assert view._zoom_timer.isActive()
-    assert view._preview._zoom == 1.0        # it opens on the whole picture
-
-    _push_for(view, 4000)
-
-    assert view._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
+def _heard_pushes(view):
+    heard = []
+    for name in _PUSH_COMMANDS:
+        setattr(view._preview, name,
+                lambda *args, _name=name: heard.append((_name, *args)))
+    return heard
 
 
-def test_a_longer_pace_creeps_more_slowly_rather_than_further(qtbot):
-    # The whole of what a longer dwell changes: the same ground, a third of the
-    # speed.  Covering three times the ground instead would end on a crop.
-    slow = _view(qtbot, image_dwell_ms=12000)
+def test_a_still_slide_pushes_into_the_picture_over_its_dwell(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    heard = _heard_pushes(view)
 
-    _push_for(slow, 4000)
-    assert slow._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 3, abs=_ONE_TICK)
+    _press(view, Qt.Key.Key_Right)
 
-    _push_for(slow, 8000)
-    assert slow._preview._zoom == approx(ZOOM_SPAN, abs=_ONE_TICK)
-
-
-def test_the_push_takes_the_pace_as_it_stands_rather_than_as_it_opened(qtbot):
-    # The pace is app-wide and moves under a running show, so the creep reads it
-    # every tick: turned up mid-slide it slows from that moment, rather than
-    # recomputing the whole move and jumping the picture back out.
-    view = _view(qtbot, image_dwell_ms=4000)
-    _push_for(view, 2000)
-    halfway = view._preview._zoom
-
-    view._playlist.image_dwell_ms = 8000  # the number set_dwell_s hands down
-    _push_for(view, 2000)
-
-    assert view._preview._zoom == approx(halfway + (ZOOM_SPAN - 1) / 4, abs=_ONE_TICK)
+    assert heard == [("start_push", 4000, 0.0)]
 
 
 def test_a_pace_of_nought_holds_the_whole_picture(qtbot):
     # Nought holds one picture until an arrow moves it.
-    view = _view(qtbot, image_dwell_ms=0)
-    assert not view._zoom_timer.isActive()
+    view = _view(qtbot, _KEYED, image_dwell_ms=0)
+    heard = _heard_pushes(view)
 
-    _push_for(view, 10_000)
+    _press(view, Qt.Key.Key_Right)
 
-    assert view._preview._zoom == 1.0
+    assert heard == [("stop_push",)]
 
 
 def test_a_clip_is_its_own_motion(qtbot):
     view = _view(qtbot, image_dwell_ms=4000)
+    heard = _heard_pushes(view)
+
     _press(view, Qt.Key.Key_Right)          # -> the video
-    assert not view._zoom_timer.isActive()
+
+    assert heard == [("stop_push",)]
 
 
-def test_holding_a_slide_carries_its_push_on_from_where_it_got_to(qtbot):
+def test_holding_a_slide_leaves_its_push_running(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
-    _push_for(view, 1000)
-    reached = view._preview._zoom
+    heard = _heard_pushes(view)
 
     _press(view, Qt.Key.Key_Down)           # hold it
 
-    assert view._zoom_timer.isActive()
+    assert heard == []
     assert not view._advance_timer.isActive()
-    assert view._preview._zoom == reached
 
 
-def test_a_held_slide_starts_its_push_over_each_time_it_ends(qtbot):
+def test_a_new_pace_carries_a_held_slides_push_on_at_that_speed(qtbot):
+    # Not back out to the whole picture: a held slide keeps its move, and the
+    # pace changes only how fast the rest of it goes.
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
+    heard = _heard_pushes(view)
 
-    _push_for(view, 4000 + 1000)
+    view.set_dwell_s(8)
 
-    assert view._preview._zoom == approx(1 + (ZOOM_SPAN - 1) / 4, abs=_ONE_TICK)
+    assert heard == [("retime_push", 8000)]
 
 
 def test_a_show_reopened_on_a_held_slide_pushes_into_it(qtbot):
     closed = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(closed, Qt.Key.Key_Down)
-
     reopened = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    heard = _heard_pushes(reopened)
+
     reopened.resume(closed.state())
 
-    assert reopened._zoom_timer.isActive()
+    assert heard == [("start_push", 4000, 0.0)]
     assert not reopened._advance_timer.isActive()
 
 
-def test_a_request_released_over_a_held_slide_carries_its_push_on(qtbot):
+def test_a_request_holds_the_push_and_its_release_carries_it_on(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
-    _press(view, Qt.Key.Key_Down)
-    view.hold_for_request(True, "🎤 listening…")
+    heard = _heard_pushes(view)
 
+    view.hold_for_request(True, "🎤 listening…")
     view.hold_for_request(False)
 
-    assert view._zoom_timer.isActive()
+    assert heard == [("pause_push",), ("resume_push",)]
+
+
+def test_the_rooms_freeze_holds_the_push_and_its_resume_carries_it_on(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    heard = _heard_pushes(view)
+
+    view.set_session_paused(True)
+    view.set_session_paused(False)
+
+    assert heard == [("pause_push",), ("resume_push",)]
+
+
+def test_a_held_slide_keeps_its_push_through_a_request_and_the_rooms_freeze(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Down)
+    heard = _heard_pushes(view)
+
+    view.hold_for_request(True, "🎤 listening…")
+    view.hold_for_request(False)
+    view.set_session_paused(True)
+    view.set_session_paused(False)
+
+    assert heard == [("pause_push",), ("resume_push",), ("pause_push",), ("resume_push",)]
     assert not view._advance_timer.isActive()
 
 
-def test_the_rooms_resume_carries_a_held_slides_push_on(qtbot):
+def test_a_request_released_under_the_rooms_freeze_leaves_the_push_held(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
-    _press(view, Qt.Key.Key_Down)
+    heard = _heard_pushes(view)
+
     view.set_session_paused(True)
-
-    view.set_session_paused(False)
-
-    assert view._zoom_timer.isActive()
-    assert not view._advance_timer.isActive()
-
-
-def test_a_released_request_carries_the_push_on_from_there(qtbot):
-    # Not back out to the whole picture: the slide never left the screen, so
-    # neither should the move that was running over it.
-    view = _view(qtbot, image_dwell_ms=4000)
-    _push_for(view, 1000)
-    reached = view._preview._zoom
-
     view.hold_for_request(True, "🎤 listening…")
-    assert not view._zoom_timer.isActive()
-
     view.hold_for_request(False)
-    assert view._zoom_timer.isActive()
-    assert view._preview._zoom == reached
 
-
-def test_the_rooms_freeze_stops_the_push_too(qtbot):
-    view = _view(qtbot, image_dwell_ms=4000)
-
-    view.set_session_paused(True)
-    assert not view._zoom_timer.isActive()
-
-    view.set_session_paused(False)
-    assert view._zoom_timer.isActive()
+    assert heard == [("pause_push",)]
 
 
 def test_each_slide_opens_on_the_whole_picture(qtbot):
-    view = _view(qtbot, image_dwell_ms=4000)
-    _push_for(view, 2000)
-    assert view._preview._zoom > 1.0
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    _press(view, Qt.Key.Key_Right)
+    heard = _heard_pushes(view)
 
-    _press(view, Qt.Key.Key_Right)          # -> the video
-    _press(view, Qt.Key.Key_Right)          # -> the next picture
+    _press(view, Qt.Key.Key_Right)
 
-    assert view._preview._zoom == 1.0
-    assert view._zoom_timer.isActive()
+    assert heard == [("start_push", 4000, 0.0)]
+
+
+def test_closing_the_show_stops_the_push(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000)
+    heard = _heard_pushes(view)
+
+    view.close()
+
+    assert ("stop_push",) in heard
 
 
 # --- re-seeding the set after it opened -------------------------------------
@@ -1249,11 +1231,16 @@ def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
 
 # --- opened over a generation still being made ------------------------------
 
+def _showing_a_picture(view):
+    picture = view._preview._pixmap
+    return picture is not None and not picture.isNull()
+
+
 def test_opens_over_a_running_generation_showing_its_frame(qtbot):
     view = _view(qtbot, [], frame=_png_bytes())
     assert view.is_live() is True
     assert view._preview._media is None                     # no file under it yet
-    assert not view._preview._image_label.pixmap().isNull()  # the streamed frame shows
+    assert _showing_a_picture(view)  # the streamed frame shows
 
 
 def test_opened_before_the_first_frame_it_says_it_is_generating(qtbot):
@@ -1265,7 +1252,7 @@ def test_opened_before_the_first_frame_it_says_it_is_generating(qtbot):
 def test_a_later_frame_replaces_the_one_it_opened_over(qtbot):
     view = _view(qtbot, [])
     view.show_frame(_png_bytes())
-    assert not view._preview._image_label.pixmap().isNull()
+    assert _showing_a_picture(view)
 
 
 def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
@@ -1310,7 +1297,7 @@ def test_a_run_with_no_folder_armed_behind_it_ignores_the_arrows(qtbot):
     view = _view(qtbot, [], frame=_png_bytes())
     _press(view, Qt.Key.Key_Right)
     assert view.is_live() is True
-    assert not view._preview._image_label.pixmap().isNull()
+    assert _showing_a_picture(view)
 
 
 def test_a_live_show_counts_nothing_until_it_steps_off(qtbot, tmp_path):

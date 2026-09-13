@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import os
 import runpy
 import sys
 from contextlib import ExitStack, contextmanager
@@ -731,6 +732,15 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
         assert main([]) == 0
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
+
+
+def test_main_asks_qt_quick_to_draw_on_a_thread_of_its_own(qapp):
+    requested = MagicMock()
+
+    with _a_faked_boot([], **{"origenerator.render_loop.request_threaded_render_loop": requested}):
+        assert main([]) == 0
+
+    requested.assert_called_once_with(os.environ)
 
 
 def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):

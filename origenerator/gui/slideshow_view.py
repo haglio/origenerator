@@ -104,7 +104,6 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.toast import Toast
-from origenerator.ken_burns import TICK_MS, progress_step, zoom_at
 from origenerator.slideshow import LIVE, ShowState, Slide, SlideshowPlaylist, in_order
 
 logger = logging.getLogger(__name__)
@@ -206,7 +205,7 @@ class SlideshowView(QWidget):
         self._preview = PreviewWidget(player=player, loop_videos=False,
                                       allow_fullscreen=False,
                                       show_funscript_strip=True, mute_audio=False,
-                                      on_double_click=self.close)
+                                      pushes_stills=True, on_double_click=self.close)
         self._preview.video_ended.connect(self._on_video_ended)
         self._preview.video_unplayable.connect(self._on_video_unplayable)
         # The media is refitted a beat after the window resizes (and again when a
@@ -254,10 +253,6 @@ class SlideshowView(QWidget):
         self._advance_timer = QTimer(self)
         self._advance_timer.setSingleShot(True)
         self._advance_timer.timeout.connect(self._advance)
-        self._zoom_timer = QTimer(self)
-        self._zoom_timer.setInterval(TICK_MS)
-        self._zoom_timer.timeout.connect(self._zoom_tick)
-        self._zoom_progress = 0.0
         # The hosting session's OmniPause, held here so it survives navigation:
         # a step lands on a NEW slide (the room being frozen does not un-aim the
         # transport), but the slide must arrive holding — no dwell armed, its
@@ -273,8 +268,7 @@ class SlideshowView(QWidget):
 
     def _show_current(self):
         """Render the current item and arm the dwell timer if it's an image."""
-        self._disarm_dwell()
-        self._restart_the_push()  # a new slide begins where the move begins
+        self._advance_timer.stop()
         if self._live:
             # Nothing on disk yet: the run's own frames stand in for a slide.
             if self._frame is not None:
@@ -297,44 +291,41 @@ class SlideshowView(QWidget):
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
         self._place_console()  # back over whatever media widget the slide put up
+        pace = self._playlist.pace_ms()
+        if pace is None:
+            self._preview.stop_push()
+        else:
+            self._preview.start_push(pace, 0.0)
+            if self._frozen():
+                self._preview.pause_push()
         if self._session_paused:
             self._preview.set_playback_paused(True)  # arrive holding
             return
-        self._arm_dwell()
+        self._arm_advance()
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
-    # --- the slide's own clock: the advance, and the push that runs with it ---
+    # --- the slide's own clock: the advance, and what holds the push ---------
 
-    def _arm_dwell(self) -> None:
-        if self._playlist.pace_ms() is not None:
-            self._zoom_timer.start()
+    def _arm_advance(self) -> None:
         dwell = self._playlist.dwell_ms()
         if dwell is not None:
             self._advance_timer.start(dwell)
 
-    def _disarm_dwell(self) -> None:
-        """Stop both, leaving the push exactly where it had got to — so a hold
-        released mid-slide carries on from there rather than snapping back out."""
-        self._advance_timer.stop()
-        self._zoom_timer.stop()
+    def _frozen(self) -> bool:
+        return self._session_paused or self._playlist.paused
 
-    def _restart_the_push(self) -> None:
-        """Back to the whole picture, for the slide about to be drawn."""
-        self._zoom_progress = 0.0
-        self._preview.set_zoom(1.0)
-
-    def _zoom_tick(self) -> None:
-        """One step of the push, at the rate the pace asks for right now.
-
-        Against the CURRENT dwell rather than the one the slide opened at: the
-        pace is app-wide and can be turned up from another window mid-slide, and
-        the move then simply slows from that moment. Recomputing the whole move
-        against the new number instead would jump the picture back out.
-        """
-        self._zoom_progress += progress_step(TICK_MS, self._playlist.image_dwell_ms)
-        if self._playlist.locked and self._zoom_progress >= 1.0:
-            self._zoom_progress = 0.0
-        self._preview.set_zoom(zoom_at(self._zoom_progress))
+    def _follow_the_freeze(self, was_frozen: bool) -> None:
+        if self._frozen() == was_frozen:
+            return
+        pushing = self._playlist.pace_ms() is not None
+        if was_frozen:
+            if pushing:
+                self._preview.resume_push()
+            self._arm_advance()
+        else:
+            self._advance_timer.stop()
+            if pushing:
+                self._preview.pause_push()
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -953,11 +944,9 @@ class SlideshowView(QWidget):
         applied once: a step while frozen lands on a new slide, and that slide
         must arrive holding too (see :meth:`_show_current`).
         """
+        was_frozen = self._frozen()
         self._session_paused = paused
-        if paused:
-            self._disarm_dwell()
-        else:
-            self._arm_dwell()
+        self._follow_the_freeze(was_frozen)
         self._preview.set_playback_paused(paused)
 
     def _on_pace_changed(self, seconds: int) -> None:
@@ -971,8 +960,18 @@ class SlideshowView(QWidget):
             return
         self._dwell_s = seconds
         self._playlist.image_dwell_ms = seconds * 1000
-        if not self._playlist.locked and not self._live:
+        if self._live:
+            return
+        if not self._playlist.locked:
             self._show_current()
+            return
+        if self._frozen():
+            return
+        pace = self._playlist.pace_ms()
+        if pace is None:
+            self._preview.pause_push()
+        else:
+            self._preview.retime_push(pace)
 
     def _on_video_ended(self):
         """A clip finished: replay it while held, else move on. A lock is
@@ -1013,16 +1012,15 @@ class SlideshowView(QWidget):
         what the corner should say while it holds — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
+        was_frozen = self._frozen()
         self._playlist.set_paused(holding)
         if holding:
-            self._disarm_dwell()
             self._note_timer.stop()  # it holds, rather than fading after a beat
             self._request_note = note
-            self._refresh_note()
         else:
             self._request_note = ""
-            self._refresh_note()
-            self._arm_dwell()
+        self._refresh_note()
+        self._follow_the_freeze(was_frozen)
 
     def note_request(self, message: str, request=None, *,
                      working: bool = False) -> None:
@@ -1404,7 +1402,8 @@ class SlideshowView(QWidget):
         slide nobody held (Escape, a double-click, the spoken "close", the last
         item culled), it hands nothing over and leaves the gallery alone.
         """
-        self._disarm_dwell()
+        self._advance_timer.stop()
+        self._preview.stop_push()
         self._preview.clear()  # release any held video file so it can be deleted
         landing = self._land_on
         if landing is None and self._playlist.locked:

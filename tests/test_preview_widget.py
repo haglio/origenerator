@@ -19,8 +19,8 @@ from origenerator.funscript import (
 from origenerator.gui import drag_thumbnail, preview_widget
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
+from origenerator.gui.ken_burns_still import KenBurnsStill
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.ken_burns import TICK_MS, ZOOM_SPAN, progress_step, zoom_at
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):
@@ -72,8 +72,8 @@ def make_preview(qtbot):
     been started, so unit tests inject a mock and assert playback *intent*
     (setSource/play/stop calls) rather than driving the backend.
     """
-    def _make():
-        w = PreviewWidget(player=MagicMock())
+    def _make(**kwargs):
+        w = PreviewWidget(player=MagicMock(), **kwargs)
         qtbot.addWidget(w)
         return w
 
@@ -848,84 +848,89 @@ def _bordered_png(path):
     return path
 
 
-def test_the_zoom_draws_the_middle_of_the_picture(make_preview, tmp_path):
-    w = make_preview()
-    w._image_label.resize(200, 150)
-    w.show_image(_bordered_png(tmp_path / "p.png"))
-    assert w._image_label.pixmap().toImage().pixelColor(0, 0).red() > 100
+def test_a_pushing_pane_draws_its_still_on_the_render_thread(make_preview, tmp_path):
+    w = make_preview(pushes_stills=True)
 
-    w.set_zoom(1.5)  # far enough in to be past the border on every side
-
-    corner = w._image_label.pixmap().toImage().pixelColor(0, 0)
-    assert corner.blue() > 100 and corner.red() < 100
-
-
-def test_the_push_never_moves_the_drawn_rect_by_so_much_as_a_pixel(make_preview, tmp_path):
-    # Exactly, not nearly.  A frame that changes size by one pixel is re-centered
-    # by the label, so the picture hops sideways several times a second — which
-    # is what a first cut of this did, and it reads as a twitch rather than a
-    # camera move.  The overlays placed against this rect care too.
-    w = make_preview()
-    w.resize(200, 150)
-    w._image_label.resize(200, 150)
-    w.show_image(_big_png(tmp_path / "p.png"))
-    w.set_zoom(1.0)
-    before = w.media_rect()
-
-    for step in range(1, 41):
-        w.set_zoom(1.0 + (ZOOM_SPAN - 1) * step / 40)
-        assert w.media_rect() == before
-
-
-def test_the_push_moves_by_a_fraction_of_a_pixel_every_tick(make_preview, tmp_path):
-    # Fixed frame, but not a frozen picture: consecutive ticks of a real slide's
-    # rate must each redraw something different, or the move is stepping rather
-    # than creeping.
-    w = make_preview()
-    w._image_label.resize(200, 150)
-    w.show_image(_bordered_png(tmp_path / "p.png"))
-    w.set_zoom(1.0)
-
-    frames = []
-    for tick in range(1, 4):
-        w.set_zoom(zoom_at(tick * progress_step(TICK_MS, 4000)))
-        frames.append(w._image_label.pixmap().toImage())
-
-    assert frames[0] != frames[1] and frames[1] != frames[2]
-
-
-def test_a_new_picture_is_drawn_at_whatever_zoom_it_was_told(make_preview, tmp_path):
-    # The show resets the zoom itself when it puts a new slide up; a version of
-    # the SAME picture swapped in under it keeps the push it was part-way through.
-    w = make_preview()
-    w._image_label.resize(200, 150)
-    w.show_image(_big_png(tmp_path / "p.png"))
-    w.set_zoom(1.08)
-
-    w.show_image(_big_png(tmp_path / "q.png"))
-
-    assert w._zoom == 1.08
-
-
-def test_a_pane_nobody_pushes_is_drawn_exactly_as_it_always_was(make_preview, tmp_path):
-    # The painter path belongs to the show.  Every other pane — the info pane's
-    # preview, the strips — keeps the plain fit, so nothing about them changed.
-    w = make_preview()
-    w._image_label.resize(200, 150)
     w.show_image(_big_png(tmp_path / "p.png"))
 
-    assert w._pushing is False
-    assert w._push_source is None
+    assert isinstance(w._stack.currentWidget(), KenBurnsStill)
 
 
-def test_the_zoom_never_backs_out_past_the_whole_picture(make_preview, tmp_path):
-    w = make_preview()
-    w._image_label.resize(200, 150)
+@pytest.mark.parametrize("command, args, still_method", [
+    ("start_push", (4000, 0.25), "start"),
+    ("pause_push", (), "pause"),
+    ("resume_push", (), "resume"),
+    ("retime_push", (8000,), "retime"),
+    ("stop_push", (), "stop"),
+])
+def test_a_pushing_pane_hands_each_push_command_to_its_still(make_preview, tmp_path,
+                                                             command, args, still_method):
+    w = make_preview(pushes_stills=True)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    w._still = MagicMock()
+
+    getattr(w, command)(*args)
+
+    getattr(w._still, still_method).assert_called_once_with(*args)
+
+
+@pytest.mark.parametrize("command, args", [
+    ("start_push", (4000, 0.0)),
+    ("pause_push", ()),
+    ("resume_push", ()),
+    ("retime_push", (8000,)),
+    ("stop_push", ()),
+])
+def test_push_commands_are_harmless_on_a_pane_with_no_still_yet(make_preview,
+                                                                command, args):
+    w = make_preview(pushes_stills=True)
+
+    getattr(w, command)(*args)
+
+    assert w._still is None
+
+
+def test_a_pushing_pane_draws_a_live_frame_on_its_still(make_preview):
+    w = make_preview(pushes_stills=True)
+
+    w.show_frame(_png_bytes())
+
+    assert isinstance(w._stack.currentWidget(), KenBurnsStill)
+
+
+def test_a_pushed_picture_is_measured_where_it_is_drawn(make_preview, tmp_path):
+    w = make_preview(pushes_stills=True)
+    w.resize(200, 300)
+    w.layout().activate()
+
     w.show_image(_big_png(tmp_path / "p.png"))
 
-    w.set_zoom(0.5)
+    rect = w.media_rect()
+    assert (rect.width(), rect.height()) == (200, 150)
+    assert rect.center() == w._media_host.geometry().center()
 
-    assert w._zoom == 1.0
+
+def test_presses_over_a_pushed_picture_reach_the_pane(make_preview, tmp_path):
+    # A double-click over the picture is how a show is closed, and a press is how
+    # one is dragged out: whatever draws the picture must not keep them.
+    w = make_preview(pushes_stills=True)
+    w.resize(200, 300)
+    w.layout().activate()
+    w.show_image(_big_png(tmp_path / "p.png"))
+
+    under = w.childAt(w.media_rect().center())
+
+    assert under is None or not (under is w._still or w._still.isAncestorOf(under))
+
+
+def test_a_pane_nobody_pushes_draws_its_stills_as_it_always_has(make_preview, tmp_path):
+    w = make_preview()
+
+    w.show_image(_big_png(tmp_path / "p.png"))
+
+    assert w._stack.currentWidget() is w._image_label
+    assert w._still is None
+
 
 # --- the notice: this picture isn't what the settings beside it would make ---
 

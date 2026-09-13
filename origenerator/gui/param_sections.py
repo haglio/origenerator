@@ -4,8 +4,7 @@ Every workflow must present the same kinds of params in the same sections, in th
 same order, regardless of which workflow's ``param_definitions()`` produced them.
 So the grouping lives here, once, keyed by param name — not on each workflow,
 which would let the orderings drift apart. :class:`~origenerator.gui.param_form.
-ParamForm` lays its editable fields out by this order and drops each read-only
-passthrough row into the matching section too.
+ParamForm` lays its fields out by this order.
 
 Kept Qt-free so the grouping is unit-testable without a QApplication.
 """
@@ -42,16 +41,13 @@ SECTIONS: tuple[Section, ...] = (
                         "negative_prompt", "input_image"),
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
-    Section("Model & LoRA", (
+    Section("Models & Add-ons", (
         "checkpoint", "unet", "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
-        "lora", "lora_strength",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
-        "clip_name", "clip_name1", "clip_name2", "clip_vision_name",
-        "vae", "vae_name", "upscale_model",
-        "depth_model", "pose_bbox_detector", "pose_estimator",
+        "upscale_model",
     ), collapsed=True),
-    Section("Sampling", (
+    Section("Drawing", (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
         "shift", "shift_high", "shift_low", "denoise",
@@ -60,12 +56,11 @@ SECTIONS: tuple[Section, ...] = (
         "motion_hz", "motion_x", "motion_ceiling", "motion_floor",
         "anchor_x", "anchor_y",
     ), collapsed=True),
-    Section("Dimensions", ("width", "height", "length"), collapsed=True),
+    Section("Size", ("width", "height"), collapsed=True),
     Section("Video", ("frame_count", "frame_rate"), collapsed=True),
-    Section("Audio", (
+    Section("Sound", (
         "audio_prompt", "audio_negative_prompt", "audio_seed",
         "voice", "voice_sample", "voice_sample_text",
-        "foley_model", "foley_vae", "foley_synchformer", "audio_encoder_name",
     ), collapsed=True),
 )
 

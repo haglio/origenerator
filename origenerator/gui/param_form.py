@@ -461,7 +461,7 @@ class ParamForm(QWidget):
         """
         if not (self._has_param("width") and self._has_param("height")):
             return
-        content = self._sections["Dimensions"].content()
+        content = self._sections["Size"].content()
         btn = QPushButton("⇅", content)  # ⇅ up/down arrows: swap the stacked pair
         btn.setToolTip("Swap width and height")
         btn.clicked.connect(self.swap_dimensions)
@@ -487,11 +487,11 @@ class ParamForm(QWidget):
         differ by form: the spinners themselves where the size is typed, and the
         stacks holding a derived size's plain reading where it is not.
         """
-        if self._sections["Dimensions"].is_collapsed():
+        if self._sections["Size"].is_collapsed():
             return
         btn.adjustSize()
         gutter = btn.width() + 10  # room for the button plus a gap to the labels
-        form = self._sections["Dimensions"].content_form()
+        form = self._sections["Size"].content_form()
         if form.contentsMargins().left() != gutter:
             # Push the labels over to open the gutter; the relayout re-invokes us
             # with the rows in their new positions.
@@ -575,10 +575,10 @@ class ParamForm(QWidget):
         self._dimensions_hint = QLabel(f"Sized from the {self._size_source()}. Unlock to override.")
         self._dimensions_hint.setObjectName("dimensionsHint")
         self._dimensions_hint.setWordWrap(True)
-        self._sections["Dimensions"].content_form().addRow(self._dimensions_hint)
+        self._sections["Size"].content_form().addRow(self._dimensions_hint)
         # A free-floating padlock toggle, parented to the Dimensions content so it
         # folds with the section; placed by :meth:`_position_unlock_button`.
-        content = self._sections["Dimensions"].content()
+        content = self._sections["Size"].content()
         btn = QToolButton(content)
         btn.setObjectName("dimensionUnlock")
         btn.setCheckable(True)

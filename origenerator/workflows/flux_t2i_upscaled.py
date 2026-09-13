@@ -68,7 +68,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         defaults = self.default_params()
         unets = list_model_files("diffusion_models", [defaults["unet"]], accepts=(FLUX,))
         return [
-            ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Prompt", "str", defaults["positive_prompt"], multiline=True),
             ParamDef("unet", "Model", "combo", defaults["unet"], options=unets),
             ParamDef("seed", "Seed", "seed", defaults["seed"]),
             ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=4096, step=16),

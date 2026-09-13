@@ -339,7 +339,7 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     form = panel._param_form
     assert form._size_deriver is not None
-    assert "width" in form._present_keys["Dimensions"]
+    assert "width" in form._present_keys["Size"]
     assert form._dim_stacks["width"].currentIndex() == 0   # locked: a plain value, not a spinner
     assert form._unlock_btn is not None
 

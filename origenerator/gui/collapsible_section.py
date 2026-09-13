@@ -38,7 +38,7 @@ class CollapsibleSection(QWidget):
         outer.setSpacing(2)
 
         # Elides its title rather than propping the whole form open at the
-        # title's own width; it also handles the "&" in "Model & LoRA".
+        # title's own width; it also handles the "&" in "Models & Add-ons".
         self._header = ElidingButton()
         self._header.setObjectName("sectionHeader")
         self._header.setFlat(True)

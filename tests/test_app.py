@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import logging
 import os
 import runpy
 import sys
@@ -102,19 +103,32 @@ def test_client_id_is_stable_across_launches(tmp_path, qtbot):
 
 
 def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
+    # The pin by its whole name: a pin that merely mentions the app, a branch
+    # preview's, must not be relabelled as the live one.
     with patch("origenerator.app.sys.platform", "win32"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+         patch("app_support.win32.stamp_pinned_shortcuts", return_value={}) as mock_stamp:
         _init_windows_taskbar_identity()
 
     mock_set_id.assert_called_once_with("FunTime.Origenerator")
-    mock_stamp.assert_called_once_with("FunTime.Origenerator", include="origenerator")
+    mock_stamp.assert_called_once_with("FunTime.Origenerator", ["Origenerator"])
+
+
+def test_a_pin_windows_will_not_stamp_is_logged_and_the_launch_goes_on(caplog):
+    refused = {Path("C:/pins/Origenerator.lnk"): OSError("IPersistFile::Save failed")}
+    with patch("origenerator.app.sys.platform", "win32"), \
+         patch("app_support.win32.set_app_user_model_id"), \
+         patch("app_support.win32.stamp_pinned_shortcuts", return_value=refused), \
+         caplog.at_level(logging.WARNING):
+        _init_windows_taskbar_identity()
+
+    assert "Could not stamp AppUserModelID" in caplog.text
 
 
 def test_init_windows_taskbar_identity_noop_off_windows():
     with patch("origenerator.app.sys.platform", "linux"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+         patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity()
 
     mock_set_id.assert_not_called()
@@ -411,7 +425,7 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     # left unstamped.
     with patch("origenerator.app.sys.platform", "win32"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
-         patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
+         patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity("FunTime.App")
 
     mock_set_id.assert_called_once_with("FunTime.App")

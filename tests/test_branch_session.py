@@ -7,7 +7,11 @@ outlive the preview in a queue only the app that queued it can cancel.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+import pytest
+from app_support.launcher import dry_run
 
 from origenerator.branch_session import ENV_FLAG, is_branch_session
 
@@ -20,14 +24,16 @@ def test_the_flag_marks_a_branch_session():
     assert is_branch_session({}) is False
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")
 def test_the_preview_launcher_marks_the_run_and_borrows_the_primary_venv():
     """The launcher must set the branch flag (else the preview would schedule
     ComfyUI's absence work as if it were the live app) and run the primary's venv
     python (a worktree has no venv, and a bare PATH python lacks PyQt6)."""
-    text = (_REPO_ROOT / "launch_preview_branch.vbs").read_text(
-        encoding="utf-8", errors="replace")
+    report = dry_run(_REPO_ROOT / "launch_preview_branch.vbs")
 
-    assert f"set {ENV_FLAG}=1&&" in text
-    assert ".venv\\Scripts\\python.exe" in text
-    assert "-m origenerator" in text
-    assert "origenerator_launcher.log" in text and "2>&1" in text
+    primary = _REPO_ROOT.parents[2]
+    assert report.value("environment") == f"{ENV_FLAG}=1"
+    assert Path(report.value("interpreter")) == primary / ".venv" / "Scripts" / "python.exe"
+    assert Path(report.value("directory")) == _REPO_ROOT
+    assert report.value("arguments") == "-m origenerator"
+    assert Path(report.value("log")) == _REPO_ROOT / "state" / "origenerator_launcher.log"

@@ -1,68 +1,118 @@
-' Launch THIS WORKTREE's origenerator as a branch session, for judging a branch
-' before it lands. Same shape as launch_origenerator.vbs, with the three things
-' a worktree needs done differently:
-'   - it borrows the primary checkout's .venv (a worktree has none of its own;
-'     the primary is three levels up: <primary>\.claude\worktrees\<name>),
-'     falling back to python on PATH exactly as the live launcher does — the
-'     primary runs happily without a venv, and a preview that refuses to start
-'     where the live app starts fine is a review cycle lost to the launcher,
-'   - it marks the run a branch session (ORIGENERATOR_BRANCH_SESSION=1): the app
-'     opens the live install's own library (the primary's database, thumbnails
-'     and trash), so every generation shows in every instance, and leaves
-'     ComfyUI's absence work to the live app (see origenerator/branch_session.py),
-'   - only this window's own state (ui_state.json) and its logs land in the
-'     worktree's state\ folder.
-' Close the live app first — two instances would both drive ComfyUI. Copy the
-' primary's content.local.json into the worktree root before the first run, or
-' the session comes up on the example overlay and finds no library.
+' Rendered from [tool.haglio.launchers."launch_preview_branch.vbs"] in pyproject.toml.
+' Change the spec, then run  python -m app_support.launcher --write  in this
+' folder: the suite fails on a launcher that differs from its spec.
+
+Option Explicit
+
+Dim fso, shell, root, app, interpreter, directory, arguments, primary, logPath
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+Decide
+If shell.Environment("Process").Item("HAGLIO_LAUNCHER_DRY_RUN") = "1" Then
+  Report
+Else
+  Launch
+End If
 
-projectRoot = fso.GetParentFolderName(WScript.ScriptFullName)
-stateDir = projectRoot & "\state"
-If Not fso.FolderExists(stateDir) Then fso.CreateFolder(stateDir)
-launcherLog = stateDir & "\origenerator_launcher.log"
+Sub Decide()
+  app = "Origenerator (branch preview)"
+  primary = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(root)))
+  logPath = fso.BuildPath(root, "state\origenerator_launcher.log")
+  arguments = "-m origenerator"
+  interpreter = fso.BuildPath(primary, ".venv\Scripts\python.exe")
+  directory = root
+End Sub
 
-Function Quote(s)
-  Quote = Chr(34) & s & Chr(34)
+Sub Report()
+  WScript.Echo "app: " & app
+  WScript.Echo "primary: " & primary
+  WScript.Echo "interpreter: " & interpreter
+  WScript.Echo "directory: " & directory
+  WScript.Echo "arguments: " & arguments
+  WScript.Echo "log: " & logPath
+  WScript.Echo "environment: " & "ORIGENERATOR_BRANCH_SESSION" & "=" & "1"
+  WScript.Echo "command: " & Command()
+End Sub
+
+Sub Launch()
+  If Not fso.FileExists(interpreter) Then
+    Refuse "The primary checkout's virtual environment is missing:" & vbCrLf & interpreter, vbCritical
+  End If
+  shell.Environment("Process").Item("ORIGENERATOR_BRANCH_SESSION") = "1"
+  logPath = FreeLog(logPath)
+  Note logPath, "===== " & Now & " launch: " & Command()
+  shell.Run Command(), 0, False
+End Sub
+
+Function Command()
+  Command = "cmd /c cd /d " & Quote(directory) & " && " & Quote(interpreter) & " " & arguments & " >> " & Quote(logPath) & " 2>&1"
 End Function
 
-' <primary>\.claude\worktrees\<this worktree> -> up three levels to the primary.
-primaryRoot = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(projectRoot)))
+Function Quote(text)
+  Quote = Chr(34) & text & Chr(34)
+End Function
 
-' The primary's venv when it has one, else whatever python the live launcher
-' would have found. An empty or absent .venv is a normal state of the primary
-' (it runs off PATH python), so refusing to launch there would strand every
-' preview at a message dialog for an interpreter the app never needed.
-Function FindPythonCommand()
-  Dim venvPython, candidates, i
-
-  venvPython = primaryRoot & "\.venv\Scripts\python.exe"
-  If fso.FileExists(venvPython) Then
-    FindPythonCommand = Quote(venvPython)
-    Exit Function
+Sub Tell(message, icon)
+  If LCase(fso.GetFileName(WScript.FullName)) = "cscript.exe" Then
+    WScript.Echo "dialog: " & message
+  Else
+    MsgBox message, icon, app
   End If
+End Sub
 
-  candidates = Array( _
-    "python", _
-    "py -3" _
-  )
-  For i = 0 To UBound(candidates)
-    If shell.Run("cmd /c where " & Split(candidates(i), " ")(0) & " >nul 2>nul", 0, True) = 0 Then
-      FindPythonCommand = candidates(i)
+Sub Refuse(message, icon)
+  Tell message, icon
+  WScript.Quit 1
+End Sub
+
+Function FreeLog(preferred)
+  Dim folder, candidate, index
+  folder = fso.GetParentFolderName(preferred)
+  If Not fso.FolderExists(folder) Then fso.CreateFolder folder
+  For index = 1 To 9
+    candidate = preferred
+    If index > 1 Then
+      candidate = fso.BuildPath(folder, fso.GetBaseName(preferred) & "-" & index & "." & fso.GetExtensionName(preferred))
+    End If
+    RollIfOversize candidate
+    If CanAppend(candidate) Then
+      FreeLog = candidate
       Exit Function
     End If
   Next
-  FindPythonCommand = ""
+  FreeLog = preferred
 End Function
 
-pythonCmd = FindPythonCommand()
-If pythonCmd = "" Then
-  MsgBox "Could not find python or py launcher.", vbCritical, "Origenerator (branch preview)"
-  WScript.Quit 1
-End If
+Function CanAppend(path)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  CanAppend = (Err.Number = 0)
+  If CanAppend Then stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Function
 
-parentDir = fso.GetParentFolderName(primaryRoot)
-cmd = "cmd /c cd /d " & Quote(projectRoot) & " && set PYTHONPATH=" & parentDir & "&&set ORIGENERATOR_BRANCH_SESSION=1&&" & pythonCmd & " -m origenerator 1>>" & Quote(launcherLog) & " 2>&1"
-shell.Run cmd, 0, False
+Sub RollIfOversize(path)
+  On Error Resume Next
+  If fso.FileExists(path) Then
+    If fso.GetFile(path).Size > 1000000 Then
+      If fso.FileExists(path & ".1") Then fso.DeleteFile path & ".1"
+      fso.MoveFile path, path & ".1"
+    End If
+  End If
+  Err.Clear
+  On Error GoTo 0
+End Sub
+
+Sub Note(path, line)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  stream.WriteLine line
+  stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Sub

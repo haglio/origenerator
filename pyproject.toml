@@ -66,6 +66,23 @@ qt_api = "pyqt6"
 [tool.haglio]
 siblings = ["app_support", "player_core", "shared_ui"]
 
+# What Origenerator's two launchers start: launch_origenerator.vbs, the file the
+# pinned shortcut runs, and launch_preview_branch.vbs, which runs a worktree's
+# code as a branch session on the primary checkout's venv. Both are rendered
+# from these by `python -m app_support.launcher --write`.
+[tool.haglio.launchers."launch_origenerator.vbs"]
+app = "Origenerator"
+run = "-m origenerator"
+named-interpreter = "Origenerator-Origenerator.exe"
+log = 'state\origenerator_launcher.log'
+
+[tool.haglio.launchers."launch_preview_branch.vbs"]
+app = "Origenerator (branch preview)"
+run = "-m origenerator"
+venv = "primary"
+log = 'state\origenerator_launcher.log'
+environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
+
 [tool.setuptools.packages.find]
 include = ["origenerator*"]
 namespaces = false

@@ -487,6 +487,18 @@ def test_a_standalone_boot_offers_its_window_to_a_fun_time_session_until_it_quit
     offer.return_value.withdraw.assert_called_once_with()
 
 
+def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
+    window = MagicMock()
+    offer = MagicMock()
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.fun_time_offer.FunTimeOffer": offer,
+    }):
+        assert main([]) == 0
+
+    window.handed_back.connect.assert_called_once_with(offer.return_value.renew)
+
+
 # --- the launch over a library of our own -------------------------------------
 #
 # The tests above hand main a MagicMock database, whose every query answers with

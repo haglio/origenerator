@@ -18,12 +18,15 @@ class FunTimeOffer(QObject):
         super().__init__(parent)
         self._state_dir = state_dir
         self._take_over = take_over
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / OFFER_NAME).write_text(
-            f"{os.getpid()} {this_process_creation_time()}", encoding="utf-8")
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._answer_a_takeover)
+        self.renew()
+
+    def renew(self) -> None:
+        self._state_dir.mkdir(parents=True, exist_ok=True)
+        (self._state_dir / OFFER_NAME).write_text(
+            f"{os.getpid()} {this_process_creation_time()}", encoding="utf-8")
         self._timer.start()
 
     def _answer_a_takeover(self) -> None:

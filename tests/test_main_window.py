@@ -906,3 +906,81 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     saved = AppState(path)
     assert [saved.get(key) for key in ("audio_enabled", "osr2_enabled", "mic_enabled")] == [
         True, True, True]
+
+
+def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.setGeometry(40, 50, 640, 480)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert not win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (40, 50, 640, 480)
+    assert win._gallery_view._fun_time is None
+
+
+def test_a_window_found_open_is_open_again_once_the_session_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert win.isVisible() and not win.isMinimized()
+
+
+def test_a_window_found_minimized_is_minimized_again_once_the_session_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.showMinimized()
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert win.isMinimized()
+
+
+def test_a_session_releasing_the_window_it_took_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+
+    win.findChildren(FunTimeBridge)[0].released.emit()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    qtbot.waitUntil(lambda: win.findChildren(FunTimeBridge) == [])
+
+
+def test_a_window_handed_back_listens_again_but_leaves_the_sound_and_device_off(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    view = win._gallery_view
+    view.set_mic_enabled(True)
+    view.set_audio_enabled(True)
+    view.set_osr2_enabled(True)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert (view.mic_enabled(), view.audio_enabled(), view.osr2_enabled()) == (True, False, False)
+
+
+def test_a_window_handed_back_says_so_for_the_next_session_to_take(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+
+    with qtbot.waitSignal(win.handed_back, timeout=1000):
+        win.become_standalone()
+
+
+def test_a_window_handed_back_can_be_taken_by_the_next_session(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win._gallery_view._arrangement.stack is None
+    qtbot.waitUntil(lambda: win.findChildren(FunTimeBridge) == [])

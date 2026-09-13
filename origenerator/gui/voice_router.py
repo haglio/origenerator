@@ -295,6 +295,10 @@ class VoiceRouter(QObject):
         self._hold_the_motion(None)
         self._switches.update(dict.fromkeys((_AUDIO, _DRIVE, _MIC)))
 
+    def become_standalone(self, motion, *, audio, drive, mic) -> None:
+        self._hold_the_motion(motion)
+        self._switches.update({_AUDIO: audio, _DRIVE: drive, _MIC: mic})
+
     def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, now that
         the bank exists.

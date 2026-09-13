@@ -266,15 +266,18 @@ class ToolbarBank(QWidget):
         self._show_the_gaps()
 
     def become_hosted(self) -> None:
-        removed = [button for button in (self.audio, self.mic, self.drive)
-                   if button is not None]
-        for button in removed:
-            self.layout().removeWidget(button)
-            button.hide()
-            button.deleteLater()
+        self._room_switches = (self.audio, self.mic, self.drive)
+        self._show_the_room_switches(False)
         self.audio = self.mic = self.drive = None
-        self._groups = [(gap, tuple(b for b in buttons if b not in removed))
-                        for gap, buttons in self._groups]
+
+    def become_standalone(self) -> None:
+        self.audio, self.mic, self.drive = self._room_switches
+        self._show_the_room_switches(True)
+
+    def _show_the_room_switches(self, shown: bool) -> None:
+        for switch in self._room_switches:
+            if switch is not None:
+                switch.setVisible(shown)
         self._show_the_gaps()
 
     def apply(self, state: BankState) -> None:

@@ -1033,12 +1033,23 @@ class GalleryView(QWidget):
         self._voice.become_hosted()
         self._bank.become_hosted()
         if self._motion_panel is not None:
-            self._motion_panel.setParent(None)
-            self._motion_panel.deleteLater()
-            self._motion_panel = None
-        self._osr2_driver = None
-        self._osr2_motion = None
+            self._motion_panel.hide()
+        self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
+        self._osr2_motion = self._osr2_driver = self._motion_panel = None
         self._arrangement.fold_into_the_session_column(self.layout())
+
+    def become_standalone(self) -> None:
+        self.set_session_paused(False)
+        self._osr2_motion, self._osr2_driver, self._motion_panel = self._kept_device
+        if self._motion_panel is not None:
+            self._motion_panel.show()
+        self._fun_time = None
+        self._shows.become_standalone(self._osr2_motion)
+        self._info_tabs.become_standalone()
+        self._bank.become_standalone()
+        self._voice.become_standalone(self._osr2_motion, audio=self._bank.audio,
+                                      drive=self._bank.drive, mic=self._bank.mic)
+        self._arrangement.unfold_from_the_session_column(self.layout())
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

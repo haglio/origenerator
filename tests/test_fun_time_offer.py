@@ -37,3 +37,17 @@ def test_a_takeover_for_this_app_hands_it_the_session_and_withdraws_the_offer(qt
     assert len(taken) == 1
     assert (tmp_path / "fun_time_takeover.json").exists()
     del offer
+
+
+def test_an_app_handed_back_offers_itself_to_the_next_session(qtbot, tmp_path):
+    taken = []
+    offer = FunTimeOffer(tmp_path, take_over=taken.append)
+    _takeover(tmp_path, pid=os.getpid())
+    qtbot.waitUntil(lambda: len(taken) == 1)
+
+    offer.renew()
+
+    assert (tmp_path / "fun_time_offer.txt").exists()
+    _takeover(tmp_path, pid=os.getpid())
+    qtbot.waitUntil(lambda: len(taken) == 2)
+    del offer

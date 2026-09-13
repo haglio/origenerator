@@ -203,6 +203,12 @@ class ShowDirector:
         self._motion = None
         self._region_shows = dict.fromkeys(_ORIENTATIONS)
 
+    def become_standalone(self, motion) -> None:
+        self.close_the_shows()
+        self._fun_time = None
+        self._motion = motion
+        self._region_shows = {}
+
     # --- what is up ---------------------------------------------------------
 
     @property

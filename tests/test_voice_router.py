@@ -512,6 +512,20 @@ def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
     assert shows.answers == ["🎤 the motion is the session's here"] * 2
 
 
+def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again(router):
+    motion = FakeMotion()
+    audio = FakeButton(tip="Audio bed")
+    voice, _host, _shows = router(motion=motion, bank={"audio": audio})
+    voice.become_hosted()
+
+    voice.become_standalone(motion, audio=audio, drive=FakeButton(), mic=FakeButton(checked=True))
+    voice.on_command(AppCommand.SPEED_UP)
+    voice.on_command(AppCommand.AUDIO_ON)
+
+    assert motion.speed == 45
+    assert audio.set_to == [True]
+
+
 def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
     # Its tip already says what it will do to what is in front of you, which is
     # what a speaker who is not looking at the bank needs told back.

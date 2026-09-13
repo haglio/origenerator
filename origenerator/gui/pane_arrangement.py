@@ -123,3 +123,12 @@ class PaneArrangement:
         left_column.setParent(None)
         layout.addWidget(self.hosted(), 1)
         left_column.deleteLater()
+
+    def unfold_from_the_session_column(self, layout: QBoxLayout) -> None:
+        layout.removeWidget(self.stack)
+        stack, self.stack = self.stack, None
+        self._info_tabs.setMinimumWidth(0)
+        self._info_pane.setMinimumWidth(0)
+        layout.addWidget(self.standalone(), 1)
+        stack.setParent(None)
+        stack.deleteLater()

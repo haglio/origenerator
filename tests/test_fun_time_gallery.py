@@ -838,20 +838,7 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
     assert len(show.hud_items()[0]) == 3
 
 
-def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
-    """Swept rather than listed: after the freeze, no movie under this window is
-    running — the grid tiles, the shelves, a tab's history strip, the "Animated
-    in" strip, the info pane's own animated still.
-
-    Written this way because the listed version was wrong three times over: the
-    tiles were wired to OmniPause and the other three kinds of looping preview
-    were not, so a frozen room went on playing and nothing in the suite noticed.
-    A sweep cannot miss the fourth one, and it fails the moment someone adds a
-    fifth that does not go through looping_movie.
-    """
-    from PyQt6.QtGui import QMovie
-    from PyQt6.QtWidgets import QLabel
-
+def _a_looping_clip(tmp_path):
     from tests.test_gallery_view import _row
 
     webp = tmp_path / "loop.webp"
@@ -863,27 +850,42 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
                  {"positive_prompt": "a clip", "seed": 1,
                   "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors"},
                  "wan22_i2v_v1.mp4", thumbnail_path=str(still))]
+    return rows, webp
 
+
+def _moving_pictures(view):
+    from PyQt6.QtGui import QMovie
+    from PyQt6.QtWidgets import QLabel
+
+    return [label for label in view.findChildren(QLabel)
+            if label.movie() is not None
+            and label.movie().state() == QMovie.MovieState.Running]
+
+
+def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
+    """Swept rather than listed: after the freeze, no movie under this window is
+    running — the grid tiles, the shelves, a tab's history strip, the "Animated
+    in" strip, the info pane's own animated still.
+
+    Written this way because the listed version was wrong three times over: the
+    tiles were wired to OmniPause and the other three kinds of looping preview
+    were not, so a frozen room went on playing and nothing in the suite noticed.
+    A sweep cannot miss the fourth one, and it fails the moment someone adds a
+    fifth that does not go through looping_movie.
+    """
+    rows, webp = _a_looping_clip(tmp_path)
     view = _fun_time_view(qtbot, rows)
     view.animated_preview = lambda row: str(webp)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
-    running = [label for label in view.findChildren(QLabel)
-               if label.movie() is not None
-               and label.movie().state() == QMovie.MovieState.Running]
-    assert running, "nothing was moving, so the sweep would prove nothing"
+    assert _moving_pictures(view), "nothing was moving, so the sweep would prove nothing"
 
     view.set_session_paused(True)
 
-    still_moving = [label for label in view.findChildren(QLabel)
-                    if label.movie() is not None
-                    and label.movie().state() == QMovie.MovieState.Running]
-    assert still_moving == []
+    assert _moving_pictures(view) == []
 
     view.set_session_paused(False)
-    assert [label for label in view.findChildren(QLabel)
-            if label.movie() is not None
-            and label.movie().state() == QMovie.MovieState.Running]
+    assert _moving_pictures(view)
 
 
 def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
@@ -977,6 +979,23 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_for
     assert panel._media_split.indexOf(panel._scroll) == 0
 
 
+def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the_form(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.generate_config_panel import GenerateConfigPanel
+
+    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(panel)
+    panel._preview._pixmap = QPixmap(400, 900)
+    panel._reflow_for_the_media()
+
+    panel.become_standalone()
+    panel.refresh_media_layout()
+
+    assert panel._media_split.orientation() == Qt.Orientation.Vertical
+    assert panel._media_split.indexOf(panel._preview) == 0
+
+
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
     from PyQt6.QtGui import QPixmap
 
@@ -994,6 +1013,26 @@ def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opene
 
     assert first._media_split.orientation() == Qt.Orientation.Horizontal
     assert later._media_split.orientation() == Qt.Orientation.Horizontal
+
+
+def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_opened_after(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    from origenerator.gui.info_pane_tabs import InfoPaneTabs
+
+    tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(tabs)
+    first = tabs.currentWidget()
+    first._preview._pixmap = QPixmap(400, 900)
+    first.refresh_media_layout()
+
+    tabs.become_standalone()
+    later = tabs._add_subtab()
+    later._preview._pixmap = QPixmap(400, 900)
+    later.refresh_media_layout()
+
+    assert first._media_split.orientation() == Qt.Orientation.Vertical
+    assert later._media_split.orientation() == Qt.Orientation.Vertical
 
 
 def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
@@ -1014,6 +1053,87 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     assert view._arrangement.panes.count() == built._arrangement.panes.count()
     assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
     assert view._arrangement.folder_panes.count() == built._arrangement.folder_panes.count()
+
+
+def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_built(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    built = GalleryView(FakeDB([]))
+    qtbot.addWidget(built)
+    view.become_hosted(_session())
+
+    view.become_standalone()
+
+    arrangement = view._arrangement
+    assert arrangement.stack is None
+    assert arrangement.panes.count() == built._arrangement.panes.count() == 2
+    assert arrangement.panes.widget(0) is arrangement.left_column
+    info_pane = arrangement.panes.widget(1)
+    assert info_pane.findChild(type(view._info_tabs)) is view._info_tabs
+    assert info_pane.minimumWidth() == view._info_tabs.minimumWidth() == 0
+    assert arrangement.left_column.widget(0) is arrangement.folder_panes
+    assert arrangement.left_column.widget(1) is view._queue
+    assert arrangement.folder_panes.count() == built._arrangement.folder_panes.count() == 2
+
+
+def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
+    from tests.test_gallery_view import _SignalMotion
+
+    motion = _SignalMotion()
+    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    qtbot.addWidget(view)
+    view.become_hosted(_session())
+
+    view.become_standalone()
+    view._bank.drive.setChecked(True)
+
+    assert motion.active
+    assert view._motion_panel is not None and not view._motion_panel.isHidden()
+
+
+def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
+    from origenerator.voice.app_commands import AppCommand
+    from tests.test_gallery_view import _FakeAmbientAudio
+
+    bed = _FakeAmbientAudio()
+    view = GalleryView(FakeDB([]), ambient_audio=bed)
+    qtbot.addWidget(view)
+    view.become_hosted(_session())
+
+    view.become_standalone()
+    view._voice.on_command(AppCommand.AUDIO_ON)
+
+    assert view._bank.audio.isChecked() and bed.starts == 1
+
+
+def test_a_gallery_handed_back_from_a_session_opens_its_next_show_over_the_monitor(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    view.become_hosted(_session())
+
+    view.become_standalone()
+    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
+
+    show = view._shows.showing
+    assert show is not None
+    qtbot.addWidget(show)
+    assert view.region_show("portrait") is None
+    assert show.isFullScreen()
+
+
+def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_again(qtbot, tmp_path):
+    rows, webp = _a_looping_clip(tmp_path)
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.animated_preview = lambda row: str(webp)
+    view.refresh()
+    view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
+    view.become_hosted(_session())
+    view.set_session_paused(True)
+
+    view.become_standalone()
+
+    assert _moving_pictures(view)
 
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
@@ -1063,8 +1183,6 @@ def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_se
 
 
 def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions(qtbot, monkeypatch):
-    from PyQt6.QtCore import QCoreApplication, QEvent
-
     from origenerator.voice.app_commands import AppCommand
 
     view = GalleryView(FakeDB([]))
@@ -1073,7 +1191,6 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
     monkeypatch.setattr(view._shows, "answer", answers.append)
 
     view.become_hosted(_session())
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     for word in (AppCommand.AUDIO_ON, AppCommand.DRIVE_ON, AppCommand.MIC_OFF):
         view._voice.on_command(word)
 
@@ -1092,6 +1209,20 @@ def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_
     view.become_hosted(_session())
 
     assert tab._media_split.orientation() == Qt.Orientation.Horizontal
+
+
+def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again(qtbot):
+    from PyQt6.QtGui import QPixmap
+
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    tab = view._info_tabs.current_config_panel()
+    tab._preview._pixmap = QPixmap(400, 900)
+    view.become_hosted(_session())
+
+    view.become_standalone()
+
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
 
 def test_standalone_never_stands_them_side_by_side(qtbot):

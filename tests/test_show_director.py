@@ -55,6 +55,7 @@ class FakeShow:
                  hud=None, **kwargs):
         self.items = list(items)
         self.actions = actions
+        self.motion = motion
         self.hud = hud
         self.opened_with = kwargs
         self.open_requested = FakeSignal()
@@ -475,6 +476,21 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regi
     assert made[0].closes == 1
     assert director.region_show(PORTRAIT) is made[1]
     assert made[1].fullscreen == 0
+
+
+def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_show(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.fill_the_regions()
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    motion = object()
+
+    director.become_standalone(motion)
+    director.open([("b.png", "image", "g2", None)])
+
+    assert made[0].closes == 1
+    assert director.region_show(PORTRAIT) is None
+    assert director.showing is made[-1]
+    assert made[-1].fullscreen == 1 and made[-1].motion is motion
 
 
 def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):

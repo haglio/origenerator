@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 
-from PyQt6.QtCore import QByteArray, Qt
+from PyQt6.QtCore import QByteArray, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow
 
@@ -69,6 +69,8 @@ _SWITCHES_THE_SESSION_OWNS = frozenset({"audio_enabled", "osr2_enabled", "mic_en
 
 
 class OrigeneratorWindow(QMainWindow):
+    handed_back = pyqtSignal()
+
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  parent=None, *, fun_time: FunTimeSession | None = None):
         super().__init__(parent)
@@ -174,13 +176,35 @@ class OrigeneratorWindow(QMainWindow):
 
     def become_hosted(self, session: FunTimeSession) -> None:
         self._persist_session()
+        self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())
         self._fun_time = session
         self._gallery_view.become_hosted(session)
         self.setWindowState(Qt.WindowState.WindowNoState)
         ui_scale.draw_at(ui_scale.hosted_scale())
         self._wear_the_session(session)
-        FunTimeBridge(session, self._gallery_view, parent=self)
+        self._bridge = FunTimeBridge(session, self._gallery_view, parent=self)
+        self._bridge.released.connect(self.become_standalone)
         self.showMinimized()
+
+    def become_standalone(self) -> None:
+        geometry, scale, minimized = self._found
+        self._bridge.deleteLater()
+        self._bridge = None
+        self._fun_time = None
+        self._gallery_view.become_standalone()
+        self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
+        self.setWindowFlags(self.windowFlags()
+                            & ~Qt.WindowType.FramelessWindowHint
+                            & ~Qt.WindowType.WindowStaysOnTopHint)
+        self._device_rect = None
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        ui_scale.draw_at(scale)
+        self.restoreGeometry(geometry)
+        if minimized:
+            self.showMinimized()
+        else:
+            self.show()
+        self.handed_back.emit()
 
     def _wear_the_session(self, session: FunTimeSession) -> None:
         # A managed window of the hosting session: frameless so the client

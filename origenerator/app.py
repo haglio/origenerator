@@ -670,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         _bring_to_front(window)
         from origenerator.gui.fun_time_offer import FunTimeOffer
         offer = FunTimeOffer(STATE_DIR, take_over=window.become_hosted)
+        window.handed_back.connect(offer.renew)
 
     exit_code = app.exec()
     if offer is not None:

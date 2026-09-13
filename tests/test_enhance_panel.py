@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QDropEvent
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QApplication, QLabel
 from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.gallery import (
@@ -191,6 +191,87 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
     # Its floor is one part, not the whole line.
     assert host.minimumSizeHint().width() <= max(
         pair.sizeHint().width() for pair in pairs) + 8
+
+
+def _laid_out_at(panel, width, height=900):
+    panel.show()
+    panel.resize(width, height)
+    for _ in range(3):  # each reflow posts the layout pass that follows it
+        QApplication.processEvents()
+
+
+def _numbers(panel):
+    return (panel._scale, panel._steps, panel._denoise)
+
+
+def test_the_numbers_share_a_line_while_they_fit_and_take_a_line_each_when_not(qtbot):
+    panel, _ = _panel(qtbot)
+    (fixes_heading,) = [label for label in panel.findChildren(QLabel)
+                        if label.text() == "Fixes"]
+
+    def top(widget):
+        return widget.mapTo(panel, QPoint(0, 0)).y()
+
+    _laid_out_at(panel, 2000)
+    assert len({top(field) for field in _numbers(panel)}) == 1
+
+    _laid_out_at(panel, panel.minimumSizeHint().width())
+    rows = [top(field) for field in _numbers(panel)]
+    assert rows == sorted(set(rows)) and len(rows) == 3
+    assert top(fixes_heading) >= rows[-1] + panel._denoise.height()
+
+
+def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot):
+    from PyQt6.QtCore import QRect
+    from PyQt6.QtWidgets import QScrollArea
+
+    panel, _ = _panel(qtbot)
+    _laid_out_at(panel, 600, panel.minimumSizeHint().height())
+    (scroll,) = panel.findChildren(QScrollArea)
+    last_part = list(panel._fixes.values())[-1]
+
+    assert scroll.verticalScrollBar().maximum() > 0
+    scroll.ensureWidgetVisible(last_part)
+    shown = QRect(last_part.mapTo(scroll.viewport(), QPoint(0, 0)), last_part.size())
+    assert scroll.viewport().rect().contains(shown)
+
+
+def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qtbot):
+    from PyQt6.QtWidgets import QScrollArea
+
+    panel, _ = _panel(qtbot)
+    (scroll,) = panel.findChildren(QScrollArea)
+    for width in (2000, 700, panel.minimumSizeHint().width()):
+        _laid_out_at(panel, width)
+        _laid_out_at(panel, width, panel.sizeHint().height())
+        assert scroll.verticalScrollBar().maximum() == 0, width
+
+
+def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):
+    panel, _ = _panel(qtbot)
+
+    def left(widget):
+        return widget.mapTo(panel, QPoint(0, 0)).x()
+
+    for width in (2000, panel.minimumSizeHint().width()):
+        _laid_out_at(panel, width)
+        assert left(panel._model) == left(panel._upscaler) == left(panel._scale), width
+    assert len({left(field) for field in _numbers(panel)}) == 1
+
+
+def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
+    from origenerator.gui.stylesheet import build_stylesheet
+
+    panel, _ = _panel(qtbot)
+    panel.setStyleSheet(build_stylesheet() + panel.styleSheet())  # the app's own chrome
+    for width in range(panel.minimumSizeHint().width(), 1201, 20):
+        _laid_out_at(panel, width)
+        for field in _numbers(panel):
+            widest = max(field.textFromValue(field.minimum()),
+                         field.textFromValue(field.maximum()), key=len)
+            digits = field.fontMetrics().horizontalAdvance(widest)
+            frame_and_buttons = field.width() - field.lineEdit().width()
+            assert field.width() >= field.minimumWidth() >= digits + frame_and_buttons, width
 
 
 def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):

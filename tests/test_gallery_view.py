@@ -5246,7 +5246,7 @@ def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     # experiment, a slideshow's Up key.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    assert view._actions._release_files == view._release_held_media
+    assert view._actions._environment.release_files == view._release_held_media
 
 
 def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_path):

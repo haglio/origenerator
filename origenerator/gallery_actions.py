@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from origenerator import recovery
@@ -40,23 +41,26 @@ from origenerator.undo_stack import UndoEntry, UndoStack
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class GalleryEnvironment:
+    """What the app around the actions does for them. Each is optional, and each
+    absence costs something: no ``release_files`` and a file the app still holds
+    open cannot be moved; no ``cancel_enhancements`` and an enhancement runs on
+    past the image it improves; no ``thumb_dir`` and a row keeps a picture of a
+    version that is gone."""
+
+    release_files: Callable[[list[Path]], None] | None = None
+    cancel_enhancements: Callable[[list[dict]], None] | None = None
+    thumb_dir: Path | None = None
+
+
 class GalleryActions:
     def __init__(self, db, output_dir: Path, trash, limit: int = 50,
-                 release_files: Callable[[list[Path]], None] | None = None,
-                 thumb_dir: Path | None = None,
-                 cancel_enhancements: Callable[[list[dict]], None] | None = None):
+                 environment: GalleryEnvironment | None = None):
         self._db = db
         self._output_dir = Path(output_dir)
         self._trash = trash
-        self._release_files = release_files
-        # Told which rows are losing their files, so an enhancement still being
-        # made of one can be stopped before it outlives the image it improves.
-        # Optional: without it an in-flight enhance runs on past its source.
-        self._cancel_enhancements = cancel_enhancements
-        # Where a row's tile picture lives, so deleting the version it was made
-        # from can redraw it from whichever version now leads. Optional: without
-        # it the row keeps a picture of a file that is no longer there.
-        self._thumb_dir = Path(thumb_dir) if thumb_dir else None
+        self._environment = environment or GalleryEnvironment()
         # Every mutation below records how to reverse itself here. Generic and
         # entirely unaware of what it is undoing (see origenerator.undo_stack).
         self._history = UndoStack(limit)
@@ -147,14 +151,15 @@ class GalleryActions:
         Rendering is best-effort: a row that can't be redrawn keeps the picture
         it has rather than losing its tile.
         """
-        if self._thumb_dir is None:
+        thumb_dir = self._environment.thumb_dir
+        if thumb_dir is None:
             return
         row = self._db.get_generation(prompt_id)
         preview = resolve_preview(row, self._output_dir) if row else None
         if preview is None:
             return
         try:
-            path = generate_thumbnail(preview[0], preview[1], self._thumb_dir,
+            path = generate_thumbnail(preview[0], preview[1], Path(thumb_dir),
                                       name=prompt_id)
         except Exception:
             logger.exception("Could not redraw the thumbnail for %s", prompt_id)
@@ -185,8 +190,8 @@ class GalleryActions:
         enhance re-derives from the original either way, so its run is still
         going to have somewhere to land.
         """
-        if self._cancel_enhancements is not None:
-            self._cancel_enhancements(rows)
+        if self._environment.cancel_enhancements is not None:
+            self._environment.cancel_enhancements(rows)
 
     def _trash_files(self, rows: list[dict], names: set[str] | None = None):
         """Move the files ``rows`` own into the trash — a batch per row — after
@@ -206,8 +211,8 @@ class GalleryActions:
         forget it.
         """
         by_row = self._files_by_row(rows, names)
-        if self._release_files is not None:
-            self._release_files([path for files in by_row for path in files])
+        if self._environment.release_files is not None:
+            self._environment.release_files([path for files in by_row for path in files])
         return [(row, self._trash.store(files)) for row, files in zip(rows, by_row)]
 
     def _files_by_row(self, rows: list[dict],

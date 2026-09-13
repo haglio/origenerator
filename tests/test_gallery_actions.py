@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from origenerator.db import Database
-from origenerator.gallery_actions import GalleryActions
+from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.trash import Trash
 
 
@@ -36,9 +36,10 @@ def _actions(tmp_path, limit=50, release_files=None, cancel_enhancements=None):
     db = Database(tmp_path / "test.db")
     output_dir = tmp_path / "output"
     trash = Trash(tmp_path / "trash")
+    environment = GalleryEnvironment(release_files=release_files,
+                                     cancel_enhancements=cancel_enhancements)
     return GalleryActions(db, output_dir, trash, limit=limit,
-                          release_files=release_files,
-                          cancel_enhancements=cancel_enhancements), db, output_dir
+                          environment=environment), db, output_dir
 
 
 def test_delete_removes_the_row_and_its_file(tmp_path):

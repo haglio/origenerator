@@ -65,7 +65,14 @@ from origenerator.workflows.detail_parts import (
 # dependency the launch interpreter has installed (see tests/test_sibling_imports).
 ensure_shared_ui_on_path()
 
-from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE, TEXT_MUTED
+from shared_ui.colors import (
+    AMBER,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BORDER_SUBTLE,
+    TEXT_MUTED,
+    hovered,
+)
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -112,6 +119,24 @@ _DISABLED_CSS = f"""
     #enhancePanel QSpinBox:disabled,
     #enhancePanel QDoubleSpinBox:disabled {{
         background-color: {BG_PRIMARY.name()};
+        border: 1px solid {BORDER_SUBTLE.name()};
+    }}
+"""
+
+
+_ENHANCE_BUTTON_CSS = f"""
+    #enhancePanel QPushButton#enhanceButton {{
+        background-color: {AMBER.name()};
+        color: {BG_PRIMARY.name()};
+        border: 1px solid {AMBER.name()};
+        font-weight: bold;
+    }}
+    #enhancePanel QPushButton#enhanceButton:hover {{
+        background-color: {hovered(AMBER).name()};
+    }}
+    #enhancePanel QPushButton#enhanceButton:disabled {{
+        background-color: {BG_SECONDARY.name()};
+        color: {TEXT_MUTED.name()};
         border: 1px solid {BORDER_SUBTLE.name()};
     }}
 """
@@ -282,7 +307,7 @@ class EnhancePanel(QWidget):
         self._defs = _enhancer_param_defs()
         self.setAcceptDrops(True)  # a version tile dropped here hands its settings over
         self.setObjectName("enhancePanel")
-        self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS)
+        self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS + _ENHANCE_BUTTON_CSS)
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -352,6 +377,7 @@ class EnhancePanel(QWidget):
         column.addWidget(_SettingsScroll(settings), 1)
 
         self._enhance_button = QPushButton("Enhance")
+        self._enhance_button.setObjectName("enhanceButton")
         self._enhance_button.clicked.connect(self.enhance_requested)
         action_row = QHBoxLayout()
         action_row.setContentsMargins(0, 0, 0, 0)

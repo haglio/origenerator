@@ -11,6 +11,7 @@ from origenerator.gui.queue_thumbs import (
     FOLDER_CELLS,
     QueueThumbs,
     block_width,
+    fitted_cell,
     folder_pixmap,
     source_pixmap,
 )
@@ -76,6 +77,21 @@ def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
     assert follow.red() == follow.green() == follow.blue()  # the recipe, drained
 
 
+def _recipe_columns(block, recipe):
+    drained = fitted_cell(recipe, CELL, gray=True).toImage().pixelColor(CELL // 2, CELL // 2)
+    image = block.toImage()
+    return [x for x in range(image.width()) if image.pixelColor(x, CELL // 2) == drained]
+
+
+def test_a_combine_row_puts_a_plus_between_the_frame_and_its_recipe(qapp, tmp_path):
+    frame = _picture(tmp_path / "frame.png", (255, 0, 0))
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+
+    block = source_pixmap(Combination(frame, recipe), CELL)
+
+    assert _painted(block.toImage(), CELL, _recipe_columns(block, recipe)[0])
+
+
 def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
     # A video queued after the image it animates has no frame on disk yet. The
     # recipe still says something about this run, and stays in its own cell so
@@ -92,17 +108,14 @@ def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path)
 def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
     recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
-    as_made = source_pixmap(Combination(frame, recipe), CELL).toImage()
-    edited = source_pixmap(Combination(frame, recipe, recipe_prompt_edited=True),
-                           CELL).toImage()
-    drained = as_made.pixelColor(_middle_of_cell(1), CELL // 2)
+    as_made = source_pixmap(Combination(frame, recipe), CELL)
+    edited = source_pixmap(Combination(frame, recipe, recipe_prompt_edited=True), CELL)
 
-    recipe_at = [x for x in range(edited.width())
-                 if edited.pixelColor(x, CELL // 2) == drained]
+    made_at, edited_at = _recipe_columns(as_made, recipe), _recipe_columns(edited, recipe)
 
-    assert recipe_at[0] > CELL + 1
-    assert _painted(edited, CELL, recipe_at[0])
-    assert _painted(edited, recipe_at[-1] + 1, block_width(CELL))
+    assert edited_at[0] > made_at[0]
+    assert _painted(edited.toImage(), made_at[0], edited_at[0])
+    assert _painted(edited.toImage(), edited_at[-1] + 1, block_width(CELL))
 
 
 def _painted(image, left, right):

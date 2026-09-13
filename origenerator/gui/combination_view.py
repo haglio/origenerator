@@ -25,32 +25,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QMovie, QPainter, QPixmap
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from origenerator.gui.combination import Combination
-from origenerator.gui.grayscale import play_grayscale
-from origenerator.gui.looping_preview import fit_size, looping_movie
-from origenerator.gui.queue_thumbs import (
-    PAREN_SHARE,
+from origenerator.gui.combination import (
+    Combination,
+    draw_plus,
     draw_recipe,
-    fitted_cell,
+    pair_side,
     paren_font,
     paren_width,
+    plus_font,
+    plus_width,
 )
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import TEXT_MUTED
+from origenerator.gui.grayscale import play_grayscale
+from origenerator.gui.looping_preview import fit_size, looping_movie
+from origenerator.gui.queue_thumbs import fitted_cell
 
 # How much of the pane's height a picture takes, leaving room for the plus sign
 # to breathe between them and the pane's own margins around them.
 _HEIGHT_SHARE = 0.8
-# The plus, as a fraction of a picture's side — big enough to read as the operator
-# joining them rather than as a mark on one of the pictures.
-_PLUS_SHARE = 0.28
-_MIN_PLUS_PT = 12
 _MARGIN = 8
 
 
@@ -70,12 +65,12 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     """
     both = bool(combination.picture and combination.recipe)
     enclosed = bool(combination.recipe) and combination.recipe_prompt_edited
-    side = _pair_side(size, both, enclosed)
+    side = pair_side(size, both, enclosed)
     image = fitted_cell(combination.picture, side)
     recipe = fitted_cell(combination.recipe, side, gray=True)
     if image is None and recipe is None:
         return None
-    plus = _plus_width(side) if image is not None and recipe is not None else 0
+    plus = plus_width(side) if image is not None and recipe is not None else 0
     paren = paren_width(side) if recipe is not None and enclosed else 0
     halves = sum(side for half in (image, recipe) if half is not None)
     canvas = QPixmap(halves + plus + 2 * paren, side)
@@ -86,27 +81,12 @@ def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
         painter.drawPixmap(0, 0, image)
         x = side
     if plus:
-        painter.setPen(QColor(TEXT_MUTED))
-        font = painter.font()
-        font.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
-        painter.setFont(font)
-        painter.drawText(QRect(x, 0, plus, side), Qt.AlignmentFlag.AlignCenter, "+")
+        draw_plus(painter, x, side)
         x += plus
     if recipe is not None:
         draw_recipe(painter, x, recipe, enclosed)
     painter.end()
     return canvas
-
-
-def _pair_side(size: QSize, both: bool, enclosed: bool) -> int:
-    """The square each half is fitted into, so the sum fits ``size`` across."""
-    across = (2 + _PLUS_SHARE if both else 1) + (2 * PAREN_SHARE if enclosed else 0)
-    return max(1, int(min(size.width() / across, size.height())))
-
-
-def _plus_width(side: int) -> int:
-    """The gap the operator sits in, in proportion to the squares beside it."""
-    return max(_MIN_PLUS_PT, int(side * _PLUS_SHARE))
 
 
 def _readable(path) -> QPixmap | None:
@@ -204,7 +184,7 @@ class CombinationView(QWidget):
         and no wider than lets the pair, its plus and any parentheses fit across
         between the margins — the arithmetic :func:`combination_pixmap` draws by."""
         room = QSize(self.width() - 2 * _MARGIN, int(self.height() * _HEIGHT_SHARE))
-        return _pair_side(room, self._pixmap is not None and self._has_clip, self._enclosed)
+        return pair_side(room, self._pixmap is not None and self._has_clip, self._enclosed)
 
     def _side_size(self) -> QSize:
         side = self._side()
@@ -225,10 +205,8 @@ class CombinationView(QWidget):
                 self._movie.setScaledSize(target)
         for picture in (self.image_label, self.video_label):
             picture.setFixedWidth(side)
-        font = self.plus_label.font()
-        font.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
-        self.plus_label.setFont(font)
-        self.plus_label.setFixedWidth(_plus_width(side))
+        self.plus_label.setFont(plus_font(self.plus_label.font(), side))
+        self.plus_label.setFixedWidth(plus_width(side))
         for paren in self._parens:
             paren.setFont(paren_font(paren.font(), side))
             paren.setFixedWidth(paren_width(side))

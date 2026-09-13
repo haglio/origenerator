@@ -25,8 +25,9 @@ intent radios and the two buttons, and reports the request through one of four
 signals — a dropped video versus a picked act, crossed with run-now
 (:attr:`generate_requested` / :attr:`category_requested`) versus edit-first
 (:attr:`open_requested` / :attr:`open_category_requested`). The act signals carry the
-chosen intent. The view owns the database, the slot predicates, the category→recipe
-routing, and both the generation and the generator tab.
+chosen intent. Its controller (:mod:`origenerator.gui.combine_controller`) owns the
+database, the slot predicates, the category→recipe routing, and both the generation
+and the generator tab.
 """
 from __future__ import annotations
 
@@ -72,6 +73,7 @@ class CombinePanel(QWidget):
     open_requested = pyqtSignal(str, str)           # (image prompt_id, video prompt_id): a dropped recipe
     open_category_requested = pyqtSignal(str, str, str)  # (image prompt_id, category, intent)
     intent_changed = pyqtSignal(str)  # the players/Genau radio moved — regrey the acts
+    item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
 
     def __init__(
         self,
@@ -89,6 +91,8 @@ class CombinePanel(QWidget):
                                    grayscale=True)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
+        self.image_slot.activated.connect(self.item_activated)
+        self.video_slot.activated.connect(self.item_activated)
 
         # The video part's fast path: pick an act and the view finds a fitting past
         # video for you. A neutral "-" leads the list (index 0, the default) so no act
@@ -281,10 +285,7 @@ class CombinePanel(QWidget):
     def _dispatch(self, video_signal, category_signal):
         """Emit the chosen recipe on the pair of signals for the requested action: a
         picked act on ``category_signal``, else a dropped video on ``video_signal``.
-
-        Only the act path carries the intent. A dropped video *is* the recipe, so
-        there is no lane to answer it from — what it makes is whatever that video's
-        workflow makes.
+        Only the act path carries the intent.
         """
         image_id = self.image_slot.current_id()
         if not image_id:

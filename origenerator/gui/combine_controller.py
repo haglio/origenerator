@@ -88,6 +88,9 @@ class CombineHost(Protocol):
         """Show a just-launched combine — its folder if the tree has one, else
         the Recents shelf its card will appear on."""
 
+    def follow_link(self, prompt_id: str) -> None:
+        """Go to a generation a slot is holding."""
+
     def ask_which_seed(self, workflow, *, can_reroll_image: bool) -> str | None:
         """Ask which seed to re-roll rather than reproduce a past run, returning
         ``None`` when the answer is to do nothing."""
@@ -134,6 +137,7 @@ class CombineController(QObject):
             lambda image_id, video_id, category="": self._open_combination(
                 image_id, video_id, category, self.panel.selected_intent()))
         self.panel.open_category_requested.connect(self._open_category)
+        self.panel.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)

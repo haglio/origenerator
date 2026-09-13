@@ -9665,6 +9665,21 @@ def test_open_in_generator_shows_the_pair_rather_than_an_empty_pane(qtbot, tmp_p
     assert preview._stack.currentWidget() is preview._combination
 
 
+@pytest.mark.parametrize(("slot_name", "prompt_id"), [("image_slot", "img"),
+                                                      ("video_slot", "vid")])
+def test_clicking_a_combine_slot_goes_to_what_it_holds(qtbot, tmp_path, slot_name, prompt_id):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    slot = getattr(view._combine.panel, slot_name)
+    slot.set_item(prompt_id)
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert view.selected_prompt_ids() == [prompt_id]
+    assert slot.current_id() == prompt_id
+
+
 def test_open_category_prefers_the_curated_recipe_too(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

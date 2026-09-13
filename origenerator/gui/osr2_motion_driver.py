@@ -33,11 +33,6 @@ import time
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
-from origenerator.config import (
-    OSR2_BROKER_HOST,
-    OSR2_GENAU_ENABLED_FILE,
-    OSR2_TCODE_UDP_PORT,
-)
 from origenerator.motion_engine import Motion
 from origenerator.osr2 import Osr2Broker
 
@@ -111,10 +106,7 @@ class Osr2MotionDriver(QObject):
     def __init__(self, broker=None, *, interval_ms: int = _TICK_MS,
                  now_source=time.monotonic, ticker_factory=None, parent=None):
         super().__init__(parent)
-        self._broker = broker or Osr2Broker(
-            OSR2_BROKER_HOST, OSR2_TCODE_UDP_PORT,
-            genau_enabled_file=OSR2_GENAU_ENABLED_FILE,
-        )
+        self._broker = broker or Osr2Broker()
         self._state = Motion()
         self._active = False
         self._streaming = False  # a one-shot "first T-code sent" log per start

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from origenerator import config
+from origenerator import config, osr2
 
 
 class TestProjectRoots:
@@ -91,26 +91,26 @@ class TestTheValuesAnotherAppHoldsToo:
     def test_the_broker_takes_t_code_on_this_udp_port(self):
         # osr2_broker/session.py binds the same number. A different one here is an
         # OSR2 that never moves, with nothing on screen saying why.
-        assert config.OSR2_TCODE_UDP_PORT == 50557
+        assert osr2.TCODE_UDP_PORT == 50557
 
     def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
         # Not this app's state dir and not the broker's: fun_time's, which is
         # where all three look for these files.
-        assert config.project_dir("fun_time") / "state" == config.OSR2_STATE_DIR
+        assert config.project_dir("fun_time") / "state" == osr2.SHARED_STATE_DIR
 
     def test_the_genau_flag_is_the_file_the_broker_reads(self):
         # This app writes "0" here while it drives, and restores the prior value
         # after; the broker reads it to know whether genau's auto-mode may run.
-        assert config.OSR2_GENAU_ENABLED_FILE.name == "genau_enabled.txt"
+        assert osr2.GENAU_ENABLED_FILE.name == "genau_enabled.txt"
 
     def test_the_devices_own_stamp_is_the_file_the_broker_writes(self):
         # The only evidence the OSR2 is there at all (see origenerator.osr2).
-        assert config.OSR2_SERIAL_RX_FILE.name == "osr2_serial_rx.txt"
+        assert osr2.SERIAL_RX_FILE.name == "osr2_serial_rx.txt"
 
     def test_the_device_may_stay_quiet_for_the_brokers_own_window(self):
         # osr2_broker.monitor.MonitorState answers the same question with the same
         # window, so the app and the broker never disagree about whether it is on.
-        assert config.OSR2_RX_STALE_S == 30.0
+        assert osr2.RX_STALE_S == 30.0
 
     def test_evolver_watches_this_exact_inbox(self):
         # Mirrors evolver's own INBOX_DIR. A folder evolver is not watching is a

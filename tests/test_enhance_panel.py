@@ -236,6 +236,20 @@ def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot
     assert scroll.viewport().rect().contains(shown)
 
 
+def test_squeezed_narrower_than_its_settings_the_panel_scrolls_sideways_to_them(qtbot):
+    from PyQt6.QtWidgets import QScrollArea
+
+    panel, _ = _panel(qtbot)
+    (scroll,) = panel.findChildren(QScrollArea)
+    _laid_out_at(panel, 2000)
+    narrowest_settings = scroll.widget().minimumSizeHint().width()
+
+    _laid_out_at(panel, narrowest_settings // 2)
+
+    assert panel.width() < narrowest_settings
+    assert scroll.horizontalScrollBar().maximum() > 0
+
+
 def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qtbot):
     from PyQt6.QtWidgets import QScrollArea
 

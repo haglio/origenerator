@@ -324,10 +324,11 @@ class GenerateConfigPanel(QWidget):
         return body
 
     def _build_saved_generation_block(self, body: QVBoxLayout) -> None:
-        """The output file + when it was made, at the top of the scroll (shown
-        only while displaying a saved generation). Above the form, because it
-        names what the settings below it made. Params — editable or read-only —
-        all live in that form now, so this block carries only those two facts."""
+        """The output file, when it was made and the workflow version that made
+        it, at the top of the scroll (shown only while displaying a saved
+        generation). Above the form, because it names what the settings below it
+        made. Params — editable or read-only — all live in that form now, so
+        this block carries only those facts."""
         self._metadata_block = MetadataBlock()
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
@@ -1334,9 +1335,9 @@ class GenerateConfigPanel(QWidget):
         ``request`` is the spoken request that made this row, when one did: it
         marks the prompt fields with what it changed and points the source tile
         at the item it was asked about."""
-        # Only files no version claims are left for this block, which for an
-        # image is usually none of them — so it shows only when it has content
-        # rather than opening a bare gap above the form.
+        # An image's files are all listed as its versions, so its block is at
+        # most the workflow version — it shows only when it has content rather
+        # than opening a bare gap above the form.
         self._metadata_block.setVisible(self._metadata_block.show_row(row))
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()

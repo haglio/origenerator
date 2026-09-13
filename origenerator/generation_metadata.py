@@ -1,11 +1,13 @@
 """The read-only facts about one generation that belong with neither the params
-nor the form: the output file and when the run happened.
+nor the form: the output file, when the run happened, and which workflow version
+made it.
 
 The gallery's info-pane tab is an editable :class:`GenerateConfigPanel`. It renders
 the prompts and every parameter as fields (the ones the workflow lays out are
 editable; the rest — an import's extras, hidden passthrough like vae or clip — show
-as read-only rows in the same form). So the only things left for this block are the
-output file and its timestamp, shown as a compact ``Basic`` section above the form.
+as read-only rows in the same form). So what is left for this block is the output
+file, its timestamp and the workflow version, shown as a compact ``Basic`` section
+above the form.
 
 An image's files are not one of those things any more: each is a version of the
 image, made by its own enhancement at its own settings and at its own moment, so
@@ -20,11 +22,13 @@ Kept Qt-free so the section/item model is unit-testable directly;
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from origenerator import config, gallery
+from origenerator.provenance import BASIS, FILE_DATE
 
 
 @dataclass
@@ -117,19 +121,39 @@ def created_item(file: dict, fallback: str = "", *,
 
 
 def basic_section(row: dict) -> MetaSection | None:
-    """The at-a-glance facts kept at the top: what this run produced, and when.
+    """The at-a-glance facts kept at the top: what this run produced, when, and
+    which workflow version made it.
 
-    ``None`` — no block at all — once every file the row holds is listed as a
-    version of the image, which is the ordinary case for an image and leaves
-    nothing here to repeat."""
+    ``None`` — no block at all — when there is none of that to show: every file
+    the row holds is listed as a version of the image, and no workflow version
+    is recorded yet."""
     listed = {level.file.get("filename")
               for level in gallery.displayed_levels(row)}
     files = [f for f in gallery.row_output_files(row)
              if f.get("filename") and f.get("filename") not in listed]
-    if not files:
-        return None
-    held = row.get("days_in_trash")
-    items = [file_item(f, held_days=held) for f in files]
-    items.append(MetaItem("Created", str(row.get("created_at", ""))))
-    return MetaSection("Basic", items)
+    items = []
+    if files:
+        held = row.get("days_in_trash")
+        items = [file_item(f, held_days=held) for f in files]
+        items.append(MetaItem("Created", str(row.get("created_at", ""))))
+    if row.get("provenance"):
+        items.append(_version_line(json.loads(row["provenance"])))
+    return MetaSection("Basic", items) if items else None
+
+
+def _version_line(block: dict) -> MetaItem:
+    return MetaItem("Workflow version", _version_text(block))
+
+
+def _version_text(block: dict) -> str:
+    version = block.get("recipe_version")
+    if not version:
+        return "unknown"
+    if block.get(BASIS) == FILE_DATE:
+        return f"{version} (going by the file's date)"
+    commit = block.get("app_commit")
+    if not commit:
+        return version
+    edits = ", plus uncommitted edits" if block.get("app_dirty") else ""
+    return f"{version} (app build {commit[:7]}{edits})"
 

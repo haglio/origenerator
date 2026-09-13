@@ -111,6 +111,52 @@ def test_created_row_carries_no_reveal_path():
     assert created.reveal is None
 
 
+def _stamped(**block):
+    return json.dumps({"recipe": "wan22_i2v", "recipe_version": "v007",
+                       "app_commit": "1a2b3c4d5e6f7a8b", "app_dirty": False,
+                       "recipe_version_basis": "recorded", **block})
+
+
+def test_the_block_ends_with_the_workflow_version_and_the_app_build_that_ran_it():
+    item = basic_section(_row(provenance=_stamped())).items[-1]
+
+    assert (item.label, item.value) == ("Workflow version", "v007 (app build 1a2b3c4)")
+
+
+def test_an_image_with_a_stamp_shows_a_block_of_just_its_workflow_version():
+    row = _image_row(provenance=_stamped(recipe="sdxl_t2i", recipe_version="v004"))
+
+    assert [(item.label, item.value) for item in basic_section(row).items] == [
+        ("Workflow version", "v004 (app build 1a2b3c4)")]
+
+
+def test_a_version_worked_out_from_the_files_date_says_so():
+    row = _row(provenance=_stamped(recipe_version="v004", app_commit=None, app_dirty=None,
+                                   recipe_version_basis="file_date"))
+
+    assert basic_section(row).items[-1].value == "v004 (going by the file's date)"
+
+
+def test_a_block_that_could_not_work_out_a_version_says_unknown():
+    row = _row(provenance=_stamped(recipe_version=None, app_commit=None, app_dirty=None,
+                                   recipe_version_basis=None))
+
+    assert basic_section(row).items[-1].value == "unknown"
+
+
+def test_a_version_recorded_before_builds_were_noted_shows_just_the_version():
+    row = _row(provenance=_stamped(recipe_version="v002", app_commit=None, app_dirty=None))
+
+    assert basic_section(row).items[-1].value == "v002"
+
+
+def test_a_build_that_carried_uncommitted_edits_says_so():
+    row = _row(provenance=_stamped(app_dirty=True))
+
+    assert basic_section(row).items[-1].value == (
+        "v007 (app build 1a2b3c4, plus uncommitted edits)")
+
+
 def test_a_passthrough_param_does_not_grow_a_second_block():
     # Params — editable or read-only passthrough — now live in the form itself, so
     # this block stays the output file and its date whatever a row carries.

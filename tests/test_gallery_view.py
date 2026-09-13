@@ -8860,7 +8860,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
     assert asked == ["beta"]
 
 
-def test_the_players_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
+def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
     # A clip for a player is watched at its own rate and wants the recipe that
     # made the one it was mined from.
     db = _combine_db(tmp_path)
@@ -9415,7 +9415,7 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
     monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     called = {}
 
-    def fake_best(category, candidates, intent=recipe_match.PLAYERS):
+    def fake_best(category, candidates, intent=recipe_match.VIDEO):
         called["category"] = category
         called["intent"] = intent
         return "vid"
@@ -9513,7 +9513,7 @@ def test_the_stand_in_row_already_carries_the_act_that_was_picked(qtbot, tmp_pat
     view.refresh()
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine._on_generate_category("img", "dancing", recipe_match.PLAYERS)
+    view._combine._on_generate_category("img", "dancing", recipe_match.VIDEO)
 
     item = view._queue._items[0]
     assert item.recipe_category == "dancing"
@@ -9546,7 +9546,7 @@ def test_the_stand_in_row_goes_when_the_act_has_no_recipe(qtbot, tmp_path, monke
     monkeypatch.setattr(combine_controller.recipe_match, "smart_recipe", lambda *a, **k: None)
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
-    view._combine._on_generate_category("img", "epsilon", recipe_match.PLAYERS)
+    view._combine._on_generate_category("img", "epsilon", recipe_match.VIDEO)
 
     assert view._queue.rows() == []
     assert view._reroll_jobs == {}
@@ -9558,7 +9558,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._on_generate_category("missing", "dancing", recipe_match.PLAYERS)
+    view._combine._on_generate_category("missing", "dancing", recipe_match.VIDEO)
 
     assert view._queue.rows() == []
 
@@ -9691,7 +9691,7 @@ def _combine_view_with_a_looping_recipe(qtbot, tmp_path):
     return view
 
 
-def _opened_combination(qtbot, tmp_path, intent=recipe_match.PLAYERS):
+def _opened_combination(qtbot, tmp_path, intent=recipe_match.VIDEO):
     view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
     view._combine._open_combination("img", "vid", intent=intent)
     return view, _front_panel(view)
@@ -9742,7 +9742,7 @@ def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_recipe_in_pa
     assert _front_panel(view)._live_source.recipe_prompt_edited
 
 
-@pytest.mark.parametrize(("lane", "stands_apart"), [(recipe_match.PLAYERS, False),
+@pytest.mark.parametrize(("lane", "stands_apart"), [(recipe_match.VIDEO, False),
                                                     (recipe_match.GENAU, True)])
 def test_a_pressed_combine_stands_in_line_with_its_recipe_marked_as_its_run_will_be(
         qtbot, tmp_path, monkeypatch, lane, stands_apart):
@@ -10740,7 +10740,7 @@ def _pick_act(panel, act):
 def _pick_lane(panel, intent):
     """Click the combine panel's lane radio; the group releases the other."""
     radio = (panel._genau_radio if intent == recipe_match.GENAU
-             else panel._players_radio)
+             else panel._video_radio)
     radio.setChecked(True)
 
 
@@ -10751,7 +10751,7 @@ def test_combine_selection_reports_the_slotted_ids(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": "img", "video": "vid",
-        "intent": recipe_match.PLAYERS, "category": "",
+        "intent": recipe_match.VIDEO, "category": "",
     }
 
 
@@ -10787,6 +10787,15 @@ def test_restore_combine_selection_puts_the_lane_and_act_back(qtbot, tmp_path):
     assert view._combine.panel.selected_intent() == recipe_match.GENAU
     assert view._combine.panel.selected_category() == "beta"
     assert view._combine.panel._generate_btn.isEnabled()  # an image and a recipe: ready
+
+
+def test_restore_reads_the_video_lane_under_the_name_older_sessions_saved(qtbot, tmp_path):
+    view = _combine_view(qtbot, tmp_path)
+    _pick_lane(view._combine.panel, recipe_match.GENAU)
+
+    view.restore_combine_selection({"image": "img", "intent": "players"})
+
+    assert view._combine.panel.selected_intent() == recipe_match.VIDEO
 
 
 def test_restore_drops_an_act_the_saved_lane_cannot_answer(qtbot, tmp_path):
@@ -10831,7 +10840,7 @@ def test_restore_combine_selection_tolerates_a_missing_payload(qtbot, tmp_path):
 
     assert view.combine_selection() == {
         "image": None, "video": None,
-        "intent": recipe_match.PLAYERS, "category": "",
+        "intent": recipe_match.VIDEO, "category": "",
     }
 
 
@@ -12979,11 +12988,11 @@ def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
 
-def test_the_view_asks_the_players_lane_unless_told_otherwise(qtbot, tmp_path, monkeypatch):
+def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     asked = []
 
-    def spy(category, candidates, intent=recipe_match.PLAYERS):
+    def spy(category, candidates, intent=recipe_match.VIDEO):
         asked.append(intent)
         return "vid"
 
@@ -12992,7 +13001,7 @@ def test_the_view_asks_the_players_lane_unless_told_otherwise(qtbot, tmp_path, m
     view._combine.generate_category("img", "dancing")
     view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
-    assert asked == [recipe_match.PLAYERS, recipe_match.GENAU]
+    assert asked == [recipe_match.VIDEO, recipe_match.GENAU]
 
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):

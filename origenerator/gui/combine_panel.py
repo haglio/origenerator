@@ -6,15 +6,15 @@ a fitting past video for you, or drop a specific i2v video for a custom action. 
 dropped video shows in gray: it is here for its settings, not as a second picture
 to be made. The two are mutually exclusive: picking an act clears a dropped video
 (and relabels the slot as the override path), and dropping a video wipes the
-dropdown back to "-".
+dropdown back to "(custom)".
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while “Edit…” hands it to a generate tab to change first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
-video for the players (the default), or a Genau clip — one complete cycle, looping.
-That choice picks which recipes the act is answered from, so the dropdown's usable
-acts change with it: an act only the players' lane can answer greys out under Genau,
-and acts that are no kind of cycle at all are not offered there.
+video (the default), or a Genau clip — one complete cycle, looping. That choice
+picks which recipes the act is answered from, so the dropdown's usable acts change
+with it: an act only the video lane can answer greys out under Genau, and acts that
+are no kind of cycle at all are not offered there.
 
 Acts with nothing to answer a pick — no video to mine a recipe from and no curated
 recipe in the content overlay — are greyed out
@@ -54,10 +54,10 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.media import MediaType
-from origenerator.recipe_match import CATEGORIES, GENAU, PLAYERS
+from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
 
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
-_NEUTRAL_LABEL = "-"
+_NEUTRAL_LABEL = "(custom)"
 # The video slot's prompt when neutral (drop a video to use its recipe) versus when
 # an act is picked (the slot becomes the override — drop a video for a custom action).
 _DROP_PLACEHOLDER = "Drop a video"
@@ -72,7 +72,7 @@ class CombinePanel(QWidget):
     # The same two recipe sources, but bound for the generator to edit rather than to run.
     open_requested = pyqtSignal(str, str)           # (image prompt_id, video prompt_id): a dropped recipe
     open_category_requested = pyqtSignal(str, str, str)  # (image prompt_id, category, intent)
-    intent_changed = pyqtSignal(str)  # the players/Genau radio moved — regrey the acts
+    intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regrey the acts
     item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
 
     def __init__(
@@ -95,8 +95,8 @@ class CombinePanel(QWidget):
         self.video_slot.activated.connect(self.item_activated)
 
         # The video part's fast path: pick an act and the view finds a fitting past
-        # video for you. A neutral "-" leads the list (index 0, the default) so no act
-        # is forced; picking it again clears an act.
+        # video for you. A neutral "(custom)" leads the list (index 0, the default) so
+        # no act is forced; picking it again clears an act.
         self._category = QComboBox()
         self._category.addItem(_NEUTRAL_LABEL)
         self._category.addItems(CATEGORIES)
@@ -115,28 +115,28 @@ class CombinePanel(QWidget):
         video_row.addWidget(self._category, 1)  # each takes half the video part's width
         video_row.addWidget(self.video_slot, 1)
 
-        # What the result is for. Players is the default because it is the long-
+        # What the result is for. Video is the default because it is the long-
         # standing behavior of this panel and by far the more common ask; Genau is
         # the deliberate detour. Under it the act list narrows, so the radio sits
         # directly beneath the dropdown it changes.
-        self._players_radio = QRadioButton("Players")
-        self._players_radio.setToolTip(
+        self._video_radio = QRadioButton("Video")
+        self._video_radio.setToolTip(
             "Make a full-length video for the satellite players."
         )
-        self._players_radio.setChecked(True)
+        self._video_radio.setChecked(True)
         self._genau_radio = QRadioButton("Genau")
         self._genau_radio.setToolTip(
             "Make a Genau clip: one complete cycle, looping, sent to Genau when done."
         )
         self._intent_group = QButtonGroup(self)
-        self._intent_group.addButton(self._players_radio)
+        self._intent_group.addButton(self._video_radio)
         self._intent_group.addButton(self._genau_radio)
         self._intent_group.buttonToggled.connect(self._on_intent_changed)
         self._intent_part = QWidget()
         intent_row = QHBoxLayout(self._intent_part)
         intent_row.setContentsMargins(0, 0, 0, 0)
         intent_row.setSpacing(BUTTON_GAP)  # two radios are one group
-        intent_row.addWidget(self._players_radio)
+        intent_row.addWidget(self._video_radio)
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
 
@@ -172,18 +172,18 @@ class CombinePanel(QWidget):
     # --- intent (what the result is for) ----------------------------------
 
     def selected_intent(self) -> str:
-        """``PLAYERS`` or ``GENAU`` — which lane the chosen recipe is answered from."""
-        return GENAU if self._genau_radio.isChecked() else PLAYERS
+        """``VIDEO`` or ``GENAU`` — which lane the chosen recipe is answered from."""
+        return GENAU if self._genau_radio.isChecked() else VIDEO
 
     def set_intent(self, intent: str):
-        """Select the ``PLAYERS``/``GENAU`` radio; anything else selects players.
+        """Select the ``VIDEO``/``GENAU`` radio; anything else selects video.
 
         For putting the panel back the way a session left it
         (:meth:`GalleryView.restore_combine_selection`) -- the lane decides which
         acts are answerable, so it goes in before the act does.
         """
         self._genau_radio.setChecked(intent == GENAU)
-        self._players_radio.setChecked(intent != GENAU)
+        self._video_radio.setChecked(intent != GENAU)
 
     def _on_intent_changed(self, _button, checked: bool):
         """Announce the new lane once, on the radio that just went on.
@@ -198,7 +198,7 @@ class CombinePanel(QWidget):
     # --- category ---------------------------------------------------------
 
     def selected_category(self) -> str:
-        """The picked act, or "" when the neutral "-" option (index 0) is selected."""
+        """The picked act, or "" when the neutral "(custom)" option (index 0) is selected."""
         index = self._category.currentIndex()
         return self._category.currentText() if index >= 1 else ""
 
@@ -216,9 +216,9 @@ class CombinePanel(QWidget):
     def set_available_categories(self, available: Collection[str]):
         """Gray out every act the current lane has no recipe for — nothing to mine and
         nothing pinned, so offering it could only ever answer "no recipe yet". A
-        disabled item says why on hover, naming the lane, since an act the players'
-        lane answers happily can still be unanswerable as a loop. The neutral "-" is
-        never greyed."""
+        disabled item says why on hover, naming the lane, since an act the video
+        lane answers happily can still be unanswerable as a loop. The neutral
+        "(custom)" is never greyed."""
         genau = self.selected_intent() == GENAU
         model = self._category.model()
         for index in range(1, self._category.count()):
@@ -251,7 +251,7 @@ class CombinePanel(QWidget):
 
     def _on_category_changed(self):
         """A picked act supersedes a dropped video: clear the slot and relabel it as
-        the override path. Blanking back to "-" restores the plain drop prompt."""
+        the override path. Going back to "(custom)" restores the plain drop prompt."""
         if self.selected_category():
             self.video_slot.clear()
             self.video_slot.set_placeholder(_OVERRIDE_PLACEHOLDER)
@@ -260,7 +260,7 @@ class CombinePanel(QWidget):
         self._sync()
 
     def _on_video_changed(self):
-        """A dropped video supersedes a picked act: wipe the dropdown back to "-"."""
+        """A dropped video supersedes a picked act: wipe the dropdown back to "(custom)"."""
         if self.video_slot.current_id():
             self._category.setCurrentIndex(0)
         self._sync()

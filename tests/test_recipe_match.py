@@ -76,7 +76,7 @@ def test_curated_recipe_is_none_for_an_uncurated_act():
 
 def test_curated_recipe_is_none_for_a_malformed_entry(monkeypatch):
     # A bad entry must send the caller to mining, never fail the act outright.
-    monkeypatch.setitem(recipe_match._CURATED_BY_INTENT, recipe_match.PLAYERS,
+    monkeypatch.setitem(recipe_match._CURATED_BY_INTENT, recipe_match.VIDEO,
                         {"beta": "not a dict", "epsilon": {"params": {}}})
     assert recipe_match.curated_recipe("beta") is None      # not a dict
     assert recipe_match.curated_recipe("epsilon") is None   # names no workflow
@@ -209,7 +209,7 @@ def test_genau_mines_only_looping_videos():
         _video("v1", "a beta", "2026-01-01", lora_high="Z"),   # long-form: not a loop
         _loop("l1", "a beta", "2026-01-02", lora_high="Z"),
     ]
-    # The players' lane sees both and prefers the newer of the one shared recipe;
+    # The video lane sees both and prefers the newer of the one shared recipe;
     # the Genau lane can only use the loop, whatever else the act has under it.
     assert recipe_match.best_recipe("beta", rows) == "l1"
     assert recipe_match.best_recipe("beta", rows, recipe_match.GENAU) == "l1"
@@ -227,7 +227,7 @@ def test_genau_available_categories_need_a_loop_or_a_pinned_recipe():
     # epsilon has a video but no loop, so the Genau lane cannot answer it; delta can
     # be mined from the loop; beta is pinned in the example overlay's genau_recipes.
     assert recipe_match.available_categories(rows, recipe_match.GENAU) == {"delta", "beta"}
-    # The players' lane is unchanged by any of it — a loop is still a video there.
+    # The video lane is unchanged by any of it — a loop is still a video there.
     assert recipe_match.available_categories(rows) == {"epsilon", "delta", "gamma"}
 
 

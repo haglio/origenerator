@@ -213,7 +213,7 @@ class CombineController(QObject):
         image_id, video_id = saved.get("image"), saved.get("video")
         if image_id and self._accepts_image(image_id):
             self.panel.image_slot.set_item(image_id)
-        self.panel.set_intent(saved.get("intent") or recipe_match.PLAYERS)
+        self.panel.set_intent(saved.get("intent") or recipe_match.VIDEO)
         self.panel.set_category(saved.get("category") or "")
         if video_id and self._accepts_video(video_id):
             self.panel.video_slot.set_item(video_id)
@@ -289,7 +289,7 @@ class CombineController(QObject):
 
     def _show_launching(self, image_id: str, *, category: str = "",
                         video_id: str | None = None,
-                        intent: str = recipe_match.PLAYERS) -> str:
+                        intent: str = recipe_match.VIDEO) -> str:
         """Put a stand-in row at the back of the line for a Generate just pressed,
         and return its key.
 
@@ -347,7 +347,7 @@ class CombineController(QObject):
     # --- building and launching a combination --------------------------------
 
     def _combined_params(self, image_id: str, video_id: str,
-                         intent: str = recipe_match.PLAYERS, category: str = ""):
+                         intent: str = recipe_match.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
         seed with only the input image swapped to the dropped one.
@@ -379,7 +379,7 @@ class CombineController(QObject):
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str, category: str = "",
-                          intent: str = recipe_match.PLAYERS) -> None:
+                          intent: str = recipe_match.VIDEO) -> None:
         """Open a dropped image + video's recipe as an editable generate tab instead
         of running it — the combine panel's "Edit…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
@@ -420,7 +420,7 @@ class CombineController(QObject):
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
-                              intent: str = recipe_match.PLAYERS) -> None:
+                              intent: str = recipe_match.VIDEO) -> None:
         """Generate a new video from a dropped image + a dropped video's recipe.
 
         Reuses the video's workflow, settings and seed, swapping only the input
@@ -587,7 +587,7 @@ class CombineController(QObject):
         )
 
     def _curated_combination(self, image_id: str, category: str,
-                             intent: str = recipe_match.PLAYERS):
+                             intent: str = recipe_match.VIDEO):
         """The ``(workflow, params)`` for ``category``'s overlay-curated ``intent``
         recipe on the dropped image — the pinned setup that outranks mining (see
         :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
@@ -646,7 +646,7 @@ class CombineController(QObject):
             self._db.mark_genau_requested(prompt_id)
 
     def generate_category(self, image_id: str, category: str,
-                          intent: str = recipe_match.PLAYERS, send: bool = False,
+                          intent: str = recipe_match.VIDEO, send: bool = False,
                           launching: str | None = None) -> None:
         """Run the recipe that fits ``category`` on the dropped image: the
         overlay's curated recipe when one is pinned for the act, else the mined
@@ -696,7 +696,7 @@ class CombineController(QObject):
             self._drop_launching(launching)
 
     def _open_category(self, image_id: str, category: str,
-                       intent: str = recipe_match.PLAYERS) -> None:
+                       intent: str = recipe_match.VIDEO) -> None:
         """Open the recipe that fits ``category`` as an editable generate tab — the
         Open-in-generator counterpart to :meth:`generate_category`, honoring the
         same curated-over-mined order and the same lane.

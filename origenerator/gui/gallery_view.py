@@ -1880,7 +1880,7 @@ class GalleryView(QWidget):
             # generation of that shape is visible while it runs.
             show_recents=bool(tree) or orientation in inflight,
             shelf_counts={key: _shelf_count(self._browser, key, orientation)
-                          for key in _SHELF_KEYS},
+                          for key in _SHELF_KEYS if key != _RECENTS_KEY},
         ) for orientation, tree in trees.items()]
 
     def _reselect_generation(self, prompt_id: str | None):

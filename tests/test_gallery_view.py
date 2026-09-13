@@ -1460,7 +1460,7 @@ def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
     assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
 
 
-def test_latest_and_favorites_lead_with_how_many_items_they_list(qtbot):
+def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
                  _image("i3", "a dog", 50, 1)])
     db.set_generation_starred("i1", True)
@@ -1474,8 +1474,9 @@ def test_latest_and_favorites_lead_with_how_many_items_they_list(qtbot):
     view._toggle_star(_key(cat))  # the starred item is in the starred folder
 
     top = _top_level(view._tree)
-    assert _shown(top["Latest"]) == "(3) Latest"
     assert _shown(top["Favorites"]) == "(2) Favorites"
+    assert _shown(top["All"]) == "(3) All"
+    assert _shown(top["Latest"]) == "Latest"
 
 
 def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, **extra):

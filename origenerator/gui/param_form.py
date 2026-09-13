@@ -40,6 +40,7 @@ from origenerator.workflows.duration import (
     on_grid,
     seconds_for_frames,
 )
+from origenerator.workflows.model_files import is_no_lora
 
 ensure_shared_ui_on_path()
 from shared_ui.tick_control import TickControl
@@ -49,6 +50,13 @@ _SEED_MAX = (1 << 63) - 1
 # prompt), what each scene keeps out (stored as the negative prompt), each
 # scene's length, and each scene's lines.
 _SCENE_KEYS = ("positive_prompt", "negative_prompt", "scene_frames", "scene_lines")
+
+_SHOWN_WHILE = {
+    "voice_sample": ("voice", lambda text: text == CUSTOM_VOICE),
+    "voice_sample_text": ("voice", lambda text: text == CUSTOM_VOICE),
+    "lora_strength_high": ("lora_high", lambda text: not is_no_lora(text)),
+    "lora_strength_low": ("lora_low", lambda text: not is_no_lora(text)),
+}
 
 # The locked-dimension spinners span from a stride floor up past any realistic
 # derived or overridden size; 0 is reserved as "no size known yet" (shown as the
@@ -198,23 +206,21 @@ class ParamForm(QWidget):
             self._scenes.changed.connect(self.changed)
             self._scenes.changed.connect(self._refresh_clip_length)
         self._build(self._param_defs)
-        self._wire_voice_rows()
+        self._wire_rows_shown_while()
 
-    def _wire_voice_rows(self):
-        """The Voice Sample rows show only while the Voice is the custom one.
-        A preset needs no recording, and two fields under it read as a second
-        thing to fill in -- which is how the sample's transcript came to be
-        taken for where her lines go."""
-        voice = self._widgets.get("voice")
-        if not isinstance(voice, QComboBox):
-            return
-        voice.currentTextChanged.connect(lambda _text: self._refresh_voice_rows())
-        self._refresh_voice_rows()
+    def _wire_rows_shown_while(self):
+        for source in {source for source, _shows in _SHOWN_WHILE.values()}:
+            widget = self._widgets.get(source)
+            if isinstance(widget, QComboBox):
+                widget.currentTextChanged.connect(
+                    lambda _text: self._refresh_rows_shown_while())
+        self._refresh_rows_shown_while()
 
-    def _refresh_voice_rows(self):
-        custom = self._widgets["voice"].currentText() == CUSTOM_VOICE
-        for key in ("voice_sample", "voice_sample_text"):
-            self._set_row_visible(key, custom)
+    def _refresh_rows_shown_while(self):
+        for row, (source, shows) in _SHOWN_WHILE.items():
+            widget = self._widgets.get(source)
+            if row in self._widgets and isinstance(widget, QComboBox):
+                self._set_row_visible(row, shows(widget.currentText()))
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         """Show or hide one row, label and field together."""

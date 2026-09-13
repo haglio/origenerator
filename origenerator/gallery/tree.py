@@ -83,12 +83,11 @@ from origenerator.gallery.signatures import (
 from origenerator.gallery.source_image import build_image_config_index
 
 
-def _group_ordered(rows, key):
-    """Group rows by ``key(row)``, preserving first-appearance order of keys."""
-    grouped: dict = {}
-    for row in rows:
-        grouped.setdefault(key(row), []).append(row)
-    return list(grouped.items())
+def _group_by_creation(newest_first, key):
+    oldest_first: dict = {}
+    for row in reversed(newest_first):
+        oldest_first.setdefault(key(row), []).append(row)
+    return [(k, rows[::-1]) for k, rows in reversed(oldest_first.items())]
 
 
 def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
@@ -437,7 +436,7 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
     already pins (the model, the LoRA, and for an i2v the source image) is
     constant here and never re-appears in it.
     """
-    grouped = _group_ordered(
+    grouped = _group_by_creation(
         rows, lambda r: settings_signature(tier.workflow_name, r.get("params_json"),
                                            tier.image_index,
                                            workflow_version=r.get("workflow_version"))
@@ -467,7 +466,7 @@ def _grouped_folders(tier: _Tier, rows, *, signature, key_for, label_for, childr
     differing only in the callables.
     """
     groups = []
-    for sig, sub_rows in _group_ordered(rows, signature):
+    for sig, sub_rows in _group_by_creation(rows, signature):
         key = key_for(sig)
         params = parse_params(sub_rows[0].get("params_json"))
         label, starred = _overlay(label_for(params), key, tier.folder_meta)
@@ -615,9 +614,10 @@ def build_gallery_tree(
     it to a single "(no LoRA)" folder. The source-image level appears only under
     a video workflow folder (a still an image-conditioned workflow output is
     grouped like any other image). Which rows are nested at all is
-    :func:`placeable_rows`. Folders appear in the order their first row appears
-    in ``rows`` (the caller orders rows newest-first); a star never moves a folder
-    — bookmarks are gathered by :func:`starred_folders` instead. ``folder_meta``
+    :func:`placeable_rows`. Folders are placed by the oldest of their rows,
+    newest-made first (the caller orders rows newest-first); neither a new
+    generation in a folder nor a star moves it — bookmarks are gathered by
+    :func:`starred_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 
@@ -631,24 +631,19 @@ def build_gallery_tree(
     if image_index is None:
         image_index = start_frame_index(rows)
     tree = []
-    # Media type is still the outer grouping, and still the first part of every
-    # key below — it just no longer earns a folder of its own. So a workflow that
-    # has made both kinds gets a folder per kind, which is what keeps the
-    # source-image level a property of videos alone (see :func:`_build_leaves`).
-    for media_type, media_rows in _group_ordered(rows, media_type_of_row):
+    for (media_type, wf_name), wf_rows in _group_by_creation(
+        rows, lambda r: (media_type_of_row(r), r.get("workflow_name") or "unknown")
+    ):
         if media_types is not None and media_type not in media_types:
             continue
-        for wf_name, wf_rows in _group_ordered(
-            media_rows, lambda r: r.get("workflow_name") or "unknown"
-        ):
-            wf_key = f"{media_type}/{wf_name}"
-            wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
-            tier = _Tier(media_type, wf_name, folder_meta, image_index)
-            tree.append(WorkflowGroup(
-                wf_key, wf_name, wf_label,
-                _build_model_groups(tier, wf_rows),
-                wf_starred,
-            ))
+        wf_key = f"{media_type}/{wf_name}"
+        wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
+        tier = _Tier(media_type, wf_name, folder_meta, image_index)
+        tree.append(WorkflowGroup(
+            wf_key, wf_name, wf_label,
+            _build_model_groups(tier, wf_rows),
+            wf_starred,
+        ))
     return tree
 
 

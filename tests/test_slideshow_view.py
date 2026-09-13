@@ -322,6 +322,21 @@ def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     assert not view._playlist.locked
 
 
+def test_the_console_restacks_its_own_window_when_it_is_seated(qtbot, monkeypatch):
+    raised = []
+    monkeypatch.setattr("origenerator.gui.media_overlay.raise_window_without_activating",
+                        raised.append)
+    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
+                         motion=_FakeMotion())
+    qtbot.addWidget(view)
+    view.show()
+    raised.clear()
+
+    view._place_console()
+
+    assert raised == [int(view._motion_panel.winId())]
+
+
 def test_escape_closes_the_view(qtbot):
     view = _view(qtbot)
     view.show()

@@ -25,7 +25,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.gui.media_overlay import float_over_media
+from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -65,4 +65,4 @@ class Toast(QLabel):
         self.adjustSize()
         x = (host.width() - self.width()) // 2
         self.move(max(0, x), TOP_MARGIN)
-        self.raise_()  # over the media, video surface included
+        raise_over_media(self)

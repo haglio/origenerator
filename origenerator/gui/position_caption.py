@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from origenerator.gui.media_overlay import PLATE_CSS, float_over_media
+from origenerator.gui.media_overlay import PLATE_CSS, float_over_media, raise_over_media
 
 _LOWER_MARGIN = 24  # how far the plate floats above the lower edge
 
@@ -34,4 +34,4 @@ class PositionCaption(QLabel):
         x = (host.width() - self.width()) // 2
         y = host.height() - self.height() - _LOWER_MARGIN
         self.move(max(0, x), max(0, y))
-        self.raise_()  # over the media, video surface included
+        raise_over_media(self)

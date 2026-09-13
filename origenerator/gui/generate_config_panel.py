@@ -24,8 +24,11 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
     EVOLVER_INBOX_DIR,
+    EVOLVER_SOURCE,
+    EVOLVER_UPSCALED_DIR,
 )
 from origenerator.db import Database
+from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery import (
     EnhanceSettings,
     build_image_config_index,
@@ -406,6 +409,9 @@ class GenerateConfigPanel(QWidget):
         # it and draggable onto the Enhance subpanel to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
         self._versions = EnhanceVersions()
+        # What the list is showing, in its order: the positions its rows report
+        # are only good against this.
+        self._listed_levels = []
         self._versions.level_selected.connect(self._show_level)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_levels_delete_requested)
@@ -1342,7 +1348,8 @@ class GenerateConfigPanel(QWidget):
         # An image's files are all listed as its versions, so its block is at
         # most the workflow version — it shows only when it has content rather
         # than opening a bare gap above the form.
-        self._metadata_block.setVisible(self._metadata_block.show_row(row))
+        self._metadata_block.setVisible(
+            self._metadata_block.show_row(row, self._upscale_of(row)))
         self._related.show_row(row, image_rows, request)
         self._refresh_versions()
         self._show_request_diff(request)
@@ -1442,7 +1449,7 @@ class GenerateConfigPanel(QWidget):
         row = self._displayed_row
         if row is None:
             return
-        levels = displayed_levels(row)
+        levels = self._listed_levels
         names = [levels[p].file.get("filename") for p in positions
                  if 0 <= p < len(levels)]
         if names:
@@ -1453,18 +1460,41 @@ class GenerateConfigPanel(QWidget):
 
         The preview is already on ``output_files[0]`` — the most-enhanced
         version — so the list leads with that level and offers the rest below
-        it, under the ``+ Enhance`` row. A video has no versions and no row to
-        press: the enhancer takes images.
+        it, under the ``+ Enhance`` row. A video has no row to press — the
+        enhancer takes images — and lists versions only once Evolver has
+        upscaled it, none of them binned from here.
         """
         row = self._displayed_row
-        if row is None or media_type_of_row(row) != "image":
+        if row is None:
+            self._listed_levels = []
             self._versions.show_levels([])
             return
+        if media_type_of_row(row) != "image":
+            self._listed_levels = displayed_levels(row, self._upscale_of(row))
+            # A video file is no picture, so both versions wear its thumbnail.
+            self._versions.show_levels(
+                [(level, row.get("thumbnail_path")) for level in self._listed_levels],
+                created_fallback=str(row.get("created_at", "")),
+                held_days=row.get("days_in_trash"), deletable=False,
+            )
+            return
+        self._listed_levels = displayed_levels(row)
+        # Each drawn from its own file, so a level shows what it actually looks
+        # like rather than the row's one shared thumbnail.
         self._versions.show_levels(
-            self._version_items(row), self._pending_enhancement,
-            self._add_card_for(row), str(row.get("created_at", "")),
-            row.get("days_in_trash"),
+            [(level, self._level_path(level)) for level in self._listed_levels],
+            self._pending_enhancement, self._add_card_for(row),
+            str(row.get("created_at", "")), row.get("days_in_trash"),
         )
+
+    def _upscale_of(self, row: dict) -> Path | None:
+        """The upscale Evolver has made of the video on display, if it has."""
+        if media_type_of_row(row) != "video":
+            return None
+        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
+        if preview is None:
+            return None
+        return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
 
     def _add_card_for(self, row: dict) -> tuple:
         """``(settings, duplicate_of)`` for the ``+ Enhance`` row on ``row``."""
@@ -1478,29 +1508,19 @@ class GenerateConfigPanel(QWidget):
         the trash once the generation has been deleted."""
         return output_file_path(level.file, COMFYUI_OUTPUT_DIR)
 
-    def _version_items(self, row: dict) -> list[tuple]:
-        """``(level, image path)`` for each version this image holds — the list
-        draws each picture from the file itself, so a level shows what it
-        actually looks like rather than the row's one shared thumbnail."""
-        return [(level, self._level_path(level))
-                for level in displayed_levels(row)]
-
     def _show_level(self, position: int):
-        """Put one of the displayed image's enhancement levels in the preview.
+        """Put one of the displayed generation's versions in the preview.
 
         Only the picture changes: the row on display, its form, its metadata and
         the OSR2 drive all still belong to the generation — the levels are
-        versions of one image, not separate generations, so switching between
-        them is a look rather than a navigation.
+        versions of one image or video, not separate generations, so switching
+        between them is a look rather than a navigation.
         """
-        if self._displayed_row is None:
+        if self._displayed_row is None or not 0 <= position < len(self._listed_levels):
             return
-        levels = displayed_levels(self._displayed_row)
-        if not 0 <= position < len(levels):
-            return
-        path = self._level_path(levels[position])
+        path = self._level_path(self._listed_levels[position])
         if path.exists():
-            self._preview.show_media(path, "image")
+            self._preview.show_media(path, media_type_of_row(self._displayed_row))
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
 

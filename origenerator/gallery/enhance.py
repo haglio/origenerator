@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from origenerator.gallery.enhance_graph import graph_level_params
 from origenerator.gallery.enhance_settings import (
@@ -66,7 +67,7 @@ _ALWAYS_ENHANCED = ("sdxl_t2i", "sdxl_pose_transfer")
 
 @dataclass(frozen=True)
 class EnhanceLevel:
-    """One version of an image: its file, and how it came to be.
+    """One version of an image or a video: its file, and how it came to be.
 
     ``index`` counts enhancements from the original (0), so the labels read
     "Original", "Enhance 1", "Enhance 2"… ``params`` are the settings that produced
@@ -199,7 +200,7 @@ def is_enhanced_row(row: dict) -> bool:
     return workflow in _ALWAYS_ENHANCED and "enhance_denoise" in params
 
 
-def displayed_levels(row: dict) -> list[EnhanceLevel]:
+def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLevel]:
     """The versions the info pane lists for ``row`` — what :func:`enhance_levels`
     finds, or the row's one file as ``Original`` when it has received no
     enhancement yet.
@@ -207,19 +208,23 @@ def displayed_levels(row: dict) -> list[EnhanceLevel]:
     An image's versions are listed even before there are two of them: a place
     that appears only once you already have versions is a place you never find,
     and the enhance you just launched replaces the strip's only other content
-    while it runs. ``[]`` for a video, which has no versions and no enhancer.
+    while it runs. A video has no enhancer, so it lists versions only once
+    Evolver has upscaled it — that ``upscale`` over the video itself.
 
     Each version carries its own file, so the file rows live beside the level
     that produced them rather than in one undifferentiated block at the top —
     which is why :mod:`origenerator.generation_metadata` asks this what it no
     longer has to list.
     """
+    files = row_output_files(row)
     if media_type_of_row(row) != "image":
-        return []
+        if upscale is None or not files:
+            return []
+        return [EnhanceLevel(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
+                EnhanceLevel(0, "Original", files[0])]
     levels = enhance_levels(row)
     if levels:
         return levels
-    files = row_output_files(row)
     return [EnhanceLevel(0, "Original", files[0])] if files else []
 
 

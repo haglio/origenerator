@@ -53,6 +53,37 @@ def test_a_script_written_before_the_folder_existed_is_still_found(tmp_path):
     assert read_actions(funscript_of(video, output_dir=tmp_path))
 
 
+def test_an_evolver_upscale_has_the_script_of_the_video_it_was_made_from(tmp_path):
+    script = tmp_path / "output" / "funscript" / "clip.funscript"
+    script.parent.mkdir(parents=True)
+    script.write_text("{}", encoding="utf-8")
+    upscale = (tmp_path / "upscaled_by_orientation" / "portrait" / "origenerator"
+               / "clip_topaz.mp4")
+
+    assert funscript_of(upscale, output_dir=tmp_path / "output") == script
+
+
+def test_an_upscale_finds_the_script_still_beside_the_video_it_was_made_from(tmp_path):
+    beside = tmp_path / "output" / "video" / "clip.funscript"
+    beside.parent.mkdir(parents=True)
+    beside.write_text("{}", encoding="utf-8")
+    upscale = (tmp_path / "upscaled_by_orientation" / "landscape" / "origenerator"
+               / "clip_topaz.mp4")
+
+    assert funscript_of(upscale, output_dir=tmp_path / "output") == beside
+
+
+def test_a_video_of_this_apps_own_named_like_an_upscale_keeps_its_own_script(tmp_path):
+    video = tmp_path / "video" / "clip_topaz.mp4"
+    video.parent.mkdir()
+    video.write_bytes(b"v")
+    own = tmp_path / "funscript" / "clip_topaz.funscript"
+    own.parent.mkdir()
+    own.write_text("{}", encoding="utf-8")
+
+    assert funscript_of(video, output_dir=tmp_path) == own
+
+
 def test_read_actions_passes_a_missing_script_through():
     """``funscript_of`` answers ``None`` for a clip with no script, and that goes
     straight to ``read_actions`` at every call site."""

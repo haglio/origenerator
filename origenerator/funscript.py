@@ -26,6 +26,8 @@ from pathlib import Path
 
 from app_support.funscript import document, write
 
+from origenerator.evolver_upscales import original_stem
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,12 +62,29 @@ def legacy_funscript_path_for(video_path) -> Path:
 
 def funscript_of(video_path, *, output_dir) -> Path | None:
     """The script this video HAS -- the folder first, then the old place beside
-    it -- or ``None`` when it has none."""
+    it -- or ``None`` when it has none. An upscale Evolver made of a video has
+    that video's."""
+    original = original_stem(video_path)
+    if original is not None:
+        return _script_of_upscaled(original, output_dir)
     dest = funscript_path_for(video_path, output_dir=output_dir)
     if dest.is_file():
         return dest
     beside = legacy_funscript_path_for(video_path)
     return beside if beside.is_file() else None
+
+
+def _script_of_upscaled(stem: str, output_dir) -> Path | None:
+    """The upscale's own path does not say which output folder the video it was
+    made from was saved in, so an old script beside that video is looked for in
+    each of them."""
+    filed = funscript_path_for(f"{stem}.mp4", output_dir=output_dir)
+    if filed.is_file():
+        return filed
+    output = Path(output_dir)
+    folders = output.iterdir() if output.is_dir() else ()
+    return next((beside for folder in folders
+                 if (beside := folder / filed.name).is_file()), None)
 
 
 def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:

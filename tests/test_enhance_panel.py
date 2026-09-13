@@ -548,6 +548,20 @@ def test_deleting_the_only_version_is_refused(qtbot):
     assert asked == []
 
 
+def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), deletable=False)
+    asked = []
+    versions.delete_requested.connect(asked.append)
+
+    row = _rows(versions)[0]
+    _click(qtbot, row)
+    qtbot.keyClick(row, Qt.Key.Key_Delete)
+
+    assert asked == []
+
+
 def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
     # A right-click on an unpicked row picks it first, so the menu always acts
     # on what it appeared over.
@@ -600,6 +614,28 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
     assert seen["enabled"] is False
     assert "only version" in seen["text"]   # grayed with the reason on it
     assert asked == []
+
+
+def test_the_menu_says_a_videos_versions_are_not_deleted_from_here(qtbot, monkeypatch):
+    from PyQt6.QtWidgets import QMenu
+
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1)), deletable=False)
+    seen = {}
+
+    def _exec(self, _pos):
+        action = self.actions()[0]
+        seen["text"] = action.text()
+        seen["enabled"] = action.isEnabled()
+        return action
+
+    monkeypatch.setattr(QMenu, "exec", _exec)
+
+    versions._on_row_menu(0, QPoint(0, 0))
+
+    assert seen == {"text": "Delete (a video's versions can't be deleted here)",
+                    "enabled": False}
 
 
 # --- dragging a level onto the panel to reuse its settings -----------------

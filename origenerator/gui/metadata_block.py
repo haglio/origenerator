@@ -58,14 +58,15 @@ class MetadataBlock(QWidget):
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
 
-    def show_row(self, row: dict) -> bool:
+    def show_row(self, row: dict, upscale=None) -> bool:
         """Render this row's section, reporting whether it had one.
 
         An image's files are all versions, listed with the enhancement level
-        that made each, so its block holds only the workflow version, and there
+        that made each — and so are a video's once Evolver has made its
+        ``upscale`` — so its block holds only the workflow version, and there
         is none before one is recorded; a caller shows this block only when
         there is something in it, rather than leaving a bare gap above the form."""
-        section = basic_section(row)
+        section = basic_section(row, upscale)
         self._render(section)
         return section is not None
 

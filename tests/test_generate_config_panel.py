@@ -952,6 +952,49 @@ def test_a_video_has_no_version_strip(saved_panel):
     assert panel._versions.isHidden()
 
 
+def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
+    """A video on disk, and the upscale Evolver made of it filed in the library."""
+    import os
+
+    output = tmp_path / "out"
+    video = output / "video" / f"{prompt_id}.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"video")
+    os.utime(video, (1_000_000, 1_000_000))  # made well before its upscale
+    library = tmp_path / "upscaled_by_orientation"
+    upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
+    upscale.parent.mkdir(parents=True)
+    upscale.write_bytes(b"upscale")
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(gcp_module, "EVOLVER_UPSCALED_DIR", library)
+    return _video_row(db, prompt_id), upscale
+
+
+def test_a_video_evolver_upscaled_lists_the_upscale_over_the_video(saved_panel, monkeypatch,
+                                                                    tmp_path):
+    panel, db = saved_panel
+    video, upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
+
+    panel.show_saved_generation(video, [])
+
+    rows = _level_rows(panel)
+    assert [row._title.text() for row in rows] == ["Evolved", "Original"]
+    assert upscale.name in _row_texts(rows[0])
+    assert panel._metadata_block.isHidden()   # its file is listed with its versions
+
+
+def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkeypatch,
+                                                             tmp_path):
+    panel, db = saved_panel
+    video, upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
+    panel.show_saved_generation(video, [])
+    panel._preview.show_media.reset_mock()
+
+    panel._show_level(0)
+
+    panel._preview.show_media.assert_called_once_with(upscale, "video")
+
+
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     panel, db = saved_panel
     image = _enhanced_image_row(db)

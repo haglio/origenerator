@@ -190,7 +190,7 @@ def test_reroll_video_seed_keeps_the_frame_and_rerolls_only_the_video_seed(qtbot
     assert len(rows) == 1 and rows[0]["workflow_name"] == "wan22_i2v"
     params = _launched_params(db, "wan22_i2v")
     assert params["input_image"] == "frame_001.png [output]"        # same start frame
-    assert params["noise_seed"] != 11 and params["seed"] != 22       # video seeds re-rolled
+    assert params["noise_seed"] != 11                                # video seed re-rolled
 
 
 def test_reroll_image_seed_regenerates_the_frame_then_keeps_the_video_seed(qtbot, tmp_path):
@@ -248,7 +248,7 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     )
     video_params = _launched_params(db, "wan22_i2v")
     assert video_params["input_image"] == "newframe.png [output]"     # fresh frame
-    assert video_params["noise_seed"] != 11 and video_params["seed"] != 22  # video seed re-rolled too
+    assert video_params["noise_seed"] != 11                             # video seed re-rolled too
 
 
 # --- combine's image re-roll: a fresh frame from the dropped image ------------

@@ -86,10 +86,11 @@ def _grouping_version(workflow_name: str | None, workflow_version: str | None) -
 @cache
 def _workflow_instance_keys(workflow_name: str) -> frozenset:
     """A registered workflow's per-instance keys: every seed param it declares
-    (sampler and foley alike — a variation re-rolls them all) plus the start
-    frame. Cached because ``seed_keys()`` walks ``param_definitions()``, which
-    scans the model directories."""
-    return frozenset(_registered(workflow_name).seed_keys()) | {"input_image"}
+    (sampler and foley alike — a variation re-rolls them all), every seed a
+    recipe carries without a field for it, and the start frame. Cached because
+    ``seed_keys()`` walks ``param_definitions()``, which scans the model
+    directories."""
+    return frozenset(_registered(workflow_name).seed_keys()) | INSTANCE_KEYS
 
 
 @cache

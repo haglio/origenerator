@@ -63,8 +63,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", "str", defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", "str", defaults["negative_prompt"], multiline=True),
-            ParamDef("noise_seed", "Seed (High)", "seed", defaults["noise_seed"]),
-            ParamDef("seed", "Seed (Low)", "seed", defaults["seed"]),
+            ParamDef("noise_seed", "Seed", "seed", defaults["noise_seed"]),
             ParamDef("width", "Width", "int", defaults["width"], min_val=64, max_val=2048, step=16),
             ParamDef("height", "Height", "int", defaults["height"], min_val=64, max_val=2048, step=16),
             ParamDef("steps", "Steps", "int", defaults["steps"], min_val=1, max_val=50),

@@ -375,6 +375,17 @@ def test_locked_dimensions_render_as_plain_values_not_input_fields(qtbot):
     assert form._dim_value_labels["width"].text() == "—"
 
 
+def test_a_derived_size_names_the_image_it_is_read_from_as_the_form_does(qtbot):
+    form = ParamForm([ParamDef("input_image", "Start Image", "image", "")],
+                     size_deriver=lambda params: None)
+    qtbot.addWidget(form)
+
+    assert form._dimensions_hint.text() == "Sized from the start image. Unlock to override."
+    assert form._unlock_btn.toolTip() == "Unlock to override the size derived from the start image"
+    form._unlock_btn.setChecked(True)
+    assert form._unlock_btn.toolTip() == "Re-lock to the size derived from the start image"
+
+
 def test_unlocking_swaps_the_plain_value_for_an_editable_field(qtbot):
     form = _sized_form(qtbot)
     form._unlock_btn.setChecked(True)
@@ -659,6 +670,7 @@ def _stub_file_dialog(monkeypatch, chosen, captured=None):
     def fake(parent, caption, directory, filt):
         if captured is not None:
             captured["dir"] = directory
+            captured["caption"] = caption
         return chosen, ""
 
     monkeypatch.setattr(pf.QFileDialog, "getOpenFileName", fake)
@@ -735,6 +747,17 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
     form._browse_buttons["input_image"].click()
 
     assert captured["dir"] == str(pf.COMFYUI_INPUT_DIR)
+
+
+def test_the_browse_dialog_is_titled_with_the_fields_own_name(qtbot, monkeypatch):
+    captured = {}
+    _stub_file_dialog(monkeypatch, "", captured)
+    form = ParamForm([ParamDef("input_image", "Structure Image", "image", "")])
+    qtbot.addWidget(form)
+
+    form._browse_buttons["input_image"].click()
+
+    assert captured["caption"] == "Select Structure Image"
 
 
 def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, tmp_path):

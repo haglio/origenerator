@@ -556,7 +556,7 @@ class ParamForm(QWidget):
             stack.addWidget(spinner)           # index 1: unlocked, editable
             self._dim_stacks[key] = stack
             self._add_row(key, label_text, stack)
-        self._dimensions_hint = QLabel("Sized from the input image. Unlock to override.")
+        self._dimensions_hint = QLabel(f"Sized from the {self._size_source()}. Unlock to override.")
         self._dimensions_hint.setObjectName("dimensionsHint")
         self._dimensions_hint.setWordWrap(True)
         self._sections["Dimensions"].content_form().addRow(self._dimensions_hint)
@@ -567,7 +567,7 @@ class ParamForm(QWidget):
         btn.setObjectName("dimensionUnlock")
         btn.setCheckable(True)
         btn.setText(_LOCK_CLOSED)
-        btn.setToolTip("Unlock to override the size derived from the input image")
+        btn.setToolTip(self._unlock_tip(unlocked=False))
         # Pin a compact font so the padlock stays a small icon under the form's
         # larger heading font, keeping its width predictable for the gutter.
         lock_font = btn.font()
@@ -596,15 +596,21 @@ class ParamForm(QWidget):
         """True when the user has unlocked the derived size to override it."""
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
+    def _size_source(self) -> str:
+        image = next((pd for pd in self._param_defs if pd.key == "input_image"), None)
+        return image.label.lower() if image is not None else "image"
+
+    def _unlock_tip(self, unlocked: bool) -> str:
+        if unlocked:
+            return f"Re-lock to the size derived from the {self._size_source()}"
+        return f"Unlock to override the size derived from the {self._size_source()}"
+
     def _on_dimensions_unlock_toggled(self, unlocked: bool):
         """Flip the padlock and swap each dimension between its plain locked value
         and its editable spinner, re-locking back onto the derived size. Announces
         the change so the panel refreshes with it."""
         self._unlock_btn.setText(_LOCK_OPEN if unlocked else _LOCK_CLOSED)
-        self._unlock_btn.setToolTip(
-            "Re-lock to the size derived from the input image" if unlocked
-            else "Unlock to override the size derived from the input image"
-        )
+        self._unlock_btn.setToolTip(self._unlock_tip(unlocked))
         for stack in self._dim_stacks.values():
             stack.setCurrentIndex(1 if unlocked else 0)
         if not unlocked:
@@ -658,18 +664,13 @@ class ParamForm(QWidget):
         it unchanged, so a full path lets the user draw an input from anywhere;
         a recording is read by the voice from wherever it is.
         """
-        pd = next((p for p in self._param_defs if p.key == key), None)
-        title, kinds = (
-            ("Select Voice Sample", "Audio (*.wav *.mp3 *.flac *.m4a *.ogg);;All Files (*)")
-            if pd is not None and pd.type == "audio"
-            else ("Select Input Image", "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)")
-        )
+        pd = next(p for p in self._param_defs if p.key == key)
+        kinds = ("Audio (*.wav *.mp3 *.flac *.m4a *.ogg);;All Files (*)" if pd.type == "audio"
+                 else "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)")
         path, _ = QFileDialog.getOpenFileName(
             self,
-            title,
-            self._initial_browse_path(
-                self._widgets[key].text().strip(), pd.browse_dir if pd else None
-            ),
+            f"Select {pd.label}",
+            self._initial_browse_path(self._widgets[key].text().strip(), pd.browse_dir),
             kinds,
         )
         if path:

@@ -675,9 +675,7 @@ class GenerateConfigPanel(QWidget):
             if pd.type == "image" and not str(params.get(pd.key, "")).strip()
         ]
         if missing_images:
-            self._generate_btn.flash_guard(
-                f"Select an input image ({', '.join(missing_images)})"
-            )
+            self._generate_btn.flash_guard(f"Select the {' and '.join(missing_images)}")
             return
         if self._folder_request is not None:
             # A request that asked for nothing would re-run every seed in the

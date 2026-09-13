@@ -212,13 +212,13 @@ def _source_image_label(params: dict, image_index: dict) -> str:
     filename comes first because the tier is one frame per folder, and two draws
     of one prompt land in one settings folder, so they would otherwise wear the
     same code. Falls back to the bare filename when the frame isn't a known
-    generation — there is no folder to borrow a code from — and ``"(no input
+    generation — there is no folder to borrow a code from — and ``"(no start
     image)"`` when there is none.
     """
     input_image = params.get("input_image")
     name = _frame_name(input_image)
     if not name:
-        return "(no input image)"
+        return "(no start image)"
     filename = _basename(_unannotated(input_image))
     entry = (image_index or {}).get(name)
     return f"{filename} · {entry.label}" if entry is not None else filename

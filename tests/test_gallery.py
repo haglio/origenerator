@@ -910,6 +910,11 @@ def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
     assert source.label == "hand_picked.png"
 
 
+def test_videos_made_without_a_start_frame_share_a_folder_named_in_the_forms_words():
+    (source,) = _i2v_source_folders([_i2v("v1", "styleA")])
+    assert source.label == "(no start image)"
+
+
 def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index():
     # A source-image bookmark's key is recomputed from a row under it; it depends on
     # the start frame's config, so folder_key_at_level must resolve it through the
@@ -1001,7 +1006,7 @@ def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
     loras = {lg.label: lg for lg in model.children}
     assert set(loras) == {"styleA_high / styleA_low", "styleB_high / styleB_low"}
 
-    (a_source,) = loras["styleA_high / styleA_low"].children  # one "(no input image)" source
+    (a_source,) = loras["styleA_high / styleA_low"].children  # one "(no start image)" source
     (a_settings,) = a_source.children                          # the two seeds collapse
     assert {r["prompt_id"] for r in a_settings.rows} == {"v1", "v2"}
     assert {r["prompt_id"] for r in rows_under(loras["styleB_high / styleB_low"])} == {"v3"}
@@ -1254,7 +1259,7 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
 
     (video_model,) = by_key["video/wan22_i2v"].model_groups
     (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no LoRA)" here)
-    (video_source,) = video_lora.children   # then a source-image level ("(no input image)")
+    (video_source,) = video_lora.children   # then a source-image level ("(no start image)")
     assert len(video_source.children) == 1
 
 

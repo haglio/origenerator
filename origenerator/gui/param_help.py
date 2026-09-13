@@ -106,7 +106,7 @@ PARAM_HELP: dict[str, str] = {
     "clip_name1": "The first of two text encoders this model reads the prompt through.",
     "clip_name2": "The second of two text encoders this model reads the prompt through.",
     "clip_vision_name": (
-        "The image encoder that lets the model read the input picture the way it "
+        "The image encoder that lets the model read the start image the way it "
         "reads the prompt."
     ),
     "upscale_model": (
@@ -114,10 +114,10 @@ PARAM_HELP: dict[str, str] = {
         "reconstructs edges rather than resampling them."
     ),
     "depth_model": (
-        "The model that reads depth out of the input picture, producing the map "
+        "The model that reads depth out of the structure image, producing the map "
         "the ControlNet holds the structure to."
     ),
-    "pose_bbox_detector": "The detector that finds people in the input picture before posing them.",
+    "pose_bbox_detector": "The detector that finds people in the structure image before posing them.",
     "pose_estimator": "The model that reads the skeleton out of each person it found.",
     "audio_encoder_name": (
         "The listener the speech model hears her lines through, so its lips "
@@ -218,12 +218,12 @@ PARAM_HELP: dict[str, str] = {
 
     # --- structure transfer ---
     "control_mode": (
-        "Which structure is lifted out of the input picture and held onto: its "
+        "Which structure is lifted out of the structure image and held onto: its "
         "depth, or the skeleton of the people in it."
     ),
     "controlnet": "The ControlNet that applies the structure map to the generation.",
     "controlnet_strength": (
-        "How firmly the output is held to the input's structure. Lower lets the "
+        "How firmly the output is held to the structure image. Lower lets the "
         "prompt reshape things; higher traces the source closely."
     ),
     "controlnet_end": (

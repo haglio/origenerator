@@ -10788,17 +10788,6 @@ def _aim_show(view, show, target):
     show.osr2_drive_target = lambda: target
     view.reconcile_osr2()
 
-    # --- what the gallery says to whichever surface is up ------------------
-
-    def isActiveWindow(self):
-        return True
-
-    def note_request(self, message):
-        self.notes.append(message)
-
-    def hold_for_request(self, holding, note=""):
-        self.holds.append((holding, note))
-
 
 def _osr2_view(qtbot):
     """A gallery with both drive sources stubbed: the funscript driver, and the

@@ -37,6 +37,7 @@ from origenerator.config import (
 )
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
@@ -87,6 +88,9 @@ class CombineHost(Protocol):
         """Show a just-launched combine — its folder if the tree has one, else
         the Recents shelf its card will appear on."""
 
+    def follow_link(self, prompt_id: str) -> None:
+        """Go to a generation a slot is holding."""
+
     def ask_which_seed(self, workflow, *, can_reroll_image: bool) -> str | None:
         """Ask which seed to re-roll rather than reproduce a past run, returning
         ``None`` when the answer is to do nothing."""
@@ -133,6 +137,7 @@ class CombineController(QObject):
             lambda image_id, video_id, category="": self._open_combination(
                 image_id, video_id, category, self.panel.selected_intent()))
         self.panel.open_category_requested.connect(self._open_category)
+        self.panel.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
         self.panel.intent_changed.connect(self._on_intent_changed)
@@ -174,8 +179,8 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def selection(self) -> dict:
-        """Everything the combine panel is holding, for session save: the two
-        slots, the lane and the act.
+        """Everything the combine panel is holding, for session save: the
+        picture, the video each lane last had dropped, the lane and the act.
 
         All four, because all four are choices the user made and none is
         recoverable from the others — an act says nothing about which lane
@@ -184,7 +189,7 @@ class CombineController(QObject):
         """
         return {
             "image": self.panel.image_slot.current_id(),
-            "video": self.panel.video_slot.current_id(),
+            "videos": self.panel.dropped_videos(),
             "intent": self.panel.selected_intent(),
             "category": self.panel.selected_category(),
         }
@@ -204,13 +209,16 @@ class CombineController(QObject):
             saved = {"image": saved[0], "video": saved[1]}
         if not isinstance(saved, dict):
             return
-        image_id, video_id = saved.get("image"), saved.get("video")
+        image_id = saved.get("image")
         if image_id and self._accepts_image(image_id):
             self.panel.image_slot.set_item(image_id)
-        self.panel.set_intent(saved.get("intent") or recipe_match.PLAYERS)
+        self.panel.set_intent(saved.get("intent") or recipe_match.VIDEO)
+        videos = saved.get("videos")
+        if not isinstance(videos, dict):
+            videos = {self.panel.selected_intent(): saved.get("video")}
+        self.panel.set_dropped_videos({lane: video for lane, video in videos.items()
+                                       if video and self._accepts_video(video)})
         self.panel.set_category(saved.get("category") or "")
-        if video_id and self._accepts_video(video_id):
-            self.panel.video_slot.set_item(video_id)
 
     def drag_started(self, prompt_id: str) -> None:
         """A generation began dragging — from a browser thumbnail or a generate tab's
@@ -251,9 +259,8 @@ class CombineController(QObject):
         they did — so the stand-in row would have appeared only once the work it
         was standing in for was already over.
         """
-        key = self._show_launching(image_id, video_id=video_id)
-
         intent = self.panel.selected_intent()
+        key = self._show_launching(image_id, video_id=video_id, intent=intent)
 
         def run():
             try:
@@ -283,7 +290,8 @@ class CombineController(QObject):
         defer(self, work)
 
     def _show_launching(self, image_id: str, *, category: str = "",
-                        video_id: str | None = None) -> str:
+                        video_id: str | None = None,
+                        intent: str = recipe_match.VIDEO) -> str:
         """Put a stand-in row at the back of the line for a Generate just pressed,
         and return its key.
 
@@ -301,6 +309,12 @@ class CombineController(QObject):
         key = f"launching-{self._launch_seq}"
         image_row = self._db.get_generation(image_id) or {}
         video_row = self._db.get_generation(video_id) if video_id else None
+        built = (self._combined_params(image_id, video_id, intent)
+                 if video_id and not category else None)
+        edited = False
+        if built is not None:
+            workflow, params, recipe_row, _image_row = built
+            edited = gallery.prompts_differ_from(params, recipe_row, workflow)
         self._launching[key] = InFlightItem(
             key=key,
             caption="A video from Combine, still being started",
@@ -313,6 +327,7 @@ class CombineController(QObject):
             # The same rule the finished row follows: a picked act names itself in
             # the text, and only a dropped video is shown.
             recipe_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
+            recipe_prompt_edited=edited,
             source_image=gallery.output_file_reference(
                 gallery.row_output_files(image_row)),
             starting=True,
@@ -334,7 +349,7 @@ class CombineController(QObject):
     # --- building and launching a combination --------------------------------
 
     def _combined_params(self, image_id: str, video_id: str,
-                         intent: str = recipe_match.PLAYERS, category: str = ""):
+                         intent: str = recipe_match.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
         ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
         seed with only the input image swapped to the dropped one.
@@ -366,7 +381,7 @@ class CombineController(QObject):
         return workflow, params, video_row, image_row
 
     def _open_combination(self, image_id: str, video_id: str, category: str = "",
-                          intent: str = recipe_match.PLAYERS) -> None:
+                          intent: str = recipe_match.VIDEO) -> None:
         """Open a dropped image + video's recipe as an editable generate tab instead
         of running it — the combine panel's "Edit…" path. The tab is
         prefilled with the same combination Generate would launch, ready to tweak,
@@ -391,10 +406,10 @@ class CombineController(QObject):
         if panel is None:
             return
         panel.set_recipe_source(category, video_id)
-        panel.show_combination(
+        panel.show_combination(Combination(
             self._still_path(image_row),
             self._host.animated_preview(video_row) if video_row is not None else None,
-        )
+        ))
 
     def _still_path(self, row: dict) -> str | None:
         """The best picture of ``row`` for a pane to show: its full-size output
@@ -407,7 +422,7 @@ class CombineController(QObject):
 
     def _generate_combination(self, image_id: str, video_id: str, send: bool = False,
                               category: str = "",
-                              intent: str = recipe_match.PLAYERS) -> None:
+                              intent: str = recipe_match.VIDEO) -> None:
         """Generate a new video from a dropped image + a dropped video's recipe.
 
         Reuses the video's workflow, settings and seed, swapping only the input
@@ -574,7 +589,7 @@ class CombineController(QObject):
         )
 
     def _curated_combination(self, image_id: str, category: str,
-                             intent: str = recipe_match.PLAYERS):
+                             intent: str = recipe_match.VIDEO):
         """The ``(workflow, params)`` for ``category``'s overlay-curated ``intent``
         recipe on the dropped image — the pinned setup that outranks mining (see
         :func:`recipe_match.curated_recipe`), its seeds freshly rolled.
@@ -633,7 +648,7 @@ class CombineController(QObject):
             self._db.mark_genau_requested(prompt_id)
 
     def generate_category(self, image_id: str, category: str,
-                          intent: str = recipe_match.PLAYERS, send: bool = False,
+                          intent: str = recipe_match.VIDEO, send: bool = False,
                           launching: str | None = None) -> None:
         """Run the recipe that fits ``category`` on the dropped image: the
         overlay's curated recipe when one is pinned for the act, else the mined
@@ -683,7 +698,7 @@ class CombineController(QObject):
             self._drop_launching(launching)
 
     def _open_category(self, image_id: str, category: str,
-                       intent: str = recipe_match.PLAYERS) -> None:
+                       intent: str = recipe_match.VIDEO) -> None:
         """Open the recipe that fits ``category`` as an editable generate tab — the
         Open-in-generator counterpart to :meth:`generate_category`, honoring the
         same curated-over-mined order and the same lane.

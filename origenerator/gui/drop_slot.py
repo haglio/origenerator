@@ -32,6 +32,7 @@ class DropSlot(QWidget):
     """A labeled drop zone that holds one accepted generation's prompt_id."""
 
     changed = pyqtSignal()  # the held item changed (dropped or cleared)
+    activated = pyqtSignal(str)  # the held item was clicked: go to it
 
     def __init__(
         self,
@@ -46,6 +47,7 @@ class DropSlot(QWidget):
         self._accepts = accepts
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
+        self._go_to_tip = f"Click to go to this {kind}"
         # Whether what lands here is held for its settings rather than shown as a
         # result — drawn gray if so, however it previews.
         self._grayscale = grayscale
@@ -80,13 +82,6 @@ class DropSlot(QWidget):
         self._render()
         self.changed.emit()
 
-    def set_placeholder(self, text: str):
-        """Change the prompt shown while the slot is empty, re-rendering if nothing
-        is held (a filled slot keeps its preview until cleared)."""
-        self._placeholder = text
-        if self._current_id is None:
-            self._render()
-
     def clear(self):
         """Empty the slot back to its placeholder; a no-op when already empty."""
         if self._current_id is None:
@@ -108,6 +103,7 @@ class DropSlot(QWidget):
             self._label.setText(self._placeholder)
             self._badge.setVisible(False)
             self.setToolTip("")
+            self.unsetCursor()
             return
         thumb_path, movie_path = self._preview(self._current_id)
         if movie_path and Path(movie_path).exists():
@@ -130,7 +126,8 @@ class DropSlot(QWidget):
             self._label.setText("✓")  # held, but no thumbnail to show
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
-        self.setToolTip("Click to remove")
+        self.setToolTip(self._go_to_tip)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     # --- drag & drop ------------------------------------------------------
 
@@ -180,7 +177,5 @@ class DropSlot(QWidget):
         event.acceptProposedAction()
 
     def mousePressEvent(self, event):
-        # Clicking a filled slot removes its item (the pair is small; a click is
-        # the least fussy way to swap a choice out).
         if event.button() == Qt.MouseButton.LeftButton and self._current_id is not None:
-            self.clear()
+            self.activated.emit(self._current_id)

@@ -95,6 +95,7 @@ class InFlightItem:
     # picked instead: :attr:`recipe_category` already says what was chosen, and
     # the clip its recipe was mined out of was never the user's pick.
     recipe_thumbnail: str | None = None
+    recipe_prompt_edited: bool = False
     # Up to four thumbnail files from the folder this job will land in — what a
     # run with no picture of its own can be recognized by, its own output being
     # the thing that doesn't exist yet.

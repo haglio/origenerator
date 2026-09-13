@@ -40,6 +40,7 @@ from origenerator.gallery import (
     level_matching_settings,
     media_type_of_row,
     output_file_path,
+    prompts_differ_from,
     resolve_preview,
     rows_in_settings,
     settings_signature,
@@ -52,6 +53,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.gui import icons
+from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import EnhanceVersions
@@ -184,10 +186,10 @@ class GenerateConfigPanel(QWidget):
         # that hasn't streamed yet, so the same text isn't re-painted every poll.
         self._watched_key: str | None = None
         self._live_note: str | None = None
-        # The pair standing in for a frame that hasn't streamed, as
-        # (image, clip) paths — so the same one isn't rebuilt every poll, which
-        # would restart the clip's loop from frame one each second.
-        self._live_source: tuple | None = None
+        # The pair standing in for a frame that hasn't streamed — kept so the
+        # same one isn't rebuilt every poll, which would restart the clip's loop
+        # from frame one each second.
+        self._live_source: Combination | None = None
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
@@ -211,6 +213,7 @@ class GenerateConfigPanel(QWidget):
         # tab — the combination as opened, or edited first — says in the queue what
         # it was asked for. Nothing else on the form remembers either.
         self._recipe_source: tuple[str, str | None] = ("", None)
+        self._recipe_row: dict | None = None
         # Re-reads (shortly) whether Generate would reproduce a past run — see
         # refresh_generate_caption for why the answer isn't taken on the spot.
         self._caption_timer = QTimer(self)
@@ -504,7 +507,7 @@ class GenerateConfigPanel(QWidget):
         # here no longer describes what this tab would run, so its mark goes
         # rather than riding onto an unrelated launch. Set again after a prefill,
         # which is what re-picks the workflow in the first place.
-        self._recipe_source = ("", None)
+        self._forget_recipe_source()
         # And a folder's rewrite is a rewrite of that folder's own recipe. Swap
         # the workflow and the form is rebuilt from scratch — the tracked prompt
         # fields with it — so what is left is an ordinary config, not a rewrite
@@ -590,6 +593,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.form_edited)
         self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self.refresh_modified_notice)
+        self._param_form.changed.connect(self._mark_recipe_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
         self._form_host_column.addWidget(self._param_form)
@@ -698,17 +702,36 @@ class GenerateConfigPanel(QWidget):
         is run as opened or edited first.
         """
         self._recipe_source = (category or "", video_prompt_id or None)
+        self._recipe_row = self._db.get_generation(video_prompt_id) if video_prompt_id else None
 
     def recipe_source(self) -> tuple[str, str | None]:
         """``(category, video_prompt_id)`` for a tab Combine opened, else
         ``("", None)`` — what a launch from here stamps on its row."""
         return self._recipe_source
 
-    def show_combination(self, image_path, video_path) -> None:
+    def _recipe_prompts_differ(self) -> bool:
+        workflow = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
+        return (self._recipe_row is not None and workflow is not None
+                and self._param_form is not None
+                and prompts_differ_from(self._param_form.get_values_static(),
+                                        self._recipe_row, workflow))
+
+    def _forget_recipe_source(self) -> None:
+        self._recipe_source = ("", None)
+        self._recipe_row = None
+
+    def _mark_recipe_prompt_edits(self) -> None:
+        if self._live_source is None:
+            self._preview.mark_recipe_prompt_edited(self._recipe_prompts_differ())
+
+    def show_combination(self, combination: Combination) -> None:
         """Put the combination this tab was opened with in the preview: the frame,
         a plus, and the gray clip whose settings came with it. Nothing has been
         made from the pair yet, so there is no result for the pane to show."""
-        self._preview.show_combination(image_path, video_path)
+        if self._live_source is None:
+            combination = combination._replace(
+                recipe_prompt_edited=self._recipe_prompts_differ())
+        self._preview.show_combination(combination)
         self._reflow_for_the_media()
 
     def launched_runs(self) -> list[str]:
@@ -1065,7 +1088,7 @@ class GenerateConfigPanel(QWidget):
         """
         self.forget_launched()
         self._forget_watch()
-        self._recipe_source = ("", None)
+        self._forget_recipe_source()
         self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
@@ -1147,12 +1170,12 @@ class GenerateConfigPanel(QWidget):
         return self._watched_key
 
     def watch_folder(self, key: str, frame: bytes | None, note: str | None = None,
-                     made_from: tuple | None = None):
+                     made_from: Combination | None = None):
         """Follow the run leading folder ``key``: its latest ``frame`` now, each
         later one as it streams (:meth:`show_live_frame`), and the picture it
         lands as.
 
-        With no frame yet the pane stands ``made_from`` — the ``(image, clip)``
+        With no frame yet the pane stands ``made_from`` — the picture and clip
         the run was built on, shown as the sum
         :class:`~origenerator.gui.combination_view.CombinationView` draws, the
         same pair the strip's corner and the folder's tile stand for that job.
@@ -1164,20 +1187,19 @@ class GenerateConfigPanel(QWidget):
         self._live_note = None
         if frame:
             self.show_live_frame(frame)
-        elif made_from and any(made_from):
-            self.show_live_source(*made_from)
+        elif made_from is not None and (made_from.picture or made_from.recipe):
+            self.show_live_source(made_from)
         else:
             self.show_live_wait(note)
 
-    def show_live_source(self, image_path, video_path):
+    def show_live_source(self, made_from: Combination):
         """Stand what the followed run is being made from, in place of a frame it
         has not streamed yet. Repainted only when the pair changes, since the
         poll re-reads the watch every tick and the clip beside it is looping."""
-        pair = (str(image_path or ""), str(video_path or ""))
-        if pair == self._live_source:
+        if made_from == self._live_source:
             return
-        self._live_source = pair
-        self.show_combination(image_path, video_path)
+        self._live_source = made_from
+        self.show_combination(made_from)
 
     def show_live_frame(self, frame: bytes):
         """The run this tab follows streamed a frame: put it up."""

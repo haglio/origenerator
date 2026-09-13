@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QWidget
 
 from origenerator import recipe_match
 from origenerator.gui import combine_controller as module
+from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 
@@ -43,8 +44,9 @@ class FakePanel:
         self.preview = preview
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
-        self.intent = recipe_match.PLAYERS
+        self.intent = recipe_match.VIDEO
         self.category = ""
+        self.dropped = {}
         self.available = None
         self.visible = None
         self.lit_for = []
@@ -54,6 +56,7 @@ class FakePanel:
         self.open_requested = _Signal()
         self.open_category_requested = _Signal()
         self.intent_changed = _Signal()
+        self.item_activated = _Signal()
 
     def selected_intent(self):
         return self.intent
@@ -66,6 +69,14 @@ class FakePanel:
 
     def set_category(self, category):
         self.category = category
+
+    def dropped_videos(self):
+        return dict(self.dropped)
+
+    def set_dropped_videos(self, videos):
+        self.dropped = dict(videos)
+        if not self.category:
+            self.video_slot.set_item(self.dropped.get(self.intent))
 
     def set_available_categories(self, categories):
         self.available = list(categories)
@@ -172,8 +183,8 @@ class FakeConfigPanel:
     def set_recipe_source(self, category, video_id):
         self.source = (category, video_id)
 
-    def show_combination(self, still, looping):
-        self.combination = (still, looping)
+    def show_combination(self, combination):
+        self.combination = combination
 
 
 class FakeHost:
@@ -213,6 +224,9 @@ class FakeHost:
 
     def reveal_launch(self, key):
         self.revealed.append(key)
+
+    def follow_link(self, prompt_id):
+        pass
 
     def ask_which_seed(self, workflow, *, can_reroll_image):
         self.asked.append(can_reroll_image)
@@ -313,18 +327,29 @@ def test_a_panel_with_no_server_behind_it_hides(combine):
 # --- what a session keeps ---------------------------------------------------
 
 
-def test_the_session_keeps_both_slots_the_lane_and_the_act(combine):
+def test_the_session_keeps_the_picture_each_lanes_video_the_lane_and_the_act(combine):
     # None of the four is recoverable from the others: an act says nothing about
     # which lane answers it.
     controller, _host = combine()
     controller.panel.image_slot.set_item("img")
-    controller.panel.video_slot.set_item("clip")
+    controller.panel.set_dropped_videos({recipe_match.VIDEO: "clip"})
     controller.panel.set_intent(recipe_match.GENAU)
     controller.panel.set_category("waving")
 
     assert controller.selection() == {
-        "image": "img", "video": "clip",
+        "image": "img", "videos": {recipe_match.VIDEO: "clip"},
         "intent": recipe_match.GENAU, "category": "waving"}
+
+
+def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combine):
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip"), _video("loop")]))
+
+    controller.restore({"image": "img", "intent": recipe_match.GENAU,
+                        "videos": {recipe_match.VIDEO: "clip", recipe_match.GENAU: "loop",
+                                   "elsewhere": "gone"}})
+
+    assert controller.panel.dropped == {recipe_match.VIDEO: "clip", recipe_match.GENAU: "loop"}
+    assert controller.panel.video_slot.item == "loop"
 
 
 def test_a_restore_puts_the_lane_in_before_the_act(combine):
@@ -579,7 +604,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller.panel.category_requested.emit("img", "waving", recipe_match.PLAYERS)
+    controller.panel.category_requested.emit("img", "waving", recipe_match.VIDEO)
 
     assert controller.launching_rows() == []
 
@@ -602,7 +627,7 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
 
     assert tabs.opened == [(VIDEO_WORKFLOW, {"seed": 7})]
     assert panel.source == ("waving", "clip")
-    assert panel.combination == ("img-thumb.png", "clip.webp")
+    assert panel.combination == Combination("img-thumb.png", "clip.webp")
 
 
 def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
@@ -618,7 +643,7 @@ def test_a_curated_act_opened_shows_the_frame_alone(combine, monkeypatch):
 
     controller._open_category("img", "waving")
 
-    assert panel.combination == ("img-thumb.png", None)
+    assert panel.combination == Combination("img-thumb.png")
 
 
 # --- the spoken "genau it" ---------------------------------------------------

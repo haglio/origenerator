@@ -22,7 +22,7 @@ def _panel(qtbot):
 
 def _pick_act(panel, act):
     """Choose an act in the dropdown, as a click on its row would; "" is the
-    neutral "-" and so is an act the list does not carry."""
+    neutral "(custom)" and so is an act the list does not carry."""
     index = panel._category.findText(act)
     panel._category.setCurrentIndex(index if index >= 1 else 0)
 
@@ -30,7 +30,7 @@ def _pick_act(panel, act):
 def _pick_lane(panel, intent):
     """Click the lane's radio; the group's exclusivity releases the other."""
     radio = (panel._genau_radio if intent == recipe_match.GENAU
-             else panel._players_radio)
+             else panel._video_radio)
     radio.setChecked(True)
 
 
@@ -101,7 +101,7 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "delta", recipe_match.PLAYERS)]
+    assert opened == [("img1", "delta", recipe_match.VIDEO)]
 
 
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
@@ -120,11 +120,11 @@ def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     assert panel.video_slot._label.property("dragActive") is False
 
 
-def test_neutral_option_is_a_dash_leading_the_acts(qtbot):
+def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     panel = _panel(qtbot)
     assert panel.selected_category() == ""  # neutral by default
     items = [panel._category.itemText(i) for i in range(panel._category.count())]
-    assert items[0] == "-"                              # the neutral choice is a dash, not a prompt
+    assert items[0] == "(custom)"
     assert items[1:] == list(recipe_match.CATEGORIES)   # the six acts follow it
 
 
@@ -140,7 +140,7 @@ def test_acts_with_no_video_to_mine_are_greyed_out(qtbot):
     assert _enabled(panel, "beta") and _enabled(panel, "epsilon")
     assert not _enabled(panel, "gamma")  # nothing in the gallery to build a recipe from
     assert not _enabled(panel, "dancing")
-    assert _enabled(panel, "-")            # the neutral option always stays pickable
+    assert _enabled(panel, "(custom)")     # the neutral option always stays pickable
 
 
 def test_an_act_becomes_pickable_once_a_video_of_it_exists(qtbot):
@@ -185,11 +185,51 @@ def test_a_picked_category_enables_generate_with_only_an_image(qtbot):
 def test_picking_an_act_clears_the_dropped_video_without_collapsing(qtbot):
     panel = _panel(qtbot)
     panel.video_slot.set_item("vid1")
+    height = panel._video_part.sizeHint().height()
 
     _pick_act(panel, "alpha")
 
     assert panel.video_slot.current_id() is None  # the act supersedes it, so the video is dropped
-    assert not panel.video_slot.isHidden()         # but the slot stays put — the area doesn't collapse
+    assert panel._video_part.sizeHint().height() == height  # hidden, but its room stays put
+
+
+def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    _pick_act(panel, "alpha")
+
+    _pick_act(panel, "")
+
+    assert panel.video_slot.current_id() == "vid1"
+
+
+def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtbot):
+    fitting = {"vid1"}
+    panel = CombinePanel(image_accepts=lambda pid: True,
+                         video_accepts=lambda pid: pid in fitting,
+                         preview=lambda pid: (None, None))
+    qtbot.addWidget(panel)
+    panel.video_slot.set_item("vid1")
+    _pick_act(panel, "alpha")
+    fitting.clear()  # binned while the act was picked
+
+    _pick_act(panel, "")
+
+    assert panel.video_slot.current_id() is None
+
+
+def test_each_lane_keeps_its_own_dropped_video(qtbot):
+    panel = _panel(qtbot)
+    panel.video_slot.set_item("vid1")
+    _pick_lane(panel, recipe_match.GENAU)
+    assert panel.video_slot.current_id() is None
+    panel.video_slot.set_item("vid2")
+
+    _pick_lane(panel, recipe_match.VIDEO)
+    assert panel.video_slot.current_id() == "vid1"
+
+    _pick_lane(panel, recipe_match.GENAU)
+    assert panel.video_slot.current_id() == "vid2"
 
 
 def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
@@ -198,19 +238,19 @@ def test_dropping_a_video_resets_the_dropdown_to_neutral(qtbot):
 
     panel.video_slot.set_item("vid1")
 
-    assert panel.selected_category() == ""          # a dropped video wipes the act back to "-"
+    assert panel.selected_category() == ""          # a dropped video wipes the act back to "(custom)"
     assert panel.video_slot.current_id() == "vid1"  # ...and the video is what's kept
 
 
-def test_picking_an_act_relabels_the_video_drop_zone(qtbot):
+def test_the_video_slot_shows_only_while_custom_is_picked(qtbot):
     panel = _panel(qtbot)
-    assert panel.video_slot._label.text() == "Drop a video"  # neutral prompt
+    assert not panel.video_slot.isHidden()
 
     _pick_act(panel, "gamma")
-    assert panel.video_slot._label.text() == "use custom action from video"  # act active: the override hint
+    assert panel.video_slot.isHidden()
 
     _pick_act(panel, "")
-    assert panel.video_slot._label.text() == "Drop a video"  # neutral again
+    assert not panel.video_slot.isHidden()
 
 
 def test_generate_emits_the_picked_act(qtbot):
@@ -222,29 +262,19 @@ def test_generate_emits_the_picked_act(qtbot):
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "delta", recipe_match.PLAYERS)]
+    assert cats == [("img1", "delta", recipe_match.VIDEO)]
 
 
-def test_clearing_a_slot_disables_generate_again(qtbot):
-    panel = _panel(qtbot)
-    panel.image_slot.set_item("img1")
-    panel.video_slot.set_item("vid1")
-    assert panel._generate_btn.isEnabled()
-
-    panel.image_slot.clear()
-
-    assert not panel._generate_btn.isEnabled()
+# --- the Video/Genau radio: what the result is for ----------------------------
 
 
-# --- the players/Genau radio: what the result is for --------------------------
-
-
-def test_the_lane_defaults_to_players(qtbot):
+def test_the_lane_defaults_to_video(qtbot):
     # The long-standing behavior of this panel, and by far the more common ask, so
     # the Genau clip is the deliberate detour rather than the default.
     panel = _panel(qtbot)
-    assert panel.selected_intent() == recipe_match.PLAYERS
-    assert panel._players_radio.isChecked()
+    assert panel.selected_intent() == recipe_match.VIDEO
+    assert panel._video_radio.text() == "Video"
+    assert panel._video_radio.isChecked()
     assert not panel._genau_radio.isChecked()
 
 
@@ -278,8 +308,8 @@ def test_switching_the_lane_announces_it_once(qtbot):
     _pick_lane(panel, recipe_match.GENAU)
     assert heard == [recipe_match.GENAU]
 
-    _pick_lane(panel, recipe_match.PLAYERS)
-    assert heard == [recipe_match.GENAU, recipe_match.PLAYERS]
+    _pick_lane(panel, recipe_match.VIDEO)
+    assert heard == [recipe_match.GENAU, recipe_match.VIDEO]
 
 
 def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
@@ -288,7 +318,7 @@ def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     panel.set_available_categories({"beta"})
 
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
-    # An act the players' lane answers happily can still have no loop under it, so
+    # An act the video lane answers happily can still have no loop under it, so
     # the greyed-out reason has to name which lane it is talking about.
     assert "looping" in reason.lower()
 

@@ -154,7 +154,7 @@ def build_stylesheet() -> str:
     /* A radio's mark, drawn here rather than left to the platform. The app-wide
        QWidget rule above hands every radio to the stylesheet engine, and the
        selected mark it falls back to paints dark on this dark ground — the
-       chosen Players/Genau lane simply vanished. So both states are stated here:
+       chosen Video/Genau lane simply vanished. So both states are stated here:
        the same hairline ring the fields wear, and inside it a light disc a
        couple of pixels short of that ring. The disc is a radial gradient because
        Qt draws no shapes for a subcontrol and takes a picture only as a file

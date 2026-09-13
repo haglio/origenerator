@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from origenerator import gallery
 from origenerator.gallery import combine
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -118,6 +120,58 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
     params = gallery.combined_params(video, image, _ManualSize())
 
     assert (params["width"], params["height"]) == (720, 928)
+
+# --- whether a run still says what its recipe video said --------------------
+
+
+def _recipe_run(**recipe_params):
+    recipe = _video_row(**recipe_params)
+    return recipe, gallery.combined_params(
+        recipe, _image_row([{"filename": "sdxl_new.png", "subfolder": ""}]), _I2V)
+
+
+def test_a_run_whose_negative_prompt_moved_off_its_recipes_differs_from_it():
+    recipe, params = _recipe_run(positive_prompt="alpha form", negative_prompt="beta")
+
+    assert not gallery.prompts_differ_from(params, recipe, _I2V)
+    assert gallery.prompts_differ_from({**params, "negative_prompt": "gamma"}, recipe, _I2V)
+
+
+@pytest.mark.parametrize(("key", "words"), [("audio_prompt", "a low hum"),
+                                             ("audio_negative_prompt", "static"),
+                                             ("scene_lines", ["hello there"])])
+def test_the_audio_prompts_and_the_spoken_lines_are_words_of_the_recipe_too(key, words):
+    recipe, params = _recipe_run(positive_prompt="alpha form")
+
+    assert gallery.prompts_differ_from({**params, key: words}, recipe, _I2V)
+
+
+def test_the_same_words_spaced_or_wrapped_differently_are_still_the_recipes():
+    recipe, params = _recipe_run(positive_prompt="alpha form,\r\ncalm", negative_prompt="beta")
+
+    respaced = {**params, "positive_prompt": "alpha form, calm  ", "negative_prompt": " beta"}
+
+    assert not gallery.prompts_differ_from(respaced, recipe, _I2V)
+
+
+def test_a_run_carrying_no_lines_says_what_a_recipe_with_empty_lines_says():
+    recipe, params = _recipe_run(positive_prompt="alpha form")
+    params.pop("scene_lines")
+
+    assert not gallery.prompts_differ_from(params, recipe, _I2V)
+
+
+def test_a_run_missing_a_prompt_reads_it_as_the_workflows_default():
+    recipe, params = _recipe_run(positive_prompt="alpha form")
+    params.pop("audio_negative_prompt")
+
+    assert not gallery.prompts_differ_from(params, recipe, _I2V)
+
+
+def test_the_words_the_genau_lane_adds_are_words_the_recipe_never_said():
+    recipe, params = _recipe_run(positive_prompt="alpha form", negative_prompt="beta")
+
+    assert gallery.prompts_differ_from(gallery.cycle_shaped(params, _I2V), recipe, _I2V)
 
 # --- curated_params: the overlay's hand-tuned act recipe on a dropped image ---
 

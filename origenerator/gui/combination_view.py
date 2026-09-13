@@ -25,28 +25,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QMovie, QPainter, QPixmap
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QMovie, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+from origenerator.gui.combination import (
+    Combination,
+    draw_plus,
+    draw_recipe,
+    pair_side,
+    paren_font,
+    paren_width,
+    plus_font,
+    plus_width,
+)
 from origenerator.gui.grayscale import play_grayscale
 from origenerator.gui.looping_preview import fit_size, looping_movie
 from origenerator.gui.queue_thumbs import fitted_cell
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import TEXT_MUTED
 
 # How much of the pane's height a picture takes, leaving room for the plus sign
 # to breathe between them and the pane's own margins around them.
 _HEIGHT_SHARE = 0.8
-# The plus, as a fraction of a picture's side — big enough to read as the operator
-# joining them rather than as a mark on one of the pictures.
-_PLUS_SHARE = 0.28
-_MIN_PLUS_PT = 12
+_MARGIN = 8
 
 
-def combination_pixmap(image_path, video_path, size: QSize) -> QPixmap | None:
+def combination_pixmap(combination: Combination, size: QSize) -> QPixmap | None:
     """The pair as one still picture, fitted into ``size`` — or ``None`` for a
     run made from nothing, which is a plate the caller leaves alone.
 
@@ -60,41 +63,30 @@ def combination_pixmap(image_path, video_path, size: QSize) -> QPixmap | None:
     from :func:`~origenerator.gui.queue_thumbs.fitted_cell`, so a picture the
     strip has already scaled this second is not scaled again for the tile.
     """
-    side = _pair_side(size, bool(image_path and video_path))
-    image = fitted_cell(image_path, side)
-    recipe = fitted_cell(video_path, side, gray=True)
-    parts = [part for part in (image, recipe) if part is not None]
-    if not parts:
+    both = bool(combination.picture and combination.recipe)
+    enclosed = bool(combination.recipe) and combination.recipe_prompt_edited
+    side = pair_side(size, both, enclosed)
+    image = fitted_cell(combination.picture, side)
+    recipe = fitted_cell(combination.recipe, side, gray=True)
+    if image is None and recipe is None:
         return None
-    plus = _plus_width(side) if len(parts) == 2 else 0
-    width = len(parts) * side + plus
-    canvas = QPixmap(width, side)
+    plus = plus_width(side) if image is not None and recipe is not None else 0
+    paren = paren_width(side) if recipe is not None and enclosed else 0
+    halves = sum(side for half in (image, recipe) if half is not None)
+    canvas = QPixmap(halves + plus + 2 * paren, side)
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
-    painter.drawPixmap(0, 0, parts[0])
-    if len(parts) == 2:
-        painter.setPen(QColor(TEXT_MUTED))
-        font = painter.font()
-        font.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
-        painter.setFont(font)
-        painter.drawText(QRect(side, 0, plus, side),
-                         Qt.AlignmentFlag.AlignCenter, "+")
-        painter.drawPixmap(side + plus, 0, parts[1])
+    x = 0
+    if image is not None:
+        painter.drawPixmap(0, 0, image)
+        x = side
+    if plus:
+        draw_plus(painter, x, side)
+        x += plus
+    if recipe is not None:
+        draw_recipe(painter, x, recipe, enclosed)
     painter.end()
     return canvas
-
-
-def _pair_side(size: QSize, both: bool) -> int:
-    """The square each half is fitted into, so the sum fits ``size`` across."""
-    if not both:
-        return max(1, min(size.width(), size.height()))
-    room = size.width() / (2 + _PLUS_SHARE)   # two squares and the operator
-    return max(1, int(min(room, size.height())))
-
-
-def _plus_width(side: int) -> int:
-    """The gap the operator sits in, in proportion to the squares beside it."""
-    return max(_MIN_PLUS_PT, int(side * _PLUS_SHARE))
 
 
 def _readable(path) -> QPixmap | None:
@@ -115,57 +107,73 @@ class CombinationView(QWidget):
         self._video_path: str | None = None
         self._movie: QMovie | None = None
         self._pixmap: QPixmap | None = None
+        self._has_clip = False
+        self._enclosed = False
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(12)
+        layout.setContentsMargins(_MARGIN, _MARGIN, _MARGIN, _MARGIN)
+        layout.setSpacing(0)
         layout.addStretch(1)
         self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.image_label)
         self.plus_label = QLabel("+")
-        self.plus_label.setObjectName("estimateLabel")  # muted, like the pane's own text
-        self.plus_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.plus_label)
+        self.open_paren_label = QLabel("(")
         self.video_label = QLabel()
-        self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.video_label)
-        layout.addStretch(1)
+        self.close_paren_label = QLabel(")")
+        self._parens = (self.open_paren_label, self.close_paren_label)
+        for operator in (self.plus_label, *self._parens):
+            operator.setObjectName("estimateLabel")  # muted, like the pane's own text
+        for paren in self._parens:
+            paren.hide()
         # Clicks fall through to the pane, which owns the double-click that opens
         # a show — there is nothing here to open, so nothing here should eat one.
-        for label in (self.image_label, self.plus_label, self.video_label):
+        for label in (self.image_label, self.plus_label, self.open_paren_label,
+                      self.video_label, self.close_paren_label):
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            layout.addWidget(label)
+        layout.addStretch(1)
 
-    def show_pair(self, image_path, video_path) -> None:
-        """Show ``image_path`` beside the looping ``video_path``, in gray.
+    def show_pair(self, combination: Combination) -> None:
+        """Show the picture beside its recipe clip, looping in gray.
 
         Either may be missing — a curated act is pinned in the overlay and has no
         past video under it, and a frame can have moved — and the plus shows only
         when both halves are there, since a lone picture is not a sum.
         """
         self._stop_movie()
-        self._image_path = str(image_path) if image_path else None
-        self._video_path = str(video_path) if video_path else None
+        self._image_path = str(combination.picture) if combination.picture else None
+        self._video_path = str(combination.recipe) if combination.recipe else None
         self._pixmap = _readable(self._image_path)
         if self._pixmap is None:
             self.image_label.clear()
         self.image_label.setVisible(self._pixmap is not None)
-        has_video = bool(self._video_path and Path(self._video_path).is_file())
-        if not has_video:
+        self._has_clip = bool(self._video_path and Path(self._video_path).is_file())
+        if not self._has_clip:
             self.video_label.clear()  # no stale last frame under the next pair
-        self.video_label.setVisible(has_video)
-        self.plus_label.setVisible(self._pixmap is not None and has_video)
-        if has_video:
+        self.video_label.setVisible(self._has_clip)
+        self.plus_label.setVisible(self._pixmap is not None and self._has_clip)
+        self._show_parentheses(combination.recipe_prompt_edited)
+        if self._has_clip:
             self._movie = looping_movie(self._video_path, self._side_size(),
                                         self.video_label)
             play_grayscale(self._movie, self.video_label)
         self._rescale()
+
+    def mark_recipe_prompt_edited(self, edited: bool) -> None:
+        self._show_parentheses(edited)
+        self._rescale()
+
+    def _show_parentheses(self, edited: bool) -> None:
+        self._enclosed = edited and self._has_clip
+        for paren in self._parens:
+            paren.setVisible(self._enclosed)
 
     def clear(self) -> None:
         """Drop both halves — the pane is showing something else now."""
         self._stop_movie()
         self._image_path = self._video_path = None
         self._pixmap = None
+        self._has_clip = self._enclosed = False
         self.image_label.clear()
         self.video_label.clear()
 
@@ -173,9 +181,10 @@ class CombinationView(QWidget):
 
     def _side(self) -> int:
         """The square each picture is fitted into: a share of the pane's height,
-        but never more than half its width, so two of them plus the operator
-        between them fit across however narrow the pane is dragged."""
-        return max(1, min(int(self.height() * _HEIGHT_SHARE), self.width() // 2))
+        and no wider than lets the pair, its plus and any parentheses fit across
+        between the margins — the arithmetic :func:`combination_pixmap` draws by."""
+        room = QSize(self.width() - 2 * _MARGIN, int(self.height() * _HEIGHT_SHARE))
+        return pair_side(room, self._pixmap is not None and self._has_clip, self._enclosed)
 
     def _side_size(self) -> QSize:
         side = self._side()
@@ -194,9 +203,13 @@ class CombinationView(QWidget):
                 # Re-fit in place rather than rebuilding: a new movie would restart
                 # the loop from frame one on every pixel of a resize drag.
                 self._movie.setScaledSize(target)
-        font = self.plus_label.font()
-        font.setPointSize(max(_MIN_PLUS_PT, int(side * _PLUS_SHARE)))
-        self.plus_label.setFont(font)
+        for picture in (self.image_label, self.video_label):
+            picture.setFixedWidth(side)
+        self.plus_label.setFont(plus_font(self.plus_label.font(), side))
+        self.plus_label.setFixedWidth(plus_width(side))
+        for paren in self._parens:
+            paren.setFont(paren_font(paren.font(), side))
+            paren.setFixedWidth(paren_width(side))
 
     def _stop_movie(self) -> None:
         if self._movie is not None:

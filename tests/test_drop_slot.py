@@ -93,6 +93,18 @@ def test_clear_on_an_empty_slot_does_not_notify(qtbot):
     assert seen == []  # idempotent: nothing to clear, no spurious change
 
 
+def test_clicking_a_filled_slot_goes_to_its_item_and_keeps_it(qtbot):
+    slot = _slot(qtbot)
+    _drop(slot, "img1")
+    went = []
+    slot.activated.connect(went.append)
+
+    qtbot.mouseClick(slot, Qt.MouseButton.LeftButton)
+
+    assert went == ["img1"]
+    assert slot.current_id() == "img1"
+
+
 def test_a_video_preview_animates(qtbot, tmp_path):
     webp = _write_looping_webp(tmp_path / "v1_anim.webp")
     slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp))
@@ -140,25 +152,6 @@ def test_an_ordinary_slot_keeps_its_color(qtbot, tmp_path):
     _drop(slot, "img1")
 
     assert slot._label.pixmap().toImage().pixelColor(2, 2).red() > 150
-
-
-def test_set_placeholder_updates_the_empty_prompt_live(qtbot):
-    slot = _slot(qtbot, placeholder="Drop here")
-    assert slot._label.text() == "Drop here"
-
-    slot.set_placeholder("use custom action from video")
-
-    assert slot._label.text() == "use custom action from video"
-
-
-def test_set_placeholder_leaves_a_held_item_untouched(qtbot):
-    slot = _slot(qtbot)
-    _drop(slot, "img1")  # preview is (None, None): the held state shows a check, not a prompt
-
-    slot.set_placeholder("something else")
-
-    assert slot.current_id() == "img1"          # still held
-    assert slot._label.text() != "something else"  # the new prompt only applies once empty
 
 
 def test_set_candidate_lights_and_clears_the_slot(qtbot):

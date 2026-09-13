@@ -6,10 +6,12 @@ from PIL import Image
 from PyQt6.QtCore import Qt
 
 from origenerator.gui import queue_thumbs
+from origenerator.gui.combination import Combination
 from origenerator.gui.queue_thumbs import (
     FOLDER_CELLS,
     QueueThumbs,
     block_width,
+    fitted_cell,
     folder_pixmap,
     source_pixmap,
 )
@@ -39,7 +41,7 @@ def test_a_cell_shows_the_whole_picture_letterboxed(qapp, tmp_path):
     # subject is not dead center comes out as a picture of something else.
     red = _picture(tmp_path / "a.png", (255, 0, 0))  # wider than tall
 
-    block = source_pixmap(red, CELL)
+    block = source_pixmap(Combination(red), CELL)
 
     assert _color_at(block, CELL // 2, CELL // 2).red() > 200  # the picture itself
     assert _color_at(block, CELL // 2, 0).alpha() == 0         # letterbox above it
@@ -49,7 +51,7 @@ def test_a_cell_shows_the_whole_picture_letterboxed(qapp, tmp_path):
 def test_a_tall_picture_is_pillarboxed_instead(qapp, tmp_path):
     tall = _picture(tmp_path / "tall.png", (255, 0, 0), size=(40, 80))
 
-    block = source_pixmap(tall, CELL)
+    block = source_pixmap(Combination(tall), CELL)
 
     assert _color_at(block, CELL // 2, CELL // 2).red() > 200
     assert _color_at(block, 0, CELL // 2).alpha() == 0
@@ -57,8 +59,8 @@ def test_a_tall_picture_is_pillarboxed_instead(qapp, tmp_path):
 
 def test_a_missing_file_is_no_picture_rather_than_a_blank_one(qapp, tmp_path):
     # A start frame can be a library file that has moved, or one still rendering.
-    assert source_pixmap(tmp_path / "gone.png", CELL) is None
-    assert source_pixmap(None, CELL) is None
+    assert source_pixmap(Combination(tmp_path / "gone.png"), CELL) is None
+    assert source_pixmap(Combination(), CELL) is None
 
 
 def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
@@ -67,12 +69,27 @@ def test_a_combine_draws_the_frame_then_its_recipe_in_gray(qapp, tmp_path):
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
     recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
 
-    block = source_pixmap(frame, CELL, recipe)
+    block = source_pixmap(Combination(frame, recipe), CELL)
 
     lead = _color_at(block, _middle_of_cell(0), CELL // 2)
     assert lead.red() > 200 and lead.blue() < 60         # the frame, still itself
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
     assert follow.red() == follow.green() == follow.blue()  # the recipe, drained
+
+
+def _recipe_columns(block, recipe):
+    drained = fitted_cell(recipe, CELL, gray=True).toImage().pixelColor(CELL // 2, CELL // 2)
+    image = block.toImage()
+    return [x for x in range(image.width()) if image.pixelColor(x, CELL // 2) == drained]
+
+
+def test_a_combine_row_puts_a_plus_between_the_frame_and_its_recipe(qapp, tmp_path):
+    frame = _picture(tmp_path / "frame.png", (255, 0, 0))
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+
+    block = source_pixmap(Combination(frame, recipe), CELL)
+
+    assert _painted(block.toImage(), CELL, _recipe_columns(block, recipe)[0])
 
 
 def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path):
@@ -81,15 +98,34 @@ def test_a_recipe_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp_path)
     # the two read as one column down the line.
     recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
 
-    block = source_pixmap(tmp_path / "not-yet.png", CELL, recipe)
+    block = source_pixmap(Combination(tmp_path / "not-yet.png", recipe), CELL)
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
     assert follow.blue() > 0 and follow.red() == follow.blue()
 
 
+def test_a_recipe_whose_prompt_was_edited_stands_in_parentheses_on_its_row(qapp, tmp_path):
+    frame = _picture(tmp_path / "frame.png", (255, 0, 0))
+    recipe = _picture(tmp_path / "recipe.png", (0, 0, 255))
+    as_made = source_pixmap(Combination(frame, recipe), CELL)
+    edited = source_pixmap(Combination(frame, recipe, recipe_prompt_edited=True), CELL)
+
+    made_at, edited_at = _recipe_columns(as_made, recipe), _recipe_columns(edited, recipe)
+
+    assert edited_at[0] > made_at[0]
+    assert _painted(edited.toImage(), made_at[0], edited_at[0])
+    assert _painted(edited.toImage(), edited_at[-1] + 1, block_width(CELL))
+
+
+def _painted(image, left, right):
+    return any(image.pixelColor(x, y).alpha() > 0
+               for x in range(left, right) for y in range(image.height()))
+
+
 def test_neither_half_on_disk_is_still_no_picture(qapp, tmp_path):
-    assert source_pixmap(tmp_path / "gone.png", CELL, tmp_path / "also-gone.png") is None
+    assert source_pixmap(Combination(tmp_path / "gone.png", tmp_path / "also-gone.png"),
+                         CELL) is None
 
 
 def test_the_pictures_lie_across_the_row_not_stacked(qapp, tmp_path):
@@ -124,7 +160,7 @@ def test_a_start_frame_leaves_the_rest_of_the_block_empty(qapp, tmp_path):
     # slots beside it would claim three that never existed.
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
 
-    block = source_pixmap(frame, CELL)
+    block = source_pixmap(Combination(frame), CELL)
 
     assert _color_at(block, _middle_of_cell(0), CELL // 2).red() > 200
     assert _color_at(block, _middle_of_cell(3), CELL // 2).alpha() == 0
@@ -135,7 +171,7 @@ def test_one_picture_takes_the_same_width_as_four(qapp, tmp_path):
     frame = _picture(tmp_path / "frame.png", (255, 0, 0))
     mates = [_picture(tmp_path / f"m{i}.png", (0, 0, 255)) for i in range(4)]
 
-    assert source_pixmap(frame, CELL).width() == folder_pixmap(mates, CELL).width()
+    assert source_pixmap(Combination(frame), CELL).width() == folder_pixmap(mates, CELL).width()
 
 
 def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
@@ -156,12 +192,12 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
     # decoding one a second and a half apart is work nobody sees.
     picture = _picture(tmp_path / "a.png", (255, 0, 0))
     queue_thumbs._CELLS.clear()
-    source_pixmap(picture, CELL)
+    source_pixmap(Combination(picture), CELL)
 
     reads = []
     monkeypatch.setattr(queue_thumbs, "_fit_in_square",
                         lambda *a: reads.append(a) or None)
-    again = source_pixmap(picture, CELL)
+    again = source_pixmap(Combination(picture), CELL)
 
     assert reads == []
     assert again is not None  # answered from the cache, not re-fitted to nothing
@@ -173,13 +209,13 @@ def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
     # the old picture until the app restarted (bug 27).
     picture = _picture(tmp_path / "a.png", (255, 0, 0))
     queue_thumbs._CELLS.clear()
-    assert _color_at(source_pixmap(picture, CELL), CELL // 2, CELL // 2).red() > 200
+    assert _color_at(source_pixmap(Combination(picture), CELL), CELL // 2, CELL // 2).red() > 200
 
     _picture(tmp_path / "a.png", (0, 0, 255))
     later = os.stat(picture).st_mtime_ns + 2_000_000_000
     os.utime(picture, ns=(later, later))
 
-    assert _color_at(source_pixmap(picture, CELL), CELL // 2, CELL // 2).blue() > 200
+    assert _color_at(source_pixmap(Combination(picture), CELL), CELL // 2, CELL // 2).blue() > 200
 
 
 def test_an_unchanged_push_costs_the_block_nothing(qtbot, tmp_path):
@@ -203,9 +239,8 @@ def test_a_source_frame_that_is_not_on_disk_yet_leaves_the_block_to_the_folder(
     thumbs = QueueThumbs(CELL)
     qtbot.addWidget(thumbs)
 
-    assert thumbs.show_source(str(tmp_path / "not-yet.png")) is False
-    assert thumbs.show_source(None) is False
-    assert thumbs.show_source("") is False
+    assert thumbs.show_source(Combination(str(tmp_path / "not-yet.png"))) is False
+    assert thumbs.show_source(Combination()) is False
 
 
 def test_a_block_with_nothing_to_show_leaves_the_row(qtbot, tmp_path):

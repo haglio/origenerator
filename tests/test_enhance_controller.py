@@ -18,10 +18,23 @@ from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
     NO_VIDEO_ENHANCER,
     EnhanceController,
+    Offer,
 )
 from origenerator.gui.toast import ERROR, NOTICE, WARNING
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
+
+
+class FakeSignal:
+    def __init__(self):
+        self._slots = []
+
+    def connect(self, slot):
+        self._slots.append(slot)
+
+    def emit(self):
+        for slot in self._slots:
+            slot()
 
 
 class FakePanel:
@@ -29,14 +42,19 @@ class FakePanel:
 
     def __init__(self, on_changed):
         self.on_changed = on_changed
+        self.enhance_requested = FakeSignal()
         self.shown = None
         self.applicable = None
+        self.offer = None
 
     def show_settings(self, settings):
         self.shown = settings
 
     def set_applicable(self, applicable, why):
         self.applicable = (applicable, why)
+
+    def show_offer(self, available, tip):
+        self.offer = (available, tip)
 
 
 class FakeWorkflow:
@@ -356,6 +374,25 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
     assert len(reroll.prepared) == 1
 
 
+def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance,
+                                                                         monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "level_matching_settings",
+                        lambda row, settings: None)
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png"})
+    monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    reroll = FakeReroll()
+    controller, _host = enhance(FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]),
+                                browser=FakeBrowser(["i1"]), reroll=reroll)
+
+    controller.panel.enhance_requested.emit()
+
+    assert [params for _key, params in reroll.prepared] == [{"input_image": "one.png"}]
+
+
 def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
     reroll = FakeReroll()
     controller, _host = enhance(reroll=reroll)
@@ -399,7 +436,7 @@ def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatc
     controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
                                 browser=FakeBrowser(["v1"]))
 
-    controller.sync_panel()
+    controller.sync_panel(Offer(False, NO_VIDEO_ENHANCER))
 
     assert controller.panel.applicable == (False, NO_VIDEO_ENHANCER)
 
@@ -411,9 +448,17 @@ def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
     controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
                                 browser=FakeBrowser(["v1", "i1"]))
 
-    controller.sync_panel()
+    controller.sync_panel(Offer(True, "Enhance 1 item"))
 
     assert controller.panel.applicable == (True, NO_VIDEO_ENHANCER)
+
+
+def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(enhance):
+    controller, _host = enhance()
+
+    controller.sync_panel(Offer(False, "Nothing here to enhance"))
+
+    assert controller.panel.offer == (False, "Nothing here to enhance")
 
 
 # --- a run in flight, and where it shows -------------------------------------

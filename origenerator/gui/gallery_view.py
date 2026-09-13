@@ -63,7 +63,7 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
 from origenerator.gui.editable_header import EditableHeader
-from origenerator.gui.enhance_controller import EnhanceController
+from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.find_bar import FindBar
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
@@ -2952,10 +2952,11 @@ class GalleryView(QWidget):
         of, each fixed by adding the call somebody had forgotten — so every
         handler asks for all of it and the state says how it stands.
         """
-        self._bank.apply(self.bank_state())
-        self._enhance.sync_panel()
+        enhance = self._enhance.offer()
+        self._bank.apply(self.bank_state(enhance))
+        self._enhance.sync_panel(enhance)
 
-    def bank_state(self) -> BankState:
+    def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
         belong to: the trail, the undo stack, the tree's selection, the pictures
         picked, the enhance settings, the shows, and the auto-generate loop.
@@ -2967,7 +2968,6 @@ class GalleryView(QWidget):
         can_go_back, can_go_forward = self._trail
         undo_label = self._actions.undo_label()
         redo_label = self._actions.redo_label()
-        enhance = self._enhance.offer()
         looping = self._auto.active_key()
         group = self.current_group()
         loopable = isinstance(group, gallery.SettingsGroup) and self._can_reroll(group)

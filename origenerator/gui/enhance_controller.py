@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # both go dark together the moment what's in front of you is a video.
 NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
 ALREADY_AT_THESE_SETTINGS = (
-    "Already enhanced at these settings — change one below to make another"
+    "Already enhanced at these settings — change one to make another"
 )
 _WHAT_AN_ENHANCE_DOES = "(upscale + light redraw)"
 
@@ -107,6 +107,7 @@ class EnhanceController:
         self._by_prompt: dict[str, object] = {}
         self._signature: tuple = ()
         self.panel = EnhancePanel(self._on_settings_changed)
+        self.panel.enhance_requested.connect(self.enhance_the_selection)
         self.panel.show_settings(self._settings)
 
     # --- what it runs at ------------------------------------------------------
@@ -151,8 +152,9 @@ class EnhanceController:
         # Every picture on screen is answering it too, in its own corner.
         self._browser.refresh_corners()
 
-    def sync_panel(self) -> None:
-        """Gray the Enhance settings out where nothing they say could ever run.
+    def sync_panel(self, offer: Offer) -> None:
+        """Gray the Enhance settings out where nothing they say could ever run,
+        and aim the panel's own Enhance button with the bank button's ``offer``.
 
         The panel is app-wide and follows you rather than the folder, which is
         why it shows on the shelves as readily as on a settings folder — but a
@@ -161,6 +163,7 @@ class EnhanceController:
         keeps them: the images in it are still enhanceable.
         """
         self.panel.set_applicable(not self._showing_only_videos(), NO_VIDEO_ENHANCER)
+        self.panel.show_offer(offer.available, offer.tip)
 
     def _showing_only_videos(self) -> bool:
         """Whether everything in front of us is video — the picked thumbnails if

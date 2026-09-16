@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from player_core.satellite_hud import MODE_BUTTONS
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
@@ -6387,6 +6388,16 @@ def _standalone_show(qtbot, monkeypatch):
     return view._shows.showing
 
 
+MODE_VERBS = frozenset(action for action, _label, _mode in MODE_BUTTONS)
+
+
+def hud_button_names(hud) -> list[str]:
+    """What each button on *hud* is for, in drawn order and with the side prefix
+    dropped: "lock", "fmode"; a mode button keeps its whole verb, having no side."""
+    return [button.action.removeprefix(f"{hud._side}_")
+            for _rect, button in hud._targets.buttons]
+
+
 def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
     # Nothing about a show is different for not being inside a session: it is
     # the same set played the same way, so it wears the same panel a region
@@ -6398,7 +6409,7 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
 
     hud, = show.findChildren(ShowHud)
     assert hud._targets is not None
-    assert {"prev", "next", "lock", "trash"} <= {n for _rect, n in hud._targets.control}
+    assert {"prev", "next", "lock", "trash"} <= set(hud_button_names(hud))
     assert show._counter.isHidden()
     show.close()
 
@@ -6412,7 +6423,7 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     show = _standalone_show(qtbot, monkeypatch)
 
     hud, = show.findChildren(ShowHud)
-    assert hud._targets.modes == []
+    assert MODE_VERBS.isdisjoint(hud_button_names(hud))
     assert hud._model.satellites_mode == ""
     show.close()
 
@@ -6577,7 +6588,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     show = view._shows.showing
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
-    names = [name for _rect, name in hud._targets.control]
+    names = hud_button_names(hud)
     assert names.index("enhanced") == names.index("fmode") + 1
 
     hud._deliver(f"{hud._side}_enhanced")

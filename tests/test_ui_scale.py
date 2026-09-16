@@ -137,6 +137,39 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
     assert applied < imported
 
 
+def test_a_running_app_is_redrawn_at_a_new_scale_and_back(qapp):
+    from PyQt6.QtWidgets import QWidget
+
+    window = QWidget()
+    window.show()
+
+    ui_scale.draw_at(ui_scale.HOSTED_SCALE)
+    window.hide()
+    window.show()
+    qapp.processEvents()
+    shrunk = window.devicePixelRatio()
+    ui_scale.draw_at(1.0)
+    window.hide()
+    window.show()
+    qapp.processEvents()
+
+    assert shrunk == pytest.approx(ui_scale.HOSTED_SCALE)
+    assert window.devicePixelRatio() == 1.0
+    assert ui_scale.active_scale() == 1.0
+    window.close()
+
+
+def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):
+    class QtWithoutTheSetter:
+        pass
+
+    monkeypatch.setattr(ui_scale.ctypes, "WinDLL", lambda _name: QtWithoutTheSetter())
+
+    ui_scale.draw_at(ui_scale.HOSTED_SCALE)
+
+    assert ui_scale.active_scale() == 1.0
+
+
 def test_only_a_hosted_launch_turns_the_scale_on():
     from origenerator.fun_time_mode import parse_app_args
 

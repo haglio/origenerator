@@ -180,3 +180,27 @@ def test_a_move_that_leaves_the_switch_alone_still_says_so():
     control.set_state(OSR2_PARKED)
 
     assert heard == [OSR2_PARKED]
+
+
+def test_a_switch_handed_no_drivers_lets_go_and_cannot_be_turned_on():
+    control = _control()
+    control.set_state(OSR2_DRIVING)
+    heard = []
+    control.changed.connect(lambda: heard.append(control.state()))
+
+    control.drive_with(None, None)
+    control.setChecked(True)
+
+    assert heard == [OSR2_CONTROL_OFF]
+    assert not control.isEnabled() and control.state() == OSR2_CONTROL_OFF
+
+
+def test_a_switch_handed_its_drivers_back_drives_them_again():
+    motion, script = FakeMotion(), FakeScript(active=True)
+    control = _control(motion)
+    control.drive_with(None, None)
+
+    control.drive_with(motion, script)
+    control.set_state(OSR2_DRIVING)
+
+    assert control.state() == OSR2_DRIVING and control.source() == "funscript"

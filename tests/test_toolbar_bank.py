@@ -10,6 +10,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtWidgets import QToolButton
 
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -61,6 +62,30 @@ def test_the_bank_holds_no_osr2_switch_at_all(bank):
     # device now -- parked, retracted, driving, control off -- and a second
     # switch for one device is what that group replaced.
     assert not hasattr(bank(), "drive")
+
+
+def test_a_bank_taken_into_a_session_stands_as_a_hosted_one_is_built(bank):
+    taken = bank()
+    built_hosted = bank(hosted=True)
+
+    taken.become_hosted()
+
+    def shown(made):
+        return sorted(button.toolTip() for button in made.findChildren(QToolButton)
+                      if not button.isHidden())
+
+    assert taken.audio is None and taken.mic is None
+    assert shown(taken) == shown(built_hosted)
+
+
+def test_a_bank_handed_back_from_a_session_has_its_room_switches_again(bank):
+    taken = bank()
+    taken.become_hosted()
+
+    taken.become_standalone()
+
+    assert all(switch is not None and not switch.isHidden()
+               for switch in (taken.audio, taken.mic))
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):

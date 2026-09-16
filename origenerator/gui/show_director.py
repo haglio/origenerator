@@ -198,6 +198,19 @@ class ShowDirector:
         # since every frame of such a run asks again (:meth:`_would_play`).
         self._show_refused: set[str] = set()
 
+    def become_hosted(self, session) -> None:
+        if self._slideshow is not None:
+            self._slideshow.close()
+        self._fun_time = session
+        self._motion = None
+        self._region_shows = dict.fromkeys(_ORIENTATIONS)
+
+    def become_standalone(self, motion) -> None:
+        self.close_the_shows()
+        self._fun_time = None
+        self._motion = motion
+        self._region_shows = {}
+
     # --- what is up ---------------------------------------------------------
 
     @property

@@ -66,6 +66,11 @@ def _unscaled_between_tests():
     try:
         yield
     finally:
+        if os.environ.get("QT_SCALE_FACTOR") != before:
+            # A window taken into a session rescales Qt itself, not only the
+            # variable, and Qt's factor outlives the test just the same.
+            from origenerator import ui_scale
+            ui_scale.draw_at(1.0)
         if before is None:
             os.environ.pop("QT_SCALE_FACTOR", None)
         else:

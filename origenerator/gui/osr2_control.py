@@ -54,6 +54,11 @@ class Osr2Control(QObject):
         self.script = script
         self._checked = False
 
+    def drive_with(self, motion, script) -> None:
+        self.setChecked(False)
+        self._motion = motion
+        self.script = script
+
     def isEnabled(self) -> bool:  # noqa: N802 - a button's name, deliberately
         """Whether this app may drive the device at all.
 

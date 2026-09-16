@@ -217,11 +217,18 @@ class FakeControl(QObject):
     """The app's OSR2 switch reduced to what the console's group asks of one."""
 
     changed = pyqtSignal()
+    settled = pyqtSignal()
 
-    def __init__(self, state=OSR2_DRIVING):
+    def __init__(self, state=OSR2_DRIVING, script=None):
         super().__init__()
         self._state = state
+        self.script = script
         self.asked = []
+
+    def source(self):
+        if self.script is not None and self.script.active:
+            return "funscript"
+        return "robot_hand"
 
     def state(self):
         return self._state
@@ -266,6 +273,68 @@ def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
     _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
     assert motion.calls == [("hold", PARK_CENTER), "release"]
+
+
+class FakeScript:
+    """The funscript driver reduced to what the console asks of one: whether it
+    has the device, and the line it is about to send."""
+
+    def __init__(self, active=True, heights=None):
+        self.active = active
+        self._heights = heights or tuple(i / 79 for i in range(80))
+
+    def trace(self, count, seconds):
+        return self._heights[:count]
+
+
+def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
+    """The whole of what the console said before: nothing.  The motion is
+    stopped while a script drives, so a console drawn from the motion showed a
+    dead readout over a device that was working."""
+    script = FakeScript()
+    control = FakeControl(script=script)
+    panel, motion, host = _panel(qtbot, control=control)
+
+    hud = console_hud(motion, host, control=control.state(), script=script)
+
+    assert hud.drive.driven == "funscript"
+    assert hud.drive.waveform == script.trace(80, 12.0)
+    assert hud.console.osr2 == "funscript"
+
+
+def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
+    script = FakeScript(heights=tuple([0.25] * 80))
+    control = FakeControl(script=script)
+    panel, motion, host = _panel(qtbot, control=control)
+
+    hud = console_hud(motion, host, control=control.state(), script=script)
+
+    assert hud.drive.position == round(0.25 * POSITION_MAX)
+
+
+def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
+    script = FakeScript(active=False)
+    control = FakeControl(script=script)
+    panel, motion, host = _panel(qtbot, control=control)
+    motion.active = True
+
+    hud = console_hud(motion, host, control=control.state(), script=script)
+
+    assert hud.drive.driven == "robot_hand"
+    assert hud.console.osr2 == "robot_hand"
+
+
+def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
+    """The script streams into the air with the OSR2 switched off, and a green
+    line would say it was arriving."""
+    script = FakeScript()
+    control = FakeControl(script=script)
+    panel, motion, host = _panel(qtbot, control=control)
+
+    hud = console_hud(motion, host, device_on=False, control=control.state(),
+                      script=script)
+
+    assert hud.console.osr2 == "off"
 
 
 def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):

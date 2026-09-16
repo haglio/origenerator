@@ -52,6 +52,7 @@ from player_core.console_hud import (  # noqa: E402
     hud_xy,
 )
 from player_core.drive_readout import (  # noqa: E402
+    DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
@@ -113,8 +114,27 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
+def script_hud(script, motion, dwell_s: int) -> DriveHud:
+    """The readout while a funscript has the device: the script's own line from
+    the playhead forward, in the green every scripted thing in this family is
+    drawn in.
+
+    The dials beside it stay the motion's.  They are what driving puts back the
+    moment the script is done, and the readout dims every one of them anyway
+    while something other than the motion is sending.
+    """
+    heights = script.trace(drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
+    dials = motion.state
+    return DriveHud(
+        speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
+        shape=dials.shape.value,
+        position=round(POSITION_MAX * (heights[0] if heights else 0.0)),
+        driven=DRIVEN_BY_FUNSCRIPT, advance_interval=dwell_s,
+        trace_seconds=_TRACE_SECONDS, waveform=heights)
+
+
 def console_hud(motion, host, *, device_on: bool = True,
-                control: str = OSR2_CONTROL_UNANSWERED) -> ConsoleHud:
+                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated motion over
@@ -122,6 +142,11 @@ def console_hud(motion, host, *, device_on: bool = True,
     :class:`ModeHud` is what leaves the status line saying only whether the
     slide is held — there is no compilation, no browse order and no length
     filter here to report.
+
+    ``script`` is the funscript driver, when this app has one: while it has the
+    device the readout is the script's line rather than the motion's, and the
+    OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
+    picture of something nobody is sending.
 
     ``device_on`` is whether the OSR2 is answering at all
     (:func:`origenerator.osr2.device_on`). A motion running with the device off
@@ -136,19 +161,22 @@ def console_hud(motion, host, *, device_on: bool = True,
     only where the host hands over a set to narrow, and here the show's own HUD
     carries them instead.
     """
-    driving = motion.active and device_on
+    scripted = script is not None and script.active and device_on
+    driving = motion.active and device_on and not scripted
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
             mode="genau", active=True, locked=host.locked,
-            osr2=OSR2_ROBOT_HAND if driving else "off",
+            osr2=(DRIVEN_BY_FUNSCRIPT if scripted
+                  else OSR2_ROBOT_HAND if driving else "off"),
             osr2_control=control,
             cruise=motion.state.cruise.active,
             learned=motion.state.learned.active,
             shape=motion.state.state.shape.value,
             advance_interval=host.dwell_s,
         ),
-        drive=drive_hud(motion.state, driving, host.dwell_s),
+        drive=(script_hud(script, motion.state, host.dwell_s) if scripted
+               else drive_hud(motion.state, driving, host.dwell_s)),
         modes_row=False,
     )
 
@@ -185,6 +213,9 @@ class MotionPanel(QWidget):
         self._control = control
         if control is not None:
             control.changed.connect(self.refresh)
+            # And whenever the app re-aims the device: which driver has it moves
+            # with the video in front as much as with a press on this panel.
+            control.settled.connect(self.refresh)
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -212,6 +243,8 @@ class MotionPanel(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
         self.setFixedSize(*panel_size(motion, self._host, self._osr2_control()))
+        # A show's console is built while its video is already driving, so the
+        # first paint must be the size that console draws at.
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
         # second is the same picture at Pillow's price, and with the panel now
@@ -242,11 +275,21 @@ class MotionPanel(QWidget):
         self.update()
 
     def _sync_repaint(self) -> None:
-        """Animate only what is moving: a shown panel with a running motion."""
-        if self.isVisible() and getattr(self._motion, "active", False):
+        """Animate only what is moving: a shown panel with something driving.
+
+        Either driver moves the line -- the motion's wave scrolls with its
+        phase, the script's with the playhead -- and neither does while the
+        device is held at an end or let go of.
+        """
+        if self.isVisible() and self._driving():
             self._repaint.start()
         else:
             self._repaint.stop()
+
+    def _driving(self) -> bool:
+        if self._control is not None:
+            return self._control.source() is not None
+        return bool(getattr(self._motion, "active", False))
 
     def reposition(self, below=None) -> None:
         """The parent's top-left corner, where Fun Time puts the same console —
@@ -354,6 +397,10 @@ class MotionPanel(QWidget):
             self._motion.hold(
                 PARK_CENTER if state == OSR2_PARKED else RETRACT_CENTER)
 
+    def _script(self):
+        """The app's funscript driver, when the switch handed one over."""
+        return self._control.script if self._control is not None else None
+
     def _osr2_control(self) -> str:
         # Unanswered with no switch handed over: the group then draws the two
         # holds it has always had and no off button, which is a switch nothing
@@ -367,7 +414,7 @@ class MotionPanel(QWidget):
         drawn without a screen in front of it."""
         return self._painter.rgba(console_hud(
             self._motion, self._host, device_on=self._device_on(),
-            control=self._osr2_control()))
+            control=self._osr2_control(), script=self._script()))
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device

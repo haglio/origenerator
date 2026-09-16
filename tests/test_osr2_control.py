@@ -15,6 +15,8 @@ from origenerator.gui.osr2_control import Osr2Control
 class FakeMotion:
     """The driver reduced to the hold it is being asked for."""
 
+    active = False
+
     def __init__(self):
         self.held_at = None
         self.calls = []
@@ -121,3 +123,48 @@ def test_a_session_that_may_not_drive_cannot_be_switched_on():
     assert control.isEnabled() is False
     assert control.isChecked() is False
     assert control.state() == OSR2_CONTROL_OFF
+
+
+class FakeScript:
+    def __init__(self, active=False):
+        self.active = active
+
+
+def test_it_says_which_driver_has_the_device():
+    motion = FakeMotion()
+    motion.active = False
+    control = Osr2Control(motion, script=FakeScript())
+
+    assert control.source() is None
+
+    motion.active = True
+    assert control.source() == "robot_hand"
+
+    control.script.active = True
+    assert control.source() == "funscript"
+
+
+def test_the_hold_is_in_place_before_the_switch_says_so():
+    """Whatever reconciles on the switch has to see the hold already taken, or
+    it re-aims the device at a funscript the hold is meant to have stood down."""
+    motion = FakeMotion()
+    control = _control(motion)
+    seen = []
+    control.toggled.connect(lambda _on: seen.append(motion.held_at))
+
+    control.set_state(OSR2_PARKED)
+
+    assert seen == [PARK_CENTER]
+
+
+def test_a_move_that_leaves_the_switch_alone_still_says_so():
+    """Driving to parked flips nothing -- and if that reached nobody, the press
+    would change the picture and leave the device where it was."""
+    control = _control()
+    control.set_state(OSR2_DRIVING)
+    heard = []
+    control.changed.connect(lambda: heard.append(control.state()))
+
+    control.set_state(OSR2_PARKED)
+
+    assert heard == [OSR2_PARKED]

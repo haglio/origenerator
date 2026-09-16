@@ -148,7 +148,7 @@ class Osr2MotionDriver(QObject):
         return self._active
 
     def start(self) -> None:
-        """Take the device: pause genau and start streaming the motion."""
+        """Take the device: start streaming the motion."""
         if self._active:
             return
         self._active = True
@@ -157,7 +157,6 @@ class Osr2MotionDriver(QObject):
         now = self._now()
         self._last_tick = now
         self._glide_until = now + _HANDOFF_MS / 1000.0
-        self._broker.pause_genau()
         logger.info("OSR2 motion engaged: %s", self.status_text())
         self.poll()  # move on the keypress, not a tick later
         self._ticker = self._make_ticker(self.poll, self._interval_s)
@@ -165,7 +164,7 @@ class Osr2MotionDriver(QObject):
         self.active_changed.emit(True)
 
     def stop(self) -> None:
-        """Release the device: stop streaming, park it, and restore genau."""
+        """Release the device: stop streaming and park it."""
         if not self._active:
             return
         self._active = False
@@ -174,8 +173,7 @@ class Osr2MotionDriver(QObject):
         if ticker is not None:
             ticker.stop()  # waits, so no tick can land after the park below
         self._broker.park()
-        self._broker.restore_genau()
-        logger.info("OSR2 motion released: parked, genau restored")
+        logger.info("OSR2 motion released: parked")
         self.active_changed.emit(False)
 
     def poll(self) -> None:

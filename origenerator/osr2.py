@@ -3,11 +3,11 @@
 The broker owns the device (real serial ``COM4``) and forwards raw T-code sent to
 its UDP listener straight to it, suppressing MultiFunPlayer for a moment so the two
 don't fight (``osr2_broker/session.py``). So origenerator drives the device simply
-by streaming T-code here in sync with a playing video. While it drives, it pauses
-genau auto-mode by writing the broker's shared enabled flag, then restores it.
+by streaming T-code here in sync with a playing video.  The device's own auto
+mode wins over that: while it runs, the broker drops what arrives here.
 
-Everything is best-effort: UDP to nobody and a write to an absent state dir are
-harmless no-ops, so the app behaves the same whether or not the broker is running.
+Everything is best-effort: UDP to nobody is a harmless no-op, so the app behaves
+the same whether or not the broker is running.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import time
 from pathlib import Path
 
 from app_support import ports
-from app_support.file_channel import read_flag, stamp_age, write_flag
-from app_support.state_files import GENAU_ENABLED, OSR2_SERIAL_RX
+from app_support.file_channel import stamp_age
+from app_support.state_files import OSR2_SERIAL_RX
 
 from origenerator.config import project_dir
 from origenerator.paths import ensure_player_core_on_path
@@ -45,9 +45,8 @@ PARK_TCODE = PARK_COMMAND
 BROKER_HOST = "127.0.0.1"
 TCODE_UDP_PORT = ports.TCODE_UDP
 # Fun Time's state directory, not this app's and not the broker's: all three
-# look for the files below there.
+# look for the file below there.
 SHARED_STATE_DIR = project_dir("fun_time") / "state"
-GENAU_ENABLED_FILE = SHARED_STATE_DIR / GENAU_ENABLED
 SERIAL_RX_FILE = SHARED_STATE_DIR / OSR2_SERIAL_RX
 # The broker's own window for the same question (osr2_broker.monitor.MonitorState),
 # so the app and the broker never disagree about whether the OSR2 is there.
@@ -92,23 +91,20 @@ def format_position(pos_0_100: float, interval_ms: float) -> str:
 
 
 class Osr2Broker:
-    """A thin UDP client to the broker's T-code listener, plus genau coordination.
+    """A thin UDP client to the broker's T-code listener.
 
-    Holds one datagram socket for streaming motion positions, and knows how to pause
-    and restore genau auto-mode via the broker's shared enabled-flag file so a driving
-    video fully owns the device. ``sock_factory`` is injectable for tests.
+    Holds one datagram socket for streaming motion positions.  ``sock_factory`` is
+    injectable for tests.
     """
 
     def __init__(self, host: str = BROKER_HOST, port: int = TCODE_UDP_PORT, *,
-                 genau_enabled_file=GENAU_ENABLED_FILE, sock_factory=None):
+                 sock_factory=None):
         self._host = host
         self._port = port
-        self._genau_file = Path(genau_enabled_file)
         self._sock_factory = sock_factory or (
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         )
         self._sink: UdpTCodeSink | None = None
-        self._prior_genau: bool | None = None
         self._send_error_logged = False
 
     def send_position(self, pos_0_100: float, interval_ms: float) -> None:
@@ -118,18 +114,6 @@ class Osr2Broker:
     def park(self) -> None:
         """Send the device to its resting position."""
         self._send(PARK_TCODE)
-
-    def pause_genau(self) -> None:
-        """Disable genau auto-mode, remembering its prior state to restore later."""
-        self._prior_genau = read_flag(self._genau_file, default=True)
-        self._write_genau(False)
-
-    def restore_genau(self) -> None:
-        """Put genau's enabled flag back to what it was before :meth:`pause_genau`."""
-        if self._prior_genau is None:
-            return
-        self._write_genau(self._prior_genau)
-        self._prior_genau = None
 
     def close(self) -> None:
         if self._sink is not None:
@@ -150,12 +134,3 @@ class Osr2Broker:
             if not self._send_error_logged:
                 self._send_error_logged = True
                 logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
-
-    def _write_genau(self, value: bool) -> None:
-        # The state directory is the broker's to make, not this app's: a
-        # flag written into a directory nobody else has is a flag nobody reads.
-        if not self._genau_file.parent.exists():
-            logger.debug("OSR2 state dir missing; not writing genau flag")
-            return
-        if not write_flag(self._genau_file, value):
-            logger.warning("Failed to write genau flag %s", self._genau_file)

@@ -63,7 +63,7 @@ class Osr2Driver(QObject):
         """Take over the device for ``player``'s video, streaming ``actions``.
 
         Releases any video already driving first, so only one ever owns the device.
-        A video with no actions is a no-op (genau is left alone).
+        A video with no actions is a no-op.
         """
         self.stop()
         if not actions:
@@ -73,13 +73,12 @@ class Osr2Driver(QObject):
         self._script = Funscript(self._actions)
         self._duration_ms = self._actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
-        self._broker.pause_genau()
         self._timer.start()
-        logger.info("OSR2 drive engaged: %d actions, %d ms; genau paused",
+        logger.info("OSR2 drive engaged: %d actions, %d ms",
                     len(self._actions), self._duration_ms)
 
     def stop(self) -> None:
-        """Release the device: stop streaming, park it, and restore genau."""
+        """Release the device: stop streaming and park it."""
         if self._player is None:
             return
         self._timer.stop()
@@ -88,8 +87,7 @@ class Osr2Driver(QObject):
         self._script = None
         self._duration_ms = 0
         self._broker.park()
-        self._broker.restore_genau()
-        logger.info("OSR2 drive released: parked, genau restored")
+        logger.info("OSR2 drive released: parked")
 
     @property
     def active(self) -> bool:

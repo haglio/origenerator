@@ -19,20 +19,12 @@ class FakeBroker:
     def __init__(self):
         self.positions = []
         self.parked = 0
-        self.paused = 0
-        self.restored = 0
 
     def send_position(self, pos, interval_ms):
         self.positions.append((pos, interval_ms))
 
     def park(self):
         self.parked += 1
-
-    def pause_genau(self):
-        self.paused += 1
-
-    def restore_genau(self):
-        self.restored += 1
 
 
 class FakeClock:
@@ -72,13 +64,12 @@ def _driver(qtbot):
     return driver, broker, clock
 
 
-def test_starting_takes_the_device_and_pauses_genau(qtbot):
+def test_starting_takes_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     handovers = []
     driver.active_changed.connect(handovers.append)
     assert driver.toggle() is True
     assert driver.active
-    assert broker.paused == 1
     assert broker.parked == 0  # taking the device isn't parking it
     assert handovers == [True]  # announced, so the funscript drive stands down
     assert driver.tickers[0].started == 1  # and the clock is running
@@ -134,7 +125,7 @@ def test_a_late_tick_still_sends_over_the_lookahead(qtbot):
     assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
 
 
-def test_stopping_parks_the_device_and_restores_genau(qtbot):
+def test_stopping_parks_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
     handovers = []
@@ -142,7 +133,6 @@ def test_stopping_parks_the_device_and_restores_genau(qtbot):
     assert driver.toggle() is False
     assert driver.tickers[0].stopped == 1  # the clock is waited out...
     assert broker.parked == 1              # ...before the park, so it sticks
-    assert broker.restored == 1
     assert handovers == [False]  # announced, so the funscript drive may re-aim
     driver.stop()  # already stopped: releasing again must not park twice
     assert broker.parked == 1

@@ -98,11 +98,6 @@ class TestTheValuesAnotherAppHoldsToo:
         # where all three look for these files.
         assert config.project_dir("fun_time") / "state" == osr2.SHARED_STATE_DIR
 
-    def test_the_genau_flag_is_the_file_the_broker_reads(self):
-        # This app writes "0" here while it drives, and restores the prior value
-        # after; the broker reads it to know whether genau's auto-mode may run.
-        assert osr2.GENAU_ENABLED_FILE.name == "genau_enabled.txt"
-
     def test_the_devices_own_stamp_is_the_file_the_broker_writes(self):
         # The only evidence the OSR2 is there at all (see origenerator.osr2).
         assert osr2.SERIAL_RX_FILE.name == "osr2_serial_rx.txt"

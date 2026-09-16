@@ -2,12 +2,18 @@
 
 Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
 app and becomes one of the session's managed windows: the main window occupies
-the rect Fun Time names (the Random Favs Browser's), the slideshows and
-fullscreen views go to the portrait/landscape satellite regions by their
-subject's orientation, and everything OSR2 is left to Fun Time's main player.
-Fun Time drives the shows through a command file and reads back which regions
-are occupied through a status file — the same file-channel idioms its own
-satellite players speak (``player_core.file_channel``).
+the rect Fun Time names (the Random Favs Browser's), each show goes to the
+portrait or landscape side by its subject's orientation, and everything OSR2 is
+left to Fun Time's main player.  Fun Time drives the shows through a command
+file and reads back which sides are occupied through a status file — the same
+file-channel idioms its own satellite players speak
+(``player_core.file_channel``).
+
+What a side IS depends on what the session hands over.  A session that names
+each player's own channel (:class:`PlayerChannel`) is handing this app its
+players: a show is then a playlist written for one, a few verbs, and the panel
+this app publishes for it.  One that names none is an older session, whose
+shows open a window of this app's over each region instead.
 
 This module is the pure half: the argv contract, the session dataclass, and the
 orientation policy that picks a region.  The Qt half — placing windows, polling
@@ -44,6 +50,23 @@ class Rect:
 
 
 @dataclass(frozen=True)
+class PlayerChannel:
+    """One of the session's players, as the player contract reaches it.
+
+    The four files a content source and a player trade through
+    (``player_core.playlist`` / ``player_verbs`` / ``status`` /
+    ``satellite_hud``): the list the player plays, the verbs it drains, the
+    status it publishes back, and the panel this app publishes for the session
+    to draw on it.
+    """
+
+    playlist: Path
+    command_file: Path
+    status_file: Path
+    hud_file: Path
+
+
+@dataclass(frozen=True)
 class FunTimeSession:
     """Everything ``--fun-time`` hands this app about the session hosting it."""
 
@@ -54,9 +77,18 @@ class FunTimeSession:
     paused_file: Path | None
     status_file: Path | None
     dashboard_cmd_file: Path | None
+    # Each satellite player's own channel, where the session hands its players
+    # over — ``None`` for a side it named none for, which is a session that
+    # still wants a window of this app's over that region instead.
+    portrait_player: PlayerChannel | None = None
+    landscape_player: PlayerChannel | None = None
 
     def region_rect(self, side: str) -> Rect:
         return self.portrait_rect if side == "portrait" else self.landscape_rect
+
+    def player(self, side: str) -> PlayerChannel | None:
+        """The player holding *side*, or ``None`` where the session named none."""
+        return self.portrait_player if side == "portrait" else self.landscape_player
 
 
 @dataclass(frozen=True)
@@ -83,6 +115,12 @@ def build_parser() -> argparse.ArgumentParser:
     _add_rect_arguments(parser, "landscape_")  # the landscape satellite region
     for name in ("command-file", "paused-file", "status-file", "dashboard-cmd-file"):
         parser.add_argument(f"--{name}", type=Path, default=None)
+    # Each player's own channel (see PlayerChannel).  Optional, because a
+    # session that hands its players over is the newer one: until it does, its
+    # shows open windows of this app's over the regions instead.
+    for side in ("portrait", "landscape"):
+        for name in ("playlist", "cmd-file", "status-file", "hud-file"):
+            parser.add_argument(f"--{side}-{name}", type=Path, default=None)
     parser.add_argument("--taskbar-identity", default=None)
     # Boot far enough to prove this launch works, then exit 0 without opening
     # anything.  A hosting session's integration suite runs the REAL launch
@@ -175,6 +213,18 @@ def region_for_items(items) -> str:
     return side
 
 
+def _player(args: argparse.Namespace, side: str) -> PlayerChannel | None:
+    """*side*'s player channel, or ``None`` where the session named no player.
+
+    All four files or none: half a channel is a player this app could write a
+    list for and never hear back from, which is worse than the window it would
+    otherwise open.
+    """
+    files = [getattr(args, f"{side}_{name}")
+             for name in ("playlist", "cmd_file", "status_file", "hud_file")]
+    return PlayerChannel(*files) if all(files) else None
+
+
 def parse_app_args(argv: list[str]) -> AppArgs:
     """The launch contract, parsed.  ``argv`` excludes the program name."""
     args = build_parser().parse_args(argv)
@@ -188,6 +238,8 @@ def parse_app_args(argv: list[str]) -> AppArgs:
             paused_file=args.paused_file,
             status_file=args.status_file,
             dashboard_cmd_file=args.dashboard_cmd_file,
+            portrait_player=_player(args, "portrait"),
+            landscape_player=_player(args, "landscape"),
         )
     return AppArgs(fun_time=session, taskbar_identity=args.taskbar_identity,
                    check_launch=args.check_launch)

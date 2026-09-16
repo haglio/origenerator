@@ -28,6 +28,7 @@ import logging
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.fun_time_mode import FunTimeSession
+from origenerator.gui.show_buttons import answer
 from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
@@ -48,6 +49,17 @@ def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
 
 
+def _split_argument(line: str) -> tuple[str, str, str]:
+    """A verb, its marker, and what it carries: the words of a spoken phrase
+    after a ":", the path of a thumbnail after a "|" — whichever comes first,
+    since a Windows path carries a colon of its own."""
+    cuts = [line.find(mark) for mark in ":|" if mark in line]
+    if not cuts:
+        return line, "", ""
+    cut = min(cuts)
+    return line[:cut], line[cut], line[cut + 1:]
+
+
 class FunTimeBridge(QObject):
     """Polls the session's channels and routes them onto the gallery's shows."""
 
@@ -57,6 +69,16 @@ class FunTimeBridge(QObject):
         self._gallery = gallery
         self._paused = False
         self._last_status: str | None = None
+        # The verbs about the session's shows as a whole, rather than one side's.
+        self._session_verbs = {
+            "OPEN_SHOWS": lambda: self._gallery.fill_the_regions(),
+            # Through the gallery, not show by show: it has to stop WANTING the
+            # regions first, or each close it makes here is answered by the
+            # base state opening again underneath it.
+            "CLOSE_SHOWS": lambda: self._gallery.close_the_shows(),
+            "FILTER_ENHANCED": self._filter_enhanced,
+            "QUIT": lambda: self._gallery.window().close(),
+        }
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._tick)
@@ -82,43 +104,27 @@ class FunTimeBridge(QObject):
                                          uppercase=False):
             self._apply(verb.strip())
 
-    def _apply(self, verb: str) -> None:
-        if not verb:
+    def _apply(self, line: str) -> None:
+        if not line:
             return
-        keyword, marker, argument = verb.partition(":")
-        verb = keyword.upper() + marker + argument  # the words keep their case
-        if verb == "OPEN_SHOWS":
-            self._gallery.fill_the_regions()
+        keyword, marker, argument = _split_argument(line)
+        keyword = keyword.upper()  # what it carries keeps its case
+        if not marker and keyword in self._session_verbs:
+            self._session_verbs[keyword]()
             return
-        if verb == "CLOSE_SHOWS":
-            # Through the gallery, not show by show: it has to stop WANTING the
-            # regions first, or each close it makes here is answered by the
-            # base state opening again underneath it.
-            self._gallery.close_the_shows()
-            return
-        if verb == "FILTER_ENHANCED":
-            self._filter_enhanced()
-            return
-        if verb == "QUIT":
-            self._gallery.window().close()
-            return
-        side, _, action = verb.partition("_")
+        side, _, action = keyword.partition("_")
         side = side.lower()
         if side not in _SIDES:
-            logger.warning("Unknown Fun Time verb dropped: %s", verb)
+            logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
-        spoken, marker, phrase = action.partition(":")
-        if spoken == "SAY":
+        if action == "SAY" and marker == ":":
             # The session owns the microphone for the whole room, so a spoken
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
             # which is the only place that knows its shelves and its parts.
-            self._gallery.run_spoken_command(f"{side} {phrase}")
+            self._gallery.run_spoken_command(f"{side} {argument}")
             return
-        if marker:
-            logger.warning("Unknown Fun Time verb dropped: %s", verb)
-            return
-        self._apply_side(side, action)
+        self._apply_side(side, action.lower(), argument, line)
 
     def _filter_enhanced(self) -> None:
         """The session's enhanced-only switch, pressed there and landing here.
@@ -135,26 +141,19 @@ class FunTimeBridge(QObject):
         for show in shows:
             show.set_enhanced_mode(enhanced_only)
 
-    def _apply_side(self, side: str, action: str) -> None:
-        """One transport verb onto whatever holds *side*.
+    def _apply_side(self, side: str, action: str, argument: str, line: str) -> None:
+        """A press on *side*'s panel, onto whatever holds that side.
 
-        Whatever holds it answers :class:`~origenerator.gui.show_host.ShowHost`,
-        so the verb is handed straight over; an unknown verb is what falls
-        through, not an unanswered one.
+        The same answers a show's own panel gets
+        (:func:`~origenerator.gui.show_buttons.answer`): the session routes a
+        player's presses back here verbatim, and its own hotkeys spell the
+        transport the same way, so one table says what every one of them means.
         """
         show = self._gallery.region_show(side)
         if show is None:
             return  # an empty region has nothing to drive
-        if action == "NEXT":
-            show.show_step(1)
-        elif action == "PREV":
-            show.show_step(-1)
-        elif action == "TRASH":
-            show.show_cull()
-        elif action == "LOCK":
-            show.show_toggle_hold()
-        elif action == "RESET":
-            show.show_reset()
+        if not answer(show, action, argument):
+            logger.warning("Unanswered press for the %s show dropped: %s", side, line)
 
     # --- the paused flag ----------------------------------------------------
 

@@ -66,12 +66,32 @@ def pace_only():
     return PaceOnlyHost(SlideshowPace())
 
 
+@pytest.fixture
+def on_a_player(qtbot, tmp_path):
+    from origenerator.fun_time_mode import PlayerChannel
+    from origenerator.gui.player_show import PlayerShow
+
+    show = PlayerShow([("a.png", "image")], side="portrait", channel=PlayerChannel(
+        playlist=tmp_path / "portrait.tsv", command_file=tmp_path / "portrait_cmd.txt",
+        status_file=tmp_path / "portrait_status.txt",
+        hud_file=tmp_path / "origenerator_portrait_hud.json"))
+    show._timer.stop()
+    return show
+
+
 @pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
 def test_a_slideshow_answers_every_attribute_of_the_protocol(slideshow, attribute):
     # The full host: it has a set, so it answers all of it itself. Asked of an
     # instance rather than the class, because two of the attributes are settled
     # when the show is built rather than declared on it.
     assert hasattr(slideshow, attribute)
+
+
+@pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
+def test_a_show_on_a_player_answers_every_attribute_of_the_protocol(on_a_player, attribute):
+    # The third host: a show handed to a session's player.  It has a set, so it
+    # answers all of it itself, the same as the window does.
+    assert hasattr(on_a_player, attribute)
 
 
 @pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)

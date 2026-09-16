@@ -768,6 +768,10 @@ class SlideshowView(QWidget):
         """The file on screen — what a hosting Fun Time session's status says."""
         return self._preview.current_media_path()
 
+    def is_showing(self) -> bool:
+        """Whether this show is on screen — what says a region is occupied."""
+        return self.isVisible()
+
     # --- what this show's HUD says, in the players' vocabulary -------------
 
     @property

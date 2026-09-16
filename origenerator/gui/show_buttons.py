@@ -7,9 +7,12 @@ The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that side; standalone,
 the show answers the same verb itself.
 
-Only what a show answers is declared.  A hosted show has no window of its own
-to park, so the panel offers the mode pair in place of minimize: a button drawn
-for sameness whose press is swallowed says a feature is there when it is not.
+Only what a show answers is declared, which depends on what is drawing the
+panel: minimize parks a window of this app's, so it is offered only where the
+show has one, and the session's mode pair is drawn by a show covering a
+region — but not by one handed to a player, whose panel the session puts its
+own row on.  A button drawn for sameness whose press is swallowed says a
+feature is there when it is not.
 """
 from __future__ import annotations
 
@@ -76,18 +79,65 @@ RESET_TOOLTIPS = {
 
 def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
               enhanced: bool = False, hosted: bool = False,
-              ) -> tuple[tuple[Button, ...], ...]:
-    """The rows a show's HUD draws: the session's mode pair where one hosts this
-    show, then the show's own band."""
+              own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
+    """The rows a show's HUD draws, for the surface it is drawn on.
+
+    *own_window* is whether this show has a window of this app's — which is
+    what minimize parks, and so what decides whether it is offered at all.
+    Handed to one of a session's players there is none, and the mode pair is
+    the session's own to put on its panel; in a window over a session's region
+    the show draws that pair itself.
+    """
+    mode_row = hosted and own_window
+    minimize = own_window and not hosted
     names = [name for group in CONTROL_GROUPS for name in group
-             if not (hosted and name == "minimize")]
+             if minimize or name != "minimize"]
     lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
         for index, name in enumerate(names)
     )
-    return (_mode_row(), band) if hosted else (band,)
+    return (_mode_row(), band) if mode_row else (band,)
+
+
+def answer(host, action: str, argument: str = "") -> bool:
+    """Do what a press on a show's panel asks of *host*, by the name its verb
+    carries after the side ("next", "fmode", "play_video"), and say whether the
+    show had an answer.
+
+    One table for every way a press reaches a show — its own window's panel,
+    and a session routing a player's panel back here — so a button means the
+    same thing whichever of them drew it.  ``False`` for minimize, which is a
+    window's rather than a show's, and for the map's own chrome that no show
+    has a counterpart for.
+    """
+    if action in ("prev", "next"):
+        host.show_step(-1 if action == "prev" else 1)
+    elif action == "lock":
+        host.show_toggle_hold()
+    elif action == "trash":
+        host.show_cull()
+    elif action == "reset":
+        host.show_reset()
+    elif action == "fmode":
+        host.toggle_f_mode()
+    elif action == "enhanced":
+        host.toggle_enhanced_mode()
+    elif action in ("no_loop", "seed_loop"):
+        # Stop looping this row: the side goes back to what it does when
+        # nothing is looping, which is browse its whole library -- the same
+        # place its reset leads, and what the press means on a player.  Pressed
+        # while nothing is looping it is the dark button it looks like: a show
+        # cannot start a loop it is not in.
+        if host.hud_looping:
+            host.show_reset()
+    elif action in ("play_video", "lock_video"):
+        # A thumbnail on the map: a click plays it, a double-click holds it.
+        host.show_item(argument, hold=action == "lock_video")
+    else:
+        return False
+    return True
 
 
 def _mode_row() -> tuple[Button, ...]:

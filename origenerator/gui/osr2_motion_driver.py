@@ -372,4 +372,4 @@ class Osr2MotionDriver(QObject):
             dials += " · cruise"
         if self._state.learned.active:
             dials += " · human inspired"
-        return f"OSR2 · {dials}" if self._active else f"OSR2 off · {dials}"
+        return f"OSR2 · {dials}" if self._active else f"Motion stopped · {dials}"

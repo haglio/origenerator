@@ -199,12 +199,14 @@ def test_the_dials_shape_the_status_line(qtbot):
     assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
 
 
-def test_the_status_line_reads_off_but_keeps_the_dials_while_stopped(qtbot):
-    # The slideshow shows this line before the motion ever starts, so the dials
-    # must be readable (and tunable) while the device is still parked.
+def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_dials(qtbot):
+    """The dials are readable and tunable before the motion starts.  Stopped is
+    all it says: a funscript may have the device meanwhile, and "OSR2 off" read
+    as the device -- or the app's control of it -- being off."""
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)
-    assert driver.status_text() == "OSR2 off · 200/min · sine · travel 100 around 50"
+    assert driver.status_text() == (
+        "Motion stopped · 200/min · sine · travel 100 around 50")
 
 
 def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):

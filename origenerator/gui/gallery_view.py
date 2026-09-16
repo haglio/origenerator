@@ -1828,7 +1828,12 @@ class GalleryView(QWidget):
             held,
             requested,
         )
-        self._tree_view.populate(self._build_sides(trees), expanded, folder_meta=meta)
+        self._tree_view.populate(
+            self._build_sides(trees), expanded, folder_meta=meta,
+            # Where the work has lately been. The tree keeps the order the
+            # recipes were tried in, so nothing else in it says so.
+            recently_worked=gallery.recently_worked_folders(trees, listed),
+        )
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
         self._selection_group = None

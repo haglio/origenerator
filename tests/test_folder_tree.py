@@ -9,6 +9,7 @@ from origenerator.gui.folder_tree import (
     COUNT_ROLE,
     DROP_KEY_ROLE,
     FOLDER_KEYS_MIME,
+    RECENT_ROLE,
     TREE_KEY_ROLE,
     FolderTree,
     _action_rects,
@@ -403,4 +404,18 @@ def test_the_picked_folder_is_marked_by_its_gray_ground_alone(qtbot):
     tree.setCurrentItem(leaf)
 
     assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
+
+
+def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot)
+    assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
+
+    leaf.setData(0, RECENT_ROLE, True)
+
+    marked = {x for x, color in _row_pixels(tree, leaf) if _is_blue(color)}
+    _star, delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    assert marked                        # the mark is drawn...
+    assert max(marked) < delete.left()   # ...at the pane's own edge, clear of the
+                                         # row's actions however deep it sits
+
 

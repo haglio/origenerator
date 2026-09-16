@@ -345,10 +345,70 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     # holding rows with no id at all) keep the order they came in — this only
     # ever lifts an image its enhancement has moved ahead of.
     bumped = enhancement_recency(rows)
-    return sorted(
-        listed, reverse=True,
-        key=lambda row: max(bumped.get(row.get("prompt_id"), 0), row.get("id") or 0),
-    )
+    return sorted(listed, reverse=True, key=lambda row: row_recency(row, bumped))
+
+
+def row_recency(row: dict, bumped: dict[str, int]) -> int:
+    """Where ``row`` falls in the library's order: its own place, or that of the
+    newest enhancement made of it, whichever is later.
+
+    ``bumped`` is :func:`~origenerator.gallery.enhance.enhancement_recency` over
+    the same rows. An image being enhanced is being worked on now, so it counts
+    as the newest thing in the library rather than as whenever it was generated
+    — which is what puts it at the head of the Latest shelf and what marks the
+    folder it sits in as lately worked in.
+    """
+    return max(bumped.get(row.get("prompt_id"), 0), row.get("id") or 0)
+
+
+# How many folders the table of contents marks as lately worked in. A sitting
+# reaches a handful of recipes; marks past that stop picking anything out, and
+# every folder marked is no folder marked.
+RECENTLY_WORKED_COUNT = 20
+
+
+def recently_worked_folders(
+    trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT
+) -> set[tuple[str, str]]:
+    """The ``(side, folder key)`` pairs of the folders worked in most recently.
+
+    A folder no longer moves when a generation lands in it — it is placed by the
+    row that made it, so the table of contents keeps the order the recipes were
+    tried in (:func:`build_gallery_tree`). That order says nothing about where
+    the work has lately been, which is the other thing the tree is read for, so
+    the freshest folders are marked where they stand instead of floating up.
+
+    Only the folders the generations themselves sit in are ranked — the ones
+    with nothing nested under them. A folder of folders is fresh whenever
+    anything anywhere under it is, which is nearly always, so a mark on one
+    would say nothing about it.
+
+    A folder's recency is the newest row in it, by :func:`row_recency`. Side by
+    side, because both sides draw the same folder key over rows of their own
+    shape: portrait work must not light the landscape copy of a folder nothing
+    portrait-shaped ever touched.
+    """
+    bumped = enhancement_recency(rows)
+    ranked: list[tuple[int, tuple[str, str]]] = []
+
+    def walk(group, side: str) -> None:
+        children = child_groups(group)
+        if children:
+            for child in children:
+                walk(child, side)
+            return
+        freshest = max(
+            (row_recency(row, bumped) for row in getattr(group, "rows", ())),
+            default=0,
+        )
+        if freshest:
+            ranked.append((freshest, (side, group.key)))
+
+    for side, model in trees.items():
+        for group in model:
+            walk(group, side)
+    ranked.sort(key=lambda entry: -entry[0])
+    return {folder for _freshest, folder in ranked[:limit]}
 
 
 def starred_generations(rows: list[dict]) -> list[dict]:

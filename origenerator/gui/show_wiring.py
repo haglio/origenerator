@@ -37,13 +37,13 @@ class ShowActions:
     every key, it just asks nobody. That is what a test's show gets, and what a
     show standing outside a session gets for the three that are a session's.
 
-    ``delete`` and ``star`` take the slide's prompt_id. ``enhance`` takes one
-    too and answers whether a run actually started, which is what the corner
-    note goes on to say. ``lock`` takes one and is a session's: it opens the
-    held item as a generate tab. ``reset`` takes the show itself and is a
-    session's too — hosted, "how it started" is the REGION's base state, which
-    only the gallery knows. ``drive_toggle`` takes nothing: Space goes to the
-    app's one OSR2 switch rather than straight to this show's motion, and
+    ``delete``, ``star`` and ``unstar`` take the slide's prompt_id. ``enhance``
+    takes one too and answers whether a run actually started, which is what
+    the corner note goes on to say. ``lock`` takes one and is a session's: it
+    opens the held item as a generate tab. ``reset`` takes the show itself and
+    is a session's too — hosted, "how it started" is the REGION's base state,
+    which only the gallery knows. ``drive_toggle`` takes nothing: Space goes to
+    the app's one OSR2 switch rather than straight to this show's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
     console's four control buttons read and set.
     ``omnipause`` takes nothing and is a session's: hosted, a click on the
@@ -59,6 +59,7 @@ class ShowActions:
     delete: Callable[[str], None] | None = None
     enhance: Callable[[str], bool] | None = None
     star: Callable[[str], None] | None = None
+    unstar: Callable[[str], None] | None = None
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], None] | None = None

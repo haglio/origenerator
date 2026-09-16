@@ -546,16 +546,25 @@ class SlideshowView(QWidget):
         self._preview.release_media(paths)
 
     def _delete_current(self):
-        """Delete the current item (if a deleter is wired) and advance to the next.
+        """Up, the players' "weird": a favorite loses its star and the show
+        moves on; anything else is deleted (if a deleter is wired) and the show
+        moves on.
 
-        A slide that is still being made has nothing to condemn: the run is on the
-        GPU and its row is a record of that, not a picture that has been judged.
-        Up takes such a slide off the show and leaves the run alone — calling one
-        off is the queue plate's Cancel, in the corner of this very screen.
+        Two things on one key, as on a satellite, and the star on screen says
+        which: holding a slide starred it, so the first press takes that back
+        and only the second condemns it.  A slide that is still being made has
+        nothing to condemn: the run is on the GPU and its row is a record of
+        that, not a picture that has been judged.  Up takes such a slide off
+        the show and leaves the run alone — calling one off is the queue
+        plate's Cancel, in the corner of this very screen.
         """
         self._playlist.unlock()  # the held slide is the one being culled
         item = self._playlist.current()
         if item is None:
+            return
+        if self._set.unstar_current(self._actions.unstar):
+            self._flash_note("Unstarred")
+            self._step(1)
             return
         if (self._actions.delete is not None
                 and item.prompt_id is not None and not item.is_live):

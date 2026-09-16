@@ -273,17 +273,22 @@ class PlayerShow(QObject):
             self._hold(False)
 
     def show_cull(self) -> None:
-        """Take the item on screen away and move on.
+        """The players' "weird": a favorite loses its star and the player moves
+        on; anything else is taken away and the player moves on.
 
-        The player is told to drop it before the generation is condemned: it is
-        playing that very file, and Windows will not move a file a process
-        still has open — the recovery bin's own retries cover the moment the
-        player takes to let go.
+        The player is told to drop a condemned item before the generation is:
+        it is playing that very file, and Windows will not move a file a
+        process still has open — the recovery bin's own retries cover the
+        moment the player takes to let go.
         """
         item = self._set.playlist.current()
         if item is None:
             return
         self._hold(False)  # the held slide is the one being culled
+        if self._set.unstar_current(self._actions.unstar):
+            self._note("Unstarred")
+            self._send(NEXT)
+            return
         self._send(TRASH)
         # Letting go already, so the delete's own release must not ask it to
         # move on a second time and skip the item after this one as well.

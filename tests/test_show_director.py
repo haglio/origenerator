@@ -383,8 +383,11 @@ class FakeHost:
     def trash_generation(self, prompt_id):
         self.trashed.append(prompt_id)
 
-    def star_generation(self, prompt_id):
-        self.starred.append(prompt_id)
+    def star_generation(self, prompt_id, starred=True):
+        if starred:
+            self.starred.append(prompt_id)
+        else:
+            self.starred.remove(prompt_id)
 
     def enhance_from_slideshow(self, prompt_id):
         self.enhanced.append(prompt_id)
@@ -1119,7 +1122,8 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
 
 def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
     """What a show asks the gallery on its own behalf now includes what the
-    library says about an item."""
+    library says about an item — and the star's undoing, for the players'
+    "weird" over a favorite."""
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2)]
     director, host, made = shows(FakeHost(rows=rows), db=FakeDB(rows))
 
@@ -1128,3 +1132,6 @@ def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
     actions = made[0].actions
     assert [slide.prompt_id for slide in actions.neighbors("g1").seeds] == ["g2"]
     assert actions.widen("g1") == ()
+    actions.star("g1")
+    actions.unstar("g1")
+    assert host.starred == []

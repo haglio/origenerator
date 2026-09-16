@@ -12710,7 +12710,6 @@ def test_the_banks_enhance_on_hold_switch_is_what_a_hold_asks_first(qtbot, tmp_p
     assert view.enhance_from_slideshow("g0") is True
 
 
-
 def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
     # A hold is made with no view of the Enhance panel, so an image that already
     # carries an enhancement must not be re-derived at whatever the settings happen

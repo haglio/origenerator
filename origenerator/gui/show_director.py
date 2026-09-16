@@ -147,8 +147,9 @@ class ShowHost(Protocol):
     def trash_generation(self, prompt_id: str) -> None:
         """Condemn it, as a show's Up key does."""
 
-    def star_generation(self, prompt_id: str) -> None:
-        """Bookmark it, as a show's Down key does."""
+    def star_generation(self, prompt_id: str, starred: bool = True) -> None:
+        """Bookmark it, as a show's Down key does — or take the bookmark back,
+        as its Up key does over a favorite."""
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
         """Queue a better version of it, returning whether one was launched."""
@@ -403,6 +404,7 @@ class ShowDirector:
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
             star=self._host.star_generation,
+            unstar=partial(self._host.star_generation, starred=False),
             # Three of these are a session's: a lock opens the held item as a
             # generate tab, a reset means the REGION's base state, and a click
             # on the picture asks the room to pause.

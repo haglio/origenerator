@@ -439,3 +439,19 @@ def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qt
 
     assert _sent(show) == ["PLAY_FILE one-x.png", "LOCK_OFF"]
     assert show.hud_prompt_id == "id-1x"
+
+
+def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
+    """The players' own "weird": a favorite loses its star and the player is
+    told to move on — nothing is dropped and nothing deleted."""
+    unstarred, deleted = [], []
+    show = _show(qtbot, tmp_path, hud=HudFacts(starred_ids={"id-1"}),
+                 actions=ShowActions(unstar=unstarred.append, delete=deleted.append))
+    _sent(show)
+
+    show.show_cull()
+
+    assert (unstarred, deleted) == (["id-1"], [])
+    assert _sent(show) == ["LOCK_OFF", "NEXT"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "two.png", "three.png"]   # still in the list

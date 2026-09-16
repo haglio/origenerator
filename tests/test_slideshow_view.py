@@ -616,6 +616,27 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
     assert view._note.text() == "Loop off"
 
 
+def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
+    # The players' "weird": a favorite loses its star and the show moves on;
+    # only a picture wearing no star is condemned — so holding a slide, which
+    # stars it, takes two presses of Up to undo all the way.
+    unstarred, deleted = [], []
+    view = _view(qtbot, _KEYED, starred_ids={"id-a"},
+                 actions=ShowActions(unstar=unstarred.append, delete=deleted.append))
+
+    _press(view, Qt.Key.Key_Up)
+
+    assert (unstarred, deleted) == (["id-a"], [])
+    assert view._playlist.current()[2] == "id-b"    # moved on
+    assert len(view._playlist) == 2                  # and still in the set
+    assert view.hud_is_favorite is False
+
+    view.step(-1)
+    _press(view, Qt.Key.Key_Up)                     # no star left to take back
+
+    assert deleted == ["id-a"]
+
+
 def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):
     # Holding several slides sends out several runs and ComfyUI takes them one at
     # a time, so a slide the show comes back around to is usually still waiting.

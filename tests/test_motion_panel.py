@@ -379,7 +379,21 @@ def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
         POSITION_MAX * wave_stack.position(live.cruise.stack, live.clock) / 100)
     assert len(set(hud.waveform)) > 20  # a live trace, not a held line
     assert len(hud.waveform) == drive_layout.TRACE_SAMPLES
-    assert hud.edge is not None and hud.slide == 0.0
+    assert hud.edge is not None and 0.0 <= hud.slide < 1.0
+
+
+def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):
+    motion = FakeMotion()
+    live = motion.state
+    live.state.playing = True
+    motion_engine.advance(live, 0.05)
+    before = drive_hud(live, active=True)
+
+    motion_engine.advance(live, 0.05)
+    after = drive_hud(live, active=True)
+
+    assert after.waveform == before.waveform
+    assert after.slide > before.slide
 
 
 def test_the_readout_holds_the_learned_motions_picture_still_between_knots(qtbot):

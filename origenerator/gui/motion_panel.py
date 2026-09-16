@@ -80,6 +80,7 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     """
     dials = state.state
     limits = _limits(state)
+    heights, slide = motion_engine.trace_window(state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
     return DriveHud(
         speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
         shape=dials.shape.value,
@@ -90,8 +91,9 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
         spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
         amp_at_min=limits.amp_at_min, amp_at_max=limits.amp_at_max,
         ctr_at_min=limits.ctr_at_min, ctr_at_max=limits.ctr_at_max,
-        waveform=tuple(motion_engine.trace(
-            state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)),
+        waveform=tuple(heights[:drive_layout.TRACE_SAMPLES]),
+        slide=slide,
+        edge=heights[drive_layout.TRACE_SAMPLES],
     )
 
 

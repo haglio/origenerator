@@ -76,7 +76,7 @@ __all__ = [
     "tick_learned_motion",
     "toggle_cruise_control",
     "toggle_learned_motion",
-    "trace",
+    "trace_window",
 ]
 
 
@@ -234,19 +234,27 @@ def position_ahead(motion: Motion, lead_s: float) -> float:
     return _at(motion, motion.phase + lead_s * motion.state.bpm / 60.0)
 
 
-def trace(motion: Motion, samples: int, span_s: float) -> list[float]:
+def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[float], float]:
     """The motion sampled forward from now as 0-1 heights — the drive readout's
-    picture of the motion the device is being sent, ``span_s`` seconds of it."""
+    picture of the motion the device is being sent, ``span_s`` seconds of it —
+    as ``samples`` + 1 values, the last one the knot past the readout's edge,
+    and how far the drawn line is shifted left, as a fraction of one sample.
+
+    The wave and cruise control's sum slide by being resampled live (nothing
+    shifts); the learned motion is read on knots and says how far it has slid,
+    so its picture holds still between knots rather than writhing.
+    """
     if motion.learned.active:
-        return learned_motion.trace(motion.learned, motion.state, samples, span_s)
+        return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
+    reach = span_s * samples / max(1, samples - 1)
     stack = motion.cruise.stack
     if stack:
-        return wave_stack.trace(stack, motion.clock, samples, span_s)
-    span_cycles = span_s * motion.state.bpm / 60.0
+        return wave_stack.trace(stack, motion.clock, samples + 1, reach), 0.0
+    span_cycles = reach * motion.state.bpm / 60.0
     return [
-        _at(motion, motion.phase + (i / max(1, samples - 1)) * span_cycles) / 100.0
-        for i in range(samples)
-    ]
+        _at(motion, motion.phase + (i / samples) * span_cycles) / 100.0
+        for i in range(samples + 1)
+    ], 0.0
 
 
 def _at(motion: Motion, phase: float) -> float:

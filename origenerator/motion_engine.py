@@ -25,14 +25,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core import cruise_control, learned_motion, wave_stack  # noqa: E402
-from player_core.cruise_control import CruiseControlState  # noqa: E402
-from player_core.learned_motion import LearnedMotionState, load_default_model  # noqa: E402
-from player_core.robot_hand import (  # noqa: E402
+from player_core import cruise_control, learned_motion, wave_stack
+from player_core.cruise_control import CruiseControlState
+from player_core.learned_motion import LearnedMotionState, load_default_model
+from player_core.robot_hand import (
     MAX_SPEED,
     MAX_TICK_SECONDS,
     MIN_SPEED,
@@ -49,7 +45,7 @@ from player_core.robot_hand import (  # noqa: E402
     set_center,
     set_speed,
 )
-from player_core.robot_hand import trace_window as wave_trace_window  # noqa: E402
+from player_core.robot_hand import trace_window as wave_trace_window
 
 __all__ = [
     "MAX_SPEED",

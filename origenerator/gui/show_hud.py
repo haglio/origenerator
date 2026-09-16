@@ -37,20 +37,6 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import QLabel, QWidget
-
-from origenerator.gui.media_overlay import float_over_media, raise_over_media
-from origenerator.gui.show_buttons import answer, show_rows
-from origenerator.paths import ensure_player_core_on_path
-from origenerator.ui_scale import (
-    to_bitmap_pos,
-    to_logical_size,
-    unscaled_pixmap,
-)
-
-ensure_player_core_on_path()
 from player_core.file_channel import append_command
 from player_core.hud_status import SHUFFLE_LABEL, looping_label, status_line
 from player_core.satellite_hud import (
@@ -61,6 +47,17 @@ from player_core.satellite_hud import (
     HudTargets,
 )
 from player_core.satellite_hud_paint import HudRenderer
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import QLabel, QWidget
+
+from origenerator.gui.media_overlay import float_over_media, raise_over_media
+from origenerator.gui.show_buttons import answer, show_rows
+from origenerator.ui_scale import (
+    to_bitmap_pos,
+    to_logical_size,
+    unscaled_pixmap,
+)
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 

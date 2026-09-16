@@ -25,21 +25,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
-
-from origenerator.gui.show_hud import show_hud_model
-from origenerator.gui.show_set import ShowSet
-from origenerator.gui.show_wiring import HudFacts, ShowActions
-from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.toast import NOTICE, WARNING
-from origenerator.media import MediaType
-from origenerator.paths import ensure_player_core_on_path
-from origenerator.slideshow import ShowState, Slide
-
-ensure_player_core_on_path()
-
-from player_core.file_channel import append_command, publish_whole  # noqa: E402
-from player_core.player_verbs import (  # noqa: E402
+from player_core.file_channel import append_command, publish_whole
+from player_core.player_verbs import (
     LOCK_OFF,
     LOCK_ON,
     NEXT,
@@ -49,9 +36,18 @@ from player_core.player_verbs import (  # noqa: E402
     TRASH,
     play_file,
 )
-from player_core.playlist import PlaylistItem, write_playlist  # noqa: E402
-from player_core.satellite_hud import hud_text  # noqa: E402
-from player_core.status import parse_status  # noqa: E402
+from player_core.playlist import PlaylistItem, write_playlist
+from player_core.satellite_hud import hud_text
+from player_core.status import parse_status
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+
+from origenerator.gui.show_hud import show_hud_model
+from origenerator.gui.show_set import ShowSet
+from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.toast import NOTICE, WARNING
+from origenerator.media import MediaType
+from origenerator.slideshow import ShowState, Slide
 
 logger = logging.getLogger(__name__)
 

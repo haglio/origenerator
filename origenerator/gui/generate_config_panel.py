@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
 
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
@@ -70,12 +71,8 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.media import MediaType
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
-
-ensure_shared_ui_on_path()
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
 
 logger = logging.getLogger(__name__)
 

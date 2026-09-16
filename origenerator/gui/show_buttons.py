@@ -16,13 +16,9 @@ feature is there when it is not.
 """
 from __future__ import annotations
 
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core.hud_button import FIT_THE_WORD, Button  # noqa: E402
-from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark  # noqa: E402
-from player_core.hud_status import F_MODE_LABEL  # noqa: E402
+from player_core.hud_button import FIT_THE_WORD, Button
+from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
+from player_core.hud_status import F_MODE_LABEL
 
 # The band, in the order the players put the same controls in: step either way,
 # then the three about the item on screen, then what narrows the set and the way

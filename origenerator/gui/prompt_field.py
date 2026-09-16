@@ -20,10 +20,6 @@ from __future__ import annotations
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QPainter, QPen
 from PyQt6.QtWidgets import QPlainTextEdit
-
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
 from shared_ui.colors import BORDER_SUBTLE
 
 # What an undragged prompt field has always been.

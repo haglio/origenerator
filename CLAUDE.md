@@ -1,4 +1,15 @@
 
+## The shared packages come from the install, at the versions `pyproject.toml` names
+
+`app_support`, `shared_ui` and `player_core` are pinned dependencies, installed
+into `.venv` — never the checkouts beside this one. Both launchers run that venv
+and nothing else, and Fun Time starts the hosted app through it too. To try an
+unlanded change of one of them here, install its checkout over the pin
+(`pip install -e ../player_core --config-settings editable_mode=compat`), and
+reinstall this repo afterwards to put the pin back; moving a pin is this repo's
+own commit. Never reinstall `.venv` while Origenerator or a Fun Time session may
+be running.
+
 ## Test fixtures must be fabricated, never copied from the real library
 
 Every fixture value that stands in for library data — a video title, a filename,
@@ -172,7 +183,7 @@ forced this flow into existence (2026-08-12):
   comes up clean" rule, which is what produced the failure. The pre-handoff
   check is windowless instead: `python -m pytest tests/test_launch_smoke.py`
   replays the launch's whole import phase in a fresh interpreter under the
-  launcher's own cwd and `PYTHONPATH`, which is precisely what a dead icon fails
+  launcher's own cwd, with no `PYTHONPATH`, which is precisely what a dead icon fails
   at — and a launcher that breaks past that, he tells you about in one line.
   `~/.claude/hooks/block-visible-origenerator.py` blocks the visible launch
   mechanically, so this one does not rest on prose. Same reason his live app

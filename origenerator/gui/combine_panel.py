@@ -33,12 +33,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Collection
 
-from origenerator.paths import ensure_shared_ui_on_path
-
-# Before any shared_ui import: that checkout is a sibling on the path, not a
-# dependency the launch interpreter has installed (see tests/test_sibling_imports).
-ensure_shared_ui_on_path()
-
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,

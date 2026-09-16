@@ -19,7 +19,7 @@ Sub AppendLog(msg)
 End Sub
 
 Function FindPythonCommand()
-  Dim venvPython, candidates, i
+  Dim venvPython
 
   ' The copy a previous run left named for this app, then the plain venv
   ' interpreter.  Windows identifies a process by the file it was started from,
@@ -38,28 +38,16 @@ Function FindPythonCommand()
     FindPythonCommand = Quote(venvPython)
     Exit Function
   End If
-
-  candidates = Array( _
-    "python", _
-    "py -3" _
-  )
-  For i = 0 To UBound(candidates)
-    If shell.Run("cmd /c where " & Split(candidates(i), " ")(0) & " >nul 2>nul", 0, True) = 0 Then
-      FindPythonCommand = candidates(i)
-      Exit Function
-    End If
-  Next
   FindPythonCommand = ""
 End Function
 
 pythonCmd = FindPythonCommand()
 If pythonCmd = "" Then
-  AppendLog "ERROR: Could not find python launcher"
-  MsgBox "Could not find python or py launcher.", vbCritical, "Origenerator"
+  AppendLog "ERROR: Origenerator's install is missing: " & projectRoot & "\.venv"
+  MsgBox "Origenerator's install is missing:" & vbCrLf & projectRoot & "\.venv", vbCritical, "Origenerator"
   WScript.Quit 1
 End If
 
-parentDir = fso.GetParentFolderName(projectRoot)
-cmd = "cmd /c cd /d " & Quote(projectRoot) & " && set PYTHONPATH=" & parentDir & "&&" & pythonCmd & " -m origenerator 1>>" & Quote(launcherLog) & " 2>&1"
+cmd = "cmd /c cd /d " & Quote(projectRoot) & " && " & pythonCmd & " -m origenerator 1>>" & Quote(launcherLog) & " 2>&1"
 AppendLog "INFO: Launching with command: " & cmd
 shell.Run cmd, 0, False

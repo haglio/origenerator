@@ -38,11 +38,6 @@ from PyQt6.QtWidgets import (
     QStyleOptionProgressBar,
     QStylePainter,
 )
-
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
 from shared_ui.colors import BG_PRIMARY, BLUE_LIGHT
 
 _TEXT_MARGIN = 6  # breathing room at each end before the caption has to move

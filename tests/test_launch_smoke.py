@@ -5,14 +5,13 @@ gap. ``main()`` imports almost the whole app *inside the function* -- the
 database, the recovery bin, the ComfyUI client, the importer, the main window --
 so nothing about a break in one of them reaches a test that imports
 ``origenerator.app`` and stops there. And every other test here runs under
-``tests/conftest.py``, which pins the content overlay and puts ``shared_ui`` on
-``sys.path`` before the first import; the launcher does neither. A run can
-therefore pass on modules the launch cannot even load.
+``tests/conftest.py``, which pins the content overlay; the launcher does not. A
+run can therefore pass on modules the launch cannot even load.
 
 So this drives the launch's import phase the way the launcher does: a fresh
-interpreter, this repo as the working directory, the launcher's ``PYTHONPATH``
-and nothing inherited, and the committed example overlay standing in for the
-git-ignored local one -- which is also what a public checkout and CI have.
+interpreter, this repo as the working directory, no ``PYTHONPATH``, and the
+committed example overlay standing in for the git-ignored local one -- which is
+also what a public checkout and CI have.
 
 The walk that reads those imports off the AST, and the three assertions that
 replay them, are ``app_support.launch_smoke``: seven repos carried a copy of the
@@ -67,28 +66,10 @@ def _launch_imports() -> list[str]:
     return launch_imports(PACKAGE, LAUNCH_FILES)
 
 
-def _checkouts_parent():
-    """The directory holding the sibling checkouts — ``REPO_ROOT``'s own parent
-    in the primary layout the launcher models.  A WORKTREE's parent is
-    ``.claude/worktrees``, which holds no siblings, so walk up to the level
-    that does (the same walk the app's own sibling resolution makes); without
-    this, every import of a sibling read as a launch failure in any worktree
-    run of the suite."""
-    for parent in [REPO_ROOT.parent, *REPO_ROOT.parents]:
-        if (parent / "app_support" / "app_support" / "__init__.py").exists():
-            return parent
-    return REPO_ROOT.parent
-
-
 def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedProcess:
-    """Run them the way ``launch_origenerator.vbs`` runs the app.
-
-    The launcher cds to this repo and sets ``PYTHONPATH`` to the checkouts'
-    parent, so that is the whole path story -- any ``PYTHONPATH`` a developer or
-    pytest happens to be carrying is dropped, because the icon does not get it.
-    """
+    """Run them the way ``launch_origenerator.vbs`` runs the app: from this repo,
+    with no ``PYTHONPATH`` at all, because the icon does not get one."""
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    env["PYTHONPATH"] = str(_checkouts_parent())
     env["QT_QPA_PLATFORM"] = "offscreen"
 
     driver = "\n".join(
@@ -138,12 +119,27 @@ def test_the_launcher_runs_the_package_from_this_repo_on_its_own_venv():
 
     assert ".venv\\Scripts\\python.exe" in text
     assert "-m origenerator" in text
-    # The working directory and PYTHONPATH are what _run_in_a_fresh_interpreter
-    # mirrors, so a launcher that stopped setting either would leave this file
-    # checking an arrangement nothing runs under.
+    # The working directory is what _run_in_a_fresh_interpreter mirrors, so a
+    # launcher that stopped setting it would leave this file checking an
+    # arrangement nothing runs under.
     assert "cd /d" in text
-    assert "set PYTHONPATH=" in text
-    assert "parentDir" in text
+
+
+def test_the_launchers_leave_the_siblings_to_the_install():
+    """Its siblings are pinned dependencies of the install.  A PYTHONPATH naming
+    the checkouts' parent put whatever those checkouts held within reach of the
+    app, which is the half-landed change a pin exists to keep out."""
+    for launcher in (LAUNCHER, REPO_ROOT / "launch_preview_branch.vbs"):
+        assert "PYTHONPATH" not in launcher.read_text(encoding="utf-8", errors="replace")
+
+
+def test_the_launchers_never_fall_back_to_a_python_off_path():
+    """One off PATH has none of the pinned siblings, so it could only die on
+    import in a hidden window; a launcher with no install to run says so."""
+    for launcher in (LAUNCHER, REPO_ROOT / "launch_preview_branch.vbs"):
+        text = launcher.read_text(encoding="utf-8", errors="replace")
+        assert "cmd /c where" not in text
+        assert "install is missing" in text
 
 
 def test_the_launcher_keeps_what_a_failed_launch_wrote_to_its_console():

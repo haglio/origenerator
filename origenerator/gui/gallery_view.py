@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.tick_control import TickControl
 
 from origenerator import (
     gallery,
@@ -167,15 +168,11 @@ from origenerator.gui.toolbar_bank import (
 )
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.media import MediaType
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.slideshow import in_order
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
-
-ensure_shared_ui_on_path()
-from shared_ui.tick_control import TickControl
 
 logger = logging.getLogger(__name__)
 

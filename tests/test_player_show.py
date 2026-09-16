@@ -8,18 +8,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from player_core.file_channel import consume_command_file
+from player_core.playlist import read_playlist
+from player_core.satellite_hud import parse_hud
+from player_core.status import PlayerStatus, status_fields
+
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
-from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import ShowState, in_order
-
-ensure_player_core_on_path()
-
-from player_core.file_channel import consume_command_file  # noqa: E402
-from player_core.playlist import read_playlist  # noqa: E402
-from player_core.satellite_hud import parse_hud  # noqa: E402
-from player_core.status import PlayerStatus, status_fields  # noqa: E402
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]

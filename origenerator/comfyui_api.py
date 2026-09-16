@@ -338,6 +338,24 @@ class ComfyUIApi:
     def fetch_history(self, prompt_id: str) -> dict:
         return self._history_entry(prompt_id, timeout=_HTTP_TIMEOUT_S)
 
+    def forget_history(self, prompt_id: str):
+        """Drop the server's record of ``prompt_id``, so a prompt sent again
+        under that id is read against nothing but its new run.
+
+        Every read of a job goes by its id -- the late-submit follow-up in
+        :meth:`submit_job`, the poll's completion backstop -- and a job taken off
+        the server to be re-run leaves a record that answers them all as
+        if the false start were the run.
+        """
+        body = json.dumps({"delete": [prompt_id]}).encode()
+        req = urllib.request.Request(
+            f"{self.base_url}/history",
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            resp.read()
+
     def _history_entry(self, prompt_id: str, timeout: float) -> dict:
         """The prompt's ``/history`` entry, ``{}`` while the server has none."""
         url = f"{self.base_url}/history/{prompt_id}"

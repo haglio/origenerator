@@ -285,6 +285,16 @@ def test_interrupt_can_name_the_one_prompt_to_stop():
     assert req.full_url == "http://127.0.0.1:8188/interrupt"
     assert json.loads(req.data) == {"prompt_id": "comfy-X"}
 
+def test_forget_history_drops_the_servers_record_of_a_prompt():
+    # A prompt sent a second time under the same id would otherwise be read
+    # against the record its first, stopped run left.
+    client = ComfyUIApi()
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
+        client.forget_history("comfy-X")
+    req = m.call_args[0][0]
+    assert req.full_url == "http://127.0.0.1:8188/history"
+    assert json.loads(req.data) == {"delete": ["comfy-X"]}
+
 def test_cancel_prompt_deletes_from_queue():
     client = ComfyUIApi()
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
@@ -305,6 +315,7 @@ def test_every_http_call_carries_a_timeout():
         client.interrupt,
         lambda: client.cancel_prompt("pid"),
         lambda: client.fetch_history("pid"),
+        lambda: client.forget_history("pid"),
         client.fetch_queue,
     ]
     for call in calls:

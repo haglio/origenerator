@@ -286,24 +286,18 @@ def test_error_for_our_id_emits_failed(qtbot, tmp_path):
     assert job.state == "failed"
 
 
-def test_cancel_while_running_interrupts_this_prompt_by_name(qtbot, tmp_path):
-    # By name: "running" is what ComfyUI last said about this job, and it can
-    # have finished and another prompt taken the GPU since. The server skips a
-    # named interrupt for a prompt it is not executing; a nameless one stops
-    # whatever is.
+def test_cancel_dequeues_and_stops_the_prompt_by_name(qtbot, tmp_path):
+    # Both, whatever this job last heard: "running" is what ComfyUI said some
+    # time ago, and a job rebound after a restart says it whether the server
+    # is executing the prompt or still holding it. Dequeuing takes it out of
+    # the server's line if it is there, and a stop by name ends it if it is the
+    # one on the GPU -- the server skips a named stop for anything else, where
+    # a nameless one would cut off whatever is executing.
     job, client = _started_job(tmp_path)
     client.node_executing.emit("comfy-A", "5")  # job is now executing
     job.cancel()
-    client.interrupt.assert_called_once_with("comfy-A")
-    client.cancel_prompt.assert_not_called()
-    assert job.state == "canceled"
-
-
-def test_cancel_while_queued_dequeues(qtbot, tmp_path):
-    job, client = _started_job(tmp_path)  # still queued, not executing
-    job.cancel()
     client.cancel_prompt.assert_called_once_with("comfy-A")
-    client.interrupt.assert_not_called()
+    client.interrupt.assert_called_once_with("comfy-A")
     assert job.state == "canceled"
 
 
@@ -526,3 +520,93 @@ def test_an_unreachable_queue_leaves_no_stale_count(qtbot, tmp_path):
     job.take_backlog(None)
 
     assert job.foreign_ahead is None
+
+
+# --- setting a job aside to run again later -----------------------------------
+
+def test_defer_stops_the_prompt_and_brings_the_job_back_unsent(qtbot, tmp_path):
+    job, client = _started_job(tmp_path)
+    client.progress.emit("comfy-A", "5", 3, 10)  # ComfyUI is rendering it
+
+    assert job.defer() is True
+
+    client.cancel_prompt.assert_called_once_with("comfy-A")
+    client.interrupt.assert_called_once_with("comfy-A")
+    assert job.state == "idle"
+    # Nothing of the run survives -- it starts over -- so the job shows as one
+    # that has not started, rather than a bar parked at where it was stopped.
+    assert job.last_progress == (0, 0)
+    assert job.last_pass_progress is None
+    assert job.last_stage == ""
+    assert job.started_at is None
+
+
+def test_defer_detaches_so_the_stopped_runs_end_is_not_taken_as_this_jobs(qtbot, tmp_path):
+    # ComfyUI ends an interrupted prompt the way it ends a finished one, with a
+    # history carrying no outputs; taken as this job's, that would fail it.
+    job, client = _started_job(tmp_path)
+    job.defer()
+    failed = []
+    job.failed.connect(lambda *a: failed.append(a))
+
+    client.job_completed.emit("comfy-A", {"outputs": {}})
+
+    assert failed == []
+    assert job.state == "idle"
+
+
+def test_a_job_the_server_does_not_hold_cannot_be_deferred(qtbot, tmp_path):
+    client = _client()
+    job = GenerationJob(client, SDXL, _params())
+
+    assert job.defer() is False
+
+    client.cancel_prompt.assert_not_called()
+    client.interrupt.assert_not_called()
+    assert job.state == "idle"
+
+
+def test_a_deferred_job_sent_again_first_forgets_its_false_start(qtbot, tmp_path):
+    # The server keeps a record of the stopped run under this job's id, and
+    # every read of the job goes by that id: the late-submit follow-up would
+    # take it as the prompt having landed, and the poll's backstop as a run to
+    # finish. So it is wiped before the prompt is sent again.
+    job, client = _started_job(tmp_path)
+    client.fetch_history = MagicMock(return_value={"outputs": {}})
+    client.forget_history = MagicMock()
+    job.defer()
+
+    job.start()
+
+    client.forget_history.assert_called_once_with("comfy-A")
+    assert [c.args[1] for c in client.submit_job.call_args_list] == ["comfy-A", "comfy-A"]
+    assert job.state == "queued"
+
+
+def test_a_deferred_job_whose_run_finished_after_all_lands_instead_of_running_again(qtbot, tmp_path):
+    # A stop that reaches the server after the last node has saved stops
+    # nothing: the run finished, and sending the prompt again would make the
+    # same file twice.
+    job, client = _started_job(tmp_path)
+    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
+    client.forget_history = MagicMock()
+    job.defer()
+    finished = []
+    job.finished.connect(lambda files, thumb, dur: finished.append(files))
+
+    job.start()
+
+    assert finished == [[{"filename": "a.png", "subfolder": ""}]]
+    assert job.state == "finished"
+    client.submit_job.assert_called_once()  # the first send; nothing went again
+    client.forget_history.assert_not_called()
+
+
+def test_a_first_send_asks_the_server_nothing_first(qtbot, tmp_path):
+    client = _client()
+    client.fetch_history = MagicMock()
+    client.forget_history = MagicMock()
+    GenerationJob(client, SDXL, _params()).start()
+
+    client.fetch_history.assert_not_called()
+    client.forget_history.assert_not_called()

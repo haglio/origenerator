@@ -315,9 +315,10 @@ def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
     assert controller.has("user-key")
 
 
-def test_user_launch_dequeues_a_still_queued_experiment(qtbot, tmp_path):
-    # An experiment ComfyUI hasn't started yet is removed from the queue (not
-    # interrupted — that would kill whatever IS executing).
+def test_user_launch_dequeues_a_still_queued_experiment_by_name(qtbot, tmp_path):
+    # An experiment ComfyUI hasn't started yet is removed from its queue, and
+    # stopped by name in case it has started meanwhile -- by name, so whatever
+    # else is executing is untouched.
     client = _client()
     db = Database(tmp_path / "test.db")
     controller = RerollController(db, client)
@@ -327,7 +328,7 @@ def test_user_launch_dequeues_a_still_queued_experiment(qtbot, tmp_path):
     controller.start_prepared("user-key", _I2V, _params(seed=7))
 
     client.cancel_prompt.assert_called_once_with(experiment.prompt_id)
-    client.interrupt.assert_not_called()
+    client.interrupt.assert_called_once_with(experiment.prompt_id)
 
 
 def test_per_seed_rerolls_preempt_experiments_too(qtbot, tmp_path):
@@ -530,8 +531,8 @@ def test_an_image_jumps_ahead_of_the_videos_waiting(qtbot, tmp_path):
     # A picture is seconds of GPU and is usually the thing being waited for; a
     # video queued earlier is a "later", and keeps its place after it.
     controller = RerollController(Database(tmp_path / "test.db"), _client())
-    running = _launch_video(controller, "v1", seed=1)
-    waiting = _launch_video(controller, "v2", seed=2)
+    running = _launch_image(controller, "i0")  # takes the server, so the rest wait
+    waiting = _launch_video(controller, "v", seed=1)
     image = _launch_image(controller, "i1")
 
     assert controller.queue_order == [
@@ -544,7 +545,7 @@ def test_a_combines_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_pa
     # for: placed as the image that prompt makes, it would take the front of the
     # line and put minutes of GPU ahead of every picture already queued.
     controller = RerollController(Database(tmp_path / "test.db"), _client())
-    _launch_video(controller, "v", seed=1)  # takes the server, so the rest wait
+    _launch_image(controller, "i0")  # takes the server, so the rest wait
     waiting = _launch_image(controller, "i1")
 
     controller.start_reroll_from_image(
@@ -562,7 +563,7 @@ def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, 
     controller = RerollController(db, _client())
     image = _image_row(seed=100)
     db.restore_generation(image)  # _reroll_source_image reads the full row from the DB
-    _launch_video(controller, "v", seed=1)  # takes the server, so the rest wait
+    _launch_image(controller, "i0")  # takes the server, so the rest wait
     waiting = _launch_image(controller, "i1")
 
     controller.start("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
@@ -575,7 +576,7 @@ def test_images_stack_newest_first(qtbot, tmp_path):
     # The last picture asked for is the next one made: it was asked for while
     # looking at the one before it, so it is the one being waited on.
     controller = RerollController(Database(tmp_path / "test.db"), _client())
-    _launch_video(controller, "v", seed=1)  # takes the server, so both images wait
+    _launch_image(controller, "i0")  # takes the server, so both images wait
     older = _launch_image(controller, "i1", seed=1)
     newer = _launch_image(controller, "i2", seed=2)
 
@@ -930,3 +931,177 @@ def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):
     controller.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
 
     assert ended[0].source == GenerationSource.EXPERIMENT
+
+
+# --- the user's image work takes the machine from a video being rendered -----
+
+def _rendering(client, job):
+    """ComfyUI has begun rendering ``job``."""
+    client.progress.emit(job.prompt_id, "s", 1, 10)
+
+
+def test_an_image_takes_the_machine_from_a_video_being_rendered(qtbot, tmp_path):
+    # Minutes of GPU, most of it spent, against seconds the user is waiting for:
+    # the video is stopped, the image goes at once, and the video starts over
+    # after it -- ahead of the video queued after it, which it was in front of.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    rendering = _launch_video(controller, "v1", seed=1)
+    waiting = _launch_video(controller, "v2", seed=2)
+    _rendering(client, rendering)
+
+    image = _launch_image(controller, "i")
+
+    client.interrupt.assert_called_once_with(rendering.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == image.prompt_id
+    assert controller.queue_order == [image.prompt_id, rendering.prompt_id, waiting.prompt_id]
+    assert db.get_generation(image.prompt_id)["status"] == "running"
+    assert db.get_generation(rendering.prompt_id)["status"] == "pending"
+
+
+def test_the_video_set_aside_starts_over_once_the_image_is_done(qtbot, tmp_path):
+    client = _client()
+    client.fetch_history = MagicMock(return_value={})  # the stopped run left nothing
+    client.forget_history = MagicMock()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    video = _launch_video(controller, "v", seed=1)
+    _rendering(client, video)
+    image = _launch_image(controller, "i")
+
+    image.finished.emit([{"filename": "out.png"}], None, 1.0)
+
+    assert [c.args[1] for c in client.submit_job.call_args_list] == [
+        video.prompt_id, image.prompt_id, video.prompt_id
+    ]
+    assert controller.queue_order == [video.prompt_id]
+
+
+def test_a_video_set_aside_shows_as_one_that_has_not_started(qtbot, tmp_path):
+    # Its row goes back to pending -- a restart re-adopts it into the line rather
+    # than looking for it on a server that no longer has it -- and the progress
+    # persisted for the stopped run goes with it.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    video = _launch_video(controller, "v", seed=1)
+    _rendering(client, video)
+    controller._persist_progress(video)
+    assert db.get_generation(video.prompt_id)["progress_json"]
+
+    _launch_image(controller, "i")
+
+    row = db.get_generation(video.prompt_id)
+    assert row["status"] == "pending"
+    assert row["progress_json"] is None
+    assert video.state == "idle"
+    assert video.started_at is None
+
+
+def test_a_video_asked_for_leaves_a_video_being_rendered_alone(qtbot, tmp_path):
+    # Asking for a video is asking for "later".
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(controller, "v1", seed=1)
+    _rendering(client, rendering)
+
+    later = _launch_video(controller, "v2", seed=2)
+
+    client.interrupt.assert_not_called()
+    assert controller.queue_order == [rendering.prompt_id, later.prompt_id]
+
+
+def test_a_videos_start_frame_being_drawn_is_left_to_finish(qtbot, tmp_path):
+    # The prompt on the GPU is a still, seconds from done; the video it opens
+    # has not started, and joins after the image.
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    controller.start_reroll_from_image(
+        "k", _image_row(), WORKFLOW_REGISTRY[_IMAGE_WF], _I2V, _params()
+    )
+    frame = controller.newest_job_for("k")
+    _rendering(client, frame)
+
+    image = _launch_image(controller, "i")
+
+    client.interrupt.assert_not_called()
+    assert controller.queue_order == [frame.prompt_id, image.prompt_id]
+
+
+def test_work_nobody_asked_for_takes_the_machine_from_nothing(qtbot, tmp_path):
+    client = _client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(controller, "v", seed=1)
+    _rendering(client, rendering)
+
+    controller.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
+                              source="experiment")
+
+    client.interrupt.assert_not_called()
+    assert controller.queue_order[0] == rendering.prompt_id
+
+
+def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_path):
+    # After a restart the server can hold several of ours -- one rendering, the
+    # rest queued after it there, where the image would wait on all of them.
+    # They come back in the order they were in, ahead of any video waiting here.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    for pid in ("v-old", "v-new"):
+        db.insert_generation(prompt_id=pid, workflow_name="wan22_i2v",
+                             workflow_version=_I2V.version, positive_prompt="x", seed=1,
+                             params_json=json.dumps(_params(seed=1)), workflow_json="{}")
+        db.update_generation(pid, status="running")
+    controller = RerollController(db, client)
+    controller.reconnect_running()
+
+    image = _launch_image(controller, "i")
+
+    assert sorted(c.args[0] for c in client.cancel_prompt.call_args_list) == ["v-new", "v-old"]
+    assert sorted(c.args[0] for c in client.interrupt.call_args_list) == ["v-new", "v-old"]
+    assert controller.queue_order == [image.prompt_id, "v-old", "v-new"]
+
+
+def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_again(
+        qtbot, tmp_path):
+    # The stop can reach the server after the video's last node has saved. Then
+    # the file exists, and its turn coming round again is when that is found.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    video = _launch_video(controller, "v", seed=1)
+    _rendering(client, video)
+    image = _launch_image(controller, "i")
+    client.fetch_history = MagicMock(return_value={"outputs": {
+        _I2V.output_node_id: {_I2V.output_key: [{"filename": "out.mp4", "subfolder": ""}]},
+    }})
+    client.forget_history = MagicMock()
+
+    image.finished.emit([{"filename": "out.png"}], None, 1.0)
+
+    assert client.submit_job.call_count == 2  # the video's first send, and the image
+    assert db.get_generation(video.prompt_id)["status"] == "completed"
+    assert controller.queue_order == []
+
+
+def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_when_it_lands(
+        qtbot, tmp_path):
+    # The server can take a minute to accept a prompt. A picture asked for in
+    # that minute cannot take the machine from a video that is not on it yet,
+    # so it takes it the moment the video lands, as one asked for later would.
+    client, gate = _gated_client()
+    controller = RerollController(Database(tmp_path / "test.db"), client)
+    seen = {}
+
+    def while_the_submit_is_out():
+        seen["image"] = _launch_image(controller, "i")
+        gate.set()
+
+    QTimer.singleShot(0, while_the_submit_is_out)
+    video = _launch_video(controller, "v", seed=1)
+
+    client.interrupt.assert_called_once_with(video.prompt_id)
+    assert [c.args[1] for c in client.submit_job.call_args_list] == [
+        video.prompt_id, seen["image"].prompt_id
+    ]
+    assert controller.queue_order == [seen["image"].prompt_id, video.prompt_id]

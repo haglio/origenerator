@@ -31,6 +31,16 @@ when nobody is waiting for a video. So a video that comes up while one plays is
 passed over — every image after it goes first — and with nothing but videos
 left the line simply holds until an image is asked for or the show ends.
 
+The front of the line is not enough on its own, because a video already on the
+GPU holds it for minutes whatever joins after it. So **a video being rendered is
+set aside for the user's image work**: stopped, put back in the line ahead of
+the videos still waiting, and started over once the pictures are done -- a run
+cannot be paused, so what it had rendered is thrown away, however close to done.
+That is the user's own call for this queue: their work goes first while they are
+working, and a video's turn comes when they are not. A video asked for is
+"later" and takes nothing from a video already running, and work nobody asked
+for takes nothing from anything.
+
 Pure ordering, no Qt and no server: it works on anything carrying a
 ``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose
 run makes something other than what it makes itself, and a ``source`` — which is
@@ -99,3 +109,20 @@ def held_back(line: list, *, videos_held: bool) -> list:
     every video in the line is waiting on the show rather than on the GPU.
     """
     return [job for job in line if videos_held and is_video(job)]
+
+
+def yields_to(running, newcomer) -> bool:
+    """Whether the job ComfyUI is rendering gives the machine up for ``newcomer``.
+
+    Only a video does, and only to the user's own image work: a picture on the
+    GPU is seconds from done, less than starting over would cost, and a video's
+    start frame is a picture on the GPU whatever run it opens.
+    """
+    return joins_the_front(newcomer) and getattr(running, "media_type", None) == MediaType.VIDEO
+
+
+def rejoin_index(line: list) -> int:
+    """Where a video set aside rejoins ``line``: ahead of every video still
+    waiting, which it was in front of, and after the pictures it was set
+    aside for."""
+    return next((index for index, job in enumerate(line) if is_video(job)), len(line))

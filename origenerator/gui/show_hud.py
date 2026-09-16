@@ -52,7 +52,7 @@ from origenerator.ui_scale import (
 
 ensure_player_core_on_path()
 from player_core.file_channel import append_command
-from player_core.hud_status import SHUFFLE_LABEL, looping_label, status_line
+from player_core.hud_status import looping_label, status_line
 from player_core.satellite_hud import (
     MARGIN,
     HudCell,
@@ -64,11 +64,10 @@ from player_core.satellite_hud_paint import HudRenderer
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
-# The presses a show answers for itself wherever it is drawn: the two filters,
-# reset, the loop button and the map's own clicks.  The transport is the other
-# half, which a hosted window hands to its session instead.
-_THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "no_loop", "seed_loop",
-                            "play_video", "lock_video"})
+# The presses a show answers for itself wherever it is drawn.  The transport is
+# the other half, which a hosted window hands to its session instead.
+_THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "shuffle", "latest",
+                            "no_loop", "seed_loop", "play_video", "lock_video"})
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
@@ -93,7 +92,6 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     f_mode = host.hud_f_mode
     enhanced = host.hud_enhanced_mode
     order_label = host.hud_order_label
-    order_label = SHUFFLE_LABEL if order_label == "Shuffle" else order_label
     # A show someone ASKED for is a loop -- this set, played round and round --
     # and the map's loop button is lit for it.  A region's base state is not:
     # it is that side browsing its whole library, exactly what a satellite does
@@ -118,7 +116,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         # The buttons this show answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
         rows=show_rows(side, locked=locked, f_mode=f_mode, enhanced=enhanced,
-                       hosted=hosted, own_window=own_window),
+                       order=order_label, hosted=hosted, own_window=own_window),
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),

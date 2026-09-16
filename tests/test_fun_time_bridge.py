@@ -95,6 +95,25 @@ def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypat
     assert show._playlist.index == 0
 
 
+def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    still = str(tmp_path / "tall.png")
+    library = {key: [(still, "image", f"{key}-{n}", still) for n in range(3)]
+               for key in ("__recents__::portrait", "__all__::portrait")}
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    orders = []
+
+    for verb in ("PORTRAIT_LATEST", "PORTRAIT_SHUFFLE"):
+        (tmp_path / "origenerator_cmd.txt").write_text(f"{verb}\n", encoding="utf-8")
+        bridge._tick()
+        orders.append((show.hud_order_label, show._playlist.current()[2].split("-")[0]))
+
+    assert orders == [("Latest", "__recents__::portrait"),
+                      ("Shuffle", "__all__::portrait")]
+
+
 def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch):
     """The session owns the room's microphone, so it hears "landscape
     favorites" and posts the WORDS on this channel — matched here, against this

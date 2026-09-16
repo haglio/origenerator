@@ -3,6 +3,11 @@ face, its tooltip and the state it draws."""
 from __future__ import annotations
 
 from origenerator.gui.show_buttons import answer, show_rows
+from origenerator.paths import ensure_player_core_on_path
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 
 def _band(**fields) -> tuple:
@@ -14,11 +19,9 @@ def _names(buttons) -> list[str]:
 
 
 def test_the_band_is_the_controls_a_show_answers_in_the_players_order():
-    """The step either way, then the three about the item on screen, then what
-    narrows the set and the way back out of all of it — the satellites' own
-    order, so a reader glancing between two screens finds one panel."""
     assert _names(_band()) == [
-        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "minimize"]
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
+        "shuffle", "latest", "minimize"]
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
@@ -36,7 +39,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
     """A run of evenly spaced squares reads as one undifferentiated strip; the
     wider gap opens at the seams the players' own band opens them at."""
     assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
-        "lock", "enhanced", "minimize"]
+        "lock", "enhanced", "shuffle", "minimize"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
@@ -53,6 +56,13 @@ def test_the_switches_light_and_the_things_done_never_do():
     assert not any(band[name].lit for name in ("prev", "next", "trash", "reset", "minimize"))
     at_rest = dict(zip(_names(_band()), _band()))
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
+
+
+def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
+    for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"]), ("", [])):
+        band = _band(order=order)
+        assert [name for name, button in zip(_names(band), band)
+                if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
 def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
@@ -84,7 +94,7 @@ def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
 
     assert len(rows) == 1
     assert _names(rows[0]) == [
-        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset"]
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "shuffle", "latest"]
 
 
 class _Host:
@@ -106,6 +116,9 @@ class _Host:
     def show_reset(self):
         self.calls.append("reset")
 
+    def show_order(self, *, latest):
+        self.calls.append(("order", latest))
+
     def toggle_f_mode(self):
         self.calls.append("fmode")
 
@@ -124,7 +137,7 @@ def test_every_declared_button_is_answered_by_the_show():
         assert answer(host, button.action.removeprefix("portrait_")), button.action
 
     assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
-                          "enhanced", "reset"]
+                          "enhanced", "reset", ("order", False), ("order", True)]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it():

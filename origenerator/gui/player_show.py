@@ -29,7 +29,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.show_set import ShowSet
-from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.media import MediaType
@@ -123,8 +123,7 @@ class PlayerShow(QObject):
              hud=None) -> None:
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
-        if self._locked:
-            self._hold(False)
+        self._let_go()
         self._hand_over(land=True)
         self._publish()
 
@@ -228,8 +227,7 @@ class PlayerShow(QObject):
     def show_step(self, delta: int) -> None:
         """Step the player either way.  Moving off a held slide releases the
         hold, the way the players' own prev/next cancel a lock."""
-        if self._locked:
-            self._hold(False)
+        self._let_go()
         self._send(NEXT if delta > 0 else PREV)
 
     def step(self, delta: int) -> None:
@@ -268,6 +266,10 @@ class PlayerShow(QObject):
         self._locked = on
         self._send(LOCK_ON if on else LOCK_OFF)
         self._publish()
+
+    def _let_go(self) -> None:
+        if self._locked:
+            self._hold(False)
 
     def show_cull(self) -> None:
         """Take the item on screen away and move on.
@@ -331,6 +333,10 @@ class PlayerShow(QObject):
             return
         self.reset_in_place()
 
+    def show_order(self, *, latest: bool) -> None:
+        if self._actions.reorder is not None:
+            self._actions.reorder(self, latest)
+
     def reset_in_place(self) -> None:
         """This show's own reset: both switches dropped, the hold released, and
         the set it is already playing started over."""
@@ -343,9 +349,12 @@ class PlayerShow(QObject):
     def retune(self, items, *, enhanced_ids=None) -> None:
         """Point this show at the region's base set instead — what a hosted
         reset does, with both switches off and a fresh pass."""
-        self._set.retune(items, hud=HudFacts(looping=False,
-                                             starred_ids=self._set.starred_ids,
-                                             enhanced_ids=enhanced_ids))
+        self._let_go()
+        self._set.retune(items, enhanced_ids=enhanced_ids)
+
+    def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
+        self._let_go()
+        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids)
 
     def show_item(self, path, *, hold: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump

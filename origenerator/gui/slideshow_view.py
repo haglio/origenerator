@@ -102,7 +102,7 @@ from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.show_set import ShowSet
-from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.gui.toast import NOTICE, Toast
@@ -666,6 +666,10 @@ class SlideshowView(QWidget):
             return
         self.reset_in_place()
 
+    def show_order(self, *, latest: bool) -> None:
+        if self._actions.reorder is not None:
+            self._actions.reorder(self, latest)
+
     def reset_in_place(self) -> None:
         """This show's own reset: both switches dropped, the hold released, and
         the top of the set it is already playing back on screen."""
@@ -693,9 +697,11 @@ class SlideshowView(QWidget):
         new set, so a new answer.
         """
         self._live = not items
-        self._set.retune(items, hud=HudFacts(looping=False,
-                                             starred_ids=self._set.starred_ids,
-                                             enhanced_ids=enhanced_ids))
+        self._set.retune(items, enhanced_ids=enhanced_ids)
+
+    def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
+        self._live = not items
+        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids)
 
     @property
     def hud_order_label(self) -> str:

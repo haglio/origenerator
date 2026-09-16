@@ -1847,3 +1847,25 @@ def test_a_slide_still_being_made_says_so(qtbot, tmp_path):
 
     assert view._note.text() == "Generating…"
     assert not view._note.isHidden()
+
+
+def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot):
+    asked = []
+    view = _view(qtbot, on_reorder=lambda held, latest: asked.append((held, latest)))
+
+    view.show_order(latest=True)
+    view.show_order(latest=False)
+
+    assert asked == [(view, True), (view, False)]
+
+
+def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_path):
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"))
+    view.step(1)
+    view.toggle_hold()
+
+    view.reorder(_named(tmp_path, "e", "d"), latest=True)
+
+    assert view._playlist.current()[2] == "e"
+    assert view.locked is False
+    assert view.hud_order_label == "Latest"

@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gui import show_director as module
+from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
@@ -29,6 +30,8 @@ LANDSCAPE = "landscape"
 # narrowed to that region's shape.
 ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
+LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
+LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
 
 
 class FakeSignal:
@@ -75,6 +78,7 @@ class FakeShow:
         self.playlist = None
         self.resumed = None
         self.retuned = None
+        self.reordered = None
         self.dwell_s = None
         self.paused = None
         self.audio_muted = None
@@ -129,6 +133,9 @@ class FakeShow:
 
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
+
+    def reorder(self, items, *, latest, enhanced_ids):
+        self.reordered = (list(items), latest, set(enhanced_ids))
 
     def note_added(self, path, media_type, prompt_id, thumb, *, starred, enhanced):
         self.added.append((prompt_id, starred, enhanced))
@@ -616,6 +623,66 @@ def test_a_region_reset_re_points_what_feeds_it(shows):
 
     assert director._live_shows == [(made[0], ALL_LANDSCAPE)]
     assert made[0].retuned == ([("g4.png", "image", "g4", None)], set())
+
+
+def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there(shows):
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g9"), _row("g4")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered == (
+        [("g9.png", "image", "g9", None), ("g4.png", "image", "g4", None)], True, set())
+    assert director._live_shows == [(made[0], LATEST_LANDSCAPE)]
+    assert made[0].said == ["Latest"]
+
+
+def test_shuffle_points_a_region_show_back_at_its_sides_whole_library(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   LATEST_PORTRAIT: [_row("g9")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
+                  side=PORTRAIT)
+
+    director.reorder_show(made[0], False)
+
+    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
+    assert director._live_shows == [(made[0], ALL_PORTRAIT)]
+    assert made[0].said == ["Shuffle"]
+
+
+def test_a_show_on_its_own_takes_latest_of_the_shape_it_opened_on(shows):
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")]})
+    director, _host, made = shows(browser=browser)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True, set())
+
+
+def test_an_order_with_nothing_to_play_says_so_and_leaves_the_show_alone(shows):
+    director, _host, made = shows(browser=FakeBrowser(shelves={}), fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered is None
+    assert list(zip(made[0].said, made[0].said_kinds)) == [
+        ("Nothing there to play", WARNING)]
+    assert director._live_shows == [(made[0], "workflow/a")]
+
+
+@pytest.mark.parametrize("session", [None, FakeSession()])
+def test_a_show_asks_this_director_for_its_order_hosted_or_not(shows, session):
+    director, _host, made = shows(fun_time=session)
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[0].actions.reorder == director.reorder_show
 
 
 def test_a_region_show_ending_comes_back_on_the_base_state(shows):

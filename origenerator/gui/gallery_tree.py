@@ -51,6 +51,7 @@ from origenerator.gui.folder_tree import (
     BRANCH_ICON_ROLE,
     COUNT_ROLE,
     DROP_KEY_ROLE,
+    RECENT_ROLE,
     TREE_KEY_ROLE,
 )
 from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
@@ -102,16 +103,25 @@ class GalleryTree:
         # shape — so a caller holding a key with no side (a re-roll's folder, a
         # saved session's, a spoken shelf name) can still find a row.
         self.keys_by_folder: dict[str, list[str]] = {}
+        self._recently_worked: set[str] = set()  # tree keys wearing the mark
         self._built = False  # whether a first populate has happened (see _open_all)
 
-    def populate(self, sides, expanded_keys, *, folder_meta=None):
+    def populate(self, sides, expanded_keys, *, folder_meta=None,
+                 recently_worked=()):
         """Rebuild the tree from ``sides``, restoring the folders in ``expanded_keys``.
 
         ``sides`` are the :class:`SideModel`s to fill the halves with, one per
         shape. ``folder_meta`` is the same label/star overlay the tree models
         were built with, so the All row each side wraps around its model can be
         renamed and starred like any folder under it.
+
+        ``recently_worked`` are the ``(side, folder key)`` pairs of the folders
+        worked in lately (:func:`~origenerator.gallery.recently_worked_folders`),
+        whose rows wear a mark. A folder stays where the row that made it put
+        it, so the mark is the whole of what says where the work has been.
         """
+        self._recently_worked = {oriented_key(key, side)
+                                 for side, key in recently_worked}
         self._tree.blockSignals(True)
         self._tree.clear()
         self.item_by_key = {}
@@ -195,8 +205,15 @@ class GalleryTree:
         The key rides the row itself so the selected row can name its own place
         without anything having to work out which side it is on;
         ``keys_by_folder`` is the way back for a caller holding a key with no
-        side on it (``folder_key`` — only a side's own root has none)."""
+        side on it (``folder_key`` — only a side's own root has none).
+
+        A row of a folder lately worked in is marked here rather than at each
+        tier, so every kind of row answers to the one rule; the tooltip says
+        what the mark means, since a dot nothing explains is a riddle."""
         item.setData(0, TREE_KEY_ROLE, key)
+        if key in self._recently_worked:
+            item.setData(0, RECENT_ROLE, True)
+            item.setToolTip(0, f"{item.toolTip(0)} · worked in recently")
         parent_item.addChild(item)
         self.item_by_key[key] = item
         if folder_key is not None:

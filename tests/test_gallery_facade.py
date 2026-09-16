@@ -48,7 +48,7 @@ PUBLISHED = {
     "named_folders_by_row", "new_work_opens_a_section", "original_files_of",
     "output_disk_files",
     "output_file_path", "output_file_reference", "parse_params",
-    "produced_output", "prompts_differ_from", "recent_generations", "recognized_spelling",
+    "produced_output", "prompts_differ_from", "recent_generations", "recently_worked_folders", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "resolve_preview",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
     "rows_of_media_types", "rows_under", "section_headings", "selection_group",

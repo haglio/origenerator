@@ -15,7 +15,9 @@ or a video.
 
 :func:`orientation_mark` is the pair over the table of contents' two halves: a
 frame of the proportions each half holds, drawn here because what it says is the
-difference between the two rather than any one named mark.
+difference between the two rather than any one named mark.  :func:`recent_mark_icon`
+is the dot at the end of the row of a folder lately worked in, drawn here for the
+same reason: it is a color saying one thing, not a mark anyone reads.
 
 The corner controls (:func:`corner_star_icon`, :func:`corner_trash_icon`,
 :func:`corner_enhance_icon`) are the marks a generation's picture wears in its
@@ -90,7 +92,6 @@ _CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
 # tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
 # badges can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
-
 _REROLL_GLYPH = QColor(255, 255, 255)
 
 # The re-roll glyph is a composite: the media mark up and to the left, leaving
@@ -208,6 +209,31 @@ def custom_folder_icon() -> QIcon:
     """A folder — the caret marker on a folder the user composed, and the toolbar
     button that composes one out of the picked folders."""
     return glyph_icon("folder", size=_SIZE)
+
+
+# How far the lately-worked-in dot sits inside its canvas, so the soft edge it is
+# scaled down to has somewhere to fall rather than being clipped at the border.
+_MARK_INSET = 3.0
+
+
+@cache
+def recent_mark_icon() -> QIcon:
+    """A filled dot — worn at the end of the row of a folder lately worked in.
+
+    A dot rather than a glyph, in the family's one accent color: it says a
+    folder is one of the few you were last in and nothing else, and a mark that
+    says one thing should not look like something you can read. Drawn at the
+    shared canvas and scaled down where it is painted, so it stays a smooth disc
+    at whatever size the row gives it; inset a little so that scaling has the
+    room its soft edge needs.
+    """
+    def draw(painter: QPainter):
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(BLUE)
+        painter.drawEllipse(QRectF(_MARK_INSET, _MARK_INSET,
+                                   _SIZE - 2 * _MARK_INSET, _SIZE - 2 * _MARK_INSET))
+
+    return QIcon(_painted(draw))
 
 
 @cache

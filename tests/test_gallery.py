@@ -1802,3 +1802,76 @@ def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     assert before == rerolled == stale
     story = canonical_settings("wan22_i2v", {"frame_count": 241, "scene_frames": [161, 81]})
     assert story["scene_frames"] == [161, 81]
+
+
+def _worked_tree(*leaf_ids):
+    """One workflow folder over one settings leaf per id, the id standing for
+    where that leaf's generation falls in the library's order."""
+    leaves = [SettingsGroup(f"s{i}", f"S{i}", [{"prompt_id": f"g{i}", "id": i}])
+              for i in leaf_ids]
+    return [WorkflowGroup("w", "wf", "WF",
+                          [ModelGroup("m", "M", [LoraGroup("l", "L", leaves)])])]
+
+
+def test_the_folder_of_the_newest_generation_is_marked_lately_worked_in():
+    from origenerator.gallery import recently_worked_folders
+    from origenerator.gallery.sides import PORTRAIT
+
+    marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2)}, [], limit=1)
+
+    assert marked == {(PORTRAIT, "s2")}
+
+
+def test_only_a_folder_with_nothing_nested_under_it_is_marked():
+    # The mark goes on the folder the generations themselves are in. A folder of
+    # folders is fresh whenever anything under it is, which is nearly always, so
+    # marking one would say nothing about it.
+    from origenerator.gallery import recently_worked_folders
+    from origenerator.gallery.sides import PORTRAIT
+
+    marked = recently_worked_folders({PORTRAIT: _worked_tree(1)}, [])
+
+    assert marked == {(PORTRAIT, "s1")}
+
+
+def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
+    # Both halves of the tree draw the same folder key over rows of their own
+    # shape, so portrait work must not light the landscape copy of it.
+    from origenerator.gallery import recently_worked_folders
+    from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+
+    marked = recently_worked_folders(
+        {PORTRAIT: _worked_tree(2), LANDSCAPE: _worked_tree()}, [])
+
+    assert (PORTRAIT, "s2") in marked
+    assert (LANDSCAPE, "s2") not in marked
+
+
+def test_only_the_last_few_folders_worked_in_are_marked():
+    # Every folder marked is no folder marked, so the freshest few take it and
+    # the rest of the library stays quiet.
+    from origenerator.gallery import recently_worked_folders
+    from origenerator.gallery.sides import PORTRAIT
+
+    marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2, 3)}, [], limit=2)
+
+    assert marked == {(PORTRAIT, "s3"), (PORTRAIT, "s2")}
+
+
+def test_enhancing_an_old_image_marks_the_folder_it_sits_in():
+    # Enhancing is working in the folder the image is in, and it leaves no row
+    # of its own there — so a folder whose only fresh thing is an enhancement is
+    # still one of the folders you were last in.
+    from origenerator.gallery import recently_worked_folders
+    from origenerator.gallery.sides import PORTRAIT
+
+    old = {"prompt_id": "g1", "id": 1,
+           "enhance_history": json.dumps([{"run_id": 9}])}
+    newer = {"prompt_id": "g2", "id": 2}
+    tree = [WorkflowGroup("w", "wf", "WF", [ModelGroup("m", "M", [LoraGroup("l", "L", [
+        SettingsGroup("s1", "S1", [old]), SettingsGroup("s2", "S2", [newer]),
+    ])])])]
+
+    marked = recently_worked_folders({PORTRAIT: tree}, [old, newer], limit=1)
+
+    assert marked == {(PORTRAIT, "s1")}  # the enhanced image's, not the newer one's

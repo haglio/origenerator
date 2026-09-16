@@ -28,7 +28,7 @@ from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_request_tile import FolderRequestTile
-from origenerator.gui.folder_tree import BRANCH_ICON_ROLE
+from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY,
     RECENTS_KEY,
@@ -425,6 +425,28 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     assert workflow_node.childCount() == 1                    # one model
     assert workflow_node.child(0).childCount() == 1           # its single "(no add-on)" level
     assert workflow_node.child(0).child(0).childCount() == 1  # the two seeds collapse
+
+
+def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, monkeypatch):
+    # Folders no longer float up when a generation lands in one, so the mark is
+    # what is left to say where the work has lately been. Which folders those
+    # are is the gallery model's answer; the tree's job is to wear it.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    asked = []
+
+    def fake(trees, rows, *args, **kwargs):
+        asked.append((sorted(trees), [row["prompt_id"] for row in rows]))
+        return {(LANDSCAPE, "image/sdxl_t2i")}
+
+    monkeypatch.setattr(gallery, "recently_worked_folders", fake)
+    view.refresh()
+
+    assert asked == [([LANDSCAPE, "portrait"], ["i1"])]  # both sides, the listed rows
+    workflow = _image_workflow(view._tree)
+    assert workflow.data(0, RECENT_ROLE)
+    assert "worked in recently" in workflow.toolTip(0)   # so the mark says what it means
+    assert not workflow.child(0).data(0, RECENT_ROLE)    # and nothing the model left out
 
 
 def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):

@@ -14,6 +14,13 @@ row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the Starred and Recents shelves
 draws that icon in its caret column so its label lines up with the siblings'.
 Which group a row holds is injected, so this stays free of the gallery model.
 
+A row carrying ``RECENT_ROLE`` is one of the folders lately worked in, and wears
+a dot at the pane's own left edge — the same place on every row, whatever its
+depth, so the marks read down the edge as one column. The tree no longer lifts a
+folder when something lands in it — it stays where the row that made it put it,
+so the order the recipes were tried in survives — and the dot is what is left to
+say where the work has been.
+
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
 ``DROP_KEY_ROLE``: the Starred shelf, or a custom folder. A drop emits
@@ -31,6 +38,7 @@ from origenerator.gui import icons
 
 _ICON = 16   # on-screen size of each action
 _PAD = 4     # gap between the label and the icons, and between the two icons
+_DOT = 6     # diameter of the lately-worked-in mark
 
 # A row carrying a QIcon here draws it where its disclosure chevron would go, so a
 # childless shelf row (Starred, Recents) aligns with the sibling folders instead
@@ -47,6 +55,11 @@ DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
 # them you picked, hovered, or dragged.
 TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 4
+# A row carrying a true value here is one of the folders lately worked in, and
+# wears a dot at the pane's left edge. Which folders those are is the gallery
+# model's answer (see origenerator.gallery.recently_worked_folders); all this
+# knows is the mark.
+RECENT_ROLE = Qt.ItemDataRole.UserRole + 5
 
 # The dragged folders' keys, newline-joined. A private type, so a drag out of the
 # tree lands nowhere except on a row that collects folders.
@@ -62,6 +75,14 @@ def _action_rects(content: QRect):
     star = QRect(content.left() - _PAD - _ICON, y, _ICON, _ICON)
     delete = QRect(star.left() - _PAD - _ICON, y, _ICON, _ICON)
     return star, delete
+
+
+def _mark_rect(content: QRect) -> QRect:
+    """Where a lately-worked-in row's dot goes: the pane's own left edge, level
+    with the row. The same place on every row whatever its depth, so a column of
+    them reads down the edge — and far left of the actions, which follow the
+    label inward as a folder nests deeper."""
+    return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
 class _CountBeforeName(QStyledItemDelegate):
@@ -87,6 +108,7 @@ class FolderTree(QTreeWidget):
         self._delete = icons.delete_icon()
         self._star = icons.star_icon(filled=False)
         self._star_on = icons.star_icon(filled=True)  # a starred leaf's filled star
+        self._recent = icons.recent_mark_icon()  # a lately-worked-in row's dot
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setItemDelegate(_CountBeforeName(self))
         self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
@@ -145,6 +167,8 @@ class FolderTree(QTreeWidget):
 
     def drawRow(self, painter, option, index):
         super().drawRow(painter, option, index)
+        if index.data(RECENT_ROLE):
+            self._recent.paint(painter, _mark_rect(self.visualRect(index)))
         group = self._leaf_group(index)
         if group is None:
             return

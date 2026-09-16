@@ -51,8 +51,9 @@ the thing a user goes hunting for an explanation of.
 """
 from __future__ import annotations
 
+from PyQt6 import sip
 from PyQt6.QtCore import QMimeData, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
@@ -67,6 +68,7 @@ from PyQt6.QtWidgets import (
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
+from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.inflight import (
     TICK_MS,
     discard_run_text,
@@ -397,6 +399,7 @@ class QueueRow(OpensAFolder, QWidget):
         self.key = item.key
         self.movable = movable
         self._press_at = None
+        self._drag_out = DragOut()
         self.setObjectName("queueRow")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setProperty("dragging", False)
@@ -518,14 +521,12 @@ class QueueRow(OpensAFolder, QWidget):
         self._press_at = None  # this gesture is a drag now, not a pending click
         mime = QMimeData()
         mime.setData(QUEUE_ROW_MIME, self.key.encode())
-        drag = QDrag(self)
-        drag.setMimeData(mime)
-        drag.setPixmap(self.grab())
         self.set_dragging(True)
         try:
-            drag.exec(Qt.DropAction.MoveAction)
+            self._drag_out.start(mime, self.grab(), action=Qt.DropAction.MoveAction)
         finally:
-            self.set_dragging(False)
+            if not sip.isdeleted(self):  # a poll can redraw the line mid-drag
+                self.set_dragging(False)
 
 
 class GenerationQueue(QWidget):

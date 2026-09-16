@@ -640,3 +640,19 @@ def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
     show.show_nav("right")
 
     assert (_sent(show), said) == ([], ["Nothing that way"])
+
+
+def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
+    """The players' own "weird": a favorite loses its star and the player is
+    told to move on — nothing is dropped and nothing deleted."""
+    unfavorited, deleted = [], []
+    show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),
+                 actions=ShowActions(unfavorite=unfavorited.append, delete=deleted.append))
+    _sent(show)
+
+    show.show_cull()
+
+    assert (unfavorited, deleted) == (["id-1"], [])
+    assert _sent(show) == ["LOCK_OFF", "NEXT"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "two.png", "three.png"]   # still in the list

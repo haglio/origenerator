@@ -14,6 +14,7 @@ import pytest
 from origenerator.app import (
     _arm_the_crash_log,
     _bring_to_front,
+    _configure_logging,
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
     _warm_voice_runtimes,
@@ -24,6 +25,21 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+
+
+def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_path):
+    # A hosted launch's stderr goes nowhere and faulthandler cannot see a
+    # fail-fast abort, so what Qt says on its way down reaches the app's own
+    # log or nothing: twenty crashes in four days left only Windows' record.
+    installed = []
+    monkeypatch.setattr("app_support.logging_utils.configure_logging",
+                        lambda *a, **k: None)
+    monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging",
+                        lambda: installed.append(True))
+
+    _configure_logging(tmp_path)
+
+    assert installed == [True]
 
 
 @pytest.fixture(autouse=True)

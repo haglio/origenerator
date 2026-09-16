@@ -72,8 +72,9 @@ def test_a_hold_asked_for_with_the_device_let_go_takes_it_back():
 
 
 def test_letting_go_leaves_the_hold_where_it_was():
-    """Control off sends nothing; it does not move the device or spend what a
-    hold wrote down, so driving afterwards puts back what park stilled."""
+    """Control off asks the motion for nothing and does not spend what a hold
+    wrote down, so driving afterwards puts back what park stilled.  Settling the
+    device home is the drivers' own hand-back, on the way out."""
     motion = FakeMotion()
     control = _control(motion)
     control.set_state(OSR2_PARKED)

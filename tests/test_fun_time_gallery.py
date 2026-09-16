@@ -36,6 +36,12 @@ def _fun_time_view(qtbot, rows=()):
     return view
 
 
+def _lit(model, action: str) -> bool:
+    """Whether the button posting *action* is drawn lit on the show's panel."""
+    return next(button.lit for row in model.rows for button in row
+                if button.action == action)
+
+
 def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     """The room's audio and its microphone are the session's, not this app's:
     the main player owns the sound and Fun Time owns the mic (it hears this
@@ -274,19 +280,21 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
 
     hud, = show.findChildren(ShowHud)
     assert hud._targets is not None
-    # The mode pair is on it — the way back to player mode from atop a show.
     names = hud_button_names(hud)
+    # The mode pair is on it — the way back to player mode from atop a show.
     assert [n for n in names if n in MODE_VERBS] == [
         "satellites_video_activate", "origenerator_activate"]
     # The transport controls are the players' own set.
     assert {"prev", "next", "lock", "trash"} <= set(names)
+    # The window a player's minimize parks is not this show's, so the panel
+    # declares no such button rather than drawing one whose press goes nowhere.
+    assert "minimize" not in names
     # The furnishings the map replaces are off.
     assert show._counter.isHidden()
 
     # A transport press posts on the session's channel, exactly as a player's
-    # HUD posts it; a player-only concept (minimize) is swallowed.
+    # HUD posts it.
     hud._deliver("portrait_next")
-    hud._deliver("portrait_minimize")
     posted = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
     assert posted == ["portrait_next"]
 
@@ -334,7 +342,10 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
     position = show._playlist.order[show._playlist.index] + 1
     expected = ("corner", 0) if position == 1 else ("seed", position - 2)
     assert model.playing == expected      # the item on screen is the lit cell
-    assert model.satellites_mode == "origenerator"
+    # And the mode pair leads the panel, with this mode lit: the way back to
+    # the player under the show.
+    assert [(button.action, button.lit) for button in model.rows[0]] == [
+        ("satellites_video_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
 
     show.show_toggle_hold()
@@ -401,7 +412,7 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
     cells, _position, _locked = show.hud_items()
     assert len(cells) == 1  # narrowed to the one favorite
     model = show_hud_model("portrait", show)
-    assert model.f_mode is True and "F-Mode" in model.lock_label
+    assert _lit(model, "portrait_fmode") and "F-Mode" in model.lock_label
 
     hud._deliver("portrait_fmode")
     cells, _position, _locked = show.hud_items()
@@ -1048,7 +1059,7 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     assert show.hud_enhanced_mode is True
     assert len(show.hud_items()[0]) == 1          # narrowed to the one enhanced
     model = show_hud_model("portrait", show)
-    assert model.enhanced_filter is True and "Enhanceds" in model.lock_label
+    assert _lit(model, "portrait_enhanced") and "Enhanceds" in model.lock_label
     # Nothing went out on the session's channel: the switch is the show's own.
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 

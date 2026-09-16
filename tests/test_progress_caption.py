@@ -3,15 +3,11 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from shared_ui.colors import BG_PRIMARY, BLUE, BLUE_LIGHT
 
 from origenerator.gui import progress_caption
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import BG_PRIMARY, BLUE, BLUE_LIGHT
 
 
 @pytest.fixture

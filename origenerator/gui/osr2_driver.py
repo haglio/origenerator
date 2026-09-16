@@ -12,15 +12,12 @@ from __future__ import annotations
 import logging
 
 from app_support.funscript import read_actions
+from player_core.funscript import Funscript
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-from player_core.funscript import Funscript  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

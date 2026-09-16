@@ -17,7 +17,7 @@ jobs:
   full-suite:
     uses: haglio/.github/.github/workflows/merge-gate.yml@main
     with:
-      siblings: "player_core app_support shared_ui"
+      siblings: ""
       python-version: "3.14"
       # One pass of this suite has taken 24 minutes on a slow runner, and a run that
       # hits its ceiling is evicted from the queue with no failing test to point at;

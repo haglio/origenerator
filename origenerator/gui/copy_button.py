@@ -9,11 +9,6 @@ from __future__ import annotations
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QPushButton
-
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import CANVAS, glyph_pixmap
 

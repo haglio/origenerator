@@ -28,8 +28,6 @@ from __future__ import annotations
 
 import os
 
-from origenerator.paths import ensure_shared_ui_on_path
-
 # Before the shared_ui import below, as every module here that reaches for a
 # sibling does.  This one runs EARLIER than any of them -- main() imports it
 # before the app's own packages are touched -- and the launch interpreter is
@@ -38,9 +36,7 @@ from origenerator.paths import ensure_shared_ui_on_path
 # out, the import raises before logging is configured, so the process dies
 # without a line in state/origenerator.log and a hosting session sees only a
 # window that never appeared.
-ensure_shared_ui_on_path()
-
-from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD  # noqa: E402
+from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
 # The ratio the hosted app draws at: its buttons become the HUD's buttons.
 HOSTED_SCALE = BUTTON_SIZE_HUD / BUTTON_SIZE

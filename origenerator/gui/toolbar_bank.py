@@ -24,20 +24,17 @@ from typing import NamedTuple
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QToolButton, QWidget
-
-from origenerator.config import AMBIENT_AUDIO_VOICES
-from origenerator.gui import icons
-from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.link_tip import LinkTip, link
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.spacing import (  # noqa: E402
+from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
     BUTTON_ICON,
     BUTTON_ROW_GAP,
 )
+
+from origenerator.config import AMBIENT_AUDIO_VOICES
+from origenerator.gui import icons
+from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.link_tip import LinkTip, link
 
 # A lit background while a switch is on.
 _LIT = "QToolButton:checked { background-color: #2d6cdf; border-radius: 4px; }"

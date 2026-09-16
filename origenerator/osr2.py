@@ -20,20 +20,14 @@ from pathlib import Path
 from app_support import ports
 from app_support.file_channel import stamp_age
 from app_support.state_files import OSR2_SERIAL_RX
-
-from origenerator.config import project_dir
-from origenerator.paths import ensure_player_core_on_path
-
-# Before any player_core import: that checkout is a sibling on the path, not a
-# dependency the launch interpreter has installed (see tests/test_sibling_imports).
-ensure_player_core_on_path()
-
-from player_core.tcode import (  # noqa: E402
+from player_core.tcode import (
     PARK_COMMAND,
     UdpTCodeSink,
     format_tcode_command,
     to_tcode_position,
 )
+
+from origenerator.config import project_dir
 
 logger = logging.getLogger(__name__)
 

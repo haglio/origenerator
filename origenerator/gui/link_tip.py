@@ -21,10 +21,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
-
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
 from shared_ui.colors import BG_SECONDARY, BLUE, BORDER_PANEL, TEXT_PRIMARY
 
 

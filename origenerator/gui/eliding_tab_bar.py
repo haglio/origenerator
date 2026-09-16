@@ -148,7 +148,14 @@ class ElidingTabBar(QTabBar):
         return size
 
     def minimumSizeHint(self):
+        # The row divides whatever width it is given among its tabs (see
+        # minimumTabSizeHint), so it has no width of its own to insist on: how
+        # narrow the pane may go is its contents' to say. Qt's own answer adds
+        # those shares up, which makes the floor a reading of the width the row
+        # happens to have — and a floor like that rises again every time the pane
+        # grows the few pixels to meet it.
         size = super().minimumSizeHint()
+        size.setWidth(0)
         if self.count() == 0:
             size.setHeight(self._row_height)
         return size

@@ -67,6 +67,16 @@ def test_all_tabs_stay_within_the_bar_when_crowded(qtbot):
     assert right_edge <= bar.width()
 
 
+def test_a_crowded_row_never_asks_for_more_width_than_it_has(qtbot):
+    # The row packs its tabs into whatever width it is given, so a floor read off
+    # the width it has right now rises every time the pane grows to meet it — and
+    # that is what walked the Generate tab sideways into the gallery on launch, a
+    # few pixels a pass, for as long as the app was busy enough to draw each one.
+    tabs = _tabs_with(qtbot, n=20, width=600)
+
+    assert tabs.minimumSizeHint().width() <= tabs.width()
+
+
 def test_tabs_collapse_further_as_more_open(qtbot):
     # The more tabs share the row, the narrower each one gets.
     roomy = _tabs_with(qtbot, n=8, width=600)

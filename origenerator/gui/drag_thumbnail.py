@@ -22,7 +22,7 @@ one size, and nothing shown for the one case with genuinely no picture to show.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QPixmap
 from PyQt6.QtWidgets import QApplication
 
@@ -69,16 +69,25 @@ def set_drag_thumbnail(drag, pixmap: QPixmap) -> None:
         drag.setPixmap(pixmap)
 
 
-class DragOut:
+class DragOut(QObject):
     """One widget's press-then-threshold drag gesture.
 
     Held by the widget that can be dragged out of; fed its presses and moves.
     A caller with its own reason to refuse (nothing armed to drag, a version
     with no settings to take) checks that before asking, so the press is still
     waiting if the reason goes away.
+
+    The gesture owns the drag and announces it, and has no Qt parent, on
+    purpose: the grid can redraw while a drag is in flight, deleting the tile it
+    came out of, and a drag or an announcement owned by that tile went with it
+    and took the app down.
     """
 
+    started = pyqtSignal(str)  # the dragged generation's prompt_id, "" for anything else
+    ended = pyqtSignal()
+
     def __init__(self):
+        super().__init__()
         self._origin: QPoint | None = None
 
     @property
@@ -109,21 +118,18 @@ class DragOut:
         self._origin = None
         return True
 
-    @staticmethod
-    def start(widget, mime, pixmap: QPixmap, *, on_started=None, on_ended=None) -> None:
-        """Carry *mime* out of *widget*, with *pixmap* trailing the cursor.
+    def start(self, mime, pixmap: QPixmap, *, prompt_id: str = "") -> None:
+        """Carry *mime* out, with *pixmap* trailing the cursor.
 
-        ``on_started`` and ``on_ended`` bracket the whole gesture rather than the
-        call: ``QDrag.exec`` is modal, so a drop slot lit by the first stays lit
-        until the drop, and the second runs even when the drag is abandoned.
+        :attr:`started` and :attr:`ended` bracket the whole gesture rather than
+        the call: ``QDrag.exec`` is modal, so a drop slot lit by the first stays
+        lit until the drop, and the second fires even when the drag is abandoned.
         """
-        drag = QDrag(widget)
+        drag = QDrag(self)
         drag.setMimeData(mime)
         set_drag_thumbnail(drag, pixmap)
-        if on_started is not None:
-            on_started()
+        self.started.emit(prompt_id)
         try:
             drag.exec(Qt.DropAction.CopyAction)
         finally:
-            if on_ended is not None:
-                on_ended()
+            self.ended.emit()

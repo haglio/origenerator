@@ -293,8 +293,8 @@ class GenerateConfigPanel(QWidget):
         self._preview = PreviewWidget(show_funscript_strip=True)
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
-        self._preview.drag_started.connect(self.preview_drag_started)
-        self._preview.drag_ended.connect(self.preview_drag_ended)
+        self._preview.drag_out.started.connect(self.preview_drag_started)
+        self._preview.drag_out.ended.connect(self.preview_drag_ended)
         # Its corners and its right-click go to the gallery, which owns the
         # bookmark, the bin and the enhance queue — the same route the browser
         # pane's thumbnails take, so an act means the same thing either side.

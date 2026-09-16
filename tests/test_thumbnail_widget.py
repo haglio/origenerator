@@ -128,7 +128,7 @@ def test_a_dragged_tile_with_no_preview_trails_nothing(qtbot, monkeypatch):
     tw = ThumbnailWidget("p1", None, "label")  # "No preview"
     qtbot.addWidget(tw)
     started = []
-    tw.drag_started.connect(started.append)
+    tw.drag_out.started.connect(started.append)
 
     _drag_out(qtbot, tw)
 

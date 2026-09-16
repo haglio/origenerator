@@ -55,8 +55,6 @@ class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the click
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
-    drag_started = pyqtSignal(str)  # prompt_id — a drag of this tile began
-    drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
     control_triggered = pyqtSignal(str, str)  # prompt_id, corner_controls.STAR/TRASH/ENHANCE
 
@@ -76,7 +74,7 @@ class ThumbnailWidget(QWidget):
         # its frames over the top, so the end of the run restores it.
         self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
-        self._drag = DragOut()  # the press-then-threshold gesture out of this tile
+        self.drag_out = DragOut()
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -366,22 +364,21 @@ class ThumbnailWidget(QWidget):
         # Only a left click (re)selects. A right click opens the context menu via
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag.note_press(event)
+            self.drag_out.note_press(event)
             self.clicked.emit(self.prompt_id, event.modifiers())
 
     def mouseMoveEvent(self, event):
         # Drag the generation out to a combine drop slot, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just selects, and a double-click still opens.
-        if not self._drag.should_start(event):
+        if not self.drag_out.should_start(event):
             return
         # The tile's picture trails the cursor — the frame a video tile's looping
         # WebP is on, as much as a still image's pixmap.
-        self._drag.start(
-            self, generation_mime(self.prompt_id),
+        self.drag_out.start(
+            generation_mime(self.prompt_id),
             label_thumbnail(self._image_label),
-            on_started=lambda: self.drag_started.emit(self.prompt_id),
-            on_ended=self.drag_ended.emit,
+            prompt_id=self.prompt_id,
         )
 
     def mouseDoubleClickEvent(self, event):

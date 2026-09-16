@@ -1251,8 +1251,8 @@ class BrowserPane(QObject):
 
     def _wire_drag(self, tw: ThumbnailWidget):
         """Light the combine slot a tile fits while it's being dragged out."""
-        tw.drag_started.connect(self.drag_started)
-        tw.drag_ended.connect(self.drag_ended)
+        tw.drag_out.started.connect(self.drag_started)
+        tw.drag_out.ended.connect(self.drag_ended)
 
     def _drill_into(self, key: str):
         """Open a folder tile's folder — the view answers by selecting its tree

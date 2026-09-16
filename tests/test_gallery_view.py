@@ -17,8 +17,9 @@ from player_core.console import (
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from player_core.satellite_hud import MODE_BUTTONS
+from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QKeyEvent, QMovie
+from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
 
 from origenerator import evolver_export, gallery, motion_engine, recipe_match, search
@@ -11086,11 +11087,11 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
     qtbot.addWidget(tw)
     view._browser._wire_drag(tw)
 
-    tw.drag_started.emit("vid")  # the drag begins — before reaching any slot
+    tw.drag_out.started.emit("vid")  # the drag begins — before reaching any slot
     assert view._combine.panel.video_slot._label.property("dragActive") is True
     assert view._combine.panel.image_slot._label.property("dragActive") is False
 
-    tw.drag_ended.emit()
+    tw.drag_out.ended.emit()
     assert view._combine.panel.video_slot._label.property("dragActive") is False
 
 
@@ -11107,6 +11108,30 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
 
     panel.preview_drag_ended.emit()
     assert view._combine.panel.video_slot._label.property("dragActive") is False
+
+
+def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
+        qtbot, tmp_path, monkeypatch):
+    view = _combine_view(qtbot, tmp_path)
+    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    tile = view._browser._thumb_widgets["vid"]
+    slot = view._combine.panel.video_slot._label
+    in_flight = {}
+
+    def drag_loop_through_a_grid_redraw(drag, _action):
+        view.refresh()
+        in_flight["slot lit"] = slot.property("dragActive")
+        in_flight["drag alive"] = not sip.isdeleted(drag)
+
+    monkeypatch.setattr(QDrag, "exec", drag_loop_through_a_grid_redraw)
+
+    qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(tile, QPoint(120, 120))
+    qtbot.mouseRelease(view, Qt.MouseButton.LeftButton)
+
+    assert sip.isdeleted(tile)
+    assert in_flight == {"slot lit": True, "drag alive": True}
+    assert slot.property("dragActive") is False
 
 
 # --- Drive OSR2: one global toggle, following whatever video is in front ----

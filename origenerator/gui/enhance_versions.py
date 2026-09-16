@@ -270,7 +270,7 @@ class _LevelRow(_Row):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
-        self._drag = DragOut()
+        self.drag_out = DragOut()
         self._selected = False
         pixmap = QPixmap(str(image_path)) if image_path else QPixmap()
         # The picture that trails the cursor when this row is dragged, cut once
@@ -323,19 +323,19 @@ class _LevelRow(_Row):
         )
 
     def mousePressEvent(self, event):
-        self._drag.note_press(event)
+        self.drag_out.note_press(event)
 
     def mouseMoveEvent(self, event):
         # Only a level that knows its settings is worth dragging: the original
         # was made by no enhancement, so there is nothing for the panel to take.
-        if not self._params or not self._drag.should_start(event):
+        if not self._params or not self.drag_out.should_start(event):
             return
         # The version's image trails the cursor.
-        self._drag.start(self, enhance_level_mime(self._params), self._drag_picture)
+        self.drag_out.start(enhance_level_mime(self._params), self._drag_picture)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self._drag.pressed:
-            self._drag.forget()
+        if event.button() == Qt.MouseButton.LeftButton and self.drag_out.pressed:
+            self.drag_out.forget()
             self.clicked.emit(self._position, event.modifiers())
 
 

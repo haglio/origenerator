@@ -14,6 +14,7 @@ from origenerator.gui.folder_tree import (
     _action_rects,
 )
 from origenerator.gui.orientation import LANDSCAPE, oriented_key
+from origenerator.gui.stylesheet import build_stylesheet
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -374,3 +375,32 @@ def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
     _drop_at(tree, shelf, text)
 
     assert dropped == []
+
+
+def _is_blue(color) -> bool:
+    """Whether a pixel carries the family's blue, rather than a gray or the
+    colored edge a letter picks up where it is drawn against one."""
+    return (color.blue() > color.red() + 50
+            and color.blue() > color.green() + 30
+            and color.blue() > 120)
+
+
+def _row_pixels(tree, item) -> list:
+    """Every pixel of the row ``item`` is drawn on, as ``(x, color)`` pairs."""
+    image = tree.viewport().grab().toImage()
+    row = tree.visualRect(tree.indexFromItem(item))
+    return [(x, image.pixelColor(x, y))
+            for y in range(row.top(), row.top() + row.height())
+            for x in range(tree.viewport().width())]
+
+
+def test_the_picked_folder_is_marked_by_its_gray_ground_alone(qtbot):
+    # The platform draws a picked row an accent bar down its left edge on top of
+    # that ground -- straight through the mark a shelf row wears in its caret
+    # column, and saying nothing the ground has not already said.
+    tree, leaf = _tree_with_leaf(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    tree.setCurrentItem(leaf)
+
+    assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
+

@@ -50,11 +50,25 @@ CREATE TABLE IF NOT EXISTS generations (
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     completed_at    TEXT,
     evolver_exported_at TEXT,
+    -- Set when the user takes that send back, and the timestamp above cleared in
+    -- the same write: the pair is one fact, and half-written it would either hide
+    -- a copy Evolver still holds or condemn one just sent. Evolver reads this
+    -- column out of this table (it reads no other app's), and deletes every copy
+    -- of the clip it is holding -- the send is a file copy, so undoing it has to
+    -- be a file delete, and only the app whose folders they are can find them.
+    -- It stays set afterwards rather than being cleared, because nothing on this
+    -- side learns when Evolver has finished; it is the standing answer to "should
+    -- this clip be in the library", not a request that drains.
+    evolver_unsent_at TEXT,
     -- The twin of evolver_exported_at for the Genau lane: a clip sent to be
     -- upscaled and delivered to Genau's folder. Separate because the two sends
     -- go to different source folders and mean different things, so a video can
     -- have had one, the other, or both.
     genau_exported_at TEXT,
+    -- The Genau lane's twin of evolver_unsent_at, and read the same way: a clip
+    -- withdrawn here is deleted from Genau's own folder as well as from the
+    -- pipeline that put it there.
+    genau_unsent_at TEXT,
     -- Set at launch on a run a spoken "genau it" started, so its completion hands
     -- the clip on without being asked again. On the row rather than in memory
     -- because a restart mid-generation is routine, and it is the only thing
@@ -185,7 +199,9 @@ ADDED_COLUMNS = {
     "generations": {
         "duration_seconds": "REAL",
         "evolver_exported_at": "TEXT",
+        "evolver_unsent_at": "TEXT",
         "genau_exported_at": "TEXT",
+        "genau_unsent_at": "TEXT",
         "genau_requested_at": "TEXT",
         "progress_json": "TEXT",
         "starred": "INTEGER NOT NULL DEFAULT 0",
@@ -217,7 +233,8 @@ GENERATION_COLUMNS = (
     "output_files", "original_files", "enhance_history", "thumbnail_path",
     "error_message", "starred", "progress_json", "experiment_verdict",
     "duration_seconds", "created_at", "completed_at", "evolver_exported_at",
-    "genau_exported_at", "genau_requested_at", "recipe_category", "recipe_video_id",
+    "evolver_unsent_at", "genau_exported_at", "genau_unsent_at",
+    "genau_requested_at", "recipe_category", "recipe_video_id",
     "enhance_of", "trimmed_from", "provenance",
 )
 

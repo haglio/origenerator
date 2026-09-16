@@ -31,7 +31,8 @@ class ExportLane:
     name agreed with another repo and must stay spelled exactly as
     :mod:`origenerator.config` has it. ``flag`` is the persisted column and
     ``mark`` stamps it — two halves of one fact, spelled apart, which is why a
-    test pins that every lane's pair agrees. ``mark`` names the database method
+    test pins that every lane's pair agrees. ``unsent_flag`` and ``unmark`` are
+    the same pair for taking the send back. Each names the database method
     outright rather than by a string the panel would have to look up: reached by
     name, a stamp nothing else calls reads as dead code and is deleted by the
     next person to run the scan. ``noun`` is what the failure dialog calls the
@@ -43,8 +44,12 @@ class ExportLane:
     source: str
     flag: str
     mark: Callable[[Database, str], None]
+    unsent_flag: str
+    unmark: Callable[[Database, str], None]
     noun: str
     tooltip: str
+    delete_tooltip: str
+    withdrawn_tooltip: str
     # The button this lane wears, filled in per panel when the bank is built
     # (see :meth:`GenerateConfigPanel._build_ui`). ``None`` on the table's own
     # rows, which describe the lanes rather than any one panel's buttons.
@@ -55,8 +60,14 @@ class ExportLane:
         return f"Send to {self.name}"
 
     @property
-    def sent_caption(self) -> str:
-        return f"Sent to {self.name} ✓"
+    def delete_caption(self) -> str:
+        """What the button offers once the clip is over there.
+
+        The send left a file in another app's folders, so the only thing left to
+        offer is its deletion — a tick reading "Sent ✓" was all the button could
+        say while there was no way to take one back, and it said it disabled.
+        """
+        return f"Delete from {self.name}"
 
     @property
     def failure_title(self) -> str:
@@ -68,16 +79,28 @@ class ExportLane:
 EVOLVER = ExportLane(
     name="Evolver", source=EVOLVER_SOURCE, flag="evolver_exported_at",
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
+    unsent_flag="evolver_unsent_at",
+    unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
     noun="video",
     tooltip="Copy this video into Evolver's inbox for sorting and upscaling.",
+    delete_tooltip="Delete the copy Evolver holds, wherever it has filed it by "
+                   "now. It goes on Evolver's next run.",
+    withdrawn_tooltip="An earlier copy of this video is down for deletion in "
+                      "Evolver. Sending puts a fresh one in its inbox.",
 )
 
 GENAU = ExportLane(
     name="Genau", source=GENAU_SOURCE, flag="genau_exported_at",
     mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
+    unsent_flag="genau_unsent_at",
+    unmark=lambda db, prompt_id: db.mark_genau_unsent(prompt_id),
     noun="clip",
     tooltip="Send this clip down the Genau lane: Evolver upscales it on its "
             "usual schedule, then delivers it to the folder Genau plays from.",
+    delete_tooltip="Delete this clip from the folder Genau plays from. Evolver "
+                   "does it on its next run.",
+    withdrawn_tooltip="An earlier copy of this clip is down for deletion in "
+                      "Genau's folder. Sending starts a fresh one down the lane.",
 )
 
 # In the order they sit in the button bank. Named above as well, because the

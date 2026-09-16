@@ -274,6 +274,69 @@ def test_mark_evolver_exported_persists_across_reopen(tmp_path):
     assert reopened.get_generation("vid-001")["evolver_exported_at"] is not None
 
 
+def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
+    # The two stamps are one fact read from both sides: this app's button asks
+    # whether the clip is out there, and Evolver asks whether to delete it.
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    db.insert_generation(
+        prompt_id="vid-002",
+        workflow_name="wan22_i2v",
+        workflow_version="v1",
+        params_json="{}",
+        workflow_json="{}",
+    )
+    db.mark_evolver_exported("vid-002")
+
+    db.mark_evolver_unsent("vid-002")
+
+    row = Database(db_path).get_generation("vid-002")
+    assert row["evolver_exported_at"] is None       # no longer out there
+    assert row["evolver_unsent_at"] is not None     # and Evolver is to delete it
+
+
+def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
+    # Re-sending must retract the withdrawal in the same breath, or Evolver
+    # deletes the copy that was just handed to it.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="vid-003",
+        workflow_name="wan22_i2v",
+        workflow_version="v1",
+        params_json="{}",
+        workflow_json="{}",
+    )
+    db.mark_evolver_exported("vid-003")
+    db.mark_evolver_unsent("vid-003")
+
+    db.mark_evolver_exported("vid-003")
+
+    row = db.get_generation("vid-003")
+    assert row["evolver_exported_at"] is not None
+    assert row["evolver_unsent_at"] is None
+
+
+def test_taking_back_one_lane_leaves_the_other_send_standing(tmp_path):
+    # A clip can be in both apps' hands; withdrawing it from one says nothing
+    # about the other.
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="clip-002",
+        workflow_name="wan22_flf2v_loop",
+        workflow_version="v006",
+        params_json="{}",
+        workflow_json="{}",
+    )
+    db.mark_evolver_exported("clip-002")
+    db.mark_genau_exported("clip-002")
+
+    db.mark_genau_unsent("clip-002")
+
+    row = db.get_generation("clip-002")
+    assert row["genau_exported_at"] is None and row["genau_unsent_at"] is not None
+    assert row["evolver_exported_at"] is not None and row["evolver_unsent_at"] is None
+
+
 def test_opening_db_without_evolver_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
     # Faithful pre-evolver schema: the table as it was before this column.

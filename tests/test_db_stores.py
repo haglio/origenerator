@@ -112,20 +112,27 @@ class TestDeletionStore:
         assert db.deletions.get_deletion("gen-beta") is not None
 
 
+# The writers that interpolate a column name into their statement, and which of
+# their positional arguments is one: `_set` and `_stamp` take a single column,
+# `_record_send` the pair of stamps it moves together.
+COLUMN_ARGUMENTS = {"_set": (1,), "_stamp": (1,), "_record_send": (1, 2)}
+
+
 def test_every_column_written_by_name_is_a_literal_column_of_the_table():
-    """`GenerationStore._set` and `._stamp` interpolate a column name straight
-    into their statement, which is safe exactly as long as every one of them is
-    a literal written in that file and a column that exists. Read off the syntax
-    tree rather than left to care: a name reaching either of them from a
-    caller's string, or a column that has been renamed out of the schema, fails
-    here — before the statement, rather than as an OperationalError mid-write.
+    """The writers above interpolate a column name straight into their
+    statement, which is safe exactly as long as every one of them is a literal
+    written in that file and a column that exists. Read off the syntax tree
+    rather than left to care: a name reaching one of them from a caller's
+    string, or a column that has been renamed out of the schema, fails here —
+    before the statement, rather than as an OperationalError mid-write.
     """
     source = (Path(origenerator.db_generations.__file__)).read_text(encoding="utf-8")
     written = [
-        node.args[1]
+        node.args[position]
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        and node.func.attr in ("_set", "_stamp") and len(node.args) >= 2
+        for position in COLUMN_ARGUMENTS.get(node.func.attr, ())
+        if len(node.args) > position
     ]
 
     assert written, "the walk found no call at all, so this checks nothing"

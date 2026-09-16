@@ -46,13 +46,31 @@ class GenerationStore(Store):
             )
 
     def _stamp(self, prompt_id: str, column: str):
-        """Set one column to now. The three export marks, whose value is only
-        ever tested for presence; the database's clock, so the stamp reads the
-        same as every other one on the row."""
+        """Set one column to now. A marker whose value is only ever tested for
+        presence; the database's clock, so the stamp reads the same as every
+        other one on the row."""
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE generations SET {column} = datetime('now')"
                 " WHERE prompt_id = ?",
+                (prompt_id,),
+            )
+
+    def _record_send(self, prompt_id: str, at_column: str, unsent_column: str,
+                     *, sent: bool):
+        """Say whether a sibling app is holding this clip — both stamps at once.
+
+        The pair is one fact read from two sides: this app's button asks whether
+        the clip is out there, and the app it went to asks whether to delete it.
+        Half-written, the row would either hide a copy the sibling still holds or
+        condemn one that was just handed over, so the two columns move in a
+        single statement rather than in two calls to :meth:`_stamp`.
+        """
+        held, taken_back = ("datetime('now')", "NULL") if sent else ("NULL", "datetime('now')")
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE generations SET {at_column} = {held},"
+                f" {unsent_column} = {taken_back} WHERE prompt_id = ?",
                 (prompt_id,),
             )
 
@@ -187,19 +205,42 @@ class GenerationStore(Store):
     def mark_evolver_exported(self, prompt_id: str):
         """Record that this generation's video was sent to Evolver's inbox.
 
-        Stamps the current time so the gallery remembers the send across sessions
-        (a plain marker — the value is only ever tested for presence).
+        Stamps the current time so the gallery remembers the send across
+        sessions, and retracts any earlier withdrawal in the same write: a clip
+        handed over again must not still be down for deletion.
         """
-        self._stamp(prompt_id, "evolver_exported_at")
+        self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
+                          sent=True)
+
+    def mark_evolver_unsent(self, prompt_id: str):
+        """Take that send back: Evolver is to delete every copy it holds.
+
+        The send was a file copy into another app's folders, so undoing it is a
+        file delete, and only that app can find the copies — it has sorted,
+        upscaled and re-filed them since. This stamp is the whole of the ask, and
+        Evolver reads it out of this table on its next run.
+        """
+        self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
+                          sent=False)
 
     def mark_genau_exported(self, prompt_id: str):
         """Record that this generation's clip was sent down the Genau lane.
 
-        The twin of :meth:`mark_evolver_exported`, and equally a plain marker: the
-        value is only ever tested for presence, so the button can show the send
-        across sessions.
+        The twin of :meth:`mark_evolver_exported`, down to retracting a
+        withdrawal: the two lanes are separate errands and each keeps its own
+        pair of stamps.
         """
-        self._stamp(prompt_id, "genau_exported_at")
+        self._record_send(prompt_id, "genau_exported_at", "genau_unsent_at",
+                          sent=True)
+
+    def mark_genau_unsent(self, prompt_id: str):
+        """Take the Genau send back — the twin of :meth:`mark_evolver_unsent`.
+
+        A clip this far down the lane has left the pipeline for the folder Genau
+        plays from, which is the reason the delete cannot be done from here.
+        """
+        self._record_send(prompt_id, "genau_exported_at", "genau_unsent_at",
+                          sent=False)
 
     def mark_genau_requested(self, prompt_id: str):
         """Record that a spoken "genau it" started this run.

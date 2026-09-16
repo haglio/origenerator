@@ -90,8 +90,14 @@ class Database:
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 
+    def mark_evolver_unsent(self, prompt_id: str):
+        return self.generations.mark_evolver_unsent(prompt_id)
+
     def mark_genau_exported(self, prompt_id: str):
         return self.generations.mark_genau_exported(prompt_id)
+
+    def mark_genau_unsent(self, prompt_id: str):
+        return self.generations.mark_genau_unsent(prompt_id)
 
     def mark_genau_requested(self, prompt_id: str):
         return self.generations.mark_genau_requested(prompt_id)

@@ -1543,7 +1543,7 @@ def test_the_two_lanes_are_sent_independently(saved_panel, monkeypatch):
 
     panel.show_saved_generation(video, [])
 
-    assert _lane_button(panel).text() == "Sent to Evolver ✓"
+    assert _lane_button(panel).text() == "Delete from Evolver"
     assert _lane_button(panel, "Genau").text() == "Send to Genau"
     assert _lane_button(panel, "Genau").isEnabled()
 
@@ -2046,8 +2046,7 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
     # belongs — the destination is the whole of what makes a lane a lane.
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source)
     assert panel._displayed_row[lane.flag]
-    assert button.text() == f"Sent to {lane.name} ✓"
-    assert button.isEnabled() is False
+    assert button.text() == f"Delete from {lane.name}"
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -2063,7 +2062,7 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
     monkeypatch.setattr(evolver_export, "export_video", export)
 
     panel.show_saved_generation(db.get_generation("vid1"), [])
-    assert panel._lanes[lane.name].button.text() == f"Sent to {lane.name} ✓"
+    assert panel._lanes[lane.name].button.text() == f"Delete from {lane.name}"
     panel._on_send(panel._lanes[lane.name])
 
     export.assert_not_called()
@@ -2112,22 +2111,145 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
     assert not panel._displayed_row[lane.flag]
 
 
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_a_lane_offers_to_delete_the_copy_it_handed_over(saved_panel,
+                                                         monkeypatch, lane):
+    # A send is a file copy into another app's folders, so the only way back is a
+    # delete there -- and it has to stay offered, however long ago the send was.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    lane.mark(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+
+    button = panel._lanes[lane.name].button
+    assert button.text() == f"Delete from {lane.name}"
+    assert button.isEnabled()
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_pressing_delete_takes_the_send_back_and_offers_it_again(saved_panel,
+                                                                 monkeypatch, lane):
+    # Nothing is deleted from here: the copy has been sorted, upscaled and
+    # re-filed since, and only the app holding it can still find it. The stamp
+    # is the whole of the ask, and the button returns to offering the send.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    lane.mark(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+
+    panel._lanes[lane.name].button.click()
+
+    row = db.get_generation("vid1")
+    assert row[lane.unsent_flag] and not row[lane.flag]
+    assert panel._lanes[lane.name].button.text() == f"Send to {lane.name}"
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
+        saved_panel, monkeypatch, lane):
+    # Withdrawn, the button reads exactly as it does for a clip never sent, and
+    # nothing else on the tab mentions the other app at all -- so the one place
+    # left to say the deletion was taken down is the words under the cursor.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    lane.mark(db, "vid1")
+    lane.unmark(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+
+    button = panel._lanes[lane.name].button
+    assert button.text() == f"Send to {lane.name}"
+    assert button.toolTip() == lane.withdrawn_tooltip
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
+                                                           monkeypatch, lane):
+    # The deletion waits for the other app's next run, so the send offered right
+    # after a withdrawal has to retract it -- otherwise the clip just handed over
+    # is the one deleted.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    lane.mark(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    monkeypatch.setattr(evolver_export, "export_video", MagicMock())
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+    panel._lanes[lane.name].button.click()   # take it back
+
+    panel._lanes[lane.name].button.click()   # and send it again
+
+    row = db.get_generation("vid1")
+    assert row[lane.flag] and not row[lane.unsent_flag]
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
+                                                                  monkeypatch, lane):
+    # The mirror of the send's guard, and the same reason: the button is only as
+    # fresh as the last time the footer was drawn. Condemning a clip that was
+    # never handed over would leave the row asking for a delete of nothing.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+
+    panel._on_unsend(panel._lanes[lane.name])
+
+    assert db.get_generation("vid1")[lane.unsent_flag] is None
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
+                                                                monkeypatch, lane):
+    # The row moved under a button still offering the send -- a spoken "genau it"
+    # landing on this very clip. The press must do nothing at all: taking the
+    # send back is the opposite of what the words under the cursor promised.
+    panel, db = saved_panel
+    _video_row(db, "vid1")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
+    export = MagicMock()
+    monkeypatch.setattr(evolver_export, "export_video", export)
+    panel.show_saved_generation(db.get_generation("vid1"), [])
+    lane.mark(db, "vid1")
+    panel._displayed_row = db.get_generation("vid1")
+
+    panel._lanes[lane.name].button.click()
+
+    export.assert_not_called()
+    assert db.get_generation("vid1")[lane.unsent_flag] is None
+
+
 def test_every_lane_is_told_apart_by_its_folder_its_column_and_its_stamp():
-    # Held as an equality per field: two lanes sharing any of these three would
+    # Held as an equality per field: two lanes sharing any of these four would
     # be one lane wearing two buttons, and each is a name outside this repo —
-    # Evolver keys on the folder, and the two columns are persisted.
+    # Evolver keys on the folder, and it reads all four columns off this app's
+    # database.
     lanes = _lanes()
     assert len({lane.source for lane in lanes}) == len(lanes)
     assert len({lane.flag for lane in lanes}) == len(lanes)
+    assert len({lane.unsent_flag for lane in lanes}) == len(lanes)
     assert [lane.source for lane in lanes] == [EVOLVER_SOURCE, GENAU_SOURCE]
 
 
 def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
     # The stamp and the column are two halves of one fact and are spelled apart,
-    # so a lane could mark one and read the other and simply never look sent.
+    # so a lane could mark one and read the other and simply never look sent —
+    # or ask for a delete under a name nothing reads.
     panel, db = saved_panel
     _video_row(db, "vid1")
 
     for lane in _lanes():
         lane.mark(db, "vid1")
         assert db.get_generation("vid1")[lane.flag]
+        lane.unmark(db, "vid1")
+        assert db.get_generation("vid1")[lane.unsent_flag]

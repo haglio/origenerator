@@ -136,7 +136,10 @@ class RerollController(QObject):
 
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment (the one generator of jobs the user didn't ask for), so
-    a Generate starts at once instead of queuing after a long experiment run."""
+    a Generate starts at once instead of queuing after a long experiment run. And
+    the user's image work owns it outright: a video being rendered when a picture
+    is asked for is set aside -- stopped, and put back in the line to start over
+    once the pictures are done (see :meth:`_set_aside_for`)."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -169,6 +172,9 @@ class RerollController(QObject):
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
         self._in_flight: GenerationJob | None = None  # out to the server, unanswered
+        # The user's picture asked for while a hand-over was out, which takes
+        # the machine from what lands (see _set_aside_for and _pump).
+        self._takes_over_on_landing: GenerationJob | None = None
         self._videos_held = False  # the slideshow's gate (see :meth:`hold_videos`)
 
     @property
@@ -392,6 +398,7 @@ class RerollController(QObject):
         # is just handed to something else.
         if source != GenerationSource.EXPERIMENT:
             self._preempt_experiments()
+        self._set_aside_for(job)
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
         # written, so that is when its tile appears.
@@ -424,8 +431,13 @@ class RerollController(QObject):
             if job is None:
                 return  # nothing may start: an empty line, or only held videos
             self._waiting.remove(job)
-            if self._hand_over(job):
-                return
+            if not self._hand_over(job):
+                continue
+            # A picture asked for while that hand-over was out takes the machine
+            # from what just landed on it, as one asked for a moment later would.
+            newcomer, self._takes_over_on_landing = self._takes_over_on_landing, None
+            if newcomer is not None and self._key_of(newcomer) is not None:
+                self._set_aside_for(newcomer)
 
     def _hand_over(self, job: GenerationJob, off_thread: bool = True) -> bool:
         """Submit one job to ComfyUI, reporting whether the server took it.
@@ -451,6 +463,11 @@ class RerollController(QObject):
             return False
         finally:
             self._in_flight = None
+        if job.state == "finished":
+            # A job set aside whose stopped run had finished after all: nothing
+            # was sent, and its landing has already been recorded through its
+            # own finished signal (see GenerationJob.start).
+            return False
         if self._key_of(job) is None:
             job.cancel()  # canceled while out; the server has it and must not run it
             return False
@@ -494,6 +511,36 @@ class RerollController(QObject):
         jobs.remove(job)
         if not jobs:
             del self._jobs[key]
+
+    def _set_aside_for(self, newcomer: GenerationJob):
+        """Take off the server whatever yields to ``newcomer`` -- a video being
+        rendered, when the newcomer is the user's own image work -- and put it
+        back in the line to start over once the newcomer is done.
+
+        ComfyUI cannot set a run down and pick it back up, so what the video had
+        rendered is thrown away, however close to done it was. That is the
+        user's own call for this queue: their work goes first while they are
+        working, and a video's turn comes when they are not. Several come back
+        in the order they were in (a restart can leave the server holding more
+        than one), ahead of every video still waiting here, which they were in
+        front of. A video whose hand-over is still out cannot be taken off a
+        server that does not hold it yet: it is taken off the moment it lands.
+        """
+        if self._in_flight is not None and queue_line.yields_to(self._in_flight, newcomer):
+            self._takes_over_on_landing = newcomer
+        at = None
+        for job in list(self._on_server):
+            if not queue_line.yields_to(job, newcomer) or not job.defer():
+                continue
+            self._on_server.remove(job)
+            at = queue_line.rejoin_index(self._waiting) if at is None else at + 1
+            self._waiting.insert(at, job)
+            # Back to pending: a restart re-adopts a pending row into the line,
+            # where a running one is looked for on a server that no longer has it.
+            self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
+                                       progress_json=None)
+            logger.info("Set aside video %s for the user's image work; it starts over after",
+                        job.prompt_id)
 
     def _preempt_experiments(self):
         """Clear the GPU for user work: cancel every in-flight background

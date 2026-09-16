@@ -7191,24 +7191,10 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch)
     assert warn.call_args.args[2] == "RIFE VFI failed: Tried all base urls but no success"
 
 
-def test_cancel_running_reroll_interrupts(qtbot, tmp_path):
-    client = _reroll_client()
-    view = GalleryView(_seeded_db(tmp_path), client=client)
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    _reroll_tile(view).add_requested.emit()
-
-    client.node_executing.emit(view._reroll_jobs[key].prompt_id, "5")  # job is now executing
-    _reroll_tile(view).cancel_requested.emit()
-
-    client.interrupt.assert_called_once()
-    client.cancel_prompt.assert_not_called()
-    assert key not in view._reroll_jobs
-    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + tile
-
-
-def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
+def test_cancel_from_the_tile_dequeues_and_stops_the_run_by_name(qtbot, tmp_path):
+    # Both calls, whatever the view last heard about the run: the server takes
+    # the prompt out of its line if it is waiting there, and stops it if it is
+    # the one being rendered -- by name, so nothing else's run is touched.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -7217,11 +7203,13 @@ def test_cancel_queued_reroll_dequeues(qtbot, tmp_path):
     _reroll_tile(view).add_requested.emit()
     prompt_id = view._reroll_jobs[key].prompt_id
 
-    _reroll_tile(view).cancel_requested.emit()  # still queued, not executing
+    client.node_executing.emit(prompt_id, "5")  # job is now executing
+    _reroll_tile(view).cancel_requested.emit()
 
     client.cancel_prompt.assert_called_once_with(prompt_id)
-    client.interrupt.assert_not_called()
+    client.interrupt.assert_called_once_with(prompt_id)
     assert key not in view._reroll_jobs
+    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + tile
 
 
 def test_active_reroll_survives_a_refresh(qtbot, tmp_path):

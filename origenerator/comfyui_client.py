@@ -95,6 +95,9 @@ class ComfyUIClient(QThread):
     def fetch_history(self, prompt_id: str) -> dict:
         return self.api.fetch_history(prompt_id)
 
+    def forget_history(self, prompt_id: str):
+        return self.api.forget_history(prompt_id)
+
     def fetch_queue(self) -> set[str]:
         return self.api.fetch_queue()
 

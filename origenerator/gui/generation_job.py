@@ -115,17 +115,27 @@ class GenerationJob(QObject):
         self.run_media_type = self.media_type
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir
-        self._state = "idle"  # idle -> queued -> running -> finished/failed/canceled
-        # Fold ComfyUI's per-pass sampler progress into one 0-to-total ramp, so a
-        # multi-stage video job doesn't report a bar that resets between passes.
-        self._progress_tracker = ProgressTracker.for_payload(self.payload)
-        self._last_progress = (0, 0)
-        self._last_pass_progress: tuple[int, int] | None = None
+        # idle -> queued -> running -> finished/failed/canceled; and back to idle
+        # from queued or running when the job is set aside (see defer()).
+        self._state = "idle"
+        # Whether the server has been handed this prompt id. A job set aside may
+        # have finished without this app hearing of it, or left a record of its stopped
+        # run that reads as this job's, so a second send asks after the first.
+        self._sent_before = False
         # What the app is doing right now, by the node ComfyUI says it is running
         # (see origenerator.progress.stage_names). Kept rather than recomputed so
         # a node with nothing worth saying about it leaves the last real stage
         # standing instead of blanking the caption between two of them.
         self._stages = stage_names(self.payload)
+        self._forget_the_run()
+
+    def _forget_the_run(self):
+        """What a job that has not started knows about its run: nothing."""
+        # Fold ComfyUI's per-pass sampler progress into one 0-to-total ramp, so a
+        # multi-stage video job doesn't report a bar that resets between passes.
+        self._progress_tracker = ProgressTracker.for_payload(self.payload)
+        self._last_progress = (0, 0)
+        self._last_pass_progress: tuple[int, int] | None = None
         self._last_stage = ""
         self._last_preview: bytes | None = None
         # When ComfyUI actually began executing this job — not when it was
@@ -311,8 +321,14 @@ class GenerationJob(QObject):
 
     def _submit(self, submit):
         self._attach()
+        landed: list[dict] = []  # the earlier run's history, if it finished after all
 
         def post():
+            if self._sent_before:
+                history = self._stopped_run_landed()
+                if history is not None:
+                    landed.append(history)
+                    return
             self._client.submit_job(self.payload, self.prompt_id)
 
         try:
@@ -320,7 +336,32 @@ class GenerationJob(QObject):
         except Exception:
             self._detach()
             raise
+        self._sent_before = True
+        if landed:
+            self._finish(landed[0])
+            return
         self._state = "queued"
+
+    def _stopped_run_landed(self) -> dict | None:
+        """The history of this job's earlier run if that run finished after all,
+        else ``None`` -- and then the server's record of the stopped run is gone.
+
+        The stop that set this job aside may have reached the server after its
+        last node had saved: then the run finished, and sending the prompt
+        again would make the same file twice. Or it stopped, and left a record
+        under this id that every read of the job -- the late-submit follow-up,
+        the poll's completion backstop -- would take for the run. A server
+        that cannot be asked is taken to hold nothing: a send that then fails
+        fails the job as any refused submit does.
+        """
+        try:
+            history = self._client.fetch_history(self.prompt_id)
+            if self.workflow.extract_output_info(history):
+                return history
+            self._client.forget_history(self.prompt_id)
+        except Exception as e:
+            logger.warning("Could not ask after the stopped run of %s: %s", self.prompt_id, e)
+        return None
 
     def _spoken(self, submit):
         """The lines are on disk: send the job, unless it was canceled while
@@ -342,16 +383,45 @@ class GenerationJob(QObject):
         self.failed.emit(message)
 
     def cancel(self):
-        """Stop the job: interrupt it if running, else drop it from the queue."""
+        """Stop the job and forget it."""
         self._detach()
-        try:
-            if self._state == "running":
-                self._client.interrupt(self.prompt_id)
-            elif self._state == "queued":
-                self._client.cancel_prompt(self.prompt_id)
-        except Exception as e:
-            logger.warning("Failed to cancel job %s: %s", self.prompt_id, e)
+        self._stop_on_server()
         self._state = "canceled"
+
+    def defer(self) -> bool:
+        """Take the job off the server to be sent again later, and say whether
+        it was -- only a job the server holds can be.
+
+        ComfyUI cannot set a run down and pick it back up, so the run is stopped
+        and thrown away, and the job comes back as one that has not started:
+        the same prompt, under the same id, to be handed over when its turn
+        comes round again (see :meth:`start`, which asks after the stopped run
+        first).
+        """
+        if self._state not in ("queued", "running"):
+            return False
+        self._detach()
+        self._stop_on_server()
+        self._state = "idle"
+        self._forget_the_run()
+        return True
+
+    def _stop_on_server(self):
+        """Take the prompt out of the server's line if it is waiting there, and
+        stop it by name if it is the one being rendered.
+
+        Both, whatever this job last heard: "running" is what ComfyUI said some
+        time ago, and a job rebound after a restart says it either way. The
+        server skips a named stop for a prompt it is not executing, so neither
+        call can touch anything but this job's own prompt.
+        """
+        if self._state not in ("queued", "running"):
+            return  # never handed over, or already gone: nothing there to stop
+        try:
+            self._client.cancel_prompt(self.prompt_id)
+            self._client.interrupt(self.prompt_id)
+        except Exception as e:
+            logger.warning("Failed to stop job %s: %s", self.prompt_id, e)
 
     def reconcile_with(self, history) -> None:
         """Finish this job from an already-fetched /history if its live
@@ -460,6 +530,11 @@ class GenerationJob(QObject):
         """
         if self._state not in ("queued", "running"):
             return
+        self._finish(history_data)
+
+    def _finish(self, history_data: dict):
+        """:meth:`_complete` past its guard -- for a run a second send finds
+        already finished, which no state of the job's own announces."""
         self._detach()
         # Thumbnail and duration are best-effort inside extract_completion — a
         # failure in either yields None rather than stranding a real completion.

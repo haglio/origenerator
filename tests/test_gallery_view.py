@@ -6417,14 +6417,16 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
 def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     # The mode pair hands a region back to the player under it.  There is no
     # player under a standalone show and no session to tell, so the row is not
-    # drawn rather than drawn dead.
+    # drawn rather than drawn dead.  The window IS this show's, though, so the
+    # minimize a hosted one leaves off is on it.
     from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
 
     hud, = show.findChildren(ShowHud)
-    assert MODE_VERBS.isdisjoint(hud_button_names(hud))
-    assert hud._model.satellites_mode == ""
+    names = hud_button_names(hud)
+    assert MODE_VERBS.isdisjoint(names)
+    assert "minimize" in names
     show.close()
 
 
@@ -6596,7 +6598,8 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     assert show.hud_enhanced_mode is True
     assert [item[2] for item in show._playlist._items] == ["i2"]
     model = show_hud_model(hud._side, show, hosted=False)
-    assert model.enhanced_filter is True and "Enhanceds" in model.lock_label
+    lit = {button.action: button.lit for row in model.rows for button in row}
+    assert lit[f"{hud._side}_enhanced"] and "Enhanceds" in model.lock_label
     show.close()
 
 

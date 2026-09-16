@@ -4,9 +4,9 @@ A show covering a satellite region covers that player's HUD, and what replaced
 it used to be a small strip of Qt buttons that only gestured at the real thing.
 This widget draws the REAL thing: the same panel the players composite into
 their video, rendered by the same shared code (``player_core.satellite_hud`` /
-``_paint``), so a show's HUD and a player's HUD cannot drift apart — the mode
-row with minimize riding it, the status line, the transport controls, and the
-nav map.
+``_paint``), so a show's HUD and a player's HUD cannot drift apart — the status
+line, the buttons this show declares (:mod:`origenerator.gui.show_buttons`) and
+the nav map.
 
 Standalone Origenerator wears it too, over its own fullscreen show.  Nothing
 about a show is different for not being inside a session: it is the same set,
@@ -28,9 +28,9 @@ prev/next/lock/trash — post onto the dashboard command file, the channel the
 players' HUDs and the global hotkeys share.  The two filter switches — F-mode,
 and the enhanced-only switch beside it that only a show's HUD grows — are the
 show's own and land on it directly, hosted or not (:meth:`ShowHud._deliver`).
-Presses whose concepts a hosted show does not have (minimize, the loops) are
-drawn for sameness but swallowed there, so they can never reach the blacked
-player underneath.
+The map's own chrome is the panel's rather than this show's, so a press on a
+concept a hosted show does not have (the loops) is swallowed here, where it can
+never reach the blacked player underneath.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
+from origenerator.gui.show_buttons import show_rows
 from origenerator.paths import ensure_player_core_on_path
 from origenerator.ui_scale import (
     to_bitmap_pos,
@@ -63,24 +64,16 @@ from player_core.satellite_hud_paint import HudRenderer
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
-# Whether this player_core's HUD knows the enhanced-only switch: the model field
-# that grows the button, and the status line's slot that names it (one change
-# there, so one question here).  Asked rather than assumed, for the reason
-# :func:`~origenerator.gui.show_director._shared_hud_widget` asks whether there
-# is a shared HUD at all: the switch lives in the newest player_core, and a show
-# opened over an older checkout must come up without the button rather than not
-# come up.
-_HUD_HAS_ENHANCED_SWITCH = "enhanced_filter" in HudModel.__dataclass_fields__
-
 
 def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_items`` empty or unanswered).
 
     *hosted* is whether a Fun Time session is under the show, and the only
-    thing it governs is the mode row.  Defaulted to the hosted answer because
-    that is what every reading of a region's model wants; :class:`ShowHud`
-    passes its own.
+    thing it governs is which buttons the panel declares (see
+    :func:`~origenerator.gui.show_buttons.show_rows`).  Defaulted to the hosted
+    answer because that is what every reading of a region's model wants;
+    :class:`ShowHud` passes its own.
     """
     cells, position, locked = host.hud_items()
     if not cells:
@@ -102,24 +95,22 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
     # the two HUDs are one HUD in two places.  Nothing playing_set when nothing
     # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
     # satellite browsing its library does.
-    line = dict(playing_set=looping_label("seed") if looping else "",
-                locked=locked, order=order_label, f_mode=f_mode)
-    switches = {}
-    if _HUD_HAS_ENHANCED_SWITCH:
-        # Named on or off, never None: a show HAS the switch, so its HUD grows
-        # the button -- where a player, publishing nothing for it, does not --
-        # and the line names the narrowing beside F-mode while it is on.
-        line["enhanced"] = enhanced
-        switches["enhanced_filter"] = enhanced
     return HudModel(
         side=side,
         locked=locked,
-        lock_label=status_line(**line),
-        # The players' favorite star and F-mode, over the same collection the
-        # Favorites shelf lists: the star lights when the item on screen is a
-        # favorite, and F-mode narrows the set to them.
+        # The line names both narrowings beside the rest — F-mode over the
+        # favorites, and the enhanced-only switch a show's HUD is the one panel
+        # here to carry.
+        lock_label=status_line(playing_set=looping_label("seed") if looping else "",
+                               locked=locked, order=order_label,
+                               f_mode=f_mode, enhanced=enhanced),
+        # The players' favorite star, over the same collection the Favorites
+        # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
-        f_mode=f_mode,
+        # The buttons this show answers, in the bands the panel draws them in —
+        # the mode pair included where a session hosts the show.
+        rows=show_rows(side, locked=locked, f_mode=f_mode, enhanced=enhanced,
+                       hosted=hosted),
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
@@ -130,14 +121,6 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         # meaning the same thing on both, "stop looping this row".  Dark in the
         # base state, where nothing is being looped.
         active_loop="seed" if looping else "",
-        # Hosted, a show exists only in this mode, and the pair is the way back
-        # to the player under it.  Standalone there is no player under it and no
-        # session to tell, so the row is not drawn at all — the same "" a
-        # session with no hosted Origenerator publishes.  Drawing a dead pair
-        # would be the one place on this panel where a lit button is a picture
-        # of a button.
-        satellites_mode="origenerator" if hosted else "",
-        **switches,
     )
 
 
@@ -320,10 +303,9 @@ class ShowHud(QLabel):
         )
         if command in allowed:
             append_command(self._dashboard_cmd_file, command)
-        # Anything else (minimize, the loops, a filter switch on a show without
-        # one) is a player concept a hosted show has no counterpart for: drawn
-        # for sameness, swallowed here so it can never reach the player
-        # underneath.
+        # Anything else is the map's own chrome (the loops, the expand mark) —
+        # a player concept a hosted show has no counterpart for, swallowed here
+        # so it can never reach the player underneath.
 
     def _act_here(self, verb: str) -> None:
         """A press with no session under it: the show answers it itself.
@@ -336,10 +318,9 @@ class ShowHud(QLabel):
         console already use, so the button does the one thing it is labeled for
         either way.
 
-        Minimize is the press that means MORE standalone than hosted rather than
-        less: hosted it would hit the blacked player under the show, so it is
-        swallowed there; standalone the show IS the window and the button parks
-        it, exactly as it parks a satellite's.
+        Minimize is the button that only a show on its own has: the show IS the
+        window here, so the button parks it exactly as it parks a satellite's,
+        where a hosted show has no window of its own and declares none.
         """
         step = {f"{self._side}_prev": -1, f"{self._side}_next": 1}.get(verb)
         if step is not None:
@@ -352,9 +333,8 @@ class ShowHud(QLabel):
             self._host.window().showMinimized()
             return  # nothing on the panel changed, and it is off screen anyway
         else:
-            # Everything a hosted press has no counterpart for either — the
-            # expand button's "more seeds", a mode press this panel does not
-            # even draw — swallowed here as it is swallowed there.
+            # The map's own chrome — the expand mark's "more seeds" — swallowed
+            # here as it is swallowed under a session.
             return
         self._tick()  # the readout answers the press without waiting for the beat
 

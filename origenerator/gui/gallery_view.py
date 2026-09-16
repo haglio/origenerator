@@ -353,7 +353,7 @@ class GalleryView(QWidget):
         self._voice.bind_the_bank(
             auto=self._bank.auto, audio=self._bank.audio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
-            mic=self._bank.mic,
+            mic=self._bank.mic, enhance_on_hold=self._bank.enhance_on_hold,
             enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
             actions={
                 AppCommand.BACK: (self._bank.back, self._navigation.go_back),
@@ -3321,8 +3321,14 @@ class GalleryView(QWidget):
         self._enhance.enhance_items(prompt_ids)
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """A held slide asked to be enhanced; whether a run started."""
-        return self._enhance.enhance_from_slideshow(prompt_id)
+        """A held slide asked to be enhanced; whether a run started.
+
+        Only while the bank's Enhance-on-hold switch is on: holding a slide is
+        how a better version is asked for, and the switch is the way to hold
+        one without asking, when the asking is in the way.
+        """
+        return (self._bank.enhance_on_hold.isChecked()
+                and self._enhance.enhance_from_slideshow(prompt_id))
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         """The spoken "enhance" over a picture."""

@@ -177,3 +177,15 @@ def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
     made.audio.setChecked(False)
 
     assert heard == [True, False]
+
+
+def test_enhance_on_hold_is_a_switch_that_starts_on_and_acts_on_nothing(bank):
+    # Whether holding a slide in a show also asks for a better version of it.
+    # App-wide, because every show asks it at the moment a slide is held; it
+    # is read by the gallery when one asks, and a press does nothing else.
+    made = bank()
+
+    assert made.enhance_on_hold.isCheckable()
+    assert made.enhance_on_hold.isChecked() is True
+    made.enhance_on_hold.setChecked(False)
+    assert made.enhance_on_hold.isChecked() is False

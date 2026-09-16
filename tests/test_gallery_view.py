@@ -12694,6 +12694,23 @@ def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_pa
     assert view.enhance_from_slideshow("g0") is False
 
 
+def test_the_banks_enhance_on_hold_switch_is_what_a_hold_asks_first(qtbot, tmp_path):
+    # Off, a held slide is held and nothing more: the switch is the one way to
+    # stop on a picture without asking for a better version of it.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._bank.enhance_on_hold.setChecked(False)
+
+    assert view.enhance_from_slideshow("g0") is False
+    assert view._reroll_jobs == {}
+
+    view._bank.enhance_on_hold.setChecked(True)
+    assert view.enhance_from_slideshow("g0") is True
+
+
+
 def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
     # A hold is made with no view of the Enhance panel, so an image that already
     # carries an enhancement must not be re-derived at whatever the settings happen

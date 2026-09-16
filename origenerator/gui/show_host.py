@@ -68,6 +68,9 @@ class ShowHost(Protocol):
     def show_reset(self) -> None:
         """Put the side back how it started. A host with no set never left."""
 
+    def show_order(self, *, latest: bool) -> None:
+        """Play the side's whole library newest first, or shuffled."""
+
     def hud_items(self):
         """``(cells, position, locked)`` for the HUD's nav map.
 

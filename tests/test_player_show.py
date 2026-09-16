@@ -17,6 +17,7 @@ from origenerator.slideshow import ShowState, in_order
 ensure_player_core_on_path()
 
 from player_core.file_channel import consume_command_file  # noqa: E402
+from player_core.hud_status import LATEST_LABEL  # noqa: E402
 from player_core.playlist import read_playlist  # noqa: E402
 from player_core.satellite_hud import parse_hud  # noqa: E402
 from player_core.status import PlayerStatus, status_fields  # noqa: E402
@@ -228,7 +229,8 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
     assert model.seed_count == 3
     assert [button.action for row in model.rows for button in row] == [
         "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
-        "portrait_fmode", "portrait_enhanced", "portrait_reset"]
+        "portrait_fmode", "portrait_enhanced", "portrait_reset",
+        "portrait_shuffle", "portrait_latest"]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it(qtbot, tmp_path):
@@ -292,10 +294,11 @@ def test_a_new_set_lets_go_of_the_hold_the_last_one_had(qtbot, tmp_path):
 def test_a_side_reset_lands_the_player_on_the_top_of_its_base_set(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
 
-    show.retune(_ITEMS)
+    show.retune([("four.png", "image", "id-4"), ("five.png", "image", "id-5")])
 
-    assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
-    assert show.hud_prompt_id == "id-1"
+    top = show._set.playlist.current()
+    assert _sent(show)[:2] == [f"PLAY_FILE {top.path}", "RELOAD_PLAYLIST"]
+    assert show.hud_prompt_id == top.prompt_id
 
 
 def test_a_reset_with_no_base_set_lands_the_player_on_the_top_of_its_own(qtbot, tmp_path):
@@ -333,3 +336,48 @@ def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
     show.release_media(["one.png"])
 
     assert _sent(show) == ["NEXT"]
+
+
+def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_path):
+    asked = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(
+        reorder=lambda held, latest: asked.append((held, latest))))
+
+    show.show_order(latest=True)
+    show.show_order(latest=False)
+
+    assert asked == [(show, True), (show, False)]
+
+
+def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.reorder([("five.png", "image", "id-5"), ("four.png", "image", "id-4")],
+                 latest=True)
+
+    assert _sent(show) == ["LOCK_OFF", "PLAY_FILE five.png", "RELOAD_PLAYLIST",
+                           f"SET_PACE {show.dwell_s}"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["five.png", "four.png"]
+    assert show.hud_order_label == LATEST_LABEL
+
+
+def test_a_reorder_of_a_show_not_held_sends_no_let_go(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+
+    show.reorder(_ITEMS, latest=True)
+
+    assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
+
+
+def test_a_hosted_reset_lets_go_of_the_hold_before_handing_over_the_base_set(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.retune([("five.png", "image", "id-5")])
+
+    assert _sent(show)[0] == "LOCK_OFF"
+    assert show.locked is False

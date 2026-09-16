@@ -19,6 +19,12 @@ from __future__ import annotations
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 
+from origenerator.paths import ensure_player_core_on_path
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import SHUFFLE_LABEL  # noqa: E402
+
 
 @dataclass(frozen=True)
 class ShowActions:
@@ -49,6 +55,7 @@ class ShowActions:
     star: Callable[[str], None] | None = None
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
+    reorder: Callable[[object, bool], None] | None = None
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None
@@ -71,7 +78,7 @@ class HudFacts:
     the toolbar, which is the ordinary case.
     """
 
-    order_label: str = "Shuffle"
+    order_label: str = SHUFFLE_LABEL
     looping: bool = True
     starred_ids: Collection[str] = field(default_factory=frozenset)
     # Which of the items carry an enhancement, for the switch beside F-mode

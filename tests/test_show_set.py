@@ -7,9 +7,18 @@ into it.
 """
 from __future__ import annotations
 
+import random
+
+import pytest
+
 from origenerator.gui.show_set import ShowSet
 from origenerator.gui.show_wiring import HudFacts
+from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import in_order
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -82,3 +91,69 @@ def test_the_whole_set_keeps_what_a_switch_left_out():
     show_set.drop_the_switches()
 
     assert [item.prompt_id for item in show_set.playlist.items] == ["id-1", "id-3"]
+
+
+def _pass(show_set) -> list[str]:
+    playlist = show_set.playlist
+    return [playlist.items[index].prompt_id for index in playlist.order]
+
+
+def test_latest_plays_the_new_set_as_listed_from_the_top_still_narrowed():
+    show_set, dealt = _set(hud=HudFacts(starred_ids={"id-1", "id-5"}))
+    show_set.set_modes(f_mode=True, enhanced=False)
+    dealt.clear()
+    newest_first = [("five.png", "image", "id-5"), ("four.png", "image", "id-4"),
+                    ("one.png", "image", "id-1")]
+
+    show_set.reorder(newest_first, latest=True)
+
+    assert dealt == [False]
+    assert _pass(show_set) == ["id-5", "id-1"]
+    assert show_set.playlist.index == 0
+    assert show_set.f_mode is True
+    assert show_set.order_label == LATEST_LABEL
+
+
+_TWELVE = [(f"{n}.png", "image", f"id-{n}") for n in range(12)]
+
+
+@pytest.fixture
+def seeded():
+    state = random.getstate()
+    random.seed(7)
+    yield
+    random.setstate(state)
+
+
+def test_shuffle_plays_the_new_set_in_a_random_order(seeded):
+    show_set, _dealt = _set()
+
+    show_set.reorder(_TWELVE, latest=False)
+
+    listed = [item[2] for item in _TWELVE]
+    assert sorted(_pass(show_set)) == sorted(listed)
+    assert _pass(show_set) != listed
+    assert show_set.order_label == SHUFFLE_LABEL
+
+
+def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
+    show_set, _dealt = _set(hud=HudFacts(starred_ids={"id-1"}))
+    show_set.set_modes(f_mode=True, enhanced=False)
+
+    show_set.reorder([("nine.png", "image", "id-9")], latest=True)
+
+    assert show_set.f_mode is False
+    assert _pass(show_set) == ["id-9"]
+
+
+def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded):
+    show_set, _dealt = _set(hud=HudFacts(starred_ids={"id-1", "id-2"}))
+    show_set.reorder(_TWELVE, latest=True)
+    show_set.set_modes(f_mode=True, enhanced=False)
+
+    show_set.retune(_TWELVE)
+
+    assert show_set.f_mode is False
+    assert sorted(_pass(show_set)) == sorted(item[2] for item in _TWELVE)
+    assert _pass(show_set) != [item[2] for item in _TWELVE]
+    assert show_set.order_label == SHUFFLE_LABEL

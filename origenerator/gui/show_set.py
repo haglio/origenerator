@@ -20,7 +20,12 @@ from collections.abc import Callable
 
 from origenerator.gui.neighbor_previews import still_for
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import Slide, SlideshowPlaylist
+from origenerator.paths import ensure_player_core_on_path
+from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 
 class ShowSet:
@@ -120,18 +125,22 @@ class ShowSet:
         self.replace_items(self.all_items, keep_slide=False)
         return True
 
-    def retune(self, items, *, hud: HudFacts) -> None:
-        """Point the set at another one entirely, described afresh.
-
-        What a hosted reset does: the side goes back to its base state, which
-        is a different set rather than a narrowing of this one — so both
-        switches come off, the pass is a fresh deal, and what the HUD says
-        about it is re-dressed.
-        """
+    def retune(self, items, *, enhanced_ids=()) -> None:
+        """Point the set at the side's base set: a hosted reset."""
         self.f_mode = self.enhanced_mode = False
+        self.reorder(items, latest=False, enhanced_ids=enhanced_ids)
+
+    def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
+        self._shuffle = in_order if latest else None
         self.all_items = [Slide.of(item) for item in items]
-        self.wear(hud)
-        self.replace_items(self.all_items, keep_slide=False)
+        self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
+                           looping=False, starred_ids=self.starred_ids,
+                           enhanced_ids=enhanced_ids))
+        kept = [item for item in self.all_items if self.passes(item)]
+        if not kept:
+            self.f_mode = self.enhanced_mode = False
+            kept = self.all_items
+        self.replace_items(kept, keep_slide=False)
 
     def passes(self, item, *, f_mode=None, enhanced=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked

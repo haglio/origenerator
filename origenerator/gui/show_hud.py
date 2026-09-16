@@ -42,7 +42,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
-from origenerator.gui.show_buttons import show_rows
+from origenerator.gui.show_buttons import answer, show_rows
 from origenerator.paths import ensure_player_core_on_path
 from origenerator.ui_scale import (
     to_bitmap_pos,
@@ -64,16 +64,24 @@ from player_core.satellite_hud_paint import HudRenderer
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
+# The presses a show answers for itself wherever it is drawn: the two filters,
+# reset, the loop button and the map's own clicks.  The transport is the other
+# half, which a hosted window hands to its session instead.
+_THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "no_loop", "seed_loop",
+                            "play_video", "lock_video"})
 
-def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
+
+def show_hud_model(side: str, host, *, hosted: bool = True,
+                   own_window: bool = True) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_items`` empty or unanswered).
 
-    *hosted* is whether a Fun Time session is under the show, and the only
-    thing it governs is which buttons the panel declares (see
-    :func:`~origenerator.gui.show_buttons.show_rows`).  Defaulted to the hosted
-    answer because that is what every reading of a region's model wants;
-    :class:`ShowHud` passes its own.
+    *hosted* is whether a Fun Time session is under the show and *own_window*
+    whether this app is drawing it in a window of its own; together they decide
+    which buttons the panel declares (see
+    :func:`~origenerator.gui.show_buttons.show_rows`) and what reset goes back
+    to.  Both default to what a region show wants, which is what every reading
+    of one wants; :class:`ShowHud` and a show handed to a player pass their own.
     """
     cells, position, locked = host.hud_items()
     if not cells:
@@ -108,9 +116,9 @@ def show_hud_model(side: str, host, *, hosted: bool = True) -> HudModel | None:
         # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
         # The buttons this show answers, in the bands the panel draws them in —
-        # the mode pair included where a session hosts the show.
+        # which ones depends on what is drawing it.
         rows=show_rows(side, locked=locked, f_mode=f_mode, enhanced=enhanced,
-                       hosted=hosted),
+                       hosted=hosted, own_window=own_window),
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
@@ -251,50 +259,25 @@ class ShowHud(QLabel):
         self._draw()
 
     def _deliver(self, command: str) -> None:
-        """Route one HUD press: map clicks act on the show itself, session
-        commands go out on the dashboard channel — or, with no session under
-        this show, onto the show as well (:meth:`_act_here`) — and the rest are
-        swallowed.
+        """Route one HUD press: what the show answers for itself lands on it,
+        and the session's transport goes out on the dashboard channel — or, with
+        no session under this show, onto the show as well (:meth:`_act_here`).
+
+        The map's own chrome that a show has no counterpart for (the expand
+        mark) is swallowed either way, so it can never reach the player a
+        region window covers.
         """
         verb, _, path = command.partition("|")
-        if verb == f"{self._side}_play_video":
-            self._jump(path, hold=False)
-            return
-        if verb == f"{self._side}_lock_video":
-            self._jump(path, hold=True)
-            return
-        if verb == f"{self._side}_fmode":
-            # The players' F-mode, meaning here what it means there: narrow
-            # the set to the favorites.  Handled on the show itself — the
-            # session's player-side F-mode is about a blacked player's browse.
-            self._host.toggle_f_mode()
-            self._tick()
-            return
-        if verb == f"{self._side}_enhanced":
-            # The switch beside F-mode, and the show's own the same way: keep
-            # only the pictures this show has enhanced, or widen back.
-            self._host.toggle_enhanced_mode()
-            self._tick()
-            return
-        if verb in (f"{self._side}_no_loop", f"{self._side}_seed_loop"):
-            # Stop looping this row: the region goes back to what it does when
-            # nothing is looping, which is browse its whole library — the same
-            # place its reset button leads, and the same thing the press means
-            # on a player.  Pressed while nothing is looping it is the dark
-            # button it looks like: a show cannot start a loop it is not in.
-            if self._host.hud_looping:
-                self._host.show_reset()
-                self._tick()
-            return
-        if verb == f"{self._side}_reset":
-            # The players' reset, meaning here what it means there: put the
-            # side back how it started.  The show owns what that is, and the
-            # session's spoken "reset" reaches the same method.
-            self._host.show_reset()
+        action = verb.removeprefix(f"{self._side}_")
+        if action in _THE_SHOWS_OWN:
+            # The two filters, reset, the loop button and the map's own clicks
+            # mean on a show what they mean on a player, and the show owns what
+            # each is — so they land here, hosted or not.
+            answer(self._host, action, path)
             self._tick()
             return
         if self._dashboard_cmd_file is None:
-            self._act_here(verb)
+            self._act_here(action)
             return
         allowed = (
             "satellites_video_activate", "origenerator_activate",
@@ -303,40 +286,23 @@ class ShowHud(QLabel):
         )
         if command in allowed:
             append_command(self._dashboard_cmd_file, command)
-        # Anything else is the map's own chrome (the loops, the expand mark) —
-        # a player concept a hosted show has no counterpart for, swallowed here
-        # so it can never reach the player underneath.
 
-    def _act_here(self, verb: str) -> None:
+    def _act_here(self, action: str) -> None:
         """A press with no session under it: the show answers it itself.
 
         Standalone there is no dashboard channel and no player under the show,
         so the transport cannot take the round trip a hosted press takes — out
         onto the session's command file, through its dispatch, and back onto
         this very show.  It lands on the show directly instead, through the same
-        four methods that round trip ends at and that the arrow keys and genau's
-        console already use, so the button does the one thing it is labeled for
-        either way.
+        answers that round trip ends at, so the button does the one thing it is
+        labeled for either way.
 
         Minimize is the button that only a show on its own has: the show IS the
         window here, so the button parks it exactly as it parks a satellite's,
         where a hosted show has no window of its own and declares none.
         """
-        step = {f"{self._side}_prev": -1, f"{self._side}_next": 1}.get(verb)
-        if step is not None:
-            self._host.show_step(step)
-        elif verb == f"{self._side}_lock":
-            self._host.show_toggle_hold()
-        elif verb == f"{self._side}_trash":
-            self._host.show_cull()
-        elif verb == f"{self._side}_minimize":
+        if action == "minimize":
             self._host.window().showMinimized()
             return  # nothing on the panel changed, and it is off screen anyway
-        else:
-            # The map's own chrome — the expand mark's "more seeds" — swallowed
-            # here as it is swallowed under a session.
-            return
-        self._tick()  # the readout answers the press without waiting for the beat
-
-    def _jump(self, path: str, *, hold: bool) -> None:
-        self._host.show_item(path, hold=hold)
+        if answer(self._host, action):
+            self._tick()  # the readout answers the press without waiting for the beat

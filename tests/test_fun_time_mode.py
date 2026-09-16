@@ -52,6 +52,40 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
     assert args.taskbar_identity == "FunTime.App"
 
 
+def test_a_session_hands_over_each_players_own_channel():
+    """Inside a session the players are what shows the slides, so the launch
+    names each one's channel: the list it plays, the verbs it answers, the
+    status it publishes, and the panel this app publishes for it."""
+    args = parse_app_args([
+        "--fun-time",
+        "--portrait-playlist", "st/portrait.tsv",
+        "--portrait-cmd-file", "st/portrait_cmd.txt",
+        "--portrait-status-file", "st/portrait_status.txt",
+        "--portrait-hud-file", "st/origenerator_portrait_hud.json",
+        "--landscape-playlist", "st/landscape.tsv",
+        "--landscape-cmd-file", "st/landscape_cmd.txt",
+        "--landscape-status-file", "st/landscape_status.txt",
+        "--landscape-hud-file", "st/origenerator_landscape_hud.json",
+    ])
+    portrait = args.fun_time.player("portrait")
+
+    assert portrait.playlist == Path("st/portrait.tsv")
+    assert portrait.command_file == Path("st/portrait_cmd.txt")
+    assert portrait.status_file == Path("st/portrait_status.txt")
+    assert portrait.hud_file == Path("st/origenerator_portrait_hud.json")
+    assert args.fun_time.player("landscape").playlist == Path("st/landscape.tsv")
+
+
+def test_a_session_that_names_no_player_hands_over_none():
+    """A session too old to name them is one whose shows still open windows of
+    their own, so the answer has to be "there is no player here" rather than a
+    channel of empty paths."""
+    args = parse_app_args(["--fun-time", "--command-file", "st/cmd.txt"])
+
+    assert args.fun_time.player("portrait") is None
+    assert args.fun_time.player("landscape") is None
+
+
 def test_region_for_size_splits_on_aspect():
     assert region_for_size(1920, 1080) == "landscape"
     assert region_for_size(720, 1280) == "portrait"

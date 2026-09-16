@@ -53,6 +53,7 @@ from origenerator.gui.orientation import (
 from origenerator.gui.orientation import (
     split_key as _split_shelf_key,
 )
+from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
@@ -239,7 +240,7 @@ class ShowDirector:
         """The show occupying satellite region *side*, or None — a closed
         window is no occupant, however recently it was one."""
         show = self._region_shows.get(side)
-        return show if show is not None and show.isVisible() else None
+        return show if show is not None and show.is_showing() else None
 
     def is_in_front(self) -> bool:
         """True when the window ahead of the gallery is our own fullscreen
@@ -342,70 +343,106 @@ class ShowDirector:
         routed by its own shape.
         """
         self._show_refused = set()  # a new show, a new set to be judged against
-        self._slideshow = SlideshowView(
-            items,
-            actions=ShowActions(
-                delete=self._host.trash_generation,
-                enhance=self._host.enhance_from_slideshow,
-                star=self._host.star_generation,
-                # Three of the seven are a session's: a lock opens the held item
-                # as a generate tab, a reset means the REGION's base state, and a
-                # click on the picture asks the room to pause.
-                lock=(self._open_generate_tab_for
-                      if self._fun_time is not None else None),
-                reset=(self.reset_region if self._fun_time is not None else None),
-                # Space reaches the one OSR2 switch, like every other surface's.
-                drive_toggle=self._host.toggle_osr2_drive,
-                omnipause=(partial(ask_for_omnipause, self._session_channel)
-                           if self._session_channel is not None else None),
-            ),
-            pace=self._pace, motion=self._motion,
-            # Which of its items carry an enhancement, for the switch beside
-            # F-mode on its HUD -- over the set it plays and the folder a live
-            # show is armed with, since either is what the switch narrows.
-            hud=replace(kwargs.pop("hud", HudFacts()),
-                        enhanced_ids=self._enhanced_prompt_ids(
-                            [*items, *(folder_items or [])])),
-            **kwargs)
-        self._live_shows.append((self._slideshow, location))
-        if folder_items and self._slideshow.is_live():
-            # Watching something render is no reason to lose the folder it is
-            # being made in: the first arrow leaves the live frames for it.
-            self._slideshow.set_playlist(folder_items, 0)
-        # Shift+Left/Right gets its own axis: the versions of whichever item is
-        # on screen, so a level can be compared against the one below it at full
-        # size rather than in a thumbnail.
-        self._slideshow.set_levels(self.versions_of(self._folder_rows()))
+        # Which side this show belongs to: the one asked for, else the one this
+        # set's own shape belongs on.  Standalone it names nothing but the
+        # panel's own verbs, since the monitor is the whole screen.
+        where = side or region_for_items(items)
+        # And what that side IS: one of the session's players, where the session
+        # handed them over, or a window of this app's over the region.
+        channel = self._fun_time.player(where) if self._fun_time is not None else None
+        # Which of its items carry an enhancement, for the switch beside F-mode
+        # on its HUD -- over the set it plays and the folder a live show is
+        # armed with, since either is what the switch narrows.
+        hud = replace(kwargs.pop("hud", HudFacts()),
+                      enhanced_ids=self._enhanced_prompt_ids(
+                          [*items, *(folder_items or [])]))
+        if channel is not None:
+            show = self._hand_to_the_player(items, where, channel, hud=hud, **kwargs)
+        else:
+            show = self._open_a_window(items, where, hud=hud,
+                                       folder_items=folder_items, **kwargs)
+        self._slideshow = show
+        self._live_shows.append((show, location))
         if resume is not None:
-            # After the levels: the version a slide was left showing is only a
-            # version once they are armed.
-            self._slideshow.resume(resume)
-        self._slideshow.open_requested.connect(self._open_from_slideshow)
-        show = self._slideshow
+            # After the levels a window armed above: the version a slide was
+            # left showing is only a version once they are armed.
+            show.resume(resume)
+        show.open_requested.connect(self._open_from_slideshow)
         show.closed.connect(lambda s=show: self._on_closed(s))
-        self._slideshow.media_changed.connect(self._host.reconcile_osr2)
-        # Standalone that is a monitor to take over; hosted, it is one of the
-        # satellite regions — the side asked for, else the one this set's own
-        # shape belongs on.
-        self._present_surface(self._slideshow, side or region_for_items(items))
+        show.media_changed.connect(self._host.reconcile_osr2)
         self._host.reconcile_osr2()
         # However the show was asked for, it now owns the card it is drawn with: a
         # video generation would saturate that card, and a show is exactly the
         # stretch when nobody is waiting on a video. The queue holds them until it
         # closes and keeps making images.
         self._reroll.hold_videos(True)
+        return show
+
+    def _show_actions(self) -> ShowActions:
+        """What a press on a show asks the gallery to do on its behalf."""
+        return ShowActions(
+            delete=self._host.trash_generation,
+            enhance=self._host.enhance_from_slideshow,
+            star=self._host.star_generation,
+            # Three of the seven are a session's: a lock opens the held item
+            # as a generate tab, a reset means the REGION's base state, and a
+            # click on the picture asks the room to pause.
+            lock=(self._open_generate_tab_for
+                  if self._fun_time is not None else None),
+            reset=(self.reset_region if self._fun_time is not None else None),
+            # Space reaches the one OSR2 switch, like every other surface's.
+            drive_toggle=self._host.toggle_osr2_drive,
+            omnipause=(partial(ask_for_omnipause, self._session_channel)
+                       if self._session_channel is not None else None),
+        )
+
+    def _hand_to_the_player(self, items, side: str, channel, *, hud, **kwargs):
+        """A show on one of the session's players: the set goes to the player
+        and the panel this app publishes goes with it — no window of ours.
+
+        A frame is dropped on the way in: a player is handed files to play, and
+        a generation still being made has none yet.
+        """
+        kwargs.pop("frame", None)
+        show = PlayerShow(items, side=side, channel=channel,
+                          actions=self._show_actions(), pace=self._pace, hud=hud,
+                          say=self._host.say, **kwargs)
+        occupant = self._region_shows.get(side)
+        if occupant is not None and occupant.is_showing():
+            occupant.close()
+        self._region_shows[side] = show
+        # A show opened while the hosting session is frozen opens frozen, the
+        # way a window one does.
+        if self._session_paused:
+            show.set_paused(True)
+        return show
+
+    def _open_a_window(self, items, side: str, *, hud, folder_items=None, **kwargs):
+        """A show in a window of this app's: over the whole monitor standalone,
+        or over one of the session's regions."""
+        view = SlideshowView(items, actions=self._show_actions(),
+                             pace=self._pace, motion=self._motion, hud=hud,
+                             **kwargs)
+        if folder_items and view.is_live():
+            # Watching something render is no reason to lose the folder it is
+            # being made in: the first arrow leaves the live frames for it.
+            view.set_playlist(folder_items, 0)
+        # Shift+Left/Right gets its own axis: the versions of whichever item is
+        # on screen, so a level can be compared against the one below it at full
+        # size rather than in a thumbnail.
+        view.set_levels(self.versions_of(self._folder_rows()))
+        self._present_surface(view, side)
         # The queue it floats in its corner is the same widget as the lower
         # strip and asks for the same things, so it goes to the same handlers:
         # a row dragged there re-lines the queue, and its Clear drops another
         # app's work off ComfyUI.
-        self._slideshow.queue().reorder_requested.connect(self._reroll.reorder)
-        self._slideshow.queue().clear_queue_requested.connect(
-            self._host.clear_foreign_queue)
+        view.queue().reorder_requested.connect(self._reroll.reorder)
+        view.queue().clear_queue_requested.connect(self._host.clear_foreign_queue)
         # And fill it at once rather than a poll later: the hold on videos is
         # this opening's own doing, so the corner comes up already saying what
         # is waiting on it rather than blank for a second and a half.
-        self._slideshow.set_queue(*self._host.queue_now())
-        return self._slideshow
+        view.set_queue(*self._host.queue_now())
+        return view
 
     def items_of(self, rows) -> list:
         """(path, media_type, prompt_id, thumbnail) for each of ``rows``, in the
@@ -484,7 +521,7 @@ class ShowDirector:
             self._wear_the_hud(view, side)
             return
         occupant = self._region_shows.get(side)
-        if occupant is not None and occupant.isVisible():
+        if occupant is not None and occupant.is_showing():
             occupant.close()
         view.setWindowTitle(SHOW_TITLES[side])
         view.setWindowFlags(

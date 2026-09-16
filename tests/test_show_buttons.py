@@ -2,7 +2,7 @@
 face, its tooltip and the state it draws."""
 from __future__ import annotations
 
-from origenerator.gui.show_buttons import show_rows
+from origenerator.gui.show_buttons import answer, show_rows
 
 
 def _band(**fields) -> tuple:
@@ -74,6 +74,91 @@ def test_a_show_on_its_own_has_a_window_to_park_and_no_session_to_switch():
 
     assert len(rows) == 1
     assert "minimize" in _names(rows[-1])
+
+
+def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
+    """The player's window is the session's, so minimize is the session's; and
+    the mode pair is on the panel the session draws around this band, not in
+    it.  What is left is exactly what the show itself answers."""
+    rows = show_rows("portrait", hosted=True, own_window=False)
+
+    assert len(rows) == 1
+    assert _names(rows[0]) == [
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset"]
+
+
+class _Host:
+    """A show reduced to the calls a press can make of one."""
+
+    def __init__(self, *, looping=True):
+        self.hud_looping = looping
+        self.calls = []
+
+    def show_step(self, delta):
+        self.calls.append(("step", delta))
+
+    def show_toggle_hold(self):
+        self.calls.append("hold")
+
+    def show_cull(self):
+        self.calls.append("cull")
+
+    def show_reset(self):
+        self.calls.append("reset")
+
+    def toggle_f_mode(self):
+        self.calls.append("fmode")
+
+    def toggle_enhanced_mode(self):
+        self.calls.append("enhanced")
+
+    def show_item(self, path, *, hold=False):
+        self.calls.append(("item", path, hold))
+
+
+def test_every_declared_button_is_answered_by_the_show():
+    """A button this panel declares and nothing answers would be drawn dead —
+    so every one of them, minimize aside, reaches the show."""
+    host = _Host()
+    for button in show_rows("portrait", hosted=True, own_window=False)[0]:
+        assert answer(host, button.action.removeprefix("portrait_")), button.action
+
+    assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
+                          "enhanced", "reset"]
+
+
+def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
+    host = _Host()
+
+    answer(host, "play_video", "scene one.png")
+    answer(host, "lock_video", "scene two.png")
+
+    assert host.calls == [("item", "scene one.png", False),
+                          ("item", "scene two.png", True)]
+
+
+def test_the_loop_button_ends_a_loop_and_starts_none():
+    """Stop looping this row: a show asked for goes back to the side's base
+    state, the way the press ends a loop on a player — and pressed where
+    nothing is looping it is the dark button it looks like."""
+    looping, browsing = _Host(looping=True), _Host(looping=False)
+
+    for host in (looping, browsing):
+        answer(host, "no_loop")
+        answer(host, "seed_loop")
+
+    assert looping.calls == ["reset", "reset"]
+    assert browsing.calls == []
+
+
+def test_a_press_a_show_has_no_answer_to_says_so():
+    """Minimize parks a window, which is not the show's to answer; nor is the
+    map's chrome for acts and seeds a show does not have."""
+    host = _Host()
+
+    assert not answer(host, "minimize")
+    assert not answer(host, "more_seeds")
+    assert host.calls == []
 
 
 def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():

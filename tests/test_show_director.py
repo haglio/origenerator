@@ -114,7 +114,7 @@ class FakeShow:
     def state(self):
         return self.state_at_close
 
-    def isVisible(self):
+    def is_showing(self):
         return self.visible
 
     # what the director tells it
@@ -245,12 +245,22 @@ class FakeRect:
 
 
 class FakeSession:
-    """A hosting Fun Time session reduced to the two things a show asks of one."""
+    """A hosting Fun Time session reduced to the three things a show asks of one.
+
+    *players* is which sides it hands over as players, by the channel it names
+    for each; a side it names none for is one a window of this app's covers.
+    """
 
     dashboard_cmd_file = None
 
+    def __init__(self, players=None):
+        self.players = players or {}
+
     def region_rect(self, side):
         return FakeRect(0 if side == LANDSCAPE else 1920, 0, 960, 540)
+
+    def player(self, side):
+        return self.players.get(side)
 
 
 class FakeReroll:
@@ -408,6 +418,7 @@ def shows(monkeypatch):
         return show
 
     monkeypatch.setattr(module, "SlideshowView", build_show)
+    monkeypatch.setattr(module, "PlayerShow", build_show)
     monkeypatch.setattr(module, "_shared_hud_widget", lambda: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
@@ -840,6 +851,51 @@ def test_a_standalone_show_takes_the_whole_monitor(shows):
 
     assert made[0].fullscreen == 1
     assert made[0].window_title is None
+
+
+def test_a_session_that_hands_over_its_players_gets_the_show_on_one(shows):
+    # The player IS the surface: the show is handed that side's channel, and no
+    # window of this app's is placed, shown or raised over the region.
+    channel = object()
+    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: channel}))
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[0].opened_with["channel"] is channel
+    assert made[0].opened_with["side"] == PORTRAIT
+    assert (made[0].shown, made[0].raised, made[0].geometry) == (0, 0, None)
+    assert director.region_show(PORTRAIT) is made[0]
+
+
+def test_a_show_on_a_player_says_its_lines_in_the_gallerys_caption(shows):
+    # A player has no corner to flash a line in, and the gallery's own caption
+    # is on screen beside the players in a session.
+    director, host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[0].opened_with["say"] == host.say
+
+
+def test_a_show_on_a_player_is_handed_files_and_no_frame(shows):
+    # A player is handed files to play; a run still being made has none yet, so
+    # the frame a double-click landed on stays with the window it was for.
+    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT, frame=b"frame")
+
+    assert "frame" not in made[0].opened_with
+
+
+def test_a_side_the_session_named_no_player_for_still_gets_a_window(shows):
+    # An older session names no players, and its regions want a window of this
+    # app's over them exactly as before.
+    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+
+    assert "channel" not in made[0].opened_with
+    assert made[0].shown == 1
 
 
 def test_what_is_on_screen_opens_where_the_last_show_left_off(shows):

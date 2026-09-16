@@ -377,3 +377,118 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     bridge._tick()
 
     assert played == []
+
+
+def _press(bridge, tmp_path, line: str) -> None:
+    """A press the session routed back here, as a player's panel posted it."""
+    (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
+    bridge._tick()
+
+
+def test_a_players_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, monkeypatch):
+    """A session hands a player's presses back verbatim, spelled the way the
+    panel posted them — so the show's own two switches answer them here."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id1"})
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    _press(bridge, tmp_path, "portrait_fmode")
+
+    assert show.hud_f_mode is True
+    assert len(show.hud_items()[0]) == 1
+
+
+def test_a_thumbnail_press_carries_its_path_through_the_colon_in_it(qtbot, tmp_path, monkeypatch):
+    """A path rides after the "|", and a Windows path has a colon of its own —
+    which must not be read as the start of a spoken phrase."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    jumps = []
+    monkeypatch.setattr(show, "show_item", lambda path, *, hold=False: jumps.append((path, hold)))
+
+    _press(bridge, tmp_path, r"portrait_lock_video|C:\fixtures\scene one.png")
+
+    assert jumps == [(r"C:\fixtures\scene one.png", True)]
+
+
+def test_a_press_no_show_answers_is_dropped_on_the_log(qtbot, tmp_path, monkeypatch, caplog):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    _press(bridge, tmp_path, "portrait_more_seeds")
+
+    assert "portrait_more_seeds" in caplog.text
+    assert not (tmp_path / "origenerator_cmd.txt").exists()
+
+
+def _players_session(tmp_path):
+    from origenerator.fun_time_mode import PlayerChannel
+
+    def channel(side):
+        return PlayerChannel(
+            playlist=tmp_path / f"{side}.tsv",
+            command_file=tmp_path / f"{side}_cmd.txt",
+            status_file=tmp_path / f"{side}_status.txt",
+            hud_file=tmp_path / f"origenerator_{side}_hud.json",
+        )
+    session = _session(tmp_path)
+    return FunTimeSession(
+        main_rect=session.main_rect, portrait_rect=session.portrait_rect,
+        landscape_rect=session.landscape_rect, command_file=session.command_file,
+        paused_file=session.paused_file, status_file=session.status_file,
+        dashboard_cmd_file=session.dashboard_cmd_file,
+        portrait_player=channel("portrait"), landscape_player=channel("landscape"),
+    )
+
+
+def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
+        qtbot, tmp_path, monkeypatch):
+    """Entering the mode with the players handed over: each player is given the
+    list of its own side's shape, and no window of this app's opens at all."""
+    from player_core.playlist import read_playlist
+
+    from origenerator.gui import show_director
+
+    def no_window(*args, **kwargs):
+        raise AssertionError("a window of this app's opened over a region")
+
+    monkeypatch.setattr(show_director, "SlideshowView", no_window)
+    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    Image.new("RGB", (200, 100)).save(wide)
+    library = {"__all__::portrait": [(str(tall), "image", "id-tall", str(tall))],
+               "__all__::landscape": [(str(wide), "image", "id-wide", str(wide))]}
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+
+    _press(bridge, tmp_path, "OPEN_SHOWS")
+
+    assert [str(item.path) for item in read_playlist(tmp_path / "portrait.tsv")] == [str(tall)]
+    assert [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")] == [str(wide)]
+    assert view.region_show("portrait").is_showing()
+
+
+def test_the_status_says_what_the_player_says_it_is_showing(qtbot, tmp_path, monkeypatch):
+    """The file on a player is the player's own answer, so that is what the
+    session reads back about the side."""
+    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    library = {"__all__::portrait": [(str(tall), "image", "id-tall", str(tall))]}
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    _press(bridge, tmp_path, "OPEN_SHOWS")
+    (tmp_path / "portrait_status.txt").write_text(f"video={tall}\nlocked=1\n", encoding="utf-8")
+    view.region_show("portrait").tick()
+
+    bridge._tick()
+
+    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
+    assert "portrait_active=1" in text
+    assert f"portrait_video={tall}" in text
+    assert "portrait_locked=1" in text

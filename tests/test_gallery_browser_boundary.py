@@ -140,7 +140,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     method now, so what used to lead them went into it. 267 -> 266: the OSR2
     switch is the only record of whether it is on, so the copy of it kept here
     went with the one method that wrote it, and the pair the session file saves
-    it through reads the four control states instead of on and off.)"""
+    it through reads the four control states instead of on and off. 266 -> 265:
+    the two arrangers came out as `PaneArrangement`, which a Fun Time session
+    taking over an open window also asks to fold the panes into its column, and
+    the gallery keeps the one `become_hosted` for that. 265 -> 266: the session
+    hands that window back when it ends, and `become_standalone` asks the
+    arrangement to unfold them.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 266
     assert sum(isinstance(x, ast.FunctionDef)

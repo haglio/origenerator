@@ -26,6 +26,8 @@ would land at ``scale`` of the way across the screen, at ``scale`` of the size.
 
 from __future__ import annotations
 
+import ctypes
+import logging
 import os
 
 from origenerator.paths import ensure_shared_ui_on_path
@@ -42,31 +44,58 @@ ensure_shared_ui_on_path()
 
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD  # noqa: E402
 
+logger = logging.getLogger(__name__)
+
 # The ratio the hosted app draws at: its buttons become the HUD's buttons.
 HOSTED_SCALE = BUTTON_SIZE_HUD / BUTTON_SIZE
 
 _ENV_VAR = "QT_SCALE_FACTOR"
 
 
+def hosted_scale() -> float:
+    """:data:`HOSTED_SCALE`, unless ``QT_SCALE_FACTOR`` was set by hand.
+
+    Someone who set it meant it, and this app is not the only reason a process
+    might be scaled.
+    """
+    try:
+        return float(os.environ.get(_ENV_VAR) or HOSTED_SCALE)
+    except ValueError:
+        return HOSTED_SCALE  # unreadable: treat it as unset rather than inherit nonsense
+
+
 def apply_hosted_scale() -> float:
-    """Draw this process at :data:`HOSTED_SCALE`, and return the factor set.
+    """Draw this process at :func:`hosted_scale`, and return the factor set.
 
     Must be called before the first PyQt6 import: Qt reads ``QT_SCALE_FACTOR``
     when the platform plugin initializes, and a value written after that is
     never looked at again.
-
-    An explicit ``QT_SCALE_FACTOR`` already in the environment wins — someone
-    who set it meant it, and this app is not the only reason a process might be
-    scaled.
     """
-    existing = os.environ.get(_ENV_VAR)
-    if existing:
-        try:
-            return float(existing)
-        except ValueError:
-            pass  # unreadable: treat it as unset rather than inherit nonsense
-    os.environ[_ENV_VAR] = repr(HOSTED_SCALE)
-    return HOSTED_SCALE
+    scale = hosted_scale()
+    os.environ[_ENV_VAR] = repr(scale)
+    return scale
+
+
+def draw_at(factor: float) -> None:
+    """Redraw the running app at *factor*; each window takes it when next shown."""
+    # Qt reads QT_SCALE_FACTOR only at startup. QHighDpiScaling::setGlobalFactor
+    # is private API, but Qt6Gui.dll exports it (checked on Qt 6.11), and it
+    # moves every screen's logical geometry at once; on the real windows platform
+    # a window hidden and shown again after it draws at the new ratio.
+    try:
+        set_global_factor = getattr(ctypes.WinDLL("Qt6Gui.dll"),
+                                    "?setGlobalFactor@QHighDpiScaling@@SAXN@Z")
+    except (OSError, AttributeError):
+        logger.warning("This Qt cannot be rescaled while running; staying at %.3f",
+                       active_scale())
+        return
+    set_global_factor.argtypes = [ctypes.c_double]
+    set_global_factor.restype = None
+    set_global_factor(factor)
+    if factor == 1.0:
+        os.environ.pop(_ENV_VAR, None)
+    else:
+        os.environ[_ENV_VAR] = repr(factor)
 
 
 def active_scale() -> float:

@@ -1,8 +1,10 @@
 """The Fun Time mode contract: the flags Fun Time launches this app with."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from origenerator.fun_time_mode import (
@@ -10,6 +12,7 @@ from origenerator.fun_time_mode import (
     parse_app_args,
     region_for_items,
     region_for_size,
+    take_the_takeover,
 )
 from origenerator.slideshow import Slide
 
@@ -84,6 +87,46 @@ def test_a_session_that_names_no_player_hands_over_none():
 
     assert args.fun_time.player("portrait") is None
     assert args.fun_time.player("landscape") is None
+_SESSION_ARGS = ["--fun-time", "--x", "0", "--y", "206", "--width", "853",
+                 "--height", "1234", "--command-file", "st/origenerator_cmd.txt"]
+
+
+def _takeover(state_dir: Path, *, pid: int, args=_SESSION_ARGS) -> Path:
+    path = state_dir / "fun_time_takeover.json"
+    path.write_text(json.dumps({"pid": pid, "args": args}), encoding="utf-8")
+    return path
+
+
+def test_a_takeover_for_this_process_is_the_session_it_names(tmp_path):
+    takeover = _takeover(tmp_path, pid=4321)
+
+    session = take_the_takeover(tmp_path, pid=4321)
+
+    assert session.main_rect == Rect(0, 206, 853, 1234)
+    assert session.command_file == Path("st/origenerator_cmd.txt")
+    assert not takeover.exists()
+
+
+def test_a_takeover_meant_for_another_process_is_spent_unanswered(tmp_path):
+    takeover = _takeover(tmp_path, pid=4321)
+
+    assert take_the_takeover(tmp_path, pid=1234) is None
+    assert not takeover.exists()
+
+
+@pytest.mark.parametrize("written", [
+    "not json",
+    "[4321]",
+    '{"pid": 4321}',
+    '{"pid": 4321, "args": ["--fun-time", "--a-flag-from-a-newer-session"]}',
+    '{"pid": 4321, "args": ["--x", "5"]}',
+])
+def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path, written):
+    takeover = tmp_path / "fun_time_takeover.json"
+    takeover.write_text(written, encoding="utf-8")
+
+    assert take_the_takeover(tmp_path, pid=4321) is None
+    assert not takeover.exists()
 
 
 def test_region_for_size_splits_on_aspect():

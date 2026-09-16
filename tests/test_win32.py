@@ -1,6 +1,7 @@
 """Tests for origenerator.win32 taskbar identity and foreground helpers."""
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -10,6 +11,7 @@ from origenerator.win32 import (
     force_foreground_window,
     raise_window_without_activating,
     register_notification_identity,
+    this_process_creation_time,
     window_exists,
 )
 
@@ -161,3 +163,14 @@ class TestNotificationIdentity:
 
         register_notification_identity("Origenerator", name="Origenerator",
                                        icon=Path("C:/marks/o.png"), write=refuse)
+
+
+def test_this_process_was_created_in_filetime_ticks_before_now():
+    ticks_per_second = 10_000_000
+    seconds_from_1601_to_1970 = 11_644_473_600
+    now = int((time.time() + seconds_from_1601_to_1970) * ticks_per_second)
+
+    created = this_process_creation_time()
+
+    assert 0 < now - created < 24 * 3600 * ticks_per_second
+    assert this_process_creation_time() == created

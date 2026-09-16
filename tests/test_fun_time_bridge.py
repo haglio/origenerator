@@ -140,6 +140,31 @@ def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
     assert filled == [True]
 
 
+def test_release_asks_for_the_app_back_from_the_session(qtbot, tmp_path):
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
+    released = []
+    bridge.released.connect(lambda: released.append(True))
+
+    (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\n", encoding="utf-8")
+    bridge._tick()
+
+    assert released == [True]
+
+
+def test_a_released_bridge_answers_the_session_no_further(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    paused = []
+    monkeypatch.setattr(view, "set_session_paused", paused.append)
+
+    (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
+    (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\nOPEN_SHOWS\n", encoding="utf-8")
+    monkeypatch.setattr(view, "fill_the_regions", lambda: paused.append("filled"))
+    bridge._tick()
+
+    assert paused == []
+    assert not (tmp_path / "origenerator_status.txt").exists()
+
+
 def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)

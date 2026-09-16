@@ -11,7 +11,8 @@ shows the way it reaches the players:
   switching INTO origenerator mode, which opens playing rather than empty) and
   ``CLOSE_SHOWS`` clears them again; ``FILTER_ENHANCED`` flips the show's
   enhanced-only switch, the one its own HUD carries and the session's console
-  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would.
+  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would, and
+  ``RELEASE`` gives a window the session took over back to standalone.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -25,7 +26,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.show_buttons import answer
@@ -63,6 +64,8 @@ def _split_argument(line: str) -> tuple[str, str, str]:
 class FunTimeBridge(QObject):
     """Polls the session's channels and routes them onto the gallery's shows."""
 
+    released = pyqtSignal()
+
     def __init__(self, session: FunTimeSession, gallery, parent=None):
         super().__init__(parent)
         self._session = session
@@ -78,7 +81,9 @@ class FunTimeBridge(QObject):
             "CLOSE_SHOWS": lambda: self._gallery.close_the_shows(),
             "FILTER_ENHANCED": self._filter_enhanced,
             "QUIT": lambda: self._gallery.window().close(),
+            "RELEASE": self._release,
         }
+        self._released = False
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._tick)
@@ -86,6 +91,8 @@ class FunTimeBridge(QObject):
 
     def _tick(self) -> None:
         self._drain_commands()
+        if self._released:
+            return
         self._apply_paused()
         self._publish_status()
 
@@ -102,6 +109,8 @@ class FunTimeBridge(QObject):
             return
         for verb in consume_command_file(self._session.command_file, logger=logger,
                                          uppercase=False):
+            if self._released:
+                return
             self._apply(verb.strip())
 
     def _apply(self, line: str) -> None:
@@ -125,6 +134,11 @@ class FunTimeBridge(QObject):
             self._gallery.run_spoken_command(f"{side} {argument}")
             return
         self._apply_side(side, action.lower(), argument, line)
+
+    def _release(self) -> None:
+        self._released = True
+        self._timer.stop()
+        self.released.emit()
 
     def _filter_enhanced(self) -> None:
         """The session's enhanced-only switch, pressed there and landing here.

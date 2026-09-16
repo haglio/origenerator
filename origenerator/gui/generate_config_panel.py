@@ -839,6 +839,14 @@ class GenerateConfigPanel(QWidget):
         """
         self._reflow_for_the_media()
 
+    def become_hosted(self, session) -> None:
+        self._fun_time = session
+        self._reflow_for_the_media()
+
+    def become_standalone(self) -> None:
+        self._fun_time = None
+        self._stand_the_media(beside=False)
+
     def _reflow_for_the_media(self) -> None:
         """Stand the picture beside the settings when it is a PORTRAIT one.
 
@@ -854,7 +862,9 @@ class GenerateConfigPanel(QWidget):
         """
         if self._fun_time is None:
             return  # standalone the pane is wide; stacking is right at any shape
-        beside = self._media_is_portrait()
+        self._stand_the_media(beside=self._media_is_portrait())
+
+    def _stand_the_media(self, *, beside: bool) -> None:
         if beside == self._media_side_by_side:
             return
         self._media_side_by_side = beside

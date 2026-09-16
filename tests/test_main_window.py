@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import base64
 import json
 
 import pytest
-from player_core.console import OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
+from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QSystemTrayIcon
 
-from origenerator import gallery, recipe_match
+from origenerator import gallery, recipe_match, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -864,3 +865,141 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
 
     assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
                      QSystemTrayIcon.MessageIcon.Information)]
+def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert [bridge.parent() for bridge in win.findChildren(FunTimeBridge)] == [win]
+    assert win._gallery_view._fun_time is not None
+
+
+def test_a_window_taken_into_a_session_draws_at_the_sessions_size(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    win.become_hosted(_fun_time_session())
+    win.showNormal()
+
+    qtbot.waitUntil(lambda: win.devicePixelRatio() == pytest.approx(ui_scale.HOSTED_SCALE))
+    assert ui_scale.active_scale() == pytest.approx(ui_scale.HOSTED_SCALE)
+
+
+def test_a_scale_set_by_hand_is_kept_when_the_window_is_taken_over(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setenv("QT_SCALE_FACTOR", "1.25")
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert ui_scale.active_scale() == 1.25
+
+
+def test_the_standalone_geometry_is_kept_through_a_session_that_took_the_window(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.setGeometry(100, 120, 900, 700)
+    standalone = base64.b64encode(bytes(win.saveGeometry())).decode("ascii")
+
+    win.become_hosted(_fun_time_session())
+    win.close()
+
+    assert AppState(path).get("window_geometry") == standalone
+
+
+def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    view = win._gallery_view
+    view.set_audio_enabled(True)
+    view.osr2_control.set_state(OSR2_RETRACTED)
+    view.set_mic_enabled(True)
+
+    win.become_hosted(_fun_time_session())
+    win.close()
+
+    saved = AppState(path)
+    assert [saved.get(key) for key in ("audio_enabled", "osr2_enabled", "mic_enabled")] == [
+        True, OSR2_RETRACTED, True]
+
+
+def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.setGeometry(40, 50, 640, 480)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert not win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (40, 50, 640, 480)
+    assert win._gallery_view._fun_time is None
+
+
+def test_a_window_found_open_is_open_again_once_the_session_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert win.isVisible() and not win.isMinimized()
+
+
+def test_a_window_found_minimized_is_minimized_again_once_the_session_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.showMinimized()
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert win.isMinimized()
+
+
+def test_a_session_releasing_the_window_it_took_hands_it_back(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+
+    win.findChildren(FunTimeBridge)[0].released.emit()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    qtbot.waitUntil(lambda: win.findChildren(FunTimeBridge) == [])
+
+
+def test_a_window_handed_back_listens_again_but_leaves_the_sound_and_device_off(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    view = win._gallery_view
+    view.set_mic_enabled(True)
+    view.set_audio_enabled(True)
+    view.osr2_control.set_state(OSR2_DRIVING)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert (view.mic_enabled(), view.audio_enabled(), view.osr2_control.state()) == (
+        True, False, OSR2_CONTROL_OFF)
+
+
+def test_a_window_handed_back_says_so_for_the_next_session_to_take(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+
+    with qtbot.waitSignal(win.handed_back, timeout=1000):
+        win.become_standalone()
+
+
+def test_a_window_handed_back_can_be_taken_by_the_next_session(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert win._gallery_view._arrangement.stack is None
+    qtbot.waitUntil(lambda: win.findChildren(FunTimeBridge) == [])

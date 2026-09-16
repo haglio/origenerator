@@ -178,3 +178,16 @@ def force_foreground_window(hwnd: int) -> bool:
         if attached:
             _user32.AttachThreadInput(other_thread, this_thread, False)
     return int(_user32.GetForegroundWindow() or 0) == hwnd
+
+
+_kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
+_kernel32.GetProcessTimes.argtypes = [
+    ctypes.wintypes.HANDLE, *[ctypes.POINTER(ctypes.wintypes.FILETIME)] * 4,
+]
+_kernel32.GetProcessTimes.restype = ctypes.wintypes.BOOL
+
+
+def this_process_creation_time() -> int:
+    times = [ctypes.wintypes.FILETIME() for _ in range(4)]
+    _kernel32.GetProcessTimes(_kernel32.GetCurrentProcess(), *map(ctypes.byref, times))
+    return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime

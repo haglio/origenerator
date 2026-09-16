@@ -32,6 +32,7 @@ from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery import (
     EnhanceSettings,
     build_image_config_index,
+    config_folder_key,
     config_folder_name,
     describe_enhance_params,
     displayed_levels,
@@ -120,7 +121,7 @@ class GenerateConfigPanel(QWidget):
     panel is one column: a fixed preview on top, then one scroll holding the
     File/Created block above the editable form and, at its foot, the displayed
     generation's related media, then a single button bank
-    (Go-to-folder, Send-to-Evolver, Send-to-Genau, Cancel, Generate).
+    (Send-to-Evolver, Send-to-Genau, Cancel, Generate).
     There's no status line: Generate only ever submits, and a run in flight is
     watched in the strip's queue and on the browser pane's card. Its caption says
     when a press will draw a fresh seed rather than re-create a generation these
@@ -809,6 +810,21 @@ class GenerateConfigPanel(QWidget):
         params = self._param_form.get_values_static()
         index = build_image_config_index(self._image_rows())
         return key, settings_signature(key, json.dumps(params), index)
+
+    def settings_folder_key(self) -> str | None:
+        """The gallery folder this tab's settings have been generating into, by
+        the key the tree files it under — the same key the tab is *named* off
+        (:meth:`title`), so where a tab sends you is the folder whose name it
+        wears.
+
+        ``None`` when there is no such folder: no workflow picked, or nothing
+        generated with these settings yet. A folder is put in the tree by the
+        generations in it, so until there are some there is nowhere to go.
+        """
+        key = self.settings_key()
+        if key is None or self._recent_matching_row() is None:
+            return None
+        return config_folder_key(*key)
 
     def refresh_media_layout(self) -> None:
         """Re-ask what shape the picture is and lay out for it.

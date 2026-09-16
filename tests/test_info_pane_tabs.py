@@ -185,6 +185,52 @@ def test_the_tab_menu_leaves_out_what_would_close_nothing(tabs):
     assert [a.text() for a in tabs._tab_menu(1).actions()] == ["Close others", "Close all"]
 
 
+def _loaded_tab(tabs):
+    """The pane's tab, pointed at a generation — so its settings have a folder."""
+    row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a wizard", seed=1),
+                        "sdxl_g1.png")
+    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    return tabs.current_config_panel()
+
+
+def test_the_tab_menu_offers_the_folder_this_tab_generates_into(tabs):
+    _loaded_tab(tabs)
+    assert [a.text() for a in tabs._tab_menu(0).actions()] == ["Go to folder"]
+
+
+def test_go_to_folder_leads_the_menu_above_the_closes(tabs):
+    # The tab's own act first, the housekeeping after it, a line between.
+    _loaded_tab(tabs)
+    tabs._add_subtab()
+
+    assert [a.text() for a in tabs._tab_menu(0).actions()] == [
+        "Go to folder", "", "Close others", "Close to the right", "Close all",
+    ]
+
+
+def test_go_to_folder_asks_for_the_tab_it_was_raised_over(tabs):
+    panel = _loaded_tab(tabs)
+    tabs._add_subtab()  # a second tab in front; the menu still names the first
+    asked = []
+    tabs.folder_requested.connect(asked.append)
+
+    tabs._tab_menu(0).actions()[0].trigger()
+
+    assert asked == [panel.settings_folder_key()]
+
+
+def test_a_tab_that_has_generated_nothing_is_offered_no_folder(tabs):
+    # Its settings have made nothing, so the tree holds no folder for them, and
+    # an entry that would go nowhere isn't listed dead.
+    _pick_workflow(tabs.currentWidget())
+    tabs._add_subtab()
+
+    assert [a.text() for a in tabs._tab_menu(0).actions()] == [
+        "Close others", "Close to the right", "Close all",
+    ]
+
+
 def test_close_all_leaves_the_pane_on_its_resting_tab(tabs):
     tabs.currentWidget().prefill("sdxl_t2i", {})
     tabs._add_subtab()

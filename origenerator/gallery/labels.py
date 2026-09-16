@@ -6,8 +6,10 @@ description, a Generate tab's default title, and a source image's folder name.
 Pure presentation over the identity layer.
 
 A settings folder is *named* by its key rather than from here (see
-:mod:`.keys`); what :func:`settings_label` builds is the description under that
-name, which the tree and the folder tiles show on hover.
+:mod:`.keys`) — :func:`config_folder_key` is where a config's key is derived,
+since the name is read straight off it. What :func:`settings_label` builds is
+the description under that name, which the tree and the folder tiles show on
+hover.
 """
 from __future__ import annotations
 
@@ -120,17 +122,26 @@ def item_label(row: dict | None) -> str:
     return ""
 
 
+def config_folder_key(workflow_name: str, signature: str) -> str:
+    """The key of the gallery folder a config would generate into.
+
+    Takes the ``(workflow, signature)`` pair a config tab holds rather than a
+    row, since a tab that has never run has no row to key off
+    (:func:`~origenerator.gallery.tree.settings_folder_key` is the same question
+    asked of one). It keys the same folder the tree does: a row with no file yet
+    is classified by its workflow's declared type, which is what this reads, so
+    a config and the generations it makes land on one key.
+    """
+    return settings_key(workflow_output_type(workflow_name) or MediaType.IMAGE,
+                        workflow_name, signature)
+
+
 def config_folder_name(workflow_name: str, signature: str,
                        folder_meta: dict | None = None) -> str:
     """The gallery folder a config would generate into, by the name it wears
-    there: the one the user typed onto it, else its short code.
-
-    Takes the ``(workflow, signature)`` pair a config tab holds rather than a
-    row, since a tab that has never run has no row to key off — but keys the
-    same folder the tree does, so a tab and its folder wear one name.
-    """
-    key = settings_key(workflow_output_type(workflow_name) or MediaType.IMAGE,
-                       workflow_name, signature)
+    there: the one the user typed onto it, else its short code — so a config tab
+    and its folder read as one thing."""
+    key = config_folder_key(workflow_name, signature)
     meta = (folder_meta or {}).get(key) or {}
     return meta.get("custom_name") or folder_id(key)
 

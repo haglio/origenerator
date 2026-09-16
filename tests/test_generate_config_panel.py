@@ -832,6 +832,36 @@ def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel):
     assert signature != gallery.settings_signature("sdxl_t2i", json.dumps({**full, "steps": 7}))
 
 
+def test_a_config_that_has_generated_has_a_folder_to_go_to(qtbot, tmp_path):
+    # Something was made with these settings, so the gallery holds a folder of it
+    # — the one this tab's "Go to folder" opens.
+    db = Database(tmp_path / "t.db")
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                  positive_prompt="a wizard")
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
+        positive_prompt="a wizard", params_json=json.dumps(params), workflow_json="{}",
+    )
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    panel.prefill("sdxl_t2i", params)
+
+    row = db.get_generation("g1")
+    assert panel.settings_folder_key() == gallery.settings_folder_key(
+        row, gallery.build_image_config_index([row]))
+
+
+def test_a_config_that_has_generated_nothing_has_no_folder_yet(panel):
+    # These settings have made nothing, so the tree has no row for them and there
+    # is nowhere for a "Go to folder" to go.
+    assert panel.settings_folder_key() is None
+
+
+def test_a_panel_still_on_the_picker_has_no_folder(blank_panel):
+    # No workflow, no settings, no folder — the question isn't answerable yet.
+    assert blank_panel.settings_folder_key() is None
+
+
 # --- displaying a saved generation: the footer folded in from the inspect pane ---
 
 def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):

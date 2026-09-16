@@ -103,18 +103,30 @@ from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
-from origenerator.gui.show_set import ShowSet
+from origenerator.gui.show_map import SEED_AXIS
+from origenerator.gui.show_set import (
+    LOOP_IS_A_HOLD,
+    LOOP_OFF,
+    ShowSet,
+    looping_note,
+)
 from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
-from origenerator.gui.toast import NOTICE, Toast
+from origenerator.gui.toast import NOTICE, WARNING, Toast
 from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
 
 _GENERATING = "Generating…"
+# What the map's chrome says when it does what it says, in the players' own
+# words, and the three ways it can have nothing to do.
+_MORE_SEEDS = "More seeds"
+_WIDENING_FAILED = "Widening net failed"
+_NOTHING_TO_LOOP = "Nothing to loop"
+_NOTHING_THAT_WAY = "Nothing that way"
 # What the corner says about an enhancement of the slide on screen. Which of the
 # two is a fact about the run, not about the ask: holding slide after slide
 # sends out a line of runs, and ComfyUI is making exactly one of them.
@@ -226,7 +238,7 @@ class SlideshowView(QWidget):
     # --- the set, and the pass dealt from it --------------------------------
 
     def play(self, items, *, frame=None, start=None, image_dwell_ms=None,
-             shuffle=None, hud=None) -> None:
+             shuffle=None, hud=None, actions=None) -> None:
         """Take a new set into this window and start it on that set.
 
         Standalone the monitor holds one show, so a second set asked for while
@@ -236,6 +248,8 @@ class SlideshowView(QWidget):
         changes.  It takes the set exactly as construction does, so a window
         re-pointed cannot drift from one freshly opened.
         """
+        if actions is not None:
+            self._actions = actions
         self._take_set(items, frame=frame, start=start,
                        image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
         self._show_current()
@@ -266,7 +280,8 @@ class SlideshowView(QWidget):
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                            start=start, hud=hud, on_pass_change=self._pass_changed)
+                            start=start, hud=hud, on_pass_change=self._pass_changed,
+                            neighbors=self._actions.neighbors, widen=self._actions.widen)
 
     @property
     def _playlist(self):
@@ -412,8 +427,7 @@ class SlideshowView(QWidget):
         Closing a show is usually a detour — the folder under the picture, a fix
         in a tab — so coming back is coming back to that picture: the slide it
         ended on, still held if it was held, still showing the version it had been
-        stepped to. The switch (holding-to-enhance) carries whether or not the
-        place does; the place carries only while that slide is among these items,
+        stepped to. The place carries only while that slide is among these items,
         since a show of another folder has nowhere to put it.
 
         Called after :meth:`set_levels`, because which version a slide was showing
@@ -706,11 +720,69 @@ class SlideshowView(QWidget):
         :class:`~origenerator.gui.show_host.ShowHost`)."""
         return self._set.order_label
 
-    @property
-    def hud_looping(self) -> bool:
-        """Whether this set is a loop someone asked for, which is what lights
-        the map's loop button."""
-        return self._set.looping
+    # --- the map, and the loops along it -----------------------------------
+
+    def hud_map(self):
+        """The map the HUD draws around the slide on screen."""
+        return self._set.map()
+
+    def pass_size(self) -> int:
+        """How many slides the pass on screen holds — what a narrowing is
+        answered with."""
+        return len(self._playlist)
+
+    def show_loop(self, axis: str) -> None:
+        """Loop the map's *axis* around the slide on screen, or end the loop
+        for "" — the map's two loop buttons, and the session's spoken loops."""
+        if not axis:
+            if self._set.end_loop():
+                self._flash_note("Loop off")
+            return
+        if self._set.start_loop(axis):
+            self._flash_note(looping_note(self._set))
+        else:
+            self._flash_note(_NOTHING_TO_LOOP, kind=WARNING)
+
+    def show_loop_cycle(self) -> None:
+        """The loop key, as on a player: seeds, then configs, then off — and
+        the hold when there is nothing on either axis to loop, which is Down's
+        whole gesture here."""
+        stepped = self._set.step_loop()
+        if stepped == LOOP_IS_A_HOLD:
+            self._hold_current()
+            self._flash_note("Locked" if self._playlist.locked else "Unlocked")
+        elif stepped == LOOP_OFF:
+            self._flash_note("Loop off")
+        else:
+            self._flash_note(looping_note(self._set))
+
+    def show_more_seeds(self) -> None:
+        """Widen the seed row past the exact configuration and loop it — the
+        map's expand mark."""
+        if self._set.more_seeds():
+            self._flash_note(_MORE_SEEDS)
+        else:
+            self._flash_note(_WIDENING_FAILED, kind=WARNING)
+
+    def show_filter(self, query: str) -> None:
+        """Narrow to the configuration whose map row is labeled *query* — the
+        button at the head of that row."""
+        slide = self._set.row_slide(query)
+        if slide is None:
+            self._flash_note(_NOTHING_TO_LOOP, kind=WARNING)
+            return
+        if slide is not self._playlist.current():
+            self._jump_to(slide)
+        self.show_loop(SEED_AXIS)
+
+    def show_nav(self, direction: str) -> None:
+        """Step to the map cell one *direction* from the lit one, the way a
+        thumbnail click lands on it."""
+        target = self._set.nav_target(direction)
+        if target is None:
+            self._flash_note(_NOTHING_THAT_WAY, kind=WARNING)
+            return
+        self._jump_to(target)
 
     @property
     def hud_device(self):
@@ -848,25 +920,24 @@ class SlideshowView(QWidget):
         there is more than one to clear, and what it means on every satellite."""
         return self._set.set_modes(favorites_filter=False, enhanced=False)
 
-    def hud_items(self):
-        """The set for this show's HUD: ``(path, still)`` per item in
-        stable order, the current item's 1-based position in that order, and
-        the lock."""
-        return self._set.hud_items()
-
     def show_item(self, path, *, hold: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
         jump a satellite's map makes; *hold* locks it there (the double-click),
         exactly as it locks a player's clip."""
-        for index, item in enumerate(self._playlist.items):
-            if str(item.path) != str(path):
-                continue
-            self._playlist.unlock()
-            self._playlist.jump_to(index)
-            self._show_current()
-            if hold:
-                self._toggle_lock()
+        slide = self._set.slide_for_path(path)
+        if slide is None:
             return
+        self._jump_to(slide)
+        if hold and not self._playlist.locked:
+            self._toggle_lock()
+
+    def _jump_to(self, slide) -> None:
+        """Stand the show on *slide*, wherever the map found it: the hold
+        comes off, the way any step off a held slide takes it off."""
+        self._playlist.unlock()
+        self._live = False
+        self._set.jump_to(slide)
+        self._show_current()
 
     def set_paused(self, paused: bool) -> None:
         """Freeze or resume the show whole — the hosting session's OmniPause, or
@@ -997,9 +1068,10 @@ class SlideshowView(QWidget):
         """Ask the gallery to enhance the slide on screen, if it wants one.
 
         The gallery decides whether it does — it is the one that knows whether
-        this image has already been enhanced, and an enhanced one wants nothing.
-        ``True`` back means a run started, and the note says so until the
-        finished version arrives.
+        this image has already been enhanced, whether its Enhance-on-hold
+        switch is on at all, and an enhanced one wants nothing.  ``True`` back
+        means a run started, and the note says so until the finished version
+        arrives.
         """
         if self._actions.enhance is None:
             return
@@ -1263,6 +1335,10 @@ class SlideshowView(QWidget):
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
             self._hold_current()    # hold it, favorite it, and enhance it
+        elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
+            # The loop key, on both of the keys a session gives its two
+            # satellites: seeds, then configs, then off.
+            self.show_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_motion_key(self._motion, key,

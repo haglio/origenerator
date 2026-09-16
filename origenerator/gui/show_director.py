@@ -51,6 +51,7 @@ from origenerator.gui.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
 )
 from origenerator.gui.orientation import (
+    filter_rows,
     oriented_key,
 )
 from origenerator.gui.orientation import (
@@ -58,11 +59,13 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
+from origenerator.gui.show_map import MapNeighbors
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
+from origenerator.nav_map import config_family, seed_family, widened_family
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.win32 import place_window_in_device_pixels
@@ -325,7 +328,7 @@ class ShowDirector:
                          image_dwell_ms=0, shuffle=in_order,
                          folder_items=folder,
                          hud=HudFacts(
-                             order_label="", looping=False,
+                             order_label="",
                              favorite_ids=self._favorite_prompt_ids()))
 
     def _folder_rows(self) -> list[dict]:
@@ -373,11 +376,13 @@ class ShowDirector:
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
         levels = self.versions_of(rows)
+        actions = self._show_actions(where)
         if channel is not None:
-            show = self._hand_to_the_player(items, where, channel, hud=hud,
-                                            levels=levels, **kwargs)
+            show = self._hand_to_the_player(items, where, channel, actions=actions,
+                                            hud=hud, levels=levels, **kwargs)
         else:
-            show = self._open_a_window(items, where, hud=hud, levels=levels,
+            show = self._open_a_window(items, where, actions=actions, hud=hud,
+                                       levels=levels,
                                        folder_items=folder_items, **kwargs)
         self._slideshow = show
         already_live = any(held is show for held, _where in self._live_shows)
@@ -399,15 +404,17 @@ class ShowDirector:
         self._reroll.hold_videos(True)
         return show
 
-    def _show_actions(self) -> ShowActions:
-        """What a press on a show asks the gallery to do on its behalf."""
+    def _show_actions(self, side: str) -> ShowActions:
+        """What a press on a show asks the gallery to do on its behalf, and what
+        the gallery says about the library the show on *side* is mapped
+        against — that side's own shape of it."""
         return ShowActions(
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
-            # Three of the seven are a session's: a lock opens the held item
-            # as a generate tab, a reset means the REGION's base state, and a
-            # click on the picture asks the room to pause.
+            # Three of these are a session's: a lock opens the held item as a
+            # generate tab, a reset means the REGION's base state, and a click
+            # on the picture asks the room to pause.
             lock=(self._open_generate_tab_for
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
@@ -418,9 +425,12 @@ class ShowDirector:
             osr2_control=self._host.osr2_control,
             omnipause=(partial(ask_for_omnipause, self._session_channel)
                        if self._session_channel is not None else None),
+            neighbors=partial(self.neighbors_of, side=side),
+            widen=partial(self.beyond_the_row_of, side=side),
         )
 
-    def _hand_to_the_player(self, items, side: str, channel, *, hud, levels, **kwargs):
+    def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
+                            levels, **kwargs):
         """A show on one of the session's players: the set goes to the player
         and the panel this app publishes goes with it — no window of ours.
 
@@ -434,7 +444,7 @@ class ShowDirector:
             occupant.set_levels(levels)
             return occupant
         show = PlayerShow(items, side=side, channel=channel,
-                          actions=self._show_actions(), pace=self._pace, hud=hud,
+                          actions=actions, pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
         show.set_levels(levels)
         self._region_shows[side] = show
@@ -444,7 +454,8 @@ class ShowDirector:
             show.set_paused(True)
         return show
 
-    def _open_a_window(self, items, side: str, *, hud, levels, folder_items=None, **kwargs):
+    def _open_a_window(self, items, side: str, *, actions, hud, levels,
+                       folder_items=None, **kwargs):
         """A show in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
 
@@ -457,11 +468,11 @@ class ShowDirector:
         view = self._window_up() if self._fun_time is None else None
         built = view is None
         if built:
-            view = SlideshowView(items, actions=self._show_actions(),
+            view = SlideshowView(items, actions=actions,
                                  pace=self._pace, motion=self._motion, hud=hud,
                                  **kwargs)
         else:
-            view.play(items, hud=hud, **kwargs)
+            view.play(items, actions=actions, hud=hud, **kwargs)
         if folder_items and view.is_live():
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
@@ -523,6 +534,55 @@ class ShowDirector:
                         media_type, level.label) for level in levels]
             playlists[str(entries[0][0])] = entries
         return playlists
+
+    # --- the map around the slide on screen ---------------------------------
+
+    def _library_of(self, side: str) -> list[dict]:
+        """The generations a show on *side* is mapped against: the whole
+        library of that side's shape — what the satellite players map their
+        clips against too, each over its own sources.  Every generation of
+        that shape, whatever the gallery's two ticks are showing: the ticks
+        narrow what is browsed, and a map is drawn against what exists."""
+        return filter_rows(self._db.list_generations(), side)
+
+    def _slides_of(self, rows) -> tuple[Slide, ...]:
+        return tuple(Slide.of(item) for item in self.items_of(rows))
+
+    def neighbors_of(self, prompt_id: str, *, side: str) -> MapNeighbors:
+        """What the library says about one generation, for the map a show on
+        *side* draws around it: the same configuration under other seeds along
+        the row, the same seed under other configurations down the column,
+        each configuration named by its folder (:mod:`origenerator.nav_map`).
+        Nothing at all for a generation the gallery does not have a row for —
+        a file being written, a set assembled without ids."""
+        row = self._host.row_for(prompt_id) if prompt_id else None
+        if row is None:
+            return MapNeighbors()
+        index = self._host.image_config_index()
+        library = self._library_of(side)
+        seeds = seed_family(row, library, image_index=index)[1:]
+        configs = config_family(row, library, image_index=index)[1:]
+        return MapNeighbors(
+            seeds=self._slides_of(seeds),
+            configs=self._slides_of(configs),
+            label=self._folder_name(row),
+            config_labels=tuple(self._folder_name(sibling) for sibling in configs),
+        )
+
+    def beyond_the_row_of(self, prompt_id: str, *, side: str) -> tuple[Slide, ...]:
+        """The slides "more seeds" adds to a show's row around *prompt_id*: the
+        nearest other configurations of the same model, or nothing when the
+        model holds nothing else."""
+        row = self._host.row_for(prompt_id) if prompt_id else None
+        if row is None:
+            return ()
+        index = self._host.image_config_index()
+        library = self._library_of(side)
+        widened = widened_family(row, library, image_index=index)
+        if widened is None:
+            return ()
+        exact = len(seed_family(row, library, image_index=index))
+        return self._slides_of(widened[exact:])
 
     def rows_at(self, location) -> list[dict]:
         """What a show opened at *location* would play if it opened now.
@@ -639,13 +699,19 @@ class ShowDirector:
             return ""
         seed = row.get("seed")
         item = f"seed {seed}" if seed is not None else ""
-        folder = gallery.config_folder_name(
-            row.get("workflow") or "",
-            gallery.settings_signature(row.get("workflow"), row.get("params"),
-                                       self._host.image_config_index()),
+        return " / ".join(part for part in (self._folder_name(row), item) if part)
+
+    def _folder_name(self, row: dict) -> str:
+        """The folder *row* sits in, by the name the tree gives it: the one the
+        user typed onto it, else its short code."""
+        workflow_name = row.get("workflow_name") or ""
+        return gallery.config_folder_name(
+            workflow_name,
+            gallery.settings_signature(workflow_name, row.get("params_json"),
+                                       self._host.image_config_index(),
+                                       workflow_version=row.get("workflow_version")),
             self._db.folder_meta_map(),
         )
-        return " / ".join(part for part in (folder, item) if part)
 
     # --- letting one go -----------------------------------------------------
 
@@ -783,9 +849,7 @@ class ShowDirector:
         if not items:
             return False
         self.open(items, rows=rows, location=key, side=side,
-                  hud=HudFacts(
-                      looping=False,
-                      favorite_ids=self._favorite_prompt_ids()))
+                  hud=HudFacts(favorite_ids=self._favorite_prompt_ids()))
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
                     side, len(items), (time.perf_counter() - began) * 1000)
@@ -1158,7 +1222,7 @@ class ShowDirector:
             return
         if show.set_enhanced_mode(True) or show.hud_enhanced_mode:
             show.note_voice_command(
-                f"🎤 enhanced only — {len(show.hud_items()[0])} to play")
+                f"🎤 enhanced only — {show.pass_size()} to play")
         else:
             show.note_voice_command("🎤 nothing here is enhanced", kind=WARNING)
 

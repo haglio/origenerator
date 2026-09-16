@@ -16,8 +16,9 @@ from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
+from origenerator.gui.show_map import MapNeighbors
 from origenerator.gui.show_wiring import HudFacts, ShowActions
-from origenerator.slideshow import ShowState, in_order
+from origenerator.slideshow import ShowState, Slide, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -98,8 +99,7 @@ def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
 
     assert show.hud_prompt_id == "id-2"
     assert show.current_media_path() == "two.png"
-    _cells, position, _locked = show.hud_items()
-    assert position == 2
+    assert show.hud_map().corner.prompt_id == "id-2"
 
 
 def test_the_shows_hold_is_the_players_own(qtbot, tmp_path):
@@ -223,7 +223,8 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
     model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
 
     assert model.player == "portrait"
-    assert model.seed_count == 3
+    assert model.corner.path == "one.png"
+    assert model.seed_count == 1     # a set with no library under it maps the slide alone
     assert [button.command for row in model.rows for button in row] == [
         "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
         "portrait_fmode", "portrait_enhanced", "portrait_reset",
@@ -443,3 +444,199 @@ class TestVersions:
         show.show_step_version(1)
 
         assert _sent(show) == ["PLAY_FILE two.png"]
+
+
+# --- the map, and the loops along it ------------------------------------------
+
+def _around(prompt_id):
+    """A library in which the first item has one seed sibling and one
+    configuration sibling, and the rest have nobody."""
+    if prompt_id != "id-1":
+        return MapNeighbors()
+    return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
+                        configs=(Slide("one-x.png", "image", "id-1x"),),
+                        label="fox", config_labels=("dawn",))
+
+
+def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+
+    model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
+
+    assert [cell.path for cell in model.seeds] == ["one-b.png"]
+    assert [(cell.path, cell.label) for cell in model.actions] == [("one-x.png", "dawn")]
+    assert (model.current_action, model.seed_count, model.action_count) == ("fox", 2, 2)
+
+
+def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_set(qtbot, tmp_path):
+    """The row becomes the player's list, the item on screen first so it keeps
+    playing; the loop key ends it and the set comes back the same way."""
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    _sent(show)
+
+    show.show_loop("seed")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "one-b.png"]
+    assert "RELOAD_PLAYLIST" in _sent(show)
+    assert said == ["Looping seeds: 2"]
+    assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).active_loop == "seed"
+
+    show.show_loop_cycle()          # seeds -> configs
+    show.show_loop_cycle()          # configs -> off
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "two.png", "three.png"]
+    assert said[-1] == "Loop off"
+
+
+def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qtbot, tmp_path):
+    """PLAY_FILE jumps to a file in the list and splices in one that is not —
+    which is where the pass put the cell too, so no list is handed over."""
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    _sent(show)
+
+    show.show_item("one-x.png")
+
+    assert _sent(show) == ["PLAY_FILE one-x.png", "LOCK_OFF"]
+    assert show.hud_prompt_id == "id-1x"
+
+
+def _plays(show) -> list[str]:
+    return [verb for verb in _sent(show) if verb.startswith("PLAY_FILE")]
+
+
+def test_a_rows_button_loops_the_seeds_of_the_row_on_screen_without_leaving_it(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    _sent(show)
+
+    show.show_filter("fox")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "one-b.png"]
+    assert _plays(show) == []
+    assert said == ["Looping seeds: 2"]
+
+
+def test_a_rows_button_plays_that_rows_picture_even_with_no_seeds_to_loop(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    _sent(show)
+
+    show.show_filter("dawn")
+
+    assert _sent(show) == ["PLAY_FILE one-x.png"]
+    assert show.hud_prompt_id == "id-1x"
+    assert said == ["Nothing to loop"]
+
+
+def test_a_rows_button_lets_go_of_a_hold_before_it_moves(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.show_filter("dawn")
+
+    assert _sent(show) == ["LOCK_OFF", "PLAY_FILE one-x.png"]
+
+
+def test_a_rows_button_no_row_wears_says_so_and_moves_nothing(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    _sent(show)
+
+    show.show_filter("nobody")
+
+    assert (_sent(show), said) == ([], ["Nothing to loop"])
+
+
+def test_the_pass_is_as_long_as_what_the_player_was_handed(qtbot, tmp_path):
+    assert _show(qtbot, tmp_path).pass_size() == 3
+
+
+def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    show.show_loop("seed")
+
+    show.show_loop("")
+    show.show_loop("")
+
+    assert said == ["Looping seeds: 2", "Loop off"]
+
+
+def test_a_loop_asked_of_an_item_with_nothing_beside_it_says_so(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, say=said.append)
+    _sent(show)
+
+    show.show_loop("seed")
+
+    assert (_sent(show), said) == ([], ["Nothing to loop"])
+
+
+def test_the_loop_key_is_the_hold_where_there_is_nothing_to_loop(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, say=said.append)
+    _sent(show)
+
+    show.show_loop_cycle()
+    show.show_loop_cycle()
+
+    assert [verb for verb in _sent(show) if verb.startswith("LOCK")] == ["LOCK_ON", "LOCK_OFF"]
+    assert said == ["Locked", "Unlocked"]
+
+
+def test_more_seeds_hands_the_player_the_wider_row(qtbot, tmp_path):
+    said = []
+    beyond = (Slide("far.png", "image", "id-far"),)
+    show = _show(qtbot, tmp_path, say=said.append, actions=ShowActions(
+        neighbors=_around, widen=lambda pid: beyond if pid == "id-1" else ()))
+
+    show.show_more_seeds()
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "one-b.png", "far.png"]
+    assert said == ["More seeds"]
+
+
+def test_more_seeds_with_nothing_beyond_the_row_says_so(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, say=said.append, actions=ShowActions(neighbors=_around))
+    _sent(show)
+
+    show.show_more_seeds()
+
+    assert (_sent(show), said) == ([], ["Widening net failed"])
+
+
+def test_a_walk_along_the_map_plays_the_next_cell(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    _sent(show)
+
+    show.show_nav("right")
+
+    assert _sent(show) == ["PLAY_FILE one-b.png"]
+    assert show.hud_prompt_id == "id-1b"
+
+
+def test_a_walk_off_a_held_item_lets_go_of_it_first(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.show_nav("down")
+
+    assert _sent(show) == ["LOCK_OFF", "PLAY_FILE one-x.png"]
+
+
+def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, say=said.append)
+    _sent(show)
+
+    show.show_nav("right")
+
+    assert (_sent(show), said) == ([], ["Nothing that way"])

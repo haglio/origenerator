@@ -81,38 +81,37 @@ def test_a_show_handed_no_acts_at_all_just_does_less(qtbot):
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", looping=False,
-                                      favorite_ids={"id-b"}))
+                         hud=HudFacts(order_label="Latest", favorite_ids={"id-b"}))
     qtbot.addWidget(view)
 
     assert view.hud_order_label == "Latest"
-    assert view.hud_looping is False
     assert view.hud_is_favorite is False   # id-a is on screen, id-b is the star
     view.step(1)
     assert view.hud_is_favorite is True
 
 
-def test_the_hud_facts_default_to_a_shuffled_loop_of_nothing_favorite(qtbot):
+def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
+    # And not looping: a loop is one axis of the map played round and round,
+    # started from the show, never a fact about the set it was handed.
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
-    assert (view.hud_order_label, view.hud_looping) == ("Shuffle", True)
+    assert (view.hud_order_label, view.hud_map().loop) == ("Shuffle", "")
     assert view.hud_is_favorite is False
 
 
 def test_retuning_a_show_dresses_it_as_a_base_state(qtbot):
     # A hosted reset points the show at the region's base set, which is one KIND
-    # of set and always the same one: shuffled, and not a loop anyone asked for.
-    # Its two callers used to spell that out and could have disagreed; there is
-    # one answer now, and the favorites it already had are not part of it.
+    # of set and always the same one: shuffled.  Its two callers used to spell
+    # that out and could have disagreed; there is one answer now, and the
+    # favorites it already had are not part of it.
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", looping=True,
-                                      favorite_ids={"id-c"}))
+                         hud=HudFacts(order_label="Latest", favorite_ids={"id-c"}))
     qtbot.addWidget(view)
 
     view.retune([("c.png", "image", "id-c", None)])
 
-    assert (view.hud_order_label, view.hud_looping) == ("Shuffle", False)
+    assert view.hud_order_label == "Shuffle"
     assert view.hud_is_favorite is True   # the stars survive a reset
 
 
@@ -122,4 +121,4 @@ def test_neither_record_can_be_edited_after_it_is_handed_over(qtbot):
     with pytest.raises(FrozenInstanceError):
         ShowActions().delete = print
     with pytest.raises(FrozenInstanceError):
-        HudFacts().looping = False
+        HudFacts().order_label = "Latest"

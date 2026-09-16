@@ -16,12 +16,15 @@ for is the pair of things that address a SESSION, and each is answered rather
 than faked — see :func:`show_hud_model` for the mode row and
 :meth:`ShowHud._act_here` for the transport.
 
-The map speaks the players' vocabulary because the show's set IS those
-concepts: the set's first item anchors the corner, the rest run right as the
-seed row with their real ordinals ("Seed 2" over the second item), the counts
-corner says "Seeds: N" for the whole set, and the cell actually on screen is
-the lit one — exactly a satellite playing through a seed family.  A thumbnail
-click jumps the show to that item, the way a map click switches a player.
+The map is the players' map drawn over this app's generations
+(:mod:`origenerator.gui.show_map`): the slide on screen in the corner, the
+same configuration under other seeds running right as the seed row, the same
+seed under other configurations running down as the column, the loop button
+lit for whichever axis is playing round and round, and the cell actually on
+screen the lit one — exactly a satellite mapping its clip against its
+library.  A thumbnail click jumps the show to that item, the way a map click
+switches a player, and the map's own chrome — the two loop buttons and the
+expand mark — means here what it means there.
 
 It is the ONE panel a show wears.  Fun Time splits what is here across two
 windows — each satellite's HUD for the set, the main player's console for the
@@ -70,6 +73,8 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.gui.show_buttons import answer, show_rows
+from origenerator.gui.show_map import CONFIG_AXIS, SEED_AXIS
+from origenerator.gui.show_set import thumb_of
 from origenerator.ui_scale import (
     to_bitmap_pos,
     to_logical_size,
@@ -82,16 +87,42 @@ _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 # scrolls and the panel has to keep up with it.
 _MOVING = frozenset({Osr2State.ROBOT_HAND, Osr2State.FUNSCRIPT})
 
-# The presses a show answers for itself wherever it is drawn.  The transport is
-# the other half, which a hosted window hands to its session instead.
-_THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "shuffle", "latest",
-                            "no_loop", "seed_loop", "play_video", "lock_video"})
+# The presses a show answers for itself wherever it is drawn: the two filters,
+# reset, the order pair, the loops, the expand mark, the map's own clicks and
+# its keys.  The transport is the other half, which a hosted window hands to
+# its session instead.
+_THE_SHOWS_OWN = frozenset({
+    "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
+    "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
+    "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
+    "cycle_action",
+})
+
+# The map's second axis, in the players' spelling: their column is the
+# subject's other acts, and the panel names it so wherever it says which axis
+# a loop or a lit cell is on.
+_PANEL_AXIS = {CONFIG_AXIS: "action"}
+
+
+def _cell(slide, label: str = "") -> HudCell:
+    return HudCell(path=str(slide.path), thumb=thumb_of(slide), label=label)
+
+
+def split_press(side: str, verb: str, argument: str = "") -> tuple[str, str]:
+    """A press as the panel spells it, taken apart into what it asks and what
+    it carries: ``<side>_<action>`` and its ``|`` payload for most, and — the
+    one verb spelled the other way round — ``filter_<side>_<row>``, whose
+    payload is the row it names."""
+    filtering = f"filter_{side}_"
+    if verb.startswith(filtering):
+        return "filter", verb[len(filtering):]
+    return verb.removeprefix(f"{side}_"), argument
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
                    own_window: bool = True, device=None) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
-    with nothing to map (``hud_items`` empty or unanswered).
+    with nothing to map (``hud_map`` unanswered).
 
     *hosted* is whether a Fun Time session is under the show and *own_window*
     whether this app is drawing it in a window of its own; together they decide
@@ -109,32 +140,26 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     the session's own main console, and any reading of the model that only wants
     the set.
     """
-    cells, position, locked = host.hud_items()
-    if not cells:
+    shown = host.hud_map()
+    if shown is None:
         return None  # a host with no set under it, and so nothing to map
-    hud_cells = tuple(
-        HudCell(path=str(path), thumb=str(thumb) if thumb else "")
-        for path, thumb in cells
-    )
+    locked = host.locked
     favorites_filter = host.hud_favorites_filter
     enhanced = host.hud_enhanced_mode
     order_label = host.hud_order_label
-    # A show someone ASKED for is a loop -- this set, played round and round --
-    # and the map's loop button is lit for it.  A region's base state is not:
-    # it is that side browsing its whole library, exactly what a satellite does
-    # with no loop on, so the button is dark and the line just names the order.
-    looping = host.hud_looping
-    # The line says what the light says, in the words a satellite says it in --
-    # the two HUDs are one HUD in two places.  Nothing playing_set when nothing
-    # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
-    # satellite browsing its library does.
+    loop = _PANEL_AXIS.get(shown.loop, shown.loop)
+    bucket, index = shown.playing
     return HudModel(
         player=side,
         locked=locked,
-        # The line names both narrowings beside the rest — F-mode over the
-        # favorites, and the enhanced-only switch a show's HUD is the one panel
-        # here to carry.
-        lock_label=status_line(playing_set=looping_label("seed") if looping else "",
+        # The line says what the map's light says, in the words a satellite
+        # says it in -- the two HUDs are one HUD in two places.  Nothing
+        # playing_set when nothing is looping, so a show browsing its set reads
+        # "Unlocked · Shuffle" exactly as a satellite browsing its library does;
+        # and it names both narrowings beside the rest — F-mode over the
+        # favorites, and the enhanced-only switch a show's HUD is the one
+        # panel here to carry.
+        lock_label=status_line(playing_set=looping_label(shown.loop) if shown.loop else "",
                                locked=locked, order=order_label,
                                f_mode=favorites_filter, enhanced=enhanced),
         # The players' favorite star, over the same collection the Favorites
@@ -154,16 +179,19 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         osr2=device.osr2 if device is not None else "",
         osr2_control=device.osr2_control if device is not None else "",
         drive=device.drive if device is not None else None,
-        corner=hud_cells[0],
-        seeds=hud_cells[1:],
-        seed_count=len(hud_cells),
-        playing=("corner", 0) if position <= 1 else ("seed", position - 2),
-        # Lit only while a set someone asked for is playing: on a player the
-        # button starts a loop, and here that loop is already what is
-        # happening, so the light says so and a press ends it — the button
-        # meaning the same thing on both, "stop looping this row".  Dark in the
-        # base state, where nothing is being looped.
-        active_loop="seed" if looping else "",
+        corner=_cell(shown.corner),
+        seeds=tuple(_cell(slide) for slide in shown.seeds),
+        actions=tuple(_cell(slide, label)
+                      for slide, label in zip(shown.configs, shown.config_labels)),
+        current_action=shown.label,
+        # The row the show is narrowed to — a satellite's act filter, here the
+        # configuration whose seed row is looping — so its button lights and a
+        # second press on it lifts the loop rather than starting it again.
+        filter_query=shown.label if shown.loop == SEED_AXIS else "",
+        seed_count=len(shown.seeds) + 1,
+        action_count=len(shown.configs) + 1,
+        playing=(_PANEL_AXIS.get(bucket, bucket), index),
+        active_loop=loop,
     )
 
 
@@ -212,6 +240,11 @@ class ShowHud(QLabel):
         model = show_hud_model(self._side, self._host,
                                hosted=self._dashboard_cmd_file is not None,
                                device=self._host.hud_device)
+        # The loop and filter buttons toggle off what they read as lit, so the
+        # clicks mirror the show's loop the way a player's mirror its published
+        # panel.
+        self._clicks.active_loop = model.active_loop if model is not None else ""
+        self._clicks.active_filter = model.filter_query if model is not None else ""
         if model != self._model:
             self._model = model
             self._draw()
@@ -333,11 +366,11 @@ class ShowHud(QLabel):
         if not command:
             return
         verb, _, path = command.partition("|")
-        action = verb.removeprefix(f"{self._side}_")
+        action, path = split_press(self._side, verb, path)
         if action in _THE_SHOWS_OWN:
-            # The two filters, reset, the loop button and the map's own clicks
-            # mean on a show what they mean on a player, and the show owns what
-            # each is — so they land here, hosted or not.
+            # The two filters, reset, the loops, the expand mark and the map's
+            # own clicks mean on a show what they mean on a player, and the
+            # show owns what each is — so they land here, hosted or not.
             answer(self._host, action, path)
             self._tick()
             return

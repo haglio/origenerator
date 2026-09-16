@@ -110,16 +110,27 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
     return (_mode_row(), band) if mode_row else (band,)
 
 
+# The map's own chrome and the session's own keys, in the players' spelling,
+# each with the axis or the direction it means on a show.  The players' second
+# axis is their action column; here it is the config column, the same seed
+# under other configurations.
+_LOOPS = {"seed_loop": "seed", "action_loop": "config", "no_loop": ""}
+_NAV = {"nav_left": "left", "nav_right": "right", "nav_up": "up", "nav_down": "down",
+        # The players' spoken "next seed" / "next action": one step along the
+        # row, one step down the column.
+        "cycle_seed": "right", "cycle_action": "down"}
+
+
 def answer(host, action: str, argument: str = "") -> bool:
     """Do what a press on a show's panel asks of *host*, by the name its verb
     carries after the side ("next", "fmode", "play_video"), and say whether the
     show had an answer.
 
     One table for every way a press reaches a show — its own window's panel,
-    and a session routing a player's panel back here — so a button means the
-    same thing whichever of them drew it.  ``False`` for minimize, which is a
-    window's rather than a show's, and for the map's own chrome that no show
-    has a counterpart for.
+    a session routing a player's panel back here, and the session's own keys
+    — so a button means the same thing whichever of them drew it.  ``False``
+    for minimize, which is a window's rather than a show's, and for the
+    players' chrome about acts, which a show has no counterpart for.
     """
     if action in ("prev", "next"):
         host.show_step(-1 if action == "prev" else 1)
@@ -135,14 +146,20 @@ def answer(host, action: str, argument: str = "") -> bool:
         host.toggle_favorites_filter()
     elif action == "enhanced":
         host.toggle_enhanced_mode()
-    elif action in ("no_loop", "seed_loop"):
-        # Stop looping this row: the side goes back to what it does when
-        # nothing is looping, which is browse its whole library -- the same
-        # place its reset leads, and what the press means on a player.  Pressed
-        # while nothing is looping it is the dark button it looks like: a show
-        # cannot start a loop it is not in.
-        if host.hud_looping:
-            host.show_reset()
+    elif action in _LOOPS:
+        host.show_loop(_LOOPS[action])
+    elif action == "loop":
+        host.show_loop_cycle()
+    elif action == "more_seeds":
+        host.show_more_seeds()
+    elif action == "filter":
+        # The button at the head of a map row: narrow to that configuration,
+        # the way a satellite's narrows to that act.
+        host.show_filter(argument)
+    elif action == "no_filter":
+        host.show_loop("")
+    elif action in _NAV:
+        host.show_nav(_NAV[action])
     elif action in ("cycle_version", "cycle_version_back"):
         host.show_step_version(-1 if action.endswith("_back") else 1)
     elif action in ("play_video", "lock_video"):

@@ -389,6 +389,17 @@ def _folder_stems(names, memo: dict) -> frozenset[str]:
     return frozenset(stems)
 
 
+def _positive_stems(row: dict, params: dict) -> frozenset[str]:
+    return frozenset(_stems(_prompt_text(row, params, "positive_prompt")))
+
+
+def content_stems(row: dict) -> frozenset[str]:
+    """The words *row*'s prompt is about, stemmed and with the filler out — what
+    two generations' prompts are compared on to say how alike they read
+    (:mod:`origenerator.nav_map`)."""
+    return _positive_stems(row, gallery.parse_params(row.get("params_json"))) - _STOP_WORDS
+
+
 def _build_entry(row: dict) -> _Entry:
     params = gallery.parse_params(row.get("params_json"))
     seeds = {str(params.get(key)) for key in ("seed", "noise_seed")
@@ -397,7 +408,7 @@ def _build_entry(row: dict) -> _Entry:
         seeds.add(str(row["seed"]))
     return _Entry(
         row=row,
-        positive=frozenset(_stems(_prompt_text(row, params, "positive_prompt"))),
+        positive=_positive_stems(row, params),
         recipe=frozenset(_recipe_stems(row, params)),
         seeds=frozenset(seeds),
     )

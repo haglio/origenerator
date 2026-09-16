@@ -29,10 +29,10 @@ _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_whe
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 
-# --- player_core reads this off the motion state this app writes it on ---
-# `cruise_control` asks `direct.playing` whether the motion is running before it
-# advances the wave stack; nothing here reads it back.
-_.playing  # noqa  # origenerator/gui/osr2_motion_driver.py:146, origenerator/gui/osr2_motion_driver.py:163
+# --- player_core reads this off the click tracker this app mirrors it onto ---
+# `satellite_hud.HudClicks.press` compares a row's filter press against it to
+# decide between narrowing and lifting; nothing here reads it back.
+_.active_filter  # noqa  # origenerator/gui/show_hud.py:207
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `gallery_view._VOICE_MOTION` maps AppCommand.CRUISE_ON/CRUISE_OFF to the string

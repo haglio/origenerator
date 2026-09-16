@@ -11215,6 +11215,46 @@ def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
     assert view._osr2_motion.active is False
 
 
+def _handoff_log(view, driver):
+    """Every take and give-back of the device by either driver, in order."""
+    log = []
+    for name, owner, method in (("script takes", driver, "start"),
+                                ("script lets go", driver, "stop"),
+                                ("motion takes", view._osr2_motion, "start"),
+                                ("motion lets go", view._osr2_motion, "stop")):
+        def logged(*args, _inner=getattr(owner, method), _name=name):
+            log.append(_name)
+            return _inner(*args)
+        setattr(owner, method, logged)
+    return log
+
+
+def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
+    """Each driver puts back what it found when it took the device -- the OSR2's
+    auto flag among it -- so one that takes over before the other has let go
+    finds the device already taken, and later puts that back.  A hold handed to
+    a script that way left OSR2 auto switched off for every app."""
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_PARKED)
+    log = _handoff_log(view, driver)
+
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    assert log == ["motion lets go", "script takes"]
+
+
+def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_DRIVING)
+    log = _handoff_log(view, driver)
+
+    view.osr2_control.set_state(OSR2_PARKED)
+
+    assert log == ["script lets go", "motion takes"]
+
+
 def test_every_console_over_the_device_hears_that_it_was_re_aimed(qtbot):
     """The panel redraws on this: which driver has the device moves with the
     video in front, not only with a press."""

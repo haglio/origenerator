@@ -468,7 +468,7 @@ class GalleryView(QWidget):
         self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._browser.tab_pin_requested.connect(self.pin_config_tab)
         self._browser.item_jump_requested.connect(self.follow_link)
-        self._browser.folder_open_requested.connect(self._open_folder_tile)
+        self._browser.folder_open_requested.connect(self._go_to_folder)
         self._browser.reveal_reroll_requested.connect(self._reveal_reroll)
         self._browser.folder_menu_requested.connect(self._folder_context_menu)
         self._browser.menu_requested.connect(self.generation_menu)
@@ -1022,6 +1022,9 @@ class GalleryView(QWidget):
         # folder's own re-roll slot and navigate there, live tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
         self._info_tabs.changes_requested.connect(self._on_changes_requested)
+        # ...and its right-click's "Go to folder" goes the other way: from a
+        # tab's settings across to the pictures they have made.
+        self._info_tabs.folder_requested.connect(self._go_to_folder)
         # The find strip, at the foot of the info pane where the prompts it
         # searches are. Ctrl+F opens it over the front tab's prompt fields; it
         # takes no room until then, and closing it clears every mark it painted.
@@ -2158,12 +2161,16 @@ class GalleryView(QWidget):
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group))
 
-    def _open_folder_tile(self, key: str):
-        """A folder tile was clicked: select its tree row, which draws the folder.
-        Clicking one is a decision to go there, so it puts a running search away
-        first — a search's results are folder tiles too, and this is how they
-        open; without it the field would still be full while the pane shows the
-        folder it drilled into."""
+    def _go_to_folder(self, key: str):
+        """Go to a folder: select its tree row, which draws it.
+
+        The one move under every gesture that names a folder to open — a folder
+        tile's click, a config tab's "Go to folder" — as :meth:`_go_to_generation`
+        is the one under every gesture that names a picture. Each is a decision
+        to go there, so a running search is put away first: a search's results
+        are folder tiles too, and this is how they open; without it the field
+        would still be full while the pane shows the folder it drilled into.
+        """
         item = self._tree_item_for(key)
         if item is not None:
             self._search.leave()

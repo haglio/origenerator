@@ -5,10 +5,12 @@ workflow and set params — with no special or permanent tab. The pane always ho
 at least one: closing the last tab opens a fresh blank one in its place, so the
 resting state is a whole generate form waiting on a workflow rather than an empty
 black rectangle. That is why there is no "+" — a tab is always there. A tab's
-right-click menu closes the others, everything to its right, or all of them,
-listing only what that tab can actually do, and tabs drag along the row to
-reorder. Closing all of them is not an empty pane either: the resting tab takes
-their place, which is what "close all" means where one tab is always open.
+right-click menu goes to the gallery folder that tab's settings have been
+generating into — the way across from a tab to the pictures it has made — and
+closes the others, everything to its right, or all of them, listing only what
+that tab can actually do. Tabs drag along the row to reorder. Closing all of
+them is not an empty pane either: the resting tab takes their place, which is
+what "close all" means where one tab is always open.
 
 Tabs open the way an IDE opens files, so browsing doesn't pile up a row of them. A single-clicked generation lands in the *preview* tab, drawn in italic:
 the next single click replaces it. A click on a folder's live tile lands the
@@ -126,6 +128,9 @@ class InfoPaneTabs(QTabWidget):
     # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
     # run per picture in that folder rather than one run of these settings.
     changes_requested = pyqtSignal(str, str, dict)
+    # A tab's "Go to folder": the key of the folder its settings have been
+    # generating into. The tab names it; the gallery, which owns the tree, goes.
+    folder_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None):
@@ -314,14 +319,29 @@ class InfoPaneTabs(QTabWidget):
         self._keep_a_tab_open()
 
     def _tab_menu(self, index: int) -> QMenu:
-        """The right-click menu for the tab at ``index``.
+        """The right-click menu for the tab at ``index``: where its settings
+        have been generating, then what to close.
+
+        "Go to folder" is the one act here — the tab is a folder's settings, and
+        this is how you get from the settings to the pictures they made. It is
+        left off until they have made something, since until then the tree has no
+        row to open (:meth:`GenerateConfigPanel.settings_folder_key`).
 
         Only what this tab can actually do: on the last tab there is nothing to
         its right, and on the only tab there are no others and no all — an entry
         that would close nothing is left out rather than listed dead.
         """
         menu = QMenu(self)
+        panel = self.widget(index)
+        folder = (panel.settings_folder_key()
+                  if isinstance(panel, GenerateConfigPanel) else None)
+        if folder is not None:
+            menu.addAction("Go to folder").triggered.connect(
+                lambda: self.folder_requested.emit(folder)
+            )
         if self.count() > 1:
+            if not menu.isEmpty():
+                menu.addSeparator()  # the act above the line, the closes below it
             menu.addAction("Close others").triggered.connect(
                 lambda: self._close_other_subtabs(index)
             )

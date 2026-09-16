@@ -6084,6 +6084,40 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
     assert _selected_folder(view) == folder    # navigated to at once, mid-generation
 
 
+# --- a tab's right-click: across to the folder its settings generate into -----
+
+def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_path):
+    # The way across from an open generate tab to the pictures it has made.
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    folder = _select_first_leaf(view)            # the folder 'orig' lives in
+    panel = view._info_tabs.current_config_panel()
+    panel.prefill("sdxl_t2i",
+                  dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # navigate away first
+
+    view._info_tabs.folder_requested.emit(panel.settings_folder_key())
+
+    assert _selected_folder(view) == folder
+
+
+def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
+    # It is a decision to go somewhere, so the hits it was raised over stop
+    # standing over the folder it opens.
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel.prefill("sdxl_t2i",
+                  dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
+    _search_for(view, "cat")
+
+    view._info_tabs.folder_requested.emit(panel.settings_folder_key())
+
+    assert view._search.field.text() == ""
+
+
 # --- voice steering: Auto is voice's "on"; utterances steer the loop's prompt --
 
 def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):

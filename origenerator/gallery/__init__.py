@@ -95,6 +95,7 @@ from origenerator.gallery.groups import (
 )
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
+    config_folder_key,
     config_folder_name,
     config_tab_title,
     item_label,
@@ -189,6 +190,7 @@ __all__ = [
     "child_groups",
     "combined_params",
     "command_bias",
+    "config_folder_key",
     "config_folder_name",
     "config_tab_title",
     "curated_params",

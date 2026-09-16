@@ -1256,7 +1256,7 @@ class BrowserPane(QObject):
 
     def _drill_into(self, key: str):
         """Open a folder tile's folder — the view answers by selecting its tree
-        row (:meth:`GalleryView._open_folder_tile`)."""
+        row (:meth:`GalleryView._go_to_folder`)."""
         self.folder_open_requested.emit(key)
 
     def visible_prompt_ids(self) -> list[str]:

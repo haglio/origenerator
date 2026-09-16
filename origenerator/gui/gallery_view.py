@@ -1506,6 +1506,12 @@ class GalleryView(QWidget):
         straight at it showed neither the discard button nor a filling Generate
         while the pane beside it streamed the very frames it was making. Only a
         matching folder claims it, so a tab parked on other settings is untouched.
+
+        A tab that claims one is kept, for the reason a tab that pressed its own
+        Generate is: the run's Cancel and its filling bar are in it now, and a
+        later click replacing the tab would take both away mid-run. Since opening
+        a folder puts the pane's italic tab on that folder, the claimer usually is
+        that tab.
         """
         panel = self._info_tabs.current_config_panel()
         job = self._reroll.newest_job_for(key)
@@ -1513,6 +1519,7 @@ class GalleryView(QWidget):
             return
         if self._panel_reroll_key(panel) == key:
             panel.note_launched(job.origin)
+            self._info_tabs.pin_current_tab()
             self._reconcile_generating()  # the launch's own reconcile ran before this
 
     def _cancel_panel_reroll(self, panel):
@@ -1582,20 +1589,36 @@ class GalleryView(QWidget):
                 self._db.set_recipe_source(prompt_id, category=category,
                                            video_prompt_id=video_id)
             launching.note_launched(self._reroll.newest_job_for(key).origin)
-        self._navigate_to_reroll(key)
+        self._stand_on_the_run_in(key, rebuild=True)
 
-    def _navigate_to_reroll(self, key: str):
-        """Open the folder a just-started re-roll runs in and select its live tile.
+    def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
+        """Open the folder ``key`` names and land on the run cooking in it,
+        saying whether the tree had a row to open at all.
 
-        The re-roll inserts a running row, so a rebuild gives even a brand-new
-        folder a node (:func:`build_gallery_tree` includes in-flight rows); this
-        rebuilds, then drills into that folder and points the info pane at the tile.
+        The ways here are one move — a Generate, a folder's prompt rewrite, a
+        combine's launch, the looping-folder link, a click on an in-flight card —
+        and in all of them the open is a step on the way to that run's tile rather
+        than somewhere browsed to. So it lands on no saved item of its own
+        (:meth:`_land_on_the_first_item`): one loaded here would paint a picture
+        nobody asked for over the very tab the run belongs to, and re-seed that
+        tab's form from a saved row mid-run. The folder is a stop and a visit all
+        the same, both recorded once the tile is picked.
+
+        ``rebuild`` first, for a run just started: it inserts a running row, and a
+        rebuild is what gives even a brand-new settings folder a node
+        (:func:`build_gallery_tree` includes in-flight rows).
         """
-        self.refresh()
+        if rebuild:
+            self.refresh()
         item = self._tree_item_for(key)
-        if item is not None:
+        if item is None:
+            return False
+        with self._navigation.off_the_record():
             self._tree.setCurrentItem(item)
-            self._select_reroll(key)
+        self._note_folder_visit(self._tree_view.selected_folder_key())
+        self._select_reroll(key)
+        self._navigation.record()
+        return True
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -2115,10 +2138,6 @@ class GalleryView(QWidget):
         # return-after-delete trail record.
         here = self._tree_view.selected_folder_key()
         self._note_folder_visit(here if group is not None else None)
-        if group is not None:
-            # A folder is somewhere the user went, so Back can return to it — and
-            # so leaving a shelf for one is a step Back can undo at all.
-            self._navigation.record()
         self._title.set_display(self._tree_view.breadcrumb(current))
         # The path ends in a code, so what the folder holds — the prompt its
         # generations ran, and the settings that set it apart from its siblings —
@@ -2126,7 +2145,37 @@ class GalleryView(QWidget):
         self._title.setToolTip(gallery.folder_detail(group) if group else "")
         self._update_folder_average(group)
         self._show_group_contents(group)
+        landed = self._land_on_the_first_item()
+        if group is not None:
+            # A folder is somewhere the user went, so Back can return to it — and
+            # so leaving a shelf for one is a step Back can undo at all. The item
+            # it landed on goes on the stop with it, so coming back lands there
+            # too rather than on a folder with nothing picked in it.
+            self._navigation.record(landed)
         self._re_aim()
+
+    def _land_on_the_first_item(self) -> str | None:
+        """Pick the folder's first generation and show it, returning which one —
+        ``None`` where the folder has none to pick.
+
+        Opening a folder is opening what is in it, so the first tile lands
+        selected and on the form, exactly as clicking it would. A folder of
+        sub-folders has no generation of its own on screen and lands on nothing.
+
+        Skipped while a rebuild or a Back/Forward is what re-drew the folder:
+        those restore the item that stop was recorded with (or none at all), and
+        a landing of our own would overwrite it.
+        """
+        if self._navigation.suppressed:
+            return None
+        first = next(iter(self._browser.visible_prompt_ids()), None)
+        if first is None or not self._show_generation(first):
+            return None
+        # Picked rather than revealed: the first tile leads a pane just drawn, so
+        # there is nothing to scroll to, and the highlight is the whole of what
+        # "selected" means here.
+        self._browser.apply_selection(first, Qt.KeyboardModifier.NoModifier)
+        return first
 
     def _open_shelf(self, base: str, orientation: str | None):
         """Show one side's copy of a shelf: dress the header, clear the info
@@ -2623,7 +2672,7 @@ class GalleryView(QWidget):
         logger.info("Requested changes to %s: %d of %d images queued into %s",
                     folder_key, launched, len(rows), key)
         if launched:
-            self._navigate_to_reroll(key)
+            self._stand_on_the_run_in(key, rebuild=True)
 
     def _job_source_picture(self, job) -> str | None:
         """A file showing what ``job`` came from, for the tile to stand blurred
@@ -2886,7 +2935,7 @@ class GalleryView(QWidget):
         """
         key = self._auto.active_key()
         if key is not None:
-            self._navigate_to_reroll(key)
+            self._stand_on_the_run_in(key, rebuild=True)
 
     def rows_to_play(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
@@ -3277,11 +3326,9 @@ class GalleryView(QWidget):
         combination with no folder yet, so park on Recents — where its in-flight
         card shows — and remember the key for :meth:`_on_reroll_finished` to drill
         into once the finished row gives the folder a node."""
-        item = self._tree_item_for(key)
-        if item is not None:
-            self._tree.setCurrentItem(item)  # existing folder: watch the live tile
-            self._select_reroll(key)
-        elif (recents := self._shelf_item(_RECENTS_KEY, self._launched_side(key))) is not None:
+        if self._stand_on_the_run_in(key):
+            return  # an existing folder: watch the live tile there
+        if (recents := self._shelf_item(_RECENTS_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
             self._tree.setCurrentItem(recents)
 
@@ -3308,18 +3355,12 @@ class GalleryView(QWidget):
         up, which reads as the click doing nothing at all.
         """
         self._search.leave()
-        item = self._tree_item_for(key)
-        if item is None:
-            # A folder the tree has not drawn yet: the first run in a brand-new
-            # settings folder makes the node, and this click can land in the
-            # gap.  Rebuild and ask once more rather than dropping the gesture.
-            self.refresh()
-            item = self._tree_item_for(key)
-        if item is None:
+        # The second try rebuilds: a folder the tree has not drawn yet — the first
+        # run in a brand-new settings folder makes the node — is a gap this click
+        # can land in, and rebuilding beats dropping the gesture.
+        if not (self._stand_on_the_run_in(key)
+                or self._stand_on_the_run_in(key, rebuild=True)):
             logger.info("Nothing to reveal for %s: no folder row", key)
-            return
-        self._tree.setCurrentItem(item)  # shows the folder and its re-roll tile
-        self._select_reroll(key)
 
     def _select_reroll(self, key: str, *, land: bool = True):
         """Make a running re-roll's tile the selected item, and show the run
@@ -4323,25 +4364,37 @@ class GalleryView(QWidget):
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         """A generation was picked, wherever it was picked — in a folder, on a
-        shelf, among a search's hits, through a followed link, by a step Back:
-        it becomes the selected item and loads into a config tab, its output in
-        the preview, its settings in the form, a footer for its media type.
-        Which tab is :meth:`InfoPaneTabs.load_selection`'s to say — the one
-        already on this row's folder, else the pane's preview tab — and a tab is
-        only ever painted through there: no tab's preview is repainted from the
-        outside, so what a tab shows is always what that tab is for.
+        shelf, among a search's hits, through a followed link, by a step Back.
         """
-        row = self.row_for(prompt_id)
-        if not row:
+        if not self._show_generation(prompt_id):
             return
-        self._select_saved_generation(row)
-        self._info_tabs.load_selection(row, self._image_rows,
-                                       request=self._request_for(prompt_id))
         # Each generation looked at is its own browsing step, wherever it was
         # looked at: in a folder, on a shelf, or among a search's hits. The view it
         # was picked in goes on the stack with it, so Back returns to the item AND
         # to the pane it was one of — not to some other folder that also holds it.
         self._navigation.record(prompt_id)
+
+    def _show_generation(self, prompt_id: str) -> bool:
+        """Make a generation the selected item and load it into a config tab —
+        its output in the preview, its settings in the form, a footer for its
+        media type — saying whether the gallery still has a row for it.
+
+        Which tab is :meth:`InfoPaneTabs.load_selection`'s to say — the one
+        already on this row's folder, else the pane's preview tab — and a tab is
+        only ever painted through there: no tab's preview is repainted from the
+        outside, so what a tab shows is always what that tab is for.
+
+        The move itself, with no step recorded: a click records the stop it made,
+        while a folder opening onto its first item records that landing as part
+        of the folder's own stop rather than as a second one beside it.
+        """
+        row = self.row_for(prompt_id)
+        if not row:
+            return False
+        self._select_saved_generation(row)
+        self._info_tabs.load_selection(row, self._image_rows,
+                                       request=self._request_for(prompt_id))
+        return True
 
     def _select_saved_generation(self, row: dict):
         """Make a saved generation the gallery's selected item, in place of any

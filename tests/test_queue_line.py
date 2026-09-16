@@ -121,55 +121,65 @@ def test_an_unclassifiable_job_is_treated_as_an_image():
     assert queue_line.next_ready([bare], videos_held=True) is bare
 
 
-# --- what gives the machine up --------------------------------------------------
+# --- what takes the machine ------------------------------------------------------
 
-def test_a_video_being_rendered_yields_to_the_users_image():
-    # Minutes of GPU, most of it already spent, against seconds the user is
-    # sitting waiting for: the user's own words for this queue are that their
-    # work goes first, whatever it costs a video.
-    assert queue_line.yields_to(_video(), _image()) is True
-
-
-def test_a_video_keeps_the_machine_from_another_video():
-    # Asking for a video is asking for "later", whatever is running -- and the
-    # start frame of one is the opening of a video, not a picture to wait for.
-    assert queue_line.yields_to(_video(), _video()) is False
-    assert queue_line.yields_to(_video(), _video_frame()) is False
+def test_the_users_image_work_takes_the_machine_from_whatever_is_rendering():
+    # Seconds the user is sitting waiting for, against anything already on the
+    # GPU: the user's own words for this queue are that their work goes first
+    # while they are working, whatever that costs the run under way.
+    assert queue_line.takes_the_front(_image()) is True
 
 
-def test_an_image_being_rendered_yields_to_nothing():
-    # Seconds from done: the newcomer waits less than starting over would cost.
-    assert queue_line.yields_to(_image(), _image()) is False
+def test_a_video_asked_for_takes_the_machine_from_nothing():
+    # Asking for a video is asking for "later" -- and the start frame of one is
+    # the opening of a video, not a picture to wait for.
+    assert queue_line.takes_the_front(_video()) is False
+    assert queue_line.takes_the_front(_video_frame()) is False
 
 
-def test_a_videos_start_frame_being_drawn_yields_to_nothing():
-    # The prompt on the GPU is a still, seconds from done; the video it opens
-    # has not started, and joins the line after the image like any video.
-    assert queue_line.yields_to(_video_frame(), _image()) is False
-
-
-def test_nothing_yields_to_work_nobody_asked_for():
+def test_work_nobody_asked_for_takes_the_machine_from_nothing():
     for source in ("experiment", "base_render"):
-        assert queue_line.yields_to(_video(), _job("image", source)) is False
-
-
-def test_an_unclassifiable_running_job_yields_to_nothing():
-    # Read as an image (see above), and an image is left to finish.
-    assert queue_line.yields_to(SimpleNamespace(), _image()) is False
+        assert queue_line.takes_the_front(_job("image", source)) is False
 
 
 # --- rejoining the line after being set aside -----------------------------------
 
-def test_a_video_set_aside_rejoins_ahead_of_the_videos_still_waiting():
-    # It was in front of them, and the pictures are what it was set aside for.
-    assert queue_line.rejoin_index([_image(), _image(), _video(), _video()]) == 2
+def test_a_video_set_aside_rejoins_after_the_last_picture():
+    # Ahead of the videos still waiting, which it was in front of, and after
+    # every picture and enhancement, which are what it was set aside for.
+    newcomer = _image("new")
+    line = [newcomer, _image("older"), _video(), _video()]
+    assert queue_line.rejoin_index(line, _video(), newcomer) == 2
 
 
-def test_a_video_set_aside_rejoins_behind_every_picture():
-    assert queue_line.rejoin_index([_image()]) == 1
-    assert queue_line.rejoin_index([]) == 0
+def test_a_video_set_aside_rejoins_after_a_picture_a_video_was_dragged_above():
+    # "Not above any other image or enhancement" outranks "top of the videos".
+    newcomer = _image("new")
+    line = [newcomer, _video(), _image("older")]
+    assert queue_line.rejoin_index(line, _video(), newcomer) == 3
 
 
-def test_a_video_set_aside_rejoins_ahead_of_a_waiting_videos_start_frame():
-    # The frame is the opening of a video asked for later than this one.
-    assert queue_line.rejoin_index([_image(), _video_frame()]) == 1
+def test_a_videos_start_frame_set_aside_rejoins_with_the_videos():
+    newcomer = _image("new")
+    assert queue_line.rejoin_index([newcomer, _video()], _video_frame(), newcomer) == 1
+
+
+def test_a_picture_set_aside_rejoins_right_after_the_picture_that_took_its_place():
+    # It was the front until the newcomer took it, so it stays ahead of the
+    # pictures asked for before it, as newest-first already had it.
+    newcomer = _image("new")
+    line = [newcomer, _image("older"), _video()]
+    assert queue_line.rejoin_index(line, _image(), newcomer) == 1
+
+
+def test_a_picture_set_aside_for_a_newcomer_no_longer_in_line_takes_the_front():
+    assert queue_line.rejoin_index([_image("older")], _image(), _image("gone")) == 0
+
+
+def test_work_nobody_asked_for_set_aside_rejoins_at_the_back():
+    # A repair from the last absence, caught rendering, goes back to where it
+    # joined: after everything the user asked for.
+    newcomer = _image("new")
+    line = [newcomer, _video()]
+    for source in ("experiment", "base_render"):
+        assert queue_line.rejoin_index(line, _job("image", source), newcomer) == 2

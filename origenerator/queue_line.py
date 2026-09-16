@@ -31,15 +31,17 @@ when nobody is waiting for a video. So a video that comes up while one plays is
 passed over — every image after it goes first — and with nothing but videos
 left the line simply holds until an image is asked for or the show ends.
 
-The front of the line is not enough on its own, because a video already on the
-GPU holds it for minutes whatever joins after it. So **a video being rendered is
-set aside for the user's image work**: stopped, put back in the line ahead of
-the videos still waiting, and started over once the pictures are done -- a run
-cannot be paused, so what it had rendered is thrown away, however close to done.
-That is the user's own call for this queue: their work goes first while they are
-working, and a video's turn comes when they are not. A video asked for is
-"later" and takes nothing from a video already running, and work nobody asked
-for takes nothing from anything.
+The front of the line is not enough on its own, because a run already on the
+GPU holds it until it is done, minutes for a video. So **whatever is being
+rendered is set aside for the user's image work**: stopped, put back in the
+line, and started over once the pictures are done -- a run cannot be paused, so
+what it had rendered is thrown away, however close to done. That is the user's
+own call for this queue: their work goes first while they are working, and
+everything else's turn comes when they are not. A video set aside goes back
+ahead of the videos still waiting and after every picture; a picture set aside
+goes right after the one that took its place; work nobody asked for goes to
+the back. A video asked for takes the machine from nothing, and so does work
+nobody asked for.
 
 Pure ordering, no Qt and no server: it works on anything carrying a
 ``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose
@@ -64,15 +66,19 @@ def is_video(job) -> bool:
             or getattr(job, "media_type", None)) == MediaType.VIDEO
 
 
-def joins_the_front(job) -> bool:
-    """Whether this job jumps the line: the user's own image work, and only that.
+def _users_own(job) -> bool:
+    """Whether the user asked for this job. A background experiment or a base
+    re-render makes images too, but it is work the user never asked for and
+    there can be a great many of them."""
+    return getattr(job, "source", GenerationSource.GENERATED) == GenerationSource.GENERATED
 
-    A background experiment or a base re-render makes images too, but it is work
-    the user never asked for and there can be a great many of them, so they take
-    the back of the line like anything else.
-    """
-    return (not is_video(job)
-            and getattr(job, "source", GenerationSource.GENERATED) == GenerationSource.GENERATED)
+
+def takes_the_front(job) -> bool:
+    """Whether this job takes the front of the line, and the machine with it:
+    the user's own image work, and only that. Work nobody asked for takes the
+    back of the line like anything else, and a video is "later" whatever it
+    draws first."""
+    return not is_video(job) and _users_own(job)
 
 
 def insertion_index(line: list, job) -> int:
@@ -83,7 +89,7 @@ def insertion_index(line: list, job) -> int:
     point of putting them there — the user asks for a variation because they are
     looking at the one before it.
     """
-    return 0 if joins_the_front(job) else len(line)
+    return 0 if takes_the_front(job) else len(line)
 
 
 def next_ready(line: list, *, videos_held: bool):
@@ -111,18 +117,18 @@ def held_back(line: list, *, videos_held: bool) -> list:
     return [job for job in line if videos_held and is_video(job)]
 
 
-def yields_to(running, newcomer) -> bool:
-    """Whether the job ComfyUI is rendering gives the machine up for ``newcomer``.
+def rejoin_index(line: list, job, newcomer) -> int:
+    """Where ``job``, taken off the machine for ``newcomer``, rejoins ``line``.
 
-    Only a video does, and only to the user's own image work: a picture on the
-    GPU is seconds from done, less than starting over would cost, and a video's
-    start frame is a picture on the GPU whatever run it opens.
+    The user's own picture goes right after the newcomer: it was the front
+    until the newcomer took it. The user's video goes after the last picture,
+    ahead of the videos still waiting: it was in front of those, and the
+    pictures are what it was set aside for. Work nobody asked for goes to the
+    back, where it joined.
     """
-    return joins_the_front(newcomer) and getattr(running, "media_type", None) == MediaType.VIDEO
-
-
-def rejoin_index(line: list) -> int:
-    """Where a video set aside rejoins ``line``: ahead of every video still
-    waiting, which it was in front of, and after the pictures it was set
-    aside for."""
-    return next((index for index, job in enumerate(line) if is_video(job)), len(line))
+    if not _users_own(job):
+        return len(line)
+    if takes_the_front(job):
+        return 1 + next((index for index, other in enumerate(line) if other is newcomer), -1)
+    return 1 + max((index for index, other in enumerate(line) if takes_the_front(other)),
+                   default=-1)

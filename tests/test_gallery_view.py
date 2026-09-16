@@ -5337,6 +5337,10 @@ def _reroll_client():
     client.submit_job = MagicMock(return_value="comfy-X")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
+    # A job set aside for a newer picture asks after its stopped run when its
+    # turn comes round again; answered here, never by a server on the machine.
+    client.fetch_history = MagicMock(return_value={})
+    client.forget_history = MagicMock()
     return client
 
 
@@ -5672,9 +5676,12 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
     _rewritten(view, key)
 
     queued = [job.prompt_id for job in view._reroll.all_jobs]
-    # The one in front is the folder's live tile; the rest each get their own card.
+    # The one in front -- the last asked for, since each picture takes the
+    # machine from the one before -- is the folder's live tile; the rest each
+    # get their own card.
     assert _reroll_tile(view) is not None
-    assert set(view._browser._inflight_cards) == set(queued[1:])
+    in_front = view._reroll.queue_order[0]
+    assert set(view._browser._inflight_cards) == set(queued) - {in_front}
     assert len(queued) == 3
 
 
@@ -10102,13 +10109,17 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     assert all(j.params["input_image"].startswith("image/sdxl_t2i_g") for j in jobs)
     assert {j.params["positive_prompt"] for j in jobs} == {"a cat"}  # the sources' own
 
-    client.job_completed.emit(jobs[0].prompt_id, _ENHANCE_HISTORY)
+    # The one ComfyUI is rendering is the last asked for: each picture takes
+    # the machine from the one before it.
+    running = next(j for j in jobs if j.prompt_id == view._reroll.queue_order[0])
+    waiting = next(j for j in jobs if j is not running)
+    client.job_completed.emit(running.prompt_id, _ENHANCE_HISTORY)
 
     # The finished one FOLDED into its source — the transient job row is gone, and
     # the source image itself now wears the enhanced file (identity untouched) —
-    # while the other keeps running.
-    assert [j.prompt_id for j in view._reroll.all_jobs] == [jobs[1].prompt_id]
-    assert view._db.get_generation(jobs[0].prompt_id) is None
+    # while the other goes on.
+    assert [j.prompt_id for j in view._reroll.all_jobs] == [waiting.prompt_id]
+    assert view._db.get_generation(running.prompt_id) is None
     (upgraded,) = [r for r in view._db.list_generations() if r.get("original_files")]
     files = gallery.row_output_files(upgraded)
     assert files[0]["filename"] == "image_enhance_00001_.png"   # the new face
@@ -10468,9 +10479,11 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     assert settings.startswith("2x · 20 steps · 0.15 redraw")
 
     # An enhance of a DIFFERENT image lands in the same settings folder (both
-    # images share a recipe), so it is this tab's own run it must keep showing.
+    # images share a recipe), so it is this tab's own run it must keep showing:
+    # the newer one takes the machine, and this run reads as waiting again --
+    # its own wait, not the other run's frame.
     view.enhance_items(["g1"])
-    assert panel._pending_enhancement == ("running", b"a frame", settings)
+    assert panel._pending_enhancement == ("queued", None, settings)
 
 
 def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
@@ -10491,18 +10504,20 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
 
     # Both went out — no backlog in here held the second one out of sight — and
     # they landed in the one folder, which is why a tab must not read it by key.
-    leader, follower = view._reroll.all_jobs
+    # The second asked for leads: each picture takes the machine from the one
+    # before it, which waits after it.
+    follower, leader = view._reroll.all_jobs
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._reroll.jobs) == 1
     # The one after it counts too — and reads as queued, since it isn't rendering.
-    assert view._enhance.run_of(db.get_generation("g1")).status == "queued"
+    assert view._enhance.run_of(db.get_generation("g0")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
-    assert first._pending_enhancement == (
+    assert second._pending_enhancement == (
         "running", b"a frame", gallery.describe_enhance_params(leader.params))
     # The tab whose image is still waiting shows a queued tile, not that frame.
-    assert second._pending_enhancement == (
+    assert first._pending_enhancement == (
         "queued", None, gallery.describe_enhance_params(follower.params))
 
 
@@ -10646,14 +10661,14 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     _select_first_leaf(view)
 
     view.enhance_items(["g0", "g1"])
-    leader, follower = view._reroll.all_jobs
+    follower, leader = view._reroll.all_jobs  # the second asked for took the machine
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
     assert tiles["g0"]._enhancing is not None and tiles["g1"]._enhancing is not None
-    assert not tiles["g0"]._image_label.pixmap().isNull()
-    assert follower.state == "idle"  # still waiting in the line, never sent
-    assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
+    assert not tiles["g1"]._image_label.pixmap().isNull()
+    assert follower.state == "idle"  # waiting in the line for its turn again
+    assert tiles["g0"]._resting_pixmap is None   # never given the leader's frame
 
 
 def test_a_held_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,

@@ -67,7 +67,7 @@ def _will_move_on(view) -> bool:
 def _wired(kw: dict) -> dict:
     """The show takes its HUD facts and its gallery actions as two records;
     these cases name the facts and the actions flat, the way the words read."""
-    facts = {k: kw.pop(k) for k in ("order_label", "looping", "favorite_ids", "enhanced_ids") if k in kw}
+    facts = {k: kw.pop(k) for k in ("order_label", "favorite_ids", "enhanced_ids") if k in kw}
     if facts:
         kw["hud"] = HudFacts(**facts)
     acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
@@ -577,18 +577,98 @@ def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     assert view._note.isHidden()
 
 
-def test_locking_a_slide_always_enhances_it(qtbot):
-    # There is no switch for this any more.  E used to turn it off, and E is
-    # already spoken for in a Fun Time session, so the setting went rather than
-    # move to a second key nobody would find: a lock asks for a better version,
-    # every time.
+def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot):
+    # E and Home are the loop key, on both of the keys a session gives its two
+    # satellites; with nothing on either axis of the map the press is the
+    # lock — Down's whole gesture, the enhancement included, with no switch to
+    # turn that off any more — and the next press lets go, so the key is never
+    # a trap.
     asked = []
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_E)
-    _press(view, Qt.Key.Key_Down)
+    assert view._playlist.locked and asked == ["id-a"]
+    assert view._note.text() == "Locked"
 
-    assert asked == ["id-a"]
+    _press(view, Qt.Key.Key_Home)
+    assert not view._playlist.locked
+    assert view._note.text() == "Unlocked"
+
+
+def _around(prompt_id):
+    from origenerator.gui.show_map import MapNeighbors
+
+    if prompt_id != "id-a":
+        return MapNeighbors()
+    return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
+                        configs=(Slide("c.png", "image", "id-c"),),
+                        label="fox", config_labels=("dawn",))
+
+
+def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == "seed"
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b"]
+    assert view._note.text() == "Looping seeds: 2"
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == "config"
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-c"]
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == ""
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b"]  # the set it was browsing
+    assert view._note.text() == "Loop off"
+
+
+def _put_up(view) -> list:
+    shown = []
+    view.media_changed.connect(lambda: shown.append(view._playlist.current()[2]))
+    return shown
+
+
+def test_a_rows_button_loops_the_seeds_of_the_row_on_screen_without_redrawing_it(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    shown = _put_up(view)
+
+    view.show_filter("fox")
+
+    assert view.hud_map().loop == "seed"
+    assert shown == []
+    assert view._note.text() == "Looping seeds: 2"
+
+
+def test_a_rows_button_puts_that_rows_picture_up_even_with_no_seeds_to_loop(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    shown = _put_up(view)
+
+    view.show_filter("dawn")
+
+    assert shown == ["id-c"]
+    assert view._note.text() == "Nothing to loop"
+
+
+def test_a_rows_button_no_row_wears_says_so_and_moves_nothing(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    shown = _put_up(view)
+
+    view.show_filter("nobody")
+
+    assert shown == []
+    assert view._note.text() == "Nothing to loop"
+
+
+def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    shown = _put_up(view)
+
+    view.show_nav("right")
+    view.show_item("a.png")
+    view.show_nav("down")
+
+    assert shown == ["id-b", "id-a", "id-c"]
 
 
 def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):

@@ -98,8 +98,7 @@ def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
 class _Host:
     """A show reduced to the calls a press can make of one."""
 
-    def __init__(self, *, looping=True):
-        self.hud_looping = looping
+    def __init__(self):
         self.calls = []
 
     def show_step(self, delta):
@@ -125,6 +124,21 @@ class _Host:
 
     def show_item(self, path, *, hold=False):
         self.calls.append(("item", path, hold))
+
+    def show_loop(self, axis):
+        self.calls.append(("loop", axis))
+
+    def show_loop_cycle(self):
+        self.calls.append("loop key")
+
+    def show_more_seeds(self):
+        self.calls.append("more seeds")
+
+    def show_nav(self, direction):
+        self.calls.append(("nav", direction))
+
+    def show_filter(self, query):
+        self.calls.append(("filter", query))
 
     def show_step_version(self, delta):
         self.calls.append(("version", delta))
@@ -171,27 +185,33 @@ def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
                           ("item", "scene two.png", True)]
 
 
-def test_the_loop_button_ends_a_loop_and_starts_none():
-    """Stop looping this row: a show asked for goes back to the side's base
-    state, the way the press ends a loop on a player — and pressed where
-    nothing is looping it is the dark button it looks like."""
-    looping, browsing = _Host(looping=True), _Host(looping=False)
+def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
+    """The two loop buttons, the loop key, the expand mark and the map's
+    keys — each in the players' spelling, each meaning on a show what it
+    means on a player.  The players' second axis is their action column; on
+    a show it is the config column, the same seed under other configurations."""
+    host = _Host()
 
-    for host in (looping, browsing):
-        answer(host, "no_loop")
-        answer(host, "seed_loop")
+    for action in ("seed_loop", "action_loop", "no_loop", "loop", "more_seeds",
+                   "nav_left", "nav_right", "nav_up", "nav_down",
+                   "cycle_seed", "cycle_action", "no_filter"):
+        assert answer(host, action), action
+    assert answer(host, "filter", "dawn")
 
-    assert looping.calls == ["reset", "reset"]
-    assert browsing.calls == []
+    assert host.calls == [
+        ("loop", "seed"), ("loop", "config"), ("loop", ""), "loop key", "more seeds",
+        ("nav", "left"), ("nav", "right"), ("nav", "up"), ("nav", "down"),
+        ("nav", "right"), ("nav", "down"), ("loop", ""), ("filter", "dawn"),
+    ]
 
 
 def test_a_press_a_show_has_no_answer_to_says_so():
     """Minimize parks a window, which is not the show's to answer; nor is the
-    map's chrome for acts and seeds a show does not have."""
+    strike under an act, which a show has no acts for."""
     host = _Host()
 
     assert not answer(host, "minimize")
-    assert not answer(host, "more_seeds")
+    assert not answer(host, "wrong_action")
     assert host.calls == []
 
 

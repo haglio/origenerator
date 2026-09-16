@@ -11,6 +11,7 @@ from PIL import Image
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.show_buttons import answer
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image
 
 
@@ -35,6 +36,15 @@ def _session(tmp_path):
         status_file=tmp_path / "origenerator_status.txt",
         dashboard_cmd_file=tmp_path / "dashboard_cmd.txt",
     )
+
+
+def _as_items(rows):
+    """The fixture's rows as a show's items — a tuple passed through, a row
+    stood in for by a tuple named after it — where a test hands the director a
+    library of ready-made items rather than files to resolve."""
+    return [row if isinstance(row, tuple)
+            else (f"{row['prompt_id']}.png", "image", row["prompt_id"], None)
+            for row in rows]
 
 
 def _view_with_bridge(qtbot, tmp_path, rows=()):
@@ -255,12 +265,12 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
 
     assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [True, True]
     # Each region down to the one enhanced picture it was playing.
-    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [1, 1]
+    assert [show.pass_size() for show in (portrait, landscape)] == [1, 1]
 
     _press_filter_enhanced(bridge, tmp_path)
 
     assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [False, False]
-    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [2, 2]
+    assert [show.pass_size() for show in (portrait, landscape)] == [2, 2]
 
 
 def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
@@ -295,7 +305,7 @@ def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
     _press_filter_enhanced(bridge, tmp_path)
 
     assert [show.hud_enhanced_mode for show in (portrait, landscape)] == [True, False]
-    assert [len(show.hud_items()[0]) for show in (portrait, landscape)] == [1, 2]
+    assert [show.pass_size() for show in (portrait, landscape)] == [1, 2]
 
 
 def test_filter_enhanced_with_no_show_up_is_dropped(qtbot, tmp_path):
@@ -463,7 +473,7 @@ def test_a_players_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, m
     _press(bridge, tmp_path, "portrait_fmode")
 
     assert show.hud_favorites_filter is True
-    assert len(show.hud_items()[0]) == 1
+    assert show.pass_size() == 1
 
 
 def test_a_thumbnail_press_carries_its_path_through_the_colon_in_it(qtbot, tmp_path, monkeypatch):
@@ -483,9 +493,9 @@ def test_a_press_no_show_answers_is_dropped_on_the_log(qtbot, tmp_path, monkeypa
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    _press(bridge, tmp_path, "portrait_more_seeds")
+    _press(bridge, tmp_path, "portrait_wrong_action")
 
-    assert "portrait_more_seeds" in caplog.text
+    assert "portrait_wrong_action" in caplog.text
     assert not (tmp_path / "origenerator_cmd.txt").exists()
 
 
@@ -597,6 +607,10 @@ def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
     monkeypatch.setattr(view, "row_for", lambda pid: next(
         (_row_of(item) for item in folder if item[2] == pid), None))
     monkeypatch.setattr(view, "selected_prompt_id", lambda: clicked[2])
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: [
+        row if isinstance(row, tuple)
+        else (row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
+        for row in rows])
 
     view._shows.open_on_preview((clicked[0], "image"), None)
 
@@ -605,7 +619,7 @@ def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
     told = _told(tmp_path, "landscape")
     assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == "SET_PACE 0"
     panel = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
-    assert panel.seed_count == len(folder)
+    assert panel.corner.path == clicked[0]
     assert _told(tmp_path, "portrait") == []
 
 
@@ -619,3 +633,57 @@ def test_a_double_click_over_a_run_still_being_made_leaves_the_players_alone(
     assert (tmp_path / "landscape.tsv").read_text(encoding="utf-8") == playing
     assert _told(tmp_path, "landscape") == []
     assert _told(tmp_path, "portrait") == []
+
+
+def test_the_sessions_loop_key_reaches_the_show_on_that_side(qtbot, tmp_path, monkeypatch):
+    """Home and E are the session's loop keys, one per satellite; in
+    origenerator mode they arrive here as the side's loop verb and step the
+    show's loop.  A show of items no library maps has nothing to loop, so the
+    press is the hold — and the next lets go, the way a lone clip's is."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    _press(bridge, tmp_path, "portrait_loop")
+    assert show.locked
+
+    _press(bridge, tmp_path, "portrait_loop")
+    assert not show.locked
+
+
+def test_the_maps_own_verbs_all_reach_the_show(qtbot, tmp_path, monkeypatch):
+    """Every press the players' map posts — the two loop buttons, the expand
+    mark, a map key — has an answer here, so none is dropped on the log."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    dropped = []
+    monkeypatch.setattr(bridge, "_apply_side", lambda side, action, argument, line:
+                        dropped.append(line) if not answer(view.region_show(side), action, argument)
+                        else None)
+
+    for verb in ("portrait_seed_loop", "portrait_action_loop", "portrait_no_loop",
+                 "portrait_more_seeds", "portrait_nav_right", "portrait_cycle_seed"):
+        _press(bridge, tmp_path, verb)
+
+    assert dropped == []
+
+
+def test_a_rows_filter_press_is_spelled_the_other_way_round_and_still_reaches_the_show(
+        qtbot, tmp_path, monkeypatch):
+    """The panel posts a row's filter button as ``filter_<side>_<row>`` —
+    the side in the middle — and a session hands it back verbatim."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    asked = []
+    monkeypatch.setattr(show, "show_filter", asked.append)
+
+    _press(bridge, tmp_path, "filter_portrait_red_fox")
+
+    assert asked == ["red_fox"]
+
+
+def test_a_verb_said_to_neither_side_is_dropped_on_the_log(qtbot, tmp_path, caplog):
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
+
+    _press(bridge, tmp_path, "sideways_next")
+
+    assert "Unknown Fun Time verb dropped: sideways_next" in caplog.text

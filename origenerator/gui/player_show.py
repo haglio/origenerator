@@ -43,7 +43,8 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.show_hud import show_hud_model
-from origenerator.gui.show_set import ShowSet
+from origenerator.gui.show_map import SEED_AXIS
+from origenerator.gui.show_set import LOOP_IS_A_HOLD, LOOP_OFF, ShowSet, looping_note
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.toast import NOTICE, WARNING
@@ -114,7 +115,8 @@ class PlayerShow(QObject):
             image_dwell_ms = self._pace.dwell_ms
         self._dwell_s = image_dwell_ms // 1000
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                            start=start, hud=hud, on_pass_change=self._pass_changed)
+                            start=start, hud=hud, on_pass_change=self._pass_changed,
+                            neighbors=self._actions.neighbors, widen=self._actions.widen)
 
     def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
              hud=None) -> None:
@@ -176,8 +178,11 @@ class PlayerShow(QObject):
     def _pass_changed(self, kept: bool) -> None:
         """A fresh pass was dealt: the player is playing the old one, so it is
         handed the new one — keeping the slide on screen when the pass kept it,
-        and sent to this show's own when it did not."""
+        and sent to this show's own when it did not.  The panel follows at
+        once, so a loop lights its button on the press rather than a tick
+        later."""
         self._hand_over(land=not kept)
+        self._publish()
 
     # --- what the player says it is showing ---------------------------------
 
@@ -394,17 +399,83 @@ class PlayerShow(QObject):
     def show_item(self, path, *, hold: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
         it makes on a player's own map; *hold* locks it there."""
-        for item in self._set.playlist.items:
-            if str(item.path) != str(path):
-                continue
-            self._send(play_file(_playlist_item(item)))
-            self._hold(hold)
+        slide = self._set.slide_for_path(path)
+        if slide is None:
             return
+        self._jump_to(slide)
+        self._hold(hold)
+
+    def _jump_to(self, slide) -> None:
+        """Stand the pass on *slide* and send the player there.
+
+        One verb either way: the player jumps to a file already in its list
+        and splices one that is not in after what it is showing — which is
+        exactly where the pass put a cell it never held.  A jump that ends a
+        loop re-deals the pass, and that hands the player the browse first
+        (see :meth:`_pass_changed`).
+        """
+        self._set.jump_to(slide)
+        self._send(play_file(_playlist_item(slide)))
+        self._publish()
+
+    # --- the map, and the loops along it -----------------------------------
+
+    def hud_map(self):
+        return self._set.map()
+
+    def pass_size(self) -> int:
+        return len(self._set.playlist)
+
+    def show_loop(self, axis: str) -> None:
+        """Loop the map's *axis* around the item on screen, or end the loop
+        for "".  The player is handed the row or the column to play, and the
+        set it was browsing when the loop ends (see :meth:`_pass_changed`)."""
+        if not axis:
+            if self._set.end_loop():
+                self._note("Loop off")
+            return
+        if self._set.start_loop(axis):
+            self._note(looping_note(self._set))
+        else:
+            self._note("Nothing to loop", kind=WARNING)
+
+    def show_loop_cycle(self) -> None:
+        """The loop key: seeds, then configs, then off — and the hold when
+        there is nothing on either axis to loop."""
+        stepped = self._set.step_loop()
+        if stepped == LOOP_IS_A_HOLD:
+            self.set_held(not self._locked)
+            self._note("Locked" if self._locked else "Unlocked")
+        elif stepped == LOOP_OFF:
+            self._note("Loop off")
+        else:
+            self._note(looping_note(self._set))
+
+    def show_more_seeds(self) -> None:
+        if self._set.more_seeds():
+            self._note("More seeds")
+        else:
+            self._note("Widening net failed", kind=WARNING)
+
+    def show_filter(self, query: str) -> None:
+        slide = self._set.row_slide(query)
+        if slide is None:
+            self._note("Nothing to loop", kind=WARNING)
+            return
+        if slide is not self._set.playlist.current():
+            self._let_go()
+            self._jump_to(slide)
+        self.show_loop(SEED_AXIS)
+
+    def show_nav(self, direction: str) -> None:
+        target = self._set.nav_target(direction)
+        if target is None:
+            self._note("Nothing that way", kind=WARNING)
+            return
+        self._let_go()
+        self._jump_to(target)
 
     # --- the two switches, and what the panel reads off the set --------------
-
-    def hud_items(self):
-        return self._set.hud_items()
 
     @property
     def hud_prompt_id(self) -> str:
@@ -426,10 +497,6 @@ class PlayerShow(QObject):
     @property
     def hud_order_label(self) -> str:
         return self._set.order_label
-
-    @property
-    def hud_looping(self) -> bool:
-        return self._set.looping
 
     @property
     def hud_device(self):

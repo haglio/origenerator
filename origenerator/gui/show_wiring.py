@@ -44,6 +44,12 @@ class ShowActions:
     console's four control buttons read and set.
     ``omnipause`` takes nothing and is a session's: hosted, a click on the
     picture asks the room to pause, where a show on its own pauses itself.
+
+    ``neighbors`` and ``widen`` take a prompt_id and answer for the library
+    the show cannot see: what shares that generation's configuration and its
+    seed (the map's two axes, as :class:`~origenerator.gui.show_map.MapNeighbors`),
+    and what lies just beyond the exact configuration (the slides "more
+    seeds" adds to the row).
     """
 
     delete: Callable[[str], None] | None = None
@@ -55,27 +61,29 @@ class ShowActions:
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None
+    neighbors: Callable[[str], object] | None = None
+    widen: Callable[[str], tuple] | None = None
 
 
 @dataclass(frozen=True)
 class HudFacts:
     """What this show's own HUD says about the set it is playing.
 
-    All three are the players' vocabulary, because the panel is the players'
+    All of it is the players' vocabulary, because the panel is the players'
     panel: ``order_label`` is how the set is ordered (Recents plays "Latest",
     everything else "Shuffle", and a folder opened in the browser's own order
-    says nothing at all rather than making one up); ``looping`` is whether this
-    is a LOOP as a player means it, a set someone asked for played round and
-    round, which a region's base state is not; ``favorite_ids`` is which of the
-    items are favorites, so the star readout and the F-mode narrowing mean here
-    what they mean on a player.
+    says nothing at all rather than making one up); ``favorite_ids`` is which of
+    the items are favorites, so the star readout and the F-mode narrowing mean
+    here what they mean on a player.  Whether the show is LOOPING is not a
+    fact about the set at all: a loop is one axis of the map played round and
+    round, started and ended from the show, and the set is what it browses
+    between loops.
 
-    The defaults are a shuffled loop with nothing favorited — a show asked for by
+    The defaults are a shuffled set with nothing favorited — a show asked for by
     the toolbar, which is the ordinary case.
     """
 
     order_label: str = SHUFFLE_LABEL
-    looping: bool = True
     favorite_ids: Collection[str] = field(default_factory=frozenset)
     # Which of the items carry an enhancement, for the switch beside F-mode
     # that only a show's HUD grows: the same shape as the favorites, over the

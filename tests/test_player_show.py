@@ -12,7 +12,7 @@ from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.paths import ensure_player_core_on_path
-from origenerator.slideshow import in_order
+from origenerator.slideshow import ShowState, in_order
 
 ensure_player_core_on_path()
 
@@ -54,9 +54,21 @@ def _sent(show: PlayerShow) -> list[str]:
 
 def _says(show: PlayerShow, **fields) -> None:
     """The player publishing what it is showing, as its status writer does."""
+    _player_says(show.channel, **fields)
+
+
+def _player_says(channel: PlayerChannel, **fields) -> None:
     lines = status_fields(PlayerStatus(**fields))
-    show.channel.status_file.write_text(
+    channel.status_file.write_text(
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
+
+
+def _show_with_the_player_on(qtbot, tmp_path, **status) -> PlayerShow:
+    show = _show(qtbot, tmp_path)
+    _says(show, **status)
+    show.tick()
+    _sent(show)
+    return show
 
 
 def test_a_show_hands_the_player_the_pass_it_is_to_play(qtbot, tmp_path):
@@ -252,13 +264,71 @@ def test_a_show_that_is_over_gives_the_side_back(qtbot, tmp_path):
     assert show.channel.hud_file.read_text(encoding="utf-8") == ""
 
 
+def test_a_new_set_lands_the_player_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+
+    assert _sent(show) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 0"]
+
+
+def test_a_new_set_does_not_reload_a_player_already_on_its_slide(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="three.png")
+
+    show.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
+
+    assert _sent(show) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
+
+
+def test_a_new_set_lets_go_of_the_hold_the_last_one_had(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png", locked=True)
+
+    show.play(_ITEMS, start=1, shuffle=in_order)
+
+    assert _sent(show)[0] == "LOCK_OFF"
+    assert show.locked is False
+
+
+def test_a_side_reset_lands_the_player_on_the_top_of_its_base_set(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+
+    show.retune(_ITEMS)
+
+    assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
+    assert show.hud_prompt_id == "id-1"
+
+
+def test_a_reset_with_no_base_set_lands_the_player_on_the_top_of_its_own(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+
+    show.reset_in_place()
+
+    assert "PLAY_FILE one.png" in _sent(show)
+    assert show.hud_prompt_id == "id-1"
+
+
+def test_a_show_picked_back_up_lands_the_player_where_the_last_one_left_off(
+        qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    assert show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-3"))
+
+    assert _sent(show)[0] == "PLAY_FILE three.png"
+
+
+def test_a_show_opened_on_a_slide_lands_the_player_on_it(qtbot, tmp_path):
+    _player_says(_channel(tmp_path), video="one.png")
+
+    show = _show(qtbot, tmp_path, start=2)
+
+    assert _sent(show)[0] == "PLAY_FILE three.png"
+    assert show.hud_prompt_id == "id-3"
+
+
 def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
     """The player holds the file open, so the way to let go is to move on —
     what the gallery asks of every surface before it moves files."""
-    show = _show(qtbot, tmp_path)
-    _says(show, video="one.png")
-    show.tick()
-    _sent(show)
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
 
     show.release_media(["one.png"])
 

@@ -17,6 +17,10 @@ from PyQt6.QtCore import QObject, QTimer
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
 from origenerator.osr2 import Osr2Broker
+from origenerator.paths import ensure_player_core_on_path
+
+ensure_player_core_on_path()
+from player_core.funscript import Funscript  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,9 @@ class Osr2Driver(QObject):
         self._broker = broker or Osr2Broker()
         self._player = None
         self._actions: list[tuple[int, int]] = []  # (at_ms, pos), sorted by time
+        # The same actions as the family's own model, for the line the console
+        # draws: where the script has the device at any moment.
+        self._script: Funscript | None = None
         self._duration_ms = 0
         self._streaming = False
         self._timer = QTimer(self)
@@ -63,6 +70,7 @@ class Osr2Driver(QObject):
             return
         self._player = player
         self._actions = sorted((int(a["at"]), int(a["pos"])) for a in actions)
+        self._script = Funscript(self._actions)
         self._duration_ms = self._actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
         self._broker.pause_genau()
@@ -77,10 +85,36 @@ class Osr2Driver(QObject):
         self._timer.stop()
         self._player = None
         self._actions = []
+        self._script = None
         self._duration_ms = 0
         self._broker.park()
         self._broker.restore_genau()
         logger.info("OSR2 drive released: parked, genau restored")
+
+    @property
+    def active(self) -> bool:
+        """Whether this is the thing sending to the device right now."""
+        return self._player is not None
+
+    def trace(self, count: int, seconds: float) -> tuple[float, ...]:
+        """The script's line from the playhead forward, as *count* heights 0-1
+        spanning *seconds* -- the motion the device is about to be asked for,
+        which is what the console draws in the Robot Hand's place while a
+        funscript has the device.
+
+        Folded onto the script the same way the stream is (the preview loops),
+        so the picture and the wire read the same script at the same moment.
+        """
+        if self._script is None or self._player is None or count <= 0:
+            return ()
+        now = int(self._player.position())
+        step = seconds * 1000 / max(1, count - 1)
+        return tuple(self._script.position_at(self._folded(now + round(i * step))) / 100
+                     for i in range(count))
+
+    def _folded(self, at_ms: int) -> int:
+        """*at_ms* wrapped onto the script, as the stream wraps the playhead."""
+        return at_ms % self._duration_ms if self._duration_ms > 0 else at_ms
 
     def poll(self) -> None:
         """Advance the device toward the action following the current playhead.
@@ -93,9 +127,7 @@ class Osr2Driver(QObject):
         player = self._player
         if player is None:
             return
-        now_ms = player.position()
-        if self._duration_ms > 0:
-            now_ms %= self._duration_ms  # the preview loops; fold onto the script
+        now_ms = self._folded(int(player.position()))  # the preview loops
         pos, interval = self._next_target(now_ms)
         if pos is not None:
             self._broker.send_position(pos, interval)

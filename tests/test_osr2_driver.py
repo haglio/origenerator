@@ -86,3 +86,43 @@ def test_start_with_no_actions_does_not_engage(qapp):
     assert broker.paused == 0
     driver.poll()
     assert broker.positions == []
+
+
+def test_it_says_whether_it_has_the_device(qapp):
+    driver = Osr2Driver(broker=FakeBroker())
+    assert driver.active is False
+
+    driver.start(FakePlayer(pos=0), ACTIONS)
+    assert driver.active is True
+
+    driver.stop()
+    assert driver.active is False
+
+
+def test_the_line_it_draws_is_the_script_from_the_playhead_forward(qapp):
+    """What the console draws in the motion's place while a script has the
+    device: where the script puts it now, and where it is about to."""
+    driver = Osr2Driver(broker=FakeBroker())
+    driver.start(FakePlayer(pos=0), ACTIONS)
+
+    heights = driver.trace(5, 1.0)  # a second, in quarter-second steps
+
+    assert len(heights) == 5
+    assert heights[0] == 0.0     # the script opens on the floor
+    assert heights[2] == 1.0     # its peak, half a second in
+    assert heights[4] == 0.0     # and back down by the end
+
+
+def test_the_line_folds_onto_the_script_the_way_the_stream_does(qapp):
+    """The preview loops, so the stream wraps the playhead onto the script --
+    and a line drawn past the end would flatten where the device turns round."""
+    driver = Osr2Driver(broker=FakeBroker())
+    driver.start(FakePlayer(pos=750), ACTIONS)
+
+    heights = driver.trace(3, 1.0)  # 750ms, 1250ms -> 250ms, 1750ms -> 750ms
+
+    assert heights == (0.5, 0.5, 0.5)
+
+
+def test_a_driver_with_nothing_to_follow_draws_nothing(qapp):
+    assert Osr2Driver(broker=FakeBroker()).trace(8, 1.0) == ()

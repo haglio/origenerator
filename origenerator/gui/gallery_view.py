@@ -314,6 +314,10 @@ class GalleryView(QWidget):
         self._osr2_enabled = False
         self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
         self.osr2_control.toggled.connect(self._on_osr2_toggle)
+        # Every move of the group re-aims the device, not only a flip of the
+        # switch: driving to parked leaves the switch on, and what has to change
+        # is which driver is sending and what it is sending.
+        self.osr2_control.changed.connect(self.reconcile_osr2)
         # How long a slide holds the screen, app-wide: Genau's console shows
         # it as clip seconds and sets it, from whichever window the console
         # is on — including this one, with nothing playing, where it is what
@@ -1021,6 +1025,9 @@ class GalleryView(QWidget):
         # None where this app may not touch the device at all (hosted by Fun
         # Time, whose main player owns the OSR2).
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
+        # The switch answers "what is the OSR2 doing" for every console over it,
+        # so it holds both drivers rather than only the motion.
+        self.osr2_control.script = self._osr2_driver
         self._osr2_driving = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs.config_panels():
@@ -1177,7 +1184,6 @@ class GalleryView(QWidget):
 
     def _on_osr2_toggle(self, on: bool):
         self._osr2_enabled = on
-        self.reconcile_osr2()
 
     def toggle_osr2_drive(self):
         """Flip the one switch — what Space does, from any surface. The motion's
@@ -1192,11 +1198,14 @@ class GalleryView(QWidget):
     def reconcile_osr2(self):
         """Put the right thing on the device, or nothing.
 
-        With the switch off, neither source drives. With it on, a funscript wins
-        wherever there is one — a slideshow showing a scripted video, else the
-        front tab's — and the self-generated motion fills every other moment,
-        which is most of them: a folder of images, a clip with no script, an
-        empty tab. That is the whole of "genau mode when no funscript is going".
+        With the switch off, neither source drives. Held at an end of the travel,
+        the motion is what drives — stilled there, which is how the device gets
+        to that end and stays — and the funscript stands down however scripted
+        the video in front is, or it would drive straight through the hold.
+        Otherwise a funscript wins wherever there is one — a slideshow showing a
+        scripted video, else the front tab's — and the self-generated motion
+        fills every other moment, which is most of them: a folder of images, a
+        clip with no script, an empty tab.
 
         Idempotent, so tab switches, browsing, completions and opening or closing
         a show all resolve without churning the device. The guard makes it
@@ -1210,7 +1219,9 @@ class GalleryView(QWidget):
             return
         self._reconciling_osr2 = True
         try:
-            target = self._osr2_drive_source() if self._osr2_enabled else None
+            held = self._osr2_motion.held_at is not None
+            target = (self._osr2_drive_source()
+                      if self._osr2_enabled and not held else None)
             if target is None:
                 if self._osr2_driving is not None:
                     self._osr2_driver.stop()
@@ -1227,6 +1238,9 @@ class GalleryView(QWidget):
                 self._osr2_motion.start()
             elif not wants_motion and self._osr2_motion.active:
                 self._osr2_motion.stop()
+            # Said inside the guard, so a console redrawing on it cannot land
+            # back in here mid-flight.
+            self.osr2_control.settled.emit()
         finally:
             self._reconciling_osr2 = False
 

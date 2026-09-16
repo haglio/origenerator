@@ -1,10 +1,15 @@
 """The app's one OSR2 switch, and which of the four control states it is in.
 
 It was a button in the toolbar until the players' console grew a control-state
-group of its own -- parked, retracted, driving, control off -- and a second
+group of its own -- control off, parked, retracted, driving -- and a second
 switch for one device is exactly what that group replaces. What is left is the
 switch itself, with no widget: the console sets it, and so do Space, Esc, a
 spoken word and a resumed session.
+
+It holds both of the app's drivers, because "what is the OSR2 doing" is one
+question and they are two halves of the answer: the funscript driver while a
+scripted video is in front, the self-generated motion otherwise, and neither
+while the device is held at an end or let go of.
 
 It wears a checkable button's three names and its toggled signal on purpose.
 Every one of those callers flipped a button before, and the voice router still
@@ -24,6 +29,7 @@ from player_core.console import (  # noqa: E402
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
+from player_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND  # noqa: E402
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER  # noqa: E402
 
 _HELD_AT = {OSR2_PARKED: PARK_CENTER, OSR2_RETRACTED: RETRACT_CENTER}
@@ -36,10 +42,17 @@ class Osr2Control(QObject):
     # And anything that can change which of the four buttons lights, the holds
     # included -- what a console showing that group redraws on.
     changed = pyqtSignal()
+    # The app has finished re-aiming the device, so what is driving it may be
+    # different: every console over it draws itself again.
+    settled = pyqtSignal()
 
-    def __init__(self, motion=None, *, parent=None) -> None:
+    def __init__(self, motion=None, *, script=None, parent=None) -> None:
         super().__init__(parent)
         self._motion = motion
+        # The funscript driver, set once the view has built it.  Held here
+        # rather than asked of the gallery so a show's console, which never sees
+        # the gallery, can still say what has the device.
+        self.script = script
         self._checked = False
 
     def isEnabled(self) -> bool:  # noqa: N802 - a button's name, deliberately
@@ -81,14 +94,29 @@ class Osr2Control(QObject):
     def set_state(self, state: str) -> None:
         """Ask for one of those four -- what a press on the console's group is.
 
-        A hold implies control: pressing park with the switch off turns it on
-        and then stills the motion, which is what the one lit button then says.
+        The hold moves first, so whatever reconciles on the switch already sees
+        it; and a state that leaves the switch where it was still says so, since
+        driving to parked flips nothing and would otherwise reach nobody.
         """
+        if self._motion is not None:
+            if state in _HELD_AT:
+                self._motion.hold(_HELD_AT[state])
+            elif state == OSR2_DRIVING:
+                self._motion.release()
+        was = self._checked
         self.setChecked(state != OSR2_CONTROL_OFF)
-        if self._motion is None or state == OSR2_CONTROL_OFF:
-            return
-        if state in _HELD_AT:
-            self._motion.hold(_HELD_AT[state])
-        else:
-            self._motion.release()
-        self.changed.emit()
+        if self._checked == was:
+            self.changed.emit()
+
+    def source(self) -> str | None:
+        """What is sending to the device right now, or None while nothing is.
+
+        The funscript wins wherever there is one to follow, which is what the
+        view's own reconcile decides; this reads the answer back off the drivers
+        rather than working it out a second time.
+        """
+        if self.script is not None and self.script.active:
+            return DRIVEN_BY_FUNSCRIPT
+        if self._motion is not None and self._motion.active:
+            return DRIVEN_BY_ROBOT_HAND
+        return None

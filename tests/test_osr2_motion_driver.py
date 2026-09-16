@@ -308,3 +308,34 @@ def test_driving_with_nothing_held_changes_nothing(qtbot):
     driver.release()
 
     assert driver.state.state.amplitude == 55
+
+
+def test_a_hold_refuses_every_dial_that_would_break_it(qtbot):
+    """A nudge under a hold would move the device while the console still said
+    it was held -- and driving puts the recording back, so it would be thrown
+    away at the end of the hold anyway.  The console dims these same marks."""
+    driver, _broker, _clock = _driver(qtbot)
+    motion_engine.set_amplitude(driver.state.state, 60)
+    driver.hold(PARK_CENTER)
+
+    driver.adjust_amplitude(10)
+    driver.set_amplitude(80)
+    driver.adjust_center(5)
+    driver.set_center(70)
+    driver.adjust_speed(10)
+    driver.toggle_cruise()
+    driver.set_cruise(True)
+
+    assert driver.state.state.amplitude == 0
+    assert driver.state.state.center == PARK_CENTER
+    assert driver.state.cruise.active is False
+
+
+def test_the_dials_answer_again_once_the_hold_is_let_go(qtbot):
+    driver, _broker, _clock = _driver(qtbot)
+    driver.hold(PARK_CENTER)
+    driver.release()
+
+    driver.set_amplitude(80)
+
+    assert driver.state.state.amplitude == 80

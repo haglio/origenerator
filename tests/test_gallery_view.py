@@ -9,8 +9,13 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_RETRACTED
-from player_core.robot_hand import RETRACT_CENTER
+from player_core.console import (
+    OSR2_CONTROL_OFF,
+    OSR2_DRIVING,
+    OSR2_PARKED,
+    OSR2_RETRACTED,
+)
+from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from player_core.satellite_hud import MODE_BUTTONS
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QKeyEvent, QMovie
@@ -11110,12 +11115,15 @@ class _FakeDriver:
     def __init__(self):
         self.started = []
         self.stopped = 0
+        self.active = False
 
     def start(self, player, actions):
         self.started.append((player, actions))
+        self.active = True
 
     def stop(self):
         self.stopped += 1
+        self.active = False
 
 
 def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
@@ -11150,6 +11158,7 @@ def _osr2_view(qtbot):
     qtbot.addWidget(view)
     driver = _FakeDriver()
     view._osr2_driver = driver
+    view.osr2_control.script = driver
     return view, driver, view._info_tabs.current_config_panel()
 
 
@@ -11176,6 +11185,46 @@ def test_a_hold_from_the_console_stills_the_motion_and_keeps_control(qtbot):
     assert view.osr2_enabled() is True
     assert ("hold", RETRACT_CENTER) in view._osr2_motion.calls
     assert view.osr2_control.state() == OSR2_RETRACTED
+
+
+def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbot):
+    """A script driving through a park is the device ignoring the hold, which is
+    what the console would be lying about.  The stilled motion is what takes the
+    device to that end and keeps it there."""
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_DRIVING)
+    assert driver.started and view._osr2_motion.active is False
+
+    view.osr2_control.set_state(OSR2_PARKED)
+
+    assert driver.stopped == 1
+    assert view._osr2_motion.active is True
+    assert ("hold", PARK_CENTER) in view._osr2_motion.calls
+
+
+def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
+    view, driver, panel = _osr2_view(qtbot)
+    panel.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
+    view.osr2_control.set_state(OSR2_PARKED)
+
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    assert ("release",) in view._osr2_motion.calls
+    assert driver.started[-1] == ("player-A", "actions-A")
+    assert view._osr2_motion.active is False
+
+
+def test_every_console_over_the_device_hears_that_it_was_re_aimed(qtbot):
+    """The panel redraws on this: which driver has the device moves with the
+    video in front, not only with a press."""
+    view, _driver, panel = _osr2_view(qtbot)
+    heard = []
+    view.osr2_control.settled.connect(lambda: heard.append(True))
+
+    view.osr2_control.set_state(OSR2_DRIVING)
+
+    assert heard
 
 
 def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):

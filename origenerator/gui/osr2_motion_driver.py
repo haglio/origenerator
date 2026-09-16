@@ -217,6 +217,12 @@ class Osr2MotionDriver(QObject):
         return round(_LOOKAHEAD_MS + (_HANDOFF_MS - _LOOKAHEAD_MS) * eased)
 
     # --- the dials the keys and the drive panel turn ------------------------
+    #
+    # Every one of them is refused while a hold has the motion stilled at an end
+    # of the travel: a nudge there would move the device while the console still
+    # said it was held, and the hold's own recording is what driving puts back,
+    # so the nudge would be thrown away at the end of it anyway.  The console
+    # dims these same marks, and the keys agree with it.
 
     @property
     def state(self) -> Motion:
@@ -225,32 +231,39 @@ class Osr2MotionDriver(QObject):
         return self._state
 
     def adjust_speed(self, delta: int) -> None:
-        with self._lock:
-            motion_engine.adjust_speed(self._state.state, delta)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.adjust_speed(self._state.state, delta)
 
     def adjust_amplitude(self, delta: int) -> None:
-        with self._lock:
-            motion_engine.adjust_amplitude(self._state.state, delta)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.adjust_amplitude(self._state.state, delta)
 
     def adjust_center(self, delta: int) -> None:
-        with self._lock:
-            motion_engine.adjust_center(self._state.state, delta)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.adjust_center(self._state.state, delta)
 
     def set_speed(self, value: int) -> None:
-        with self._lock:
-            motion_engine.set_speed(self._state.state, value)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.set_speed(self._state.state, value)
 
     def set_amplitude(self, value: int) -> None:
-        with self._lock:
-            motion_engine.set_amplitude(self._state.state, value)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.set_amplitude(self._state.state, value)
 
     def set_center(self, value: int) -> None:
-        with self._lock:
-            motion_engine.set_center(self._state.state, value)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.set_center(self._state.state, value)
 
     def cycle_shape(self, step: int = 1) -> None:
-        with self._lock:
-            motion_engine.cycle_shape(self._state.state, step)
+        if self._held_at is None:
+            with self._lock:
+                motion_engine.cycle_shape(self._state.state, step)
 
     def toggle_cruise(self) -> None:
         """Hands off: cruise control takes the motion over (genau's ``/``).
@@ -261,6 +274,8 @@ class Osr2MotionDriver(QObject):
         whole motion's travel, center and pace, so the console still says what is
         being sent. It only moves while the motion is actually running, so arming
         it against a parked device changes nothing until the device is taken."""
+        if self._held_at is not None:
+            return
         with self._lock:
             motion_engine.toggle_cruise_control(self._state)
 
@@ -273,6 +288,8 @@ class Osr2MotionDriver(QObject):
         flip — the same reason every switch in the toolbar answers an explicit
         on and off beside its flip.
         """
+        if self._held_at is not None:
+            return
         with self._lock:
             if on:
                 motion_engine.enable_cruise_control(self._state)

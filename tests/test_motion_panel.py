@@ -6,7 +6,7 @@ lookalike), and that each command it posts reaches the right thing here.
 """
 from __future__ import annotations
 
-from player_core import wave_stack
+from player_core import drive_layout, wave_stack
 from player_core.console import console_rows
 from player_core.console_hud import ConsoleHud, ConsolePainter
 from player_core.robot_hand import POSITION_MAX
@@ -378,3 +378,31 @@ def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
     assert hud.position == round(
         POSITION_MAX * wave_stack.position(live.cruise.stack, live.clock) / 100)
     assert len(set(hud.waveform)) > 20  # a live trace, not a held line
+    assert len(hud.waveform) == drive_layout.TRACE_SAMPLES
+    assert hud.edge is not None and hud.slide == 0.0
+
+
+def test_the_readout_holds_the_learned_motions_picture_still_between_knots(qtbot):
+    # The learned motion is read on knots: a tick later the same heights are
+    # drawn, shifted left by the fraction of a knot the clock has moved.
+    import random
+
+    from player_core.learned_model import LearnedModel, Phrase, classify
+
+    phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
+    motion = FakeMotion()
+    live = motion.state
+    live.state.playing = True
+    live.learned.model = LearnedModel(phrases={classify(phrase): [phrase]},
+                                      seen={classify(phrase): 1})
+    live.learned.rng = random.Random(1)
+    motion_engine.enable_learned_motion(live)
+    motion_engine.tick_learned_motion(live, 1000.0)
+    before = drive_hud(live, active=True)
+    motion_engine.tick_learned_motion(live, 1000.02)
+
+    after = drive_hud(live, active=True)
+
+    assert after.waveform == before.waveform
+    assert after.slide > before.slide
+    assert after.edge == before.edge

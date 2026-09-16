@@ -447,7 +447,7 @@ class GenerateConfigPanel(QWidget):
         for lane in self._lanes.values():
             lane.button.setToolTip(lane.tooltip)
             lane.button.clicked.connect(
-                lambda _checked=False, lane=lane: self._on_send(lane))
+                lambda _checked=False, lane=lane: self._on_lane_pressed(lane))
             lane.button.hide()  # shown only for a video the tab is displaying
             btn_row.addWidget(lane.button)
         self._cancel_btn = QPushButton(discard_run_text(False))
@@ -1578,17 +1578,44 @@ class GenerateConfigPanel(QWidget):
 
         Shown only for a video with a file on disk — every lane carries clips,
         and Evolver is a video pipeline — so an image or a missing file hides it.
-        One already sent shows a persistent, disabled "Sent \u2713", read from the
-        row rather than from the button's own state so it survives a restart.
+        One already sent offers its deletion instead, read from the row rather
+        than from the button's own state so it survives a restart.
         ``preview`` is the resolved ``(path, media_type)``, or ``None``.
         """
         is_video = preview is not None and preview[1] == MediaType.VIDEO
         lane.button.setVisible(is_video)
         if not is_video:
             return
-        already_sent = bool(self._displayed_row and self._displayed_row.get(lane.flag))
-        lane.button.setText(lane.sent_caption if already_sent else lane.send_caption)
-        lane.button.setEnabled(not already_sent)
+        row = self._displayed_row or {}
+        already_sent = bool(row.get(lane.flag))
+        lane.button.setText(lane.delete_caption if already_sent else lane.send_caption)
+        lane.button.setToolTip(self._lane_tooltip(lane, row))
+
+    @staticmethod
+    def _lane_tooltip(lane, row: dict) -> str:
+        """What *lane*'s button says about *row* when the cursor rests on it.
+
+        Withdrawn, the button reads exactly as it does for a clip never sent, and
+        nothing else on the tab mentions the other app at all — so this is the
+        one place left to say the earlier copy is down for deletion.
+        """
+        if row.get(lane.flag):
+            return lane.delete_tooltip
+        return lane.withdrawn_tooltip if row.get(lane.unsent_flag) else lane.tooltip
+
+    def _on_lane_pressed(self, lane):
+        """Do what *lane*'s button says: send the clip, or delete it over there.
+
+        Which of the two is read off the caption under the cursor rather than off
+        the row, so a press does what it promised. Where the row has moved on
+        since it was drawn — a spoken "genau it" landing on this very clip — each
+        half re-checks and does nothing, rather than the opposite of what the
+        words said.
+        """
+        if lane.button.text() == lane.delete_caption:
+            self._on_unsend(lane)
+        else:
+            self._on_send(lane)
 
     def _on_send(self, lane):
         """Copy the displayed video into *lane*'s inbox folder and remember it.
@@ -1610,11 +1637,33 @@ class GenerateConfigPanel(QWidget):
             QMessageBox.warning(self._preview, lane.failure_title,
                                 lane.failure_body(e))
             return
+        self._record_lane_state(lane, lane.mark)
+
+    def _on_unsend(self, lane):
+        """Take the send back: the app it went to deletes every copy it holds.
+
+        Nothing is deleted from here. The clip has been sorted, upscaled and
+        re-filed since it was handed over, and only the app whose folders those
+        are can still find it — so the whole of this is a stamp on the row, which
+        that app reads on its next run. The button goes back to offering the
+        send, which from here on puts a fresh copy in that app's hands.
+        """
+        if not self._displayed_row or not self._displayed_row.get(lane.flag):
+            return
+        self._record_lane_state(lane, lane.unmark)
+
+    def _record_lane_state(self, lane, write):
+        """Persist a lane's new state for the displayed row, then redraw its button.
+
+        The button is drawn from the row, so the row is re-read first: writing and
+        then trusting the value written is how a button comes to disagree with
+        what a restart would show.
+        """
         prompt_id = self._displayed_row["prompt_id"]
-        lane.mark(self._db, prompt_id)
-        # Re-read so the row (and thus the button) reflects the persisted send.
+        write(self._db, prompt_id)
         self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
-        self._update_export_button(lane, (path, MediaType.VIDEO))
+        path = self._displayed_video_path()
+        self._update_export_button(lane, None if path is None else (path, MediaType.VIDEO))
 
     def _displayed_video_path(self) -> Path | None:
         """The on-disk video file backing the displayed generation, or ``None``

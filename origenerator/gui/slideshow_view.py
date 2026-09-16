@@ -239,7 +239,9 @@ class SlideshowView(QWidget):
         # Genau's console, seated under the players' HUD once the show wears
         # one (see :meth:`adopt_hud`): the two share the corner Fun Time puts
         # each in, and the console used to sit UNDER the map, unreachable.
-        self._motion_panel = MotionPanel(motion, self, host=self) if motion is not None else None
+        self._motion_panel = MotionPanel(
+            motion, self, host=self, control=self._actions.osr2_control,
+        ) if motion is not None else None
         self._hud = None
         self._preview.media_resized.connect(self._place_console)
 

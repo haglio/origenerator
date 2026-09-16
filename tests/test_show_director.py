@@ -383,6 +383,10 @@ class FakeHost:
         self.enhanced.append(prompt_id)
         return True
 
+    # The app's one OSR2 switch, handed to a show whole: a host with no device
+    # (which is every host here) has none to hand over.
+    osr2_control = None
+
     def toggle_osr2_drive(self):
         self.drive_toggles += 1
 

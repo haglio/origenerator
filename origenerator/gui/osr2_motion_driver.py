@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import dataclass
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -50,6 +51,16 @@ _LOOKAHEAD_MS = 40
 # as the window closes, so the seam is a movement rather than a slam. (Genau's
 # HandoffGlide, minus its cliff edge at the end.)
 _HANDOFF_MS = 300
+
+
+@dataclass(frozen=True)
+class _HeldDials:
+    """The motion as it stood when a hold stilled it, and as it comes back."""
+
+    cruise: bool
+    speed: int
+    amplitude: int
+    center: int
 
 
 class _TickThread:
@@ -119,6 +130,10 @@ class Osr2MotionDriver(QObject):
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread
         self._ticker = None
+        # Which end a hold has stilled the motion at, and what it was doing
+        # before the first of them -- see hold() and release().
+        self._held_at: int | None = None
+        self._held: _HeldDials | None = None
 
     @property
     def active(self) -> bool:
@@ -283,6 +298,51 @@ class Osr2MotionDriver(QObject):
         r"""Shift the motion a quarter cycle (genau's ``\``)."""
         with self._lock:
             motion_engine.quarter_offset(self._state)
+
+    # --- holding the motion still, at one end of the travel or the other -----
+
+    @property
+    def held_at(self) -> int | None:
+        """Which end the motion is being held at, or None when it is free."""
+        return self._held_at
+
+    def hold(self, center: int) -> None:
+        """Still the motion at *center*, remembering what it was doing.
+
+        Cruise goes off first: it rewrites all three dials every tick, so a
+        number set under it is overwritten inside the frame. Then the travel
+        closes before the center moves, so the motion stills where it is and
+        travels to the end from there rather than oscillating its way across.
+
+        A second hold does not overwrite the first recording -- park, then
+        retract, then driving puts back what was playing before the park.
+        """
+        with self._lock:
+            dials = self._state.state
+            if self._held_at is None:
+                self._held = _HeldDials(
+                    cruise=self._state.cruise.active, speed=dials.speed,
+                    amplitude=dials.amplitude, center=dials.intended_center)
+            self._held_at = center
+            motion_engine.disable_cruise_control(self._state)
+            motion_engine.set_amplitude(dials, 0)
+            motion_engine.set_center(dials, center)
+            motion_engine.set_speed(dials, motion_engine.MIN_SPEED)
+
+    def release(self) -> None:
+        """Put back whatever the motion was doing, cruise included, and spend
+        the recording.  Cruise goes back last: it draws its waves from what the
+        dials say."""
+        with self._lock:
+            held, self._held, self._held_at = self._held, None, None
+            if held is None:
+                return
+            dials = self._state.state
+            motion_engine.set_amplitude(dials, held.amplitude)
+            motion_engine.set_center(dials, held.center)
+            motion_engine.set_speed(dials, held.speed)
+            if held.cruise:
+                motion_engine.enable_cruise_control(self._state)
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the

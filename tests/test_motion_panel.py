@@ -7,9 +7,16 @@ lookalike), and that each command it posts reaches the right thing here.
 from __future__ import annotations
 
 from player_core import drive_layout, wave_stack
-from player_core.console import console_rows
+from player_core.console import (
+    OSR2_CONTROL_BUTTONS,
+    OSR2_CONTROL_OFF,
+    OSR2_DRIVING,
+    OSR2_PARKED,
+    console_rows,
+)
 from player_core.console_hud import ConsoleHud, ConsolePainter
-from player_core.robot_hand import POSITION_MAX
+from player_core.robot_hand import PARK_CENTER, POSITION_MAX
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
 from origenerator.gui.motion_panel import MotionPanel, console_hud, drive_hud
@@ -56,6 +63,14 @@ class FakeMotion:
     def set_center(self, value):
         self.calls.append(("set_center", value))
 
+    held_at = None
+
+    def hold(self, center):
+        self.calls.append(("hold", center))
+
+    def release(self):
+        self.calls.append("release")
+
 
 class FakeHost:
     """Stands in for the slideshow the transport and the pace act on."""
@@ -80,10 +95,10 @@ class FakeHost:
         self.calls.append(("dwell", self.dwell_s))
 
 
-def _panel(qtbot, motion=None, host=None):
+def _panel(qtbot, motion=None, host=None, control=None):
     motion = motion if motion is not None else FakeMotion()
     host = host if host is not None else FakeHost()
-    panel = MotionPanel(motion, host=host)
+    panel = MotionPanel(motion, host=host, control=control)
     qtbot.addWidget(panel)
     return panel, motion, host
 
@@ -196,6 +211,61 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
         _press(panel, action)
     assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
                             "cruise", "learned", "shape", "quarter"]
+
+
+class FakeControl(QObject):
+    """The app's OSR2 switch reduced to what the console's group asks of one."""
+
+    changed = pyqtSignal()
+
+    def __init__(self, state=OSR2_DRIVING):
+        super().__init__()
+        self._state = state
+        self.asked = []
+
+    def state(self):
+        return self._state
+
+    def set_state(self, state):
+        self._state = state
+        self.asked.append(state)
+
+
+def test_the_control_group_asks_the_apps_one_switch(qtbot):
+    """The four buttons are the app's OSR2 switch now, on every surface -- which
+    is what the separate toolbar one was replaced by."""
+    control = FakeControl()
+    panel, _motion, _host = _panel(qtbot, control=control)
+    panel.render_console()
+
+    for action in OSR2_CONTROL_BUTTONS.values():
+        _press(panel, action)
+
+    assert control.asked == list(OSR2_CONTROL_BUTTONS)
+
+
+def test_the_group_lights_the_state_the_switch_is_in(qtbot):
+    """The console draws the lit button; what this app owes it is the answer to
+    which state, which nothing on the panel itself knows."""
+    control = FakeControl(OSR2_CONTROL_OFF)
+    panel, motion, host = _panel(qtbot, control=control)
+
+    hud = console_hud(motion, host, control=control.state())
+
+    assert hud.console.osr2_control == OSR2_CONTROL_OFF
+    assert panel.render_console()[0]  # and it paints in that state
+
+
+def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
+    """A console outside a gallery -- a test's, and any future host that hands
+    over no switch -- can still park and release what it does have."""
+    panel, motion, _host = _panel(qtbot)
+    panel.render_console()
+
+    _press(panel, OSR2_CONTROL_BUTTONS[OSR2_PARKED])
+    _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
+
+    assert motion.calls == [("hold", PARK_CENTER), "release"]
 
 
 def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):

@@ -13,8 +13,9 @@ button riding it (``modes_row=False``). This console is inside another app's
 window, so it is not one of those three and has no borderless window of its own
 to park.
 
-The on/off switch is not on it either. That is a button in the toolbar, and this
-panel is what appears once it is pressed.  Nor are the two switches saying what
+The on/off switch IS on it: the control-state group -- parked, retracted,
+driving, control off -- is the app's one OSR2 switch now, and the toolbar's
+separate one is gone.  What is not on it are the two switches saying what
 a show may play: over a show those are on the players' HUD this panel sits
 under (:mod:`origenerator.gui.show_hud`), the same buttons a satellite's HUD
 carries, and a second pair here would be two switches for one thing.
@@ -35,7 +36,14 @@ from origenerator.paths import ensure_player_core_on_path
 ensure_player_core_on_path()
 
 from player_core import drive_layout  # noqa: E402
-from player_core.console import ConsoleModel  # noqa: E402
+from player_core.console import (  # noqa: E402
+    OSR2_CONTROL_BUTTONS,
+    OSR2_CONTROL_UNANSWERED,
+    OSR2_DRIVING,
+    OSR2_PARKED,
+    OSR2_RETRACTED,
+    ConsoleModel,
+)
 from player_core.console_hud import (  # noqa: E402
     OSR2_ROBOT_HAND,
     ConsoleHud,
@@ -48,7 +56,15 @@ from player_core.drive_readout import (  # noqa: E402
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
-from player_core.robot_hand import POSITION_MAX  # noqa: E402
+from player_core.robot_hand import (  # noqa: E402
+    PARK_CENTER,
+    POSITION_MAX,
+    RETRACT_CENTER,
+)
+
+# Which of the console's four control buttons asks for which state, read off
+# player_core's own mapping so a press cannot drift from the button that lights.
+_OSR2_CONTROL_BY_COMMAND = {verb: state for state, verb in OSR2_CONTROL_BUTTONS.items()}
 
 _TRACE_SECONDS = 12.0
 _REPAINT_MS = 100  # the trace scrolls with the phase while the panel shows
@@ -97,7 +113,8 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
+def console_hud(motion, host, *, device_on: bool = True,
+                control: str = OSR2_CONTROL_UNANSWERED) -> ConsoleHud:
     """The whole console as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated motion over
@@ -125,6 +142,7 @@ def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
         console=ConsoleModel(
             mode="genau", active=True, locked=host.locked,
             osr2=OSR2_ROBOT_HAND if driving else "off",
+            osr2_control=control,
             cruise=motion.state.cruise.active,
             learned=motion.state.learned.active,
             shape=motion.state.state.shape.value,
@@ -135,9 +153,9 @@ def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
     )
 
 
-def panel_size(motion, host) -> tuple[int, int]:
+def panel_size(motion, host, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[int, int]:
     """How big the console draws, which is what the widget has to be."""
-    return ConsolePainter().rgba(console_hud(motion, host))[1]
+    return ConsolePainter().rgba(console_hud(motion, host, control=control))[1]
 
 
 class MotionPanel(QWidget):
@@ -156,9 +174,17 @@ class MotionPanel(QWidget):
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, motion, parent=None, host=None, pace=None, device_on=None):
+    def __init__(self, motion, parent=None, host=None, pace=None, device_on=None,
+                 control=None):
         super().__init__(parent)
         self._motion = motion
+        # The app's one OSR2 switch: the control-state group's four buttons
+        # read which state it is in and ask it for another.  None where nobody
+        # handed one over, which is what a test's bare panel gets -- the group
+        # then draws as driving and its presses reach only the motion.
+        self._control = control
+        if control is not None:
+            control.changed.connect(self.refresh)
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
@@ -185,7 +211,7 @@ class MotionPanel(QWidget):
         # it and once more at double its offset, where that surface ended up.
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(motion, self._host))
+        self.setFixedSize(*panel_size(motion, self._host, self._osr2_control()))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
         # second is the same picture at Pillow's price, and with the panel now
@@ -295,6 +321,8 @@ class MotionPanel(QWidget):
         }.get(action)
         if step is not None:
             step[0](step[1])
+        elif action in _OSR2_CONTROL_BY_COMMAND:
+            self._ask_for_control(_OSR2_CONTROL_BY_COMMAND[action])
         elif action == "robot_hand_toggle_cruise":
             motion.toggle_cruise()
         elif action == "robot_hand_toggle_learned":
@@ -314,12 +342,32 @@ class MotionPanel(QWidget):
 
     # --- painting: the console's own painter, blitted ----------------------
 
+    def _ask_for_control(self, state: str) -> None:
+        """A press on the control-state group.  With no switch handed over there
+        is still the motion to hold, which is what a panel outside a gallery can
+        do about the device."""
+        if self._control is not None:
+            self._control.set_state(state)
+        elif state == OSR2_DRIVING:
+            self._motion.release()
+        elif state in (OSR2_PARKED, OSR2_RETRACTED):
+            self._motion.hold(
+                PARK_CENTER if state == OSR2_PARKED else RETRACT_CENTER)
+
+    def _osr2_control(self) -> str:
+        # Unanswered with no switch handed over: the group then draws the two
+        # holds it has always had and no off button, which is a switch nothing
+        # would hear.  The holds still reach the motion -- see _ask_for_control.
+        return (OSR2_CONTROL_UNANSWERED if self._control is None
+                else self._control.state())
+
     def render_console(self) -> tuple[bytes, tuple[int, int]]:
         """The console drawn — the picture, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
-        return self._painter.rgba(
-            console_hud(self._motion, self._host, device_on=self._device_on()))
+        return self._painter.rgba(console_hud(
+            self._motion, self._host, device_on=self._device_on(),
+            control=self._osr2_control()))
 
     def _device_on(self) -> bool:
         """Whether the OSR2 is answering, asked afresh on every draw — the device

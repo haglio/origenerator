@@ -29,7 +29,6 @@ from origenerator.config import AMBIENT_AUDIO_VOICES
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
-from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
 from origenerator.paths import ensure_shared_ui_on_path
 
 ensure_shared_ui_on_path()
@@ -108,7 +107,6 @@ class BankActs(NamedTuple):
     delete: Callable[[], None]
     toggle_audio: Callable[[bool], None]
     toggle_mic: Callable[[bool], None]
-    toggle_drive: Callable[[bool], None]
 
 
 def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
@@ -157,11 +155,12 @@ class ToolbarBank(QWidget):
     ``hosted`` builds no audio bed and no microphone: inside a Fun Time session
     the main player owns the room's sound and the session owns the mic, so a
     second switch for either would be a switch over something this window does
-    not hold. ``device`` builds no OSR2 switch for the same reason — the session
-    keeps the device on its main player.
+    not hold. There is no OSR2 switch here at all any more: the players' console
+    carries a control-state group — parked, retracted, driving, control off —
+    and that group is where the device is switched now, on every surface.
     """
 
-    def __init__(self, acts: BankActs, *, hosted: bool, device: bool):
+    def __init__(self, acts: BankActs, *, hosted: bool):
         super().__init__()
         policy = self.sizePolicy()
         policy.setHeightForWidth(True)  # so the column above gives it the rows it asks for
@@ -227,22 +226,6 @@ class ToolbarBank(QWidget):
                 acts.toggle_mic, checkable=True,
             )
             self.mic.setStyleSheet(_LIT)
-        # One switch for the device, wearing the waveform: on means Origenerator
-        # is driving the OSR2, and the app picks the source — the funscript of
-        # whatever scripted video is in front, and a self-generated motion
-        # whenever there is no script to follow. It used to be two buttons, which
-        # asked the user to answer a question the app can answer for itself, and
-        # let both sources be armed at once. Always visible (it's app-wide).
-        self.drive = None
-        if device:
-            self.drive = _tool_button(
-                icons.motion_icon(),
-                "Drive the OSR2 — the funscript of the video in front, or a "
-                f"self-generated motion when there is none ({MOTION_KEY_LEGEND}; "
-                "Esc to stop)",
-                acts.toggle_drive, checkable=True,
-            )
-            self.drive.setStyleSheet(_LIT)
         # The family's own gap along a row, and its wider one between wrapped
         # rows -- at the single small gap this used, a bank that wrapped had its
         # two rows all but touching.
@@ -253,8 +236,8 @@ class ToolbarBank(QWidget):
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
             (self.star, self.enhance, self.delete),  # …to what's in front
-            (self.slideshow, self.auto,              # what the app is doing,
-             self.audio, self.drive),                # and Esc stops
+            (self.slideshow, self.auto, self.audio),  # what the app is doing,
+                                                      # and Esc stops
             (self.mic,),                             # what it hears with
         ):
             buttons = tuple(b for b in buttons if b is not None)

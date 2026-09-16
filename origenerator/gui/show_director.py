@@ -54,6 +54,7 @@ from origenerator.gui.orientation import (
     split_key as _split_shelf_key,
 )
 from origenerator.gui.player_show import PlayerShow
+from origenerator.gui.show_hud import ShowHud
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
@@ -64,31 +65,6 @@ from origenerator.voice.show_commands import ShowCommand
 from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
-
-
-def _shared_hud_widget():
-    """The players' HUD widget, or ``None`` where player_core has not got one.
-
-    Reached for here rather than imported at module top, and reached for at all
-    rather than assumed, for the same reason: the panel lives in the newest
-    player_core, while this app's other reaches into that sibling (genau's
-    console, the motion) resolve against an older checkout perfectly well.  A
-    session names the checkout it wants on PYTHONPATH; a plain launch walks up
-    to the primary one, and that one only grows the panel when it lands.
-
-    So a checkout without it starts, browses and generates exactly as before,
-    and a show opened on it is the show that used to be: its own neighbor
-    stills and position plate, no map.  Losing the panel is a bad afternoon;
-    losing the fullscreen view over the panel would be a dead app.
-    """
-    try:
-        from origenerator.gui.show_hud import ShowHud
-    except ImportError:
-        logger.warning(
-            "This player_core carries no shared HUD, so shows wear none",
-            exc_info=True)
-        return None
-    return ShowHud
 
 
 class ShowHost(Protocol):
@@ -579,18 +555,12 @@ class ShowDirector:
         pair leads the panel.  Standalone the panel is the same panel minus
         those two — no channel to post on, so the transport lands on the show
         itself, and no session to switch modes on, so no mode row.
-
-        A player_core with no shared HUD in it leaves the show as it was, with
-        its own stills and plate still on — see :func:`_shared_hud_widget`.
         """
-        hud = _shared_hud_widget()
-        if hud is None:
-            return
         # The view is handed the panel itself rather than only told one is on:
         # its console seats itself under the panel and follows it as it resizes.
-        view.adopt_hud(hud(view, side=side,
-                           dashboard_cmd_file=self._session_channel,
-                           label_for=self._item_label))
+        view.adopt_hud(ShowHud(view, side=side,
+                               dashboard_cmd_file=self._session_channel,
+                               label_for=self._item_label))
 
     @property
     def _session_channel(self):

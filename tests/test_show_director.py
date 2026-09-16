@@ -423,7 +423,7 @@ def shows(monkeypatch):
 
     monkeypatch.setattr(module, "SlideshowView", build_show)
     monkeypatch.setattr(module, "PlayerShow", build_show)
-    monkeypatch.setattr(module, "_shared_hud_widget", lambda: None)
+    monkeypatch.setattr(module.ShowDirector, "_wear_the_hud", lambda self, view, side: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
 

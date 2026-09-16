@@ -107,8 +107,8 @@ def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
          patch("origenerator.win32.stamp_pinned_shortcuts") as mock_stamp:
         _init_windows_taskbar_identity()
 
-    mock_set_id.assert_called_once_with("FunTime.Origenerator")
-    mock_stamp.assert_called_once_with("FunTime.Origenerator", include="origenerator")
+    mock_set_id.assert_called_once_with("Origenerator")
+    mock_stamp.assert_called_once_with("Origenerator", include="origenerator")
 
 
 def test_init_windows_taskbar_identity_noop_off_windows():

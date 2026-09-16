@@ -283,6 +283,24 @@ def _never_take_the_real_device(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
+    """Keep the suite out of the registry and out of the real AppData.
+
+    Every window this suite builds builds the desktop notices with it, and those
+    name the app to Windows: a value under HKEY_CURRENT_USER and a mark written
+    beside it, both of which belong to a real launch rather than to a test's
+    fiftieth throwaway window. The registration is replaced and the mark is
+    pointed at a directory of the run's own; the test that covers either
+    supplies its own stand-in over these.
+    """
+    from origenerator.gui import desktop_notices
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
+    monkeypatch.setattr(desktop_notices, "register_notification_identity",
+                        lambda *_a, **_kw: None)
+
+
+@pytest.fixture(autouse=True)
 def _no_dialog_nobody_can_answer(monkeypatch):
     """Fail on a modal the test never arranged to answer, rather than hang on it.
 

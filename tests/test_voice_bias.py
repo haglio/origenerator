@@ -62,5 +62,8 @@ def test_the_budget_is_not_spent_on_words_whisper_already_knows():
     # whisper has never mis-heard "fifty", and a word listed here is a word not
     # listed for something that would have been mis-heard.
     words = app_command_bias().split()
-    for ordinary in ("fifty,", "fifty", "50,", "50", "min,", "max,", "to,", "it,"):
+    # The letters and the number of "OSR2" are the same: whisper writes them
+    # every way there is, and the vocabulary takes every one of those.
+    for ordinary in ("fifty,", "fifty", "50,", "50", "min,", "max,", "to,", "it,",
+                     "osr,", "o,", "s,", "r,", "two,", "2,"):
         assert ordinary not in words

@@ -13914,13 +13914,25 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
 
     view._voice.listener.speak("drive on")
     assert view.osr2_control.isChecked()
-    assert view._voice.status.text() == "🎤 the OSR2 on"
+    assert view._voice.status.text() == "🎤 OSR2 control on"
 
     view._voice.listener.speak("drive")           # bare: flips whichever way it stands
     assert not view.osr2_control.isChecked()
 
     view._voice.listener.speak("drive off")       # already off: still ends up off
     assert not view.osr2_control.isChecked()
+
+
+def test_osr2_off_lets_go_of_the_device_and_says_it_is_control(qtbot, tmp_path):
+    """The word is the console's fourth button, and the answer names what went
+    off: this app's control, not the device."""
+    view = _listening(qtbot, tmp_path)
+    view._voice.listener.speak("drive on")
+
+    view._voice.listener.speak("OSR2 off")
+
+    assert view.osr2_control.state() == OSR2_CONTROL_OFF
+    assert view._voice.status.text() == "🎤 OSR2 control off"
 
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):

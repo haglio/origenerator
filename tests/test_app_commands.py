@@ -148,6 +148,15 @@ def test_a_switch_takes_a_flip_and_an_explicit_way():
     assert match_app_command("audio on") is AppCommand.AUDIO_ON
 
 
+@pytest.mark.parametrize("said", [
+    "OSR2 off", "OSR 2 off", "O.S.R. 2 off", "OSR two off", "O S R two off",
+])
+def test_the_osr2_is_let_go_of_in_fun_times_words(said):
+    """Fun Time's spoken word for the console's control-off button, heard here
+    however the transcriber writes the letters and the number."""
+    assert match_app_command(said) is AppCommand.DRIVE_OFF
+
+
 def test_the_mic_can_be_shut_by_voice_but_not_opened():
     # A shut recognizer hears nothing, so there is no spoken way back — the same
     # reason Fun Time's mic has "voice off" and no "voice on".

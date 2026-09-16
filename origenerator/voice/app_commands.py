@@ -203,6 +203,9 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
+# Fun Time's word for the console's control-off button, which is this switch
+# off -- the letters and the number however whisper writes them.
+_say(AppCommand.DRIVE_OFF, "osr 2 off", "o s r 2 off", "osr two off", "o s r two off")
 
 # The show's own narrowing filter, in Fun Time's own grammar: "filter <what to
 # keep>" turns one on, and "clear filter" is the way back to all of it — the
@@ -285,7 +288,8 @@ def match_app_command(text: str) -> AppCommand | DialSetting | None:
 # has never once mis-heard "fifty" — and listing them only crowds out a word
 # that would have been mis-heard.
 _BIAS_SKIP = frozenset(
-    ("go", "to", "it", "this", "shelf", "on", "off", "min", "max", "one", "hundred")
+    ("go", "to", "it", "this", "shelf", "on", "off", "min", "max", "one", "hundred",
+     "osr", "o", "s", "r", "two", "2")
     + tuple(_TENS)
     + tuple(str(value) for value in _TENS.values())
 )

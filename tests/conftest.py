@@ -391,8 +391,32 @@ def _the_live_widget_count_stays_flat():
     )
 
 
+@pytest.fixture(scope="session")
+def _widgets_registered_this_test():
+    """What the running test handed ``qtbot.addWidget``, held until the reap below.
+
+    pytest-qt holds those widgets only weakly, and spins the event loop again
+    once the test body has returned. A shown gallery is a reference cycle, so for
+    that spin it was garbage Qt was still painting, and a collection that landed
+    inside one of its paints freed the whole tree under the paint: the Python 3.14
+    gate went down that way in the gallery's delete tests.
+    """
+    from pytestqt.qtbot import QtBot
+
+    held = []
+    register = QtBot.addWidget
+
+    def register_and_hold(bot, widget, **kwargs):
+        register(bot, widget, **kwargs)
+        held.append(widget)
+
+    QtBot.addWidget = register_and_hold
+    yield held
+    QtBot.addWidget = register
+
+
 @pytest.fixture(autouse=True)
-def _collect_widgets_between_tests():
+def _collect_widgets_between_tests(_widgets_registered_this_test):
     """Reap each test's widgets before the next one builds its own.
 
     The GUI widgets (a config panel's param form, the gallery's panes) form Python
@@ -405,8 +429,11 @@ def _collect_widgets_between_tests():
     finishes what Qt was asked to do with it, so each test pays for its own
     leavings rather than handing them to the next one that runs an event loop —
     which is what the suite's one flake was (tests/test_deferred_deletes.py).
+    By now pytest-qt has closed what the test registered, so letting go of it
+    here cannot free anything Qt is still drawing.
     """
     yield
+    _widgets_registered_this_test.clear()
     gc.collect()
     _deliver_the_deletions_already_scheduled()
 

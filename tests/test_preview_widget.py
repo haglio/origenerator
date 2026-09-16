@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from PIL import Image
@@ -1479,3 +1479,42 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
 
     assert fired == []
     assert all(b.isHidden() for b in _corners(w))
+
+
+def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
+    # Qt destroys a widget's children in the order they were parented. The
+    # player used to be parented after the stack holding its video surface, so
+    # on every close it outlived that surface while still rendering into it --
+    # the media pipeline's use-after-free, or Qt aborting, that Windows' own
+    # crash log shows for this app whenever a show was replaced or the app quit
+    # (2026-09-12 to 09-16, ~20 times). The real player, since only the real
+    # one is a child of this widget.
+    import gc
+
+    w = PreviewWidget()
+    order = []
+    w._player.destroyed.connect(lambda *_: order.append("player"))
+    w._video.destroyed.connect(lambda *_: order.append("surface"))
+
+    del w
+    gc.collect()
+
+    assert order == ["player", "surface"]
+
+
+def test_releasing_the_player_detaches_it_from_the_pane(make_preview):
+    # A stop alone leaves the backend winding down into a surface a closing
+    # widget is about to take down; a released player is stopped, emptied and
+    # then pointed at nothing, so whatever the widget does next it renders
+    # nowhere.
+    w = make_preview()
+    p = w._player
+
+    w.release_player()
+
+    assert p.method_calls[-4:] == [
+        call.stop(),
+        call.setSource(QUrl()),
+        call.setVideoOutput(None),
+        call.setAudioOutput(None),
+    ]

@@ -137,6 +137,19 @@ class PreviewWidget(QWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
+        # Parented before the pane that will hold its video surface: Qt takes a
+        # widget's children down in the order they were parented, so the player
+        # goes first, stopped and detached, rather than rendering into a surface
+        # already gone (test_the_player_is_torn_down_before_the_surface_it_renders_to).
+        # The player is injectable so unit tests can drive playback intent
+        # without spinning up the real (WMF) backend, which deadlocks at exit.
+        # A hosting session's OmniPause over this pane, held rather than edged:
+        # the pane is re-pointed constantly and each new media starts playing.
+        self._playback_paused = False
+        self._player = player if player is not None else QMediaPlayer(self)
+        self._audio = QAudioOutput(self)
+        self._audio.setMuted(mute_audio)
+
         # The media (image/video) fills the pane; an optional funscript strip rides
         # along its lower edge, so a scripted clip shows its motion motion at a glance.
         outer = QVBoxLayout(self)
@@ -169,14 +182,6 @@ class PreviewWidget(QWidget):
 
         self._video = QVideoWidget()
         self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._audio = QAudioOutput(self)
-        self._audio.setMuted(mute_audio)
-        # The player is injectable so unit tests can drive playback intent
-        # without spinning up the real (WMF) backend, which deadlocks at exit.
-        # A hosting session's OmniPause over this pane, held rather than edged:
-        # the pane is re-pointed constantly and each new media starts playing.
-        self._playback_paused = False
-        self._player = player if player is not None else QMediaPlayer(self)
         self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video)
         # Infinite for the info-pane preview (an immediate moving thumbnail); a
@@ -252,7 +257,7 @@ class PreviewWidget(QWidget):
         if player is None:
             app = QApplication.instance()
             if app is not None:
-                app.aboutToQuit.connect(self._release)
+                app.aboutToQuit.connect(self.release_player)
 
     def _take_the_pane(self, media, *, stop_player: bool = True,
                        enhancing: bool = False,
@@ -284,8 +289,7 @@ class PreviewWidget(QWidget):
         self._hide_strip()
         self._unplayable_report.stop()
         if stop_player:
-            self._player.stop()
-            self._player.setSource(QUrl())
+            self._stop_playback()
         if not enhancing:
             self.set_notice(None)
             self.set_actions(None)
@@ -820,10 +824,17 @@ class PreviewWidget(QWidget):
         if self.is_showing_video():
             self.video_unplayable.emit()
 
-    def _release(self) -> None:
-        """Tear down the media pipeline so shutdown can't deadlock the backend."""
+    def _stop_playback(self) -> None:
         self._player.stop()
         self._player.setSource(QUrl())
+
+    def release_player(self) -> None:
+        """Stop the player and point it at nothing, for a pane about to be
+        dropped and for the app about to quit (where a still-active real
+        backend deadlocks)."""
+        self._stop_playback()
+        self._player.setVideoOutput(None)
+        self._player.setAudioOutput(None)
 
     def _set_movie(self, movie: QMovie | None, native_size=None) -> None:
         """Attach (or clear) an animated movie, retiring any previous one.

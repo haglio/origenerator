@@ -87,5 +87,5 @@ def test_the_legend_names_every_key_the_cluster_answers():
     # Each key beside the word for what it does: "/" and "I" alone appear inside
     # "J/L" and elsewhere, so on their own they would say nothing.
     for written in ("Space drives", "J/L speed", "7/9 travel", "U/O center",
-                    "I shape", "/ cruise", "; learned", "\\ nudge"):
+                    "I shape", "/ cruise", "; human inspired", "\\ nudge"):
         assert written in MOTION_KEY_LEGEND

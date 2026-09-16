@@ -232,9 +232,9 @@ _say(AppCommand.CRUISE, "cruise", "cruise control")
 # should never have to find out which way it is standing first.
 _say(AppCommand.CRUISE_ON, "cruise on")
 _say(AppCommand.CRUISE_OFF, "cruise off")
-_say(AppCommand.LEARNED, "learned motion")
-_say(AppCommand.LEARNED_ON, "learned on")
-_say(AppCommand.LEARNED_OFF, "learned off")
+_say(AppCommand.LEARNED, "human inspired")
+_say(AppCommand.LEARNED_ON, "human inspired on")
+_say(AppCommand.LEARNED_OFF, "human inspired off")
 _say(AppCommand.OFFSET, "offset")
 
 # --- the dials said outright: "amp fifty", "max speed" ----------------------

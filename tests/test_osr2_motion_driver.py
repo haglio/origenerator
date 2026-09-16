@@ -226,7 +226,7 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
         assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
     assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
     assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
-    assert "learned" in driver.status_text()
+    assert "human inspired" in driver.status_text()
     driver.set_learned(False)
     assert not driver.state.learned.active and not driver.state.learned.times
 

@@ -67,9 +67,9 @@ def test_the_motion_dials_keep_fun_times_phrases():
 
 
 def test_the_learned_motion_answers_the_same_three_ways_cruise_does():
-    assert match_app_command("learned motion") is AppCommand.LEARNED
-    assert match_app_command("learned on") is AppCommand.LEARNED_ON
-    assert match_app_command("learned off") is AppCommand.LEARNED_OFF
+    assert match_app_command("human inspired") is AppCommand.LEARNED
+    assert match_app_command("human inspired on") is AppCommand.LEARNED_ON
+    assert match_app_command("human inspired off") is AppCommand.LEARNED_OFF
 
 
 def test_cruise_answers_an_explicit_on_and_off_as_well_as_a_flip():

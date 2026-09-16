@@ -6,7 +6,7 @@ show) answers the same keys through this helper,
 and floats the same drive panel
 (:mod:`origenerator.gui.motion_panel`). The keys are genau's own, so the muscle
 memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
-I shape, / cruise control, backslash nudges a quarter cycle.
+I shape, / cruise control, ; learned motion, backslash nudges a quarter cycle.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 
 # The key legend, shown as the drive panel's tooltip.
 MOTION_KEY_LEGEND = ("Space drives · J/L speed · 7/9 travel · U/O center"
-                     r" · I shape · / cruise · \ nudge")
+                     r" · I shape · / cruise · ; learned · \ nudge")
 
 
 def apply_motion_key(motion, key, *, on_drive_toggle=None) -> bool:
@@ -47,6 +47,8 @@ def apply_motion_key(motion, key, *, on_drive_toggle=None) -> bool:
         motion.cycle_shape()
     elif key == Qt.Key.Key_Slash:
         motion.toggle_cruise()
+    elif key == Qt.Key.Key_Semicolon:
+        motion.toggle_learned()
     elif key == Qt.Key.Key_Backslash:
         motion.quarter_offset()
     else:

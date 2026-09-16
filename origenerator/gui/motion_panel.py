@@ -124,6 +124,7 @@ def console_hud(motion, host, *, device_on: bool = True) -> ConsoleHud:
             mode="genau", active=True, locked=host.locked,
             osr2=OSR2_ROBOT_HAND if driving else "off",
             cruise=motion.state.cruise.active,
+            learned=motion.state.learned.active,
             shape=motion.state.state.shape.value,
             advance_interval=host.dwell_s,
         ),
@@ -294,6 +295,8 @@ class MotionPanel(QWidget):
             step[0](step[1])
         elif action == "robot_hand_toggle_cruise":
             motion.toggle_cruise()
+        elif action == "robot_hand_toggle_learned":
+            motion.toggle_learned()
         elif action == "robot_hand_cycle_shape":
             motion.cycle_shape()
         elif action == "quarter_button":

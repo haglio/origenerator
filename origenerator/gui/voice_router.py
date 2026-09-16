@@ -104,6 +104,9 @@ _MOTION = {
     AppCommand.CRUISE: ("toggle_cruise", None),
     AppCommand.CRUISE_ON: ("set_cruise", True),
     AppCommand.CRUISE_OFF: ("set_cruise", False),
+    AppCommand.LEARNED: ("toggle_learned", None),
+    AppCommand.LEARNED_ON: ("set_learned", True),
+    AppCommand.LEARNED_OFF: ("set_learned", False),
     AppCommand.OFFSET: ("quarter_offset", None),
 }
 

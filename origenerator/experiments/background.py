@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import logging
 
-from origenerator.gallery.output import is_in_progress
 from origenerator.generation_state import GenerationSource
+from origenerator.inflight import drop_in_flight
 
 logger = logging.getLogger(__name__)
 
@@ -64,47 +64,8 @@ def cancel_experiments(db, client) -> int:
 
     The app is open now, so the GPU is the user's: every experiment still queued
     is dropped and its abandoned row deleted, and one caught mid-render is
-    interrupted as well — dequeuing alone would leave it holding the card.
-    Returns how many were dropped. Finished ones are untouched: they're the
-    results waiting on the shelf.
+    stopped as well (:func:`origenerator.inflight.drop_in_flight`). Returns how
+    many were dropped. Finished ones are untouched: they're the results waiting
+    on the shelf.
     """
-    rows = [
-        r for r in db.list_generations()
-        if r.get("source") == GenerationSource.EXPERIMENT and is_in_progress(r)
-    ]
-    if not rows:
-        return 0
-    executing = _safe_running(client)
-    dropped = 0
-    interrupt = False
-    for row in rows:
-        prompt_id = row["prompt_id"]
-        try:
-            client.cancel_prompt(prompt_id)
-        except Exception as e:
-            # Leave the row alone: the prompt may still run, and the app adopts
-            # an in-flight row as a live job it can preempt when the user works.
-            logger.warning("Could not dequeue experiment %s: %s", prompt_id, e)
-            continue
-        db.delete_generation(prompt_id)
-        dropped += 1
-        interrupt = interrupt or prompt_id in executing
-    if interrupt:
-        # Only ever for a prompt of ours: ComfyUI serves other clients, and
-        # /interrupt stops whatever it happens to be executing.
-        try:
-            client.interrupt()
-        except Exception as e:
-            logger.warning("Could not interrupt the running experiment: %s", e)
-    if dropped:
-        logger.info("Dropped %d queued experiment(s) — the app is open", dropped)
-    return dropped
-
-
-def _safe_running(client) -> set:
-    """The prompt ids ComfyUI is executing, or an empty set if it can't say."""
-    try:
-        return client.fetch_running()
-    except Exception as e:
-        logger.warning("Could not read ComfyUI's running prompts: %s", e)
-        return set()
+    return drop_in_flight(db, client, GenerationSource.EXPERIMENT, "experiment")

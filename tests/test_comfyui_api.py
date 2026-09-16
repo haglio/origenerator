@@ -102,20 +102,6 @@ def test_fetch_queue_returns_running_and_pending_ids():
 
     assert ids == {"run-1", "pend-1", "pend-2"}
 
-def test_fetch_running_returns_only_what_is_executing():
-    # Telling the executing prompt from a merely queued one is what lets a
-    # caller interrupt its own job without stopping someone else's.
-    client = ComfyUIApi()
-    body = json.dumps({
-        "queue_running": [[0, "run-1", {}, {}, []]],
-        "queue_pending": [[1, "pend-1", {}, {}, []]],
-    }).encode()
-
-    with patch("urllib.request.urlopen", return_value=_mock_response(200, body)):
-        ids = client.fetch_running()
-
-    assert ids == {"run-1"}
-
 def _queue_client(body: dict, client_id="ours-client"):
     """A bare client, with its own id, whose one /queue call answers with ``body``."""
     client = ComfyUIApi(client_id=client_id)
@@ -215,11 +201,13 @@ def test_foreign_queue_is_empty_when_the_queue_is_all_ours():
     with urlopen:
         assert client.foreign_queue().total == 0
 
-def test_clear_foreign_queue_drops_theirs_and_interrupts_the_one_running():
+def test_clear_foreign_queue_drops_their_pending_and_stops_their_run_by_name():
     # The reported mess: a batch of background experiments from a branch preview
     # sitting on the shared server, in nobody's ledger, in the way of every
     # Generate. Deleting the pending ones alone would leave the one mid-render
-    # holding the GPU, so what's executing is stopped too.
+    # holding the GPU, so what's executing is stopped too -- by name, so that if
+    # it has finished and a job of ours has taken the GPU meanwhile, the server
+    # skips the interrupt rather than cutting ours off.
     client = ComfyUIApi(client_id="ours-client")
     queue = {
         "queue_running": [_entry(0, "theirs-running", "some-other-app")],
@@ -242,32 +230,8 @@ def test_clear_foreign_queue_drops_theirs_and_interrupts_the_one_running():
     assert dropped == 3  # two pending of theirs, plus the one they had running
     deletes = [json.loads(d) for u, d in posted if u.endswith("/queue")]
     assert deletes == [{"delete": ["theirs-a", "theirs-b"]}]  # one call, never "ours"
-    assert [u for u, _ in posted if u.endswith("/interrupt")]
-
-def test_clear_foreign_queue_leaves_our_own_running_job_alone():
-    # /interrupt stops whatever is executing right now, so between reading the
-    # queue and calling it their job can have finished and ours have started.
-    # Re-reading first is what keeps a clear from killing the user's own run.
-    client = ComfyUIApi(client_id="ours-client")
-    states = [
-        {"queue_running": [_entry(0, "theirs-running", "some-other-app")],
-         "queue_pending": [_entry(1, "theirs-a", "some-other-app")]},
-        {"queue_running": [_entry(2, "ours", "ours-client")], "queue_pending": []},
-    ]
-    posted = []
-
-    def fake_urlopen(req, **kwargs):
-        if not isinstance(req, str) and req.data is not None:
-            posted.append(req.full_url)
-            return _mock_response(200, b"{}")
-        state = states.pop(0) if len(states) > 1 else states[0]
-        return _mock_response(200, json.dumps(state).encode())
-
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        dropped = client.clear_foreign_queue()
-
-    assert dropped == 1  # only the pending one they had; nothing was interrupted
-    assert not [u for u in posted if u.endswith("/interrupt")]
+    interrupts = [json.loads(d) for u, d in posted if u.endswith("/interrupt")]
+    assert interrupts == [{"prompt_id": "theirs-running"}]
 
 def test_clear_foreign_queue_touches_nothing_when_the_queue_is_all_ours():
     client, urlopen = _queue_client({
@@ -308,6 +272,18 @@ def test_interrupt_posts_to_interrupt_endpoint():
     req = m.call_args[0][0]
     assert req.full_url == "http://127.0.0.1:8188/interrupt"
     assert req.data == b""  # a body forces a POST
+
+def test_interrupt_can_name_the_one_prompt_to_stop():
+    # Unnamed, /interrupt stops whatever ComfyUI is executing, whoever asked for
+    # it. Named, the server stops that prompt if it is the one running and
+    # nothing otherwise -- so a job can be stopped without first asking whether
+    # it is still the one on the GPU.
+    client = ComfyUIApi()
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"")) as m:
+        client.interrupt("comfy-X")
+    req = m.call_args[0][0]
+    assert req.full_url == "http://127.0.0.1:8188/interrupt"
+    assert json.loads(req.data) == {"prompt_id": "comfy-X"}
 
 def test_cancel_prompt_deletes_from_queue():
     client = ComfyUIApi()

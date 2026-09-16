@@ -346,7 +346,7 @@ class GenerationJob(QObject):
         self._detach()
         try:
             if self._state == "running":
-                self._client.interrupt()
+                self._client.interrupt(self.prompt_id)
             elif self._state == "queued":
                 self._client.cancel_prompt(self.prompt_id)
         except Exception as e:

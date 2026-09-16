@@ -80,8 +80,8 @@ class ComfyUIClient(QThread):
     def submit_job(self, workflow_payload: dict, prompt_id: str) -> str:
         return self.api.submit_job(workflow_payload, prompt_id)
 
-    def interrupt(self):
-        return self.api.interrupt()
+    def interrupt(self, prompt_id: str | None = None):
+        return self.api.interrupt(prompt_id)
 
     def free_memory(self):
         return self.api.free_memory()
@@ -97,9 +97,6 @@ class ComfyUIClient(QThread):
 
     def fetch_queue(self) -> set[str]:
         return self.api.fetch_queue()
-
-    def fetch_running(self) -> set[str]:
-        return self.api.fetch_running()
 
     def foreign_backlog(self, prompt_id: str) -> int | None:
         return self.api.foreign_backlog(prompt_id)

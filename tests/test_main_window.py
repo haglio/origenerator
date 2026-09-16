@@ -228,21 +228,17 @@ def test_persists_the_dragged_prompt_heights_on_close(
 class _QueueSpyClient(ComfyUIClient):
     """A real client whose queue operations are recorded instead of sent."""
 
-    def __init__(self, running=()):
+    def __init__(self):
         super().__init__()
-        self.running = set(running)
         self.canceled = []
         self.submitted = []
-        self.interrupts = 0
-
-    def fetch_running(self):
-        return set(self.running)
+        self.interrupted = []
 
     def cancel_prompt(self, prompt_id):
         self.canceled.append(prompt_id)
 
-    def interrupt(self):
-        self.interrupts += 1
+    def interrupt(self, prompt_id=None):
+        self.interrupted.append(prompt_id)
 
     def submit_job(self, payload, prompt_id):
         self.submitted.append(prompt_id)
@@ -325,13 +321,13 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
         workflow_json="{}", source="experiment",
     )
     db.update_generation("exp-1", status="running")
-    client = _QueueSpyClient(running=["exp-1"])
+    client = _QueueSpyClient()
 
     win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
     assert client.canceled == ["exp-1"]
-    assert client.interrupts == 1  # it was mid-render — dequeuing alone wouldn't stop it
+    assert client.interrupted == ["exp-1"]  # in case it is mid-render: dequeuing alone wouldn't stop it
     assert db.get_generation("exp-1") is None
     assert win._gallery_view._reroll_jobs == {}  # and it is not adopted as a live job
 
@@ -349,13 +345,13 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
         workflow_json="{}", source="experiment",
     )
     db.update_generation("exp-1", status="running")
-    client = _QueueSpyClient(running=["exp-1"])
+    client = _QueueSpyClient()
 
     win = OrigeneratorWindow(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
     assert client.canceled == []
-    assert client.interrupts == 0
+    assert client.interrupted == []
     assert db.get_generation("exp-1") is not None
 
 

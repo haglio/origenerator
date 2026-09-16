@@ -233,18 +233,14 @@ def test_the_startup_sweep_folds_the_finished_and_leaves_the_running(tmp_path):
 
 
 class _FakeClient:
-    def __init__(self, running=()):
-        self._running = set(running)
-        self.cancelled, self.interrupts = [], 0
-
-    def fetch_running(self):
-        return self._running
+    def __init__(self):
+        self.cancelled, self.interrupted = [], []
 
     def cancel_prompt(self, prompt_id):
         self.cancelled.append(prompt_id)
 
-    def interrupt(self):
-        self.interrupts += 1
+    def interrupt(self, prompt_id=None):
+        self.interrupted.append(prompt_id)
 
 
 def test_opening_the_app_drops_what_the_absence_had_not_reached(tmp_path):
@@ -263,16 +259,19 @@ def test_opening_the_app_drops_what_the_absence_had_not_reached(tmp_path):
     assert db.get_generation("done") is not None  # a finished repair still folds
 
 
-def test_one_caught_mid_render_is_interrupted_too(tmp_path):
-    # Dequeuing alone would leave it holding the GPU the user just came back for.
+def test_one_caught_mid_render_is_stopped_by_name_too(tmp_path):
+    # Dequeuing alone would leave it holding the GPU the user just came back
+    # for. Which repair the server is executing it alone knows, so each is asked
+    # to stop by name -- never with the nameless interrupt, which would stop
+    # whatever is running, another app's included.
     db = Database(tmp_path / "t.db")
     _baked(db, "one")
     _add(db, "running", params={TARGET_KEY: "one"}, files=None,
          source=GenerationSource.BASE_RENDER, status="running")
-    client = _FakeClient(running={"running"})
+    client = _FakeClient()
 
     assert cancel_base_renders(db, client) == 1
-    assert client.interrupts == 1
+    assert client.interrupted == ["running"]
 
 
 def test_a_repair_never_grows_a_folder_of_its_own(tmp_path):

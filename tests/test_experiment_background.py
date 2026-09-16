@@ -85,25 +85,22 @@ def test_launches_that_keep_failing_give_up_instead_of_retrying_the_batch_out():
 
 
 class FakeClient:
-    """A ComfyUI stand-in: records what was dequeued and interrupted, and
-    raises from ``cancel_prompt`` for the prompt ids in ``refuse``."""
+    """A ComfyUI stand-in: records what was dequeued and which prompts were
+    asked to stop, and raises from ``cancel_prompt`` for the prompt ids in
+    ``refuse``."""
 
-    def __init__(self, running=(), refuse=()):
-        self.running = set(running)
+    def __init__(self, refuse=()):
         self.refuse = set(refuse)
         self.canceled = []
-        self.interrupts = 0
-
-    def fetch_running(self):
-        return set(self.running)
+        self.interrupted = []
 
     def cancel_prompt(self, prompt_id):
         if prompt_id in self.refuse:
             raise OSError("ComfyUI is not answering")
         self.canceled.append(prompt_id)
 
-    def interrupt(self):
-        self.interrupts += 1
+    def interrupt(self, prompt_id=None):
+        self.interrupted.append(prompt_id)
 
 
 def _row(db, prompt_id, *, status, source="generated"):
@@ -124,7 +121,6 @@ def test_opening_drops_every_experiment_still_waiting_in_the_queue(tmp_path):
 
     assert cancel_experiments(db, client) == 2
     assert sorted(client.canceled) == ["exp-1", "exp-2"]
-    assert client.interrupts == 0  # nothing of ours was mid-render
     assert db.get_generation("exp-1") is None
     assert db.get_generation("exp-2") is None
     # A finished experiment is a result to review, and the user's own job is
@@ -133,28 +129,22 @@ def test_opening_drops_every_experiment_still_waiting_in_the_queue(tmp_path):
     assert db.get_generation("mine") is not None
 
 
-def test_an_experiment_caught_mid_render_is_interrupted_not_just_dequeued(tmp_path):
+def test_each_experiment_is_asked_to_stop_by_name_in_case_it_is_mid_render(tmp_path):
     # Dequeuing only unqueues; the one ComfyUI is already executing keeps the
     # GPU until it's interrupted — and holding it is exactly what the user
-    # turned this off for.
+    # turned this off for. Which one that is, the server knows and this does
+    # not: a "running" row was handed over, not necessarily started. So every
+    # one is asked to stop by name, and the server stops the one it is running.
+    # By name and never otherwise: ComfyUI serves other clients too (a sibling
+    # app's upscale, say), and a nameless /interrupt stops whatever is
+    # executing, whoever asked for it.
     db = Database(tmp_path / "test.db")
     _row(db, "exp-1", status="running", source="experiment")
     _row(db, "exp-2", status="pending", source="experiment")
-    client = FakeClient(running=["exp-1"])
+    client = FakeClient()
 
     assert cancel_experiments(db, client) == 2
-    assert client.interrupts == 1
-
-
-def test_someone_elses_running_prompt_is_never_interrupted(tmp_path):
-    # ComfyUI serves other clients too (a sibling app's upscale, say). Only an
-    # experiment of ours mid-render earns an interrupt.
-    db = Database(tmp_path / "test.db")
-    _row(db, "exp-1", status="pending", source="experiment")
-    client = FakeClient(running=["someone-elses-prompt"])
-
-    assert cancel_experiments(db, client) == 1
-    assert client.interrupts == 0
+    assert sorted(client.interrupted) == ["exp-1", "exp-2"]
 
 
 def test_an_experiment_that_wont_dequeue_keeps_its_row(tmp_path):

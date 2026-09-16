@@ -1220,6 +1220,11 @@ class GalleryView(QWidget):
             held = self._osr2_motion.held_at is not None
             target = (self._osr2_drive_source()
                       if self.osr2_control.isChecked() and not held else None)
+            wants_motion = self.osr2_control.isChecked() and target is None
+            # Whoever gives the device up goes first: each driver puts back what
+            # it found on taking over, and must not find the other still there.
+            if not wants_motion and self._osr2_motion.active:
+                self._osr2_motion.stop()
             if target is None:
                 if self._osr2_driving is not None:
                     self._osr2_driver.stop()
@@ -1231,11 +1236,8 @@ class GalleryView(QWidget):
                 if self._osr2_driving != driving:
                     self._osr2_driver.start(player, actions)
                     self._osr2_driving = driving
-            wants_motion = self.osr2_control.isChecked() and target is None
             if wants_motion and not self._osr2_motion.active:
                 self._osr2_motion.start()
-            elif not wants_motion and self._osr2_motion.active:
-                self._osr2_motion.stop()
             # Said inside the guard, so a console redrawing on it cannot land
             # back in here mid-flight.
             self.osr2_control.settled.emit()

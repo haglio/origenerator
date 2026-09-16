@@ -13,8 +13,10 @@ from PyQt6.QtWidgets import QSplitter
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
+    MODE_VERBS,
     FakeDB,
     _image,
+    hud_button_names,
 )
 
 
@@ -273,11 +275,11 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     hud, = show.findChildren(ShowHud)
     assert hud._targets is not None
     # The mode pair is on it — the way back to player mode from atop a show.
-    assert [command for _rect, command in hud._targets.modes] == [
+    names = hud_button_names(hud)
+    assert [n for n in names if n in MODE_VERBS] == [
         "satellites_video_activate", "origenerator_activate"]
     # The transport controls are the players' own set.
-    control_names = {name for _rect, name in hud._targets.control}
-    assert {"prev", "next", "lock", "trash"} <= control_names
+    assert {"prev", "next", "lock", "trash"} <= set(names)
     # The furnishings the map replaces are off.
     assert show._counter.isHidden()
 
@@ -1038,7 +1040,7 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
-    names = [name for _rect, name in hud._targets.control]
+    names = hud_button_names(hud)
     assert names.index("enhanced") == names.index("fmode") + 1
 
     hud._deliver("portrait_enhanced")

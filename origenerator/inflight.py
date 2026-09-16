@@ -29,11 +29,41 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.completion import extract_completion
+from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
+
+
+def drop_in_flight(db, client, source: str, noun: str) -> int:
+    """Take the unfinished rows of ``source`` off ComfyUI and out of the
+    database, and say how many went.
+
+    What opening the app does with the work an absence queued: the GPU is the
+    user's again. Each row is dequeued and asked to stop by name; which one the
+    server is executing only it knows, since a ``running`` row was handed over,
+    not necessarily started. A row the server would not let go of is kept: the
+    prompt may still run, and the app adopts an in-flight row as a live job the
+    user's work can preempt. Finished rows are untouched.
+    """
+    dropped = 0
+    for row in db.list_generations():
+        if row.get("source") != source or not is_in_progress(row):
+            continue
+        prompt_id = row["prompt_id"]
+        try:
+            client.cancel_prompt(prompt_id)
+            client.interrupt(prompt_id)
+        except Exception as e:
+            logger.warning("Could not dequeue %s %s: %s", noun, prompt_id, e)
+            continue
+        db.delete_generation(prompt_id)
+        dropped += 1
+    if dropped:
+        logger.info("Dropped %d queued %s(s) — the app is open", dropped, noun)
+    return dropped
 
 
 def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:

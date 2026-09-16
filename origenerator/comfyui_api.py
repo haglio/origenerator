@@ -257,11 +257,19 @@ class ComfyUIApi:
             return True
         return bool(self._history_entry(prompt_id, timeout=_ACCEPTANCE_READ_TIMEOUT_S))
 
-    def interrupt(self):
-        """Stop the prompt ComfyUI is currently executing."""
+    def interrupt(self, prompt_id: str | None = None):
+        """Stop ``prompt_id`` if it is what ComfyUI is executing -- or, given
+        none, whatever is executing, whoever submitted it.
+
+        Naming the prompt is what makes stopping a job of ours safe without
+        first asking the server what is running: a prompt that has since
+        finished, or was never started, is skipped rather than something
+        else's run being cut off in its place.
+        """
+        body = json.dumps({"prompt_id": prompt_id}).encode() if prompt_id else b""
         req = urllib.request.Request(
             f"{self.base_url}/interrupt",
-            data=b"",
+            data=body,
             headers={"Content-Type": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
@@ -344,14 +352,6 @@ class ComfyUIApi:
         """
         return self._queue_ids("queue_running", "queue_pending")
 
-    def fetch_running(self) -> set[str]:
-        """Just the prompt ids ComfyUI is executing right now.
-
-        :meth:`interrupt` stops whatever is executing, whoever submitted it — so
-        a caller that wants to stop its own job checks this first.
-        """
-        return self._queue_ids("queue_running")
-
     def foreign_backlog(self, prompt_id: str) -> int | None:
         """How many prompts from *other* clients ComfyUI will run before ``prompt_id``.
 
@@ -397,24 +397,20 @@ class ComfyUIApi:
                             pending=self._their_ids(data, "queue_pending"))
 
     def clear_foreign_queue(self) -> int:
-        """Drop another app's work off ComfyUI, and report how much went.
+        """Drop another app's work off ComfyUI, and report how much was asked to go.
 
         This app's own jobs are never touched: those are what the user asked
         for, and they're visible and cancellable here already. Pending ones go
-        by deletion; one already executing can only be stopped by ``/interrupt``,
-        which stops whatever is running *now* — so what's executing is re-read
-        after the deletion and interrupted only if it's still one of theirs,
-        rather than a job of ours that has since started.
+        by deletion; one already executing is stopped by name, so that if it
+        has finished and a job of ours has started meanwhile, the server skips
+        the interrupt rather than cutting ours off.
         """
         foreign = self.foreign_queue()
-        if not foreign.total:
-            return 0
         if foreign.pending:
             self.cancel_prompts(foreign.pending)
-        theirs_still_running = self.fetch_running() & set(foreign.running)
-        if theirs_still_running:
-            self.interrupt()
-        return len(foreign.pending) + len(theirs_still_running)
+        for prompt_id in foreign.running:
+            self.interrupt(prompt_id)
+        return foreign.total
 
     def _their_ids(self, data: dict, section: str) -> list[str]:
         """The prompt ids in a ``/queue`` section some other client submitted.

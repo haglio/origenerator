@@ -39,6 +39,7 @@ from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_OUTPUT_DIR, THUMB_DIR
 from origenerator.gallery.output import is_in_progress
 from origenerator.generation_state import GenerationSource, GenerationStatus
+from origenerator.inflight import drop_in_flight
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -282,42 +283,10 @@ def cancel_base_renders(db, client) -> int:
 
     *client* is asked for HTTP only, as in :func:`render_base_now`.
 
-    The app is open now, so the GPU is the user's. Mirrors the experimenter's
-    own cancel: every one still queued is dropped and its abandoned row deleted,
-    and one caught mid-render is interrupted as well. Returns how many were
-    dropped; a finished one is untouched, since it is a repair waiting to fold.
+    The app is open now, so the GPU is the user's. The experimenter's own
+    cancel, for repairs (:func:`origenerator.inflight.drop_in_flight`): every
+    one still queued is dropped and its abandoned row deleted, and one caught
+    mid-render is stopped as well. Returns how many were dropped; a finished one
+    is untouched, since it is a repair waiting to fold.
     """
-    rows = [
-        r for r in db.list_generations()
-        if r.get("source") == GenerationSource.BASE_RENDER and is_in_progress(r)
-    ]
-    if not rows:
-        return 0
-    executing = _safe_running(client)
-    dropped, interrupt = 0, False
-    for row in rows:
-        prompt_id = row["prompt_id"]
-        try:
-            client.cancel_prompt(prompt_id)
-        except Exception as e:
-            logger.warning("Could not dequeue base re-render %s: %s", prompt_id, e)
-            continue
-        db.delete_generation(prompt_id)
-        dropped += 1
-        interrupt = interrupt or prompt_id in executing
-    if interrupt:
-        try:
-            client.interrupt()
-        except Exception as e:
-            logger.warning("Could not interrupt the running base re-render: %s", e)
-    if dropped:
-        logger.info("Dropped %d queued base re-render(s) — the app is open", dropped)
-    return dropped
-
-
-def _safe_running(client) -> set:
-    try:
-        return client.fetch_running()
-    except Exception as e:
-        logger.warning("Could not read ComfyUI's running prompts: %s", e)
-        return set()
+    return drop_in_flight(db, client, GenerationSource.BASE_RENDER, "base re-render")

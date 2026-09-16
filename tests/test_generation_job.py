@@ -286,11 +286,15 @@ def test_error_for_our_id_emits_failed(qtbot, tmp_path):
     assert job.state == "failed"
 
 
-def test_cancel_while_running_interrupts(qtbot, tmp_path):
+def test_cancel_while_running_interrupts_this_prompt_by_name(qtbot, tmp_path):
+    # By name: "running" is what ComfyUI last said about this job, and it can
+    # have finished and another prompt taken the GPU since. The server skips a
+    # named interrupt for a prompt it is not executing; a nameless one stops
+    # whatever is.
     job, client = _started_job(tmp_path)
     client.node_executing.emit("comfy-A", "5")  # job is now executing
     job.cancel()
-    client.interrupt.assert_called_once()
+    client.interrupt.assert_called_once_with("comfy-A")
     client.cancel_prompt.assert_not_called()
     assert job.state == "canceled"
 

@@ -15,11 +15,10 @@ switches are the same ones a window show keeps
 the way the window does (:class:`~origenerator.gui.show_host.ShowHost`), and
 what is on screen is read back from the player rather than rendered here.
 
-Four things a window show has are the player's to learn next, and each is a
-no-op here rather than something half-done: the versions Shift+Left steps
-through, the frames of a generation still being made, the queue plate in the
-corner, and the lines this app flashes over a show — which go to the gallery's
-own caption instead, where the speaker can still see them.
+Four things a window show has are the player's to learn next: the versions
+Shift+Left steps through, the frames of a generation still being made, the
+queue plate in the corner, and the lines this app flashes over a show — which
+go to the gallery's own caption instead, where the speaker can still see them.
 """
 from __future__ import annotations
 
@@ -35,7 +34,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.paths import ensure_player_core_on_path
-from origenerator.slideshow import ShowState, Slide, in_order
+from origenerator.slideshow import ShowState, Slide
 
 ensure_player_core_on_path()
 
@@ -101,7 +100,10 @@ class PlayerShow(QObject):
         # version of what is on screen, unless the gallery wired none.
         self._enhance_on_hold = self._actions.enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
-        self._hand_over()
+        opened_on_a_slide = start is not None
+        if opened_on_a_slide:
+            self._showing = self._player_status().video
+        self._hand_over(land=opened_on_a_slide)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self.tick)
@@ -121,23 +123,23 @@ class PlayerShow(QObject):
              hud=None) -> None:
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
-        self._hand_over()
+        if self._locked:
+            self._hold(False)
+        self._hand_over(land=True)
         self._publish()
 
-    def _hand_over(self) -> None:
-        """Give the player this pass to play, opening on the slide this show
-        stands on.
-
-        The list is written rotated onto that slide, so the player lands on it
-        by reading the list rather than by being sent somewhere afterwards: a
-        player already showing it keeps playing it untouched, and one that is
-        not opens on it.
-        """
+    def _hand_over(self, *, land: bool = False) -> None:
+        """Give the player this pass to play, written rotated onto the slide
+        this show stands on: a player showing nothing of it opens there, and a
+        reload keeps the item a player is on wherever that item survived."""
         items = [item for item in self._set.playlist.in_play_order() if not item.is_live]
         current = self._set.playlist.current()
         rotated = _rotated_onto(items, current)
         write_playlist(self.channel.playlist,
-                       [PlaylistItem(Path(str(item.path))) for item in rotated])
+                       [_playlist_item(item) for item in rotated])
+        if land and current is not None and str(current.path) != self._showing:
+            # Before the reload, which then keeps it: after, it would load twice.
+            self._send(play_file(_playlist_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._send(f"{SET_PACE} {self._dwell_s}")
 
@@ -175,26 +177,25 @@ class PlayerShow(QObject):
         self._set.playlist.image_dwell_ms = seconds * 1000
         self._send(f"{SET_PACE} {seconds}")
 
-    def _pass_changed(self, _kept: bool) -> None:
+    def _pass_changed(self, kept: bool) -> None:
         """A fresh pass was dealt: the player is playing the old one, so it is
-        handed the new one.
-
-        Which slide it lands on is the hand-over's business either way — the
-        player keeps the one it is showing when that survived, and opens on
-        this show's own when it did not.
-        """
-        self._hand_over()
+        handed the new one — keeping the slide on screen when the pass kept it,
+        and sent to this show's own when it did not."""
+        self._hand_over(land=not kept)
 
     # --- what the player says it is showing ---------------------------------
 
     def tick(self) -> None:
         """Read the player's status, follow it, and publish the panel."""
-        status = parse_status(_read_fields(self.channel.status_file))
+        status = self._player_status()
         self._locked = status.locked
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
         self._publish()
+
+    def _player_status(self):
+        return parse_status(_read_fields(self.channel.status_file))
 
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the player just moved to.
@@ -337,7 +338,7 @@ class PlayerShow(QObject):
         if self._set.drop_the_switches():
             return  # the player has the fresh pass already (see _pass_changed)
         self._set.playlist.restart()
-        self._hand_over()
+        self._hand_over(land=True)
 
     def retune(self, items, *, enhanced_ids=None) -> None:
         """Point this show at the region's base set instead — what a hosted
@@ -352,7 +353,7 @@ class PlayerShow(QObject):
         for item in self._set.playlist.items:
             if str(item.path) != str(path):
                 continue
-            self._send(play_file(PlaylistItem(Path(str(item.path)))))
+            self._send(play_file(_playlist_item(item)))
             self._hold(hold)
             return
 
@@ -477,10 +478,6 @@ class PlayerShow(QObject):
         """How the enhancements in flight are going, for a corner this show
         has not got."""
 
-    def set_levels(self, levels_by_path: dict) -> None:
-        """The versions of each item, for the Shift+Left/Right a player has no
-        keys for."""
-
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """What is in flight, for the queue plate a window floats in its
         corner."""
@@ -496,10 +493,6 @@ class PlayerShow(QObject):
         """The room's OmniPause.  The session freezes its own players through
         their paused flag, so there is nothing to do here — a frozen player
         holds the picture, and nothing advances until it is let go."""
-
-    def set_audio_muted(self, muted: bool) -> None:
-        """A satellite is silent until its own chip is asked, so this side is
-        already as quiet as a show on it can be."""
 
     def hold_for_request(self, holding: bool, note: str = "") -> None:
         """Stop the advance while a request is being spoken: the pace goes to
@@ -558,14 +551,8 @@ class PlayerShow(QObject):
             self._enhance_on_hold = state.enhance_on_hold
         if not self._set.playlist.resume(state.order, state.current):
             return False
-        self._hand_over()
+        self._hand_over(land=True)
         return True
-
-    def set_playlist(self, items, index: int) -> None:
-        """Re-seed the set this show plays, on *index* — what a show opened on
-        one picture is armed with once the gallery has its folder."""
-        self._set.reseed(items, start=index, shuffle=in_order)
-        self._hand_over()
 
     def is_showing(self) -> bool:
         """Whether this show still holds its side."""
@@ -584,6 +571,10 @@ class PlayerShow(QObject):
         self._timer.stop()
         publish_whole(self.channel.hud_file, "")
         self.closed.emit()
+
+
+def _playlist_item(slide) -> PlaylistItem:
+    return PlaylistItem(Path(str(slide.path)))
 
 
 def _rotated_onto(items: list, current) -> list:

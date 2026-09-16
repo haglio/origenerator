@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "origenerator"
 version = "0.1.0"
 description = "Local ComfyUI frontend with metadata tracking and gallery browser"
-# 3.12, not 3.10: every gate in the family runs 3.12 and nothing has ever
-# collected a suite on anything older, so >=3.10 was a promise no run backed.
-requires-python = ">=3.12"
+# The version every gate runs, and the one the family's machine runs: a floor
+# lower than what a run proves is a promise nothing backs.
+requires-python = ">=3.14"
 # Every requirement carries a ceiling. Without one each run installs whatever
 # PyPI served that morning: that is how this venv came to hold opencv-python 5
 # while four of its siblings hold 4, with nothing anywhere saying so. Floors are

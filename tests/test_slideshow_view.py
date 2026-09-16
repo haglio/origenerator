@@ -1430,6 +1430,16 @@ def test_closing_releases_the_video_file(qtbot, tmp_path):
     view._preview._player.setSource.assert_called_with(QUrl())
 
 
+def test_closing_detaches_the_player_from_its_surface(qtbot, tmp_path):
+    # A closed show is dropped by whoever held it, and a new one opening on the
+    # same region drops it at once. Its player must render nowhere by then,
+    # not still be winding down into the surface about to go under it: that
+    # was the crash on every slideshow replace and every quit.
+    view = _view(qtbot, [(str(tmp_path / "c.mp4"), "video")])
+    view.close()
+    view._preview._player.setVideoOutput.assert_called_with(None)
+
+
 def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
     clip = str(tmp_path / "c.mp4")
     view = _view(qtbot, [(clip, "video")])

@@ -650,6 +650,29 @@ def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch)
     assert row.property("dragging") is False  # and it settles back afterwards
 
 
+def test_a_row_the_line_redraws_away_mid_drag_lets_the_drag_finish(queue, monkeypatch):
+    from PyQt6 import sip
+    from PyQt6.QtCore import QCoreApplication, QEvent
+    from PyQt6.QtGui import QDrag
+
+    _four(queue)
+    row = queue.rows()[2]
+    drag_alive = []
+
+    def drag_loop_through_a_redraw(drag, *_):
+        queue.set_items([_item(key="a"), _item(key="c", status="queued"),
+                         _item(key="d", status="queued")])
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        drag_alive.append(not sip.isdeleted(drag))
+
+    monkeypatch.setattr(QDrag, "exec", drag_loop_through_a_redraw)
+    row.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, 5, 5))
+    row.mouseMoveEvent(_mouse(QEvent.Type.MouseMove, 5, 80))
+
+    assert sip.isdeleted(row)
+    assert drag_alive == [True]
+
+
 def test_the_job_being_made_cannot_be_picked_up(queue, monkeypatch):
     # Nothing goes in front of what ComfyUI is already rendering, so the head of
     # the line does not move.

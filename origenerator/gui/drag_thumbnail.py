@@ -78,9 +78,9 @@ class DragOut(QObject):
     waiting if the reason goes away.
 
     The gesture owns the drag and announces it, and has no Qt parent, on
-    purpose: the grid can redraw while a drag is in flight, deleting the tile it
-    came out of, and a drag or an announcement owned by that tile went with it
-    and took the app down.
+    purpose: a poll can redraw the gallery grid or the queue's line while a drag
+    is in flight, deleting the widget it came out of, and a drag or an
+    announcement owned by that widget went with it and took the app down.
     """
 
     started = pyqtSignal(str)  # the dragged generation's prompt_id, "" for anything else
@@ -118,7 +118,8 @@ class DragOut(QObject):
         self._origin = None
         return True
 
-    def start(self, mime, pixmap: QPixmap, *, prompt_id: str = "") -> None:
+    def start(self, mime, pixmap: QPixmap, *, prompt_id: str = "",
+              action: Qt.DropAction = Qt.DropAction.CopyAction) -> None:
         """Carry *mime* out, with *pixmap* trailing the cursor.
 
         :attr:`started` and :attr:`ended` bracket the whole gesture rather than
@@ -130,6 +131,6 @@ class DragOut(QObject):
         set_drag_thumbnail(drag, pixmap)
         self.started.emit(prompt_id)
         try:
-            drag.exec(Qt.DropAction.CopyAction)
+            drag.exec(action)
         finally:
             self.ended.emit()

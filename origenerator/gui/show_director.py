@@ -342,7 +342,6 @@ class ShowDirector:
         to land it on inside Fun Time, for a show asked for by side rather than
         routed by its own shape.
         """
-        self._show_refused = set()  # a new show, a new set to be judged against
         # Which side this show belongs to: the one asked for, else the one this
         # set's own shape belongs on.  Standalone it names nothing but the
         # panel's own verbs, since the monitor is the whole screen.
@@ -350,6 +349,9 @@ class ShowDirector:
         # And what that side IS: one of the session's players, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.player(where) if self._fun_time is not None else None
+        if channel is not None and not items:
+            return None  # a player is handed files, and a run being made has none yet
+        self._show_refused = set()  # a new show, a new set to be judged against
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD -- over the set it plays and the folder a live show is
         # armed with, since either is what the switch narrows.
@@ -362,14 +364,17 @@ class ShowDirector:
             show = self._open_a_window(items, where, hud=hud,
                                        folder_items=folder_items, **kwargs)
         self._slideshow = show
+        already_live = any(held is show for held, _where in self._live_shows)
+        self._live_shows = [entry for entry in self._live_shows if entry[0] is not show]
         self._live_shows.append((show, location))
         if resume is not None:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
             show.resume(resume)
-        show.open_requested.connect(self._open_from_slideshow)
-        show.closed.connect(lambda s=show: self._on_closed(s))
-        show.media_changed.connect(self._host.reconcile_osr2)
+        if not already_live:
+            show.open_requested.connect(self._open_from_slideshow)
+            show.closed.connect(lambda s=show: self._on_closed(s))
+            show.media_changed.connect(self._host.reconcile_osr2)
         self._host.reconcile_osr2()
         # However the show was asked for, it now owns the card it is drawn with: a
         # video generation would saturate that card, and a show is exactly the
@@ -406,12 +411,13 @@ class ShowDirector:
         a generation still being made has none yet.
         """
         kwargs.pop("frame", None)
+        occupant = self.region_show(side)
+        if occupant is not None:
+            occupant.play(items, hud=hud, **kwargs)
+            return occupant
         show = PlayerShow(items, side=side, channel=channel,
                           actions=self._show_actions(), pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
-        occupant = self._region_shows.get(side)
-        if occupant is not None and occupant.is_showing():
-            occupant.close()
         self._region_shows[side] = show
         # A show opened while the hosting session is frozen opens frozen, the
         # way a window one does.

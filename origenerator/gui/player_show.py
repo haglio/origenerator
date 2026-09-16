@@ -87,12 +87,9 @@ class PlayerShow(QObject):
         # which is on screen beside the players in a session.
         self._say = say
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
         self._pace.changed.connect(self._on_pace_changed)
-        self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                            start=start, hud=hud, on_pass_change=self._pass_changed)
+        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
+                       shuffle=shuffle, hud=hud)
         self._open = True
         # What the player last said it was showing, and whether it is holding
         # it: the player's answer, not this app's — a picture that has moved on
@@ -112,6 +109,20 @@ class PlayerShow(QObject):
         self.tick()
 
     # --- handing the player what to play ------------------------------------
+
+    def _take_set(self, items, *, image_dwell_ms, start, shuffle, hud) -> None:
+        if image_dwell_ms is None:
+            image_dwell_ms = self._pace.dwell_ms
+        self._dwell_s = image_dwell_ms // 1000
+        self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+                            start=start, hud=hud, on_pass_change=self._pass_changed)
+
+    def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
+             hud=None) -> None:
+        self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
+                       shuffle=shuffle, hud=hud)
+        self._hand_over()
+        self._publish()
 
     def _hand_over(self) -> None:
         """Give the player this pass to play, opening on the slide this show

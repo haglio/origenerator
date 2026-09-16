@@ -492,3 +492,68 @@ def test_the_status_says_what_the_player_says_it_is_showing(qtbot, tmp_path, mon
     assert "portrait_active=1" in text
     assert f"portrait_video={tall}" in text
     assert "portrait_locked=1" in text
+
+
+def _stills(tmp_path, prefix, count, size):
+    items = []
+    for n in range(count):
+        path = tmp_path / f"{prefix}-{n}.png"
+        Image.new("RGB", size).save(path)
+        items.append((str(path), "image", f"id-{prefix}-{n}", str(path)))
+    return items
+
+
+def _players_playing_their_libraries(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    library = {"__all__::landscape": _stills(tmp_path, "library-wide", 3, (200, 100)),
+               "__all__::portrait": _stills(tmp_path, "library-tall", 1, (100, 200))}
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    _press(bridge, tmp_path, "OPEN_SHOWS")
+    for side in ("landscape", "portrait"):
+        _told(tmp_path, side)
+    return view
+
+
+def _told(tmp_path, side):
+    from player_core.file_channel import consume_command_file
+
+    return consume_command_file(tmp_path / f"{side}_cmd.txt", uppercase=False)
+
+
+def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
+        qtbot, tmp_path, monkeypatch):
+    from player_core.playlist import read_playlist
+    from player_core.satellite_hud import parse_hud
+
+    view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
+    folder = _stills(tmp_path, "scene-wide", 2, (200, 100))
+    clicked = folder[1]
+    monkeypatch.setattr(view, "visible_prompt_ids", lambda: [item[2] for item in folder])
+    monkeypatch.setattr(view, "row_for",
+                        lambda pid: next((i for i in folder if i[2] == pid), None))
+    monkeypatch.setattr(view, "selected_prompt_id", lambda: clicked[2])
+
+    view._shows.open_on_preview((clicked[0], "image"), None)
+
+    played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
+    assert played == [clicked[0], folder[0][0]]
+    told = _told(tmp_path, "landscape")
+    assert [verb for verb in told if verb.startswith("SET_PACE")][-1] == "SET_PACE 0"
+    panel = parse_hud((tmp_path / "origenerator_landscape_hud.json").read_text(encoding="utf-8"))
+    assert panel.seed_count == len(folder)
+    assert _told(tmp_path, "portrait") == []
+
+
+def test_a_double_click_over_a_run_still_being_made_leaves_the_players_alone(
+        qtbot, tmp_path, monkeypatch):
+    view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
+    playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
+
+    assert view._shows.open_on_preview(None, b"a frame of the run") is None
+
+    assert (tmp_path / "landscape.tsv").read_text(encoding="utf-8") == playing
+    assert _told(tmp_path, "landscape") == []
+    assert _told(tmp_path, "portrait") == []

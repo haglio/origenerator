@@ -71,14 +71,31 @@ class ShowHost(Protocol):
     def show_order(self, *, latest: bool) -> None:
         """Play the side's whole library newest first, or shuffled."""
 
-    def hud_items(self):
-        """``(cells, position, locked)`` for the HUD's nav map.
+    def show_loop(self, axis: str) -> None:
+        """Loop the map's *axis* — "seed" or "config" — around what is on
+        screen, or end the loop for "".  No set, nothing to loop."""
 
-        ``cells`` empty means there is nothing to map, and that is how a host
-        with no set says so — :func:`~origenerator.gui.show_hud.show_hud_model`
-        reads it and draws no map at all.
+    def show_loop_cycle(self) -> None:
+        """The loop key: seeds, then configs, then off — or the hold, with
+        nothing on either axis to loop."""
+
+    def show_more_seeds(self) -> None:
+        """Widen the seed row past the exact configuration and loop it."""
+
+    def show_filter(self, query: str) -> None:
+        """Narrow to the configuration whose map row is labeled *query*: jump
+        to it and loop its seed row."""
+
+    def show_nav(self, direction: str) -> None:
+        """Step to the map cell one *direction* from the lit one."""
+
+    def hud_map(self):
+        """The map the HUD draws around what is on screen
+        (:class:`~origenerator.gui.show_map.ShowMap`), which says which of its
+        axes is looping — or ``None`` for nothing to map, which is how a host
+        with no set says so, and what
+        :func:`~origenerator.gui.show_hud.show_hud_model` reads as no map at all.
         """
-        return (), 0, self.locked
 
     @property
     def hud_f_mode(self) -> bool:
@@ -89,15 +106,6 @@ class ShowHost(Protocol):
     def hud_order_label(self) -> str:
         """The order the set is played in, in the players' own words."""
         return ""
-
-    @property
-    def hud_looping(self) -> bool:
-        """Whether a set someone asked for is playing round and round.
-
-        True for a host with no set, because that is the answer that leaves the
-        map's loop button meaning what it means on a player.
-        """
-        return True
 
     @property
     def hud_is_favorite(self) -> bool:

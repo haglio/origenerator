@@ -193,8 +193,8 @@ class FakeShow:
         self.hud_f_mode = False
         self.hud_enhanced_mode = False
 
-    def hud_items(self):
-        return (list(self.enhanced_items), [])
+    def pass_size(self):
+        return len(self.enhanced_items)
 
     def step(self, delta):
         self.steps.append(delta)
@@ -1066,3 +1066,65 @@ def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(shows):
     director.release_media(["one.png"])
 
     assert [show.released for show in made] == [[["one.png"]], [["one.png"]]]
+
+
+# --- the map around the slide on screen: what the library says ---------------
+
+def _picture(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
+    """A finished picture with real params, shaped by what it asked for —
+    which is what places it on a side with no file to measure."""
+    params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
+              "width": width, "height": height}
+    row = _row(prompt_id, params=params)
+    row["params_json"] = json.dumps(params)
+    return row
+
+
+def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(shows):
+    """The same configuration under other seeds is the row and the same seed
+    under other configurations the column, each configuration named by its
+    folder — read off every generation of that side's shape, whatever set the
+    show itself is playing."""
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
+            _picture("g3", "a red fox at dawn", seed=1),
+            _picture("w1", "a red fox", seed=3, width=200, height=100)]
+    director, _host, _made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("g1", side="portrait")
+
+    assert [slide.prompt_id for slide in around.seeds] == ["g2"]
+    assert [slide.prompt_id for slide in around.configs] == ["g3"]
+    assert around.label and around.config_labels != (around.label,)
+    assert len(around.config_labels) == 1
+
+
+def test_beyond_the_row_lies_the_nearest_of_the_models_other_configurations(shows):
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
+            _picture("g3", "a red fox at dawn", seed=7),
+            _picture("g4", "a blue car", seed=8, steps=30)]
+    director, _host, _made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    beyond = director.beyond_the_row_of("g1", side="portrait")
+
+    assert [slide.prompt_id for slide in beyond] == ["g3", "g4"]
+    assert director.beyond_the_row_of("nobody", side="portrait") == ()
+
+
+def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
+    director, _host, _made = shows()
+
+    assert director.neighbors_of("nobody", side="portrait").seeds == ()
+    assert director.neighbors_of("", side="landscape").configs == ()
+
+
+def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
+    """What a show asks the gallery on its own behalf now includes what the
+    library says about an item."""
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2)]
+    director, host, made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    director.open(director.items_of(rows), location="a-folder", side="portrait")
+
+    actions = made[0].actions
+    assert [slide.prompt_id for slide in actions.neighbors("g1").seeds] == ["g2"]
+    assert actions.widen("g1") == ()

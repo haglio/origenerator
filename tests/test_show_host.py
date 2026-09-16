@@ -30,8 +30,12 @@ TRANSPORT = (
     "show_step", "show_toggle_hold", "show_cull",
 )
 THE_SET = (
-    "show_reset", "hud_items", "hud_f_mode", "hud_order_label", "hud_looping",
+    "show_reset", "hud_map", "hud_f_mode", "hud_order_label",
     "hud_is_favorite", "toggle_f_mode", "show_item", "current_media_path",
+    # The map's own chrome and the session's keys over it: the loops along
+    # its two axes, the loop key that steps them, the expand mark, and a step
+    # to a neighboring cell.
+    "show_loop", "show_loop_cycle", "show_more_seeds", "show_nav", "show_filter",
     # The enhanced-only switch beside F-mode: declared here because three
     # drivers reach for it — the HUD's button, the session console's, and the
     # spoken word — and it was the last of the switches still being probed for.
@@ -105,10 +109,9 @@ def test_a_pace_only_host_answers_every_attribute_of_the_protocol(pace_only, att
 def test_a_host_with_no_set_says_it_has_no_set(pace_only):
     host = pace_only
 
-    assert host.hud_items() == ((), 0, True)
+    assert host.hud_map() is None
     assert host.hud_f_mode is False
     assert host.hud_order_label == ""
-    assert host.hud_looping is True
     assert host.hud_is_favorite is False
     assert host.current_media_path() == ""
 
@@ -122,6 +125,11 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     assert host.show_order(latest=True) is None
     assert host.toggle_f_mode() is None
     assert host.show_item("anything", hold=True) is None
+    assert host.show_loop("seed") is None
+    assert host.show_loop_cycle() is None
+    assert host.show_more_seeds() is None
+    assert host.show_nav("right") is None
+    assert host.show_filter("fox") is None
     assert host.hud_enhanced_mode is False
     assert host.toggle_enhanced_mode() is False
     assert host.set_enhanced_mode(True) is False

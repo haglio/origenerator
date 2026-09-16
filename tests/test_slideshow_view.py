@@ -54,7 +54,7 @@ def _view(qtbot, items=_ITEMS, **kw):
 def _wired(kw: dict) -> dict:
     """The show takes its HUD facts and its gallery actions as two records;
     these cases name the facts and the actions flat, the way the words read."""
-    facts = {k: kw.pop(k) for k in ("order_label", "looping", "starred_ids", "enhanced_ids") if k in kw}
+    facts = {k: kw.pop(k) for k in ("order_label", "starred_ids", "enhanced_ids") if k in kw}
     if facts:
         kw["hud"] = HudFacts(**facts)
     acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
@@ -571,19 +571,49 @@ def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     assert view._note.isHidden()
 
 
-def test_e_turns_the_whole_behavior_off(qtbot):
+def test_the_loop_key_with_nothing_to_loop_is_the_hold(qtbot):
+    # E and Home are the loop key, on both of the keys a session gives its two
+    # satellites; with nothing on either axis of the map the press is the
+    # hold — Down's whole gesture, the enhancement included — and the next
+    # press lets go, so the key is never a trap.
     asked = []
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_E)
-    _press(view, Qt.Key.Key_Down)
-    assert asked == []
-    assert "off" in view._note.text()
+    assert view._playlist.locked and asked == ["id-a"]
+    assert view._note.text() == "Locked"
 
-    _press(view, Qt.Key.Key_E)      # and back on
-    _press(view, Qt.Key.Key_Down)   # release the hold
-    _press(view, Qt.Key.Key_Down)   # hold again
-    assert asked == ["id-a"]
+    _press(view, Qt.Key.Key_Home)
+    assert not view._playlist.locked
+    assert view._note.text() == "Unlocked"
+
+
+def _around(prompt_id):
+    from origenerator.gui.show_map import MapNeighbors
+
+    if prompt_id != "id-a":
+        return MapNeighbors()
+    return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
+                        configs=(Slide("c.png", "image", "id-c"),),
+                        label="fox", config_labels=("dawn",))
+
+
+def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == "seed"
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b"]
+    assert view._note.text() == "Looping seeds: 2"
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == "config"
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-c"]
+
+    _press(view, Qt.Key.Key_E)
+    assert view.hud_map().loop == ""
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b"]  # the set it was browsing
+    assert view._note.text() == "Loop off"
 
 
 def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):
@@ -1685,20 +1715,6 @@ def test_a_reopened_show_shows_the_version_that_was_on_screen(qtbot, tmp_path):
     reopened.resume(closed.state())
 
     assert reopened._preview._media[0] == original
-
-
-def test_a_reopened_show_keeps_the_enhance_on_hold_switch(qtbot):
-    # Turned off because it was in the way; a show that came back with it on
-    # would fire a run on the next hold.
-    closed = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: True))
-    _press(closed, Qt.Key.Key_E)
-
-    asked = []
-    reopened = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
-    reopened.resume(closed.state())
-    _press(reopened, Qt.Key.Key_Down)
-
-    assert asked == []
 
 
 def test_a_show_following_a_running_generation_resumes_nothing(qtbot):

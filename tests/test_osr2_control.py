@@ -90,7 +90,7 @@ def test_the_switch_announces_a_move_and_not_a_re_statement():
     Esc puts the device back on, and a resumed session sets it again."""
     control = _control()
     heard = []
-    control.toggled.connect(heard.append)
+    control.changed.connect(lambda: heard.append(control.isChecked()))
 
     control.setChecked(True)
     control.setChecked(True)
@@ -125,6 +125,17 @@ def test_a_session_that_may_not_drive_cannot_be_switched_on():
     assert control.state() == OSR2_CONTROL_OFF
 
 
+def test_a_saved_state_is_put_back_and_an_old_on_off_switch_still_reads():
+    for saved, state in ((OSR2_RETRACTED, OSR2_RETRACTED), (True, OSR2_DRIVING),
+                         (False, OSR2_CONTROL_OFF), (None, OSR2_CONTROL_OFF),
+                         ("sideways", OSR2_CONTROL_OFF)):
+        control = _control()
+
+        control.restore(saved)
+
+        assert control.state() == state, saved
+
+
 class FakeScript:
     def __init__(self, active=False):
         self.active = active
@@ -150,7 +161,7 @@ def test_the_hold_is_in_place_before_the_switch_says_so():
     motion = FakeMotion()
     control = _control(motion)
     seen = []
-    control.toggled.connect(lambda _on: seen.append(motion.held_at))
+    control.changed.connect(lambda: seen.append(motion.held_at))
 
     control.set_state(OSR2_PARKED)
 

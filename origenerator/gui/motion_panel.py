@@ -9,9 +9,8 @@ and this only routes them to what this app has: the slideshow for the transport
 and the pace, the motion driver for everything about the motion.
 
 The one row left off is the one naming the three players, and the minimize
-button riding it (``modes_row=False``). This console is inside another app's
-window, so it is not one of those three and has no borderless window of its own
-to park.
+button riding it. This console is inside another app's window, so it is not one
+of those three and has no borderless window of its own to park.
 
 The on/off switch IS on it: the control-state group -- parked, retracted,
 driving, control off -- is the app's one OSR2 switch now, and the toolbar's
@@ -28,6 +27,7 @@ from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import motion_engine, osr2
+from origenerator.gui.console_buttons import console_rows
 from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
@@ -170,14 +170,14 @@ def console_hud(motion, host, *, device_on: bool = True,
             osr2=(DRIVEN_BY_FUNSCRIPT if scripted
                   else OSR2_ROBOT_HAND if driving else "off"),
             osr2_control=control,
-            cruise=motion.state.cruise.active,
-            learned=motion.state.learned.active,
-            shape=motion.state.state.shape.value,
             advance_interval=host.dwell_s,
+            rows=console_rows(locked=host.locked, pace_s=host.dwell_s, control=control,
+                              cruise=motion.state.cruise.active,
+                              learned=motion.state.learned.active,
+                              shape=motion.state.state.shape.value),
         ),
         drive=(script_hud(script, motion.state, host.dwell_s) if scripted
                else drive_hud(motion.state, driving, host.dwell_s)),
-        modes_row=False,
     )
 
 

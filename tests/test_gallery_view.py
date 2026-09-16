@@ -16,7 +16,6 @@ from player_core.console import (
     OSR2_RETRACTED,
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
-from player_core.satellite_hud import MODE_BUTTONS
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
@@ -57,6 +56,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.show_buttons import MODE_BUTTONS
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.motion_engine import Motion
@@ -6396,7 +6396,7 @@ def _standalone_show(qtbot, monkeypatch):
     return view._shows.showing
 
 
-MODE_VERBS = frozenset(action for action, _label, _mode in MODE_BUTTONS)
+MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
 def hud_button_names(hud) -> list[str]:

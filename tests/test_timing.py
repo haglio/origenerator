@@ -6,6 +6,7 @@ from origenerator.timing import (
     average_label,
     average_seconds,
     clock_duration,
+    elapsed_since,
     estimate_label,
     estimate_seconds,
     execution_duration_seconds,
@@ -255,3 +256,17 @@ def test_remaining_label_is_the_countdown_on_its_own():
     assert RunTiming(900.0, (20, 20), 724.0).remaining_label() == "finishing"
     assert RunTiming(83.0, None, None).remaining_label() == ""   # nothing to count down from
     assert RunTiming(None, (10, 20), 724.0).remaining_label() == ""  # not started yet
+
+
+def test_elapsed_since_counts_from_the_moment_a_run_began():
+    assert elapsed_since(1_000.0, now=lambda: 1_252.0) == 252.0
+
+
+def test_elapsed_since_a_run_that_never_began_is_nothing():
+    assert elapsed_since(None) is None
+
+
+def test_elapsed_since_floors_a_clock_that_went_backwards_at_zero():
+    # The system clock can step back (an NTP correction, a resume from sleep),
+    # and a negative elapsed reads as a run that has not started.
+    assert elapsed_since(1_000.0, now=lambda: 999.0) == 0.0

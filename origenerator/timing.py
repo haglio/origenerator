@@ -11,6 +11,7 @@ job in flight how much of its run is left (:class:`RunTiming`).
 from __future__ import annotations
 
 import statistics
+import time
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -32,6 +33,20 @@ def execution_duration_seconds(history_data: dict) -> float | None:
     if start is None or end is None:
         return None
     return (end - start) / 1000.0
+
+
+def elapsed_since(started_at: float | None, *, now=time.time) -> float | None:
+    """How long a run that began at *started_at* has been going, in seconds.
+
+    ``None`` for a run ComfyUI has not started: it is waiting in a line, and a
+    wait counted as run time makes every reading drawn from it nonsense — the
+    count on the bar, the estimate of what is left, and how long a finished run
+    is reported to have taken. Floored at zero because the system clock can
+    step backwards under a running job.
+    """
+    if started_at is None:
+        return None
+    return max(0.0, now() - started_at)
 
 
 def estimate_seconds(durations: list[float]) -> float | None:

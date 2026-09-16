@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
@@ -22,7 +21,7 @@ from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming
+from origenerator.timing import RunTiming, elapsed_since
 
 _IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
 _BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
@@ -275,8 +274,7 @@ class ThumbnailWidget(QWidget):
         run = self._enhancing
         if run is None:
             return
-        elapsed = (None if run.started_at is None
-                   else max(0.0, time.time() - run.started_at))
+        elapsed = elapsed_since(run.started_at)
         self._enhancing_bar.show_progress(
             RunTiming(elapsed, run.progress, run.typical_seconds).status_label(
                 step=run.stage, compact=True),

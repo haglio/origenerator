@@ -51,8 +51,6 @@ the thing a user goes hunting for an explanation of.
 """
 from __future__ import annotations
 
-import time
-
 from PyQt6.QtCore import QMimeData, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
@@ -83,7 +81,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.timing import RunTiming
+from origenerator.timing import RunTiming, elapsed_since
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
@@ -302,8 +300,7 @@ class RunningPreview(OpensAFolder, QWidget):
         """
         if self._item is None:
             return
-        started = self._item.started_at
-        elapsed = None if started is None else max(0.0, time.time() - started)
+        elapsed = elapsed_since(self._item.started_at)
         self._progress.show_progress(
             RunTiming(elapsed, self._item.progress,
                       self._item.typical_seconds).status_label(step=self._item.stage),

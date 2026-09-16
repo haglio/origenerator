@@ -84,8 +84,6 @@ class PreviewWidget(QWidget):
     # and the one a show has to be told about (see _on_media_status).
     video_unplayable = pyqtSignal()
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
-    drag_started = pyqtSignal(str)  # the shown generation began dragging out (prompt_id)
-    drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
     action_triggered = pyqtSignal(str, str)  # a corner control: prompt_id, action
     context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
@@ -120,10 +118,10 @@ class PreviewWidget(QWidget):
         self._on_press = on_press
         # The shown generation's prompt_id when the owner has armed the preview to be
         # dragged out onto a combine slot (like a gallery thumbnail), else None; a
-        # transient view (a live frame, a message) disarms it. _drag holds the
+        # transient view (a live frame, a message) disarms it. drag_out holds the
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
-        self._drag = DragOut()
+        self.drag_out = DragOut()
         self._pushes_stills = pushes_stills
         self._still: KenBurnsStill | None = None
 
@@ -720,7 +718,7 @@ class PreviewWidget(QWidget):
         # image or video lands here. Note the origin for a possible drag of the
         # shown generation; a plain click still falls through to the double-click.
         if self._draggable_id is not None:
-            self._drag.note_press(event)
+            self.drag_out.note_press(event)
         self._run_press(event)
 
     def _run_press(self, event) -> None:
@@ -731,19 +729,17 @@ class PreviewWidget(QWidget):
         # Drag the shown generation out to a combine slot, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just opens fullscreen on the following double-click.
-        if self._draggable_id is None or not self._drag.should_start(event):
+        if self._draggable_id is None or not self.drag_out.should_start(event):
             return
         self._start_drag(self._draggable_id)
 
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
         slot can read its prompt_id — the same payload a gallery thumbnail drags."""
-        self._drag.start(
-            self, generation_mime(prompt_id),
+        self.drag_out.start(
+            generation_mime(prompt_id),
             self._drag_picture(),  # what is shown trails the cursor
-            # Announce the drag so a combine slot can light the moment it starts.
-            on_started=lambda: self.drag_started.emit(prompt_id),
-            on_ended=self.drag_ended.emit,
+            prompt_id=prompt_id,
         )
 
     def _drag_picture(self) -> QPixmap:

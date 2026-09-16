@@ -1232,8 +1232,8 @@ def test_panel_forwards_the_preview_drag_signals(panel):
     panel.preview_drag_started.connect(started.append)
     panel.preview_drag_ended.connect(lambda: ended.append(True))
 
-    panel._preview.drag_started.emit("gen9")
-    panel._preview.drag_ended.emit()
+    panel._preview.drag_out.started.emit("gen9")
+    panel._preview.drag_out.ended.emit()
 
     assert started == ["gen9"]  # relayed for the view to light the combine slot
     assert ended == [True]

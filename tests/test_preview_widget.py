@@ -806,8 +806,8 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_draggable_id("gen1")
     started, ended = [], []
-    w.drag_started.connect(started.append)
-    w.drag_ended.connect(lambda: ended.append(True))
+    w.drag_out.started.connect(started.append)
+    w.drag_out.ended.connect(lambda: ended.append(True))
 
     _drag_out(w)
 
@@ -875,7 +875,7 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
     w.show_video(tmp_path / "clip.mp4")
     w.set_draggable_id("gen1")
     started = []
-    w.drag_started.connect(started.append)
+    w.drag_out.started.connect(started.append)
 
     _drag_out(w)
 
@@ -888,7 +888,7 @@ def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))  # shown, but never armed
     started = []
-    w.drag_started.connect(started.append)
+    w.drag_out.started.connect(started.append)
 
     _drag_out(w)
 

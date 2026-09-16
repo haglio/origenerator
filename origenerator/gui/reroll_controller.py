@@ -137,9 +137,9 @@ class RerollController(QObject):
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment (the one generator of jobs the user didn't ask for), so
     a Generate starts at once instead of queuing after a long experiment run. And
-    the user's image work owns it outright: a video being rendered when a picture
-    is asked for is set aside -- stopped, and put back in the line to start over
-    once the pictures are done (see :meth:`_set_aside_for`)."""
+    the user's image work owns it outright: whatever is being rendered when a
+    picture is asked for is set aside -- stopped, and put back in the line to
+    start over once the pictures are done (see :meth:`_set_aside_for`)."""
 
     changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -183,9 +183,11 @@ class RerollController(QObject):
 
         A folder can have several queued at once, but the things keyed by folder —
         its one live re-roll tile, the selection that follows it — show the one in
-        front. Use :attr:`all_jobs` for everything actually in flight.
+        front: being made, or next to be. That is not always the one asked for
+        first, since a picture asked for second takes the machine from the first
+        (:meth:`_set_aside_for`). Use :attr:`all_jobs` for everything in flight.
         """
-        return {key: jobs[0] for key, jobs in self._jobs.items() if jobs}
+        return {key: self._leading(jobs) for key, jobs in self._jobs.items() if jobs}
 
     @property
     def all_jobs(self) -> list:
@@ -200,7 +202,13 @@ class RerollController(QObject):
     def job_for(self, key: str):
         """The live job leading a folder's queue, or ``None``."""
         jobs = self._jobs.get(key)
-        return jobs[0] if jobs else None
+        return self._leading(jobs) if jobs else None
+
+    def _leading(self, jobs: list) -> GenerationJob:
+        """The one of a folder's jobs nearest the front of the line."""
+        place = {pid: index for index, pid in enumerate(self.queue_order)}
+        return min(jobs, key=lambda job: (-1 if job is self._in_flight
+                                          else place.get(job.prompt_id, len(place))))
 
     def newest_job_for(self, key: str):
         """The job most recently launched into a folder, or ``None``.
@@ -513,33 +521,34 @@ class RerollController(QObject):
             del self._jobs[key]
 
     def _set_aside_for(self, newcomer: GenerationJob):
-        """Take off the server whatever yields to ``newcomer`` -- a video being
-        rendered, when the newcomer is the user's own image work -- and put it
-        back in the line to start over once the newcomer is done.
+        """Take everything off the server for ``newcomer``, if it is the user's
+        own image work, and put each job back in the line to start over once
+        the newcomer is done.
 
-        ComfyUI cannot set a run down and pick it back up, so what the video had
+        ComfyUI cannot set a run down and pick it back up, so whatever was
         rendered is thrown away, however close to done it was. That is the
         user's own call for this queue: their work goes first while they are
-        working, and a video's turn comes when they are not. Several come back
-        in the order they were in (a restart can leave the server holding more
-        than one), ahead of every video still waiting here, which they were in
-        front of. A video whose hand-over is still out cannot be taken off a
-        server that does not hold it yet: it is taken off the moment it lands.
+        working, and everything else's turn comes when they are not. Each job
+        goes back where :func:`queue_line.rejoin_index` says, placed last to
+        first so that several (a restart can leave the server holding more than
+        one) keep their order. A job whose hand-over is still out cannot be
+        taken off a server that does not hold it yet: it is taken off the
+        moment it lands (see :meth:`_pump`).
         """
-        if self._in_flight is not None and queue_line.yields_to(self._in_flight, newcomer):
+        if not queue_line.takes_the_front(newcomer):
+            return
+        if self._in_flight is not None:
             self._takes_over_on_landing = newcomer
-        at = None
-        for job in list(self._on_server):
-            if not queue_line.yields_to(job, newcomer) or not job.defer():
+        for job in reversed(list(self._on_server)):
+            if job is newcomer or not job.defer():
                 continue
             self._on_server.remove(job)
-            at = queue_line.rejoin_index(self._waiting) if at is None else at + 1
-            self._waiting.insert(at, job)
+            self._waiting.insert(queue_line.rejoin_index(self._waiting, job, newcomer), job)
             # Back to pending: a restart re-adopts a pending row into the line,
             # where a running one is looked for on a server that no longer has it.
             self._db.update_generation(job.prompt_id, status=GenerationStatus.PENDING,
                                        progress_json=None)
-            logger.info("Set aside video %s for the user's image work; it starts over after",
+            logger.info("Set aside %s for the user's image work; it starts over after",
                         job.prompt_id)
 
     def _preempt_experiments(self):

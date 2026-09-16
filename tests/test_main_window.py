@@ -5,15 +5,18 @@ import json
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import QSystemTrayIcon
 
 from origenerator import gallery, recipe_match
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.test_gallery_view import _selected_folder, _shelf
 
@@ -847,3 +850,19 @@ def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, t
 def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
     # Nothing to wire: no command file to poll, no status to publish.
     assert _window(qtbot, tmp_path).findChildren(FunTimeBridge) == []
+
+
+def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
+    # The whole chain, because every link in it is one the app has no other
+    # reason to have: the queue's news leaves the gallery, the window hands it to
+    # the tray icon, and Windows shows it wherever the user has got to.
+    win = _window(qtbot, tmp_path)
+    said = []
+    monkeypatch.setattr(win._notices._tray, "showMessage", lambda *args: said.append(args))
+
+    win._gallery_view._reroll.run_ended.emit(
+        RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
+                   ok=True, source=GenerationSource.GENERATED))
+
+    assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
+                     QSystemTrayIcon.MessageIcon.Information)]

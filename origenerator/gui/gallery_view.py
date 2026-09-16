@@ -5,7 +5,7 @@ import logging
 import random
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer
+from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
@@ -269,6 +269,12 @@ def _is_deletable_folder(group) -> bool:
 
 
 class GalleryView(QWidget):
+    # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The view
+    # has nowhere left to draw that news — the run's tile went with it — so it
+    # passes it out to the window, which owns the tray icon Windows' own
+    # notifications come from (:mod:`origenerator.gui.desktop_notices`).
+    run_ended = pyqtSignal(object)
+
     def __init__(self, db: Database, parent=None, *,
                  client: ComfyUIClient | None = None,
                  actions: GalleryActions | None = None,
@@ -375,6 +381,7 @@ class GalleryView(QWidget):
         self._reroll.preview.connect(self._on_reroll_preview)
         self._reroll.finished.connect(self._on_reroll_finished)
         self._reroll.failed.connect(self._on_reroll_failed)
+        self._reroll.run_ended.connect(self.run_ended)
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_auto_reroll)

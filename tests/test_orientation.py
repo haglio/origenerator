@@ -417,6 +417,6 @@ def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
     view.refresh()
 
     for side, expected in (("portrait", ["t1"]), ("landscape", ["w1"])):
-        key = view._shows.region_base_location(side)
+        key = view._shows.base_location(side)
         assert key in view._item_by_key  # a real row, not a synthetic narrowing
         assert [row["prompt_id"] for row in view._shows.rows_at(key)] == expected

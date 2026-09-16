@@ -22,15 +22,15 @@ ensure_player_core_on_path()
 
 from player_core.hud_button import FIT_THE_WORD, Button  # noqa: E402
 from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark  # noqa: E402
-from player_core.hud_status import F_MODE_LABEL  # noqa: E402
+from player_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
-# The band, in the order the players put the same controls in: step either way,
-# then the three about the item on screen, then what narrows the set and the way
-# back out of all of it.  The tuples are the groups the wider gap opens between.
+# The band, in the order the players put the same controls in.  The tuples are
+# the groups the wider gap opens between.
 CONTROL_GROUPS = (
     ("prev", "next"),
     ("lock", "trash", "fmode"),
     ("enhanced", "reset"),
+    ("shuffle", "latest"),
     ("minimize",),
 )
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
@@ -52,6 +52,7 @@ CONTROL_FACES = {
     "prev": "⏮", "next": "⏭", "lock": "🔒",
     "trash": shared_mark("trash"), "fmode": FMODE_ICON,
     "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
+    "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),
     "minimize": MINIMIZE_ICON,
 }
 
@@ -65,6 +66,8 @@ CONTROL_TOOLTIPS = {
     "trash": "Delete this one and move on",
     "fmode": f"{F_MODE_LABEL} — play only the favorites",
     "enhanced": "Enhanced only — play just the pictures that have been enhanced",
+    "shuffle": f"{SHUFFLE_LABEL} — every picture and video of this shape, shuffled",
+    "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
     "minimize": "Minimize this show — bring it back from the taskbar",
 }
 # Reset means what the side goes back TO, which is not the same in both places:
@@ -78,7 +81,7 @@ RESET_TOOLTIPS = {
 
 
 def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
-              enhanced: bool = False, hosted: bool = False,
+              enhanced: bool = False, order: str = "", hosted: bool = False,
               own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
     """The rows a show's HUD draws, for the surface it is drawn on.
 
@@ -92,7 +95,8 @@ def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
     minimize = own_window and not hosted
     names = [name for group in CONTROL_GROUPS for name in group
              if minimize or name != "minimize"]
-    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced}
+    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced,
+           "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
@@ -120,6 +124,8 @@ def answer(host, action: str, argument: str = "") -> bool:
         host.show_cull()
     elif action == "reset":
         host.show_reset()
+    elif action in ("shuffle", "latest"):
+        host.show_order(latest=action == "latest")
     elif action == "fmode":
         host.toggle_f_mode()
     elif action == "enhanced":

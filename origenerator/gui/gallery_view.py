@@ -3194,10 +3194,11 @@ class GalleryView(QWidget):
         session's bridge asks this window for it."""
         return self._shows.region_show(side)
 
-    def favorite_generation(self, prompt_id: str):
+    def favorite_generation(self, prompt_id: str, favorite: bool = True):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
-        star the gallery's own control sets."""
-        self.set_items_favorite([prompt_id], True)
+        star the gallery's own control sets — or take the bookmark back (its Up
+        key over a favorite, the players' "weird" on one)."""
+        self.set_items_favorite([prompt_id], favorite)
 
     def trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same

@@ -406,6 +406,17 @@ class ShowSet:
         HUD marks at the head of the line naming that very item."""
         return self.current_prompt_id() in self.favorite_ids
 
+    def unfavorite_current(self, unfavorite) -> bool:
+        """Take the star off the item on screen, through *unfavorite* — the
+        players' "weird" on a favorite, which demotes it rather than condemning
+        it.  ``False`` when it wears no star, or nothing was wired to take one
+        off: then the press means the other thing."""
+        prompt_id = self.current_prompt_id()
+        if unfavorite is None or prompt_id is None or prompt_id not in self.favorite_ids:
+            return False
+        unfavorite(prompt_id)
+        self.favorite_ids.discard(prompt_id)  # the star readout and F-mode follow it
+        return True
 
 
 def looping_note(show_set: ShowSet) -> str:

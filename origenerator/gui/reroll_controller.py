@@ -45,6 +45,8 @@ from origenerator.gui.generation_job import (
     mark_generation_completed,
 )
 from origenerator.media import MediaType
+from origenerator.run_notice import RunOutcome
+from origenerator.timing import elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,23 @@ logger = logging.getLogger(__name__)
 # progress ticks fire per sampler step (sub-second for images); the persisted value
 # only needs to be recent enough that a restart resumes the bar near where it was.
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
+
+
+def _outcome_of(job, *, ok: bool, seconds: float | None = None) -> RunOutcome:
+    """What *job* came to, in the record whoever reports a run reads.
+
+    *seconds* is ComfyUI's own measure of the run, which only a finished one
+    has: a prompt that died left no ``execution_success`` to measure to. So a
+    failure is timed by the clock it ran under instead, which is the same span
+    the bar was counting up while it ran.
+    """
+    return RunOutcome(
+        kind=gallery.job_kind_label(job.workflow.name),
+        recipe=job.workflow.display_name,
+        seconds=elapsed_since(job.started_at) if seconds is None else seconds,
+        ok=ok,
+        source=job.source,
+    )
 
 
 def _off_the_gui_thread(run) -> None:
@@ -132,6 +151,11 @@ class RerollController(QObject):
     # finds the tab that launched it — the only tab its result belongs in.
     finished = pyqtSignal(str, str, str)
     failed = pyqtSignal(str, str)     # (folder key, message) a re-roll failed
+    # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The two
+    # signals above say which folder to redraw; this says what the run *was*,
+    # which is all anyone reporting it outside the window has to go on — by then
+    # there is no tile left to write the news on.
+    run_ended = pyqtSignal(object)
 
     def __init__(self, db, client, parent=None):
         super().__init__(parent)
@@ -701,6 +725,7 @@ class RerollController(QObject):
         self._pump()  # the machine is free: start whatever is next
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
         self.finished.emit(key, job.prompt_id, job.origin)
+        self.run_ended.emit(_outcome_of(job, ok=True, seconds=duration))
 
     def _on_failed(self, key, job, message):
         self._drop(key, job)
@@ -709,3 +734,4 @@ class RerollController(QObject):
                                    error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self.failed.emit(key, message)
+        self.run_ended.emit(_outcome_of(job, ok=False))

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import QTimer
@@ -10,7 +11,9 @@ from PyQt6.QtCore import QTimer
 from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.reroll_controller import RerollController
+from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -876,3 +879,54 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
     assert seen["submits"] == 1
     assert controller.queue_order == [first, second]
     assert client.submit_job.call_count == 1  # the second waits for the first to finish
+
+
+def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
+    # What the window's own surfaces can't carry: the run is over, so there is no
+    # tile left to write on, and whoever tells the user needs the whole of it in
+    # one record (see origenerator.run_notice).
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("k", _I2V, _params())
+    ended = []
+    controller.run_ended.connect(ended.append)
+
+    controller.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
+
+    assert ended == [RunOutcome(kind="Video", recipe=_I2V.display_name, seconds=252.0,
+                                ok=True, source=GenerationSource.GENERATED)]
+
+
+def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
+    # A prompt that died wrote no execution_success for ComfyUI to measure to, so
+    # the only measure left is the one the bar was counting up: how long since the
+    # run began. Stamped here rather than waited out.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("k", _I2V, _params())
+    job = controller.job_for("k")
+    job._started_at = time.time() - 200
+    ended = []
+    controller.run_ended.connect(ended.append)
+
+    job.failed.emit("the sampler ran out of memory")
+
+    assert not ended[0].ok
+    assert 190 <= ended[0].seconds <= 210
+
+
+def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):
+    # Whoever tells the user has to be able to leave the app's own idle work out:
+    # a night of experiments is a night of interruptions otherwise.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    controller = RerollController(db, client)
+    controller.start_prepared("k", _I2V, _params(), source=GenerationSource.EXPERIMENT)
+    ended = []
+    controller.run_ended.connect(ended.append)
+
+    controller.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
+
+    assert ended[0].source == GenerationSource.EXPERIMENT

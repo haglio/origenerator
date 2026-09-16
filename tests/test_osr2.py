@@ -15,12 +15,8 @@ class FakeSock:
         self.closed = True
 
 
-def _broker(tmp_path, sock):
-    return Osr2Broker(
-        "127.0.0.1", 50557,
-        genau_enabled_file=tmp_path / "genau_enabled.txt",
-        sock_factory=lambda: sock,
-    )
+def _broker(sock):
+    return Osr2Broker("127.0.0.1", 50557, sock_factory=lambda: sock)
 
 
 def test_format_position_maps_percent_to_four_digit_axis_and_interval():
@@ -42,43 +38,16 @@ def test_park_tcode_is_the_familys_park_command():
     assert PARK_TCODE == "L00000I500"
 
 
-def test_send_position_streams_a_newline_terminated_tcode_datagram(tmp_path):
+def test_send_position_streams_a_newline_terminated_tcode_datagram():
     sock = FakeSock()
-    _broker(tmp_path, sock).send_position(50, 100)
+    _broker(sock).send_position(50, 100)
     assert sock.sent == [(b"L05000I100\n", ("127.0.0.1", 50557))]
 
 
-def test_park_sends_the_rest_command(tmp_path):
+def test_park_sends_the_rest_command():
     sock = FakeSock()
-    _broker(tmp_path, sock).park()
+    _broker(sock).park()
     assert sock.sent == [(b"L00000I500\n", ("127.0.0.1", 50557))]
-
-
-def test_pause_genau_writes_zero_then_restore_puts_the_prior_value_back(tmp_path):
-    flag = tmp_path / "genau_enabled.txt"
-    flag.write_text("1", encoding="utf-8")
-    broker = _broker(tmp_path, FakeSock())
-
-    broker.pause_genau()
-    assert flag.read_text(encoding="utf-8") == "0"
-    broker.restore_genau()
-    assert flag.read_text(encoding="utf-8") == "1"
-
-
-def test_pause_genau_treats_a_missing_flag_as_enabled(tmp_path):
-    flag = tmp_path / "genau_enabled.txt"  # absent → broker default is enabled
-    broker = _broker(tmp_path, FakeSock())
-
-    broker.pause_genau()
-    assert flag.read_text(encoding="utf-8") == "0"
-    broker.restore_genau()
-    assert flag.read_text(encoding="utf-8") == "1"
-
-
-def test_restore_genau_without_a_pause_does_nothing(tmp_path):
-    flag = tmp_path / "genau_enabled.txt"
-    _broker(tmp_path, FakeSock()).restore_genau()
-    assert not flag.exists()
 
 
 # --- is the device there: what the console reads to say "Off" ---------------
@@ -131,8 +100,7 @@ def test_the_window_defaults_to_the_brokers_own(tmp_path, monkeypatch):
 def test_a_broker_named_nothing_streams_where_the_broker_listens():
     named, unnamed = FakeSock(), FakeSock()
 
-    Osr2Broker("127.0.0.1", 50557, genau_enabled_file="unused",
-               sock_factory=lambda: named).park()
+    Osr2Broker("127.0.0.1", 50557, sock_factory=lambda: named).park()
     Osr2Broker(sock_factory=lambda: unnamed).park()
 
     assert unnamed.sent == named.sent

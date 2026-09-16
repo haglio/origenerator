@@ -33,7 +33,11 @@ _SWP_NOZORDER = 0x0004
 _SWP_NOACTIVATE = 0x0010
 _kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
 
-APP_USER_MODEL_ID = "FunTime.Origenerator"
+# What this app calls itself to Windows. It is not decoration: the taskbar
+# groups by it, and it is the name Windows prints over a notification this app
+# raises, so it is this app's name and no one else's. It read
+# "FunTime.Origenerator" until the notifications made that visible.
+APP_USER_MODEL_ID = "Origenerator"
 
 
 def stamp_pinned_shortcuts(app_id: str, *, include: str) -> None:
@@ -57,6 +61,39 @@ def stamp_pinned_shortcuts(app_id: str, *, include: str) -> None:
             _log.info("Stamped AppUserModelID on %s", lnk)
         except OSError as exc:
             _log.warning("Could not stamp AppUserModelID on %s: %s", lnk, exc)
+
+
+def _write_string_values(key_path: str, values: dict[str, str]) -> None:
+    """Put *values* under *key_path* in HKEY_CURRENT_USER, making the key if new."""
+    import winreg
+
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0,
+                            winreg.KEY_SET_VALUE) as key:
+        for name, value in values.items():
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+
+
+def register_notification_identity(app_id: str, *, name: str, icon: Path,
+                                   write=_write_string_values) -> None:
+    """Say what Windows calls this app over a notification, and what mark it draws.
+
+    It takes both from whatever is registered under the AppUserModelID the
+    process claims. With nothing registered it prints the id itself and falls
+    back to a generic glyph — which is how this app's first notification came
+    out headed "FunTime.Origenerator" beside an (i). Every app on a desktop
+    whose notifications read properly carries these two values, and Windows
+    writes them itself for a tray app that claims no id of its own.
+
+    Written on every launch rather than once, so a mark that has moved or been
+    deleted comes back. Failures are logged and never fatal: a notification
+    with the wrong heading beats a launch that stopped over one.
+    """
+    try:
+        write(rf"Software\Classes\AppUserModelId\{app_id}",
+              {"DisplayName": name, "IconUri": str(icon)})
+    except OSError as exc:
+        logging.getLogger(__name__).warning(
+            "Could not register the notification identity: %s", exc)
 
 
 # --- Taking the foreground for the window this process just opened ---

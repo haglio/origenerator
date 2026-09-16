@@ -1,6 +1,7 @@
 """Tests for origenerator.win32 taskbar identity and foreground helpers."""
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
@@ -8,6 +9,7 @@ import pytest
 from origenerator.win32 import (
     force_foreground_window,
     raise_window_without_activating,
+    register_notification_identity,
     stamp_pinned_shortcuts,
     window_exists,
 )
@@ -42,9 +44,9 @@ class TestStampPinnedShortcuts:
             patch("os.environ", {"APPDATA": str(_appdata_root(fake_pin_dir))}),
             patch("origenerator.win32.set_shortcut_app_user_model_id") as mock_set,
         ):
-            stamp_pinned_shortcuts("FunTime.Origenerator", include="origenerator")
+            stamp_pinned_shortcuts("Origenerator", include="origenerator")
 
-        mock_set.assert_called_once_with(str(lnk), "FunTime.Origenerator")
+        mock_set.assert_called_once_with(str(lnk), "Origenerator")
 
     def test_skips_unrelated_shortcut(self, fake_pin_dir):
         # A sibling app's pinned shortcut (e.g. ComfyUI) must not be stamped.
@@ -54,7 +56,7 @@ class TestStampPinnedShortcuts:
             patch("os.environ", {"APPDATA": str(_appdata_root(fake_pin_dir))}),
             patch("origenerator.win32.set_shortcut_app_user_model_id") as mock_set,
         ):
-            stamp_pinned_shortcuts("FunTime.Origenerator", include="origenerator")
+            stamp_pinned_shortcuts("Origenerator", include="origenerator")
 
         mock_set.assert_not_called()
 
@@ -64,7 +66,7 @@ class TestStampPinnedShortcuts:
             patch("os.environ", {"APPDATA": str(tmp_path)}),
             patch("origenerator.win32.set_shortcut_app_user_model_id") as mock_set,
         ):
-            stamp_pinned_shortcuts("FunTime.Origenerator", include="origenerator")
+            stamp_pinned_shortcuts("Origenerator", include="origenerator")
 
         mock_set.assert_not_called()
 
@@ -189,3 +191,30 @@ class TestRaiseWindowWithoutActivating:
             assert raise_window_without_activating(111) is False
 
         user32.SetWindowPos.assert_not_called()
+
+
+class TestNotificationIdentity:
+    def test_it_registers_the_name_and_the_mark_under_the_apps_own_id(self):
+        # Windows heads a notification with whatever is registered under the id
+        # the process claims. With nothing there it prints the id itself and
+        # draws a generic glyph, which is what a finished run's first
+        # notification came out looking like.
+        written = {}
+
+        register_notification_identity(
+            "Origenerator", name="Origenerator", icon=Path("C:/marks/o.png"),
+            write=lambda key, values: written.update({key: values}))
+
+        assert written == {
+            r"Software\Classes\AppUserModelId\Origenerator": {
+                "DisplayName": "Origenerator",
+                "IconUri": str(Path("C:/marks/o.png")),
+            },
+        }
+
+    def test_a_registry_that_refuses_the_write_costs_the_launch_nothing(self):
+        def refuse(key, values):
+            raise OSError("access denied")
+
+        register_notification_identity("Origenerator", name="Origenerator",
+                                       icon=Path("C:/marks/o.png"), write=refuse)

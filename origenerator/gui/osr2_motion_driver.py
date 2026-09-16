@@ -272,7 +272,7 @@ class Osr2MotionDriver(QObject):
 
     def set_learned(self, on: bool) -> None:
         """Put the learned motion the way asked, whichever way it is standing —
-        what a spoken "learned on" is, as :meth:`set_cruise` is for cruise."""
+        what a spoken "human inspired on" is, as :meth:`set_cruise` is for cruise."""
         with self._lock:
             if on:
                 motion_engine.enable_learned_motion(self._state)
@@ -294,5 +294,5 @@ class Osr2MotionDriver(QObject):
         if self._state.cruise.active:
             dials += " · cruise"
         if self._state.learned.active:
-            dials += " · learned"
+            dials += " · human inspired"
         return f"OSR2 · {dials}" if self._active else f"OSR2 off · {dials}"

@@ -18,8 +18,6 @@ cached state on construction rather than relying solely on future signals.
 """
 from __future__ import annotations
 
-import time
-
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
@@ -30,7 +28,7 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming
+from origenerator.timing import RunTiming, elapsed_since
 
 # The dashed resting outline and the solid selected border are the family look every
 # non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
@@ -180,8 +178,7 @@ class RerollTile(QFrame):
         strip's queue to explain, not a zero counting up over a bar that hasn't
         moved.
         """
-        started = self._job.started_at
-        elapsed = None if started is None else max(0.0, time.time() - started)
+        elapsed = elapsed_since(self._job.started_at)
         progress = self._job.last_progress
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being

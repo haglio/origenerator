@@ -22,8 +22,6 @@ same way, for the pane to answer with the run's own menu.
 """
 from __future__ import annotations
 
-import time
-
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
@@ -34,7 +32,7 @@ from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming
+from origenerator.timing import RunTiming, elapsed_since
 
 _IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
@@ -167,8 +165,7 @@ class InFlightCard(QWidget):
         so the bar stays indeterminate with nothing written on it: its wait is the
         queue's to explain, not a zero counting up over a bar that has not moved.
         """
-        started = self._item.started_at
-        elapsed = None if started is None else max(0.0, time.time() - started)
+        elapsed = elapsed_since(self._item.started_at)
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has

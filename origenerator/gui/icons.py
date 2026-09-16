@@ -156,13 +156,6 @@ def mic_icon() -> QIcon:
     return glyph_icon("mic", size=_SIZE)
 
 
-def motion_icon() -> QIcon:
-    """A sine wave — the one OSR2 switch. It wears the waveform whichever source
-    is driving, because from the outside they are the same thing: motion the app
-    is sending the device."""
-    return glyph_icon("wave", size=_SIZE)
-
-
 def audio_icon() -> QIcon:
     """A speaker sounding off — the audio bed's on/off switch."""
     return glyph_icon("speaker", size=_SIZE)

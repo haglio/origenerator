@@ -39,8 +39,8 @@ def _state(**overrides) -> BankState:
 
 @pytest.fixture
 def bank(qtbot):
-    def build(acts=None, *, hosted=False, device=True):
-        made = ToolbarBank(acts or _acts(), hosted=hosted, device=device)
+    def build(acts=None, *, hosted=False):
+        made = ToolbarBank(acts or _acts(), hosted=hosted)
         qtbot.addWidget(made)
         return made
     return build
@@ -50,14 +50,17 @@ def test_the_room_s_own_appliances_are_absent_when_a_session_owns_them(bank):
     # Hosted, the session's main player owns the room's sound and the session
     # owns the mic, so a second switch for either would be a switch over
     # something this window does not hold.
-    hosted = bank(hosted=True, device=False)
+    hosted = bank(hosted=True)
 
-    assert hosted.audio is None and hosted.mic is None and hosted.drive is None
+    assert hosted.audio is None and hosted.mic is None
     assert bank().audio is not None
 
 
-def test_the_device_switch_is_absent_where_the_app_may_not_touch_it(bank):
-    assert bank(device=False).drive is None
+def test_the_bank_holds_no_osr2_switch_at_all(bank):
+    # The players' console carries the control-state group that switches the
+    # device now -- parked, retracted, driving, control off -- and a second
+    # switch for one device is what that group replaced.
+    assert not hasattr(bank(), "drive")
 
 
 def test_the_bank_opens_with_its_optional_buttons_away(bank):
@@ -168,9 +171,9 @@ def test_every_button_presses_its_own_handler(bank):
 
 def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
     heard = []
-    made = bank(_acts(toggle_drive=heard.append))
+    made = bank(_acts(toggle_audio=heard.append))
 
-    made.drive.setChecked(True)
-    made.drive.setChecked(False)
+    made.audio.setChecked(True)
+    made.audio.setChecked(False)
 
     assert heard == [True, False]

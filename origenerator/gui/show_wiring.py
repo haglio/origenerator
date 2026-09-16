@@ -37,7 +37,9 @@ class ShowActions:
     held item as a generate tab. ``reset`` takes the show itself and is a
     session's too — hosted, "how it started" is the REGION's base state, which
     only the gallery knows. ``drive_toggle`` takes nothing: Space goes to the
-    app's one OSR2 switch rather than straight to this show's motion.
+    app's one OSR2 switch rather than straight to this show's motion, and
+    ``osr2_control`` is that same switch handed over whole, which is what the
+    console's four control buttons read and set.
     ``omnipause`` takes nothing and is a session's: hosted, a click on the
     picture asks the room to pause, where a show on its own pauses itself.
     """
@@ -48,6 +50,7 @@ class ShowActions:
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
     drive_toggle: Callable[[], None] | None = None
+    osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None
 
 

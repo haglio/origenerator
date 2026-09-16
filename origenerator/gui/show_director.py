@@ -390,8 +390,10 @@ class ShowDirector:
             lock=(self._open_generate_tab_for
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
-            # Space reaches the one OSR2 switch, like every other surface's.
+            # Space reaches the one OSR2 switch, like every other surface's,
+            # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
+            osr2_control=self._host.osr2_control,
             omnipause=(partial(ask_for_omnipause, self._session_channel)
                        if self._session_channel is not None else None),
         )

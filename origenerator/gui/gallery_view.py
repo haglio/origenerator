@@ -142,6 +142,7 @@ from origenerator.gui.orientation import (
 from origenerator.gui.orientation import (
     split_key as _split_shelf_key,
 )
+from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_driver import Osr2Driver
 from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
 from origenerator.gui.panes import FootSplitter, pane, pane_splitter
@@ -307,6 +308,12 @@ class GalleryView(QWidget):
             self._osr2_motion = None
         else:
             self._osr2_motion = osr2_motion if osr2_motion is not None else Osr2MotionDriver(parent=self)
+        # The app's one OSR2 switch, and now its only one: the players' console
+        # carries the control-state group that sets it, on every surface.  Public
+        # because a show is handed it whole -- see ShowActions.
+        self._osr2_enabled = False
+        self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
+        self.osr2_control.toggled.connect(self._on_osr2_toggle)
         # How long a slide holds the screen, app-wide: Genau's console shows
         # it as clip seconds and sets it, from whichever window the console
         # is on — including this one, with nothing playing, where it is what
@@ -339,7 +346,8 @@ class GalleryView(QWidget):
         self._stopped_by_escape: _Running | None = None
         self._build_ui()
         self._voice.bind_the_bank(
-            auto=self._bank.auto, audio=self._bank.audio, drive=self._bank.drive,
+            auto=self._bank.auto, audio=self._bank.audio,
+            drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic,
             enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
             actions={
@@ -684,7 +692,7 @@ class GalleryView(QWidget):
         if running.osr2:
             # One switch, so one thing to turn off: untoggling stops whichever
             # source is on the device — a funscript drive or the motion.
-            self._bank.drive.setChecked(False)
+            self.osr2_control.setChecked(False)
         elif running.motion:
             self._osr2_motion.stop()
         if running.auto:
@@ -725,7 +733,7 @@ class GalleryView(QWidget):
             self._re_aim()      # a resumed loop lights its switch again
             self._sync_discard_buttons()  # and its run offers a next seed, not a cancel
         if stopped.osr2:
-            self._bank.drive.setChecked(True)
+            self.osr2_control.setChecked(True)
         elif stopped.motion:
             self._osr2_motion.start()
 
@@ -908,10 +916,8 @@ class GalleryView(QWidget):
                 delete=self._delete_selection,
                 toggle_audio=self._on_audio_toggle,
                 toggle_mic=self._voice.mic_toggled,
-                toggle_drive=self._on_osr2_toggle,
             ),
             hosted=self._fun_time is not None,
-            device=self._osr2_motion is not None,
         )
         browser_column.addWidget(self._bank)
         # The Experiments shelf's controls: the background experimenter's on/off
@@ -968,7 +974,13 @@ class GalleryView(QWidget):
         enhance_column.addWidget(self._enhance.panel)
         below = enhance
         if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(self._osr2_motion, pace=self._pace)
+            self._motion_panel = MotionPanel(
+                self._osr2_motion, pace=self._pace, control=self.osr2_control)
+            # The one place Esc's panic stop is discoverable, now that the
+            # toolbar switch whose tooltip said so is gone.  Only here: in a
+            # show Esc closes the show rather than stopping the device.
+            self._motion_panel.setToolTip(
+                f"{self._motion_panel.toolTip()} · Esc stops")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
             hud_scroll.setWidget(self._motion_panel)
@@ -998,8 +1010,8 @@ class GalleryView(QWidget):
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
         self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time)
-        # One OSR2 driver for the whole view, under the one global toggle
-        # (self._bank.drive): while that's on it follows whichever video is foreground —
+        # One OSR2 driver for the whole view, under the one global switch
+        # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —
         # and with it off nothing drives on either surface.
         # Switching tabs/videos or opening/closing a slideshow re-aims it; with
@@ -1009,7 +1021,6 @@ class GalleryView(QWidget):
         # None where this app may not touch the device at all (hosted by Fun
         # Time, whose main player owns the OSR2).
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
-        self._osr2_enabled = False
         self._osr2_driving = None
         self._info_tabs.tab_added.connect(self._wire_config_panel)
         for panel in self._info_tabs.config_panels():
@@ -1176,8 +1187,7 @@ class GalleryView(QWidget):
 
         A no-op with no switch to flip: hosted by Fun Time the device belongs
         to the session's main player, so nothing here may start it."""
-        if self._bank.drive is not None:
-            self._bank.drive.setChecked(not self._bank.drive.isChecked())
+        self.osr2_control.setChecked(not self.osr2_control.isChecked())
 
     def reconcile_osr2(self):
         """Put the right thing on the device, or nothing.
@@ -1258,8 +1268,7 @@ class GalleryView(QWidget):
     def set_osr2_enabled(self, enabled):
         """Restore the global OSR2 toggle from a saved session.  With no OSR2
         surface (hosted by Fun Time) a stale saved value has nothing to restore."""
-        if self._bank.drive is not None:
-            self._bank.drive.setChecked(bool(enabled))  # drives _on_osr2_toggle → reconcile
+        self.osr2_control.setChecked(bool(enabled))  # → _on_osr2_toggle → reconcile
 
     # --- the audio bed: one app-global switch, following nothing on screen ----
 

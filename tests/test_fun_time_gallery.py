@@ -7,6 +7,7 @@ console — and its layout folds to fit the Random Favs Browser's upright rect.
 from __future__ import annotations
 
 from PIL import Image
+from player_core.console import OSR2_CONTROL_OFF
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSplitter
 
@@ -59,7 +60,8 @@ def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
     assert view._osr2_motion is None
     assert view._osr2_driver is None
-    assert view._bank.drive is None
+    assert view.osr2_control.isEnabled() is False
+    assert view.osr2_control.state() == OSR2_CONTROL_OFF
     assert view._motion_panel is None
 
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import threading
 import time
 
+from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+
 from origenerator import motion_engine
 from origenerator.gui.osr2_motion_driver import (
     _HANDOFF_MS,
@@ -251,3 +253,58 @@ def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     assert driver.state.cruise.stack.waves
     driver.toggle_cruise()
     assert not driver.state.cruise.active and not driver.state.cruise.stack.waves
+
+
+def test_a_hold_stills_the_motion_at_the_end_it_names(qtbot):
+    """Cruise first, because it rewrites all three dials every tick; then the
+    travel closes before the center moves, so the motion stills where it is and
+    travels to the end from there rather than oscillating its way across."""
+    driver, _broker, _clock = _driver(qtbot)
+    motion_engine.enable_cruise_control(driver.state)
+
+    driver.hold(RETRACT_CENTER)
+
+    assert driver.held_at == RETRACT_CENTER
+    assert driver.state.cruise.active is False
+    assert driver.state.state.amplitude == 0
+    assert driver.state.state.center == RETRACT_CENTER
+
+
+def test_driving_puts_back_what_the_first_hold_stilled(qtbot):
+    """Park, then retract, then driving: the second hold must not overwrite the
+    recording the first one took, or the way back is a flat line at an end."""
+    driver, _broker, _clock = _driver(qtbot)
+    motion_engine.set_amplitude(driver.state.state, 60)
+    motion_engine.set_center(driver.state.state, 40)
+    motion_engine.set_speed(driver.state.state, 70)
+
+    driver.hold(PARK_CENTER)
+    driver.hold(RETRACT_CENTER)
+    driver.release()
+
+    assert driver.held_at is None
+    assert (driver.state.state.amplitude, driver.state.state.intended_center,
+            driver.state.state.speed) == (60, 40, 70)
+
+
+def test_cruise_comes_back_last_where_it_was_on(qtbot):
+    """It draws its waves from what the dials say, so it is re-armed after they
+    are back rather than before."""
+    driver, _broker, _clock = _driver(qtbot)
+    motion_engine.enable_cruise_control(driver.state)
+
+    driver.hold(PARK_CENTER)
+    driver.release()
+
+    assert driver.state.cruise.active is True
+
+
+def test_driving_with_nothing_held_changes_nothing(qtbot):
+    """The console's driving button is also the way back off control-off, where
+    there is no hold to put back."""
+    driver, _broker, _clock = _driver(qtbot)
+    motion_engine.set_amplitude(driver.state.state, 55)
+
+    driver.release()
+
+    assert driver.state.state.amplitude == 55

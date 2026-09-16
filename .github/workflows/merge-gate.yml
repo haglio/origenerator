@@ -17,7 +17,7 @@ jobs:
   full-suite:
     uses: haglio/.github/.github/workflows/merge-gate.yml@main
     with:
-      siblings: "app_support shared_ui player_core"
+      siblings: "player_core app_support shared_ui"
       python-version: "3.12"
       # One pass of this suite has taken 24 minutes on a slow runner, and a run that
       # hits its ceiling is evicted from the queue with no failing test to point at;
@@ -34,7 +34,7 @@ jobs:
     if: github.event_name == 'push'
     uses: haglio/.github/.github/workflows/merge-gate.yml@main
     with:
-      siblings: "app_support shared_ui player_core"
+      siblings: "player_core app_support shared_ui"
       python-version: "3.14"
       timeout-minutes: 55
       qt-platform: offscreen

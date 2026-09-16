@@ -132,8 +132,13 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     that built them here went. 267 -> 266: a folder tile's still of a combine's
     recipe clip and a config tab's loop of it are one "what this run was made
     from", asked for once. 266 -> 265: that answer compares the run's prompts
-    with its recipe's, so the lookup of the recipe row folds into it.)"""
+    with its recipe's, so the lookup of the recipe row folds into it. 265 -> 267:
+    opening a folder lands on its first item, which wants the loading half of a
+    thumbnail click without the browsing step a click records -- two methods,
+    since a click's own name would be a lie on the folder open driving it. The
+    three sites that opened a folder to watch the run cooking in it are one
+    method now, so what used to lead them went into it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 265
+               for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 75

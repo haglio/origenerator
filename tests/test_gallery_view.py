@@ -583,6 +583,27 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     assert view.visible_prompt_ids()  # now showing that folder's thumbnails
 
 
+def test_opening_a_folder_lands_on_its_first_item(qtbot):
+    # Picking a folder is picking what is in it: the first tile lands selected
+    # and on the form, so a folder opens ready to work in rather than beside
+    # whatever the tab in front happened to be holding.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+
+    assert view.visible_prompt_ids()[0] == "i1"
+    assert view.selected_generation() == "i1"
+    assert view.selected_prompt_ids() == ["i1"]   # the tile itself, highlighted
+    panel = view._info_tabs.current_config_panel()
+    assert panel.displayed_row()["prompt_id"] == "i1"
+    # Italic, so the next thing opened takes it over rather than piling up
+    # a tab per folder walked through.
+    assert view._info_tabs._preview_panel is panel
+
+
 def _first_leaf(view):
     """The first settings folder in the tree — the one tier a name of your own
     can go on, since its own name is a generic code."""
@@ -2849,24 +2870,20 @@ def test_folders_start_collapsed(qtbot):
     assert workflow.child(0).isExpanded() is False
 
 
-def test_opening_a_folder_shows_its_grid_but_selects_nothing(qtbot):
-    # Opening a folder used to auto-load its first item; now it shows the grid and
-    # selects nothing, so the info pane's tab is left alone until an explicit click.
+def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
+    # A branch folder shows folders, not generations, so it has no first item to
+    # land on the way a settings folder does
+    # (test_opening_a_folder_lands_on_its_first_item).
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # A branch folder shows its child tiles but auto-selects no generation...
-    workflow = _image_workflow(view._tree)
-    view._tree.setCurrentItem(workflow)
-    assert view._selected is None
+    view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    # ...and a leaf folder shows its thumbnails but likewise selects nothing.
-    leaf = workflow.child(0).child(0).child(0)
-    view._tree.setCurrentItem(leaf)
-    assert set(view.visible_prompt_ids()) == {"i1", "i2"}  # the grid is shown
-    assert view._selected is None                          # but nothing is picked
+    assert view._browser._visible_keys      # its child folders, as tiles
+    assert view.visible_prompt_ids() == []
+    assert view._selected is None
 
 
 def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
@@ -3167,7 +3184,8 @@ def test_star_button_falls_back_to_the_folder_on_screen(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)                       # nothing picked inside it
+    _select_first_leaf(view)
+    _click_off(view)                               # nothing picked inside it
     assert view._bank.star.isEnabled()
     assert "folder" in view._bank.star.toolTip()
 
@@ -3675,27 +3693,25 @@ def test_a_followed_link_does_not_scroll_a_folder_moved_on_from(qtbot):
 
 
 def test_history_spans_folder_navigation(qtbot):
-    # Every place the user went is a stop: the folder they opened and the item they
-    # then viewed in it, so Back retraces the walk rather than skipping the folders.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    # Every place the user went is a stop: the folder they opened, on the item it
+    # landed them on, so Back retraces the walk rather than skipping the folders.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+            _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # browse to the video folder
-    view._browser._thumbnail_clicked("v1", _NO_MOD)                      # view its item
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then to the image folder
-    view._browser._thumbnail_clicked("i1", _NO_MOD)                      # view its item
+    view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video folder, landing on v1
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then the image folder, on i1
+    view._browser._thumbnail_clicked("i2", _NO_MOD)    # then its other item
+    assert view._selected["prompt_id"] == "i2"
+
+    view._navigation.go_back()                    # the image folder, on what it opened on
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]
     assert view._selected["prompt_id"] == "i1"
 
-    view._navigation.go_back()                                    # the image folder, nothing picked
-    assert view._tree.currentItem() is view._leaf_by_id["i1"]
-    assert view._selected is None
-
-    view._navigation.go_back()                                    # the video folder, on its item
-    assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
-
-    view._navigation.go_back()                                    # the video folder, nothing picked
+    view._navigation.go_back()                    # and out to the video folder, on its item
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
-    assert view._selected is None
+    assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
 
 def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
@@ -3775,7 +3791,8 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
 
 
 def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
+            _image("i3", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
@@ -3783,8 +3800,8 @@ def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
     view._toggle_star(dog_key)
 
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
-    view._browser._drill_into(view._browser._visible_keys[0])      # into the dog folder
-    view._browser._thumbnail_clicked("i2", _NO_MOD)                        # view an item there
+    view._browser._drill_into(view._browser._visible_keys[0])  # into the dog folder, on i2
+    view._browser._thumbnail_clicked("i3", _NO_MOD)            # view another item there
     assert view._tree.currentItem() is not _shelf(view, STARRED_KEY)
 
     view._navigation.go_back()                                      # the folder drilled into
@@ -3883,21 +3900,21 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
     assert len(view._navigation._history._stack) == depth
 
 
-def test_back_onto_the_folder_itself_drops_the_pick(qtbot):
-    # The folder was opened with nothing picked in it, so that is what returning to
-    # it shows — a pane still lit on the item Back just left looks like a dead press.
+def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
+    # A folder of folders has no item to land on, so that is what returning to it
+    # shows — a pane still lit on the item Back just left looks like a dead press.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    lora = _image_workflow(view._tree).child(0).child(0)
+    view._tree.setCurrentItem(lora)                    # its sub-folders, none picked
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])  # down into one, landing on i1
 
     view._navigation.go_back()
 
-    assert view._tree.currentItem() is view._leaf_by_id["i1"]  # the same folder...
-    assert view._selected is None                              # ...showing nothing
-    assert not view._browser._thumb_widgets["i1"].is_selected()
+    assert view._tree.currentItem() is lora   # the folder of folders...
+    assert view._selected is None             # ...showing nothing picked
 
 
 def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
@@ -4615,6 +4632,14 @@ def _open_leaf(view):
     return leaf
 
 
+def _click_off(view):
+    """Put the pick down, as a click on the pane's background does — which since
+    a folder opens on its first item is how Star, Enhance and Delete come to be
+    aimed at the whole folder again (see
+    test_clicking_the_pane_background_drops_the_selection)."""
+    view._browser.clear_thumbnail_selection()
+
+
 def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
@@ -4720,10 +4745,11 @@ def test_changing_folders_clears_the_selection(qtbot):
     view._browser.apply_selection("i1", _NO_MOD)
     assert view.selected_prompt_ids() == ["i1"]
 
-    # Drilling to the sibling settings folder must not carry the pick over.
+    # Drilling to the sibling settings folder must not carry the pick over: what
+    # is picked there is that folder's own first item.
     dog_leaf = cat_leaf.parent().child(1)
     view._tree.setCurrentItem(dog_leaf)
-    assert view.selected_prompt_ids() == []
+    assert view.selected_prompt_ids() == ["i2"]
 
 
 def test_clicking_the_pane_background_drops_the_selection(qtbot):
@@ -4798,7 +4824,8 @@ def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    _open_leaf(view)  # leaf selected, nothing picked
+    _open_leaf(view)
+    _click_off(view)  # leaf selected, nothing picked
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     view._delete_selection()
@@ -4812,6 +4839,7 @@ def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
+    _click_off(view)  # nothing picked, so Delete is the folder's
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)  # user says no
 
     view._delete_selection()
@@ -5016,6 +5044,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     view.refresh()
     model = _image_workflow(view._tree).child(0)
     view._tree.setCurrentItem(model.child(0).child(0))  # one of the two settings leaves
+    _click_off(view)                                   # nothing picked: Delete is the folder's
     view._confirm = lambda text: True
 
     view._delete_selection()  # deletes that settings folder
@@ -5051,6 +5080,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     first_key = first_leaf.data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
     view._tree.setCurrentItem(second_leaf)  # then the second (now current)
+    _click_off(view)                        # nothing picked: Delete is the folder's
     view._confirm = lambda text: True
 
     view._delete_selection()  # deletes the second folder
@@ -5903,7 +5933,8 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
 
     assert view._info_tabs.count() == 1
     panel = view._info_tabs.current_config_panel()
-    assert panel.is_blank()  # the resting tab is still the one a click loads into
+    # Still holding the item the folder opened on, not a variation the loop made.
+    assert panel.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
     view._on_thumbnail_clicked(landed["prompt_id"])
@@ -7271,12 +7302,12 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
     assert panel._displayed_row["prompt_id"] == job.prompt_id  # the just-finished result
 
 
-def test_a_run_no_tab_launched_lands_in_no_tab(qtbot, tmp_path):
-    # The folder tile's "+" is the gallery's launch, not a tab's Generate, so its
-    # result belongs to no tab. It used to fill the front one whatever that was —
-    # which left the pane's resting tab holding a picture nothing in it had asked
-    # for, and no longer blank, so the next clicked generation opened a tab beside
-    # it instead of loading into it.
+def test_the_tiles_run_lands_in_the_tab_standing_on_its_folder(qtbot, tmp_path):
+    # The folder tile's "+" is the gallery's launch, not a tab's Generate, so it
+    # has no tab of its own — it goes to the tab already standing on that very
+    # folder, which opening the folder is what put there. A tab parked on other
+    # settings still gets nothing
+    # (test_a_tab_on_other_settings_does_not_claim_the_tiles_launch).
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
@@ -7285,9 +7316,42 @@ def test_a_run_no_tab_launched_lands_in_no_tab(qtbot, tmp_path):
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
+    assert view._info_tabs.count() == 1   # no tab grew beside it
     panel = view._info_tabs.current_config_panel()
-    assert panel._displayed_row is None   # the resting tab was not taken over
-    assert panel.is_blank()               # ...so it is still the tab a click fills
+    assert panel.displayed_row()["prompt_id"] == job.prompt_id
+
+
+def test_the_tab_claiming_the_tiles_run_is_kept(qtbot, tmp_path):
+    # That run's Cancel and its filling bar are in this tab now, so it is no
+    # longer one a later click may replace — the rule a tab's own Generate
+    # already follows.
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    tabs = view._info_tabs
+    assert tabs._preview_panel is tabs.current_config_panel()  # italic until now
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert tabs._preview_panel is None
+
+
+def test_opening_a_runs_folder_from_its_card_loads_no_saved_item(qtbot, tmp_path):
+    # Clicking an in-flight card goes to the run, so the folder it opens on the
+    # way lands on no saved item of its own — one loaded there would paint a
+    # picture nobody asked for over the very tab the run belongs to.
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    view._tree.setCurrentItem(_image_workflow(view._tree))  # browse away from it
+    view._info_tabs.load_selection = MagicMock()
+
+    view._reveal_reroll(key)
+
+    view._info_tabs.load_selection.assert_not_called()
+    assert view._info_tabs.current_config_panel().watched_key() == key
 
 
 def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
@@ -9954,6 +10018,7 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    _click_off(view)                               # so the button is the folder's
     assert not view._bank.enhance.isHidden()
     assert view._bank.enhance.isEnabled()          # a plain image awaits
     assert "1 not-yet-enhanced image" in view._bank.enhance.toolTip()
@@ -13648,6 +13713,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
     # speaker who is not looking at the bank needs told back.
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
+    _click_off(view)                               # so the button is the folder's
     aimed = view._bank.star.toolTip()
     assert aimed.startswith("Star folder")
 

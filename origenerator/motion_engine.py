@@ -34,6 +34,7 @@ from player_core.cruise_control import CruiseControlState  # noqa: E402
 from player_core.learned_motion import LearnedMotionState, load_default_model  # noqa: E402
 from player_core.robot_hand import (  # noqa: E402
     MAX_SPEED,
+    MAX_TICK_SECONDS,
     MIN_SPEED,
     RobotHandState,
     WaveformShape,
@@ -48,6 +49,7 @@ from player_core.robot_hand import (  # noqa: E402
     set_center,
     set_speed,
 )
+from player_core.robot_hand import trace_window as wave_trace_window  # noqa: E402
 
 __all__ = [
     "MAX_SPEED",
@@ -94,6 +96,9 @@ class Motion:
     # Its model is read from the package the first time it is switched on.
     learned: LearnedMotionState = field(default_factory=LearnedMotionState)
     phase: float = 0.0
+    # The phase counted up without wrapping: what the readout's knots are
+    # anchored to, so they stay put from one cycle to the next.
+    phase_total: float = 0.0
 
     @property
     def bpm(self) -> float:
@@ -114,6 +119,7 @@ def advance(motion: Motion, dt_s: float) -> None:
     time and nothing else.
     """
     motion.phase = phase_advanced(motion.phase, motion.state.bpm, dt_s)
+    motion.phase_total += max(0.0, min(dt_s, MAX_TICK_SECONDS)) * motion.state.bpm / 60.0
 
 
 def tick_cruise_control(motion: Motion, now: float) -> None:
@@ -184,6 +190,7 @@ def quarter_offset(motion: Motion) -> None:
     """Jump a quarter cycle — genau's ``\\`` key, for when the motion is out of
     step with what is on screen and you want it moved rather than restarted."""
     motion.phase = (motion.phase + 0.25) % 1.0
+    motion.phase_total += 0.25
     for wave in motion.cruise.stack.waves:
         wave.phase = (wave.phase + 0.25) % 1.0
 
@@ -240,21 +247,20 @@ def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[floa
     as ``samples`` + 1 values, the last one the knot past the readout's edge,
     and how far the drawn line is shifted left, as a fraction of one sample.
 
-    The wave and cruise control's sum slide by being resampled live (nothing
-    shifts); the learned motion is read on knots and says how far it has slid,
-    so its picture holds still between knots rather than writhing.
+    Every source is read on knots a fixed stretch of its own clock apart --
+    the wave on its phase, cruise control's sum on the stack's clock, the
+    learned motion on its script -- so the picture holds still between knots
+    and slides by the fraction rather than being redrawn at fixed columns.
     """
     if motion.learned.active:
         return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
-    reach = span_s * samples / max(1, samples - 1)
     stack = motion.cruise.stack
     if stack:
-        return wave_stack.trace(stack, motion.clock, samples + 1, reach), 0.0
-    span_cycles = reach * motion.state.bpm / 60.0
-    return [
-        _at(motion, motion.phase + (i / samples) * span_cycles) / 100.0
-        for i in range(samples + 1)
-    ], 0.0
+        return wave_stack.trace_window(stack, motion.clock, samples, span_s)
+    state = motion.state
+    return wave_trace_window(
+        state.shape, state.amplitude, state.center, phase=motion.phase_total,
+        bpm=state.bpm, samples=samples, span_s=span_s)
 
 
 def _at(motion: Motion, phase: float) -> float:

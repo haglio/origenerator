@@ -11349,6 +11349,12 @@ class _SignalMotion(QObject):
     def set_cruise(self, on):
         self.calls.append(("cruise", on))
 
+    def toggle_learned(self):
+        self.calls.append("learned")
+
+    def set_learned(self, on):
+        self.calls.append(("learned", on))
+
     def quarter_offset(self):
         self.calls.append("nudge")
 

@@ -66,6 +66,12 @@ def test_the_motion_dials_keep_fun_times_phrases():
     assert match_app_command("offset") is AppCommand.OFFSET
 
 
+def test_the_learned_motion_answers_the_same_three_ways_cruise_does():
+    assert match_app_command("learned motion") is AppCommand.LEARNED
+    assert match_app_command("learned on") is AppCommand.LEARNED_ON
+    assert match_app_command("learned off") is AppCommand.LEARNED_OFF
+
+
 def test_cruise_answers_an_explicit_on_and_off_as_well_as_a_flip():
     # Hands-free is reached for without looking at the panel, so a speaker who
     # wants it ON must not have to find out which way it is standing first.

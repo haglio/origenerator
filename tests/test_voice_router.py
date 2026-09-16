@@ -169,6 +169,7 @@ class FakeMotion:
         self.amplitude = 50
         self.centre = 50
         self.cruising = False
+        self.learned = False
         self.shape_steps = []
 
     def adjust_speed(self, by):
@@ -188,6 +189,12 @@ class FakeMotion:
 
     def set_cruise(self, on):
         self.cruising = on
+
+    def toggle_learned(self):
+        self.learned = not self.learned
+
+    def set_learned(self, on):
+        self.learned = on
 
     def quarter_offset(self):
         pass

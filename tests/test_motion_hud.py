@@ -38,6 +38,7 @@ _KEYS = [
     (Qt.Key.Key_O, ("adjust_center", 5)),
     (Qt.Key.Key_I, ("cycle_shape",)),
     (Qt.Key.Key_Slash, ("toggle_cruise",)),
+    (Qt.Key.Key_Semicolon, ("toggle_learned",)),
     (Qt.Key.Key_Backslash, ("quarter_offset",)),
 ]
 
@@ -86,5 +87,5 @@ def test_the_legend_names_every_key_the_cluster_answers():
     # Each key beside the word for what it does: "/" and "I" alone appear inside
     # "J/L" and elsewhere, so on their own they would say nothing.
     for written in ("Space drives", "J/L speed", "7/9 travel", "U/O center",
-                    "I shape", "/ cruise", "\\ nudge"):
+                    "I shape", "/ cruise", "; learned", "\\ nudge"):
         assert written in MOTION_KEY_LEGEND

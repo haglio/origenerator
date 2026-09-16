@@ -205,6 +205,32 @@ def test_the_status_line_reads_off_but_keeps_the_dials_while_stopped(qtbot):
     assert driver.status_text() == "OSR2 off · 200/min · sine · travel 100 around 50"
 
 
+def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
+    # Hands off to the scripts: the tick streams where the phrases will have
+    # the device when the command's own interval runs out, inside the dials'
+    # range -- and cruise control, had it the motion, has let go.
+    from player_core.learned_model import LearnedModel, Phrase, classify
+
+    phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
+    driver, broker, clock = _driver(qtbot)
+    driver.state.learned.model = LearnedModel(
+        phrases={classify(phrase): [phrase]}, seen={classify(phrase): 1})
+    driver.start()
+    driver.toggle_cruise()
+    driver.toggle_learned()
+    assert driver.state.learned.active and not driver.state.cruise.active
+    for _ in range(60):
+        clock.t += 0.025
+        driver.poll()
+        pos, interval = broker.positions[-1]
+        assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
+    assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
+    assert len({round(pos) for pos, _i in broker.positions}) > 5  # it moves
+    assert "learned" in driver.status_text()
+    driver.set_learned(False)
+    assert not driver.state.learned.active and not driver.state.learned.times
+
+
 def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     # Hands off, the motion is no longer one wave: it is several summed, each
     # with its own speed and its own share of the travel, both on their way

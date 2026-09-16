@@ -183,6 +183,7 @@ class Osr2MotionDriver(QObject):
             motion_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
             motion_engine.tick_cruise_control(self._state, now)
+            motion_engine.tick_learned_motion(self._state, now)
             pos = motion_engine.position_ahead(self._state, lead_ms / 1000.0)
         self._broker.send_position(pos, lead_ms)
         if not self._streaming:
@@ -263,6 +264,21 @@ class Osr2MotionDriver(QObject):
             else:
                 motion_engine.disable_cruise_control(self._state)
 
+    def toggle_learned(self) -> None:
+        """Hands off to the scripts: the learned motion takes the motion over
+        (genau's ``;``), and cruise control lets go if it had it."""
+        with self._lock:
+            motion_engine.toggle_learned_motion(self._state)
+
+    def set_learned(self, on: bool) -> None:
+        """Put the learned motion the way asked, whichever way it is standing —
+        what a spoken "learned on" is, as :meth:`set_cruise` is for cruise."""
+        with self._lock:
+            if on:
+                motion_engine.enable_learned_motion(self._state)
+            else:
+                motion_engine.disable_learned_motion(self._state)
+
     def quarter_offset(self) -> None:
         r"""Shift the motion a quarter cycle (genau's ``\``)."""
         with self._lock:
@@ -277,4 +293,6 @@ class Osr2MotionDriver(QObject):
                  f" · travel {state.amplitude} around {state.center}")
         if self._state.cruise.active:
             dials += " · cruise"
+        if self._state.learned.active:
+            dials += " · learned"
         return f"OSR2 · {dials}" if self._active else f"OSR2 off · {dials}"

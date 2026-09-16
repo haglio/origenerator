@@ -17,7 +17,9 @@ and speed, and each of those always on its way somewhere else
 (:mod:`player_core.wave_stack` is the arithmetic under it). While it is engaged
 the stack is what the device follows and the dials only report what the sum came
 to; the rest of the time the motion is the single hand-driven wave it has always
-been.
+been. :mod:`player_core.learned_motion` is the other takeover: phrases of real
+scripting in place of the waveform, played inside the dials' range and at the
+speed dial's pace, and never on together with cruise control.
 """
 from __future__ import annotations
 
@@ -27,8 +29,9 @@ from origenerator.paths import ensure_player_core_on_path
 
 ensure_player_core_on_path()
 
-from player_core import cruise_control, wave_stack  # noqa: E402
+from player_core import cruise_control, learned_motion, wave_stack  # noqa: E402
 from player_core.cruise_control import CruiseControlState  # noqa: E402
+from player_core.learned_motion import LearnedMotionState, load_default_model  # noqa: E402
 from player_core.robot_hand import (  # noqa: E402
     MAX_SPEED,
     MIN_SPEED,
@@ -60,7 +63,9 @@ __all__ = [
     "bpm_for_speed",
     "cycle_shape",
     "disable_cruise_control",
+    "disable_learned_motion",
     "enable_cruise_control",
+    "enable_learned_motion",
     "position",
     "position_ahead",
     "quarter_offset",
@@ -68,7 +73,9 @@ __all__ = [
     "set_center",
     "set_speed",
     "tick_cruise_control",
+    "tick_learned_motion",
     "toggle_cruise_control",
+    "toggle_learned_motion",
     "trace",
 ]
 
@@ -84,6 +91,8 @@ class Motion:
 
     state: RobotHandState = field(default_factory=RobotHandState)
     cruise: CruiseControlState = field(default_factory=CruiseControlState)
+    # Its model is read from the package the first time it is switched on.
+    learned: LearnedMotionState = field(default_factory=LearnedMotionState)
     phase: float = 0.0
 
     @property
@@ -113,17 +122,51 @@ def tick_cruise_control(motion: Motion, now: float) -> None:
                                        phase=motion.phase)
 
 
+def tick_learned_motion(motion: Motion, now: float) -> None:
+    """Let the phrases carry the motion, if the learned motion has it.  The
+    first phrase begins where the wave already has the device, so the takeover
+    cannot be felt."""
+    learned_motion.tick_learned_motion(
+        motion.state, motion.learned, now, start_fraction=_envelope_fraction(motion))
+
+
 def toggle_cruise_control(motion: Motion) -> None:
     """Hands off, or hands back on — taking the motion over from where the dials
     already have it, and handing the single wave back at the phase of the wave
     that was carrying most of the travel, so neither seam is felt."""
-    _picked_up(motion, cruise_control.toggle_cruise_control(motion.cruise))
+    if motion.cruise.active:
+        disable_cruise_control(motion)
+    else:
+        enable_cruise_control(motion)
 
 
 def enable_cruise_control(motion: Motion) -> None:
     """Hands off, whichever way the switch was standing — what a spoken "cruise
-    on" is, where the toggle above is what a key press is."""
+    on" is, where the toggle above is what a key press is.  The learned motion
+    lets go: the two are never on together."""
+    learned_motion.disable_learned_motion(motion.learned)
     cruise_control.enable_cruise_control(motion.cruise)
+
+
+def toggle_learned_motion(motion: Motion) -> None:
+    """Hands off to the scripts, or back — genau's ``;``."""
+    if motion.learned.active:
+        disable_learned_motion(motion)
+    else:
+        enable_learned_motion(motion)
+
+
+def enable_learned_motion(motion: Motion) -> None:
+    """Hands off to the scripts, whichever way the switch was standing.  Cruise
+    control lets go the way it always does, handing the wave its phase."""
+    disable_cruise_control(motion)
+    if motion.learned.model is None:
+        motion.learned.model = load_default_model()
+    learned_motion.enable_learned_motion(motion.learned)
+
+
+def disable_learned_motion(motion: Motion) -> None:
+    learned_motion.disable_learned_motion(motion.learned)
 
 
 def disable_cruise_control(motion: Motion) -> None:
@@ -148,12 +191,31 @@ def quarter_offset(motion: Motion) -> None:
 def position(motion: Motion) -> float:
     """Where the motion is now, 0-100 — the scale
     :func:`origenerator.osr2.format_position` takes."""
+    if motion.learned.active:
+        return learned_motion.position(motion.learned, motion.state)
+    return _wave_position(motion)
+
+
+def _wave_position(motion: Motion) -> float:
+    """Where the wave has the device — cruise control's sum while it has the
+    motion, the single wave otherwise."""
     # Read the stack once: the driver's clock thread can swap it out from
     # under a repaint, and asking twice can be answered twice differently.
     stack = motion.cruise.stack
     if stack:
         return wave_stack.position(stack, motion.clock)
     return _at(motion, motion.phase)
+
+
+def _envelope_fraction(motion: Motion) -> float:
+    """How far up the dials' envelope the wave has the device, 0 at its floor
+    and 1 at its ceiling — where the learned motion's first phrase begins."""
+    state = motion.state
+    if state.amplitude <= 0:
+        return 0.0
+    low = max(0.0, state.center - state.amplitude / 2)
+    span = min(100.0, state.center + state.amplitude / 2) - low
+    return (_wave_position(motion) - low) / span if span > 0 else 0.0
 
 
 def position_ahead(motion: Motion, lead_s: float) -> float:
@@ -164,6 +226,8 @@ def position_ahead(motion: Motion, lead_s: float) -> float:
     one it is actually due to be at when the time is up. Aimed at the present it
     can only ever chase.
     """
+    if motion.learned.active:
+        return learned_motion.position(motion.learned, motion.state, lead_s)
     stack = motion.cruise.stack
     if stack:
         return wave_stack.position_ahead(stack, motion.clock, lead_s)
@@ -173,6 +237,8 @@ def position_ahead(motion: Motion, lead_s: float) -> float:
 def trace(motion: Motion, samples: int, span_s: float) -> list[float]:
     """The motion sampled forward from now as 0-1 heights — the drive readout's
     picture of the motion the device is being sent, ``span_s`` seconds of it."""
+    if motion.learned.active:
+        return learned_motion.trace(motion.learned, motion.state, samples, span_s)
     stack = motion.cruise.stack
     if stack:
         return wave_stack.trace(stack, motion.clock, samples, span_s)

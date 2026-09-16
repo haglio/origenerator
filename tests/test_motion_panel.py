@@ -28,6 +28,10 @@ class FakeMotion:
         self.calls.append("cruise")
         self.state.cruise.active = not self.state.cruise.active
 
+    def toggle_learned(self):
+        self.calls.append("learned")
+        self.state.learned.active = not self.state.learned.active
+
     def cycle_shape(self):
         self.calls.append("shape")
 
@@ -174,7 +178,8 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     assert not any(a.endswith("_activate") for a in actions)
     for kept in ("genau_prev_clip", "genau_next_clip", "main_lock",
                  "genau_weird_clip", "genau_clip_seconds_down", "genau_clip_seconds_up",
-                 "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button",
+                 "robot_hand_toggle_cruise", "robot_hand_toggle_learned",
+                 "robot_hand_cycle_shape", "quarter_button",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
 
@@ -186,10 +191,11 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
     motion.state.state.amplitude = 40
     panel.render_console()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
-                   "robot_hand_toggle_cruise", "robot_hand_cycle_shape", "quarter_button"):
+                   "robot_hand_toggle_cruise", "robot_hand_toggle_learned",
+                   "robot_hand_cycle_shape", "quarter_button"):
         _press(panel, action)
     assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
-                            "cruise", "shape", "quarter"]
+                            "cruise", "learned", "shape", "quarter"]
 
 
 def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):

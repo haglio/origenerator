@@ -311,9 +311,10 @@ class GalleryView(QWidget):
         # The app's one OSR2 switch, and now its only one: the players' console
         # carries the control-state group that sets it, on every surface.  Public
         # because a show is handed it whole -- see ShowActions.
-        self._osr2_enabled = False
         self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
-        self.osr2_control.toggled.connect(self._on_osr2_toggle)
+        # What the session file said to reopen in, kept for a window that may
+        # not drive to hand back untouched (see osr2_state).
+        self._osr2_left_in = None
         # Every move of the group re-aims the device, not only a flip of the
         # switch: driving to parked leaves the switch on, and what has to change
         # is which driver is sending and what it is sending.
@@ -666,11 +667,11 @@ class GalleryView(QWidget):
         """Everything the app is doing under its own steam right now."""
         show = self._shows.showing
         return _Running(
-            osr2=self._osr2_enabled,
+            osr2=self.osr2_control.isChecked(),
             # Space reaches the switch rather than the motion, so a motion
             # running with the switch off is one something else started — the
             # stop has always covered that case, and so does the resume.
-            motion=self._osr2_motion.active and not self._osr2_enabled,
+            motion=self._osr2_motion.active and not self.osr2_control.isChecked(),
             auto=self._auto.active_key(),
             audio=self._bank.audio is not None and self._bank.audio.isChecked(),
             show=show is not None,
@@ -1182,9 +1183,6 @@ class GalleryView(QWidget):
 
     # --- Drive OSR2: one switch, the app picking funscript or motion ----------
 
-    def _on_osr2_toggle(self, on: bool):
-        self._osr2_enabled = on
-
     def toggle_osr2_drive(self):
         """Flip the one switch — what Space does, from any surface. The motion's
         own toggle is deliberately not reachable from a key any more: with two
@@ -1221,7 +1219,7 @@ class GalleryView(QWidget):
         try:
             held = self._osr2_motion.held_at is not None
             target = (self._osr2_drive_source()
-                      if self._osr2_enabled and not held else None)
+                      if self.osr2_control.isChecked() and not held else None)
             if target is None:
                 if self._osr2_driving is not None:
                     self._osr2_driver.stop()
@@ -1233,7 +1231,7 @@ class GalleryView(QWidget):
                 if self._osr2_driving != driving:
                     self._osr2_driver.start(player, actions)
                     self._osr2_driving = driving
-            wants_motion = self._osr2_enabled and target is None
+            wants_motion = self.osr2_control.isChecked() and target is None
             if wants_motion and not self._osr2_motion.active:
                 self._osr2_motion.start()
             elif not wants_motion and self._osr2_motion.active:
@@ -1275,14 +1273,19 @@ class GalleryView(QWidget):
         self._reconcile_generating()
         self._retarget_find()
 
-    def osr2_enabled(self) -> bool:
-        """Whether the global OSR2 toggle is on (for session persistence)."""
-        return self._osr2_enabled
+    def osr2_state(self):
+        """Which of the four control states to reopen in.  A window that may not
+        drive (hosted by Fun Time) hands back what it was opened with instead:
+        the standalone app keeps the same state file, and a hosted run would
+        otherwise leave it saying control off."""
+        if not self.osr2_control.isEnabled():
+            return self._osr2_left_in
+        return self.osr2_control.state()
 
-    def set_osr2_enabled(self, enabled):
-        """Restore the global OSR2 toggle from a saved session.  With no OSR2
-        surface (hosted by Fun Time) a stale saved value has nothing to restore."""
-        self.osr2_control.setChecked(bool(enabled))  # → _on_osr2_toggle → reconcile
+    def restore_osr2_state(self, saved):
+        """Put the control state a saved session was left in back on."""
+        self._osr2_left_in = saved
+        self.osr2_control.restore(saved)
 
     # --- the audio bed: one app-global switch, following nothing on screen ----
 

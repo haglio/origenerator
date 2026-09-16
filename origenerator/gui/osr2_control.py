@@ -11,10 +11,10 @@ question and they are two halves of the answer: the funscript driver while a
 scripted video is in front, the self-generated motion otherwise, and neither
 while the device is held at an end or let go of.
 
-It wears a checkable button's three names and its toggled signal on purpose.
-Every one of those callers flipped a button before, and the voice router still
-flips the audio bed and the microphone that way, so one shape across the four is
-one fewer thing to keep in step.
+It wears a checkable button's three names on purpose. Every one of those
+callers flipped a button before, and the voice router still flips the audio bed
+and the microphone that way, so one shape across the four is one fewer thing to
+keep in step.
 """
 from __future__ import annotations
 
@@ -37,10 +37,9 @@ _HELD_STATE = {center: state for state, center in _HELD_AT.items()}
 
 
 class Osr2Control(QObject):
-    # The switch moved: what reconciles the device follows this.
-    toggled = pyqtSignal(bool)
-    # And anything that can change which of the four buttons lights, the holds
-    # included -- what a console showing that group redraws on.
+    # Anything that can change which of the four buttons lights, the holds
+    # included: what re-aims the device, and what a console showing the group
+    # redraws on.
     changed = pyqtSignal()
     # The app has finished re-aiming the device, so what is driving it may be
     # different: every console over it draws itself again.
@@ -76,7 +75,6 @@ class Osr2Control(QObject):
         if on == self._checked:
             return
         self._checked = on
-        self.toggled.emit(on)
         self.changed.emit()
 
     def state(self) -> str:
@@ -107,6 +105,15 @@ class Osr2Control(QObject):
         self.setChecked(state != OSR2_CONTROL_OFF)
         if self._checked == was:
             self.changed.emit()
+
+    def restore(self, saved) -> None:
+        """Put back the state a saved session was left in.  True is a session
+        saved while this was an on/off switch; anything unrecognized opens with
+        the device let go of."""
+        if saved is True:
+            saved = OSR2_DRIVING
+        known = saved in (OSR2_PARKED, OSR2_RETRACTED, OSR2_DRIVING)
+        self.set_state(saved if known else OSR2_CONTROL_OFF)
 
     def source(self) -> str | None:
         """What is sending to the device right now, or None while nothing is.

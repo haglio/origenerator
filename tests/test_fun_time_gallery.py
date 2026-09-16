@@ -7,7 +7,7 @@ console — and its layout folds to fit the Random Favs Browser's upright rect.
 from __future__ import annotations
 
 from PIL import Image
-from player_core.console import OSR2_CONTROL_OFF
+from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSplitter
 
@@ -77,10 +77,16 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     assert view.eventFilter(view, event) is False
 
 
-def test_fun_time_gallery_restores_osr2_state_as_a_no_op(qtbot):
+def test_fun_time_gallery_carries_the_standalone_osr2_state_through(qtbot):
+    """Hosted, the device is the session's, so the state the standalone app was
+    left in cannot be put on -- and is handed back untouched on the way out
+    rather than saved over, since both runs keep the one state file."""
     view = _fun_time_view(qtbot)
-    view.set_osr2_enabled(True)  # a stale standalone session key must not crash
-    assert view.osr2_enabled() is False
+
+    view.restore_osr2_state(OSR2_RETRACTED)
+
+    assert view.osr2_control.state() == OSR2_CONTROL_OFF
+    assert view.osr2_state() == OSR2_RETRACTED
 
 
 def test_fun_time_gallery_stacks_the_generate_tabs_over_the_browser(qtbot):

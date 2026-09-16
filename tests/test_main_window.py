@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from player_core.console import OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QSystemTrayIcon
@@ -101,20 +102,21 @@ def test_a_saved_tab_from_before_the_rename_reopens_on_the_live_aim_keys(qtbot, 
     assert "stroke_hz" not in params
 
 
-def test_restores_the_global_osr2_toggle_from_app_state(qtbot, tmp_path):
+@pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_RETRACTED, OSR2_DRIVING])
+def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved):
     state = AppState(tmp_path / "ui.json")
-    state.set("osr2_enabled", True)
+    state.set("osr2_enabled", saved)
     win = _window(qtbot, tmp_path, state)
-    assert win._gallery_view.osr2_enabled() is True
+    assert win._gallery_view.osr2_control.state() == saved
 
 
-def test_persists_the_global_osr2_toggle_on_close(qtbot, tmp_path):
+def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.set_osr2_enabled(True)
+    win._gallery_view.osr2_control.set_state(OSR2_RETRACTED)
 
     win.close()  # closeEvent persists the session
-    assert state.get("osr2_enabled") is True
+    assert state.get("osr2_enabled") == OSR2_RETRACTED
 
 
 def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):

@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 #
 # The keys are the state file's public surface and cannot change, "generate_tabs"
 # included: it is from before the Generate and Gallery views merged, and a
-# session saved then still opens.
+# session saved then still opens. "osr2_enabled" is the same: it holds which of
+# the four OSR2 control states the app was left in, and reads the True or False
+# of the on/off switch it held before.
 #
 # The order is the restore order and is load-bearing: the tabs before the folder
 # before the generation, each later one needing what the earlier ones put up.
@@ -43,7 +45,7 @@ SESSION_PREFS = (
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
     ("gallery_combine", GalleryView.combine_selection, GalleryView.restore_combine_selection),
-    ("osr2_enabled", GalleryView.osr2_enabled, GalleryView.set_osr2_enabled),
+    ("osr2_enabled", GalleryView.osr2_state, GalleryView.restore_osr2_state),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
     ("audio_enabled", GalleryView.audio_enabled, GalleryView.set_audio_enabled),
     # The mic switch. Absent from a session saved before it was persisted — and

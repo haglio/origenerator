@@ -95,15 +95,13 @@ class ShowState:
 
     ``order`` is the pass it was playing and ``current`` the slide it stood on,
     both as generation ids. The rest is what that slide was doing — held against
-    the advance, showing which of its versions — and ``enhance_on_hold`` the
-    switch the show was set to.
+    the advance, and showing which of its versions.
     """
 
     order: tuple = ()
     current: str | None = None
     locked: bool = False
     level_index: int = 0
-    enhance_on_hold: bool = True
 
 
 def in_order(order: list) -> None:

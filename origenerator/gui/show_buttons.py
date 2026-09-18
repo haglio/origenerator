@@ -22,15 +22,15 @@ ensure_player_core_on_path()
 
 from player_core.hud_button import FIT_THE_WORD, Button  # noqa: E402
 from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark  # noqa: E402
-from player_core.hud_status import F_MODE_LABEL  # noqa: E402
+from player_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
-# The band, in the order the players put the same controls in: step either way,
-# then the three about the item on screen, then what narrows the set and the way
-# back out of all of it.  The tuples are the groups the wider gap opens between.
+# The band, in the order the players put the same controls in.  The tuples are
+# the groups the wider gap opens between.
 CONTROL_GROUPS = (
     ("prev", "next"),
     ("lock", "trash", "fmode"),
     ("enhanced", "reset"),
+    ("shuffle", "latest"),
     ("minimize",),
 )
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
@@ -52,6 +52,7 @@ CONTROL_FACES = {
     "prev": "⏮", "next": "⏭", "lock": "🔒",
     "trash": shared_mark("trash"), "fmode": FMODE_ICON,
     "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
+    "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),
     "minimize": MINIMIZE_ICON,
 }
 
@@ -65,6 +66,8 @@ CONTROL_TOOLTIPS = {
     "trash": "Delete this one and move on",
     "fmode": f"{F_MODE_LABEL} — play only the favorites",
     "enhanced": "Enhanced only — play just the pictures that have been enhanced",
+    "shuffle": f"{SHUFFLE_LABEL} — every picture and video of this shape, shuffled",
+    "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
     "minimize": "Minimize this show — bring it back from the taskbar",
 }
 # Reset means what the side goes back TO, which is not the same in both places:
@@ -78,7 +81,7 @@ RESET_TOOLTIPS = {
 
 
 def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
-              enhanced: bool = False, hosted: bool = False,
+              enhanced: bool = False, order: str = "", hosted: bool = False,
               own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
     """The rows a show's HUD draws, for the surface it is drawn on.
 
@@ -92,7 +95,8 @@ def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
     minimize = own_window and not hosted
     names = [name for group in CONTROL_GROUPS for name in group
              if minimize or name != "minimize"]
-    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced}
+    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced,
+           "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
@@ -101,16 +105,27 @@ def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
     return (_mode_row(), band) if mode_row else (band,)
 
 
+# The map's own chrome and the session's own keys, in the players' spelling,
+# each with the axis or the direction it means on a show.  The players' second
+# axis is their action column; here it is the config column, the same seed
+# under other configurations.
+_LOOPS = {"seed_loop": "seed", "action_loop": "config", "no_loop": ""}
+_NAV = {"nav_left": "left", "nav_right": "right", "nav_up": "up", "nav_down": "down",
+        # The players' spoken "next seed" / "next action": one step along the
+        # row, one step down the column.
+        "cycle_seed": "right", "cycle_action": "down"}
+
+
 def answer(host, action: str, argument: str = "") -> bool:
     """Do what a press on a show's panel asks of *host*, by the name its verb
     carries after the side ("next", "fmode", "play_video"), and say whether the
     show had an answer.
 
     One table for every way a press reaches a show — its own window's panel,
-    and a session routing a player's panel back here — so a button means the
-    same thing whichever of them drew it.  ``False`` for minimize, which is a
-    window's rather than a show's, and for the map's own chrome that no show
-    has a counterpart for.
+    a session routing a player's panel back here, and the session's own keys
+    — so a button means the same thing whichever of them drew it.  ``False``
+    for minimize, which is a window's rather than a show's, and for the
+    players' chrome about acts, which a show has no counterpart for.
     """
     if action in ("prev", "next"):
         host.show_step(-1 if action == "prev" else 1)
@@ -120,18 +135,26 @@ def answer(host, action: str, argument: str = "") -> bool:
         host.show_cull()
     elif action == "reset":
         host.show_reset()
+    elif action in ("shuffle", "latest"):
+        host.show_order(latest=action == "latest")
     elif action == "fmode":
         host.toggle_f_mode()
     elif action == "enhanced":
         host.toggle_enhanced_mode()
-    elif action in ("no_loop", "seed_loop"):
-        # Stop looping this row: the side goes back to what it does when
-        # nothing is looping, which is browse its whole library -- the same
-        # place its reset leads, and what the press means on a player.  Pressed
-        # while nothing is looping it is the dark button it looks like: a show
-        # cannot start a loop it is not in.
-        if host.hud_looping:
-            host.show_reset()
+    elif action in _LOOPS:
+        host.show_loop(_LOOPS[action])
+    elif action == "loop":
+        host.show_loop_cycle()
+    elif action == "more_seeds":
+        host.show_more_seeds()
+    elif action == "filter":
+        # The button at the head of a map row: narrow to that configuration,
+        # the way a satellite's narrows to that act.
+        host.show_filter(argument)
+    elif action == "no_filter":
+        host.show_loop("")
+    elif action in _NAV:
+        host.show_nav(_NAV[action])
     elif action in ("play_video", "lock_video"):
         # A thumbnail on the map: a click plays it, a double-click holds it.
         host.show_item(argument, hold=action == "lock_video")

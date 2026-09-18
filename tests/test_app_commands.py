@@ -258,3 +258,9 @@ def test_every_dial_can_be_sent_to_every_stop_on_the_grid():
         for dial in ("speed", "amp", "center")
         for stop in (0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
     }
+
+
+def test_enhance_on_hold_is_a_switch_with_the_three_shapes_every_switch_has():
+    assert match_app_command("enhance on hold") is AppCommand.ENHANCE_ON_HOLD
+    assert match_app_command("enhance on hold on") is AppCommand.ENHANCE_ON_HOLD_ON
+    assert match_app_command("enhance on hold off") is AppCommand.ENHANCE_ON_HOLD_OFF

@@ -119,13 +119,14 @@ _DIALS = {
     "center": "set_center",
 }
 
-# The app-wide switch each spoken word flips, as (which of the four switches, the
+# The app-wide switch each spoken word flips, as (which of the five switches, the
 # state asked for — ``None`` flips whichever way it is standing — and what the
 # answer calls it). Set through the button rather than around it, so a spoken
 # switch and a clicked one are the same event and the bank shows both. The
 # buttons themselves arrive in :meth:`VoiceRouter.bind_the_bank`, by keyword, so
 # a rename is a TypeError at launch rather than a word that quietly does nothing.
 _AUTO, _AUDIO, _DRIVE, _MIC = "auto", "audio", "drive", "mic"
+_ENHANCE_ON_HOLD = "enhance_on_hold"
 _SWITCHES = {
     AppCommand.AUTO: (_AUTO, None, "auto-generate"),
     AppCommand.AUTO_ON: (_AUTO, True, "auto-generate"),
@@ -136,6 +137,9 @@ _SWITCHES = {
     AppCommand.DRIVE: (_DRIVE, None, "OSR2 control"),
     AppCommand.DRIVE_ON: (_DRIVE, True, "OSR2 control"),
     AppCommand.DRIVE_OFF: (_DRIVE, False, "OSR2 control"),
+    AppCommand.ENHANCE_ON_HOLD: (_ENHANCE_ON_HOLD, None, "enhance on hold"),
+    AppCommand.ENHANCE_ON_HOLD_ON: (_ENHANCE_ON_HOLD, True, "enhance on hold"),
+    AppCommand.ENHANCE_ON_HOLD_OFF: (_ENHANCE_ON_HOLD, False, "enhance on hold"),
     AppCommand.MIC_OFF: (_MIC, False, "the mic"),
 }
 
@@ -292,7 +296,8 @@ class VoiceRouter(QObject):
             for dial, setter in _DIALS.items()
         }
 
-    def bind_the_bank(self, *, auto, audio, drive, mic, actions, enhance) -> None:
+    def bind_the_bank(self, *, auto, audio, drive, mic, enhance_on_hold, actions,
+                      enhance) -> None:
         """Bind the spoken vocabulary to the buttons it acts through, now that
         the bank exists.
 
@@ -307,7 +312,8 @@ class VoiceRouter(QObject):
         :meth:`_flip_switch` can still answer that the session owns them, and
         the dial words find nothing to turn rather than a driver that is absent.
         """
-        self._switches = {_AUTO: auto, _AUDIO: audio, _DRIVE: drive, _MIC: mic}
+        self._switches = {_AUTO: auto, _AUDIO: audio, _DRIVE: drive, _MIC: mic,
+                          _ENHANCE_ON_HOLD: enhance_on_hold}
         self._bank = dict(actions)
         self._enhance = enhance
 

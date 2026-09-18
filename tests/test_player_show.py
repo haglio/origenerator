@@ -10,13 +10,15 @@ from pathlib import Path
 
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
+from origenerator.gui.show_map import MapNeighbors
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.paths import ensure_player_core_on_path
-from origenerator.slideshow import ShowState, in_order
+from origenerator.slideshow import ShowState, Slide, in_order
 
 ensure_player_core_on_path()
 
 from player_core.file_channel import consume_command_file  # noqa: E402
+from player_core.hud_status import LATEST_LABEL  # noqa: E402
 from player_core.playlist import read_playlist  # noqa: E402
 from player_core.satellite_hud import parse_hud  # noqa: E402
 from player_core.status import PlayerStatus, status_fields  # noqa: E402
@@ -100,8 +102,7 @@ def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
 
     assert show.hud_prompt_id == "id-2"
     assert show.current_media_path() == "two.png"
-    _cells, position, _locked = show.hud_items()
-    assert position == 2
+    assert show.hud_map().corner.prompt_id == "id-2"
 
 
 def test_the_shows_hold_is_the_players_own(qtbot, tmp_path):
@@ -225,10 +226,12 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
     model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
 
     assert model.side == "portrait"
-    assert model.seed_count == 3
+    assert model.corner.path == "one.png"
+    assert model.seed_count == 1     # a set with no library under it maps the slide alone
     assert [button.action for row in model.rows for button in row] == [
         "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
-        "portrait_fmode", "portrait_enhanced", "portrait_reset"]
+        "portrait_fmode", "portrait_enhanced", "portrait_reset",
+        "portrait_shuffle", "portrait_latest"]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it(qtbot, tmp_path):
@@ -292,10 +295,11 @@ def test_a_new_set_lets_go_of_the_hold_the_last_one_had(qtbot, tmp_path):
 def test_a_side_reset_lands_the_player_on_the_top_of_its_base_set(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
 
-    show.retune(_ITEMS)
+    show.retune([("four.png", "image", "id-4"), ("five.png", "image", "id-5")])
 
-    assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
-    assert show.hud_prompt_id == "id-1"
+    top = show._set.playlist.current()
+    assert _sent(show)[:2] == [f"PLAY_FILE {top.path}", "RELOAD_PLAYLIST"]
+    assert show.hud_prompt_id == top.prompt_id
 
 
 def test_a_reset_with_no_base_set_lands_the_player_on_the_top_of_its_own(qtbot, tmp_path):
@@ -333,3 +337,121 @@ def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
     show.release_media(["one.png"])
 
     assert _sent(show) == ["NEXT"]
+
+
+def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_path):
+    asked = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(
+        reorder=lambda held, latest: asked.append((held, latest))))
+
+    show.show_order(latest=True)
+    show.show_order(latest=False)
+
+    assert asked == [(show, True), (show, False)]
+
+
+def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.reorder([("five.png", "image", "id-5"), ("four.png", "image", "id-4")],
+                 latest=True)
+
+    assert _sent(show) == ["LOCK_OFF", "PLAY_FILE five.png", "RELOAD_PLAYLIST",
+                           f"SET_PACE {show.dwell_s}"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["five.png", "four.png"]
+    assert show.hud_order_label == LATEST_LABEL
+
+
+def test_a_reorder_of_a_show_not_held_sends_no_let_go(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+
+    show.reorder(_ITEMS, latest=True)
+
+    assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
+
+
+def test_a_hosted_reset_lets_go_of_the_hold_before_handing_over_the_base_set(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.retune([("five.png", "image", "id-5")])
+
+    assert _sent(show)[0] == "LOCK_OFF"
+    assert show.locked is False
+
+
+# --- the map, and the loops along it ------------------------------------------
+
+def _around(prompt_id):
+    """A library in which the first item has one seed sibling and one
+    configuration sibling, and the rest have nobody."""
+    if prompt_id != "id-1":
+        return MapNeighbors()
+    return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
+                        configs=(Slide("one-x.png", "image", "id-1x"),),
+                        label="fox", config_labels=("dawn",))
+
+
+def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+
+    model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
+
+    assert [cell.path for cell in model.seeds] == ["one-b.png"]
+    assert [(cell.path, cell.label) for cell in model.actions] == [("one-x.png", "dawn")]
+    assert (model.current_action, model.seed_count, model.action_count) == ("fox", 2, 2)
+
+
+def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_set(qtbot, tmp_path):
+    """The row becomes the player's list, the item on screen first so it keeps
+    playing; the loop key ends it and the set comes back the same way."""
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    _sent(show)
+
+    show.show_loop("seed")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "one-b.png"]
+    assert "RELOAD_PLAYLIST" in _sent(show)
+    assert said == ["Looping seeds: 2"]
+    assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).active_loop == "seed"
+
+    show.show_loop_cycle()          # seeds -> configs
+    show.show_loop_cycle()          # configs -> off
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "two.png", "three.png"]
+    assert said[-1] == "Loop off"
+
+
+def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qtbot, tmp_path):
+    """PLAY_FILE jumps to a file in the list and splices in one that is not —
+    which is where the pass put the cell too, so no list is handed over."""
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    _sent(show)
+
+    show.show_item("one-x.png")
+
+    assert _sent(show) == ["PLAY_FILE one-x.png", "LOCK_OFF"]
+    assert show.hud_prompt_id == "id-1x"
+
+
+def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
+    """The players' own "weird": a favorite loses its star and the player is
+    told to move on — nothing is dropped and nothing deleted."""
+    unstarred, deleted = [], []
+    show = _show(qtbot, tmp_path, hud=HudFacts(starred_ids={"id-1"}),
+                 actions=ShowActions(unstar=unstarred.append, delete=deleted.append))
+    _sent(show)
+
+    show.show_cull()
+
+    assert (unstarred, deleted) == (["id-1"], [])
+    assert _sent(show) == ["LOCK_OFF", "NEXT"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "two.png", "three.png"]   # still in the list

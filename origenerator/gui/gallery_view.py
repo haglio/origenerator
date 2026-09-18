@@ -353,7 +353,7 @@ class GalleryView(QWidget):
         self._voice.bind_the_bank(
             auto=self._bank.auto, audio=self._bank.audio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
-            mic=self._bank.mic,
+            mic=self._bank.mic, enhance_on_hold=self._bank.enhance_on_hold,
             enhance=(self._bank.enhance, self._enhance.enhance_the_selection),
             actions={
                 AppCommand.BACK: (self._bank.back, self._navigation.go_back),
@@ -3242,10 +3242,11 @@ class GalleryView(QWidget):
         session's bridge asks this window for it."""
         return self._shows.region_show(side)
 
-    def star_generation(self, prompt_id: str):
+    def star_generation(self, prompt_id: str, starred: bool = True):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
-        star the gallery's own control sets."""
-        self.set_items_starred([prompt_id], True)
+        star the gallery's own control sets — or take the bookmark back (its Up
+        key over a favorite, the players' "weird" on one)."""
+        self.set_items_starred([prompt_id], starred)
 
     def trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same
@@ -3321,8 +3322,14 @@ class GalleryView(QWidget):
         self._enhance.enhance_items(prompt_ids)
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """A held slide asked to be enhanced; whether a run started."""
-        return self._enhance.enhance_from_slideshow(prompt_id)
+        """A held slide asked to be enhanced; whether a run started.
+
+        Only while the bank's Enhance-on-hold switch is on: holding a slide is
+        how a better version is asked for, and the switch is the way to hold
+        one without asking, when the asking is in the way.
+        """
+        return (self._bank.enhance_on_hold.isChecked()
+                and self._enhance.enhance_from_slideshow(prompt_id))
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         """The spoken "enhance" over a picture."""

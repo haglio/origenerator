@@ -76,6 +76,10 @@ class AppCommand(Enum):
     DRIVE = "drive"
     DRIVE_ON = "drive_on"
     DRIVE_OFF = "drive_off"
+    # Whether holding a slide in a show also asks for a better version of it.
+    ENHANCE_ON_HOLD = "enhance_on_hold"
+    ENHANCE_ON_HOLD_ON = "enhance_on_hold_on"
+    ENHANCE_ON_HOLD_OFF = "enhance_on_hold_off"
     # No "mic on": a muted recognizer hears nothing, so there is no spoken way
     # back — the toolbar's switch is it. Fun Time's mic works the same way.
     MIC_OFF = "mic_off"
@@ -197,6 +201,8 @@ for _words, (_toggle, _on, _off) in (
     (("auto", "auto generate"), (AppCommand.AUTO, AppCommand.AUTO_ON, AppCommand.AUTO_OFF)),
     (("audio", "ambient"), (AppCommand.AUDIO, AppCommand.AUDIO_ON, AppCommand.AUDIO_OFF)),
     (("drive", "motion"), (AppCommand.DRIVE, AppCommand.DRIVE_ON, AppCommand.DRIVE_OFF)),
+    (("enhance on hold",),
+     (AppCommand.ENHANCE_ON_HOLD, AppCommand.ENHANCE_ON_HOLD_ON, AppCommand.ENHANCE_ON_HOLD_OFF)),
 ):
     for _word in _words:
         _say(_toggle, _word)

@@ -124,7 +124,8 @@ def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton
     btn.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
     btn.setToolTip(tooltip)
     btn.setCheckable(checkable)
-    (btn.toggled if checkable else btn.clicked).connect(handler)
+    if handler is not None:  # a switch something reads, rather than one that acts
+        (btn.toggled if checkable else btn.clicked).connect(handler)
     return btn
 
 
@@ -175,6 +176,19 @@ class ToolbarBank(QWidget):
             icons.slideshow_icon(), "Play this folder as a slideshow",
             acts.start_show)
         self.slideshow.hide()
+        # Whether holding a slide in a show also asks for a better version of
+        # it.  App-wide rather than a show's own: every show asks it the
+        # moment a slide is held, so there is nothing to hand along from one
+        # show to the next, and E — which used to flip it inside a show — is
+        # the loop key now, as it is on a player.  Read by the gallery when a
+        # hold asks; it acts on nothing itself.
+        self.enhance_on_hold = _tool_button(
+            icons.enhance_on_hold_icon(),
+            "Enhance on hold: holding a picture in a slideshow also enhances it",
+            None, checkable=True,
+        )
+        self.enhance_on_hold.setStyleSheet(_LIT)
+        self.enhance_on_hold.setChecked(True)
         self.auto = _tool_button(
             icons.autoloop_icon(),
             "Auto-generate: repeatedly generate variations of this folder until "
@@ -236,8 +250,8 @@ class ToolbarBank(QWidget):
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
             (self.star, self.enhance, self.delete),  # …to what's in front
-            (self.slideshow, self.auto, self.audio),  # what the app is doing,
-                                                      # and Esc stops
+            (self.slideshow, self.enhance_on_hold,   # what the app is doing,
+             self.auto, self.audio),                 # and Esc stops
             (self.mic,),                             # what it hears with
         ):
             buttons = tuple(b for b in buttons if b is not None)

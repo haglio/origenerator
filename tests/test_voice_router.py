@@ -301,6 +301,8 @@ def router(qtbot, monkeypatch):
             audio=buttons.get("audio", FakeButton(tip="Audio bed")),
             drive=buttons.get("drive", FakeButton(tip="Drive the OSR2")),
             mic=buttons.get("mic", FakeButton(tip="Listen", checked=mic_on)),
+            enhance_on_hold=buttons.get("enhance_on_hold",
+                                        FakeButton(tip="Enhance on hold", checked=True)),
             enhance=buttons.get("enhance",
                                 (FakeButton(tip="Enhance 2 images"), lambda: None)),
             actions=buttons.get("actions", {}),
@@ -326,7 +328,8 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):
 
     assert voice.listener.commands_on is False
     voice.bind_the_bank(auto=None, audio=None, drive=None,
-                        mic=FakeButton(checked=True), enhance=None, actions={})
+                        mic=FakeButton(checked=True), enhance_on_hold=None,
+                        enhance=None, actions={})
     voice.sync()
     assert voice.listener.commands_on is True
 
@@ -783,3 +786,13 @@ def test_words_that_match_nothing_here_are_handed_back_as_not_ours(router):
     voice, _host, _shows = router()
 
     assert voice.run_spoken_command("put the kettle on") is False
+
+
+def test_the_spoken_enhance_on_hold_flips_the_banks_switch(router):
+    switch = FakeButton(tip="Enhance on hold")
+    voice, _host, shows = router(bank={"enhance_on_hold": switch})
+
+    voice.on_command(AppCommand.ENHANCE_ON_HOLD_OFF)
+
+    assert switch.set_to == [False]
+    assert shows.answers == ["🎤 enhance on hold off"]

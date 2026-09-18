@@ -31,6 +31,16 @@ def _session(tmp_path=None):
     )
 
 
+def _as_items(rows):
+    """The fixture's rows as a show's items — a tuple passed through, a row
+    stood in for by a tuple named after it — where a test hands the director a
+    library of ready-made items rather than files to resolve."""
+    return [row if isinstance(row, tuple)
+            else (f"{row['prompt_id']}.png", "image", row["prompt_id"],
+                  row.get("thumbnail_path"))
+            for row in rows]
+
+
 def _fun_time_view(qtbot, rows=()):
     view = GalleryView(FakeDB(list(rows)), fun_time=_session())
     qtbot.addWidget(view)
@@ -246,7 +256,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     stub.set_audio_muted = lambda muted: None
     stub.set_paused = lambda paused: None
     stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
-    stub.hud_items = lambda: ((), 0, False)  # a host with no set draws no map
+    stub.hud_map = lambda: None  # a host with no set draws no map
     view._shows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 
@@ -332,24 +342,59 @@ def _session_with_dashboard(tmp_path):
     )
 
 
-def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, monkeypatch):
-    """Seeds: N in the counts corner, Seed ordinals over the columns, the item
-    on screen the lit cell — the slideshow's set drawn exactly as a player
-    draws a seed family."""
+def _fox_library(tmp_path):
+    """Four portrait pictures: two of one configuration under two seeds, a
+    third of the first seed under an edited prompt, and a stranger."""
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    rows = [_image("g1", "a red fox", 50, 1), _image("g2", "a red fox", 50, 2),
+            _image("g3", "a red fox at dawn", 50, 1), _image("g4", "a blue car", 30, 9)]
+    for row in rows:
+        row["thumbnail_path"] = str(tall)
+    return rows
+
+
+def _open_the_fox_show(qtbot, view, monkeypatch, rows):
+    """The fox library as a portrait show, standing on the first fox."""
+    monkeypatch.setattr(view, "rows_to_play", lambda: rows)
+    monkeypatch.setattr(view._shows, "items_of", _as_items)
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "the fox folder")
+    view._shows.start()
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    show.show_item("g1.png")
+    return show
+
+
+def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, monkeypatch):
+    """The slide in the corner; the same configuration under its other seed
+    running right; the same seed under another configuration running down,
+    labeled by that configuration's folder; the corner lit and no loop — the
+    players' map, drawn against this app's library of that side's shape."""
+    from origenerator import gallery
     from origenerator.gui.show_hud import show_hud_model
 
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    rows = _fox_library(tmp_path)
+    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    show = view._shows._region_shows["portrait"]
-    qtbot.addWidget(show)
+    show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
 
     model = show_hud_model("portrait", show)
-    assert model.seed_count == 3          # "Seeds: 3" in the counts corner
-    assert model.corner is not None and len(model.seeds) == 2
-    position = show._playlist.order[show._playlist.index] + 1
-    expected = ("corner", 0) if position == 1 else ("seed", position - 2)
-    assert model.playing == expected      # the item on screen is the lit cell
+
+    assert model.corner.path == "g1.png"
+    assert [cell.path for cell in model.seeds] == ["g2.png"]
+    assert [cell.path for cell in model.actions] == ["g3.png"]
+    assert (model.seed_count, model.action_count) == (2, 2)
+    assert model.playing == ("corner", 0) and model.active_loop == ""
+    assert model.lock_label == "Unlocked · Shuffle"
+    # Each configuration down the column is named by its folder, as the
+    # corner's row is by its own — the tree's name for it, its short code here.
+    folder = gallery.config_folder_name(
+        "sdxl_t2i", gallery.settings_signature(
+            "sdxl_t2i", rows[0]["params_json"],
+            workflow_version=rows[0]["workflow_version"]), {})
+    assert model.current_action == folder
+    assert model.actions[0].label and model.actions[0].label != folder
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the player under the show.
     assert [(button.action, button.lit) for button in model.rows[0]] == [
@@ -358,6 +403,42 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
 
     show.show_toggle_hold()
     assert show_hud_model("portrait", show).locked is True
+
+
+def test_the_map_re_homes_on_whatever_the_show_moves_to(qtbot, tmp_path, monkeypatch):
+    from origenerator.gui.show_hud import show_hud_model
+
+    rows = _fox_library(tmp_path)
+    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
+
+    show.show_item("g4.png")
+
+    model = show_hud_model("portrait", show)
+    assert model.corner.path == "g4.png"
+    assert (model.seeds, model.actions) == ((), ())
+
+
+def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, tmp_path, monkeypatch):
+    """The column can name a generation outside the set a show opened with —
+    another configuration of this seed, which lives in another folder — and a
+    click on it plays it, spliced in after the slide on screen."""
+    rows = _fox_library(tmp_path)
+    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "rows_to_play", lambda: rows[:2])   # the fox folder alone
+    monkeypatch.setattr(view._shows, "items_of", _as_items)
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "the fox folder")
+    view._shows.start()
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    show.show_item("g1.png")
+
+    show.show_item("g3.png")
+
+    assert show._playlist.current()[2] == "g3"
+    assert show.hud_map().corner.path == "g3.png"    # and the map re-homed on it
 
 
 def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatch):
@@ -417,14 +498,12 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
     hud._deliver("portrait_fmode")
 
     assert show.hud_f_mode is True
-    cells, _position, _locked = show.hud_items()
-    assert len(cells) == 1  # narrowed to the one favorite
+    assert show.pass_size() == 1  # narrowed to the one favorite
     model = show_hud_model("portrait", show)
     assert _lit(model, "portrait_fmode") and "F-Mode" in model.lock_label
 
     hud._deliver("portrait_fmode")
-    cells, _position, _locked = show.hud_items()
-    assert len(cells) == 3  # widened back
+    assert show.pass_size() == 3  # widened back
     # The star readout lights exactly on the favorite item.  (Every fixture
     # item shares one file, so land on it by position, not by path.)
     show._playlist.jump_to(1)
@@ -451,11 +530,11 @@ def test_a_hosted_show_keeps_up_with_its_own_folder(qtbot, tmp_path, monkeypatch
     Image.new("RGB", (100, 200)).save(still)
     monkeypatch.setattr(view._shows, "items_of",
                         lambda rows: [(str(still), "image", "new-1", str(still))])
-    before = len(portrait.hud_items()[0])
+    before = portrait.pass_size()
 
     view._shows.note_finished(landed)
 
-    assert len(portrait.hud_items()[0]) == before + 1
+    assert portrait.pass_size() == before + 1
 
 
 def test_a_landing_reaches_only_the_show_playing_its_folder(qtbot, tmp_path, monkeypatch):
@@ -473,12 +552,12 @@ def test_a_landing_reaches_only_the_show_playing_its_folder(qtbot, tmp_path, mon
     Image.new("RGB", (200, 100)).save(still)
     monkeypatch.setattr(view._shows, "items_of",
                         lambda rows: [(str(still), "image", "new-1", str(still))])
-    counts = [len(portrait.hud_items()[0]), len(landscape.hud_items()[0])]
+    counts = [portrait.pass_size(), landscape.pass_size()]
 
     view._shows.note_finished(landed)
 
-    assert len(portrait.hud_items()[0]) == counts[0]        # not its folder
-    assert len(landscape.hud_items()[0]) == counts[1] + 1   # its folder
+    assert portrait.pass_size() == counts[0]        # not its folder
+    assert landscape.pass_size() == counts[1] + 1   # its folder
 
 
 def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
@@ -507,39 +586,60 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
     qtbot.addWidget(show)
 
 
-def test_the_shows_row_reads_as_looping_and_the_button_ends_it(qtbot, tmp_path, monkeypatch):
-    """A show someone ASKED for is the seed row played round and round, so the
-    map's loop button is lit — and pressing the lit one stops that loop, which
-    means the region goes back to browsing its library."""
+def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
+        qtbot, tmp_path, monkeypatch):
+    """The seed-loop button plays the row round and round: the pass becomes
+    the row, the button lights, and the line says so in the satellite's own
+    words — dropping "Unlocked", exactly as a looping satellite's does, since a
+    set playing through holds nothing.  The press that ends it puts the show
+    back to browsing what it opened with, the slide on screen kept."""
     from origenerator.gui.show_hud import ShowHud, show_hud_model
 
-    view = _fun_time_view(qtbot)
-    tall = tmp_path / "tall.png"
-    Image.new("RGB", (100, 200)).save(tall)
-    base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(5)]
-    monkeypatch.setattr(view._shows, "rows_at",
-                        lambda key: base if key == "__all__::portrait" else [])
-    _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
-    show = view.region_show("portrait")
-    qtbot.addWidget(show)
+    rows = _fox_library(tmp_path)
+    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
     hud, = show.findChildren(ShowHud)
 
+    hud._deliver("portrait_seed_loop")
+
+    assert [item[2] for item in show._playlist.items] == ["g1", "g2"]
     model = show_hud_model("portrait", show)
     assert model.active_loop == "seed"
-    # And the line says what the light says, in the satellite's own words: the
-    # two HUDs are one HUD in two places.  It also drops "Unlocked", exactly as
-    # a looping satellite's does — a set playing through holds nothing.
+    assert model.filter_query == model.current_action   # its row's button lights too
     assert model.lock_label.startswith("Looping seeds")
     assert "Unlocked" not in model.lock_label
+    assert show._note.text() == "Looping seeds: 2"
 
     hud._deliver("portrait_no_loop")
 
     assert show.isVisible()                      # the region is not handed back
-    assert len(show.hud_items()[0]) == len(base)  # it browses its library again
+    assert show.pass_size() == 4                 # it browses its set again
+    assert show._playlist.current()[2] == "g1"
     dropped = show_hud_model("portrait", show)
     assert dropped.active_loop == ""
     assert "Looping" not in dropped.lock_label
+
+
+def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
+        qtbot, tmp_path, monkeypatch):
+    """The expand mark: the row grows past the exact configuration to the
+    nearest others of the same model, and that wider row is what loops."""
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
+    rows = _fox_library(tmp_path)
+    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
+    hud, = show.findChildren(ShowHud)
+
+    hud._deliver("portrait_more_seeds")
+
+    model = show_hud_model("portrait", show)
+    assert [cell.path for cell in model.seeds] == ["g2.png", "g3.png", "g4.png"]
+    assert model.active_loop == "seed"
+    assert [item[2] for item in show._playlist.items] == ["g1", "g2", "g3", "g4"]
+    assert show._note.text() == "More seeds"
 
 
 def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
@@ -555,7 +655,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     base = [(str(tall), "image", f"lib-{n}", str(tall)) for n in range(4)]
     monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: base if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", _as_items)
 
     view.fill_the_regions()
 
@@ -579,7 +679,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     library = {"rows": []}
     monkeypatch.setattr(view._shows, "rows_at",
                         lambda key: library["rows"] if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", _as_items)
 
     view.fill_the_regions()          # asked for too early: nothing to play yet
     assert view.region_show("portrait") is None
@@ -615,7 +715,7 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 
     view._voice.on_command(ShelfCommand("__starred__", "portrait"))
     assert show.hud_f_mode is True
-    assert len(show.hud_items()[0]) == 1     # narrowed to the one favorite
+    assert show.pass_size() == 1     # narrowed to the one favorite
 
     view._voice.on_command(ShelfCommand("__starred__", "portrait"))
     assert show.hud_f_mode is False          # and the word widens it back
@@ -740,10 +840,9 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     hud._deliver("portrait_reset")
 
     assert show.hud_f_mode is False
-    cells, _position, locked = show.hud_items()
-    assert len(cells) == 3                 # widened back to the whole set
+    assert show.pass_size() == 3           # widened back to the whole set
     assert show._playlist.index == 0       # back at the top of the pass
-    assert locked is False                 # the hold released with everything else
+    assert show.locked is False            # the hold released with everything else
 
 
 def test_the_regions_open_on_the_whole_library_of_their_own_shape(
@@ -775,8 +874,7 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         show = view.region_show(side)
         assert show is not None and show.isVisible()
         assert show.hud_order_label == "Shuffle"
-        cells, _position, _locked = show.hud_items()
-        assert [path for path, _still in cells] == \
+        assert [str(item.path) for item in show._playlist.items] == \
             [library[f"__all__::{side}"][0]["thumbnail_path"]]
         qtbot.addWidget(show)
     # And each remembers WHERE it plays from, so what lands in the library
@@ -828,19 +926,46 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     _open_slideshow(view, monkeypatch, tmp_path, "folder", 100, 200, count=2)
     # _open_slideshow stubs the items for the folder it opened; from here the
     # rows the library hands back are the items.
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "items_of", _as_items)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     hud, = show.findChildren(ShowHud)
-    assert len(show.hud_items()[0]) == 2      # the folder it was started on
+    assert show.pass_size() == 2      # the folder it was started on
     view._shows._live_shows = [(show, "folder-a")]
 
     hud._deliver("portrait_reset")
 
-    assert len(show.hud_items()[0]) == len(base)   # the library of its shape
+    assert show.pass_size() == len(base)   # the library of its shape
     assert show.hud_order_label == "Shuffle"
     # And it is fed from the library now, not from the folder it left.
     assert [where for _show, where in view._shows._live_shows] == ["__all__::portrait"]
+
+
+def test_latest_on_a_hosted_shows_panel_plays_its_side_newest_first(
+        qtbot, tmp_path, monkeypatch):
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    newest_first = [(str(tall), "image", f"new-{n}", str(tall)) for n in range(4)]
+    monkeypatch.setattr(view._shows, "rows_at",
+                        lambda key: newest_first if key == "__recents__::portrait" else [])
+    _open_slideshow(view, monkeypatch, tmp_path, "folder", 100, 200, count=2)
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+
+    hud._deliver("portrait_latest")
+
+    playlist = show._playlist
+    assert [playlist.items[index][2] for index in playlist.order] == [
+        "new-0", "new-1", "new-2", "new-3"]
+    assert _lit(show_hud_model("portrait", show), "portrait_latest")
+    assert not _lit(show_hud_model("portrait", show), "portrait_shuffle")
+    assert not (tmp_path / "dashboard_cmd.txt").exists()
 
 
 def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypatch):
@@ -858,7 +983,7 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
 
     assert show._playlist.index == 0
     assert show._playlist.locked is False
-    assert len(show.hud_items()[0]) == 3
+    assert show.pass_size() == 3
 
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
@@ -1065,14 +1190,14 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     hud._deliver("portrait_enhanced")
 
     assert show.hud_enhanced_mode is True
-    assert len(show.hud_items()[0]) == 1          # narrowed to the one enhanced
+    assert show.pass_size() == 1          # narrowed to the one enhanced
     model = show_hud_model("portrait", show)
     assert _lit(model, "portrait_enhanced") and "Enhanceds" in model.lock_label
     # Nothing went out on the session's channel: the switch is the show's own.
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 
     hud._deliver("portrait_enhanced")
-    assert len(show.hud_items()[0]) == 3          # widened back
+    assert show.pass_size() == 3          # widened back
 
 
 def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, monkeypatch):
@@ -1089,14 +1214,14 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, 
 
     assert view.run_spoken_command("portrait enhanced only")
     assert show.hud_enhanced_mode is True
-    assert len(show.hud_items()[0]) == 1
+    assert show.pass_size() == 1
 
     assert view.run_spoken_command("portrait favorites")
     assert (show.hud_f_mode, show.hud_enhanced_mode) == (True, True)
 
     assert view.run_spoken_command("portrait clear filter")
     assert (show.hud_f_mode, show.hud_enhanced_mode) == (False, False)
-    assert len(show.hud_items()[0]) == 3
+    assert show.pass_size() == 3
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):

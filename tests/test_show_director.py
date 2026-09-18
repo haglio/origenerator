@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gui import show_director as module
+from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
@@ -29,6 +30,8 @@ LANDSCAPE = "landscape"
 # narrowed to that region's shape.
 ALL_PORTRAIT = oriented_key(gallery.ALL_KEY, PORTRAIT)
 ALL_LANDSCAPE = oriented_key(gallery.ALL_KEY, LANDSCAPE)
+LATEST_PORTRAIT = oriented_key(RECENTS_KEY, PORTRAIT)
+LATEST_LANDSCAPE = oriented_key(RECENTS_KEY, LANDSCAPE)
 
 
 class FakeSignal:
@@ -75,6 +78,7 @@ class FakeShow:
         self.playlist = None
         self.resumed = None
         self.retuned = None
+        self.reordered = None
         self.dwell_s = None
         self.paused = None
         self.audio_muted = None
@@ -129,6 +133,9 @@ class FakeShow:
 
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
+
+    def reorder(self, items, *, latest, enhanced_ids):
+        self.reordered = (list(items), latest, set(enhanced_ids))
 
     def note_added(self, path, media_type, prompt_id, thumb, *, starred, enhanced):
         self.added.append((prompt_id, starred, enhanced))
@@ -186,8 +193,8 @@ class FakeShow:
         self.hud_f_mode = False
         self.hud_enhanced_mode = False
 
-    def hud_items(self):
-        return (list(self.enhanced_items), [])
+    def pass_size(self):
+        return len(self.enhanced_items)
 
     def step(self, delta):
         self.steps.append(delta)
@@ -376,8 +383,11 @@ class FakeHost:
     def trash_generation(self, prompt_id):
         self.trashed.append(prompt_id)
 
-    def star_generation(self, prompt_id):
-        self.starred.append(prompt_id)
+    def star_generation(self, prompt_id, starred=True):
+        if starred:
+            self.starred.append(prompt_id)
+        else:
+            self.starred.remove(prompt_id)
 
     def enhance_from_slideshow(self, prompt_id):
         self.enhanced.append(prompt_id)
@@ -616,6 +626,66 @@ def test_a_region_reset_re_points_what_feeds_it(shows):
 
     assert director._live_shows == [(made[0], ALL_LANDSCAPE)]
     assert made[0].retuned == ([("g4.png", "image", "g4", None)], set())
+
+
+def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there(shows):
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g9"), _row("g4")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered == (
+        [("g9.png", "image", "g9", None), ("g4.png", "image", "g4", None)], True, set())
+    assert director._live_shows == [(made[0], LATEST_LANDSCAPE)]
+    assert made[0].said == ["Latest"]
+
+
+def test_shuffle_points_a_region_show_back_at_its_sides_whole_library(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   LATEST_PORTRAIT: [_row("g9")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
+                  side=PORTRAIT)
+
+    director.reorder_show(made[0], False)
+
+    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
+    assert director._live_shows == [(made[0], ALL_PORTRAIT)]
+    assert made[0].said == ["Shuffle"]
+
+
+def test_a_show_on_its_own_takes_latest_of_the_shape_it_opened_on(shows):
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")]})
+    director, _host, made = shows(browser=browser)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True, set())
+
+
+def test_an_order_with_nothing_to_play_says_so_and_leaves_the_show_alone(shows):
+    director, _host, made = shows(browser=FakeBrowser(shelves={}), fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    director.reorder_show(made[0], True)
+
+    assert made[0].reordered is None
+    assert list(zip(made[0].said, made[0].said_kinds)) == [
+        ("Nothing there to play", WARNING)]
+    assert director._live_shows == [(made[0], "workflow/a")]
+
+
+@pytest.mark.parametrize("session", [None, FakeSession()])
+def test_a_show_asks_this_director_for_its_order_hosted_or_not(shows, session):
+    director, _host, made = shows(fun_time=session)
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[0].actions.reorder == director.reorder_show
 
 
 def test_a_region_show_ending_comes_back_on_the_base_state(shows):
@@ -999,3 +1069,69 @@ def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(shows):
     director.release_media(["one.png"])
 
     assert [show.released for show in made] == [[["one.png"]], [["one.png"]]]
+
+
+# --- the map around the slide on screen: what the library says ---------------
+
+def _picture(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
+    """A finished picture with real params, shaped by what it asked for —
+    which is what places it on a side with no file to measure."""
+    params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
+              "width": width, "height": height}
+    row = _row(prompt_id, params=params)
+    row["params_json"] = json.dumps(params)
+    return row
+
+
+def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(shows):
+    """The same configuration under other seeds is the row and the same seed
+    under other configurations the column, each configuration named by its
+    folder — read off every generation of that side's shape, whatever set the
+    show itself is playing."""
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
+            _picture("g3", "a red fox at dawn", seed=1),
+            _picture("w1", "a red fox", seed=3, width=200, height=100)]
+    director, _host, _made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("g1", side="portrait")
+
+    assert [slide.prompt_id for slide in around.seeds] == ["g2"]
+    assert [slide.prompt_id for slide in around.configs] == ["g3"]
+    assert around.label and around.config_labels != (around.label,)
+    assert len(around.config_labels) == 1
+
+
+def test_beyond_the_row_lies_the_nearest_of_the_models_other_configurations(shows):
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
+            _picture("g3", "a red fox at dawn", seed=7),
+            _picture("g4", "a blue car", seed=8, steps=30)]
+    director, _host, _made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    beyond = director.beyond_the_row_of("g1", side="portrait")
+
+    assert [slide.prompt_id for slide in beyond] == ["g3", "g4"]
+    assert director.beyond_the_row_of("nobody", side="portrait") == ()
+
+
+def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
+    director, _host, _made = shows()
+
+    assert director.neighbors_of("nobody", side="portrait").seeds == ()
+    assert director.neighbors_of("", side="landscape").configs == ()
+
+
+def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
+    """What a show asks the gallery on its own behalf now includes what the
+    library says about an item — and the star's undoing, for the players'
+    "weird" over a favorite."""
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2)]
+    director, host, made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+
+    director.open(director.items_of(rows), location="a-folder", side="portrait")
+
+    actions = made[0].actions
+    assert [slide.prompt_id for slide in actions.neighbors("g1").seeds] == ["g2"]
+    assert actions.widen("g1") == ()
+    actions.star("g1")
+    actions.unstar("g1")
+    assert host.starred == []

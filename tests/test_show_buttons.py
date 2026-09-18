@@ -3,6 +3,11 @@ face, its tooltip and the state it draws."""
 from __future__ import annotations
 
 from origenerator.gui.show_buttons import answer, show_rows
+from origenerator.paths import ensure_player_core_on_path
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 
 def _band(**fields) -> tuple:
@@ -14,11 +19,9 @@ def _names(buttons) -> list[str]:
 
 
 def test_the_band_is_the_controls_a_show_answers_in_the_players_order():
-    """The step either way, then the three about the item on screen, then what
-    narrows the set and the way back out of all of it — the satellites' own
-    order, so a reader glancing between two screens finds one panel."""
     assert _names(_band()) == [
-        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "minimize"]
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
+        "shuffle", "latest", "minimize"]
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
@@ -36,7 +39,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
     """A run of evenly spaced squares reads as one undifferentiated strip; the
     wider gap opens at the seams the players' own band opens them at."""
     assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
-        "lock", "enhanced", "minimize"]
+        "lock", "enhanced", "shuffle", "minimize"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
@@ -53,6 +56,13 @@ def test_the_switches_light_and_the_things_done_never_do():
     assert not any(band[name].lit for name in ("prev", "next", "trash", "reset", "minimize"))
     at_rest = dict(zip(_names(_band()), _band()))
     assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
+
+
+def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
+    for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"]), ("", [])):
+        band = _band(order=order)
+        assert [name for name, button in zip(_names(band), band)
+                if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
 def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
@@ -84,14 +94,13 @@ def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
 
     assert len(rows) == 1
     assert _names(rows[0]) == [
-        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset"]
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "shuffle", "latest"]
 
 
 class _Host:
     """A show reduced to the calls a press can make of one."""
 
-    def __init__(self, *, looping=True):
-        self.hud_looping = looping
+    def __init__(self):
         self.calls = []
 
     def show_step(self, delta):
@@ -106,6 +115,9 @@ class _Host:
     def show_reset(self):
         self.calls.append("reset")
 
+    def show_order(self, *, latest):
+        self.calls.append(("order", latest))
+
     def toggle_f_mode(self):
         self.calls.append("fmode")
 
@@ -114,6 +126,21 @@ class _Host:
 
     def show_item(self, path, *, hold=False):
         self.calls.append(("item", path, hold))
+
+    def show_loop(self, axis):
+        self.calls.append(("loop", axis))
+
+    def show_loop_cycle(self):
+        self.calls.append("loop key")
+
+    def show_more_seeds(self):
+        self.calls.append("more seeds")
+
+    def show_nav(self, direction):
+        self.calls.append(("nav", direction))
+
+    def show_filter(self, query):
+        self.calls.append(("filter", query))
 
 
 def test_every_declared_button_is_answered_by_the_show():
@@ -124,7 +151,7 @@ def test_every_declared_button_is_answered_by_the_show():
         assert answer(host, button.action.removeprefix("portrait_")), button.action
 
     assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
-                          "enhanced", "reset"]
+                          "enhanced", "reset", ("order", False), ("order", True)]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
@@ -137,27 +164,33 @@ def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
                           ("item", "scene two.png", True)]
 
 
-def test_the_loop_button_ends_a_loop_and_starts_none():
-    """Stop looping this row: a show asked for goes back to the side's base
-    state, the way the press ends a loop on a player — and pressed where
-    nothing is looping it is the dark button it looks like."""
-    looping, browsing = _Host(looping=True), _Host(looping=False)
+def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
+    """The two loop buttons, the loop key, the expand mark and the map's
+    keys — each in the players' spelling, each meaning on a show what it
+    means on a player.  The players' second axis is their action column; on
+    a show it is the config column, the same seed under other configurations."""
+    host = _Host()
 
-    for host in (looping, browsing):
-        answer(host, "no_loop")
-        answer(host, "seed_loop")
+    for action in ("seed_loop", "action_loop", "no_loop", "loop", "more_seeds",
+                   "nav_left", "nav_right", "nav_up", "nav_down",
+                   "cycle_seed", "cycle_action", "no_filter"):
+        assert answer(host, action), action
+    assert answer(host, "filter", "dawn")
 
-    assert looping.calls == ["reset", "reset"]
-    assert browsing.calls == []
+    assert host.calls == [
+        ("loop", "seed"), ("loop", "config"), ("loop", ""), "loop key", "more seeds",
+        ("nav", "left"), ("nav", "right"), ("nav", "up"), ("nav", "down"),
+        ("nav", "right"), ("nav", "down"), ("loop", ""), ("filter", "dawn"),
+    ]
 
 
 def test_a_press_a_show_has_no_answer_to_says_so():
     """Minimize parks a window, which is not the show's to answer; nor is the
-    map's chrome for acts and seeds a show does not have."""
+    strike under an act, which a show has no acts for."""
     host = _Host()
 
     assert not answer(host, "minimize")
-    assert not answer(host, "more_seeds")
+    assert not answer(host, "wrong_action")
     assert host.calls == []
 
 

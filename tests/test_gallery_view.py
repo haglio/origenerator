@@ -6457,6 +6457,23 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
     show.close()
 
 
+def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monkeypatch):
+    from origenerator.gui.show_hud import ShowHud
+
+    show = _standalone_show(qtbot, monkeypatch)
+    hud, = show.findChildren(ShowHud)
+    played = []
+
+    for order in ("latest", "shuffle"):
+        hud._deliver(f"{hud._side}_{order}")
+        playlist = show._playlist
+        played.append((show.hud_order_label,
+                       sorted(playlist.items[index][2] for index in playlist.order)))
+
+    assert played == [("Latest", ["i1", "i2"]), ("Shuffle", ["i1", "i2"])]
+    show.close()
+
+
 def test_a_player_core_without_the_shared_hud_still_opens_the_show(qtbot, monkeypatch):
     # The panel lives in the newest player_core; a plain launch walks up to the
     # primary checkout, which grows it only when it lands.  Without it the show
@@ -12675,6 +12692,22 @@ def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_pa
 
     # Asked again while that one is still cooking: nothing new is started.
     assert view.enhance_from_slideshow("g0") is False
+
+
+def test_the_banks_enhance_on_hold_switch_is_what_a_hold_asks_first(qtbot, tmp_path):
+    # Off, a held slide is held and nothing more: the switch is the one way to
+    # stop on a picture without asking for a better version of it.
+    db = _enhanceable_db(tmp_path, count=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._bank.enhance_on_hold.setChecked(False)
+
+    assert view.enhance_from_slideshow("g0") is False
+    assert view._reroll_jobs == {}
+
+    view._bank.enhance_on_hold.setChecked(True)
+    assert view.enhance_from_slideshow("g0") is True
 
 
 def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):

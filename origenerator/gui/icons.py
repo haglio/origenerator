@@ -147,6 +147,13 @@ def enhance_icon() -> QIcon:
     return glyph_icon("plus", color=AMBER, size=_SIZE)
 
 
+def enhance_on_hold_icon() -> QIcon:
+    """Enhance's plus drawn open — the switch that makes holding a slide ask
+    for the better version, kept apart from the Enhance button's solid plus so
+    the ask and the switch over it read as two things in one color."""
+    return glyph_icon("plus_outline", color=AMBER, size=_SIZE)
+
+
 def mic_icon() -> QIcon:
     """A microphone — speak a prompt edit.
 

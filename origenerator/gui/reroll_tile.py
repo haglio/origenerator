@@ -25,10 +25,9 @@ from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 from origenerator.gui import grid_card, palette
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
-from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
-from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.inflight import TICK_MS, RunReading, discard_run_text, discard_run_tooltip
+from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming, elapsed_since
 
 # The dashed resting outline and the solid selected border are the family look every
 # non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
@@ -36,10 +35,6 @@ _IDLE_FRAME_CSS = grid_card.idle_css("rerollTile")
 _SELECTED_FRAME_CSS = grid_card.selected_css("rerollTile")
 
 _IMAGE_SIZE = grid_card.PICTURE_SIZE
-_BAR_HEIGHT = 26  # the bar laid along the frame's foot, the way a player's is
-# How often the tile re-reads the clock. Its own timer rather than the gallery's
-# poll, which would make a seconds count skip every other tick.
-_TICK_MS = 1000
 
 
 class RerollTile(QFrame):
@@ -102,7 +97,7 @@ class RerollTile(QFrame):
         # Its own clock rather than the gallery's poll, so the count advances a
         # second at a time whether or not a refresh has landed.
         self._tick = QTimer(self)
-        self._tick.setInterval(_TICK_MS)
+        self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
 
         if job is None:
@@ -160,11 +155,21 @@ class RerollTile(QFrame):
 
     # --- state rendering ---------------------------------------------------
 
+    def _reading(self) -> RunReading:
+        """How the bound job is going, in the record every surface reads it from."""
+        return RunReading(
+            status=self._job.state, frame=self._job.last_preview,
+            progress=self._job.last_progress,
+            pass_progress=self._job.last_pass_progress,
+            stage=self._job.last_stage, started_at=self._job.started_at,
+            typical_seconds=self._typical_seconds,
+        )
+
     def _render_state(self):
         """Name the stage on the scrim and write the run's reading on the bar."""
         self._scrim.cover(
             self._image,
-            "Generating…" if self._job.state == "running" else "Waiting…",
+            "Generating…" if self._reading().rendering else "Waiting…",
         )
         self._bar.raise_()  # the scrim it sits on was just raised over everything
         self._render_timing()
@@ -178,17 +183,12 @@ class RerollTile(QFrame):
         strip's queue to explain, not a zero counting up over a bar that hasn't
         moved.
         """
-        elapsed = elapsed_since(self._job.started_at)
-        progress = self._job.last_progress
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has
             # the room for the elapsed count too.
-            RunTiming(elapsed, progress, self._typical_seconds).status_label(
-                step=self._job.last_stage, compact=True),
-            progress if self._job.state == "running" else None,
-            (self._job.last_pass_progress
-             if self._job.state == "running" else None),
+            self._reading().caption(compact=True),
+            *self._reading().bars(),
         )
 
     def _place_overlays(self):
@@ -198,8 +198,8 @@ class RerollTile(QFrame):
         self.layout().activate()
         frame = self._image.geometry()
         self._bar.setGeometry(QRect(
-            frame.x(), frame.y() + frame.height() - _BAR_HEIGHT,
-            frame.width(), _BAR_HEIGHT,
+            frame.x(), frame.y() + frame.height() - BAR_HEIGHT,
+            frame.width(), BAR_HEIGHT,
         ))
 
     def _on_started(self):

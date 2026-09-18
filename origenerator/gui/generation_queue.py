@@ -68,6 +68,7 @@ from PyQt6.QtWidgets import (
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.inflight import (
+    TICK_MS,
     discard_run_text,
     discard_run_tooltip,
     foreign_queue_text,
@@ -78,7 +79,7 @@ from origenerator.gui.inflight import (
     queue_wait_text,
     starting_row_text,
 )
-from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -97,10 +98,6 @@ _STRIP_HEIGHT = 88
 # narrower than its caption elides the countdown away. The queue's names are
 # long, so the rest of the strip still goes to the line.
 _BAR_WIDTH = 290
-_BAR_HEIGHT = 26  # a line of that font, with room to read as a bar around it
-# How often the running half re-reads the clock. Its own timer rather than the
-# gallery's 1.5s poll, which would make a seconds count skip every other tick.
-_TICK_MS = 1000
 # Marks a drag as one of our own rows, so a thumbnail dragged from the gallery
 # (which carries its own type) can't be dropped into the queue as a reorder.
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
@@ -204,7 +201,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # stripe under it. The same line, in the same words, as the browser pane's
         # in-flight cards carry.
         self._progress = ProgressCaption()
-        self._progress.setFixedHeight(_BAR_HEIGHT)
+        self._progress.setFixedHeight(BAR_HEIGHT)
         self._progress.setFixedWidth(_BAR_WIDTH)
         column.addWidget(self._progress)
         # What the shared server is doing to us: the backlog holding our job
@@ -225,7 +222,7 @@ class RunningPreview(OpensAFolder, QWidget):
         # Its own clock rather than the gallery's poll, so the count advances a
         # second at a time whether or not a refresh has landed.
         self._tick = QTimer(self)
-        self._tick.setInterval(_TICK_MS)
+        self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
 
         self.show_item(None)

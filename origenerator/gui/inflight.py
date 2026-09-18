@@ -161,6 +161,11 @@ _KIND_TOOLTIPS = {
 }
 
 
+# How often a surface showing a run in flight re-reads the clock. Its own timer
+# rather than the gallery's poll, so the count advances a second at a time
+# whether or not a refresh has landed.
+TICK_MS = 1000
+
 @dataclass
 class RunReading:
     """How a run in flight is going, as every surface showing one reads it.

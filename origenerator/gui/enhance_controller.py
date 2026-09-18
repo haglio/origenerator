@@ -26,6 +26,7 @@ from typing import NamedTuple, Protocol
 from origenerator import gallery
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
+from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.inflight import EnhancingRun
 from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
@@ -569,8 +570,8 @@ class EnhanceController:
             for prompt_id, job in self._by_prompt.items()
         })
 
-    def _pending_for(self, row: dict, running) -> tuple | None:
-        """``(status, frame, settings)`` of a standalone enhance running on
+    def _pending_for(self, row: dict, running) -> RunningEnhancement | None:
+        """A standalone enhance running on
         ``row``'s own image, or ``None`` — the version list's live row.
 
         The settings ride along so the live row can name what is being made the
@@ -583,7 +584,8 @@ class EnhanceController:
         if job is None:
             return None
         run = self._as_run(job)
-        return run.status, run.frame, gallery.describe_enhance_params(job.params)
+        return RunningEnhancement(run.status, run.frame,
+                                  gallery.describe_enhance_params(job.params))
 
     def forget(self, prompt_id: str) -> None:
         """A run that is over is nobody's enhance any more."""

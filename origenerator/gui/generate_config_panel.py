@@ -57,7 +57,7 @@ from origenerator.gui import icons
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_controls import enhance_state
 from origenerator.gui.eliding import ElidingLabel
-from origenerator.gui.enhance_versions import EnhanceVersions
+from origenerator.gui.enhance_versions import EnhanceOffer, EnhanceVersions, RunningEnhancement
 from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
@@ -197,7 +197,7 @@ class GenerateConfigPanel(QWidget):
         # image, fed from outside (the gallery owns the jobs); None when nothing
         # is cooking. Beside it, the app-wide enhance settings the "+ Enhance"
         # card would run at — also the gallery's, pushed in the same way.
-        self._pending_enhancement: tuple | None = None
+        self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
         # The settings the preview's generation went on display under, captured
         # whenever one does. Editing the form away from these is what marks the
@@ -1415,10 +1415,10 @@ class GenerateConfigPanel(QWidget):
         """
         return self._displayed_row
 
-    def set_pending_enhancement(self, pending: tuple | None):
+    def set_pending_enhancement(self, pending: RunningEnhancement | None):
         """Reflect an enhancement being generated for the image on display.
 
-        ``pending`` is ``(status, frame, settings)`` while one is running,
+        ``pending`` is a :class:`RunningEnhancement` while one is running,
         ``None`` otherwise. Fed from the gallery, which owns the jobs. A new
         frame updates the level's row in place; only a run starting or ending
         rebuilds the list, so a stream of frames doesn't thrash the layout.
@@ -1443,7 +1443,7 @@ class GenerateConfigPanel(QWidget):
         was_running = self._pending_enhancement is not None
         self._pending_enhancement = pending
         if pending is not None:
-            frame = pending[1]
+            frame = pending.frame
             if frame:
                 self._preview.show_frame(frame, enhancing=True)
         elif was_running:
@@ -1547,11 +1547,11 @@ class GenerateConfigPanel(QWidget):
             return None
         return EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE).upscale_of(preview[0])
 
-    def _add_card_for(self, row: dict) -> tuple:
-        """``(settings, duplicate_of)`` for the ``+ Enhance`` row on ``row``."""
+    def _add_card_for(self, row: dict) -> EnhanceOffer:
+        """What the ``+ Enhance`` row on ``row`` would run, and what it repeats."""
         params = enhance_params_for(row, self._enhance_settings)
-        return (describe_enhance_params(params or {}),
-                level_matching_settings(row, self._enhance_settings))
+        return EnhanceOffer(describe_enhance_params(params or {}),
+                            level_matching_settings(row, self._enhance_settings))
 
     @staticmethod
     def _level_path(level) -> Path:

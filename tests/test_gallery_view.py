@@ -36,6 +36,7 @@ from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
 from origenerator.gui.gallery_tree import (
@@ -9097,13 +9098,14 @@ def test_open_category_hints_and_opens_nothing_when_the_act_has_no_video(qtbot, 
 
 
 def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
-    # The panel's two "Edit…" signals reach the view's open handlers, so
-    # clicking Open with a dropped video (or a picked act) opens an editable tab.
+    # An "Edit…" press reaches the view's open handler, so clicking it with a
+    # dropped video (or a picked act) opens an editable tab.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine.panel.open_requested.emit("img", "vid")
+    view._combine.panel.combine_requested.emit(CombineRequest(
+        image_id="img", video_id="vid", edit_first=True))
 
     assert view._reroll_jobs == {}
     config = view._info_tabs.current_config_panel().current_config()
@@ -9630,7 +9632,9 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     deferred = []
     monkeypatch.setattr(view._combine, "_after_painting", deferred.append)
 
-    view._combine._on_generate("img", "vid")
+    view._combine.panel.combine_requested.emit(
+        CombineRequest(image_id="img", video_id="vid",
+                       intent=view._combine.panel.selected_intent()))
 
     row, = view._queue.rows()
     assert row._note_text == "Starting…"
@@ -9667,7 +9671,9 @@ def test_the_stand_in_row_shows_a_dropped_videos_clip(qtbot, tmp_path, monkeypat
     view.refresh()
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
 
-    view._combine._on_generate("img", "vid")
+    view._combine.panel.combine_requested.emit(
+        CombineRequest(image_id="img", video_id="vid",
+                       intent=view._combine.panel.selected_intent()))
 
     item = view._queue._items[0]
     assert item.recipe_thumbnail == "thumbs/vid.jpg"
@@ -9887,7 +9893,9 @@ def test_a_pressed_combine_stands_in_line_with_its_recipe_marked_as_its_run_will
     monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
     _pick_lane(view._combine.panel, lane)
 
-    view._combine._on_generate("img", "vid")
+    view._combine.panel.combine_requested.emit(
+        CombineRequest(image_id="img", video_id="vid",
+                       intent=view._combine.panel.selected_intent()))
 
     (standing,) = view._combine.launching_rows()
     assert standing.recipe_prompt_edited is stands_apart

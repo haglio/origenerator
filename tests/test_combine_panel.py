@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout
 
 from origenerator import recipe_match
-from origenerator.gui.combine_panel import CombinePanel
+from origenerator.gui.combine_panel import CombinePanel, CombineRequest
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
@@ -55,16 +55,17 @@ def test_generate_is_disabled_until_both_slots_are_filled(qtbot):
     assert panel._generate_btn.isEnabled()       # both filled: ready
 
 
-def test_clicking_generate_emits_the_two_ids(qtbot):
+def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")
     panel.video_slot.set_item("vid1")
     got = []
-    panel.generate_requested.connect(lambda i, v: got.append((i, v)))
+    panel.combine_requested.connect(got.append)
 
     panel._generate_btn.click()
 
-    assert got == [("img1", "vid1")]
+    assert got == [CombineRequest(image_id="img1", video_id="vid1",
+                                  intent=recipe_match.VIDEO)]
 
 
 def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
@@ -85,11 +86,13 @@ def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):
     panel.image_slot.set_item("img1")
     panel.video_slot.set_item("vid1")
     opened = []
-    panel.open_requested.connect(lambda i, v: opened.append((i, v)))
+    panel.combine_requested.connect(opened.append)
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "vid1")]  # same pair Generate would, but bound for the generator
+    # The same pair Generate would ask for, marked as bound for the generator.
+    assert opened == [CombineRequest(image_id="img1", video_id="vid1",
+                                     intent=recipe_match.VIDEO, edit_first=True)]
 
 
 def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
@@ -97,11 +100,12 @@ def test_clicking_open_with_a_picked_act_emits_the_category(qtbot):
     panel.image_slot.set_item("img1")
     _pick_act(panel, "delta")
     opened = []
-    panel.open_category_requested.connect(lambda i, c, n: opened.append((i, c, n)))
+    panel.combine_requested.connect(opened.append)
 
     panel._open_btn.click()
 
-    assert opened == [("img1", "delta", recipe_match.VIDEO)]
+    assert opened == [CombineRequest(image_id="img1", category="delta",
+                                     intent=recipe_match.VIDEO, edit_first=True)]
 
 
 def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
@@ -258,11 +262,12 @@ def test_generate_emits_the_picked_act(qtbot):
     panel.image_slot.set_item("img1")
     _pick_act(panel, "delta")
     cats = []
-    panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
+    panel.combine_requested.connect(cats.append)
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "delta", recipe_match.VIDEO)]
+    assert cats == [CombineRequest(image_id="img1", category="delta",
+                                   intent=recipe_match.VIDEO)]
 
 
 # --- the Video/Genau radio: what the result is for ----------------------------
@@ -291,11 +296,12 @@ def test_generate_carries_the_chosen_lane(qtbot):
     _pick_act(panel, "delta")
     _pick_lane(panel, recipe_match.GENAU)
     cats = []
-    panel.category_requested.connect(lambda i, c, n: cats.append((i, c, n)))
+    panel.combine_requested.connect(cats.append)
 
     panel._generate_btn.click()
 
-    assert cats == [("img1", "delta", recipe_match.GENAU)]
+    assert cats == [CombineRequest(image_id="img1", category="delta",
+                                   intent=recipe_match.GENAU)]
 
 
 def test_switching_the_lane_announces_it_once(qtbot):

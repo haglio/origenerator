@@ -19,6 +19,7 @@ from origenerator import recipe_match
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
+from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.toast import NOTICE, WARNING
 
@@ -52,10 +53,7 @@ class FakePanel:
         self.visible = None
         self.lit_for = []
         self.cleared = 0
-        self.generate_requested = _Signal()
-        self.category_requested = _Signal()
-        self.open_requested = _Signal()
-        self.open_category_requested = _Signal()
+        self.combine_requested = _Signal()
         self.intent_changed = _Signal()
         self.item_activated = _Signal()
 
@@ -605,7 +603,8 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, monkeypatch):
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
-    controller.panel.category_requested.emit("img", "waving", recipe_match.VIDEO)
+    controller.panel.combine_requested.emit(CombineRequest(
+        image_id="img", category="waving", intent=recipe_match.VIDEO))
 
     assert controller.launching_rows() == []
 

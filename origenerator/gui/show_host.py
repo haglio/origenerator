@@ -98,7 +98,7 @@ class ShowHost(Protocol):
 
     @property
     def hud_is_favorite(self) -> bool:
-        """Whether the item on screen is starred — the players' star readout."""
+        """Whether the item on screen is favorited — the players' star readout."""
         return False
 
     def toggle_favorites_filter(self) -> None:

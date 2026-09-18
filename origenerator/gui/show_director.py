@@ -39,10 +39,10 @@ from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.fun_time_bridge import ask_for_omnipause
 from origenerator.gui.gallery_tree import (
-    RECENTS_KEY as _RECENTS_KEY,
+    FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gui.gallery_tree import (
-    STARRED_KEY as _STARRED_KEY,
+    RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gui.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
@@ -138,7 +138,7 @@ class ShowHost(Protocol):
     def trash_generation(self, prompt_id: str) -> None:
         """Condemn it, as a show's Up key does."""
 
-    def star_generation(self, prompt_id: str) -> None:
+    def favorite_generation(self, prompt_id: str) -> None:
         """Bookmark it, as a show's Down key does."""
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
@@ -290,7 +290,7 @@ class ShowDirector:
             resume=self._show_state,
             shuffle=(lambda order: None) if latest else None,
             hud=HudFacts(order_label="Latest" if latest else "Shuffle",
-                         starred_ids=self._starred_prompt_ids()),
+                         favorite_ids=self._favorite_prompt_ids()),
         )
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
@@ -330,7 +330,7 @@ class ShowDirector:
                          folder_items=folder,
                          hud=HudFacts(
                              order_label="", looping=False,
-                             starred_ids=self._starred_prompt_ids()))
+                             favorite_ids=self._favorite_prompt_ids()))
 
     def _folder_rows(self) -> list[dict]:
         """The rows the browser lists, in its order."""
@@ -401,7 +401,7 @@ class ShowDirector:
         return ShowActions(
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
-            star=self._host.star_generation,
+            favorite=self._host.favorite_generation,
             # Three of the seven are a session's: a lock opens the held item
             # as a generate tab, a reset means the REGION's base state, and a
             # click on the picture asks the room to pause.
@@ -760,7 +760,7 @@ class ShowDirector:
             self.open(items, location=key, side=side,
                       hud=HudFacts(
                           looping=False,
-                          starred_ids=self._starred_prompt_ids()))
+                          favorite_ids=self._favorite_prompt_ids()))
 
     def _refill_region(self, side: str) -> None:
         """Put *side* back on its base state, if the mode still wants it there.
@@ -779,7 +779,7 @@ class ShowDirector:
         self.open(items, location=key, side=side,
                   hud=HudFacts(
                       looping=False,
-                      starred_ids=self._starred_prompt_ids()))
+                      favorite_ids=self._favorite_prompt_ids()))
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""
@@ -855,8 +855,8 @@ class ShowDirector:
                 continue
             for item in self.items_of([row]):
                 # With what the show's two switches judge it by: whether it is
-                # starred, and whether it carries an enhancement.
-                show.note_added(*item, starred=bool(row.get("starred")),
+                # favorited, and whether it carries an enhancement.
+                show.note_added(*item, favorite=bool(row.get("starred")),
                                 enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):
@@ -889,7 +889,7 @@ class ShowDirector:
         A shelf's cannot — Recents is a shelf of results and a run has none yet —
         so Recents answers for itself, by its own rule: every generation this app
         makes lands there, and this is one. The other shelves are deliberate sets
-        (starred, requested, condemned) that nothing joins by being made, and a
+        (favorited, requested, condemned) that nothing joins by being made, and a
         search's hits are a set that was already asked for.
 
         An enhancement is nobody's slide, wherever it is running. It is a better
@@ -1065,7 +1065,7 @@ class ShowDirector:
         no shelf spanning both to fall back to, and the half you are looking at
         is the half the word meant.  The browser is left where it is: this
         starts a show, it does not go browsing."""
-        if command.shelf_key == _STARRED_KEY:
+        if command.shelf_key == _FAVORITES_KEY:
             self.toggle_favorites_filter(command.side)
             return
         orientation = (command.side if command.side and self._fun_time is not None
@@ -1081,7 +1081,7 @@ class ShowDirector:
             items, location=key, side=command.side,
             shuffle=(lambda order: None) if latest else None,
             hud=HudFacts(order_label="Latest" if latest else "Shuffle",
-                         starred_ids=self._starred_prompt_ids()),
+                         favorite_ids=self._favorite_prompt_ids()),
         )
 
     def toggle_favorites_filter(self, side) -> None:
@@ -1152,8 +1152,8 @@ class ShowDirector:
             show.cull()
             said = "🎤 gone"
         elif command is AppCommand.STAR:
-            said, kind = (("🎤 starred", FAVORITE) if show.star()
-                          else ("🎤 nothing here to star", WARNING))
+            said, kind = (("🎤 favorited", FAVORITE) if show.favorite()
+                          else ("🎤 nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
             said, kind = (("🎤 holding this one", NOTICE) if show.set_held(True)
                           else ("🎤 already holding it", WARNING))
@@ -1164,8 +1164,8 @@ class ShowDirector:
 
     # --- what the HUD's two switches judge items by -------------------------
 
-    def _starred_prompt_ids(self) -> set[str]:
-        """Which generations are favorites (starred), for the shows' HUD: the
+    def _favorite_prompt_ids(self) -> set[str]:
+        """Which generations are favorites (favorited), for the shows' HUD: the
         star readout on the current item, and the F-mode narrowing — the same
         concepts the players' HUD wears, over the same collection the
         Favorites shelf lists."""

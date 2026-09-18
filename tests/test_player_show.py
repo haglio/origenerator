@@ -131,12 +131,12 @@ def test_stepping_lets_go_of_a_held_slide_first(qtbot, tmp_path):
     assert _sent(show) == ["LOCK_OFF", "NEXT"]
 
 
-def test_a_hold_stars_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
+def test_a_hold_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
     """Holding is the whole gesture it is in a window: the player repeats it,
-    and the show stars it, asks for the better version, and hands it to the
+    and the show favorites it, asks for the better version, and hands it to the
     gallery to open."""
     asked = []
-    actions = ShowActions(star=lambda pid: asked.append(("star", pid)),
+    actions = ShowActions(favorite=lambda pid: asked.append(("star", pid)),
                           enhance=lambda pid: asked.append(("enhance", pid)) or True,
                           lock=lambda pid: asked.append(("lock", pid)))
     show = _show(qtbot, tmp_path, actions=actions)
@@ -206,7 +206,7 @@ def test_a_file_the_player_will_not_let_go_of_is_said_rather_than_raised(qtbot, 
 def test_narrowing_hands_the_player_what_is_left(qtbot, tmp_path):
     """A switch is a narrowing of what the player may reach, so the list it is
     playing is written again with what survives."""
-    show = _show(qtbot, tmp_path, hud=HudFacts(starred_ids={"id-3"}))
+    show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
     _sent(show)
 
     assert show.toggle_favorites_filter() is True

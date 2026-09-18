@@ -35,13 +35,13 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
 from origenerator.gui.gallery_tree import (
+    FAVORITES_KEY as _FAVORITES_KEY,
+)
+from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gui.gallery_tree import (
     REQUESTS_KEY as _REQUESTS_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    STARRED_KEY as _STARRED_KEY,
 )
 from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
@@ -81,7 +81,7 @@ _WANTS = {
 # host's answer, so a row renamed is renamed in one place.
 _SHELVES = {
     AppCommand.RECENTS: _RECENTS_KEY,
-    AppCommand.STARRED: _STARRED_KEY,
+    AppCommand.STARRED: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
     AppCommand.REQUESTS: _REQUESTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
@@ -141,7 +141,7 @@ _SWITCHES = {
 
 # The refusal each bank word carries when its button cannot run — ``None`` to use
 # the button's own tooltip, which for most of them already says why ("Nothing to
-# undo", "Nothing here to star"). Only the two whose tips are bare labels, and
+# undo", "Nothing here to favorite"). Only the two whose tips are bare labels, and
 # Group, whose tip explains the button rather than refusing it, carry their own
 # words.
 _BANK_REFUSALS = {
@@ -559,7 +559,7 @@ class VoiceRouter(QObject):
         key = _SHELVES[command]
         label = self._host.shelf_label(key)
         if not self._host.stand_in_shelf(key, side):
-            # Recents and Starred appear only once there is one
+            # Recents and Favorites appear only once there is one
             self._shows.answer(f"🎤 no {label} shelf yet", kind=WARNING)
             return
         self._shows.answer(f"🎤 {label}")

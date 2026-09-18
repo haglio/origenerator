@@ -61,7 +61,7 @@ CONTROL_FACES = {
 CONTROL_TOOLTIPS = {
     "prev": "Previous slide",
     "next": "Next slide",
-    "lock": "Hold this one on screen — starring it, and asking for a better version",
+    "lock": "Hold this one on screen — favoriting it, and asking for a better version",
     "trash": "Delete this one and move on",
     "fmode": f"{F_MODE_LABEL} — play only the favorites",
     "enhanced": "Enhanced only — play just the pictures that have been enhanced",

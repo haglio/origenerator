@@ -85,10 +85,10 @@ _BADGE_DISPLAY = 22  # the badge's on-screen size, in px
 _CHIP_GLYPH = 44
 _CHIP_INSET = (_SIZE - _CHIP_GLYPH) / 2
 
-# A starred item's star, in the green Fun Time paints its favorite ★ with: one
+# A favorited item's star, in the green Fun Time paints its favorite ★ with: one
 # color means "bookmarked" across both apps, so a star learned in one reads in
-# the other. Worn by every star that says something IS starred — the tile's
-# corner badge and a starred folder's row alike. The plus marking an enhanced
+# the other. Worn by every star that says something IS favorited — the tile's
+# corner badge and a favorited folder's row alike. The plus marking an enhanced
 # tile is yellow (AMBER, this palette's yellow): green is spoken for and the two
 # badges can sit on one tile, and blue is genau's across this family.
 _STAR_GLYPH = GREEN
@@ -175,12 +175,12 @@ def delete_icon() -> QIcon:
 
 
 def star_icon(*, filled: bool) -> QIcon:
-    """A five-pointed star — solid when the folder is starred, an outline when
+    """A five-pointed star — solid when the folder is favorited, an outline when
     not, so the hover control shows the state it will toggle.
 
-    A starred one is green (:data:`_STAR_GLYPH`), the color the corner badge and
+    A favorited one is green (:data:`_STAR_GLYPH`), the color the corner badge and
     Fun Time's favorite ★ both wear; the outline stays the chrome's own gray,
-    because it is an offer to star rather than a thing that is starred. The
+    because it is an offer to favorite rather than a thing that is favorited. The
     button bank's Star wears the filled one, so the control and the mark it
     leaves on a tile are one symbol in one color."""
     if filled:
@@ -348,18 +348,18 @@ _ENHANCE_SHADOW = 5.0
 
 
 @cache
-def corner_star_icon(*, starred: bool, armed: bool) -> QIcon:
+def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
     """The star in a picture's top-left corner: bookmark it, or take the
     bookmark away.
 
     Filled and green once it is bookmarked — the green Fun Time paints its
     favorite ★ with, so one color means one thing across both apps — and a
     hollow outline while it is not. The mark is therefore the state and the
-    button at once, which is why a starred picture keeps it up with nothing
+    button at once, which is why a favorited picture keeps it up with nothing
     hovering: there is no separate badge left to disagree with it.
     """
-    return _corner_icon("star" if starred else "star_outline",
-                        _STAR_GLYPH if starred else _CORNER_REST, armed)
+    return _corner_icon("star" if favorite else "star_outline",
+                        _STAR_GLYPH if favorite else _CORNER_REST, armed)
 
 
 @cache

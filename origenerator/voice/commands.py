@@ -26,12 +26,12 @@ from typing import NamedTuple
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL,
+    FAVORITES_KEY,
+    FAVORITES_LABEL,
     RECENTS_KEY,
     RECENTS_LABEL,
     REQUESTS_KEY,
     REQUESTS_LABEL,
-    STARRED_KEY,
-    STARRED_LABEL,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -50,7 +50,7 @@ SIDES = (PORTRAIT, LANDSCAPE)
 # carries into the vocabulary rather than leaving it saying the old word.
 SHELF_KEYS: dict[str, str] = {
     RECENTS_LABEL.lower(): RECENTS_KEY,
-    STARRED_LABEL.lower(): STARRED_KEY,
+    FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
     REQUESTS_LABEL.lower(): REQUESTS_KEY,
     TRASH_LABEL.lower(): TRASH_KEY,

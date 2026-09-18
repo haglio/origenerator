@@ -403,13 +403,13 @@ def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypa
 
 def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
     """The players' F-mode, meaning on a show what it means on a player:
-    narrow to the favorites — the starred items, the same collection the
+    narrow to the favorites — the favorited items, the same collection the
     Favorites shelf lists — and widen back on the second press."""
     from origenerator.gui.show_hud import ShowHud, show_hud_model
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
@@ -609,7 +609,7 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
@@ -727,7 +727,7 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
@@ -1350,7 +1350,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_show(qtbot, tmp_path, 
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_enhanced_prompt_ids", lambda items: {"id-tall-1"})
-    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
+    monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view.region_show("portrait")
     qtbot.addWidget(show)

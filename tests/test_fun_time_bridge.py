@@ -113,7 +113,7 @@ def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch
 def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
     """End to end from the words: the phrase the session heard becomes the
     command this app would have matched had it heard it itself."""
-    from origenerator.gui.gallery_tree import STARRED_KEY
+    from origenerator.gui.gallery_tree import FAVORITES_KEY
 
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
@@ -123,7 +123,7 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
         "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
     bridge._tick()
 
-    assert [(c.shelf_key, c.side) for c in played] == [(STARRED_KEY, "landscape")]
+    assert [(c.shelf_key, c.side) for c in played] == [(FAVORITES_KEY, "landscape")]
 
 
 def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
@@ -414,7 +414,7 @@ def test_a_players_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, m
     """A session hands a player's presses back verbatim, spelled the way the
     panel posted them — so the show's own two switches answer them here."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    monkeypatch.setattr(view._shows, "_starred_prompt_ids", lambda: {"id1"})
+    monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id1"})
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
     _press(bridge, tmp_path, "portrait_fmode")

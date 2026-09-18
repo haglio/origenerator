@@ -1,13 +1,13 @@
 """The fullscreen player — the one way this app fills the screen with a picture.
 
-It plays a set of generations: a folder's, a shelf's (Recents, Starred), or the
+It plays a set of generations: a folder's, a shelf's (Recents, Favorites), or the
 one folder a double-clicked picture came from. Reuses :class:`PreviewWidget` (in
 play-once mode) for the actual image/video rendering and a
 :class:`~origenerator.slideshow.SlideshowPlaylist` for the order and pacing.
 Images advance on a dwell timer; videos play once and advance when they end
 (``PreviewWidget.video_ended``). The arrows step, Shift+arrows step the
 versions of the item on screen, Up culls, Down locks the slide
-against the advance (a locked clip replays, and the hold both stars the slide and
+against the advance (a locked clip replays, and the hold both favorites the slide and
 asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
 for the shown item's own folder (``open_requested``), and Escape closes. Ending
 a show on a locked slide leaves for that slide's folder too: holding one is the
@@ -443,9 +443,9 @@ class SlideshowView(QWidget):
         return True
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
-                   starred: bool = False, enhanced: bool = False) -> None:
+                   favorite: bool = False, enhanced: bool = False) -> None:
         """A generation that belongs to what this show is playing has landed: it
-        joins the set, queued to come up next.  ``starred`` and ``enhanced`` are
+        joins the set, queued to come up next.  ``favorited`` and ``enhanced`` are
         what the gallery knows of its row, so the two switches can judge it.
 
         A folder that is auto-generating is the case this is for. Without it the
@@ -458,8 +458,8 @@ class SlideshowView(QWidget):
         own frames, and finishing is not a second slide: it keeps its place in
         the pass and simply becomes the file.
         """
-        if starred:
-            self._set.starred_ids.add(prompt_id)
+        if favorite:
+            self._set.favorite_ids.add(prompt_id)
         if enhanced:
             self._set.enhanced_ids.add(prompt_id)
         slide = Slide(path, media_type, prompt_id, still)
@@ -470,7 +470,7 @@ class SlideshowView(QWidget):
             self._update_neighbors()  # it may be the still riding either side
             return
         # Into the pass only past the switches: a show narrowed to its favorites
-        # must not fill back up with every unstarred thing the loop makes.  The
+        # must not fill back up with every unfavorited thing the loop makes.  The
         # whole set remembers it either way, for when the switch comes off.
         if self._set.passes(slide) and self._playlist.add(slide):
             self._update_counter()
@@ -687,14 +687,14 @@ class SlideshowView(QWidget):
         A base state is one KIND of set and always the same one, so it is
         re-dressed rather than re-described: shuffled, and NOT a loop anyone
         asked for — that side browsing its whole library, which is what a
-        satellite does with no loop on.  It kept the starred ids it had, and
+        satellite does with no loop on.  It kept the favorited ids it had, and
         still does; nothing about a reset changes which items are favorites.
         ``enhanced_ids`` is which of the new items carry an enhancement — a
         new set, so a new answer.
         """
         self._live = not items
         self._set.retune(items, hud=HudFacts(looping=False,
-                                             starred_ids=self._set.starred_ids,
+                                             favorite_ids=self._set.favorite_ids,
                                              enhanced_ids=enhanced_ids))
 
     @property
@@ -734,14 +734,14 @@ class SlideshowView(QWidget):
         self._hold_current() if held else self._toggle_lock()
         return True
 
-    def star(self) -> bool:
+    def favorite(self) -> bool:
         """Bookmark the slide on screen; ``False`` when there is nothing to
         bookmark — a live generation has no row of its own yet."""
         item = self._playlist.current()
-        if self._actions.star is None or item is None or item.prompt_id is None:
+        if self._actions.favorite is None or item is None or item.prompt_id is None:
             return False
-        self._actions.star(item.prompt_id)
-        self._set.starred_ids.add(item.prompt_id)  # the star readout and F-mode follow it
+        self._actions.favorite(item.prompt_id)
+        self._set.favorite_ids.add(item.prompt_id)  # the star readout and F-mode follow it
         return True
 
     # The motion console reaches the three above by its own names: it drives this
@@ -789,7 +789,7 @@ class SlideshowView(QWidget):
 
     @property
     def hud_is_favorite(self) -> bool:
-        """Whether the item on screen is a favorite (starred) — the players'
+        """Whether the item on screen is a favorite (favorited) — the players'
         star readout, over the same collection the Favorites shelf lists."""
         return self._set.is_favorite
 
@@ -805,7 +805,7 @@ class SlideshowView(QWidget):
 
     def toggle_favorites_filter(self) -> bool:
         """Narrow the set to the favorites, or widen it back — the players' own
-        F-mode, over the starred items.  ``True`` when the switch moved."""
+        F-mode, over the favorited items.  ``True`` when the switch moved."""
         return self.set_favorites_filter(not self._set.favorites_filter)
 
     def toggle_enhanced_mode(self) -> bool:
@@ -967,10 +967,10 @@ class SlideshowView(QWidget):
         self._flash_note(message, ms=3000, kind=kind)
 
     def _hold_current(self):
-        """Down: hold the slide, star it, and ask for it to be enhanced.
+        """Down: hold the slide, favorite it, and ask for it to be enhanced.
 
         Stopping on a picture is the gesture that says you want it, so it is
-        also the one that stars it and the one that asks for the better version
+        also the one that favorites it and the one that asks for the better version
         — nothing extra to press, and the run happens while you keep looking at
         it. Releasing the hold asks for nothing; only stopping does, and only on
         a picture that has never been enhanced (the gallery's call).
@@ -1159,7 +1159,7 @@ class SlideshowView(QWidget):
         """
         if self._playlist.toggle_lock():
             self._advance_timer.stop()
-            self.star()
+            self.favorite()
             self._update_counter()
             if self._actions.lock is not None:
                 prompt_id = self._current_prompt_id()
@@ -1287,7 +1287,7 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
-            self._hold_current()    # hold it, star it, and enhance it
+            self._hold_current()    # hold it, favorite it, and enhance it
         elif key == Qt.Key.Key_E:
             self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):

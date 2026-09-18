@@ -247,7 +247,7 @@ class PlayerShow(QObject):
         flipping; ``True`` when that moved it.
 
         Holding is the whole gesture it is in a window: the player repeats the
-        item, and the show stars it, asks for a better version of it, and — in
+        item, and the show favorites it, asks for a better version of it, and — in
         a session — hands it to the gallery to open.
         """
         if held == self._locked:
@@ -255,7 +255,7 @@ class PlayerShow(QObject):
         self._hold(held)
         if not held:
             return True
-        self.star()
+        self.favorite()
         self._enhance_current()
         prompt_id = self._set.current_prompt_id()
         if self._actions.lock is not None and prompt_id is not None:
@@ -313,14 +313,14 @@ class PlayerShow(QObject):
     def cull(self) -> None:
         self.show_cull()
 
-    def star(self) -> bool:
+    def favorite(self) -> bool:
         """Bookmark the item on screen; ``False`` when there is nothing to
         bookmark."""
         prompt_id = self._set.current_prompt_id()
-        if self._actions.star is None or prompt_id is None:
+        if self._actions.favorite is None or prompt_id is None:
             return False
-        self._actions.star(prompt_id)
-        self._set.starred_ids.add(prompt_id)  # the star readout and F-mode follow it
+        self._actions.favorite(prompt_id)
+        self._set.favorite_ids.add(prompt_id)  # the star readout and F-mode follow it
         return True
 
     def show_reset(self) -> None:
@@ -344,7 +344,7 @@ class PlayerShow(QObject):
         """Point this show at the region's base set instead — what a hosted
         reset does, with both switches off and a fresh pass."""
         self._set.retune(items, hud=HudFacts(looping=False,
-                                             starred_ids=self._set.starred_ids,
+                                             favorite_ids=self._set.favorite_ids,
                                              enhanced_ids=enhanced_ids))
 
     def show_item(self, path, *, hold: bool = False) -> None:
@@ -417,12 +417,12 @@ class PlayerShow(QObject):
         return self._set.playlist.holds(prompt_id)
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
-                   starred: bool = False, enhanced: bool = False) -> None:
+                   favorite: bool = False, enhanced: bool = False) -> None:
         """A generation that belongs to what this show plays has landed: it
         joins the set, queued to come up next, and the player is handed the
         list again so it can reach it."""
-        if starred:
-            self._set.starred_ids.add(prompt_id)
+        if favorite:
+            self._set.favorite_ids.add(prompt_id)
         if enhanced:
             self._set.enhanced_ids.add(prompt_id)
         slide = Slide(path, media_type, prompt_id, still)

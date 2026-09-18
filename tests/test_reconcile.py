@@ -134,14 +134,14 @@ def _add_completed(db, pid, *, params, filename, workflow="sdxl_t2i"):
     return db.get_generation(pid)
 
 
-def test_reconcile_repoints_a_star_orphaned_by_the_settings_formula_change(tmp_path):
+def test_reconcile_repoints_a_favorite_orphaned_by_the_settings_formula_change(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
     legacy_key = gallery.legacy_settings_folder_key(row)
     current_key = gallery.settings_folder_key(row)
     assert legacy_key != current_key
-    db.set_folder_starred(legacy_key, True)  # a star from before the formula change
+    db.set_folder_favorite(legacy_key, True)  # a star from before the formula change
 
     summary = reconcile_folder_meta(db)
 
@@ -156,7 +156,7 @@ def test_reconcile_backfills_identity_onto_a_matching_bookmark(tmp_path):
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
     key = gallery.settings_folder_key(row)
-    db.set_folder_starred(key, True)  # identity NULL
+    db.set_folder_favorite(key, True)  # identity NULL
 
     summary = reconcile_folder_meta(db)
 
@@ -172,7 +172,7 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
                          filename="sdxl_t2i_p1.png")
     key = gallery.settings_folder_key(row)
     # A bookmark already carrying identity, as a prior reconcile would leave it.
-    db.upsert_folder_meta(key, custom_name=None, starred=True,
+    db.upsert_folder_meta(key, custom_name=None, favorite=True,
                           level="settings", ref_prompt_id="p1")
 
     # Simulate a *future* settings-key formula change: the folder's key shifts.
@@ -192,7 +192,7 @@ def test_reconcile_remaps_a_future_key_change_via_stored_identity(tmp_path, monk
     assert summary["repointed"] == 1
 
 
-def test_reconcile_repoints_an_i2v_star_across_the_frame_config_change(tmp_path):
+def test_reconcile_repoints_an_i2v_favorite_across_the_frame_config_change(tmp_path):
     # A star made before an i2v's start-frame config was folded into its settings
     # key dangles once the formula changes. With no stored identity it is recovered
     # through the pre-frame-config legacy formula and moved onto the live folder —
@@ -209,7 +209,7 @@ def test_reconcile_repoints_an_i2v_star_across_the_frame_config_change(tmp_path)
     legacy_key = gallery.legacy_preframe_settings_folder_key(video)
     current_key = gallery.settings_folder_key(video, index)
     assert legacy_key != current_key                 # the fold moved the folder's key
-    db.set_folder_starred(legacy_key, True)          # a star from before the fold
+    db.set_folder_favorite(legacy_key, True)          # a star from before the fold
 
     summary = reconcile_folder_meta(db)
 
@@ -219,7 +219,7 @@ def test_reconcile_repoints_an_i2v_star_across_the_frame_config_change(tmp_path)
     assert summary["repointed"] == 1
 
 
-def test_reconcile_repoints_a_star_across_the_version_fold(tmp_path):
+def test_reconcile_repoints_a_favorite_across_the_version_fold(tmp_path):
     # A star made before the workflow generation was folded into the settings
     # key dangles once the formula changes. With no stored identity it is
     # recovered through the pre-version legacy formula and moved onto the live
@@ -230,7 +230,7 @@ def test_reconcile_repoints_a_star_across_the_version_fold(tmp_path):
     legacy_key = gallery.legacy_preversion_settings_folder_key(row)
     current_key = gallery.settings_folder_key(row)
     assert legacy_key != current_key                 # the fold moved the folder's key
-    db.set_folder_starred(legacy_key, True)          # a star from before the fold
+    db.set_folder_favorite(legacy_key, True)          # a star from before the fold
 
     summary = reconcile_folder_meta(db)
 
@@ -240,7 +240,7 @@ def test_reconcile_repoints_a_star_across_the_version_fold(tmp_path):
     assert summary["repointed"] == 1
 
 
-def test_reconcile_repoints_both_stars_across_the_enhancement_merge(tmp_path):
+def test_reconcile_repoints_both_favorites_across_the_enhancement_merge(tmp_path):
     # The enhancement split is the one formula change that MERGED folders: an
     # enhanced render and its unenhanced twin used to be two, and are now one. A
     # star on either of the old folders has to land on the merged one — including
@@ -260,7 +260,7 @@ def test_reconcile_repoints_both_stars_across_the_enhancement_merge(tmp_path):
         for row in (plain, enhanced)
     )
     assert plain_key != enhanced_key != current_key  # two folders before
-    db.set_folder_starred(plain_key, True)
+    db.set_folder_favorite(plain_key, True)
     db.rename_folder(enhanced_key, "Cats")
 
     summary = reconcile_folder_meta(db)
@@ -277,7 +277,7 @@ def test_reconcile_leaves_a_truly_orphaned_bookmark_untouched(tmp_path):
     _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
                    filename="sdxl_t2i_p1.png")
     dead = "image/sdxl_t2i/000000000000"  # names no live folder, no recoverable identity
-    db.set_folder_starred(dead, True)
+    db.set_folder_favorite(dead, True)
 
     summary = reconcile_folder_meta(db)
 
@@ -292,7 +292,7 @@ def test_reconcile_merges_when_the_target_folder_is_already_bookmarked(tmp_path)
     legacy_key = gallery.legacy_settings_folder_key(row)
     current_key = gallery.settings_folder_key(row)
     db.rename_folder(current_key, "Cats")    # the live folder already has a name
-    db.set_folder_starred(legacy_key, True)  # a stale star to fold in
+    db.set_folder_favorite(legacy_key, True)  # a stale star to fold in
 
     reconcile_folder_meta(db)
 
@@ -393,13 +393,13 @@ def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
 
 
 def _a_library_with_both_kinds_of_bookmark(tmp_path):
-    """One generation, its settings folder starred under a legacy key, and a
+    """One generation, its settings folder favorited under a legacy key, and a
     hand-composed folder holding that same legacy key."""
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a harbor", "steps": 30, "seed": 1},
                          filename="sdxl_t2i_p1.png")
     legacy_key = gallery.legacy_settings_folder_key(row)
-    db.set_folder_starred(legacy_key, True)
+    db.set_folder_favorite(legacy_key, True)
     folder_id = db.create_custom_folder("Scene One")
     db.add_custom_folder_items(folder_id, [(legacy_key, None, None)])
     return db, row, legacy_key
@@ -451,7 +451,7 @@ def test_neither_bookmark_pass_touches_a_generation(tmp_path):
     assert db.list_generations() == before
 
 
-def test_the_stars_are_reconciled_before_the_hand_composed_folders(tmp_path, monkeypatch):
+def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path, monkeypatch):
     """The order the boot ran them in, kept now that one call runs both. A
     custom folder gathers the same keys a star sits on, so the star's move is
     the one that has to be settled first."""

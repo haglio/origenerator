@@ -83,7 +83,7 @@ def picture_size() -> QSize:
 
 
 # The two lines a folder's card carries that a generation's does not: how many
-# items are in it, and -- on the Starred shelf, where a folder is out of its
+# items are in it, and -- on the Favorites shelf, where a folder is out of its
 # parent's context -- the breadcrumb saying where it lives.
 COUNT_HEIGHT = 14
 BREADCRUMB_HEIGHT = 14

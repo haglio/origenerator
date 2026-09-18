@@ -26,7 +26,7 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
     """A switch is a narrowing of what you are looking through, not a new show:
     the picture stays where it is kept, so the surface only has to say where in
     the set it now sits."""
-    show_set, dealt = _set(hud=HudFacts(starred_ids={"id-2", "id-3"}))
+    show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
     show_set.playlist.jump_to(1)          # standing on the favorite
 
     assert show_set.set_modes(favorites_filter=True, enhanced=False) is True
@@ -37,7 +37,7 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
 def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
     """Kept out by the switch, it is gone from the pass — so the surface has to
     show whatever the new pass opens on rather than leave the old picture up."""
-    show_set, dealt = _set(hud=HudFacts(starred_ids={"id-3"}))
+    show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-3"}))
 
     assert show_set.set_modes(favorites_filter=True, enhanced=False) is True
     assert dealt == [False]
@@ -57,7 +57,7 @@ def test_a_switch_that_would_leave_nothing_is_refused():
 def test_a_reset_widens_only_where_something_was_narrowed():
     """With neither switch on there is nothing to widen back to, so the pass is
     left exactly as it is for the surface to start over in."""
-    show_set, dealt = _set(hud=HudFacts(starred_ids={"id-1"}))
+    show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
 
     assert show_set.drop_the_switches() is False
     assert dealt == []
@@ -75,7 +75,7 @@ def test_a_reset_widens_only_where_something_was_narrowed():
 def test_the_whole_set_keeps_what_a_switch_left_out():
     """An arrival while a switch is on is still there when it comes off, and
     one taken away is still gone — the set is kept by id beside the pass."""
-    show_set, _dealt = _set(hud=HudFacts(starred_ids={"id-1"}))
+    show_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
     show_set.set_modes(favorites_filter=True, enhanced=False)
 
     show_set.forget_id("id-2")

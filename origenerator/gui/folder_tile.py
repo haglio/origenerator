@@ -34,14 +34,14 @@ class FolderTile(QFrame):
 
     _BADGE = 16  # on-tile size of the recipe-level chip
 
-    def __init__(self, key, text, preview_paths, count, starred=False,
+    def __init__(self, key, text, preview_paths, count, favorite=False,
                  context="", level=None, detail="", parent=None):
         super().__init__(parent)
         self._key = key
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # The same card the generations beside it in the flow stand in, plus the
-        # breadcrumb line the Starred shelf's tiles carry.
+        # breadcrumb line the Favorites shelf's tiles carry.
         self.setFixedSize(*grid_card.folder_card_size(breadcrumb=bool(context)))
         self.setStyleSheet(grid_card.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -56,7 +56,7 @@ class FolderTile(QFrame):
         layout.addWidget(self._collage)
 
         if context:
-            # Where this folder lives, so a starred folder is tellable apart from a
+            # Where this folder lives, so a favorited folder is tellable apart from a
             # same-named one elsewhere. Elided from the left to keep the tail — the
             # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
@@ -68,14 +68,14 @@ class FolderTile(QFrame):
             layout.addWidget(crumb)
 
         # The name, led by its recipe-level chip when the folder has one (the same
-        # badge the tree shows), so a Starred-shelf tile is placeable even out of
+        # badge the tree shows), so a Favorites-shelf tile is placeable even out of
         # its parent's context.
         caption_row = QHBoxLayout()
         caption_row.setContentsMargins(0, 0, 0, 0)
         caption_row.setSpacing(4)
         if level is not None:
             caption_row.addWidget(self._level_badge(level), 0, Qt.AlignmentFlag.AlignTop)
-        caption = QLabel(("★ " if starred else "") + text)
+        caption = QLabel(("★ " if favorite else "") + text)
         caption.setWordWrap(True)
         grid_card.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and

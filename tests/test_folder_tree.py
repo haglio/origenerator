@@ -21,17 +21,17 @@ _ROLE = Qt.ItemDataRole.UserRole
 
 
 class _Group:
-    def __init__(self, key, starred=False):
+    def __init__(self, key, favorite=False):
         self.key = key
-        self.starred = starred
+        self.favorite = favorite
 
 
-def _folder_row(label, key, starred=False):
+def _folder_row(label, key, favorite=False):
     """A folder row as the tree draws one: the folder it holds, and its own key —
     that folder's, plus the side this copy of it is drawn on. The two differ
     because both sides draw the same folder (see origenerator.gui.orientation)."""
     item = QTreeWidgetItem([label])
-    item.setData(0, _ROLE, _Group(key, starred))
+    item.setData(0, _ROLE, _Group(key, favorite))
     item.setData(0, TREE_KEY_ROLE, oriented_key(key, LANDSCAPE))
     return item
 
@@ -44,7 +44,7 @@ def test_action_rects_sit_left_of_the_label_star_nearest():
     assert delete.left() >= 0                   # and within the indentation, not off-screen
 
 
-def _tree_with_leaf(qtbot, *, starred=False):
+def _tree_with_leaf(qtbot, *, favorite=False):
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     # Nest the leaf a few levels deep, as real folders are, so its indentation has
@@ -52,7 +52,7 @@ def _tree_with_leaf(qtbot, *, starred=False):
     media = _folder_row("Media", "m")
     wf = _folder_row("Workflow", "m/w")
     model = _folder_row("Model", "m/w/mo")
-    leaf = _folder_row("A folder", "m/w/mo/key", starred=starred)
+    leaf = _folder_row("A folder", "m/w/mo/key", favorite=favorite)
     media.addChild(wf)
     wf.addChild(model)
     model.addChild(leaf)
@@ -75,10 +75,10 @@ def test_clicking_the_delete_icon_on_a_leaf_emits_delete_clicked(qtbot):
     assert fired == ["m/w/mo/key"]
 
 
-def test_clicking_the_star_icon_on_a_leaf_emits_star_clicked(qtbot):
+def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
     fired = []
-    tree.star_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(fired.append)
 
     star_rect, _ = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star_rect.center())
@@ -90,7 +90,7 @@ def test_a_parent_row_offers_no_actions(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
     parent = leaf.parent()  # "Model" has a child, so it is a non-leaf
     fired = []
-    tree.star_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(fired.append)
     tree.delete_clicked.connect(fired.append)
 
     # Where a leaf would show its icons, a parent shows nothing and just selects.
@@ -111,7 +111,7 @@ def _caret_pos(tree, item):
 def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
     # QTreeView toggles the caret on a press of any button. A folder with
     # sub-folders wears no star of its own, so its right-click menu is the only
-    # way to star it — and the menu covers the tree, so a collapse on the way in
+    # way to favorite it — and the menu covers the tree, so a collapse on the way in
     # is only seen once the menu closes, reading as something the star did.
     tree, leaf = _tree_with_leaf(qtbot)
     parent = leaf.parent()
@@ -148,7 +148,7 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
 def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
     tree, leaf = _tree_with_leaf(qtbot)
     fired = []
-    tree.star_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(fired.append)
     tree.delete_clicked.connect(fired.append)
 
     row = tree.visualRect(tree.indexFromItem(leaf))

@@ -51,7 +51,7 @@ CHIP_CSS = (
 )
 
 _TIPS = {
-    STAR: ("Star this item", "Unstar this item"),
+    STAR: ("Favorite this item", "Unfavorite this item"),
     TRASH: ("Delete this item",),
     icons.ENHANCE_OPEN: ("Enhance this image (upscale + re-sample)",),
     icons.ENHANCE_HELD: ("Already enhanced at these settings — "
@@ -137,10 +137,10 @@ class CornerControls(QObject):
     def __init__(self, host: QWidget, *, native: bool = False):
         super().__init__(host)
         self._available = False   # is there a saved generation here to act on?
-        self._starred = False
+        self._favorite = False
         self._enhance: str | None = None
         self._star = _CornerButton(
-            host, lambda armed: icons.corner_star_icon(starred=self._starred,
+            host, lambda armed: icons.corner_star_icon(favorite=self._favorite,
                                                        armed=armed), native=native)
         self._trash = _CornerButton(host, lambda armed: icons.corner_trash_icon(
             armed=armed), native=native)
@@ -157,10 +157,10 @@ class CornerControls(QObject):
         cursor that left for a button from one that left the picture entirely."""
         return [self._star, self._trash, self._enhance_button]
 
-    def show_for(self, *, starred: bool, enhance: str | None):
+    def show_for(self, *, favorite: bool, enhance: str | None):
         """Arm the controls for the generation now on show, in its current state."""
         self._available = True
-        self._starred = starred
+        self._favorite = favorite
         self._enhance = enhance
         self._redraw()
 
@@ -201,7 +201,7 @@ class CornerControls(QObject):
         self._sync()
 
     def _retip(self):
-        self._star.setToolTip(_TIPS[STAR][1 if self._starred else 0])
+        self._star.setToolTip(_TIPS[STAR][1 if self._favorite else 0])
         self._trash.setToolTip(_TIPS[TRASH][0])
         if self._enhance is not None:
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])

@@ -241,15 +241,15 @@ def legacy_preenhance_settings_folder_keys(rows, image_index: dict | None = None
 
 
 def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
-    """Apply a folder's saved custom name and star, returning (label, starred)."""
+    """Apply a folder's saved custom name and star, returning (label, favorited)."""
     meta = folder_meta.get(key, {})
     return (meta.get("custom_name") or label, bool(meta.get("starred")))
 
 
-def starred_folders(tree: list[WorkflowGroup]) -> list:
-    """Every starred folder in ``tree``, at any depth, in top-down tree order.
+def favorite_folders(tree: list[WorkflowGroup]) -> list:
+    """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
-    Powers the gallery's Starred shelf: a folder is bookmarked in place (its
+    Powers the gallery's Favorites shelf: a folder is bookmarked in place (its
     position in the tree never changes) and collected here so all bookmarks —
     however deeply nested — are reachable from one spot.
     """
@@ -257,7 +257,7 @@ def starred_folders(tree: list[WorkflowGroup]) -> list:
 
     def walk(groups):
         for group in groups:
-            if group.starred:
+            if group.favorite:
                 found.append(group)
             walk(child_groups(group))
 
@@ -411,11 +411,11 @@ def recently_worked_folders(
     return {folder for _freshest, folder in ranked[:limit]}
 
 
-def starred_generations(rows: list[dict]) -> list[dict]:
-    """Every starred image or video that produced an output, newest first — the
-    individual bookmarks the Starred shelf collects alongside starred folders.
+def favorite_generations(rows: list[dict]) -> list[dict]:
+    """Every favorited image or video that produced an output, newest first — the
+    individual bookmarks the Favorites shelf collects alongside favorited folders.
 
-    Any produced row the user starred qualifies, imported files included (unlike
+    Any produced row the user favorited qualifies, imported files included (unlike
     the Recents shelf, which is app-made results only). ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
     """
@@ -466,7 +466,7 @@ class _Tier:
     """What every folder level under one workflow is built against.
 
     The media type and the workflow name are the two halves of every key below;
-    ``folder_meta`` is what the user has renamed and starred; ``image_index``
+    ``folder_meta`` is what the user has renamed and favorited; ``image_index``
     resolves a start frame to the picture it is. All four used to travel as four
     parameters through five builders that each handed them on untouched, and
     every builder's `children_for` lambda had to list them again.
@@ -503,9 +503,9 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
     groups = []
     for i, (sig, sig_rows) in enumerate(grouped):
         key = settings_key(tier.media_type, tier.workflow_name, sig)
-        label, starred = _overlay(folder_id(key), key, tier.folder_meta)
+        label, favorite = _overlay(folder_id(key), key, tier.folder_meta)
         groups.append(SettingsGroup(
-            key, label, sig_rows, starred,
+            key, label, sig_rows, favorite,
             settings_label(settings_dicts[i], distinguishing, tier.workflow_name),
         ))
     return groups
@@ -523,8 +523,8 @@ def _grouped_folders(tier: _Tier, rows, *, signature, key_for, label_for, childr
     for sig, sub_rows in _group_by_creation(rows, signature):
         key = key_for(sig)
         params = parse_params(sub_rows[0].get("params_json"))
-        label, starred = _overlay(label_for(params), key, tier.folder_meta)
-        groups.append(cls(key, label, children_for(sub_rows), starred))
+        label, favorite = _overlay(label_for(params), key, tier.folder_meta)
+        groups.append(cls(key, label, children_for(sub_rows), favorite))
     return groups
 
 
@@ -691,19 +691,19 @@ def build_gallery_tree(
         if media_types is not None and media_type not in media_types:
             continue
         wf_key = f"{media_type}/{wf_name}"
-        wf_label, wf_starred = _overlay(workflow_label(wf_name), wf_key, folder_meta)
+        wf_label, wf_favorite = _overlay(workflow_label(wf_name), wf_key, folder_meta)
         tier = _Tier(media_type, wf_name, folder_meta, image_index)
         tree.append(WorkflowGroup(
             wf_key, wf_name, wf_label,
             _build_model_groups(tier, wf_rows),
-            wf_starred,
+            wf_favorite,
         ))
     return tree
 
 
 # The row over the workflow folders, standing for the library entire. Not part of
 # the grouping — build_gallery_tree still returns the workflow folders, and
-# everything reading that (starred folders, custom folders, the browser's tiles)
+# everything reading that (favorited folders, custom folders, the browser's tiles)
 # is unchanged — this is a folder wrapped *around* the result, for somewhere to
 # stand that means everything.
 ALL_KEY = "__all__"
@@ -712,5 +712,5 @@ ALL_LABEL = "All"
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
     """The workflow folders gathered under one folder, renamable like any other."""
-    label, starred = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
-    return AllGroup(ALL_KEY, label, list(tree_model), starred)
+    label, favorite = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
+    return AllGroup(ALL_KEY, label, list(tree_model), favorite)

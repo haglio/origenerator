@@ -97,7 +97,7 @@ class SplitFolderTree(QWidget):
     itemSelectionChanged = pyqtSignal()
     itemDoubleClicked = pyqtSignal(object, int)
     itemChanged = pyqtSignal(object, int)
-    star_clicked = pyqtSignal(object)      # folder key
+    favorite_clicked = pyqtSignal(object)      # folder key
     delete_clicked = pyqtSignal(object)    # folder key
     folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped tree keys
     context_menu_requested = pyqtSignal(object, object)  # row under the cursor (or None), global pos
@@ -153,7 +153,7 @@ class SplitFolderTree(QWidget):
             lambda item, column: self.itemDoubleClicked.emit(item, column))
         tree.itemChanged.connect(
             lambda item, column: self.itemChanged.emit(item, column))
-        tree.star_clicked.connect(self.star_clicked)
+        tree.favorite_clicked.connect(self.favorite_clicked)
         tree.delete_clicked.connect(self.delete_clicked)
         tree.folders_dropped.connect(self.folders_dropped)
         column.addWidget(tree, 1)

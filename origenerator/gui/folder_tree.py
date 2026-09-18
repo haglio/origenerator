@@ -4,13 +4,13 @@ Only a leaf folder (a row with no sub-folders) carries actions, and they sit in
 the empty indentation just left of its label — a star right beside the text and,
 further left, a delete. Because that space is the row's existing indentation, the
 icons appear there on hover without moving the text at all. The star doubles as
-the starred indicator: filled and always shown for a starred leaf, an outline
-offered on hover otherwise, so clicking it to star a folder just leaves the star
+the favorited indicator: filled and always shown for a favorited leaf, an outline
+offered on hover otherwise, so clicking it to favorite a folder just leaves the star
 in place. Clicking an icon emits ``star_clicked`` / ``delete_clicked`` with the
 folder's key instead of selecting the row; the tree hit-tests clicks against the
 same rects it paints. Only a left click ever works the caret: a right one just
 picks the row it lands on, so opening a folder's menu never shuts the folder. A
-row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the Starred and Recents shelves)
+row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the Favorites and Recents shelves)
 draws that icon in its caret column so its label lines up with the siblings'.
 Which group a row holds is injected, so this stays free of the gallery model.
 
@@ -23,7 +23,7 @@ say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
-``DROP_KEY_ROLE``: the Starred shelf, or a custom folder. A drop emits
+``DROP_KEY_ROLE``: the Favorites shelf, or a custom folder. A drop emits
 ``folders_dropped`` and is never applied to the tree itself, so nothing is ever
 reparented; what a collecting row does with the dropped folders is the view's
 business, not this widget's.
@@ -41,11 +41,11 @@ _PAD = 4     # gap between the label and the icons, and between the two icons
 _DOT = 6     # diameter of the lately-worked-in mark
 
 # A row carrying a QIcon here draws it where its disclosure chevron would go, so a
-# childless shelf row (Starred, Recents) aligns with the sibling folders instead
+# childless shelf row (Favorites, Recents) aligns with the sibling folders instead
 # of shifting a glyph into its label. Distinct from the injected group role (plain
 # UserRole).
 BRANCH_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
-# A row carrying its own key here collects dropped folders (Starred, a custom
+# A row carrying its own key here collects dropped folders (Favorites, a custom
 # folder). Rows without it refuse a drop, so a folder can never be dragged into
 # the derived hierarchy, whose shape belongs to the generations' settings.
 DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
@@ -98,7 +98,7 @@ class FolderTree(QTreeWidget):
     whose folders can be picked several at a time, and whose collecting rows accept
     folders dragged onto them."""
 
-    star_clicked = pyqtSignal(object)    # folder key
+    favorite_clicked = pyqtSignal(object)    # folder key
     delete_clicked = pyqtSignal(object)  # folder key
     folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped folder keys
 
@@ -107,7 +107,7 @@ class FolderTree(QTreeWidget):
         self._role = group_role
         self._delete = icons.delete_icon()
         self._star = icons.star_icon(filled=False)
-        self._star_on = icons.star_icon(filled=True)  # a starred leaf's filled star
+        self._star_on = icons.star_icon(filled=True)  # a favorited leaf's filled star
         self._recent = icons.recent_mark_icon()  # a lately-worked-in row's dot
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setItemDelegate(_CountBeforeName(self))
@@ -172,17 +172,17 @@ class FolderTree(QTreeWidget):
         group = self._leaf_group(index)
         if group is None:
             return
-        starred = bool(getattr(group, "starred", False))
+        favorite = bool(getattr(group, "starred", False))
         hovered = index.data(TREE_KEY_ROLE) == self._hover_key
-        if not (starred or hovered):
+        if not (favorite or hovered):
             return
         star_rect, delete_rect = _action_rects(self.visualRect(index))
-        (self._star_on if starred else self._star).paint(painter, star_rect)
+        (self._star_on if favorite else self._star).paint(painter, star_rect)
         if hovered:
             self._delete.paint(painter, delete_rect)
 
     def drawBranches(self, painter, rect, index):
-        """Paint a shelf row's icon (Starred's star, Recents' clock) in its caret
+        """Paint a shelf row's icon (Favorites' star, Recents' clock) in its caret
         column, so its label aligns with the sibling folders' rather than sitting a
         chevron-width off. Every other row keeps its normal disclosure control —
         and a folder's level chip is its row *icon*, drawn to the right of the
@@ -201,7 +201,7 @@ class FolderTree(QTreeWidget):
             # button, so a right-click landing in the caret column shuts the row
             # it is opening a menu for. A folder with sub-folders carries no star
             # of its own (the row's actions are a leaf's), so that menu is the
-            # only way to star one — and the menu pops over the tree, hiding the
+            # only way to favorite one — and the menu pops over the tree, hiding the
             # collapse until it closes, which reads as something the star did.
             # QAbstractItemView's press is the rest of what QTreeView would have
             # done here: pick the row under the cursor, and nothing else.
@@ -215,7 +215,7 @@ class FolderTree(QTreeWidget):
                 self.delete_clicked.emit(group.key)
                 return
             if star_rect.contains(event.pos()):
-                self.star_clicked.emit(group.key)
+                self.favorite_clicked.emit(group.key)
                 return
         super().mousePressEvent(event)
 

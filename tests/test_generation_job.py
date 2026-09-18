@@ -610,3 +610,20 @@ def test_a_first_send_asks_the_server_nothing_first(qtbot, tmp_path):
 
     client.fetch_history.assert_not_called()
     client.forget_history.assert_not_called()
+
+
+def test_a_row_waiting_to_be_sent_is_called_queued_on_screen():
+    # The database calls it pending and the line calls it queued, and that
+    # translation was a ternary buried in the card builder.
+    from origenerator.generation_state import GenerationStatus
+    from origenerator.gui.generation_job import JobState, display_status
+
+    assert display_status(GenerationStatus.PENDING) == JobState.QUEUED
+    assert display_status(GenerationStatus.RUNNING) == JobState.RUNNING
+
+
+def test_every_state_a_job_walks_through_is_named_once():
+    from origenerator.gui.generation_job import JobState
+
+    assert {state.value for state in JobState} == {
+        "idle", "speaking", "queued", "running", "finished", "failed", "canceled"}

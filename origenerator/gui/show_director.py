@@ -44,20 +44,20 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_tree import (
     STARRED_KEY as _STARRED_KEY,
 )
-from origenerator.gui.orientation import (
-    ORIENTATIONS as _ORIENTATIONS,
-)
-from origenerator.gui.orientation import (
-    oriented_key,
-)
-from origenerator.gui.orientation import (
-    split_key as _split_shelf_key,
-)
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
+from origenerator.orientation import (
+    ORIENTATIONS as _ORIENTATIONS,
+)
+from origenerator.orientation import (
+    oriented_key,
+)
+from origenerator.orientation import (
+    split_key as _split_shelf_key,
+)
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand

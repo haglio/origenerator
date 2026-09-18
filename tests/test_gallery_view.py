@@ -49,11 +49,6 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.orientation import (
-    LANDSCAPE,
-    base_of,
-    oriented_key,
-)
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -61,6 +56,11 @@ from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.motion_engine import Motion
+from origenerator.orientation import (
+    LANDSCAPE,
+    base_of,
+    oriented_key,
+)
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.trash import Trash
@@ -345,7 +345,7 @@ def _amber_matches(field) -> int:
 def _side(tree, orientation=LANDSCAPE):
     """One half of the TOC pane — the Portrait tree or the Landscape one. The
     table of contents exists twice over, once per shape (see
-    :mod:`origenerator.gui.orientation`)."""
+    :mod:`origenerator.orientation`)."""
     return tree._halves[orientation]
 
 

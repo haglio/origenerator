@@ -14,8 +14,8 @@ from origenerator.gui.folder_tree import (
     FolderTree,
     _action_rects,
 )
-from origenerator.gui.orientation import LANDSCAPE, oriented_key
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.orientation import LANDSCAPE, oriented_key
 
 _ROLE = Qt.ItemDataRole.UserRole
 
@@ -29,7 +29,7 @@ class _Group:
 def _folder_row(label, key, starred=False):
     """A folder row as the tree draws one: the folder it holds, and its own key —
     that folder's, plus the side this copy of it is drawn on. The two differ
-    because both sides draw the same folder (see origenerator.gui.orientation)."""
+    because both sides draw the same folder (see origenerator.orientation)."""
     item = QTreeWidgetItem([label])
     item.setData(0, _ROLE, _Group(key, starred))
     item.setData(0, TREE_KEY_ROLE, oriented_key(key, LANDSCAPE))

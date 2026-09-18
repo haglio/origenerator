@@ -26,7 +26,7 @@ from origenerator.gui.gallery_tree import (
     TRASH_LABEL,
 )
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.orientation import (
+from origenerator.orientation import (
     ORIENTATION_LABELS,
     base_of,
     filter_rows,

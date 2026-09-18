@@ -31,10 +31,10 @@ def _spin_arrow_rules() -> str:
 
     Qt takes an arrow only as a picture — the CSS zero-size-element-with-borders triangle
     draws a filled rectangle here, which is what appeared over the buttons — so
-    :mod:`origenerator.gui.spin_arrows` renders one. If it can't, this contributes
+    :mod:`origenerator.spin_arrows` renders one. If it can't, this contributes
     nothing and Qt draws its own arrow: uncertain color, but an arrow.
     """
-    from origenerator.gui.spin_arrows import arrow_paths
+    from origenerator.spin_arrows import arrow_paths
 
     normal = arrow_paths(TEXT_PRIMARY)
     if normal is None:

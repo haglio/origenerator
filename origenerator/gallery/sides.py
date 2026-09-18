@@ -2,7 +2,7 @@
 
 A set of mixed-shape media has no one screen to play on, so every folder is
 looked at from one side or the other and a row's tree key carries which
-(:mod:`origenerator.gui.orientation` appends it). These are the two words that
+(:mod:`origenerator.orientation` appends it). These are the two words that
 key is built from, so they are data the same way a shelf key is: stored
 expansions, bookmarks and navigation history are all written with them, and a
 changed value would orphan every one.

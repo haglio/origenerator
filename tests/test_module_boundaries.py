@@ -45,6 +45,10 @@ QT_FREE = (
     "origenerator.config",
     "origenerator.undo_stack",
     "origenerator.gallery_actions",
+    # Neither draws anything: one measures a file to say which way it stands,
+    # the other writes the two arrow PNGs the spinners wear.
+    "origenerator.orientation",
+    "origenerator.spin_arrows",
 )
 
 # The two that legitimately do, at import. `comfyui_client` is one because it is

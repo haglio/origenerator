@@ -7,7 +7,7 @@ Requests and Trash shelves, the folders the user composed, and the All row over
 the workflow → model → LoRA → [source image] → settings hierarchy — all
 built from that shape's rows alone. Standing anywhere means standing on one
 shape, so a slideshow started there has one region to go to (see
-:mod:`origenerator.gui.orientation`).
+:mod:`origenerator.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
@@ -54,7 +54,7 @@ from origenerator.gui.folder_tree import (
     RECENT_ROLE,
     TREE_KEY_ROLE,
 )
-from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
+from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
 
 # The tree used to narrow itself to a query typed above it. It no longer does:
 # a narrowed list of folder names is a poor answer to "where is the one with

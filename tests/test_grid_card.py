@@ -55,3 +55,12 @@ def test_styling_a_caption_gives_it_the_family_font_and_band(qtbot):
 
     assert label.font().pointSizeF() == grid_card.caption_font().pointSizeF()
     assert label.maximumHeight() == grid_card.caption_height()
+
+
+def test_the_caption_is_handed_out_as_a_copy(qtbot):
+    # A caller sets it on a widget, which may then change it; the next card's
+    # caption must still be the size the grid chose.
+    first = grid_card.caption_font()
+    first.setPointSizeF(first.pointSizeF() + 4)
+
+    assert grid_card.caption_font().pointSizeF() != first.pointSizeF()

@@ -17,6 +17,8 @@ from the band, so choosing a bigger caption never quietly costs a line again.
 """
 from __future__ import annotations
 
+from functools import cache
+
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QFont, QFontMetrics
 from PyQt6.QtWidgets import QApplication
@@ -38,7 +40,6 @@ CAPTION_SCALE = 0.8
 _STEP_PT = 0.5
 _FLOOR_PT = 7.0
 
-_CAPTION_FONT: QFont | None = None
 
 
 def scaled_point_size(base_pt: float) -> float:
@@ -47,20 +48,21 @@ def scaled_point_size(base_pt: float) -> float:
     return max(_FLOOR_PT, round(base_pt * CAPTION_SCALE / _STEP_PT) * _STEP_PT)
 
 
-def caption_font() -> QFont:
-    """The font every card's caption is set in.
+@cache
+def _caption_font() -> QFont:
+    app = QApplication.instance()
+    base = app.font() if app is not None else QFont()
+    font = QFont(base)
+    font.setPointSizeF(scaled_point_size(base.pointSizeF()))
+    return font
 
-    Cached — the app's font is fixed for the session, and this is asked for once
-    per tile in a grid that rebuilds on every poll.
-    """
-    global _CAPTION_FONT
-    if _CAPTION_FONT is None:
-        app = QApplication.instance()
-        base = app.font() if app is not None else QFont()
-        font = QFont(base)
-        font.setPointSizeF(scaled_point_size(base.pointSizeF()))
-        _CAPTION_FONT = font
-    return QFont(_CAPTION_FONT)
+
+def caption_font() -> QFont:
+    """The font every card's caption is set in — a copy of the one built once
+    for the app's own font, since a caller may set it on a widget that then
+    changes it."""
+    return QFont(_caption_font())
+
 
 
 def caption_height() -> int:

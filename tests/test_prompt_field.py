@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt6.QtGui import QMouseEvent
 
 from origenerator.gui.prompt_field import (
     DEFAULT_HEIGHT,
     MAX_HEIGHT,
     PROMPT_HEIGHTS,
     PromptField,
+    PromptHeights,
 )
 
 
@@ -126,3 +128,32 @@ def test_a_corrupt_stored_height_opens_at_the_default(qtbot, stored):
     # value that isn't a height must cost the default, not the launch.
     PROMPT_HEIGHTS.restore(stored)
     assert _field(qtbot).height() == DEFAULT_HEIGHT
+
+
+def test_a_field_built_with_its_own_heights_keeps_to_them(qtbot):
+    # The set a field files its height in is handed to it, so a window can open
+    # its fields at its own sizes without every other field in the process
+    # following — and so a test can hand it a set of its own.
+    mine = PromptHeights()
+    mine.set_height("positive_prompt", 260)
+
+    field = PromptField("positive_prompt", heights=mine)
+    qtbot.addWidget(field)
+
+    assert field.height() == 260
+    assert PROMPT_HEIGHTS.height("positive_prompt") == DEFAULT_HEIGHT
+
+
+def test_a_drag_is_filed_in_the_set_the_field_was_given(qtbot):
+    mine = PromptHeights()
+    field = PromptField("negative_prompt", heights=mine)
+    qtbot.addWidget(field)
+
+    field._apply_height(240)
+    field._drag = (0.0, 240)
+    field.mouseReleaseEvent(QMouseEvent(
+        QEvent.Type.MouseButtonRelease, QPointF(0, 0), QPointF(0, 0),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier))
+
+    assert mine.height("negative_prompt") == 240
+    assert PROMPT_HEIGHTS.height("negative_prompt") == DEFAULT_HEIGHT

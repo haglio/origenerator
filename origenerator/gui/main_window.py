@@ -101,7 +101,8 @@ class OrigeneratorWindow(QMainWindow):
         # One unified view: the gallery, whose info pane now holds the editable
         # config tabs that used to be a separate Generate tab. A clicked
         # thumbnail, the re-roll "+", and the combine panel all feed it.
-        self._gallery_view = GalleryView(db, client=client, fun_time=fun_time)
+        self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
+                                         prompt_heights=PROMPT_HEIGHTS)
         self.setCentralWidget(self._gallery_view)
         # Where a run that outlasted the user's attention reports itself: the
         # window's own icon, on a tray icon that lives as long as the app does.

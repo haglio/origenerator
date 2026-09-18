@@ -119,8 +119,12 @@ class ParamForm(QWidget):
         size_deriver: Callable[[dict], tuple[int, int] | None] | None = None,
         hidden_keys: tuple[str, ...] = (),
         pins_reused_seed: bool = True,
+        heights=None,
     ):
         super().__init__(parent)
+        # Where a dragged prompt height is filed: the window's own set, handed
+        # down rather than reached for, so a form can be built at chosen sizes.
+        self._heights = heights
         # Whether a written-in seed is pinned as well as shown (see the class
         # docstring). Defaults to pinning: that is what reusing a still's
         # settings means, and it is the answer a form built without a workflow
@@ -229,7 +233,7 @@ class ParamForm(QWidget):
                 if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
-            field_kind(pd).change_signal(widget).connect(self.changed)
+            field_kind(pd, self._heights).change_signal(widget).connect(self.changed)
             if isinstance(widget, PresetComboBox):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
@@ -310,7 +314,7 @@ class ParamForm(QWidget):
 
     def _make_extras(self, pd: ParamDef) -> list[QWidget]:
         # Copy leads so it reads [field] [copy] [Random]/[Browse].
-        kind = field_kind(pd)
+        kind = field_kind(pd, self._heights)
         extras: list[QWidget] = []
         if kind.copyable:
             copy = CopyButton(lambda key=pd.key: self._field_text(key))
@@ -642,7 +646,7 @@ class ParamForm(QWidget):
             self,
             f"Select {pd.label}",
             self._initial_browse_path(self._widgets[key].text().strip(), pd.browse_dir),
-            field_kind(pd).browse_filter,
+            field_kind(pd, self._heights).browse_filter,
         )
         if path:
             self._widgets[key].setText(path)
@@ -669,7 +673,7 @@ class ParamForm(QWidget):
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
-        return field_kind(pd).make(pd)
+        return field_kind(pd, self._heights).make(pd)
 
     def get_values(self) -> dict:
         """Read current values; a seed with its Random tick checked is randomized."""
@@ -716,7 +720,7 @@ class ParamForm(QWidget):
         tick = self._randomize_checks.get(pd.key)
         if randomize_seed and tick is not None and tick.isChecked():
             return random.randint(0, _SEED_MAX)
-        return field_kind(pd).read(pd, w)
+        return field_kind(pd, self._heights).read(pd, w)
 
     def _write_field(self, pd: ParamDef, value) -> None:
         """Apply one value to its widget. A seed's value always fills its field;
@@ -732,7 +736,7 @@ class ParamForm(QWidget):
             elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
             return
-        field_kind(pd).write(pd, w, value)
+        field_kind(pd, self._heights).write(pd, w, value)
         tick = self._randomize_checks.get(pd.key)
         if tick is not None and self._pins_reused_seed:
             tick.setChecked(False)

@@ -174,8 +174,9 @@ class GenerateConfigPanel(QWidget):
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None):
+                 *, fun_time=None, heights=None):
         super().__init__(parent)
+        self._heights = heights  # the window's prompt heights, for its forms
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._param_form: ParamForm | None = None
@@ -530,7 +531,8 @@ class GenerateConfigPanel(QWidget):
             # They still round-trip, so reusing an old run reproduces it exactly.
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
                                          hidden_keys=wf.enhance_keys(),
-                                         pins_reused_seed=wf.pins_reused_seed()))
+                                         pins_reused_seed=wf.pins_reused_seed(),
+                                         heights=self._heights))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {

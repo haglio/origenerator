@@ -99,8 +99,11 @@ class _AudioPath(_Line):
 class _Prompt(FieldKind):
     copyable = True
 
+    def __init__(self, heights=None):
+        self._heights = heights
+
     def make(self, pd):
-        widget = PromptField(pd.key)
+        widget = PromptField(pd.key, heights=self._heights)
         widget.setPlainText(str(pd.default))
         return widget
 
@@ -225,9 +228,11 @@ _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
 
-def field_kind(pd: ParamDef) -> FieldKind:
+def field_kind(pd: ParamDef, heights=None) -> FieldKind:
+    """The kind of field ``pd`` is edited in. ``heights`` is the set a prompt's
+    dragged height is filed in, which is the form's to supply."""
     if pd.type == ParamType.STR and pd.multiline:
-        return _PROMPT
+        return _Prompt(heights) if heights is not None else _PROMPT
     if pd.type in (ParamType.INT, ParamType.FLOAT) and pd.options:
         return _PRESETS
     return _KINDS[pd.type]

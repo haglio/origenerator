@@ -41,6 +41,7 @@ from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
     GenerationJob,
+    JobState,
     insert_generation_row,
     mark_generation_completed,
 )
@@ -471,7 +472,7 @@ class RerollController(QObject):
             return False
         finally:
             self._in_flight = None
-        if job.state == "finished":
+        if job.state == JobState.FINISHED:
             # A job set aside whose stopped run had finished after all: nothing
             # was sent, and its landing has already been recorded through its
             # own finished signal (see GenerationJob.start).

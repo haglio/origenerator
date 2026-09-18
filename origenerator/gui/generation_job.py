@@ -20,6 +20,7 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
@@ -28,6 +29,25 @@ from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.progress import ProgressTracker, stage_names
+
+
+class JobState(StrEnum):
+    """Where a job is between being asked for and being done with."""
+
+    IDLE = "idle"
+    SPEAKING = "speaking"
+    QUEUED = "queued"
+    RUNNING = "running"
+    FINISHED = "finished"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+def display_status(row_status: str) -> JobState:
+    """What a stored row in progress is called in the line: the database says
+    pending for one waiting to be sent, and the line says queued."""
+    return JobState.RUNNING if row_status == GenerationStatus.RUNNING else JobState.QUEUED
+
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +137,7 @@ class GenerationJob(QObject):
         self._thumb_dir = thumb_dir
         # idle -> queued -> running -> finished/failed/canceled; and back to idle
         # from queued or running when the job is set aside (see defer()).
-        self._state = "idle"
+        self._state = JobState.IDLE
         # Whether the server has been handed this prompt id. A job set aside may
         # have finished without this app hearing of it, or left a record of its stopped
         # run that reads as this job's, so a second send asks after the first.
@@ -149,7 +169,7 @@ class GenerationJob(QObject):
     # --- state, exposed so a freshly-built tile can rebind to a running job --
 
     @property
-    def state(self) -> str:
+    def state(self) -> JobState:
         return self._state
 
     @property
@@ -219,7 +239,7 @@ class GenerationJob(QObject):
         they asked for — and a job ComfyUI has already started waits on nothing,
         so anything fetched for one no longer queued is dropped here.
         """
-        self._foreign_ahead = foreign_ahead if self._state == "queued" else None
+        self._foreign_ahead = foreign_ahead if self._state == JobState.QUEUED else None
 
     def progress_state(self) -> dict:
         """A JSON-able snapshot of this job's live progress, to persist on its row.
@@ -277,7 +297,7 @@ class GenerationJob(QObject):
         if progress_state:
             job._restore_progress(progress_state)
         job._attach()
-        job._state = "running"
+        job._state = JobState.RUNNING
         return job
 
     @classmethod
@@ -306,7 +326,7 @@ class GenerationJob(QObject):
         after on the calling thread, so nothing of the job's is touched from
         another.
         """
-        if self._state != "idle":
+        if self._state != JobState.IDLE:
             return
         # A story whose lines are not all spoken yet is spoken first: the voice
         # runs off the GUI thread and the job is sent when it is done, or fails
@@ -314,7 +334,7 @@ class GenerationJob(QObject):
         # line takes the job as started either way: the machine is busy with
         # its voice, which is that job's own work.
         if speech.missing_speech(self.params, self._input_dir):
-            self._state = "speaking"
+            self._state = JobState.SPEAKING
             self._speaker.speak(self.params, lambda: self._spoken(submit), self._unspoken)
             return
         self._submit(submit)
@@ -340,7 +360,7 @@ class GenerationJob(QObject):
         if landed:
             self._finish(landed[0])
             return
-        self._state = "queued"
+        self._state = JobState.QUEUED
 
     def _stopped_run_landed(self) -> dict | None:
         """The history of this job's earlier run if that run finished after all,
@@ -367,26 +387,26 @@ class GenerationJob(QObject):
         """The lines are on disk: send the job, unless it was canceled while
         the voice spoke. A submit refused here has no caller to raise to, so
         it fails the job the way a run that errors does."""
-        if self._state != "speaking":
+        if self._state != JobState.SPEAKING:
             return
-        self._state = "idle"
+        self._state = JobState.IDLE
         try:
             self._submit(submit)
         except Exception as e:
-            self._state = "failed"
+            self._state = JobState.FAILED
             self.failed.emit(str(e))
 
     def _unspoken(self, message: str):
-        if self._state != "speaking":
+        if self._state != JobState.SPEAKING:
             return
-        self._state = "failed"
+        self._state = JobState.FAILED
         self.failed.emit(message)
 
     def cancel(self):
         """Stop the job and forget it."""
         self._detach()
         self._stop_on_server()
-        self._state = "canceled"
+        self._state = JobState.CANCELED
 
     def defer(self) -> bool:
         """Take the job off the server to be sent again later, and say whether
@@ -398,11 +418,11 @@ class GenerationJob(QObject):
         comes round again (see :meth:`start`, which asks after the stopped run
         first).
         """
-        if self._state not in ("queued", "running"):
+        if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return False
         self._detach()
         self._stop_on_server()
-        self._state = "idle"
+        self._state = JobState.IDLE
         self._forget_the_run()
         return True
 
@@ -415,7 +435,7 @@ class GenerationJob(QObject):
         server skips a named stop for a prompt it is not executing, so neither
         call can touch anything but this job's own prompt.
         """
-        if self._state not in ("queued", "running"):
+        if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return  # never handed over, or already gone: nothing there to stop
         try:
             self._client.cancel_prompt(self.prompt_id)
@@ -436,7 +456,7 @@ class GenerationJob(QObject):
         fetched (``None``), while the prompt is still queued or running (absent
         from /history), or once the job is already terminal.
         """
-        if history is None or self._state not in ("queued", "running"):
+        if history is None or self._state not in (JobState.QUEUED, JobState.RUNNING):
             return
         if self.workflow.extract_output_info(history):
             self._complete(history)
@@ -472,8 +492,8 @@ class GenerationJob(QObject):
         # with no start time, and would otherwise never get one.
         if self._started_at is None:
             self._started_at = time.time()
-        if self._state == "queued":
-            self._state = "running"
+        if self._state == JobState.QUEUED:
+            self._state = JobState.RUNNING
             self._foreign_ahead = None  # it's ours now: nothing left in front of it
             self.started.emit()
 
@@ -528,7 +548,7 @@ class GenerationJob(QObject):
         A run that produced no file didn't finish, so it fails instead — see
         :data:`_NO_OUTPUT_MESSAGE`.
         """
-        if self._state not in ("queued", "running"):
+        if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return
         self._finish(history_data)
 
@@ -543,17 +563,17 @@ class GenerationJob(QObject):
             self.prompt_id, params=self.params,
         )
         if not files:
-            self._state = "failed"
+            self._state = JobState.FAILED
             self.failed.emit(_NO_OUTPUT_MESSAGE)
             return
-        self._state = "finished"
+        self._state = JobState.FINISHED
         self.finished.emit(files, thumb, duration)
 
     def _on_error(self, prompt_id: str, message: str):
         if not self._is_mine(prompt_id):
             return
         self._detach()
-        self._state = "failed"
+        self._state = JobState.FAILED
         self.failed.emit(message)
 
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from origenerator import gallery, timing
-from origenerator.generation_state import GenerationStatus
+from origenerator.gui.generation_job import JobState, display_status
 from origenerator.gui.inflight import InFlightItem
 from origenerator.gui.orientation import row_orientation
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
@@ -107,7 +107,7 @@ class InFlightItems:
                 stop_auto = lambda k=folder_key: self._auto.stop(k)
                 # A story's lines are spoken before the job is sent: the row
                 # already says running, and the card says what the wait is.
-                speaking = job.state == "speaking"
+                speaking = job.state == JobState.SPEAKING
             else:  # a running row no live job holds — no live frame, progress, or cancel
                 if image_index is None:
                     image_index = gallery.build_image_config_index(self._image_rows())
@@ -123,9 +123,8 @@ class InFlightItems:
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
-                status=("speaking" if speaking
-                        else "running" if row.get("status") == GenerationStatus.RUNNING
-                        else "queued"),
+                status=(JobState.SPEAKING if speaking
+                        else display_status(row.get("status"))),
                 frame=frame,
                 reveal=lambda k=folder_key: self._on_reveal(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge

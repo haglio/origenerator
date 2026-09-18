@@ -33,7 +33,7 @@ dependencies = [
 origenerator = "origenerator.app:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3",
+dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3",
        "ruff==0.16.6"]
 # Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
 # optional — the mic button degrades gracefully when these aren't installed.
@@ -55,7 +55,7 @@ voice = ["faster-whisper>=1,<2", "sounddevice>=0.5,<0.6"]
 # the half that pays for itself: it dumps the stack of the test that stopped,
 # which turns a stalled required check into a one-line diagnosis.
 # tests/test_timeouts.py holds all three halves of it.
-addopts = "-p app_support.sanitize.pytest_plugin --timeout=240 --timeout-method=thread"
+addopts = "-p app_support.sanitize.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread"
 testpaths = ["tests"]
 qt_api = "pyqt6"
 

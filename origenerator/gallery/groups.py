@@ -25,7 +25,7 @@ class SettingsGroup:
     key: str
     label: str
     rows: list[dict]
-    starred: bool = False
+    favorite: bool = False
     # What the folder's generic name doesn't say: the prompt it ran, plus the
     # settings that set it apart from its siblings. Shown on hover rather than as
     # the name, which is a short code (see :mod:`origenerator.gallery.keys`).
@@ -42,7 +42,7 @@ class SourceImageGroup:
     key: str
     label: str
     children: list[SettingsGroup]
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "source_image"
 
 
@@ -53,7 +53,7 @@ class LoraGroup:
     # SourceImageGroups when the workflow is image-conditioned, else SettingsGroups
     # directly — the same conditional the model level applies for the LoRA tier.
     children: list
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "lora"
 
 
@@ -65,7 +65,7 @@ class ModelGroup:
     # "(no add-on)" folder rather than skipping the level, so depth stays uniform.
     # (An image-conditioned workflow grows a source-image level below the LoRA.)
     children: list[LoraGroup]
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "model"
 
 
@@ -75,7 +75,7 @@ class WorkflowGroup:
     workflow_name: str
     label: str
     children: list[ModelGroup]
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "workflow"
 
 
@@ -93,7 +93,7 @@ class AllGroup:
     key: str
     label: str
     children: list[WorkflowGroup]
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "all"
 
 
@@ -112,7 +112,7 @@ class CustomGroup:
     label: str
     children: list
     folder_id: int | None = None
-    starred: bool = False
+    favorite: bool = False
     level: ClassVar[str] = "custom"
 
 

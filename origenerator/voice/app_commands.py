@@ -58,7 +58,7 @@ class AppCommand(Enum):
 
     # What you do to what is in front of you.
     CULL = "cull"        # Fun Time's "weird": take this one away
-    LOCK = "lock"        # hold the slide (which stars it and asks for the better version)
+    LOCK = "lock"        # hold the slide (which favorites it and asks for the better version)
     UNLOCK = "unlock"    # let it go again
     STAR = "star"
     UNDO = "undo"

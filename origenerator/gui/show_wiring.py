@@ -48,7 +48,7 @@ class ShowActions:
 
     delete: Callable[[str], None] | None = None
     enhance: Callable[[str], bool] | None = None
-    star: Callable[[str], None] | None = None
+    favorite: Callable[[str], None] | None = None
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], None] | None = None
@@ -66,17 +66,17 @@ class HudFacts:
     everything else "Shuffle", and a folder opened in the browser's own order
     says nothing at all rather than making one up); ``looping`` is whether this
     is a LOOP as a player means it, a set someone asked for played round and
-    round, which a region's base state is not; ``starred_ids`` is which of the
+    round, which a region's base state is not; ``favorite_ids`` is which of the
     items are favorites, so the star readout and the F-mode narrowing mean here
     what they mean on a player.
 
-    The defaults are a shuffled loop with nothing starred — a show asked for by
+    The defaults are a shuffled loop with nothing favorited — a show asked for by
     the toolbar, which is the ordinary case.
     """
 
     order_label: str = SHUFFLE_LABEL
     looping: bool = True
-    starred_ids: Collection[str] = field(default_factory=frozenset)
+    favorite_ids: Collection[str] = field(default_factory=frozenset)
     # Which of the items carry an enhancement, for the switch beside F-mode
     # that only a show's HUD grows: the same shape as the favorites, over the
     # same set, and followed the same way as enhancements land.

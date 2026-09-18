@@ -642,7 +642,7 @@ def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
 
     row = _completed_image(Database(library), "p1")
     legacy = gallery.legacy_settings_folder_key(row)
-    Database(library).set_folder_starred(legacy, True)
+    Database(library).set_folder_favorite(legacy, True)
 
     db = _boot(library)
 

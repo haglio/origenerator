@@ -10,7 +10,7 @@ about what the queue says or does has to be said twice or kept in step.
 The show covers the strip, and a show is the worst moment to lose it. It is the
 one stretch where the line deliberately stops moving — every video in it is held
 until the show closes (:mod:`origenerator.queue_line`) — and it is when the user
-keeps *adding* to it, since holding a slide stars it and asks for the better
+keeps *adding* to it, since holding a slide favorites it and asks for the better
 version of that picture. So the strip comes along, into the one region this view
 leaves empty: the console is top-left, the position counter lower-center, the
 neighbor stills up the two side edges.

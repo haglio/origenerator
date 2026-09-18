@@ -18,7 +18,7 @@ class FolderMetaStore(Store):
     """The six queries over the `folder_meta` table."""
 
     def folder_meta_map(self) -> dict[str, dict]:
-        """Return ``{folder_key: {"custom_name": str|None, "starred": bool}}``."""
+        """Return ``{folder_key: {"custom_name": str|None, "favorited": bool}}``."""
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT folder_key, custom_name, starred FROM folder_meta"
@@ -42,14 +42,14 @@ class FolderMetaStore(Store):
                 (folder_key, custom_name),
             )
 
-    def set_folder_starred(self, folder_key: str, starred: bool):
+    def set_folder_favorite(self, folder_key: str, favorite: bool):
         with self._connect() as conn:
             conn.execute(
                 """INSERT INTO folder_meta (folder_key, starred)
                    VALUES (?, ?)
                    ON CONFLICT(folder_key)
                    DO UPDATE SET starred = excluded.starred""",
-                (folder_key, 1 if starred else 0),
+                (folder_key, 1 if favorite else 0),
             )
 
     def folder_meta_full(self) -> list[dict]:
@@ -75,7 +75,7 @@ class FolderMetaStore(Store):
         ]
 
     def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
-                           starred: bool, level: str | None, ref_prompt_id: str | None):
+                           favorite: bool, level: str | None, ref_prompt_id: str | None):
         """Write a folder_meta row in full — the reconcile's tool for re-pointing a
         bookmark onto a new key and for stamping identity onto a matched one."""
         with self._connect() as conn:
@@ -88,7 +88,7 @@ class FolderMetaStore(Store):
                        starred = excluded.starred,
                        level = excluded.level,
                        ref_prompt_id = excluded.ref_prompt_id""",
-                (folder_key, custom_name, 1 if starred else 0, level, ref_prompt_id),
+                (folder_key, custom_name, 1 if favorite else 0, level, ref_prompt_id),
             )
 
     def delete_folder_meta(self, folder_key: str):

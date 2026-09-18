@@ -20,7 +20,7 @@ from origenerator.gallery import (
 )
 
 
-def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", starred=False):
+def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False):
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt="a cat", seed=1,
@@ -31,8 +31,8 @@ def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", starred=False)
                          output_files=json.dumps([{"filename": filename,
                                                    "subfolder": "image",
                                                    "type": "output"}]))
-    if starred:
-        db.set_generation_starred(prompt_id, True)
+    if favorite:
+        db.set_generation_favorite(prompt_id, True)
     return db.get_generation(prompt_id)
 
 
@@ -56,7 +56,7 @@ def _add_enhance(db, prompt_id, input_ref, filename, status="completed",
 
 def test_fold_upgrades_the_source_row_in_place(tmp_path):
     db = Database(tmp_path / "t.db")
-    source = _add_source(db, starred=True)
+    source = _add_source(db, favorite=True)
     key_before = gallery.settings_folder_key(source)
     enhance = _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
                            "image_enhance_00001_.png")
@@ -391,7 +391,7 @@ def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
     # reaches the live install bare and the scan rebuilds it as a standalone
     # image — pointing a start-frame tile at the very picture it is a version of.
     db = Database(tmp_path / "t.db")
-    _add_source(db, starred=True)
+    _add_source(db, favorite=True)
     _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
                                "image_enhance_00001_.png")
 

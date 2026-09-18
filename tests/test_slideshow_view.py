@@ -55,7 +55,7 @@ def _view(qtbot, items=_ITEMS, **kw):
 def _wired(kw: dict) -> dict:
     """The show takes its HUD facts and its gallery actions as two records;
     these cases name the facts and the actions flat, the way the words read."""
-    facts = {k: kw.pop(k) for k in ("order_label", "looping", "starred_ids", "enhanced_ids") if k in kw}
+    facts = {k: kw.pop(k) for k in ("order_label", "looping", "favorite_ids", "enhanced_ids") if k in kw}
     if facts:
         kw["hud"] = HudFacts(**facts)
     acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
@@ -110,7 +110,7 @@ def test_a_switch_that_would_leave_nothing_is_refused(qtbot, tmp_path):
 
 def test_both_switches_together_keep_what_answers_both(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
-                 starred_ids={"a", "b"}, enhanced_ids={"b", "c"})
+                 favorite_ids={"a", "b"}, enhanced_ids={"b", "c"})
 
     view.toggle_favorites_filter()
     view.toggle_enhanced_mode()
@@ -161,15 +161,15 @@ def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
 
 
 def test_holding_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path):
-    # Down stars the slide; the star readout and F-mode follow, not only the
+    # Down favorites the slide; the star readout and F-mode follow, not only the
     # database the gallery writes.
-    starred = []
-    view = _view(qtbot, _named(tmp_path, "a", "b"), on_star=starred.append)
+    favorite = []
+    view = _view(qtbot, _named(tmp_path, "a", "b"), on_favorite=favorite.append)
     assert view.hud_is_favorite is False
 
     view.toggle_hold()
 
-    assert starred == ["a"]
+    assert favorite == ["a"]
     assert view.hud_is_favorite is True
     assert view.set_favorites_filter(True) is True
     assert [item[2] for item in view._playlist._items] == ["a"]
@@ -177,7 +177,7 @@ def test_holding_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path)
 
 def test_reset_drops_both_switches(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
-                 starred_ids={"a"}, enhanced_ids={"a"})
+                 favorite_ids={"a"}, enhanced_ids={"a"})
     view.toggle_favorites_filter()
     view.toggle_enhanced_mode()
     assert len(view._playlist) == 1
@@ -785,32 +785,32 @@ def test_a_press_in_the_queue_leaves_the_arrows_stepping_the_show(qtbot):
 
 # --- locking also stars, and a double-click leaves ---------------------------
 
-def test_locking_stars_the_item_on_screen(qtbot):
+def test_locking_favorites_the_item_on_screen(qtbot):
     # Holding a slide is how the user says this one is worth keeping; having said
     # it once they should not have to say it again in a second way.
-    starred = []
+    favorite = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
-    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
+    view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
     _press(view, Qt.Key.Key_Down)
 
     assert view._playlist.locked
-    assert starred == ["gen-a"]
+    assert favorite == ["gen-a"]
 
 
-def test_letting_go_of_the_lock_does_not_unstar(qtbot):
-    starred = []
+def test_letting_go_of_the_lock_does_not_unfavorite(qtbot):
+    favorite = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
+    view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Down)
 
     assert not view._playlist.locked
-    assert starred == ["gen-a"]  # starred once, on the way in
+    assert favorite == ["gen-a"]  # favorited once, on the way in
 
 
-def test_a_slideshow_without_a_starrer_still_locks(qtbot):
+def test_a_slideshow_without_a_favoriter_still_locks(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.locked
@@ -821,27 +821,27 @@ def test_a_slideshow_without_a_starrer_still_locks(qtbot):
 def test_asking_for_a_hold_holds_and_asking_again_changes_nothing(qtbot):
     # Someone talking to a picture is asking for a state, not for the other one,
     # and cannot see the counter's padlock to know which the flip would give.
-    starred = []
+    favorite = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
-    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
+    view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
     assert view.set_held(True) is True
-    assert view.locked and starred == ["gen-a"]
+    assert view.locked and favorite == ["gen-a"]
 
     assert view.set_held(True) is False   # already holding: nothing moved
-    assert view.locked and starred == ["gen-a"]
+    assert view.locked and favorite == ["gen-a"]
 
 
-def test_a_spoken_hold_stars_the_slide_like_a_pressed_one(qtbot):
+def test_a_spoken_hold_favorites_the_slide_like_a_pressed_one(qtbot):
     # Holding is Down's whole gesture here; a spoken hold must not quietly mean
     # less than a pressed one.
-    starred = []
+    favorite = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
+    view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
     view.set_held(True)
 
-    assert starred == ["gen-a"]
+    assert favorite == ["gen-a"]
 
 
 def test_asking_to_let_go_releases_only_what_was_held(qtbot):
@@ -853,21 +853,21 @@ def test_asking_to_let_go_releases_only_what_was_held(qtbot):
     assert not view.locked
 
 
-def test_starring_the_slide_on_screen_without_holding_it(qtbot):
-    starred = []
+def test_favoriting_the_slide_on_screen_without_holding_it(qtbot):
+    favorite = []
     items = [("a.png", "image", "gen-a", None)]
-    view = _view(qtbot, items=items, actions=ShowActions(star=starred.append))
+    view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
-    assert view.star() is True
+    assert view.favorite() is True
 
-    assert starred == ["gen-a"]
+    assert favorite == ["gen-a"]
     assert not view.locked  # bookmarked, still moving on
 
 
-def test_starring_says_no_when_there_is_nothing_to_star(qtbot):
+def test_favoriting_says_no_when_there_is_nothing_to_favorite(qtbot):
     # A show whose items carry no generation id — or a live one with no row of
     # its own yet — has nothing to bookmark, and says so rather than seeming to.
-    assert _view(qtbot).star() is False
+    assert _view(qtbot).favorite() is False
 
 
 def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):

@@ -69,7 +69,7 @@ REGISTRY = {FakeWorkflow.name: FakeWorkflow(), FakeI2vWorkflow.name: FakeI2vWork
 
 
 def make_row(prompt_id, *, workflow_name="fake_t2i", status="completed",
-             source="generated", params=None, output=True, starred=False,
+             source="generated", params=None, output=True, favorite=False,
              verdict=None, positive_prompt="a cat"):
     all_params = {"positive_prompt": positive_prompt, "negative_prompt": "",
                   "seed": 1, "steps": 20, "sampler_name": "euler"}
@@ -81,7 +81,7 @@ def make_row(prompt_id, *, workflow_name="fake_t2i", status="completed",
         "source": source,
         "params_json": json.dumps(all_params),
         "output_files": json.dumps([{"filename": f"{prompt_id}.png"}]) if output else None,
-        "starred": 1 if starred else 0,
+        "starred": 1 if favorite else 0,
         "experiment_verdict": verdict,
         "positive_prompt": positive_prompt,
         "negative_prompt": "",
@@ -134,8 +134,8 @@ def test_mutated_values_respect_the_dimension_contract():
         assert proposal.params["sampler_name"] in ("euler", "dpmpp_2m", "uni_pc")
 
 
-def test_starred_bases_are_favored():
-    rows = [make_row("plain-1"), make_row("starred-1", starred=True)]
+def test_favorite_bases_are_favored():
+    rows = [make_row("plain-1"), make_row("starred-1", favorite=True)]
     policy = make_policy(seed=1)
     picks = [policy.propose(rows).base_prompt_id for _ in range(300)]
     assert picks.count("starred-1") > picks.count("plain-1")

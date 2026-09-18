@@ -182,13 +182,13 @@ def test_every_button_presses_its_own_handler(bank):
     made = bank(_acts(
         go_back=lambda: pressed.append("back"),
         undo=lambda: pressed.append("undo"),
-        star=lambda: pressed.append("star"),
+        favorite=lambda: pressed.append("star"),
         delete=lambda: pressed.append("delete"),
     ))
 
     made.back.click()
     made.undo.click()
-    made.star.click()
+    made.favorite.click()
     made.delete.click()
 
     assert pressed == ["back", "undo", "star", "delete"]

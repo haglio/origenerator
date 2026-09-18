@@ -40,9 +40,9 @@ from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY,
+    FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    STARRED_KEY,
     TRASH_KEY,
 )
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
@@ -197,14 +197,14 @@ class FakeDB:
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["custom_name"] = custom_name
 
-    def set_folder_starred(self, key, starred):
+    def set_folder_favorite(self, key, favorite):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
-        self._meta[key]["starred"] = bool(starred)
+        self._meta[key]["starred"] = bool(favorite)
 
-    def set_generation_starred(self, prompt_id, starred):
+    def set_generation_favorite(self, prompt_id, favorite):
         row = self._by_id.get(prompt_id)
         if row is not None:
-            row["starred"] = 1 if starred else 0
+            row["starred"] = 1 if favorite else 0
 
     def set_experiment_verdict(self, prompt_id, verdict):
         row = self._by_id.get(prompt_id)
@@ -796,10 +796,10 @@ def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
     _search_for(view, "cat")
 
-    assert view.visible_prompt_ids() == ["i2"]     # the starred one alone
+    assert view.visible_prompt_ids() == ["i2"]     # the favorited one alone
     assert "Favorites" in view._title.display_text()
 
 
@@ -1423,7 +1423,7 @@ def test_renaming_a_folder_persists_and_relabels_it(qtbot):
     assert _image_workflow(view._tree).text(0) == "Best Models"
 
 
-def test_starring_a_folder_persists_without_reordering(qtbot):
+def test_favoriting_a_folder_persists_without_reordering(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -1433,22 +1433,22 @@ def test_starring_a_folder_persists_without_reordering(qtbot):
     lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     cat_key = _key(lora.child(0))
     dog_key = _key(lora.child(1))  # cat is first, dog second
-    view._toggle_star(dog_key)
+    view._toggle_favorite(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
     lora = _image_workflow(view._tree).child(0).child(0)
     # The star marks the folder in place; it does not jump above the cat.
     assert [_key(lora.child(i)) for i in range(lora.childCount())] == [cat_key, dog_key]
-    # Starred state rides on the group (the row's star icon reads it), not a ★ text
+    # Favorites state rides on the group (the row's star icon reads it), not a ★ text
     # prefix, so the labels stay the plain folder names.
-    assert lora.child(1).data(0, _GROUP_ROLE).starred is True
-    assert lora.child(0).data(0, _GROUP_ROLE).starred is False
+    assert lora.child(1).data(0, _GROUP_ROLE).favorite is True
+    assert lora.child(0).data(0, _GROUP_ROLE).favorite is False
     assert not lora.child(1).text(0).startswith("★")
 
 
-def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
+def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     # A folder with sub-folders wears no star of its own (the row's actions are a
-    # leaf's), so its right-click menu is the only way to star it — and the menu
+    # leaf's), so its right-click menu is the only way to favorite it — and the menu
     # covers the tree, so a right-click that shut the folder on the way in is only
     # seen once the menu closes, and reads as something the star did.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
@@ -1474,7 +1474,7 @@ def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec",
-        lambda menu, *a: next(act for act in menu.actions() if act.text() == "Star"),
+        lambda menu, *a: next(act for act in menu.actions() if act.text() == "Favorite"),
     )
     view._on_tree_context_menu(images, caret)
 
@@ -1482,7 +1482,7 @@ def test_starring_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     assert _image_workflow(view._tree).isExpanded()
 
 
-def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
+def test_favorite_shelf_is_pinned_first_and_collects_favorite_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -1491,25 +1491,25 @@ def test_starred_shelf_is_pinned_first_and_collects_starred_folders(qtbot):
 
     lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
-    view._toggle_star(dog_key)
+    view._toggle_favorite(dog_key)
 
-    # The Starred shelf sits just below Recents, above the media folders.
+    # The Favorites shelf sits just below Recents, above the media folders.
     assert list(_top_level(view._tree))[:2] == ["Latest", "Favorites"]
-    # Selecting it lists a tile for each starred folder, wherever it lives.
+    # Selecting it lists a tile for each favorited folder, wherever it lives.
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view._browser._visible_keys == [dog_key]
     assert view.visible_prompt_ids() == []
 
 
-def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
+def test_favorite_shelf_row_aligns_like_the_media_folders(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
     shelf = _top_level(view._tree)["Favorites"]
     # No "★ " text prefix: the star is drawn in the caret column instead, so the
-    # "Starred" label lines up with "Images"/"Videos" rather than sitting a
+    # "Favorites" label lines up with "Images"/"Videos" rather than sitting a
     # chevron-width to the right of them.
     assert shelf.text(0) == "Favorites"
     assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
@@ -1518,7 +1518,7 @@ def test_starred_shelf_row_aligns_like_the_media_folders(qtbot):
 def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
                  _image("i3", "a dog", 50, 1)])
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1526,7 +1526,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     (cat,) = [lora.child(i) for i in range(lora.childCount())
               if "a cat" in lora.child(i).toolTip(0)]
 
-    view._toggle_star(_key(cat))  # the starred item is in the starred folder
+    view._toggle_favorite(_key(cat))  # the favorited item is in the favorited folder
 
     top = _top_level(view._tree)
     assert _shown(top["Favorites"]) == "(2) Favorites"
@@ -1582,7 +1582,7 @@ def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
     # An experiment has a folder like anything else, so the shelf's double-click
-    # is the same jump Recents and Starred make — no verdict needed first.
+    # is the same jump Recents and Favorites make — no verdict needed first.
     experiment = _experiment_row("e1", steps=30)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
@@ -2221,7 +2221,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     assert Path(path).exists() and Path(path).is_relative_to(tmp_path / "trash")
 
 
-def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
+def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -2230,15 +2230,15 @@ def test_clicking_a_starred_tile_drills_into_the_real_folder(qtbot):
 
     lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
-    view._toggle_star(dog_key)
+    view._toggle_favorite(dog_key)
 
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
-    view._browser._drill_into(view._browser._visible_keys[0])  # click the starred tile
+    view._browser._drill_into(view._browser._visible_keys[0])  # click the favorited tile
     assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
 
 
-def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
+def test_favorite_shelf_shows_empty_state_when_nothing_is_favorite(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2249,31 +2249,31 @@ def test_starred_shelf_shows_empty_state_when_nothing_is_starred(qtbot):
     assert view.visible_prompt_ids() == []
 
 
-def test_starred_shelf_collects_starred_items_as_thumbnails(qtbot):
+def test_favorite_shelf_collects_favorite_items_as_thumbnails(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
-    db.set_generation_starred("i2", True)
+    db.set_generation_favorite("i2", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
-    assert view.visible_prompt_ids() == ["i2"]  # the starred item, on the shelf
-    assert view._browser._thumb_widgets["i2"]._starred is True
+    assert view.visible_prompt_ids() == ["i2"]  # the favorited item, on the shelf
+    assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
-def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
+def test_favorite_shelf_shows_both_favorite_items_and_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
-    db.set_generation_starred("i1", True)  # a starred item
+    db.set_generation_favorite("i1", True)  # a favorited item
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
     lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
     dog_key = _key(lora.child(1))
-    view._toggle_star(dog_key)  # and a starred folder
+    view._toggle_favorite(dog_key)  # and a favorited folder
 
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
@@ -2281,10 +2281,10 @@ def test_starred_shelf_shows_both_starred_items_and_folders(qtbot):
     assert view._browser._visible_keys == [dog_key]  # the folder
 
 
-def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
+def test_unfavoriting_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
     db = FakeDB(rows)
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -2292,14 +2292,14 @@ def test_unstarring_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     shelf = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(shelf)
     assert view.visible_prompt_ids() == ["i1"]
-    _answer_menu(monkeypatch, "Unstar 1 item")
+    _answer_menu(monkeypatch, "Unfavorite 1 item")
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
     assert view.visible_prompt_ids() == []  # gone from the shelf at once
 
 
-def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
+def test_favorite_shelf_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2310,13 +2310,13 @@ def test_starred_shelf_stays_selected_across_a_refresh(qtbot):
     assert view._tree.currentItem().text(0) == "Favorites"
 
 
-def test_starred_shelf_is_absent_until_a_folder_exists(qtbot):
+def test_favorite_shelf_is_absent_until_a_folder_exists(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
     top = _top_level(view._tree)
     assert "Latest" not in top
-    assert "Starred" not in top
+    assert "Favorites" not in top
 
 
 def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
@@ -2325,7 +2325,7 @@ def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    # Recents leads its side, above Starred and the media folders.
+    # Recents leads its side, above Favorites and the media folders.
     assert list(_top_level(view._tree))[0] == "Latest"
     # Selecting it lists every recently generated item, newest first — not folders.
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
@@ -2451,7 +2451,7 @@ def _menu_labels(monkeypatch, labels):
     )
 
 
-def test_right_clicking_a_recent_item_offers_its_folder_star_enhance_and_delete(
+def test_right_clicking_a_recent_item_offers_its_folder_favorite_enhance_and_delete(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -2466,7 +2466,7 @@ def test_right_clicking_a_recent_item_offers_its_folder_star_enhance_and_delete(
 
     # A shelf gathers items from all over, so where this one actually lives is
     # the question its menu is most often asked — it leads, above a separator.
-    assert labels == ["Go to folder", "", "Star 1 item", "Enhance 1 image",
+    assert labels == ["Go to folder", "", "Favorite 1 item", "Enhance 1 image",
                       "Delete 1 item"]
     assert view.selected_prompt_ids() == ["i2"]  # right-clicking picked it
 
@@ -2484,7 +2484,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
 
     _right_click(view, "i1")
 
-    assert labels == ["Star 1 item", "Enhance 1 image", "Delete 1 item"]
+    assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
 def test_go_to_folder_from_a_shelf_opens_the_folder_and_lands_on_the_item(
@@ -2519,20 +2519,20 @@ def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeyp
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_right_click_star_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeypatch):
+def test_right_click_favorite_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
-    _answer_menu(monkeypatch, "Star 1 item")
+    _answer_menu(monkeypatch, "Favorite 1 item")
 
     _right_click(view, "i1")
 
     assert db.get_generation("i1")["starred"]                # persisted
     assert view._browser.showing_recents()                           # still on the shelf
-    assert view._browser._thumb_widgets["i1"]._starred is True    # the tile takes the star at once
+    assert view._browser._thumb_widgets["i1"]._favorite is True    # the tile takes the star at once
 
 
 def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_path, monkeypatch):
@@ -3193,7 +3193,7 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
 
 # --- the bank's act-on-this trio: star and enhance aim where delete aims ------
 
-def test_star_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
+def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -3201,40 +3201,40 @@ def test_star_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     _select_first_leaf(view)
     view._browser._thumbnail_clicked("i1", _NO_MOD)
 
-    assert view._bank.star.isEnabled()
-    assert view._bank.star.toolTip() == "Star 1 item"
-    view._bank.star.click()
+    assert view._bank.favorite.isEnabled()
+    assert view._bank.favorite.toolTip() == "Favorite 1 item"
+    view._bank.favorite.click()
     assert db.get_generation("i1")["starred"]
 
     # A second press is the other half of the one toggle.
     view._browser._thumbnail_clicked("i1", _NO_MOD)
-    assert view._bank.star.toolTip() == "Unstar 1 item"
-    view._bank.star.click()
+    assert view._bank.favorite.toolTip() == "Unfavorite 1 item"
+    view._bank.favorite.click()
     assert not db.get_generation("i1")["starred"]
 
 
-def test_star_button_falls_back_to_the_folder_on_screen(qtbot):
+def test_favorite_button_falls_back_to_the_folder_on_screen(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)                               # nothing picked inside it
-    assert view._bank.star.isEnabled()
-    assert "folder" in view._bank.star.toolTip()
+    assert view._bank.favorite.isEnabled()
+    assert "folder" in view._bank.favorite.toolTip()
 
-    view._bank.star.click()
+    view._bank.favorite.click()
 
     key = _selected_folder(view)
     assert view._db.folder_meta_map()[key]["starred"]
 
 
-def test_star_button_is_dark_where_a_star_means_nothing(qtbot):
+def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))   # a shelf is nobody's folder
-    assert not view._bank.star.isEnabled()
-    assert view._bank.star.toolTip() == "Nothing here to star"
+    assert not view._bank.favorite.isEnabled()
+    assert view._bank.favorite.toolTip() == "Nothing here to favorite"
 
 
 def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):
@@ -3332,13 +3332,13 @@ def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
     view._browser._thumb_widgets["i2"]._controls.triggered.emit(corner_controls.STAR)
 
     assert db.get_generation("i2")["starred"]
-    assert view._browser._thumb_widgets["i2"]._starred is True   # the tile takes the star at once
+    assert view._browser._thumb_widgets["i2"]._favorite is True   # the tile takes the star at once
     assert not db.get_generation("i1").get("starred")
 
 
-def test_a_starred_tiles_star_corner_takes_the_bookmark_away(qtbot):
+def test_a_favorite_tiles_favorite_corner_takes_the_bookmark_away(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -3349,7 +3349,7 @@ def test_a_starred_tiles_star_corner_takes_the_bookmark_away(qtbot):
     assert not db.get_generation("i1")["starred"]
 
 
-def test_a_star_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
+def test_a_favorite_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -3358,14 +3358,14 @@ def test_a_star_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot,
     rebuilds = []
     monkeypatch.setattr(view, "_rebuild", lambda rows, meta: rebuilds.append(rows))
 
-    view.star_generation("i1")
+    view.favorite_generation("i1")
 
     assert db.get_generation("i1")["starred"]
-    assert view._browser._thumb_widgets["i1"]._starred is True
+    assert view._browser._thumb_widgets["i1"]._favorite is True
     assert rebuilds == []
 
 
-def test_the_favorites_count_follows_a_star_without_rebuilding_the_gallery(qtbot, monkeypatch):
+def test_the_favorites_count_follows_a_favorite_without_rebuilding_the_gallery(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -3373,15 +3373,15 @@ def test_the_favorites_count_follows_a_star_without_rebuilding_the_gallery(qtbot
     rebuilds = []
     monkeypatch.setattr(view, "_rebuild", lambda rows, meta: rebuilds.append(rows))
 
-    view.star_generation("i1")
+    view.favorite_generation("i1")
     assert _shown(_top_level(view._tree)["Favorites"]) == "(1) Favorites"
 
-    view.set_items_starred(["i1"], False)
+    view.set_items_favorite(["i1"], False)
     assert _shown(_top_level(view._tree)["Favorites"]) == "Favorites"
     assert rebuilds == []
 
 
-def test_a_star_landing_during_an_inline_rename_leaves_the_rename_alone(qtbot):
+def test_a_favorite_landing_during_an_inline_rename_leaves_the_rename_alone(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -3390,14 +3390,14 @@ def test_a_star_landing_during_an_inline_rename_leaves_the_rename_alone(qtbot):
     key = _key(leaf)
 
     view._begin_inline_rename(leaf, 0)
-    view.star_generation("i1")
+    view.favorite_generation("i1")
 
     assert db.folder_meta_map().get(key, {}).get("custom_name") is None
 
 
-def test_unstarring_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
+def test_unfavoriting_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=2)
-    db.set_generation_starred("g0", True)
+    db.set_generation_favorite("g0", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -3409,17 +3409,17 @@ def test_unstarring_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot
     assert view.visible_prompt_ids() == []
 
 
-def test_starring_the_picked_items_turns_the_star_button_to_unstar(qtbot):
+def test_favoriting_the_picked_items_turns_the_favorite_button_to_unfavorite(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     view._browser._thumbnail_clicked("i1", _NO_MOD)
-    assert view._bank.star.toolTip() == "Star 1 item"
+    assert view._bank.favorite.toolTip() == "Favorite 1 item"
 
-    view._bank.star.click()
+    view._bank.favorite.click()
 
-    assert view._bank.star.toolTip() == "Unstar 1 item"
+    assert view._bank.favorite.toolTip() == "Unfavorite 1 item"
 
 
 def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
@@ -3475,7 +3475,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
 
     star.click()
 
-    assert star.toolTip() == "Unstar this item"
+    assert star.toolTip() == "Unfavorite this item"
 
 
 def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tmp_path):
@@ -3569,7 +3569,7 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     groups = [buttons for _gap, buttons in view._bank._groups]
     assert groups[0] == (view._bank.back, view._bank.forward)
     assert groups[1] == (view._bank.undo, view._bank.redo)
-    assert groups[3] == (view._bank.star, view._bank.enhance, view._bank.delete)
+    assert groups[3] == (view._bank.favorite, view._bank.enhance, view._bank.delete)
     assert view._bank.auto in groups[4] and view._bank.audio in groups[4]
     # The mic has a space of its own: the group beside it is what Esc turns off,
     # and the mic is the one switch it leaves listening.
@@ -3823,23 +3823,23 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     assert len(view._navigation._history._stack) == depth
 
 
-def test_back_returns_to_the_starred_shelf_after_drilling_into_a_folder(qtbot):
+def test_back_returns_to_the_favorite_shelf_after_drilling_into_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     dog_key = _key(_image_workflow(view._tree).child(0).child(0).child(1))
-    view._toggle_star(dog_key)
+    view._toggle_favorite(dog_key)
 
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
     view._browser._drill_into(view._browser._visible_keys[0])  # into the dog folder, on i2
     view._browser._thumbnail_clicked("i3", _NO_MOD)            # view another item there
-    assert view._tree.currentItem() is not _shelf(view, STARRED_KEY)
+    assert view._tree.currentItem() is not _shelf(view, FAVORITES_KEY)
 
     view._navigation.go_back()                                      # the folder drilled into
     view._navigation.go_back()
-    assert view._tree.currentItem() is _shelf(view, STARRED_KEY)  # Back returns to Starred
+    assert view._tree.currentItem() is _shelf(view, FAVORITES_KEY)  # Back returns to Favorites
 
 
 def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
@@ -4667,7 +4667,7 @@ def _open_leaf(view):
 
 def _click_off(view):
     """Put the pick down, as a click on the pane's background does — which since
-    a folder opens on its first item is how Star, Enhance and Delete come to be
+    a folder opens on its first item is how Favorite, Enhance and Delete come to be
     aimed at the whole folder again (see
     test_clicking_the_pane_background_drops_the_selection)."""
     view._browser.clear_thumbnail_selection()
@@ -4787,7 +4787,7 @@ def test_changing_folders_clears_the_selection(qtbot):
 
 def test_clicking_the_pane_background_drops_the_selection(qtbot):
     """Click off and nothing is picked — the way out of a selection that would
-    otherwise keep Enhance/Star/Delete aimed at one tile instead of the folder."""
+    otherwise keep Enhance/Favorite/Delete aimed at one tile instead of the folder."""
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -4983,27 +4983,27 @@ def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, mon
     assert set(view.selected_prompt_ids()) == {"i1", "i3"}
 
 
-def test_a_starred_row_renders_a_starred_tile(qtbot):
+def test_a_favorite_row_renders_a_favorite_tile(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = FakeDB(rows)
-    db.set_generation_starred("i2", True)
+    db.set_generation_favorite("i2", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
 
-    assert view._browser._thumb_widgets["i1"]._starred is False
-    assert view._browser._thumb_widgets["i2"]._starred is True
+    assert view._browser._thumb_widgets["i1"]._favorite is False
+    assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
-def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
+def test_right_click_favorite_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = FakeDB(rows)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    # The menu's first entry is Star/Unstar (Delete is last).
+    # The menu's first entry is Favorite/Unfavorite (Delete is last).
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[0]
     )
@@ -5011,13 +5011,13 @@ def test_right_click_star_bookmarks_the_picked_thumbnail(qtbot, monkeypatch):
     view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
 
     assert db.get_generation("i1")["starred"]           # persisted
-    assert view._browser._thumb_widgets["i1"]._starred is True  # the tile takes the star at once
+    assert view._browser._thumb_widgets["i1"]._favorite is True  # the tile takes the star at once
 
 
-def test_right_click_unstar_clears_a_starred_thumbnail(qtbot, monkeypatch):
+def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
     db = FakeDB(rows)
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -5030,11 +5030,11 @@ def test_right_click_unstar_clears_a_starred_thumbnail(qtbot, monkeypatch):
 
     view._browser._thumbnail_context_menu("i1", QPoint(0, 0))
 
-    assert labels == ["Unstar 1 item"]                 # a starred item offers Unstar
+    assert labels == ["Unfavorite 1 item"]                 # a favorited item offers Unfavorite
     assert not db.get_generation("i1")["starred"]      # cleared
 
 
-def test_right_click_star_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
+def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     db = FakeDB(rows)
@@ -6502,7 +6502,7 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -6514,7 +6514,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Latest" in view._bank.slideshow.toolTip()
-    view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Favorites" in view._bank.slideshow.toolTip()
 
@@ -6639,7 +6639,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
                                _row("i2", "sdxl_t2i",
                                     {"positive_prompt": "a cat", "steps": 50, "seed": 2,
                                      "enhance": True},
-                                    "sdxl_t2i_i2.png", starred=1)]))
+                                    "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -6772,16 +6772,16 @@ def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
     assert [r["prompt_id"] for batch in actions.deleted for r in batch] == ["i1"]
 
 
-def test_starred_slideshow_plays_starred_items_and_folders_once(qtbot, monkeypatch):
+def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
-    db.set_generation_starred("i2", True)  # a starred item...
+    db.set_generation_favorite("i2", True)  # a favorited item...
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     lora = _image_workflow(view._tree).child(0).child(0)  # "(no add-on)"
-    view._toggle_star(_key(lora.child(0)))   # ...and a starred folder (the cat one)
-    view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
+    view._toggle_favorite(_key(lora.child(0)))   # ...and a favorited folder (the cat one)
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
 
     view._shows.start()
 
@@ -6914,15 +6914,15 @@ def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     assert view._shows.items_of([row])[0] == ("i1.png", "image", "i1", "thumb.png")
 
 
-def test_starred_slideshow_plays_a_starred_item_in_a_starred_folder_once(qtbot, monkeypatch):
+def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.set_generation_starred("i1", True)
+    db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._toggle_star(_select_first_leaf(view))  # star the folder holding it too
-    view._tree.setCurrentItem(_shelf(view, STARRED_KEY))
+    view._toggle_favorite(_select_first_leaf(view))  # star the folder holding it too
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
 
     view._shows.start()
 
@@ -9965,15 +9965,15 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
 class _VoiceSurface:
     """A show standing in for the one being spoken over."""
 
-    def __init__(self, prompt_id, *, starrable=True):
+    def __init__(self, prompt_id, *, favoritable=True):
         self._prompt_id = prompt_id
-        self._starrable = starrable
+        self._favoritable = favoritable
         self.noted = None
         self.enhancing = {}
         self.said = None    # what a spoken command was answered with
         self.steps = []     # the transport moves it was asked for, in order
         self.culled = 0
-        self.starred = 0
+        self.favorited = 0
         self.held = False
         self.queued = []     # what the poll last fed its corner queue
         self.in_flight = set()
@@ -9999,10 +9999,10 @@ class _VoiceSurface:
     def cull(self):
         self.culled += 1
 
-    def star(self):
-        if not self._starrable:
+    def favorite(self):
+        if not self._favoritable:
             return False
-        self.starred += 1
+        self.favorited += 1
         return True
 
     def set_held(self, held):
@@ -10086,7 +10086,7 @@ def _enhanceable_db(tmp_path, count=2):
 
 
 def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
-    # It keeps its place in the bank beside Star and Delete rather than coming
+    # It keeps its place in the bank beside Favorite and Delete rather than coming
     # and going — a button that vanishes is one you have to go looking for — and
     # says in its tooltip what it would do here.
     db = _enhanceable_db(tmp_path, count=1)
@@ -10366,7 +10366,7 @@ def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     assert not view._enhance.panel.isHidden()
 
     for item in (_image_workflow(view._tree), _shelf(view, RECENTS_KEY),
-                 _shelf(view, STARRED_KEY), _shelf(view, EXPERIMENTS_KEY),
+                 _shelf(view, FAVORITES_KEY), _shelf(view, EXPERIMENTS_KEY),
                  _shelf(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
         assert not view._enhance.panel.isHidden()
@@ -12212,10 +12212,10 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     assert view._browser._visible_keys == [cat, dog]  # landed on it
 
 
-def test_dropping_a_folder_onto_starred_stars_it(qtbot):
+def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
 
-    view._on_folders_dropped(gallery_view_module._STARRED_KEY, [cat])
+    view._on_folders_dropped(gallery_view_module._FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
 
@@ -12321,7 +12321,7 @@ def _tree_menu(view, key=None):
     )
 
 
-def test_a_folders_menu_offers_rename_star_and_a_delete_kept_apart(qtbot, monkeypatch):
+def test_a_folders_menu_offers_rename_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -12330,7 +12330,7 @@ def test_a_folders_menu_offers_rename_star_and_a_delete_kept_apart(qtbot, monkey
 
     # The separator is the point: the one entry that destroys anything sits below
     # it, away from the two that cost nothing.
-    assert labels == ["Rename…", "Star", "", "Delete folder…"]
+    assert labels == ["Rename…", "Favorite", "", "Delete folder…"]
 
 
 def test_a_workflows_menu_offers_neither_a_rename_nor_a_delete(qtbot, monkeypatch):
@@ -12342,7 +12342,7 @@ def test_a_workflows_menu_offers_neither_a_rename_nor_a_delete(qtbot, monkeypatc
 
     _tree_menu(view, _key(_image_workflow(view._tree)))
 
-    assert labels == ["Star"]
+    assert labels == ["Favorite"]
 
 
 def test_renaming_a_folder_from_its_menu_renames_it_and_takes_nothing_away(
@@ -12501,7 +12501,7 @@ def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
 
     _tree_menu(view, fish)
 
-    assert labels == ["Rename…", "Star", "", "Delete folder…"]
+    assert labels == ["Rename…", "Favorite", "", "Delete folder…"]
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------
@@ -13849,7 +13849,7 @@ def _listening(qtbot, tmp_path, db=None):
     ("experiments", gallery_view_module._EXPERIMENTS_KEY),
     ("trash", gallery_view_module._TRASH_KEY),
     ("recents", gallery_view_module._RECENTS_KEY),
-    ("starred", gallery_view_module._STARRED_KEY),
+    ("starred", gallery_view_module._FAVORITES_KEY),
     ("go to experiments", gallery_view_module._EXPERIMENTS_KEY),
 ])
 def test_a_spoken_shelf_name_stands_you_in_that_shelf(qtbot, tmp_path, said, key):
@@ -13876,7 +13876,7 @@ def test_the_requests_shelf_answers_the_plural_and_the_singular_still_dictates(
 
 def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(
         qtbot, tmp_path):
-    # Starred appears only once there are folders; a word for a row that isn't
+    # Favorites appears only once there are folders; a word for a row that isn't
     # there must not vanish, having already been claimed as a command.
     db = Database(tmp_path / "empty.db")
     view = _listening(qtbot, tmp_path, db=db)
@@ -13917,14 +13917,14 @@ def test_the_transport_words_step_the_show_they_are_said_over(qtbot, tmp_path):
     assert surface.steps == [1, 1, -1, -1]
 
 
-def test_a_spoken_star_over_a_show_bookmarks_the_slide(qtbot, tmp_path):
+def test_a_spoken_favorite_over_a_show_bookmarks_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
     view._shows._slideshow = surface
 
     view._voice.listener.speak("star")
 
-    assert surface.starred == 1 and surface.said == "🎤 starred"
+    assert surface.favorited == 1 and surface.said == "🎤 favorited"
 
 
 def test_the_same_two_words_walk_the_history_with_no_show_up(qtbot, tmp_path):
@@ -13956,13 +13956,13 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
     view = _listening(qtbot, tmp_path)
     _select_first_leaf(view)
     _click_off(view)                               # so the button is the folder's
-    aimed = view._bank.star.toolTip()
-    assert aimed.startswith("Star folder")
+    aimed = view._bank.favorite.toolTip()
+    assert aimed.startswith("Favorite folder")
 
     view._voice.listener.speak("star")
 
     assert view._voice.status.text() == f"🎤 {aimed}"
-    assert view._bank.star.toolTip().startswith("Unstar folder")
+    assert view._bank.favorite.toolTip().startswith("Unfavorite folder")
 
 
 def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
@@ -14145,7 +14145,7 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
     tile.context_requested.emit(_key(_image_workflow(view._tree).child(0)),
                                 QPoint(1, 1))
 
-    assert "Star" in labels
+    assert "Favorite" in labels
 
 
 def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(

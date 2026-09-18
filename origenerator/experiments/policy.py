@@ -1,7 +1,7 @@
 """Derive the next background experiment from the gallery's own history.
 
 The policy hill-climbs the user's actual work: it picks a past generation as a
-base (favoring starred items and up-voted experiments), mutates one or two of
+base (favoring favorited items and up-voted experiments), mutates one or two of
 its workflow's declared dimensions — a numeric nudged within its form range, a
 combo swapped for another installed option, or the prompt pair crossed over from
 a sibling generation — and re-rolls every seed. Review verdicts feed back in:
@@ -25,7 +25,7 @@ from origenerator.workflows.base import ParamType
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
-_STAR_BONUS = 2.0
+_FAVORITE_BONUS = 2.0
 _UP_BONUS = 1.0
 _RECENT_BONUS = 0.5
 _RECENT_WINDOW = 25  # rows arrive newest-first; this many count as "recent"
@@ -128,7 +128,7 @@ class ExperimentPolicy:
     def _base_weight(row, index):
         weight = 1.0
         if row.get("starred"):
-            weight += _STAR_BONUS
+            weight += _FAVORITE_BONUS
         if row.get("experiment_verdict") == "up":
             weight += _UP_BONUS
         if index < _RECENT_WINDOW:
@@ -213,7 +213,7 @@ class ExperimentPolicy:
                 continue
             donors.append((positive, donor_params.get("negative_prompt",
                                                       row.get("negative_prompt") or "")))
-            weights.append(1.0 + (_STAR_BONUS if row.get("starred") else 0.0))
+            weights.append(1.0 + (_FAVORITE_BONUS if row.get("starred") else 0.0))
         choice = self._pick_value(
             donors, workflow, "positive_prompt", rows,
             value_of=lambda donor: donor[0], appeal=weights,

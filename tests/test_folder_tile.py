@@ -11,7 +11,7 @@ def _label_texts(tile):
 
 
 def test_folder_tile_shows_its_breadcrumb_context(qtbot):
-    # The Starred shelf captions each tile with where the folder lives, alongside
+    # The Favorites shelf captions each tile with where the folder lives, alongside
     # the folder's own name, so two same-named folders stay tellable apart.
     tile = FolderTile("k", "a dog", [], 3, context="Images › SDXL")
     qtbot.addWidget(tile)
@@ -33,7 +33,7 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
 
 def test_folder_tile_shows_its_recipe_level_badge(qtbot):
     # A model/LoRA/workflow tile wears the same lettered chip the tree does, so a
-    # folder's place in the hierarchy reads even in the mixed Starred shelf.
+    # folder's place in the hierarchy reads even in the mixed Favorites shelf.
     tile = FolderTile("k", "wan model", [], 3, level="model")
     qtbot.addWidget(tile)
 
@@ -63,7 +63,7 @@ def test_a_folder_tile_is_the_same_card_as_the_ones_it_stands_beside(qtbot):
 
 
 def test_the_breadcrumb_line_is_the_whole_of_what_makes_a_shelf_tile_taller(qtbot):
-    # The Starred shelf's tiles carry one line the others do not, so their height
+    # The Favorites shelf's tiles carry one line the others do not, so their height
     # is the same card plus exactly that line.
     tile = FolderTile("k", "a dog", [], 3, context="Images > SDXL")
     qtbot.addWidget(tile)

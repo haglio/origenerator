@@ -66,14 +66,14 @@ class ThumbnailWidget(QWidget):
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  parent=None, *, media_type: str | None = None,
-                 movie_path: str | None = None, starred: bool = False,
+                 movie_path: str | None = None, favorite: bool = False,
                  enhance: str | None = None, controls: bool = True,
                  enhancing: RunReading | None = None,
                  corner_actions: list[CornerAction] | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
-        self._starred = starred
+        self._favorite = favorite
         self._enhance = enhance       # what the enhance corner has to say, if anything
         self._enhancing = enhancing   # the run being made of this image, if any
         # The tile's own picture, held aside while a running enhancement streams
@@ -201,14 +201,14 @@ class ThumbnailWidget(QWidget):
         self._enhance = enhance
         self._sync_controls()
 
-    def set_starred(self, starred: bool):
-        self._starred = starred
+    def set_favorite(self, favorite: bool):
+        self._favorite = favorite
         self._sync_controls()
 
     def _sync_controls(self):
         if self._controls is None:
             return
-        self._controls.show_for(starred=self._starred, enhance=self._enhance)
+        self._controls.show_for(favorite=self._favorite, enhance=self._enhance)
 
     def set_enhancing(self, run: RunReading | None):
         """Show the enhancement being made of this image, or clear it away.

@@ -1,9 +1,9 @@
 """Where the sibling app checkouts are, and how config finds them.
 
-``suite_root`` named two things at once -- the folder holding the media library
+``library_root`` named two things at once -- the folder holding the media library
 and the folder holding the sibling apps -- and those came apart when the suite's
 own repos were moved out of the file-synced tree the library stays in. ComfyUI
-is not one of those repos: it did not move, so it stays on ``suite_root`` while
+is not one of those repos: it did not move, so it stays on ``library_root`` while
 ``fun_time`` comes from the new setting. That split is the point of these tests.
 """
 from __future__ import annotations
@@ -14,17 +14,17 @@ from origenerator import config, osr2
 
 
 class TestProjectRoots:
-    def test_defaults_to_the_projects_folder_under_the_suite_root(self):
+    def test_defaults_to_the_projects_folder_under_the_library_root(self):
         """An overlay with no project_roots behaves exactly as it always did."""
-        assert config.project_roots({"suite_root": "S:/suite"}) == (Path("S:/suite/projects"),)
+        assert config.project_roots({"library_root": "S:/suite"}) == (Path("S:/suite/projects"),)
 
     def test_an_empty_list_falls_back_to_the_default_too(self):
-        content = {"suite_root": "S:/suite", "project_roots": []}
+        content = {"library_root": "S:/suite", "project_roots": []}
 
         assert config.project_roots(content) == (Path("S:/suite/projects"),)
 
     def test_reads_the_roots_from_the_overlay_in_the_order_given(self):
-        content = {"suite_root": "S:/suite", "project_roots": ["W:/work", "S:/suite/projects"]}
+        content = {"library_root": "S:/suite", "project_roots": ["W:/work", "S:/suite/projects"]}
 
         assert config.project_roots(content) == (Path("W:/work"), Path("S:/suite/projects"))
 
@@ -72,9 +72,9 @@ class TestProjectDir:
 
 
 class TestWhichPathsMovedAndWhichDidNot:
-    def test_comfyui_stays_on_the_suite_root_because_it_is_not_one_of_our_repos(self):
+    def test_comfyui_stays_on_the_library_root_because_it_is_not_one_of_our_repos(self):
         """ComfyUI is a third-party app that did not move with the suite."""
-        assert config.COMFYUI_DIR == config.SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
+        assert config.COMFYUI_DIR == config.LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 
 class TestTheValuesAnotherAppHoldsToo:
@@ -111,11 +111,11 @@ class TestTheValuesAnotherAppHoldsToo:
         # Mirrors evolver's own INBOX_DIR. A folder evolver is not watching is a
         # finished video that is simply never ingested.
         assert config.EVOLVER_INBOX_DIR == (
-            config.SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox")
+            config.LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI" / "0_inbox")
         assert config.EVOLVER_SOURCE == "origenerator"  # how evolver routes ours
 
     def test_evolver_files_its_upscales_under_this_exact_tree(self):
         # Mirrors evolver's own OUT_UPSCALED_DIR.
         assert config.EVOLVER_UPSCALED_DIR == (
-            config.SUITE_ROOT / "videos" / "videos" / "2D" / "AI" / "2_outbox"
+            config.LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI" / "2_outbox"
             / "upscaled_by_orientation")

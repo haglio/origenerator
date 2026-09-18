@@ -71,20 +71,20 @@ def _import_in_a_fresh_interpreter(*modules) -> dict:
 
 def test_the_committed_example_answers_when_there_is_no_local_overlay(tmp_path):
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"suite_root": "C:/example"}), encoding="utf-8")
+    example.write_text(json.dumps({"library_root": "C:/example"}), encoding="utf-8")
 
     loaded = content.load_content(tmp_path / "content.local.json", example)
 
-    assert loaded == {"suite_root": "C:/example"}
+    assert loaded == {"library_root": "C:/example"}
 
 
 def test_the_local_overlay_answers_instead_when_it_is_there(tmp_path):
     local = tmp_path / "content.local.json"
-    local.write_text(json.dumps({"suite_root": "D:/private"}), encoding="utf-8")
+    local.write_text(json.dumps({"library_root": "D:/private"}), encoding="utf-8")
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"suite_root": "C:/example"}), encoding="utf-8")
+    example.write_text(json.dumps({"library_root": "C:/example"}), encoding="utf-8")
 
-    assert content.load_content(local, example) == {"suite_root": "D:/private"}
+    assert content.load_content(local, example) == {"library_root": "D:/private"}
 
 
 def test_two_callers_are_not_handed_the_same_dictionary(tmp_path):
@@ -92,7 +92,7 @@ def test_two_callers_are_not_handed_the_same_dictionary(tmp_path):
     module's edit of the overlay every other module's edit of it — the
     cross-module mutable state this whole file exists to keep out."""
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"suite_root": "C:/example"}), encoding="utf-8")
+    example.write_text(json.dumps({"library_root": "C:/example"}), encoding="utf-8")
     local = tmp_path / "content.local.json"
 
     first = content.load_content(local, example)
@@ -161,11 +161,11 @@ def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
     complete = json.loads((REPO_ROOT / "content.example.json").read_text())
     local = tmp_path / "content.local.json"
     local.write_text(json.dumps(
-        {k: v for k, v in complete.items() if k not in ("genau_source", "suite_root")}),
+        {k: v for k, v in complete.items() if k not in ("genau_source", "library_root")}),
         encoding="utf-8")
 
     assert content.missing_overlay_keys(local, REPO_ROOT / "content.example.json") == (
-        "genau_source", "suite_root")
+        "genau_source", "library_root")
 
 
 def test_a_complete_overlay_is_missing_nothing(tmp_path):
@@ -180,10 +180,10 @@ def test_a_key_present_but_empty_is_not_missing(tmp_path):
     """How you switch a feature off: the key is there with nothing in it. Every
     consumer of an optional key already reads it as `.get(key) or default`."""
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"suite_root": "C:/x", "search_synonyms": [["a"]]}),
+    example.write_text(json.dumps({"library_root": "C:/x", "search_synonyms": [["a"]]}),
                        encoding="utf-8")
     local = tmp_path / "content.local.json"
-    local.write_text(json.dumps({"suite_root": "D:/y", "search_synonyms": []}),
+    local.write_text(json.dumps({"library_root": "D:/y", "search_synonyms": []}),
                      encoding="utf-8")
 
     assert content.missing_overlay_keys(local, example) == ()
@@ -193,17 +193,17 @@ def test_no_local_overlay_at_all_is_missing_nothing(tmp_path):
     """A fresh or public checkout: the example is not compared against itself,
     it IS what loads."""
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"suite_root": "C:/x"}), encoding="utf-8")
+    example.write_text(json.dumps({"library_root": "C:/x"}), encoding="utf-8")
 
     assert content.missing_overlay_keys(tmp_path / "content.local.json", example) == ()
 
 
 def test_the_comment_the_example_carries_is_not_a_key_to_copy(tmp_path):
     example = tmp_path / "content.example.json"
-    example.write_text(json.dumps({"_comment": "what this file is", "suite_root": "C:/x"}),
+    example.write_text(json.dumps({"_comment": "what this file is", "library_root": "C:/x"}),
                        encoding="utf-8")
     local = tmp_path / "content.local.json"
-    local.write_text(json.dumps({"suite_root": "D:/y"}), encoding="utf-8")
+    local.write_text(json.dumps({"library_root": "D:/y"}), encoding="utf-8")
 
     assert content.missing_overlay_keys(local, example) == ()
 
@@ -215,7 +215,7 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
 
     assert documented == {
-        "suite_root", "ambient_audio_dir", "speech_python", "genau_source", "recipe_categories",
+        "library_root", "ambient_audio_dir", "speech_python", "genau_source", "recipe_categories",
         "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
         "detector_labels", "genau_stroke_prompts",
     }

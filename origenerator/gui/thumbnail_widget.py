@@ -17,17 +17,14 @@ from origenerator.gui.corner_controls import (
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.inflight import RunReading
+from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
 _IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
-_BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
-_BAR_HEIGHT = 26               # the enhancement's bar, along the picture's foot
-_TICK_MS = 1000                # how often the bar's clock re-reads itself
-
+_BORDER_PX = 2
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
 # shelf's keep/reject): the same translucent chip the corner controls sit on, blue
 # on hover, laid along the tile's top-left edge — the one edge the three corner
@@ -172,7 +169,7 @@ class ThumbnailWidget(QWidget):
         # Its own clock rather than the gallery's poll, so the countdown advances
         # a second at a time whether or not a refresh has landed.
         self._enhancing_tick = QTimer(self)
-        self._enhancing_tick.setInterval(_TICK_MS)
+        self._enhancing_tick.setInterval(TICK_MS)
         self._enhancing_tick.timeout.connect(self._render_enhancing_timing)
         self._place_enhancing_bar()
         self._show_enhancing_run()
@@ -292,9 +289,9 @@ class ThumbnailWidget(QWidget):
         clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
         self._enhancing_bar.setGeometry(QRect(
             picture.x() + clear_of_a_corner,
-            picture.y() + picture.height() - _BORDER_PX - _BAR_HEIGHT,
+            picture.y() + picture.height() - _BORDER_PX - BAR_HEIGHT,
             picture.width() - 2 * clear_of_a_corner,
-            _BAR_HEIGHT,
+            BAR_HEIGHT,
         ))
 
     def _apply_styles(self):

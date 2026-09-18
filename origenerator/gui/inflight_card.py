@@ -28,19 +28,15 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from origenerator.gui import grid_card, palette
 from origenerator.gui.blurred import blurred_backdrop
-from origenerator.gui.inflight import InFlightItem, queue_wait_text
+from origenerator.gui.inflight import TICK_MS, InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.progress_caption import ProgressCaption
+from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
 _IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
 # A blue "in progress" edge, distinct from a resting tile's.
 _BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
-_BAR_HEIGHT = 26  # the bar laid along the frame's foot, the way a player's is
-# How often the card re-reads the clock. Its own timer rather than the gallery's
-# 1.5s poll, which would make a seconds count skip every other tick.
-_TICK_MS = 1000
 
 
 class InFlightCard(QWidget):
@@ -96,7 +92,7 @@ class InFlightCard(QWidget):
         # Its own clock rather than the gallery's poll, so the count advances a
         # second at a time whether or not a refresh has landed.
         self._tick = QTimer(self)
-        self._tick.setInterval(_TICK_MS)
+        self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_timing)
 
         self.setFixedSize(*grid_card.card_size())
@@ -186,9 +182,9 @@ class InFlightCard(QWidget):
         frame = self._image.geometry()
         self._bar.setGeometry(QRect(
             frame.x() + _BORDER_PX,
-            frame.y() + frame.height() - _BORDER_PX - _BAR_HEIGHT,
+            frame.y() + frame.height() - _BORDER_PX - BAR_HEIGHT,
             frame.width() - 2 * _BORDER_PX,
-            _BAR_HEIGHT,
+            BAR_HEIGHT,
         ))
 
     def mousePressEvent(self, event):

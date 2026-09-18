@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import NamedTuple
 
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QCursor, QPixmap
+from PyQt6.QtGui import QCursor, QIcon, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from origenerator.gui import grid_card, palette
@@ -51,6 +52,15 @@ _BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
 _BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
+class CornerAction(NamedTuple):
+    """One hover control on a tile's corner: what it asks for, the icon it wears,
+    and what it says on hover."""
+
+    action_id: str
+    icon: QIcon
+    tooltip: str
+
+
 class ThumbnailWidget(QWidget):
     clicked = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the click
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
@@ -63,7 +73,7 @@ class ThumbnailWidget(QWidget):
                  movie_path: str | None = None, starred: bool = False,
                  enhance: str | None = None, controls: bool = True,
                  enhancing: EnhancingRun | None = None,
-                 corner_actions: list | None = None):
+                 corner_actions: list[CornerAction] | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
         self._selected = False
@@ -304,20 +314,20 @@ class ThumbnailWidget(QWidget):
 
     # --- corner action buttons (hover-revealed per-seed re-rolls) -----------
 
-    def _build_corner_actions(self, actions: list):
-        """Lay out one hidden button per ``(action_id, icon, tooltip)`` along the
-        tile's top-left edge.
+    def _build_corner_actions(self, actions: list[CornerAction]):
+        """Lay out one hidden button per :class:`CornerAction` along the tile's
+        top-left edge.
 
         Each fires :attr:`corner_action_triggered` with this tile's prompt_id and
         its action_id. Hidden until the tile is hovered (see :meth:`enterEvent`);
         an event filter keeps them up while the cursor sits on a button rather than
         the tile itself, so they don't flicker out from under the pointer.
         """
-        for i, (action_id, icon, tooltip) in enumerate(actions):
+        for i, action in enumerate(actions):
             button = QPushButton(self)
-            button.setIcon(icon)
+            button.setIcon(action.icon)
             button.setIconSize(QSize(CORNER_SIZE - 8, CORNER_SIZE - 8))
-            button.setToolTip(tooltip)
+            button.setToolTip(action.tooltip)
             button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setStyleSheet(_CORNER_BUTTON_CSS)
@@ -325,7 +335,9 @@ class ThumbnailWidget(QWidget):
                         self._image_label.y() + CORNER_INSET)
             button.setVisible(False)
             button.installEventFilter(self)  # keep the set up while hovering a button
-            button.clicked.connect(lambda _=False, a=action_id: self.corner_action_triggered.emit(self.prompt_id, a))
+            button.clicked.connect(
+                lambda _=False, a=action.action_id:
+                self.corner_action_triggered.emit(self.prompt_id, a))
             self._corner_buttons.append(button)
 
     def _set_corner_actions_visible(self, visible: bool):

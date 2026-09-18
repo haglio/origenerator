@@ -60,7 +60,7 @@ from origenerator.gui.inflight_items import InFlightItems
 from origenerator.gui.orientation import filter_rows, row_orientation, split_key
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
@@ -884,10 +884,10 @@ class BrowserPane(QObject):
         and double-clicking opens its folder, like the other shelves."""
         container, flow = self._new_tile_pane()
         actions = [
-            ("keep", icons.experiment_verdict_icon("up"),
-             "Keep — add it to the gallery"),
-            ("reject", icons.experiment_verdict_icon("down"),
-             "Reject — trash it and steer future experiments away"),
+            CornerAction("keep", icons.experiment_verdict_icon("up"),
+                         "Keep — add it to the gallery"),
+            CornerAction("reject", icons.experiment_verdict_icon("down"),
+                         "Reject — trash it and steer future experiments away"),
         ]
         rows = filter_rows(self._experiment_rows, self._shelf_orientation)
 
@@ -968,10 +968,10 @@ class BrowserPane(QObject):
         automatic."""
         container, flow = self._new_tile_pane()
         actions = [
-            ("restore", icons.recovery_action_icon("restore"),
-             "Restore — put it and its files back where they were"),
-            ("purge", icons.recovery_action_icon("purge"),
-             "Delete permanently — remove it and its files for good"),
+            CornerAction("restore", icons.recovery_action_icon("restore"),
+                         "Restore — put it and its files back where they were"),
+            CornerAction("purge", icons.recovery_action_icon("purge"),
+                         "Delete permanently — remove it and its files for good"),
         ]
         rows = filter_rows(self._trash_rows, self._shelf_orientation)
         for row in rows:
@@ -1231,11 +1231,11 @@ class BrowserPane(QObject):
         """The per-seed re-roll hover controls for an i2v item: always the video
         seed (new motion of the same frame), plus the image seed (a new frame)
         when the item's start frame is itself a re-buildable generation."""
-        actions = [(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
-                    "Randomize video seed")]
+        actions = [CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
+                                "Randomize video seed")]
         if gallery.find_source_image_id(row, self._host.image_rows()) is not None:
-            actions.append((REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
-                            "Randomize image seed"))
+            actions.append(CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
+                                        "Randomize image seed"))
         return actions
 
     @staticmethod

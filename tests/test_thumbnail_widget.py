@@ -14,7 +14,7 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
 
 
@@ -26,8 +26,10 @@ def _corners(tile):
 
 def _corner_actions():
     return [
-        (REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO), "Randomize video seed"),
-        (REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE), "Randomize image seed"),
+        CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
+                     "Randomize video seed"),
+        CornerAction(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
+                     "Randomize image seed"),
     ]
 
 

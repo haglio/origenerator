@@ -132,12 +132,7 @@ class CombineController(QObject):
         # Both Generate paths go through a wrapper that puts a stand-in row in the
         # line first: the work between the press and a real job is seconds long,
         # and a button that seems to do nothing reads as an app that has died.
-        self.panel.generate_requested.connect(self._on_generate)
-        self.panel.category_requested.connect(self._on_generate_category)
-        self.panel.open_requested.connect(
-            lambda image_id, video_id, category="": self._open_combination(
-                image_id, video_id, category, self.panel.selected_intent()))
-        self.panel.open_category_requested.connect(self._open_category)
+        self.panel.combine_requested.connect(self._on_request)
         self.panel.item_activated.connect(self._host.follow_link)
         # Switching lanes re-asks which acts are answerable: an act with plenty of
         # long-form video under it may have no loop at all.
@@ -250,7 +245,21 @@ class CombineController(QObject):
 
     # --- the line's answer to the press, before there is a job ---------------
 
-    def _on_generate(self, image_id: str, video_id: str) -> None:
+    def _on_request(self, request) -> None:
+        """Answer one press of the panel: run the chosen recipe now, or hand it to
+        a generate tab to change first (:class:`CombineRequest`)."""
+        if request.edit_first:
+            if request.category:
+                self._open_category(request.image_id, request.category, request.intent)
+            else:
+                self._open_combination(request.image_id, request.video_id,
+                                       intent=request.intent)
+        elif request.category:
+            self._on_generate_category(request.image_id, request.category, request.intent)
+        else:
+            self._on_generate(request.image_id, request.video_id, request.intent)
+
+    def _on_generate(self, image_id: str, video_id: str, intent: str) -> None:
         """The combine panel's Generate with a dropped video, with the line
         showing it at once.
 
@@ -260,7 +269,6 @@ class CombineController(QObject):
         they did — so the stand-in row would have appeared only once the work it
         was standing in for was already over.
         """
-        intent = self.panel.selected_intent()
         key = self._show_launching(image_id, video_id=video_id, intent=intent)
 
         def run():

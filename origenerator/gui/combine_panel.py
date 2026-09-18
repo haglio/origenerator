@@ -21,17 +21,17 @@ recipe in the content overlay — are greyed out
 (:meth:`CombinePanel.set_available_categories`).
 
 The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown, the
-intent radios and the two buttons, and reports the request through one of four
-signals — a dropped video versus a picked act, crossed with run-now
-(:attr:`generate_requested` / :attr:`category_requested`) versus edit-first
-(:attr:`open_requested` / :attr:`open_category_requested`). The act signals carry the
-chosen intent. Its controller (:mod:`origenerator.gui.combine_controller`) owns the
-database, the slot predicates, the category→recipe routing, and both the generation
-and the generator tab.
+intent radios and the two buttons, and reports what was asked for as one
+:class:`CombineRequest` on :attr:`combine_requested` — which recipe (a dropped video
+or a picked act), which lane, and whether the press was Generate or “Edit…”. Its
+controller (:mod:`origenerator.gui.combine_controller`) owns the database, the slot
+predicates, the category→recipe routing, and both the generation and the generator
+tab.
 """
 from __future__ import annotations
 
 from collections.abc import Callable, Collection
+from dataclasses import dataclass
 
 from origenerator.paths import ensure_shared_ui_on_path
 
@@ -61,14 +61,23 @@ _NEUTRAL_LABEL = "(custom)"
 _DROP_PLACEHOLDER = "Drop a video"
 
 
+@dataclass(frozen=True)
+class CombineRequest:
+    """One press of Generate or “Edit…”: the picture, the recipe to run on it —
+    a dropped video or a picked act, never both — the lane it is answered from,
+    and whether it is bound for the generator rather than for a run now."""
+
+    image_id: str
+    video_id: str = ""
+    category: str = ""
+    intent: str = VIDEO
+    edit_first: bool = False
+
+
 class CombinePanel(QWidget):
     """Image slot + a recipe (dropped video or picked act) + an intent + Generate."""
 
-    generate_requested = pyqtSignal(str, str)   # (image prompt_id, video prompt_id): a dropped recipe
-    category_requested = pyqtSignal(str, str, str)   # (image prompt_id, category, intent)
-    # The same two recipe sources, but bound for the generator to edit rather than to run.
-    open_requested = pyqtSignal(str, str)           # (image prompt_id, video prompt_id): a dropped recipe
-    open_category_requested = pyqtSignal(str, str, str)  # (image prompt_id, category, intent)
+    combine_requested = pyqtSignal(object)  # a CombineRequest: what was asked for
     intent_changed = pyqtSignal(str)  # the Video/Genau radio moved — regrey the acts
     item_activated = pyqtSignal(str)  # a slot's picture or clip was clicked (prompt_id)
 
@@ -298,22 +307,20 @@ class CombinePanel(QWidget):
 
     def _emit(self):
         """Generate: run the chosen recipe on the dropped image now."""
-        self._dispatch(self.generate_requested, self.category_requested)
+        self._dispatch(edit_first=False)
 
     def _emit_open(self):
         """“Edit…”: hand the chosen recipe to a generate tab to change first."""
-        self._dispatch(self.open_requested, self.open_category_requested)
+        self._dispatch(edit_first=True)
 
-    def _dispatch(self, video_signal, category_signal):
-        """Emit the chosen recipe on the pair of signals for the requested action: a
-        picked act on ``category_signal``, else a dropped video on ``video_signal``.
-        Only the act path carries the intent.
-        """
+    def _dispatch(self, *, edit_first: bool):
+        """Announce what was asked for: a picked act, else the dropped video, and
+        nothing at all while either the picture or the recipe is missing."""
         image_id = self.image_slot.current_id()
-        if not image_id:
-            return
         category = self.selected_category()
-        if category:
-            category_signal.emit(image_id, category, self.selected_intent())
-        elif self.video_slot.current_id():
-            video_signal.emit(image_id, self.video_slot.current_id())
+        video_id = "" if category else (self.video_slot.current_id() or "")
+        if not image_id or not (category or video_id):
+            return
+        self.combine_requested.emit(CombineRequest(
+            image_id=image_id, video_id=video_id, category=category,
+            intent=self.selected_intent(), edit_first=edit_first))

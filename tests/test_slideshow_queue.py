@@ -14,16 +14,16 @@ from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QPushButton, QWidget
 
 from origenerator.gui.generation_queue import QueueRow
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.slideshow_queue import MARGIN, ROWS, SlideshowQueue
 
 
 def _item(key="j1", status="running", **kw):
     kw.setdefault("caption", "Alpha Workflow › a paper kite")
-    kw.setdefault("frame", None)
     kw.setdefault("reveal", lambda: None)
     kw.setdefault("cancel", lambda: None)
-    return InFlightItem(key=key, status=status, **kw)
+    reading = {k: kw.pop(k) for k in list(kw) if k in ("status", "frame", "progress", "pass_progress", "stage", "started_at", "typical_seconds")}
+    return InFlightItem(key=key, reading=RunReading(status=status, **reading), **kw)
 
 
 @pytest.fixture

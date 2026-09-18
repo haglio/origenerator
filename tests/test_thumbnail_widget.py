@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import corner_controls, drag_thumbnail, icons
 from origenerator.gui.corner_controls import CORNER_INSET
-from origenerator.gui.inflight import EnhancingRun
+from origenerator.gui.inflight import RunReading
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -452,7 +452,7 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
 def _run(**kw):
     base = dict(status="running", frame=None)
     base.update(kw)
-    return EnhancingRun(**base)
+    return RunReading(**base)
 
 
 def _png_bytes(color=(30, 90, 160)):

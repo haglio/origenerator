@@ -81,7 +81,6 @@ from origenerator.gui.inflight import (
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.timing import RunTiming, elapsed_since
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 ensure_shared_ui_on_path()
@@ -300,12 +299,10 @@ class RunningPreview(OpensAFolder, QWidget):
         """
         if self._item is None:
             return
-        elapsed = elapsed_since(self._item.started_at)
+
         self._progress.show_progress(
-            RunTiming(elapsed, self._item.progress,
-                      self._item.typical_seconds).status_label(step=self._item.stage),
-            self._item.progress if self._item.status == "running" else None,
-            self._item.pass_progress if self._item.status == "running" else None,
+            self._item.reading.caption(),
+            *self._item.reading.bars(),
         )
 
     def _render_frame(self, item):
@@ -327,7 +324,7 @@ class RunningPreview(OpensAFolder, QWidget):
         """
         side = min(self.height(), _STRIP_HEIGHT)
         pixmap = QPixmap()
-        frame = None if item is None else item.frame
+        frame = None if item is None else item.reading.frame
         if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
             pixmap = pixmap.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio,
                                    Qt.TransformationMode.SmoothTransformation)
@@ -677,7 +674,7 @@ class GenerationQueue(QWidget):
             # be dropped in front of it. Everything else is only waiting — held
             # or not — and its place is the user's to change.
             self._rows_column.insertWidget(
-                index, QueueRow(item, movable=item.status != "running")
+                index, QueueRow(item, movable=not item.reading.rendering)
             )
         # The scroll area would otherwise squeeze the whole line into its own
         # height, stacking the rows on top of each other instead of scrolling.
@@ -752,7 +749,7 @@ class GenerationQueue(QWidget):
         """The first slot a row may be moved to or from — past whatever is already
         being rendered, which nothing can be put in front of."""
         for index, item in enumerate(self._items):
-            if item.status != "running":
+            if not item.reading.rendering:
                 return index
         return len(self._items)
 

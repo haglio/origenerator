@@ -6,7 +6,7 @@ import pytest
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import InFlightItem, RunReading
 
 
 @pytest.fixture
@@ -24,10 +24,13 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
           starting=False):
-    return InFlightItem(key=key, caption=caption, status=status, frame=frame,
-                        reveal=reveal or (lambda: None), progress=progress, cancel=cancel,
-                        foreign_ahead=foreign_ahead, held=held, started_at=started_at,
-                        typical_seconds=typical_seconds, auto_generating=auto_generating,
+    return InFlightItem(key=key, caption=caption,
+                        reading=RunReading(status=status, frame=frame, progress=progress,
+                                           started_at=started_at,
+                                           typical_seconds=typical_seconds),
+                        reveal=reveal or (lambda: None), cancel=cancel,
+                        foreign_ahead=foreign_ahead, held=held,
+                        auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
                         recipe_category=recipe_category, recipe_thumbnail=recipe_thumbnail,
@@ -563,7 +566,7 @@ def test_the_clock_advances_between_polls(queue):
     # time.
     queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
     assert _timing(queue) == "0:05 elapsed"
-    queue._running._item.started_at -= 3  # as if three seconds had gone by
+    queue._running._item.reading.started_at -= 3  # as if three seconds had gone by
     queue._running._tick.timeout.emit()
     assert _timing(queue) == "0:08 elapsed"
 

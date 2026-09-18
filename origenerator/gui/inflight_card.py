@@ -32,7 +32,6 @@ from origenerator.gui.inflight import InFlightItem, queue_wait_text
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming, elapsed_since
 
 _IMAGE_SIZE = grid_card.PICTURE_SIZE  # the family shape, so cards flow with tiles
 _BORDER_PX = 2
@@ -120,7 +119,8 @@ class InFlightCard(QWidget):
         self._item = item
         self._caption.setText(item.caption)
         pixmap = QPixmap()
-        if item.frame and pixmap.loadFromData(item.frame) and not pixmap.isNull():
+        if (item.reading.frame and pixmap.loadFromData(item.reading.frame)
+                and not pixmap.isNull()):
             self._image.setPixmap(pixmap.scaled(
                 *_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
@@ -132,7 +132,7 @@ class InFlightCard(QWidget):
         self._render_timing()
         # Only a job ComfyUI has actually started has a clock to advance; ticking a
         # queued one would redraw a line that cannot change.
-        if item.started_at is None:
+        if item.reading.started_at is None:
             self._tick.stop()
         else:
             self._tick.start()
@@ -156,7 +156,7 @@ class InFlightCard(QWidget):
         hold is another app's — what it is waiting on."""
         return (queue_wait_text(item.foreign_ahead)
                 or {"running": "Generating…", "speaking": "Speaking her lines…"}.get(
-                    item.status, "Queued…"))
+                    item.reading.status, "Queued…"))
 
     def _render_timing(self):
         """Write the run's reading across the bar at the frame's foot.
@@ -165,16 +165,13 @@ class InFlightCard(QWidget):
         so the bar stays indeterminate with nothing written on it: its wait is the
         queue's to explain, not a zero counting up over a bar that has not moved.
         """
-        elapsed = elapsed_since(self._item.started_at)
+
         self._bar.show_progress(
             # A tile's width takes the compact reading: what pass is being
             # taken, how far along, and how much longer. The strip's queue has
             # the room for the elapsed count too.
-            RunTiming(elapsed, self._item.progress,
-                      self._item.typical_seconds).status_label(
-                          step=self._item.stage, compact=True),
-            self._item.progress if self._item.status == "running" else None,
-            self._item.pass_progress if self._item.status == "running" else None,
+            self._item.reading.caption(compact=True),
+            *self._item.reading.bars(),
         )
 
     def _place_overlays(self):

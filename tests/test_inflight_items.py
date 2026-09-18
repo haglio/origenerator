@@ -118,8 +118,8 @@ def test_a_running_row_no_live_job_holds_still_gets_a_plain_card(build):
     items = build([_row("g1", status="running")])
 
     card, = items
-    assert (card.frame, card.progress, card.cancel) == (None, None, None)
-    assert card.status == "running"
+    assert (card.reading.frame, card.reading.progress, card.cancel) == (None, None, None)
+    assert card.reading.status == "running"
 
 
 def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
@@ -128,7 +128,7 @@ def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
                   jobs_by_folder={"image/sdxl_t2i/aaa": [job]})
 
     card, = items
-    assert (card.frame, card.progress, card.stage) == (b"frame", (5, 20), "Render")
+    assert (card.reading.frame, card.reading.progress, card.reading.stage) == (b"frame", (5, 20), "Render")
     assert card.cancel is not None
 
 
@@ -139,7 +139,7 @@ def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
     items = build([_row("g1", status="running")],
                   jobs_by_folder={"image/sdxl_t2i/aaa": [job]})
 
-    assert items[0].status == "speaking"
+    assert items[0].reading.status == "speaking"
 
 
 def test_the_queues_own_line_orders_the_cards(build):
@@ -211,4 +211,4 @@ def test_a_queued_run_with_no_picture_shows_what_its_folder_already_holds(build)
 def test_a_workflows_recent_runs_are_what_the_countdown_reads(build):
     items = build([_row("g1", status="running")])
 
-    assert items[0].typical_seconds == pytest.approx(32.0)
+    assert items[0].reading.typical_seconds == pytest.approx(32.0)

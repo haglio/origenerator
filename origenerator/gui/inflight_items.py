@@ -17,7 +17,7 @@ from collections.abc import Callable
 
 from origenerator import gallery, timing
 from origenerator.gui.generation_job import JobState, display_status
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.orientation import row_orientation
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -123,15 +123,19 @@ class InFlightItems:
             items.append(InFlightItem(
                 key=pid,
                 caption=gallery.config_tab_title(workflow_name, params),
-                status=(JobState.SPEAKING if speaking
-                        else display_status(row.get("status"))),
-                frame=frame,
+                reading=RunReading(
+                    status=(JobState.SPEAKING if speaking
+                            else display_status(row.get("status"))),
+                    frame=frame,
+                    progress=progress,
+                    pass_progress=pass_progress,
+                    stage=stage,
+                    started_at=started,
+                    typical_seconds=self._typical_seconds(workflow_name, typical),
+                ),
                 reveal=lambda k=folder_key: self._on_reveal(k),
                 media_type=gallery.media_type_of_row(row),  # image/video corner badge
                 orientation=row_orientation(row),  # the side its picture will land on
-                progress=progress,
-                pass_progress=pass_progress,
-                stage=stage,
                 cancel=cancel,
                 # Its folder auto-looping makes that button "Next seed": the press
                 # discards this run and the loop launches another. A menu can
@@ -140,8 +144,6 @@ class InFlightItems:
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
                 held=pid in held,
-                started_at=started,
-                typical_seconds=self._typical_seconds(workflow_name, typical),
                 job_kind=kind,
                 requested=pid in requested,
                 # Only where the start frame is what the run is *of*: a video
@@ -173,7 +175,7 @@ class InFlightItems:
             ))
         place = {pid: i for i, pid in enumerate(self._reroll.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
-                                   it.status != "running"))
+                                   not it.reading.rendering))
         return items
 
     @staticmethod

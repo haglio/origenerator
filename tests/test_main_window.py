@@ -485,7 +485,7 @@ def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_pa
     win = _window(qtbot, tmp_path)
 
     item = next(it for it in win._gallery_view._inflight_items() if it.key == "rr")
-    assert item.progress == (30, 50)
+    assert item.reading.progress == (30, 50)
 
 
 def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):

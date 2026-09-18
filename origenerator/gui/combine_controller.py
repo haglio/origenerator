@@ -41,7 +41,8 @@ from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
 from origenerator.gui.export_lane import GENAU as GENAU_LANE
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.generation_job import JobState
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.media import MediaType
@@ -327,8 +328,7 @@ class CombineController(QObject):
         self._launching[key] = InFlightItem(
             key=key,
             caption="A video from Combine, still being started",
-            status="queued",
-            frame=None,
+            reading=RunReading(status=JobState.QUEUED),
             reveal=lambda: None,  # no folder to open yet: it has no settings
             media_type=MediaType.VIDEO,
             job_kind="Video",

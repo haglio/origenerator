@@ -366,7 +366,7 @@ class BrowserPane(QObject):
     def show_enhancing(self, runs: dict):
         """Hand every visible tile the enhancement being made of its image.
 
-        ``runs`` is ``{prompt_id: EnhancingRun}`` for the enhances in flight
+        ``runs`` is ``{prompt_id: RunReading}`` for the enhances in flight
         right now — the latest frame, how far along the run is, and how long it
         has been going. A tile not named there is handed ``None`` and goes back
         to resting. The tile keeps its own picture until a frame arrives — the

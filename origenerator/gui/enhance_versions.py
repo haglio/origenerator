@@ -39,6 +39,7 @@ it would have duplicated.
 from __future__ import annotations
 
 import json
+from typing import NamedTuple
 
 from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
@@ -56,6 +57,7 @@ from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui import palette
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
+from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
 from origenerator.paths import ensure_shared_ui_on_path
 
@@ -130,6 +132,26 @@ def _pass_mouse_through(widget) -> None:
     """
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+
+
+
+class RunningEnhancement(NamedTuple):
+    """The enhancement in flight on the image on display, as its live row shows
+    it: what the run is doing, its latest frame if one has streamed, and the
+    settings it was launched with -- which name what is being made, since the
+    panel may have moved on since the press."""
+
+    status: str
+    frame: bytes | None
+    settings: str = ""
+
+
+class EnhanceOffer(NamedTuple):
+    """The row that would start one: the settings it would run, and the level
+    those settings would duplicate (``None`` when they would make something new)."""
+
+    settings: str
+    duplicate_of: object = None
 
 
 class _Row(QWidget):
@@ -360,22 +382,22 @@ class _PendingRow(_Row):
         self._settings = ""
         self.setToolTip("An enhancement of this image is being generated")
 
-    def update_pending(self, status: str, frame: bytes | None, settings: str = ""):
+    def update_pending(self, pending: RunningEnhancement):
         pixmap = QPixmap()
-        if frame and pixmap.loadFromData(frame) and not pixmap.isNull():
+        if pending.frame and pixmap.loadFromData(pending.frame) and not pixmap.isNull():
             self._show_picture(pixmap)
         else:
             self._picture.setText(
-                "Generating…" if status == "running" else "Queued…"
+                "Generating…" if pending.status == JobState.RUNNING else "Queued…"
             )
         # Only when the text actually moves: a run streams several frames a
         # second and each would otherwise rebuild the row under the cursor.
-        if settings != self._settings:
-            self._settings = settings
-            self._show_facts([MetaItem("Enhancement", settings)] if settings else [])
+        if pending.settings != self._settings:
+            self._settings = pending.settings
+            self._show_facts([MetaItem("Enhancement", pending.settings)] if pending.settings else [])
         self.setToolTip(
-            f"An enhancement of this image is being generated at {settings}"
-            if settings else "An enhancement of this image is being generated"
+            f"An enhancement of this image is being generated at {pending.settings}"
+            if pending.settings else "An enhancement of this image is being generated"
         )
 
 
@@ -465,18 +487,17 @@ class EnhanceVersions(QWidget):
     def set_collapsed(self, collapsed: bool) -> None:
         self._section.set_collapsed(collapsed)
 
-    def show_levels(self, items: list[tuple], pending: tuple | None = None,
-                    add: tuple | None = None, created_fallback: str = "",
+    def show_levels(self, items: list[tuple], pending: RunningEnhancement | None = None,
+                    add: EnhanceOffer | None = None, created_fallback: str = "",
                     held_days: int | None = None, deletable: bool = True):
         """Rebuild the list from ``(level, image_path)`` pairs.
 
-        ``add`` is ``(settings, duplicate_of)`` for the ``+ Enhance`` row, which
+        ``add`` is the :class:`EnhanceOffer` for the ``+ Enhance`` row, which
         leads the list: that is where a new version arrives, since the list runs
         newest first. ``duplicate_of`` names the level those settings would
         duplicate, or ``None`` when they would make something new.
 
-        ``pending`` is the ``(status, frame, settings)`` of an enhancement still
-        running, and it takes that same leading slot — the row *becomes* the
+        ``pending`` is the :class:`RunningEnhancement` of one still running, and it takes that same leading slot — the row *becomes* the
         thing it asked for rather than sitting beside it, which is what the press
         looks like from the other side.
 
@@ -508,14 +529,13 @@ class EnhanceVersions(QWidget):
         # flight if there is one, else the row that would start it.
         if pending is not None:
             self._pending = _PendingRow()
-            self._pending.update_pending(*pending)
+            self._pending.update_pending(pending)
             column.addWidget(self._pending)
         elif add is not None:
-            settings, duplicate_of = add
-            card = _AddRow(settings, duplicate_of)
+            card = _AddRow(add.settings, add.duplicate_of)
             card.clicked.connect(self.enhance_requested)
             card.hovered.connect(
-                lambda on, at=duplicate_of: self._highlight_level(at, on))
+                lambda on, at=add.duplicate_of: self._highlight_level(at, on))
             column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
             row = _LevelRow(level, position, image_path, created_fallback, held_days)
@@ -597,7 +617,7 @@ class EnhanceVersions(QWidget):
             return
         self._rows[position].set_highlighted(on)
 
-    def update_pending(self, pending: tuple | None) -> bool:
+    def update_pending(self, pending: RunningEnhancement | None) -> bool:
         """Feed a new frame to the row already standing, without rebuilding.
 
         A run streams frames several times a second, and rebuilding the list on
@@ -608,5 +628,5 @@ class EnhanceVersions(QWidget):
         if (self._pending is None) != (pending is None):
             return False
         if pending is not None:
-            self._pending.update_pending(*pending)
+            self._pending.update_pending(pending)
         return True

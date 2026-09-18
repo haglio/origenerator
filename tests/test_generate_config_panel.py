@@ -19,6 +19,7 @@ from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
+from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -1068,7 +1069,7 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     panel.show_saved_generation(image, [image])
     assert not panel._versions._host.findChildren(_PendingRow)
 
-    panel.set_pending_enhancement(("running", None, "2x · 20 steps · 0.15 redraw"))
+    panel.set_pending_enhancement(RunningEnhancement("running", None, "2x · 20 steps · 0.15 redraw"))
 
     assert not panel._versions.isHidden()
     assert panel._versions._host.findChildren(_PendingRow)
@@ -1098,7 +1099,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     panel._preview.show_frame = MagicMock()
     panel._preview.show_media.reset_mock()
 
-    panel.set_pending_enhancement(("running", b"\x89PNG-ish", "2x"))
+    panel.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
     panel._preview.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
 
     # ...and when the run ends the pane goes back to the image itself.
@@ -1692,14 +1693,14 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
     panel.show_saved_generation(image, [image])
     _set_prompt(panel, "a dog")
 
-    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+    panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
     assert _notice(panel) == "(not yet generated with modifications)"
     assert not panel._preview._notice_dim.isHidden()
 
     # ...and it goes on standing as the run streams, rather than blinking off
     # with every frame that arrives.
-    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path, 10), "2x"))
+    panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path, 10), "2x"))
 
     assert _notice(panel) == "(not yet generated with modifications)"
 
@@ -1721,7 +1722,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
     _set_prompt(panel, "a dog")
-    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+    panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
     enhanced = _fold_enhancement(db, "img1")
     panel.refresh_displayed(enhanced, [enhanced])
@@ -1943,7 +1944,7 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
 
-    panel.set_pending_enhancement(("running", _frame_bytes(tmp_path), "2x"))
+    panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
     assert panel._preview.actions_id() == "img1"
 

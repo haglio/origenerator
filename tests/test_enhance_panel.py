@@ -21,7 +21,9 @@ from origenerator.gallery import (
 from origenerator.gui import drag_thumbnail
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
+    EnhanceOffer,
     EnhanceVersions,
+    RunningEnhancement,
     _AddRow,
     _LevelRow,
     _PendingRow,
@@ -790,7 +792,7 @@ def test_the_add_card_leads_the_strip_and_reports_its_press(qtbot):
     # newest first.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     tiles = versions._host.findChildren((_LevelRow, _AddRow))
     assert isinstance(tiles[0], _AddRow)
 
@@ -805,8 +807,8 @@ def test_a_running_enhance_takes_the_add_cards_slot_rather_than_sitting_beside_i
     # like from the other side.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), pending=("running", None, "2x"),
-                         add=("2x", None))
+    versions.show_levels(_items(_levels(1)), pending=RunningEnhancement("running", None, "2x"),
+                         add=EnhanceOffer("2x", None))
     tiles = versions._host.findChildren((_PendingRow, _AddRow, _LevelRow))
     assert isinstance(tiles[0], _PendingRow)
     assert not versions._host.findChildren(_AddRow)
@@ -823,7 +825,7 @@ def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtb
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     versions.resize(420, 600)
     versions.show()
     QApplication.processEvents()
@@ -841,7 +843,7 @@ def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtb
 def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", None))
+    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
     (card,) = versions._host.findChildren(_AddRow)
     plus = card._picture.pixmap().toImage()  # drawn, like the bank's plus, not typed
 
@@ -853,7 +855,7 @@ def test_the_add_cards_plus_is_drawn_big_in_its_tile(qtbot):
 def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels([], add=("2x", None))
+    versions.show_levels([], add=EnhanceOffer("2x", None))
     assert not versions.isHidden()
     assert versions._host.findChildren(_AddRow)
 
@@ -861,7 +863,7 @@ def test_an_image_with_nothing_yet_still_gets_the_card(qtbot):
 def test_the_card_dims_when_it_would_only_duplicate_a_level(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x · 20 steps", 0))
+    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", 0))
     (card,) = versions._host.findChildren(_AddRow)
 
     pressed = []
@@ -874,7 +876,7 @@ def test_the_card_dims_when_it_would_only_duplicate_a_level(qtbot):
 def test_hovering_the_dimmed_card_lights_the_level_it_would_duplicate(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(2)), add=("2x", 1))
+    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", 1))
     duplicate = versions._rows[1]
     assert duplicate._picture.styleSheet() == ""
 
@@ -1007,7 +1009,7 @@ def test_a_missing_file_drags_without_a_picture(qtbot, monkeypatch):
 def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), ("running", None, "2x"))
+    versions.show_levels(_items(_levels(1)), RunningEnhancement("running", None, "2x"))
     tiles = versions._host.findChildren((_PendingRow, _LevelRow))
     assert isinstance(tiles[0], _PendingRow)   # newest first, and it's becoming that
 
@@ -1017,7 +1019,7 @@ def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
     # being made for it is worth showing, so the strip appears for that alone.
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(0)), ("queued", None, "2x"))
+    versions.show_levels(_items(_levels(0)), RunningEnhancement("queued", None, "2x"))
     assert not versions.isHidden()
 
 
@@ -1029,7 +1031,7 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)),
-                         ("queued", None, "3x · 40 steps · 0.35 redraw"))
+                         RunningEnhancement("queued", None, "3x · 40 steps · 0.35 redraw"))
     texts = [lbl.text().replace("\u200b", "")
              for lbl in versions._pending.findChildren(QLabel)]
     assert "Queued…" in texts
@@ -1040,10 +1042,10 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
 def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), ("running", None, "2x"))
+    versions.show_levels(_items(_levels(1)), RunningEnhancement("running", None, "2x"))
     tile = versions._pending
 
-    assert versions.update_pending(("running", b"not a real png", "2x")) is True
+    assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
     assert versions._pending is tile          # the same widget, fed in place
 
     # A run starting or ending changes the strip's shape, which only a rebuild
@@ -1079,7 +1081,7 @@ def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_levels(_items(_levels(1)), add=("2x", None))
+    versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x", None))
 
     (section,) = versions.findChildren(CollapsibleSection)
     assert "Enhancement levels" in section._header.text()
@@ -1094,7 +1096,7 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.set_collapsed(True)
-    versions.show_levels(_items(_levels(2)), add=("2x", None))
+    versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", None))
     assert versions.is_collapsed()
 
 

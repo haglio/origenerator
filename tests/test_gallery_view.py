@@ -8570,8 +8570,8 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     )]
 
     item = view._inflight_items()[0]
-    assert item.started_at == began
-    assert item.typical_seconds == 724.0   # the median of the three timed runs
+    assert item.reading.started_at == began
+    assert item.reading.typical_seconds == 724.0   # the median of the three timed runs
 
     view._update_queue()
     assert view._queue._running.status_text() == "50% · 1:30 elapsed · ~6:02 left"
@@ -8587,7 +8587,7 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._inflight_items()[0].started_at is None
+    assert view._inflight_items()[0].reading.started_at is None
     assert view._queue._running.status_text() == ""
 
 
@@ -8604,7 +8604,7 @@ def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
 
     item = view._inflight_items()[0]
     assert item.job_kind == "Video"
-    assert item.typical_seconds == 120.0
+    assert item.reading.typical_seconds == 120.0
 
 
 def test_a_job_a_spoken_request_queued_says_so(qtbot):

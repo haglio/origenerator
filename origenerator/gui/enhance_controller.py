@@ -27,7 +27,8 @@ from origenerator import gallery
 from origenerator.generation_config import randomize_seeds
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
-from origenerator.gui.inflight import EnhancingRun
+from origenerator.gui.generation_job import JobState
+from origenerator.gui.inflight import RunReading
 from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -465,7 +466,7 @@ class EnhanceController:
                 return job
         return None
 
-    def run_of(self, row: dict) -> EnhancingRun | None:
+    def run_of(self, row: dict) -> RunReading | None:
         """The standalone enhance being made of this image right now, as the
         image's tile sees it, or ``None``.
 
@@ -476,7 +477,7 @@ class EnhanceController:
         job = self._job_for(row)
         return self._as_run(job) if job is not None else None
 
-    def _as_run(self, job) -> EnhancingRun:
+    def _as_run(self, job) -> RunReading:
         """One enhance in flight, as every surface showing it reads it.
 
         The frame is the job's own latest, which a run that hasn't started has
@@ -485,9 +486,9 @@ class EnhanceController:
         way, whether the job is still in this app's line or already sitting on
         ComfyUI, since neither has a frame to show.
         """
-        rendering = job.state == "running"
-        return EnhancingRun(
-            status="running" if rendering else "queued",
+        rendering = job.state == JobState.RUNNING
+        return RunReading(
+            status=JobState.RUNNING if rendering else JobState.QUEUED,
             frame=job.last_preview,
             progress=job.last_progress,
             pass_progress=job.last_pass_progress,

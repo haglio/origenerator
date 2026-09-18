@@ -728,14 +728,14 @@ def test_the_toast_wears_the_color_of_what_it_says(qtbot):
 # --- the queue, in the corner this view leaves empty -------------------------
 
 def _inflight(**kw):
-    from origenerator.gui.inflight import InFlightItem
+    from origenerator.gui.inflight import InFlightItem, RunReading
 
     kw.setdefault("key", "j1")
     kw.setdefault("caption", "Alpha Workflow › a paper kite")
     kw.setdefault("status", "queued")
-    kw.setdefault("frame", None)
     kw.setdefault("reveal", lambda: None)
-    return InFlightItem(**kw)
+    reading = {k: kw.pop(k) for k in list(kw) if k in ("status", "frame", "progress", "pass_progress", "stage", "started_at", "typical_seconds")}
+    return InFlightItem(reading=RunReading(**reading), **kw)
 
 
 def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):

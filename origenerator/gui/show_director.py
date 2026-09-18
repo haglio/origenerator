@@ -932,9 +932,9 @@ class ShowDirector:
         if show is None or show.is_live():
             return
         for item in items:
-            if item.frame is not None and (show.holds(item.key)
+            if item.reading.frame is not None and (show.holds(item.key)
                                            or self._would_play(item.key)):
-                show.note_generating(item.key, item.frame)
+                show.note_generating(item.key, item.reading.frame)
         show.note_in_flight({item.key for item in items})
 
     def note_enhanced(self, row: dict | None):

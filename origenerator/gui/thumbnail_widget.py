@@ -17,12 +17,11 @@ from origenerator.gui.corner_controls import (
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.inflight import EnhancingRun
+from origenerator.gui.inflight import RunReading
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.progress_caption import ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
-from origenerator.timing import RunTiming, elapsed_since
 
 _IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
 _BORDER_PX = 2                 # the image's own edge, which the overlays stay inside
@@ -72,7 +71,7 @@ class ThumbnailWidget(QWidget):
                  parent=None, *, media_type: str | None = None,
                  movie_path: str | None = None, starred: bool = False,
                  enhance: str | None = None, controls: bool = True,
-                 enhancing: EnhancingRun | None = None,
+                 enhancing: RunReading | None = None,
                  corner_actions: list[CornerAction] | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
@@ -214,7 +213,7 @@ class ThumbnailWidget(QWidget):
             return
         self._controls.show_for(starred=self._starred, enhance=self._enhance)
 
-    def set_enhancing(self, run: EnhancingRun | None):
+    def set_enhancing(self, run: RunReading | None):
         """Show the enhancement being made of this image, or clear it away.
 
         Fed on every reconcile, so a fresh frame and another step of progress
@@ -282,12 +281,10 @@ class ThumbnailWidget(QWidget):
         run = self._enhancing
         if run is None:
             return
-        elapsed = elapsed_since(run.started_at)
+
         self._enhancing_bar.show_progress(
-            RunTiming(elapsed, run.progress, run.typical_seconds).status_label(
-                step=run.stage, compact=True),
-            run.progress if run.status == "running" else None,
-            run.pass_progress if run.status == "running" else None,
+            run.caption(compact=True),
+            *run.bars(),
         )
 
     def _place_enhancing_bar(self):

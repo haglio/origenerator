@@ -32,7 +32,7 @@ from origenerator.gui.gallery_tree import (
     REQUESTS_KEY,
     TRASH_KEY,
 )
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
@@ -223,7 +223,8 @@ def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_i
         qtbot, monkeypatch):
     rows = [_row("g1", 1, _ago(minutes=5))]
     pane, scroll = _pane(qtbot, rows)
-    running = InFlightItem(key="j1", caption="scene one", status="running", frame=None,
+    running = InFlightItem(key="j1", caption="scene one",
+                           reading=RunReading(status="running"),
                            reveal=lambda: None, media_type="image")
     monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
     _open_recents(pane, rows)
@@ -236,7 +237,8 @@ def test_latest_puts_work_started_long_after_the_newest_picture_in_a_now_section
         qtbot, monkeypatch):
     rows = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, rows)
-    running = InFlightItem(key="j1", caption="scene one", status="running", frame=None,
+    running = InFlightItem(key="j1", caption="scene one",
+                           reading=RunReading(status="running"),
                            reveal=lambda: None, media_type="image")
     monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [running])
     _open_recents(pane, rows)
@@ -330,7 +332,7 @@ def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
                    output_files=json.dumps([]))
     finished = _row("g1", 1, _ago(hours=5))
     pane, scroll = _pane(qtbot, [running, finished])
-    card = InFlightItem(key="r1", caption="scene one", status="running", frame=None,
+    card = InFlightItem(key="r1", caption="scene one", reading=RunReading(status="running"),
                         reveal=lambda: None, media_type="image")
     monkeypatch.setattr(pane, "inflight_items", lambda rows=None, requests=None: [card])
 

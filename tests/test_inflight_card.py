@@ -6,7 +6,7 @@ import time
 from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
 
-from origenerator.gui.inflight import InFlightItem
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.media_badge import MediaBadge
 
@@ -17,11 +17,14 @@ def _png_bytes(color=(200, 50, 50)):
     return buf.getvalue()
 
 
+_READING_KEYS = ("status", "frame", "progress", "pass_progress", "stage", "started_at", "typical_seconds")
+
+
 def _item(**kw):
-    base = dict(key="p1", caption="SDXL › a cat", status="queued",
-                frame=None, reveal=lambda: None)
+    reading = {"status": "queued"} | {k: kw.pop(k) for k in list(kw) if k in _READING_KEYS}
+    base = dict(key="p1", caption="SDXL › a cat", reveal=lambda: None)
     base.update(kw)
-    return InFlightItem(**base)
+    return InFlightItem(reading=RunReading(**reading), **base)
 
 
 def test_card_says_queued_over_the_frame(qtbot):
@@ -139,7 +142,7 @@ def test_the_clock_advances_between_polls(qtbot):
     qtbot.addWidget(card)
     assert card._bar.caption() == "~1:34 left"
 
-    card._item.started_at -= 3  # as if three seconds had gone by
+    card._item.reading.started_at -= 3  # as if three seconds had gone by
     card._tick.timeout.emit()
     assert card._bar.caption() == "~1:31 left"
 

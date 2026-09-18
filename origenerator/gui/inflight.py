@@ -7,10 +7,11 @@ note — and none of them should know where a job came from or how to reach it.
 They are handed :class:`InFlightItem` instead: a plain view-model the gallery
 builds per job, carrying what to draw, how to stop it, and how to go to it.
 
-:class:`EnhancingRun` is the same idea for the one run that has no card of its
-own: an enhancement is shown on the tile of the image it improves
-(:mod:`origenerator.gui.thumbnail_widget`), which already has a picture, a name
-and a click of its own — so all it needs handed to it is how the run is going.
+How the run itself is going — what it is doing, its latest frame, how far along
+it is, how long it has left — is :class:`RunReading`, which an item carries and
+which is also all the tile of an image being enhanced is handed
+(:mod:`origenerator.gui.thumbnail_widget`): that tile has a picture, a name and
+a click of its own already.
 
 :func:`queue_wait_text` is here for the same reason: what a wait on another app
 reads like is one wording, shared by every surface that has to say it — as is
@@ -23,7 +24,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from origenerator.timing import queue_estimate_label
+from origenerator.gui.generation_job import JobState
+from origenerator.timing import RunTiming, elapsed_since, queue_estimate_label
 
 
 @dataclass
@@ -32,23 +34,13 @@ class InFlightItem:
 
     key: str                     # stable id: the job's prompt id
     caption: str                 # what a surface labels the job (workflow › prompt)
-    status: str                  # "running", "queued", or "speaking" (its lines, before it is sent)
-    frame: bytes | None          # latest live preview frame, if one has arrived
+    reading: RunReading          # how the run itself is going
     reveal: Callable[[], None]   # show the job's gallery folder and its live tile
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     # Which side of the tree the job belongs to, by the shape it was asked to
     # come out: a running generation has no picture to measure, and its card has
     # to sit on the shelf its picture will land on rather than move there later.
     orientation: str = "landscape"
-    progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps, for a progress bar
-    # The one sampler pass running right now, on its own count — the band along
-    # the foot of that bar. ``None`` for a job of a single pass, which has
-    # nothing to say the whole-run reading doesn't.
-    pass_progress: tuple[int, int] | None = None
-    # What the app is doing right now ("Loading models", "First pass", "Writing
-    # the video"), which the bar's caption leads with. "" before ComfyUI has
-    # named a node — which for a queued job is the whole of its wait.
-    stage: str = ""
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"
     # End the loop its folder is on. What a menu's real stop calls before
@@ -58,11 +50,6 @@ class InFlightItem:
     stop_auto: Callable[[], None] | None = None
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
     held: bool = False           # the queue is holding it back (a video, during a slideshow)
-    # The two halves of the countdown on the job being rendered: when ComfyUI
-    # began executing it (None while it's still queued), and what this workflow's
-    # recent runs say a whole one takes.
-    started_at: float | None = None
-    typical_seconds: float | None = None
     # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
@@ -128,7 +115,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     request is the kind that is easy not to recognize later. A hand-launched job
     says neither, and needs to say neither.
     """
-    parts = [queue_estimate_label(item.typical_seconds)]
+    parts = [queue_estimate_label(item.reading.typical_seconds)]
     if item.job_kind:
         parts.append(item.job_kind)
     if item.recipe_category:
@@ -149,10 +136,10 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     """
     if item.starting:
         lines = ["Not sent to ComfyUI yet — this row stands in until it is"]
-    elif item.typical_seconds is None:
+    elif item.reading.typical_seconds is None:
         lines = ["No timing data for this workflow yet"]
     else:
-        lines = [f"About {queue_estimate_label(item.typical_seconds).lstrip('~')}"
+        lines = [f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
                  " on this workflow's recent runs"]
     lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
     if item.recipe_category:
@@ -175,19 +162,16 @@ _KIND_TOOLTIPS = {
 
 
 @dataclass
-class EnhancingRun:
-    """An enhancement in flight, as the tile of the image it improves sees it.
+class RunReading:
+    """How a run in flight is going, as every surface showing one reads it.
 
-    The tile shows it the way every other in-flight surface shows its work: the
-    stage on a dimming scrim over the picture, and how far along it is on a bar
-    along the picture's foot. So it is handed the same readings an
-    :class:`InFlightItem` carries, minus the ones the tile already has — the
-    picture is the image being enhanced, and the name and the click are the
-    tile's own.
+    A queued or running generation carries one inside its :class:`InFlightItem`;
+    the tile of an image being enhanced is handed one on its own, since the
+    picture, the name and the click there are the tile's already.
     """
 
-    status: str                              # "running" or "queued"
-    frame: bytes | None                      # latest live frame, if one has arrived
+    status: str                              # JobState.RUNNING, QUEUED or SPEAKING
+    frame: bytes | None = None               # latest live frame, if one has arrived
     progress: tuple[int, int] | None = None  # (cumulative, total) sampler steps
     # The pass running right now, on its own count, for the band along the foot
     # of the bar. An enhancement is the run that most needs it: the upscale and
@@ -200,6 +184,22 @@ class EnhancingRun:
     # countdown on the bar.
     started_at: float | None = None
     typical_seconds: float | None = None
+
+    @property
+    def rendering(self) -> bool:
+        """Whether ComfyUI is working on it now, rather than holding it in line."""
+        return self.status == JobState.RUNNING
+
+    def caption(self, *, compact: bool = False) -> str:
+        """The line over the bar: what is being done, and how much is left of it."""
+        return RunTiming(elapsed_since(self.started_at), self.progress,
+                         self.typical_seconds).status_label(step=self.stage,
+                                                            compact=compact)
+
+    def bars(self) -> tuple:
+        """What the bar and its band show — nothing at all while the run is still
+        waiting, which has no progress to report and no time to count down."""
+        return (self.progress, self.pass_progress) if self.rendering else (None, None)
 
 
 def discard_run_text(auto_generating: bool) -> str:

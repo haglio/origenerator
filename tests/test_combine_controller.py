@@ -393,7 +393,7 @@ def test_a_press_puts_a_row_in_the_line_before_there_is_a_job(combine):
 
     (row,) = controller.launching_rows()
     assert row.key == key
-    assert row.status == "queued" and row.starting is True
+    assert row.reading.status == "queued" and row.starting is True
     assert row.recipe_thumbnail == "clip-thumb.png"
     assert host.queue_redraws == 1
 

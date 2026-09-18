@@ -11,7 +11,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.gui import icons, palette
+from origenerator.gui import grid_card, icons, palette
+
+# The collage's four cells fill the card's picture area, a gap apart.
+_CELL_GAP = 2
+_CELL_SIZE = ((grid_card.PICTURE_SIZE[0] - _CELL_GAP) // 2,
+              (grid_card.PICTURE_SIZE[1] - _CELL_GAP) // 2)
+_INNER_WIDTH = grid_card.CARD_WIDTH - 2 * grid_card.CARD_MARGIN
 
 
 class FolderTile(QFrame):
@@ -34,22 +40,20 @@ class FolderTile(QFrame):
         self._key = key
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # A breadcrumb line (used by the Starred shelf) needs a little more height.
-        self.setFixedSize(180, 216 if context else 200)
-        self.setStyleSheet(
-            f"#folderTile {{ border: 1px solid {palette.CARD_BORDER};"
-            " border-radius: 4px; }"
-            f"#folderTile:hover {{ border-color: {palette.CARD_HOVER_BORDER}; }}"
-        )
+        # The same card the generations beside it in the flow stand in, plus the
+        # breadcrumb line the Starred shelf's tiles carry.
+        self.setFixedSize(*grid_card.folder_card_size(breadcrumb=bool(context)))
+        self.setStyleSheet(grid_card.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(
             lambda pos: self.context_requested.emit(self._key, self.mapToGlobal(pos))
         )
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
-        layout.addWidget(self._build_collage(preview_paths))
+        layout.setContentsMargins(*(grid_card.CARD_MARGIN,) * 4)
+        layout.setSpacing(grid_card.CARD_SPACING)
+        self._collage = self._build_collage(preview_paths)
+        layout.addWidget(self._collage)
 
         if context:
             # Where this folder lives, so a starred folder is tellable apart from a
@@ -57,9 +61,9 @@ class FolderTile(QFrame):
             # folder's own parent — visible; the whole path sits in the tooltip.
             crumb = QLabel()
             crumb.setStyleSheet("color: #7a7a7a; font-size: 10px;")
-            crumb.setFixedHeight(14)
+            crumb.setFixedHeight(grid_card.BREADCRUMB_HEIGHT)
             crumb.setText(crumb.fontMetrics().elidedText(
-                context, Qt.TextElideMode.ElideLeft, 164))
+                context, Qt.TextElideMode.ElideLeft, _INNER_WIDTH))
             crumb.setToolTip(context)
             layout.addWidget(crumb)
 
@@ -73,7 +77,7 @@ class FolderTile(QFrame):
             caption_row.addWidget(self._level_badge(level), 0, Qt.AlignmentFlag.AlignTop)
         caption = QLabel(("★ " if starred else "") + text)
         caption.setWordWrap(True)
-        caption.setMaximumHeight(30)
+        grid_card.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and
         # the settings that set it apart — is read on hover rather than under the
         # collage, where it would take more of the tile than the pictures do.
@@ -83,6 +87,7 @@ class FolderTile(QFrame):
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
         count_label.setStyleSheet("color: #9a9a9a; font-size: 10px;")
+        count_label.setFixedHeight(grid_card.COUNT_HEIGHT)
         layout.addWidget(count_label)
 
     def _level_badge(self, level) -> QLabel:
@@ -96,21 +101,22 @@ class FolderTile(QFrame):
     @staticmethod
     def _build_collage(preview_paths) -> QWidget:
         collage = QWidget()
+        collage.setFixedSize(grid_card.picture_size())
         grid = QGridLayout(collage)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(2)
+        grid.setSpacing(_CELL_GAP)
         previews = list(preview_paths)[:4]
         if not previews:
             placeholder = QLabel("empty")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setStyleSheet(
                 f"color: #6a6a6a; background: {palette.EMPTY_PLATE}; border-radius: 2px;")
-            placeholder.setFixedSize(166, 144)
+            placeholder.setFixedSize(grid_card.picture_size())
             grid.addWidget(placeholder, 0, 0)
             return collage
         for idx in range(4):
             cell = QLabel()
-            cell.setFixedSize(82, 71)
+            cell.setFixedSize(*_CELL_SIZE)
             cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cell.setStyleSheet(
                 f"background: {palette.EMPTY_PLATE}; border-radius: 2px;")
@@ -118,7 +124,7 @@ class FolderTile(QFrame):
                 pm = QPixmap(str(previews[idx]))
                 if not pm.isNull():
                     cell.setPixmap(pm.scaled(
-                        82, 71,
+                        *_CELL_SIZE,
                         Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                         Qt.TransformationMode.SmoothTransformation,
                     ))

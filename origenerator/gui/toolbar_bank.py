@@ -73,7 +73,7 @@ class BankState(NamedTuple):
     undo: Button
     redo: Button
     group: Button
-    star: Button
+    favorite: Button
     enhance: Button
     delete: Button
     slideshow: Button
@@ -98,7 +98,7 @@ class BankActs(NamedTuple):
     start_show: Callable[[], None]
     toggle_auto: Callable[[bool], None]
     go_to_looping_folder: Callable[[str], None]
-    star: Callable[[], None]
+    favorite: Callable[[], None]
     enhance: Callable[[], None]
     group: Callable[[], None]
     delete: Callable[[], None]
@@ -167,7 +167,7 @@ class ToolbarBank(QWidget):
         self.undo = _tool_button(icons.undo_icon(), "Undo", acts.undo)
         self.redo = _tool_button(icons.redo_icon(), "Redo", acts.redo)
         # Shown wherever there's a collection of media to play — a folder, or the
-        # Recents/Starred shelf — with its tooltip naming that subject.
+        # Recents/Favorites shelf — with its tooltip naming that subject.
         self.slideshow = _tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow",
             acts.start_show)
@@ -184,11 +184,11 @@ class ToolbarBank(QWidget):
         # It greys instead when there is nothing to do.
         self.auto_tip = LinkTip(self.auto)
         self.auto_tip.link_activated.connect(acts.go_to_looping_folder)
-        # Star, enhance, delete: the three things you can do to what is in front
+        # Favorite, enhance, delete: the three things you can do to what is in front
         # of you, each aimed the same way — the picked thumbnails, else the
         # folder on screen. Colored, and grouped, because they are one set: gold
         # for keep, green for make-better, red for take-away.
-        self.star = _tool_button(icons.star_icon(filled=True), "Star", acts.star)
+        self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", acts.favorite)
         self.enhance = _tool_button(icons.enhance_icon(), "Enhance", acts.enhance)
         # Turn the folders picked in the tree into a folder of their own. Shown
         # only while several are picked — that selection IS the folder, unsaved.
@@ -232,7 +232,7 @@ class ToolbarBank(QWidget):
             (self.back, self.forward),               # where you are
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
-            (self.star, self.enhance, self.delete),  # …to what's in front
+            (self.favorite, self.enhance, self.delete),  # …to what's in front
             (self.slideshow, self.auto, self.audio),  # what the app is doing,
                                                       # and Esc stops
             (self.mic,),                             # what it hears with
@@ -272,7 +272,7 @@ class ToolbarBank(QWidget):
             (self.undo, state.undo),
             (self.redo, state.redo),
             (self.group, state.group),
-            (self.star, state.star),
+            (self.favorite, state.favorite),
             (self.enhance, state.enhance),
             (self.delete, state.delete),
             (self.slideshow, state.slideshow),

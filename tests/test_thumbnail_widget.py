@@ -261,11 +261,11 @@ def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
     assert all(not b.isHidden() for b in _corners(tw))
 
 
-def test_a_starred_tile_shows_it_in_the_star(qtbot):
-    tw = ThumbnailWidget("p1", None, "label", starred=True)
+def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
+    tw = ThumbnailWidget("p1", None, "label", favorite=True)
     qtbot.addWidget(tw)
     star, trash, _plus = _corners(tw)
-    assert tw._starred is True
+    assert tw._favorite is True
     assert not star.isHidden() and not trash.isHidden()
 
 
@@ -340,7 +340,7 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
 def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
     # Star top-right, trash lower-left, plus lower-right — and the media badge
     # keeps the top-left it has always had, so all four can coexist.
-    tw = ThumbnailWidget("p1", None, "label", starred=True,
+    tw = ThumbnailWidget("p1", None, "label", favorite=True,
                          enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE)
     qtbot.addWidget(tw)
     star, trash, plus = (b.geometry() for b in _corners(tw))
@@ -357,7 +357,7 @@ def test_the_corners_sit_one_to_a_corner_of_the_picture(qtbot):
 
 
 def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
-    tw = ThumbnailWidget("p1", None, "label", starred=True,
+    tw = ThumbnailWidget("p1", None, "label", favorite=True,
                          enhance=icons.ENHANCE_OPEN, enhancing=_run())
     qtbot.addWidget(tw)
 

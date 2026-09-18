@@ -1,7 +1,7 @@
 """The gallery's browser pane — the middle column showing a folder's contents.
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
-settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Starred /
+settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Favorites /
 Experiments / Requests / Trash shelf overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
@@ -43,9 +43,9 @@ from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY,
+    FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    STARRED_KEY,
     TRASH_KEY,
 )
 from origenerator.gui.inflight import (
@@ -90,7 +90,7 @@ class BrowserScrollArea(QScrollArea):
     arrives at this widget travelled the whole pane without meeting one: the
     background between the tiles, or the room under the last row. That is the
     gesture every file browser answers by putting the selection down, and this
-    pane needs it for more than tidiness — Star, Enhance and Delete all aim at
+    pane needs it for more than tidiness — Favorite, Enhance and Delete all aim at
     the picked thumbnails when there are any and at the folder on screen when
     there are none, so "Enhance every image in this folder" is out of reach
     while a single tile stays picked, with nothing on screen saying why.
@@ -305,11 +305,11 @@ class BrowserPane(QObject):
             RECENTS_KEY: Shelf(
                 rows=lambda side: filter_rows(self._recent_rows, side),
                 render=self._render_recents),
-            STARRED_KEY: Shelf(
-                rows=self._combined_starred_rows,
-                render=lambda: self._show_starred(
-                    self._starred_groups.get(self._shelf_orientation, ()),
-                    filter_rows(gallery.starred_generations(self._listed_rows),
+            FAVORITES_KEY: Shelf(
+                rows=self._combined_favorite_rows,
+                render=lambda: self._show_favorites(
+                    self._favorite_groups.get(self._shelf_orientation, ()),
+                    filter_rows(gallery.favorite_generations(self._listed_rows),
                                 self._shelf_orientation))),
             EXPERIMENTS_KEY: Shelf(
                 rows=lambda side: filter_rows(self._experiment_rows, side),
@@ -336,7 +336,7 @@ class BrowserPane(QObject):
         self._recents_drawn = 0             # finished items it has drawn so far
         # Each side's bookmarked folders, keyed by orientation — a Favorites
         # shelf collects the copies of them its own side holds.
-        self._starred_groups: dict = {}
+        self._favorite_groups: dict = {}
         self._listed_rows: list[dict] = []
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
@@ -348,7 +348,7 @@ class BrowserPane(QObject):
         # shelf_rows. Every shelf belongs to one side, so on one it is never None.
         self._shelf_orientation: str | None = None
 
-    def set_model(self, recent_rows, starred_groups, listed_rows, experiment_rows,
+    def set_model(self, recent_rows, favorite_groups, listed_rows, experiment_rows,
                   trash_rows, request_items=()):
         """Take the newly rebuilt gallery model the shelves render from.
 
@@ -357,7 +357,7 @@ class BrowserPane(QObject):
         collects the copies of the bookmarks its own side has.
         """
         self._recent_rows = recent_rows
-        self._starred_groups = starred_groups
+        self._favorite_groups = favorite_groups
         self._listed_rows = listed_rows
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
@@ -428,11 +428,11 @@ class BrowserPane(QObject):
         self._recents_flow = None
         self._recents_drawn = 0
 
-    def _add_folder_tile(self, flow, group, *, starred, context=""):
+    def _add_folder_tile(self, flow, group, *, favorite, context=""):
         """Build one folder tile, wire its click/context signals, and track it."""
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
-            len(gallery.rows_under(group)), starred=starred, context=context,
+            len(gallery.rows_under(group)), favorite=favorite, context=context,
             level=gallery.folder_level(group), detail=gallery.folder_detail(group),
         )
         tile.clicked.connect(self._drill_into)
@@ -443,7 +443,7 @@ class BrowserPane(QObject):
     def show_folder_tiles(self, groups):
         container, flow = self._new_tile_pane()
         for group in groups:
-            self._add_folder_tile(flow, group, starred=group.starred)
+            self._add_folder_tile(flow, group, favorite=group.favorite)
         self.show_widget(container)
 
     # --- a folder the user composed: its gathered folders, wherever they live ---
@@ -454,13 +454,13 @@ class BrowserPane(QObject):
 
         The breadcrumb is what makes this readable at all — a grouping can hold two
         folders that are both called "30 steps" from opposite corners of the tree,
-        so the bare label the hierarchy relies on isn't enough here (the Starred
+        so the bare label the hierarchy relies on isn't enough here (the Favorites
         shelf shows its folders the same way, for the same reason).
         """
         folders = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
         for folder in folders:
-            self._add_folder_tile(flow, folder, starred=folder.starred,
+            self._add_folder_tile(flow, folder, favorite=folder.favorite,
                                   context=self._tree.folder_context(folder.key))
         self.show_widget(container if folders else self._empty_state(
             f"“{group.label}” is empty.\n\nDrag folders from the list onto it, or "
@@ -588,7 +588,7 @@ class BrowserPane(QObject):
         than the order the search scored them.
         """
         if tile.group is not None:
-            self._add_folder_tile(flow, tile.group, starred=tile.group.starred,
+            self._add_folder_tile(flow, tile.group, favorite=tile.group.favorite,
                                   context=self._tree.folder_context(tile.group.key))
         else:
             self._add_shelf_thumbnail(flow, tile.row)
@@ -600,7 +600,7 @@ class BrowserPane(QObject):
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the shelves: Recents / Starred / Experiments / Requests / Trash -----
+    # --- the shelves: Recents / Favorites / Experiments / Requests / Trash -----
 
     def show_shelf(self, base: str, orientation: str | None = None):
         """Render one side's copy of shelf ``base``.
@@ -715,7 +715,7 @@ class BrowserPane(QObject):
             self._scroll_bar().setValue(offset)
 
     def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
-        """Build one finished-item tile for a shelf (Recents/Starred/Experiments):
+        """Build one finished-item tile for a shelf (Recents/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
         to a combine slot, and right-click it for the same star / enhance / delete
         menu a tile inside a folder offers. Returns the tile so a caller can add a
@@ -725,7 +725,7 @@ class BrowserPane(QObject):
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
-            starred=bool(row.get("starred")),
+            favorite=bool(row.get("starred")),
             enhance=self._enhance_state(row),           # the plus in the picture's corner
             enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
@@ -1002,7 +1002,7 @@ class BrowserPane(QObject):
             row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
-            starred=bool(row.get("starred")),
+            favorite=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners
             corner_actions=corner_actions,
         )
@@ -1034,33 +1034,33 @@ class BrowserPane(QObject):
         base, _orientation = split_key(self._tree.selected_folder_key())
         return base == TRASH_KEY
 
-    # --- the Starred shelf: every bookmark — items and folders — in one place ---
+    # --- the Favorites shelf: every bookmark — items and folders — in one place ---
 
-    def _combined_starred_rows(self, orientation: str | None = None) -> list[dict]:
-        """Everything one side's Favorites shelf stands for: its starred items,
+    def _combined_favorite_rows(self, orientation: str | None = None) -> list[dict]:
+        """Everything one side's Favorites shelf stands for: its favorited items,
         plus the items inside the folders it has bookmarked."""
-        return _unique_rows(filter_rows(gallery.starred_generations(self._listed_rows),
+        return _unique_rows(filter_rows(gallery.favorite_generations(self._listed_rows),
                                         orientation) + [
-            row for group in self._starred_groups.get(orientation, ())
+            row for group in self._favorite_groups.get(orientation, ())
             for row in gallery.rows_under(group)
         ])
 
-    def _show_starred(self, groups, rows):
-        """The Starred shelf: the individual starred images and videos as
+    def _show_favorites(self, groups, rows):
+        """The Favorites shelf: the individual favorited images and videos as
         thumbnails, then one tile per bookmarked folder (each captioned with its
-        breadcrumb so identically-named folders stay tellable apart). A starred
+        breadcrumb so identically-named folders stay tellable apart). A favorited
         item previews here on click and opens its own folder on double-click; a
         folder tile lists its sub-folders."""
         container, flow = self._new_tile_pane()
         for row in rows:
             self._add_shelf_thumbnail(flow, row)
         for group in groups:
-            self._add_folder_tile(flow, group, starred=False,
+            self._add_folder_tile(flow, group, favorite=False,
                                   context=self._tree.folder_context(group.key))
         # An empty shelf teaches how to fill it rather than showing a blank pane.
         self.show_widget(container if (rows or groups) else self._empty_state(
             "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
-            "or star a folder from the list, to collect them here."
+            "or favorite a folder from the list, to collect them here."
         ))
 
 
@@ -1089,13 +1089,13 @@ class BrowserPane(QObject):
         off the shelves, where a folder is what's on screen instead.
 
         The slideshow plays these, so they have to match the tiles: Recents is its
-        listed items (the media-type filter already applied), Starred is its
-        starred items plus everything under each bookmarked folder, since a folder
+        listed items (the media-type filter already applied), Favorites is its
+        favorited items plus everything under each bookmarked folder, since a folder
         tile there stands for its whole folder, Experiments is its unreviewed
         queue, Requests is what your spoken requests made, and Trash is what the
         bin is holding — deleted is not unwatchable, and a shelf of items you are
         deciding whether to keep is exactly one you want to sit and look through.
-        A starred item inside a starred folder is one item, so repeats drop out.
+        A favorited item inside a favorited folder is one item, so repeats drop out.
         A running search collects too — its hits are a gathered collection
         exactly as a shelf's are, and sitting through what a search turned up is
         one of the better reasons to have run it.
@@ -1148,7 +1148,7 @@ class BrowserPane(QObject):
             tw = ThumbnailWidget(
                 row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
                 movie_path=self._host.animated_preview(row),  # videos loop; images stay still
-                starred=bool(row.get("starred")),
+                favorite=bool(row.get("starred")),
                 enhance=self._enhance_state(row),           # the plus in the picture's corner
                 enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
                 corner_actions=self._seed_reroll_actions(row) if i2v else None,
@@ -1341,7 +1341,7 @@ class BrowserPane(QObject):
         return self._selection.in_shown_order()
 
     def _thumbnail_context_menu(self, prompt_id: str, global_pos):
-        """Right-click menu for a thumbnail: go to its folder, star/unstar,
+        """Right-click menu for a thumbnail: go to its folder, favorite/unfavorite,
         enhance or delete the picked item(s).
 
         Right-clicking a tile that isn't part of the current selection first
@@ -1381,4 +1381,4 @@ class BrowserPane(QObject):
             row = self._db.get_generation(prompt_id)
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))
-                tile.set_starred(bool(row.get("starred")))
+                tile.set_favorite(bool(row.get("starred")))

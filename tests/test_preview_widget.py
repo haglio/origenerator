@@ -1255,7 +1255,7 @@ def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
 
-    w.set_actions("p1", starred=True, enhance=icons.ENHANCE_HELD)
+    w.set_actions("p1", favorite=True, enhance=icons.ENHANCE_HELD)
 
     assert all(not b.isHidden() for b in _corners(w))
 
@@ -1264,7 +1264,7 @@ def test_a_new_picture_takes_the_last_one_s_corners_away(make_preview, tmp_path)
     # The corners are about the generation on screen, so they can no more outlive
     # it than the "no longer these settings" notice can.
     w = make_preview()
-    w.set_actions("p1", starred=True, enhance=None)
+    w.set_actions("p1", favorite=True, enhance=None)
 
     w.show_image(_make_png(tmp_path / "other.png"))
 
@@ -1276,7 +1276,7 @@ def test_a_running_generation_has_no_corners_to_press(make_preview):
     # Live frames are a part-drawn file that does not exist yet: nothing to
     # bookmark, bin or enhance.
     w = make_preview()
-    w.set_actions("p1", starred=False, enhance=None)
+    w.set_actions("p1", favorite=False, enhance=None)
 
     w.show_frame(_png_bytes())
 
@@ -1290,7 +1290,7 @@ def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
 
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_actions("p1", starred=False, enhance=None)
+    w.set_actions("p1", favorite=False, enhance=None)
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))
 
@@ -1304,7 +1304,7 @@ def test_right_clicking_the_picture_asks_for_its_menu(make_preview, tmp_path):
 
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_actions("p1", starred=False, enhance=None)
+    w.set_actions("p1", favorite=False, enhance=None)
     asked = []
     w.context_requested.connect(lambda pid, pos: asked.append(pid))
 
@@ -1333,7 +1333,7 @@ def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_p
     w.resize(400, 300)
     w._image_label.resize(400, 300)
     w.show_image(_make_tall_png(tmp_path / "tall.png"))
-    w.set_actions("p1", starred=True, enhance=None)
+    w.set_actions("p1", favorite=True, enhance=None)
 
     picture = w.media_rect()
     assert picture.width() < w.width()          # it really is letterboxed
@@ -1355,7 +1355,7 @@ def _pane_holding_everything(w, tmp_path):
     animated picture, a notice over it, armed corners and an armed drag."""
     w.show_image(_animated_webp(tmp_path / "held.webp"))
     w.set_notice("no longer what these settings would make")
-    w.set_actions("held", starred=True, enhance=None)
+    w.set_actions("held", favorite=True, enhance=None)
     w.set_draggable_id("held")
     w._player.reset_mock()
     return w

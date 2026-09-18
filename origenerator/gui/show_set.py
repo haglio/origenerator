@@ -131,7 +131,7 @@ class ShowSet:
         self._shuffle = in_order if latest else None
         self.all_items = [Slide.of(item) for item in items]
         self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
-                           looping=False, starred_ids=self.starred_ids,
+                           looping=False, favorite_ids=self.favorite_ids,
                            enhanced_ids=enhanced_ids))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:
@@ -142,12 +142,12 @@ class ShowSet:
     def passes(self, item, *, favorites_filter=None, enhanced=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
         about a setting the show is not in yet.  An item with no id (a test's,
-        or a run's frames) is neither starred nor enhanced, so any switch that
+        or a run's frames) is neither favorited nor enhanced, so any switch that
         is on leaves it out."""
         favorites_filter = self.favorites_filter if favorites_filter is None else favorites_filter
         enhanced = self.enhanced_mode if enhanced is None else enhanced
         prompt_id = item.prompt_id
-        if favorites_filter and prompt_id not in self.starred_ids:
+        if favorites_filter and prompt_id not in self.favorite_ids:
             return False
         if enhanced and prompt_id not in self.enhanced_ids:
             return False
@@ -199,7 +199,7 @@ class ShowSet:
         carry an enhancement."""
         self.order_label = hud.order_label
         self.looping = hud.looping
-        self.starred_ids = set(hud.starred_ids or ())
+        self.favorite_ids = set(hud.favorite_ids or ())
         self.enhanced_ids = set(hud.enhanced_ids or ())
 
     def hud_items(self):
@@ -221,4 +221,4 @@ class ShowSet:
     def is_favorite(self) -> bool:
         """Whether the item on screen is one of the favorites — the star the
         HUD marks at the head of the line naming that very item."""
-        return self.current_prompt_id() in self.starred_ids
+        return self.current_prompt_id() in self.favorite_ids

@@ -7,7 +7,7 @@ instead, beside Genau's console, and it is app-wide: whatever is set here is
 what Enhance All runs with, what a single image's Enhance action runs with, and
 — with the tick on — what every image the app newly generates receives as it
 lands. It follows you rather than the folder, so it shows on the shelves
-(Recents, Starred, Experiments) exactly as it does on a settings folder.
+(Recents, Favorites, Experiments) exactly as it does on a settings folder.
 
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a

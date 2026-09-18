@@ -77,6 +77,12 @@ from origenerator.gui.gallery_tree import (
     EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
 )
 from origenerator.gui.gallery_tree import (
+    FAVORITES_KEY as _FAVORITES_KEY,
+)
+from origenerator.gui.gallery_tree import (
+    FAVORITES_LABEL as _FAVORITES_LABEL,
+)
+from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
 )
 from origenerator.gui.gallery_tree import (
@@ -90,12 +96,6 @@ from origenerator.gui.gallery_tree import (
 )
 from origenerator.gui.gallery_tree import (
     REQUESTS_LABEL as _REQUESTS_LABEL,
-)
-from origenerator.gui.gallery_tree import (
-    STARRED_KEY as _STARRED_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    STARRED_LABEL as _STARRED_LABEL,
 )
 from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
@@ -196,12 +196,12 @@ _SEARCH_MIN_CHARS = 3
 # The synthetic shelves, as back/forward history locations: each is a place the
 # user can be standing, so a visit to one is recorded and restored by key rather
 # than by the generation that happened to be picked there.
-_SHELF_KEYS = (_RECENTS_KEY, _STARRED_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
+_SHELF_KEYS = (_RECENTS_KEY, _FAVORITES_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
                _TRASH_KEY)
 # Their plain names — what the search field and header call a shelf it is
 # searching.
 _SHELF_LABELS = {
-    _RECENTS_KEY: _RECENTS_LABEL, _STARRED_KEY: _STARRED_LABEL,
+    _RECENTS_KEY: _RECENTS_LABEL, _FAVORITES_KEY: _FAVORITES_LABEL,
     _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL, _REQUESTS_KEY: _REQUESTS_LABEL,
     _TRASH_KEY: _TRASH_LABEL,
 }
@@ -361,7 +361,7 @@ class GalleryView(QWidget):
                 AppCommand.BACK: (self._bank.back, self._navigation.go_back),
                 AppCommand.FORWARD: (self._bank.forward, self._navigation.go_forward),
                 AppCommand.CULL: (self._bank.delete, self._delete_selection),
-                AppCommand.STAR: (self._bank.star, self._star_selection),
+                AppCommand.STAR: (self._bank.favorite, self._favorite_selection),
                 AppCommand.UNDO: (self._bank.undo, self._undo),
                 AppCommand.REDO: (self._bank.redo, self._redo),
                 AppCommand.GROUP: (self._bank.group, self._group_selection),
@@ -826,7 +826,7 @@ class GalleryView(QWidget):
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
         self._tree.itemChanged.connect(self._commit_inline_rename)
-        self._tree.star_clicked.connect(self._toggle_star)          # hover-row action
+        self._tree.favorite_clicked.connect(self._toggle_favorite)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.folders_dropped.connect(self._on_folders_dropped)
         toc, toc_column = pane()
@@ -888,7 +888,7 @@ class GalleryView(QWidget):
                 start_show=self._shows.start,
                 toggle_auto=self._toggle_auto,
                 go_to_looping_folder=self._go_to_looping_folder,
-                star=self._star_selection,
+                favorite=self._favorite_selection,
                 enhance=self._enhance.enhance_the_selection,
                 group=self._group_selection,
                 delete=self._delete_selection,
@@ -925,7 +925,7 @@ class GalleryView(QWidget):
         self._scroll.setWidgetResizable(True)
         # A click on the background between the tiles puts the selection down,
         # as it does in a file browser — and here it is also the only way back
-        # to aiming Star / Enhance / Delete at the whole folder once a tile has
+        # to aiming Favorite / Enhance / Delete at the whole folder once a tile has
         # been picked.
         self._scroll.background_clicked.connect(
             self._browser.clear_thumbnail_selection)
@@ -1788,7 +1788,7 @@ class GalleryView(QWidget):
         trees = _side_trees(listed, meta, start_frames)
         self._browser.set_model(
             gallery.recent_generations(listed),
-            {orientation: gallery.starred_folders(tree) for orientation, tree in trees.items()},
+            {orientation: gallery.favorite_folders(tree) for orientation, tree in trees.items()},
             listed,
             unreviewed,
             held,
@@ -2034,7 +2034,7 @@ class GalleryView(QWidget):
         """What the search covers: the path it is scoped to, and what is under it.
 
         The tree's selection is the scope, whatever kind of row it is. A shelf
-        counts: Recents, Starred, Experiments and Trash are each a collection of
+        counts: Recents, Favorites, Experiments and Trash are each a collection of
         generations, and standing on one and searching it is the obvious thing to
         try. The All row over the workflow folders is what covers the library
         entire, since every other folder narrows the answer before the query does.
@@ -2171,7 +2171,7 @@ class GalleryView(QWidget):
         breadcrumb has, since a shelf belongs to one side like everything else.
         Favorites keeps the star its tree row wears."""
         label = _SHELF_LABELS[base]
-        if base == _STARRED_KEY:
+        if base == _FAVORITES_KEY:
             label = "★ " + label
         if orientation is None:
             return label
@@ -2297,12 +2297,12 @@ class GalleryView(QWidget):
             self._tree.setCurrentItem(item)
 
     def _on_folders_dropped(self, target_key: str, keys: list):
-        """Folders dragged onto a collecting row: Starred stars them (the drag-and-
+        """Folders dragged onto a collecting row: Favorites favorites them (the drag-and-
         drop way to bookmark), a custom folder gathers them."""
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
-        if target_key == _STARRED_KEY:
+        if target_key == _FAVORITES_KEY:
             for group in groups:
-                self._db.set_folder_starred(group.key, True)
+                self._db.set_folder_favorite(group.key, True)
             self.refresh()
             return
         folder_id = gallery.custom_folder_id(target_key)
@@ -2893,7 +2893,7 @@ class GalleryView(QWidget):
 
     def stand_in_shelf(self, key: str, side: str | None) -> bool:
         """Select a shelf's row, exactly as clicking it does, and say whether the
-        tree had one — Recents and Starred appear only once there is one."""
+        tree had one — Recents and Favorites appear only once there is one."""
         item = self._tree_item_for(oriented_key(key, side) if side else key)
         if item is None:
             return False
@@ -2981,7 +2981,7 @@ class GalleryView(QWidget):
             # a grouping, and the button would only ask what it meant.
             group=Button(visible=self._selection_group is not None,
                          tip="Group the selected folders into a folder of your own"),
-            star=self._star_offer(),
+            favorite=self._favorite_offer(),
             enhance=Button(enabled=enhance.available, tip=enhance.tip),
             delete=self._delete_offer(),
             # Media, not rows: a folder gets its node the moment a generation
@@ -3013,23 +3013,23 @@ class GalleryView(QWidget):
             "Auto-generate: open a settings folder to generate variations of it"
         )
 
-    def _star_offer(self) -> Button:
-        """Star, aimed like Delete and Enhance: the picked thumbnails, else the
+    def _favorite_offer(self) -> Button:
+        """Favorite, aimed like Delete and Enhance: the picked thumbnails, else the
         folder on screen. It toggles, so the tip says which way it will go — a set
-        already starred all over unstars.
+        already favorited all over unfavorites.
 
         Dark where a star means nothing: a shelf, or a deleted item in the bin,
         which has no folder to be bookmarked in.
         """
         pids = self.selected_prompt_ids() if self._browser.selected_ids else []
         if pids and not self._browser.showing_trash():
-            starring = not self._all_starred(pids)
-            return Button(tip=f"{'Star' if starring else 'Unstar'} {len(pids)} "
+            favoriting = not self._all_favorites(pids)
+            return Button(tip=f"{'Favorite' if favoriting else 'Unfavorite'} {len(pids)} "
                               f"item{'s' if len(pids) != 1 else ''}")
-        group = None if pids else self._starrable_folder()
+        group = None if pids else self._favoritable_folder()
         if group is None:
-            return Button(enabled=False, tip="Nothing here to star")
-        return Button(tip=f"{'Unstar' if group.starred else 'Star'} "
+            return Button(enabled=False, tip="Nothing here to favorite")
+        return Button(tip=f"{'Unfavorite' if group.favorite else 'Favorite'} "
                           f"folder “{group.label}”")
 
     def _delete_offer(self) -> Button:
@@ -3052,7 +3052,7 @@ class GalleryView(QWidget):
             return Button(enabled=False, tip="Nothing to delete")
         return Button(tip=f"Delete folder “{folder.label}”")
 
-    def _starrable_folder(self):
+    def _favoritable_folder(self):
         """The folder on screen if a star can be set on it, else ``None``.
 
         A shelf has no group at all, and a multi-selection's folder isn't one
@@ -3062,21 +3062,21 @@ class GalleryView(QWidget):
             return None
         return self.current_group()
 
-    def _all_starred(self, prompt_ids) -> bool:
+    def _all_favorites(self, prompt_ids) -> bool:
         rows = [self._db.get_generation(pid) for pid in prompt_ids]
         return all(row and row.get("starred") for row in rows)
 
-    def _star_selection(self):
+    def _favorite_selection(self):
         """The bank button's action: bookmark the picked thumbnails, or the
         folder on screen — and un-bookmark them when they already are, so the one
         button is the whole of the toggle."""
         if self._browser.selected_ids and not self._browser.showing_trash():
             pids = self.selected_prompt_ids()
-            self.set_items_starred(pids, not self._all_starred(pids))
+            self.set_items_favorite(pids, not self._all_favorites(pids))
             return
-        group = self._starrable_folder()
+        group = self._favoritable_folder()
         if group is not None:
-            self._toggle_star(group.key)
+            self._toggle_favorite(group.key)
 
     def fill_the_regions(self) -> None:
         """Put a show on each satellite region — what entering origenerator
@@ -3180,10 +3180,10 @@ class GalleryView(QWidget):
         session's bridge asks this window for it."""
         return self._shows.region_show(side)
 
-    def star_generation(self, prompt_id: str):
+    def favorite_generation(self, prompt_id: str):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
         star the gallery's own control sets."""
-        self.set_items_starred([prompt_id], True)
+        self.set_items_favorite([prompt_id], True)
 
     def trash_generation(self, prompt_id: str):
         """Trash a generation condemned from a slideshow (its Up key) — the same
@@ -3821,7 +3821,7 @@ class GalleryView(QWidget):
         image — the handler skips the rest — and enhances deliberately, so an
         image that already holds one is re-enhanced rather than skipped; the
         corner's plus is where "you already have this one" is said. The star entry
-        reads Unstar only when every picked item is already starred, and toggles
+        reads Unfavorite only when every picked item is already favorited, and toggles
         the whole selection to the opposite state.
 
         A fifth act appears only while something is being made of a picked image:
@@ -3842,8 +3842,8 @@ class GalleryView(QWidget):
         if count == 1 and self._can_open_containing_folder(rows[0]):
             folder_action = menu.addAction("Go to folder")
             menu.addSeparator()
-        all_starred = all(row.get("starred") for row in rows)
-        star_action = menu.addAction(("Unstar" if all_starred else "Star") + suffix)
+        all_favorites = all(row.get("starred") for row in rows)
+        favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
         enhanceable = [row["prompt_id"] for row in rows
                        if gallery.is_enhanceable_row(row)]
         enhance_action = None
@@ -3863,8 +3863,8 @@ class GalleryView(QWidget):
         chosen = menu.exec(global_pos)
         if folder_action is not None and chosen is folder_action:
             self.follow_link(rows[0]["prompt_id"])
-        elif chosen is star_action:
-            self.set_items_starred([row["prompt_id"] for row in rows], not all_starred)
+        elif chosen is favorite_action:
+            self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif enhance_action is not None and chosen is enhance_action:
             self._enhance.enhance_items(enhanceable)
         elif cancel_action is not None and chosen is cancel_action:
@@ -3895,24 +3895,24 @@ class GalleryView(QWidget):
         if row is None:
             return
         if action == corner_controls.STAR:
-            self.set_items_starred([prompt_id], not row.get("starred"))
+            self.set_items_favorite([prompt_id], not row.get("starred"))
         elif action == corner_controls.TRASH:
             self._delete_rows([row])
         elif action == corner_controls.ENHANCE:
             self._enhance.enhance_items([prompt_id])
 
-    def set_items_starred(self, prompt_ids, starred: bool):
+    def set_items_favorite(self, prompt_ids, favorite: bool):
         for pid in prompt_ids:
-            self._db.set_generation_starred(pid, starred)
+            self._db.set_generation_favorite(pid, favorite)
         ids = set(prompt_ids)
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
-                row["starred"] = 1 if starred else 0
+                row["starred"] = 1 if favorite else 0
         for orientation in _ORIENTATIONS:
             self._tree_view.set_shelf_count(
-                _STARRED_KEY, orientation, _shelf_count(self._browser, _STARRED_KEY, orientation))
-        if _base_of(self.selected_folder_key() or "") == _STARRED_KEY:
-            self._browser.show_shelf(_STARRED_KEY, self.side_in_view())
+                _FAVORITES_KEY, orientation, _shelf_count(self._browser, _FAVORITES_KEY, orientation))
+        if _base_of(self.selected_folder_key() or "") == _FAVORITES_KEY:
+            self._browser.show_shelf(_FAVORITES_KEY, self.side_in_view())
         else:
             self._browser.refresh_corners()
         self._info_tabs.reconcile_previews(self._live_ids)
@@ -4171,7 +4171,7 @@ class GalleryView(QWidget):
         # No rename for a folder named after what it holds — a workflow, a model,
         # a LoRA, a source image (see :func:`gallery.is_renamable`).
         rename_action = menu.addAction("Rename…") if gallery.is_renamable(group) else None
-        star_action = menu.addAction("Unstar" if group.starred else "Star")
+        favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
         # Inside a folder the user made, an item tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
         # it isn't in any grouping from there.
@@ -4188,8 +4188,8 @@ class GalleryView(QWidget):
         chosen = menu.exec(global_pos)
         if rename_action is not None and chosen == rename_action:
             self._rename_folder(key)
-        elif chosen == star_action:
-            self._toggle_star(key)
+        elif chosen == favorite_action:
+            self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
             self._remove_from_custom_folder(open_custom, group.key)
         elif chosen in add_menu:
@@ -4292,11 +4292,11 @@ class GalleryView(QWidget):
         # violation. The tree's inline rename defers for the same reason.
         defer(self, self.refresh)
 
-    def _toggle_star(self, key: str):
+    def _toggle_favorite(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,
-        # so starring it on one is starring it.
+        # so favoriting it on one is favoriting it.
         group = self.group_for_key(key)
-        self._db.set_folder_starred(_base_of(key), not bool(group and group.starred))
+        self._db.set_folder_favorite(_base_of(key), not bool(group and group.favorite))
         self.refresh()
 
     def _delete_folder_by_key(self, key: str):

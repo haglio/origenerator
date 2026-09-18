@@ -81,8 +81,8 @@ class Database:
     def set_provenance(self, blocks: dict[str, str]):
         return self.generations.set_provenance(blocks)
 
-    def set_generation_starred(self, prompt_id: str, starred: bool):
-        return self.generations.set_generation_starred(prompt_id, starred)
+    def set_generation_favorite(self, prompt_id: str, favorite: bool):
+        return self.generations.set_generation_favorite(prompt_id, favorite)
 
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         return self.generations.set_experiment_verdict(prompt_id, verdict)
@@ -165,16 +165,16 @@ class Database:
     def rename_folder(self, folder_key: str, custom_name: str | None):
         return self.folder_meta.rename_folder(folder_key, custom_name)
 
-    def set_folder_starred(self, folder_key: str, starred: bool):
-        return self.folder_meta.set_folder_starred(folder_key, starred)
+    def set_folder_favorite(self, folder_key: str, favorite: bool):
+        return self.folder_meta.set_folder_favorite(folder_key, favorite)
 
     def folder_meta_full(self) -> list[dict]:
         return self.folder_meta.folder_meta_full()
 
     def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
-                           starred: bool, level: str | None, ref_prompt_id: str | None):
+                           favorite: bool, level: str | None, ref_prompt_id: str | None):
         return self.folder_meta.upsert_folder_meta(
-            folder_key, custom_name=custom_name, starred=starred,
+            folder_key, custom_name=custom_name, favorite=favorite,
             level=level, ref_prompt_id=ref_prompt_id)
 
     def delete_folder_meta(self, folder_key: str):

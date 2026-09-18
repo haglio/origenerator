@@ -94,7 +94,7 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
         level, ref = identity
         held = meta_by_key[row["folder_key"]]
         db.upsert_folder_meta(row["folder_key"], custom_name=held["custom_name"],
-                              starred=held["starred"], level=level, ref_prompt_id=ref)
+                              favorite=held["starred"], level=level, ref_prompt_id=ref)
         held["level"], held["ref_prompt_id"] = level, ref
 
     def repoint(row, target, identity):
@@ -213,10 +213,10 @@ def _move_bookmark(db, row, target, identity, meta_by_key):
     level, ref = identity
     existing = meta_by_key.get(target)
     name = (existing["custom_name"] if existing else None) or row["custom_name"]
-    starred = bool((existing["starred"] if existing else False) or row["starred"])
-    db.upsert_folder_meta(target, custom_name=name, starred=starred,
+    favorite = bool((existing["starred"] if existing else False) or row["starred"])
+    db.upsert_folder_meta(target, custom_name=name, favorite=favorite,
                           level=level, ref_prompt_id=ref)
     db.delete_folder_meta(row["folder_key"])
-    meta_by_key[target] = {"folder_key": target, "custom_name": name, "starred": starred,
+    meta_by_key[target] = {"folder_key": target, "custom_name": name, "starred": favorite,
                            "level": level, "ref_prompt_id": ref}
     meta_by_key.pop(row["folder_key"], None)

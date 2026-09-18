@@ -14,11 +14,11 @@ RECENTS_LABEL = "Latest"      # its row label; a clock is drawn in the caret col
 # "Latest" rather than "Recents" because that is the word the players use
 # for the same ordering — a Fun Time session's browse says Latest, and this
 # shelf is that same newest-first listing of what the app has made.
-STARRED_KEY = "__starred__"   # synthetic tree node collecting every starred folder
+FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited folder
 # Its row label: the same concept as a Fun Time player's favorites (the star
 # there IS the favorite mark), so it wears that name.  The key stays
 # "__starred__" so saved expansions and history survive the rename.
-STARRED_LABEL = "Favorites"
+FAVORITES_LABEL = "Favorites"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
 EXPERIMENTS_LABEL = "Experiments"    # its row label; a flask is drawn in the caret column
 REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queued

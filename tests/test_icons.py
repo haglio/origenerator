@@ -122,7 +122,7 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     # which leaves the enhanced picture's plus this palette's yellow, since the
     # two can sit on one tile and blue is genau's across this family. Both marks
     # are solid at their center, so the middle pixel is the color.
-    star = _corner_image(icons.corner_star_icon(starred=True, armed=False))
+    star = _corner_image(icons.corner_star_icon(favorite=True, armed=False))
     plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False))
     assert star.pixelColor(24, 25) == GREEN
     assert plus.pixelColor(24, 24) == AMBER
@@ -130,10 +130,10 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
     # The mark is the badge and the button at once, so what is filled says what
-    # is true: an unstarred item's star is an outline with nothing in the middle,
+    # is true: an unfavorited item's star is an outline with nothing in the middle,
     # and an image with no enhancement yet wears the hollow plus.
-    unstarred = _corner_image(icons.corner_star_icon(starred=False, armed=False))
-    assert unstarred.pixelColor(24, 25).alpha() < 32
+    unfavorited = _corner_image(icons.corner_star_icon(favorite=False, armed=False))
+    assert unfavorited.pixelColor(24, 25).alpha() < 32
     open_plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_OPEN,
                                                         armed=False))
     assert open_plus.pixelColor(24, 24).alpha() < 32
@@ -167,8 +167,8 @@ def test_arming_a_corner_control_changes_its_mark(qtbot):
     assert rest != armed
     assert any(armed.pixelColor(x, y) == RED
                for y in range(48) for x in range(48))
-    star_rest = _corner_image(icons.corner_star_icon(starred=False, armed=False))
-    star_armed = _corner_image(icons.corner_star_icon(starred=False, armed=True))
+    star_rest = _corner_image(icons.corner_star_icon(favorite=False, armed=False))
+    star_armed = _corner_image(icons.corner_star_icon(favorite=False, armed=True))
     assert star_rest != star_armed
 
 
@@ -184,16 +184,16 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
     assert normal == disabled
 
 
-def test_a_starred_folders_star_is_the_same_green(qtbot):
+def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QIcon
     from shared_ui.colors import GREEN
 
-    # The tree paints a starred leaf (and the Starred shelf) with the filled star,
-    # so it wears the badge's green: one color for "starred", tile or folder row.
+    # The tree paints a favorited leaf (and the Favorites shelf) with the filled star,
+    # so it wears the badge's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
     assert filled.toImage().pixelColor(24, 25) == GREEN
-    # The outline is the offer to star, not a thing that is starred, so it stays
+    # The outline is the offer to favorite, not a thing that is favorited, so it stays
     # the chrome's gray — and it dims like every other icon when disabled.
     outline = icons.star_icon(filled=False)
     assert outline.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage() \

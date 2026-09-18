@@ -19,9 +19,9 @@ from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 from origenerator import gallery
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY,
+    FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    STARRED_KEY,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -307,13 +307,13 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     db = FakeDB([tall, wide])
-    db.set_generation_starred("t1", True)
-    db.set_generation_starred("w1", True)
+    db.set_generation_favorite("t1", True)
+    db.set_generation_favorite("w1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._item_by_key[oriented_key(STARRED_KEY, "landscape")])
+    view._tree.setCurrentItem(view._item_by_key[oriented_key(FAVORITES_KEY, "landscape")])
 
     assert view._browser.visible_prompt_ids() == ["w1"]
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]

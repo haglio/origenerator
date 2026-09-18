@@ -101,14 +101,14 @@ def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
     # have to go looking for, and two of these report state as well as offering
     # an act.
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=icons.ENHANCE_OPEN)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
 
     assert all(not b.isHidden() for b in controls.buttons())
 
 
 def test_a_picture_the_enhancer_cannot_take_grows_no_plus(qtbot):
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=None)
+    controls.show_for(favorite=False, enhance=None)
     star, trash, plus = controls.buttons()
 
     assert not star.isHidden() and not trash.isHidden()
@@ -117,7 +117,7 @@ def test_a_picture_the_enhancer_cannot_take_grows_no_plus(qtbot):
 
 def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=icons.ENHANCE_HELD)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_HELD)
     plus = controls.buttons()[2]
     assert not plus.isEnabled()
 
@@ -127,7 +127,7 @@ def test_a_spent_enhance_corner_is_a_badge_rather_than_a_button(qtbot):
 
 def test_taking_the_picture_away_takes_every_corner_with_it(qtbot):
     host, controls = _controls(qtbot)
-    controls.show_for(starred=True, enhance=icons.ENHANCE_HELD)
+    controls.show_for(favorite=True, enhance=icons.ENHANCE_HELD)
 
     controls.hide_all()
 
@@ -136,7 +136,7 @@ def test_taking_the_picture_away_takes_every_corner_with_it(qtbot):
 
 def test_each_control_names_the_act_it_carries(qtbot):
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=icons.ENHANCE_OPEN)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
     fired = []
     controls.triggered.connect(fired.append)
 
@@ -148,12 +148,12 @@ def test_each_control_names_the_act_it_carries(qtbot):
 
 def test_the_star_says_which_way_it_would_go(qtbot):
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=None)
+    controls.show_for(favorite=False, enhance=None)
     star = controls.buttons()[0]
-    assert star.toolTip() == "Star this item"
+    assert star.toolTip() == "Favorite this item"
 
-    controls.show_for(starred=True, enhance=None)
-    assert star.toolTip() == "Unstar this item"
+    controls.show_for(favorite=True, enhance=None)
+    assert star.toolTip() == "Unfavorite this item"
 
 
 def test_a_chip_under_the_pointer_wears_its_armed_mark(qtbot):
@@ -161,7 +161,7 @@ def test_a_chip_under_the_pointer_wears_its_armed_mark(qtbot):
     # nothing ever armed a real chip, so the step from a hover to that drawing ran
     # in no test at all.
     host, controls = _controls(qtbot)
-    controls.show_for(starred=False, enhance=None)
+    controls.show_for(favorite=False, enhance=None)
     star = controls.buttons()[0]
 
     def mark():

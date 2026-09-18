@@ -401,26 +401,26 @@ def test_set_params_json_rewrites_row_params(tmp_path):
     assert json.loads(row["params_json"])["lora_high"] == "x.safetensors"
 
 
-def test_star_generation_round_trips_across_reopen(tmp_path):
+def test_favorite_generation_round_trips_across_reopen(tmp_path):
     db_path = tmp_path / "test.db"
     db = Database(db_path)
     db.insert_generation(
         prompt_id="s-001", workflow_name="sdxl_t2i", workflow_version="v002",
         params_json="{}", workflow_json="{}",
     )
-    assert not db.get_generation("s-001")["starred"]  # unstarred by default
+    assert not db.get_generation("s-001")["starred"]  # unfavorited by default
 
-    db.set_generation_starred("s-001", True)
+    db.set_generation_favorite("s-001", True)
     # Reopening the file (a fresh app session) still remembers the star.
     assert Database(db_path).get_generation("s-001")["starred"]
 
-    db.set_generation_starred("s-001", False)
+    db.set_generation_favorite("s-001", False)
     assert not db.get_generation("s-001")["starred"]
 
 
 def test_opening_db_without_starred_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
-    # Faithful pre-starred schema: the table as it was before this column.
+    # Faithful pre-favorited schema: the table as it was before this column.
     conn = sqlite3.connect(db_path)
     conn.execute(
         "CREATE TABLE generations ("
@@ -448,7 +448,7 @@ def test_opening_db_without_starred_column_migrates_it(tmp_path):
 
     db = Database(db_path)
     assert not db.get_generation("old-001")["starred"]  # migrated in, defaulting off
-    db.set_generation_starred("old-001", True)
+    db.set_generation_favorite("old-001", True)
     assert db.get_generation("old-001")["starred"]
 
 
@@ -513,22 +513,22 @@ def test_rename_folder_round_trips(tmp_path):
     assert db.folder_meta_map()["video/wan22_i2v"]["custom_name"] == "Dance clips"
 
 
-def test_star_folder_round_trips_and_preserves_custom_name(tmp_path):
+def test_favorite_folder_round_trips_and_preserves_custom_name(tmp_path):
     db = Database(tmp_path / "test.db")
     db.rename_folder("image/sdxl_t2i", "Portraits")
-    db.set_folder_starred("image/sdxl_t2i", True)
+    db.set_folder_favorite("image/sdxl_t2i", True)
 
     meta = db.folder_meta_map()["image/sdxl_t2i"]
     assert meta["starred"] is True
-    assert meta["custom_name"] == "Portraits"  # starring must not wipe the name
+    assert meta["custom_name"] == "Portraits"  # favoriting must not wipe the name
 
-    db.set_folder_starred("image/sdxl_t2i", False)
+    db.set_folder_favorite("image/sdxl_t2i", False)
     assert db.folder_meta_map()["image/sdxl_t2i"]["starred"] is False
 
 
 def test_folder_meta_full_reports_identity_columns(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.upsert_folder_meta("image/sdxl_t2i/abc123", custom_name="Cats", starred=True,
+    db.upsert_folder_meta("image/sdxl_t2i/abc123", custom_name="Cats", favorite=True,
                           level="settings", ref_prompt_id="p1")
     assert db.folder_meta_full() == [{
         "folder_key": "image/sdxl_t2i/abc123", "custom_name": "Cats",
@@ -536,11 +536,11 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
     }]
 
 
-def test_a_star_set_through_the_plain_api_has_null_identity(tmp_path):
+def test_a_favorite_set_through_the_plain_api_has_null_identity(tmp_path):
     # The view stars by key alone; a bookmark's identity (tier + a row under it)
     # stays NULL until the reconcile backfills it, so folder_meta_full surfaces that.
     db = Database(tmp_path / "test.db")
-    db.set_folder_starred("image/sdxl_t2i", True)
+    db.set_folder_favorite("image/sdxl_t2i", True)
     (row,) = db.folder_meta_full()
     assert row["starred"] is True
     assert row["level"] is None and row["ref_prompt_id"] is None
@@ -548,8 +548,8 @@ def test_a_star_set_through_the_plain_api_has_null_identity(tmp_path):
 
 def test_upsert_folder_meta_overwrites_every_field(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.set_folder_starred("k", True)
-    db.upsert_folder_meta("k", custom_name="N", starred=False,
+    db.set_folder_favorite("k", True)
+    db.upsert_folder_meta("k", custom_name="N", favorite=False,
                           level="model", ref_prompt_id="p2")
     (row,) = db.folder_meta_full()
     assert row["custom_name"] == "N" and row["starred"] is False
@@ -558,7 +558,7 @@ def test_upsert_folder_meta_overwrites_every_field(tmp_path):
 
 def test_delete_folder_meta_removes_the_row(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.set_folder_starred("k", True)
+    db.set_folder_favorite("k", True)
     db.delete_folder_meta("k")
     assert db.folder_meta_full() == []
 

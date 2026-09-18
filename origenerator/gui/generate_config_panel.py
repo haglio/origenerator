@@ -1311,8 +1311,8 @@ class GenerateConfigPanel(QWidget):
         menu toggles one, what the plus offers whenever a setting moves on the
         Enhance panel. An autoshow arms them as readily as an explicit selection:
         the footer stays hidden there because an autoshow is a peek rather than a
-        choice, but the picture is a real generation and starring it means exactly
-        what starring it anywhere means.
+        choice, but the picture is a real generation and favoriting it means exactly
+        what favoriting it anywhere means.
 
         ``prompt_id`` names the generation when it is NOT the row this tab holds —
         the picture a followed run landed as (:meth:`show_finished_media`) goes
@@ -1326,7 +1326,7 @@ class GenerateConfigPanel(QWidget):
             self._preview.set_actions(None)
             return
         self._preview.set_actions(
-            row["prompt_id"], starred=bool(row.get("starred")),
+            row["prompt_id"], favorite=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
         )
 

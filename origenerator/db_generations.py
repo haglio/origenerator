@@ -185,13 +185,13 @@ class GenerationStore(Store):
                 [(block, prompt_id) for prompt_id, block in blocks.items()],
             )
 
-    def set_generation_starred(self, prompt_id: str, starred: bool):
-        """Star (or unstar) one generation — the user's per-item bookmark.
+    def set_generation_favorite(self, prompt_id: str, favorite: bool):
+        """Favorite (or unfavorite) one generation — the user's per-item bookmark.
 
         Its own method rather than a key of update_generation, which covers a
         job's lifecycle rather than a user gesture like this.
         """
-        self._set(prompt_id, "starred", 1 if starred else 0)
+        self._set(prompt_id, "starred", 1 if favorite else 0)
 
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         """Record the user's review of a background experiment: ``'up'`` (keep),

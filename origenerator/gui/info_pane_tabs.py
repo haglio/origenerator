@@ -133,8 +133,9 @@ class InfoPaneTabs(QTabWidget):
     folder_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None):
+                 *, fun_time=None, heights=None):
         super().__init__(parent)
+        self._heights = heights  # the window's prompt heights, for its panels
         self._client = client
         # The hosting session, or None standalone: a tab lays its picture out
         # differently in Fun Time's upright column (GenerateConfigPanel).
@@ -212,7 +213,8 @@ class InfoPaneTabs(QTabWidget):
         disabled. The tab's source-link / animation signals are wired so a click
         in either of them reaches the gallery.
         """
-        panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time)
+        panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
+                                    heights=self._heights)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name

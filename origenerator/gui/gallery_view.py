@@ -284,9 +284,13 @@ class GalleryView(QWidget):
                  ambient_audio: AmbientAudio | None = None,
                  search_expander: SearchExpander | None = None,
                  experiment_policy: ExperimentPolicy | None = None,
-                 fun_time: FunTimeSession | None = None):
+                 fun_time: FunTimeSession | None = None,
+                 prompt_heights=None):
         super().__init__(parent)
         self._db = db
+        # The window's prompt heights, handed down to every form opened here
+        # rather than reached for by each field (see gui.prompt_field).
+        self._prompt_heights = prompt_heights
         self._client = client
         # The Fun Time session hosting this app, or None standalone.  Inside one
         # the layout goes vertical, the fullscreen surfaces land on the satellite
@@ -988,7 +992,8 @@ class GalleryView(QWidget):
         # into a tab (its output in the preview, its settings in the form, a footer
         # for its media type). Each panel's source-image link and animation clicks
         # surface here as a source link the view follows.
-        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time)
+        self._info_tabs = InfoPaneTabs(self._client, self._db, fun_time=self._fun_time,
+                                       heights=self._prompt_heights)
         # One OSR2 driver for the whole view, under the one global switch
         # (self.osr2_control): while that's on it follows whichever video is foreground —
         # an open slideshow, else whatever scripted video is in the front tab —

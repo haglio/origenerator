@@ -101,18 +101,22 @@ class PromptField(QPlainTextEdit):
     """A multiline prompt field whose lower edge drags to resize it.
 
     ``key`` is the param it edits, which is what its height is filed under in
-    :data:`PROMPT_HEIGHTS`.
+    ``heights`` — the window's own :class:`PromptHeights`, handed down the forms
+    rather than reached for, so a field can be built at a chosen size and two
+    windows could disagree. It falls back to the app-wide one, which is what a
+    field built on its own in a test gets.
     """
 
-    def __init__(self, key: str, parent=None):
+    def __init__(self, key: str, parent=None, *, heights: PromptHeights | None = None):
         super().__init__(parent)
         self._key = key
+        self._heights = heights or PROMPT_HEIGHTS
         self._drag: tuple[float, int] | None = None   # (grabbed at, height then)
         # Without tracking, the edge can only offer its resize cursor while a
         # button is already down — by which time you have clicked into the text.
         self.viewport().setMouseTracking(True)
-        self._apply_height(PROMPT_HEIGHTS.height(key))
-        PROMPT_HEIGHTS.changed.connect(self._on_shared_height_changed)
+        self._apply_height(self._heights.height(key))
+        self._heights.changed.connect(self._on_shared_height_changed)
 
     # --- the height ----------------------------------------------------------
 
@@ -173,7 +177,7 @@ class PromptField(QPlainTextEdit):
             self._drag = None
             # File the height it actually settled at — a drag past the floor stops
             # there — so the other fields for this param land on the same size.
-            PROMPT_HEIGHTS.set_height(self._key, self.height())
+            self._heights.set_height(self._key, self.height())
             event.accept()
             return
         super().mouseReleaseEvent(event)

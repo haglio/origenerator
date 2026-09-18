@@ -1697,7 +1697,7 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     pd = next(pd for pd in wf.param_definitions() if pd.key == "input_image")
     assert pd.browse_dir == config.CUSTOM_POSES_DIR
-    assert config.CUSTOM_POSES_DIR == config.SUITE_ROOT / "images" / "custom_poses"
+    assert config.CUSTOM_POSES_DIR == config.LIBRARY_ROOT / "images" / "custom_poses"
 
 
 def test_sdxl_pose_transfer_build_api_payload_structure():

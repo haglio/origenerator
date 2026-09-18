@@ -1,7 +1,7 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
 The act vocabulary the recipe matcher scores prompts against, the detector's
-class labels, and the suite root all describe the library this tool serves, so
+class labels, and the library root all describe the library this tool serves, so
 they live in ``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
 public checkout loads; every consumer reads them through here, so the matcher,

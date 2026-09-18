@@ -234,7 +234,7 @@ def _field_cell_of(form, key):
 
 
 def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
-    # The seed row reads [field] [copy] [Random ☐] — copy before the tick.
+    # The seed row reads [field] [copy] [Random tick] — copy before the tick.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
     qtbot.addWidget(form)
     cell = _field_cell_of(form, "seed")

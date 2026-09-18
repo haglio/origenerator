@@ -28,26 +28,26 @@ _CONTENT = load_content()
 # Public now: the tests assert which paths still hang off the media-library root
 # and which come from the project roots, and that split is the thing worth
 # pinning -- getting it backwards silently repoints a live app at nothing.
-SUITE_ROOT = Path(overlay_value(_CONTENT, "suite_root"))
+LIBRARY_ROOT = Path(overlay_value(_CONTENT, "library_root"))
 
 
 def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
     """The folders that hold the suite's own app checkouts, in search order.
 
-    ``suite_root`` used to answer this as well as naming where the media library
+    ``library_root`` used to answer this as well as naming where the media library
     and the third-party apps are, and one folder was the answer to all of it.
     The suite's *own* repos then moved out of the file-synced tree the library
     stays in, so they get their own key; everything that did not move --
-    the library, ComfyUI -- keeps reading ``suite_root``.
+    the library, ComfyUI -- keeps reading ``library_root``.
 
     A *list*, because the move runs one repo at a time: with a single path there
     is a window where a sibling that has not moved yet is unreachable. An
-    overlay that says nothing still means ``suite_root/projects``, as before.
+    overlay that says nothing still means ``library_root/projects``, as before.
     """
     content = _CONTENT if content is None else content
     return siblings.project_roots(
         content.get("project_roots"),
-        fallback=Path(overlay_value(content, "suite_root")) / "projects")
+        fallback=Path(overlay_value(content, "library_root")) / "projects")
 
 
 PROJECT_ROOTS = project_roots()
@@ -58,7 +58,7 @@ def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
 
     *Which* folder of the library it is describes the library, so it comes from
     the overlay rather than from source. A relative value hangs off
-    ``suite_root`` -- where it in fact sits -- and an absolute one is taken as
+    ``library_root`` -- where it in fact sits -- and an absolute one is taken as
     given, so a folder outside the library tree works too.
     """
     content = _CONTENT if content is None else content
@@ -66,7 +66,7 @@ def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
     if not raw:
         return None
     path = Path(raw)
-    return path if path.is_absolute() else Path(content["suite_root"]) / path
+    return path if path.is_absolute() else Path(content["library_root"]) / path
 
 
 AMBIENT_AUDIO_DIR = ambient_audio_dir()
@@ -118,7 +118,7 @@ TRASH_DIR = LIBRARY_STATE_DIR / "trash"
 # location is private, so it comes from the content overlay. ComfyUI is not one
 # of the suite's own repos and did not move with them, so it stays on the suite
 # root rather than coming from the project roots.
-COMFYUI_DIR = SUITE_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
+COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 # Where ComfyUI keeps a ``name [temp]`` LoadImage source -- a preview or a
@@ -135,7 +135,7 @@ COMFYUI_PORT = 8188
 # finalized video dropped under a per-source subfolder. Mirrors evolver's own
 # INBOX_DIR; we write under our own source name so Evolver can route
 # Origenerator's videos distinctly from other inbox sources.
-_EVOLVER_AI_DIR = SUITE_ROOT / "videos" / "videos" / "2D" / "AI"
+_EVOLVER_AI_DIR = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 # Where Evolver files the upscale it makes of each video sent to it. Mirrors
@@ -160,7 +160,7 @@ GENAU_SOURCE = _CONTENT["genau_source"]
 # collects generated frames instead; LoadImage takes the absolute path back
 # unchanged, so drawing the input from outside costs nothing. Built from the
 # library root because that root is private and must stay out of source.
-CUSTOM_POSES_DIR = SUITE_ROOT / "images" / "custom_poses"
+CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
 
 # --- Funscript ---------------------------------------------------------------
 # Each generated video gets a funscript synthesized alongside it (see

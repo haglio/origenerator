@@ -901,7 +901,7 @@ def test_a_favorite_over_a_slide_with_nothing_to_favorite_says_so(shows):
     director.open([("a.png", "image", "g1", None)])
     made[0].favoritable = False
 
-    director.run_on_slide(AppCommand.STAR)
+    director.run_on_slide(AppCommand.FAVORITE)
 
     assert made[0].said == ["🎤 nothing here to favorite"]
     assert made[0].said_kinds == [WARNING]
@@ -911,7 +911,7 @@ def test_a_favorite_that_lands_says_so_in_the_favorites_green(shows):
     director, _host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.run_on_slide(AppCommand.STAR)
+    director.run_on_slide(AppCommand.FAVORITE)
 
     assert made[0].said == ["🎤 favorited"]
     assert made[0].said_kinds == [FAVORITE]

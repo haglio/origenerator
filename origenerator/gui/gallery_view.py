@@ -361,7 +361,7 @@ class GalleryView(QWidget):
                 AppCommand.BACK: (self._bank.back, self._navigation.go_back),
                 AppCommand.FORWARD: (self._bank.forward, self._navigation.go_forward),
                 AppCommand.CULL: (self._bank.delete, self._delete_selection),
-                AppCommand.STAR: (self._bank.favorite, self._favorite_selection),
+                AppCommand.FAVORITE: (self._bank.favorite, self._favorite_selection),
                 AppCommand.UNDO: (self._bank.undo, self._undo),
                 AppCommand.REDO: (self._bank.redo, self._redo),
                 AppCommand.GROUP: (self._bank.group, self._group_selection),

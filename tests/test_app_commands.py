@@ -10,12 +10,12 @@ from __future__ import annotations
 import pytest
 
 from origenerator.voice.app_commands import (
-    _BIAS_SKIP,
     _PHRASES,
     AppCommand,
     DialSetting,
-    app_command_bias,
     match_app_command,
+    phrases_heard_only_outright,
+    spoken_phrases,
 )
 
 # --- the shelves that lead the tree, each by the name on its row -------------
@@ -212,35 +212,34 @@ def test_an_empty_utterance_asks_for_nothing():
     assert match_app_command("...") is None
 
 
-# --- what whisper is told to expect -----------------------------------------
+# --- what the recognizer is asked to hear ------------------------------------
 
-def test_the_bias_carries_every_word_the_vocabulary_uses():
-    bias = app_command_bias()
-    for word in ("experiments", "requests", "trash", "weird", "lock", "unlock",
-                 "undo", "redo", "star", "cruise", "amp", "offset"):
-        assert word in bias
-    assert bias.endswith(".")
-
-
-def test_the_bias_follows_the_vocabulary_rather_than_a_second_list():
-    # Derived from the phrases, so a command added above reaches whisper with
-    # nothing else to keep in step — and off a quiet mic a short imperative
-    # whisper was not told to expect comes back as another word entirely.
-    bias_words = set(app_command_bias().rstrip(".").split(": ", 1)[1].split(", "))
-    for phrase in _PHRASES:
-        for word in phrase.split():
-            if word not in _BIAS_SKIP:
-                assert word in bias_words
+def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
+    heard = spoken_phrases()
+    for phrase in ("experiments", "go to trash", "weird", "star it", "auto generate on",
+                   "mic off", "o s r two off", "clear filter", "slow down",
+                   "human inspired off", "amp fifty", "center one hundred", "max speed"):
+        assert phrase in heard
 
 
-def test_the_skipped_words_are_only_ones_whisper_cannot_get_wrong():
-    # The prompt has a hard budget (tests/test_voice_bias.py), so it is spent on
-    # the odd words. What is skipped has to be genuinely ordinary — a command's
-    # own name landing in here would be a command whisper was never told about.
-    assert _BIAS_SKIP.isdisjoint(
-        {"recents", "starred", "experiments", "requests", "trash", "weird",
-         "unlock", "cruise", "offset", "amp", "center", "speed", "shape"}
-    )
+def test_taking_a_picture_away_and_shutting_the_mic_are_heard_only_when_said_outright():
+    # A near miss is never repaired into either: one has no spoken way back, and the
+    # other is not something to do to a picture on a guess.
+    assert phrases_heard_only_outright() == {
+        "mic off", "voice off", "weird", "delete", "delete it"}
+
+
+def test_a_number_in_digits_is_how_whisper_writes_it_not_something_to_listen_for():
+    # The grammar is made of words a speaker says; "amp 50" is one spelling of "amp fifty".
+    assert not [phrase for phrase in spoken_phrases() if any(c.isdigit() for c in phrase)]
+    assert "amp 50" in _PHRASES
+
+
+def test_every_phrase_the_recognizer_is_asked_to_hear_is_a_command():
+    # Derived from the phrases, so a command added above reaches the recognizer with
+    # nothing else to keep in step.
+    assert {phrase for phrase in spoken_phrases() if match_app_command(phrase) is None} == set()
+    assert {match_app_command(phrase) for phrase in spoken_phrases()} == set(_PHRASES.values())
 
 
 def test_every_command_has_at_least_one_word_that_reaches_it():

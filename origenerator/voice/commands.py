@@ -36,11 +36,11 @@ from origenerator.gallery.shelves import (
     TRASH_LABEL,
 )
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
-from origenerator.gallery.voice_commands import command_bias, match_command
+from origenerator.gallery.voice_commands import command_phrases, match_command
 from origenerator.voice.show_commands import (
     ShowCommand,
     match_show_command,
-    show_command_bias,
+    show_command_phrases,
 )
 from origenerator.voice.text import words
 
@@ -168,9 +168,13 @@ def _shelf_named(words: list[str]) -> str | None:
     return SHELF_KEYS.get(" ".join(words))
 
 
-def voice_command_bias() -> str:
-    """The vocabulary as whisper's initial prompt — every word the picture and
-    slideshow commands use, plus the sides and shelf names, which a quiet mic
-    mangles the same way."""
-    extra = ", ".join([*SIDES, *SHELF_KEYS])
-    return f"{command_bias()} {show_command_bias()} Sides and shelves: {extra}."
+def spoken_phrases() -> frozenset[str]:
+    """The whole vocabulary as a recognizer that listens for words is asked to hear it.
+
+    Unsided: a side is for a hosting session's two shows, and that session hears for
+    itself. One said here still works, by the slower road every sentence takes.
+    """
+    from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
+
+    return (app_command_phrases() | command_phrases() | show_command_phrases()
+            | frozenset(SHELF_KEYS))

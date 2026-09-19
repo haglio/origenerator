@@ -1,11 +1,10 @@
 """Always-listening prompt steering for voice-driven auto-generate.
 
-While active, the mic stays open (:class:`~origenerator.voice.listener.Listener`)
-and each endpointed utterance is transcribed and used to rewrite the prompt the
-caller exposes via ``get_prompt``, written back through ``set_prompt``. The
-transcribe+rewrite runs on the global thread pool so audio callbacks and the UI
-never block. The listener and worker are injectable, so the flow tests inline
-without a mic, a model, or a server.
+While active, the mic stays open (:class:`~origenerator.voice.hearing.Hearing`)
+and each thing said is used to rewrite the prompt the caller exposes via
+``get_prompt``, written back through ``set_prompt``. The rewrite runs on the
+global thread pool so the UI never blocks. The listener and worker are injectable,
+so the flow tests inline without a mic, a model, or a server.
 
 The same mic also serves spoken commands (:meth:`VoiceSteering.start_commands`):
 while a fullscreen surface is up, an utterance the injected matcher recognizes —
@@ -42,9 +41,8 @@ from PyQt6.QtCore import QObject, QThreadPool, pyqtSignal
 from origenerator import config
 from origenerator.prompts import VOICE_REWRITE_SYSTEM_PROMPT
 from origenerator.voice.dictation import SpokenRequest
-from origenerator.voice.listener import Listener
+from origenerator.voice.hearing import Hearing
 from origenerator.voice.rewrite import rewrite_prompt
-from origenerator.voice.transcribe import Transcriber
 from origenerator.voice.worker import ProcessTask, VoiceWorker
 
 logger = logging.getLogger(__name__)
@@ -53,19 +51,18 @@ logger = logging.getLogger(__name__)
 class VoiceSteering(QObject):
     edited = pyqtSignal(str)   # applied a revised prompt
     error = pyqtSignal(str)    # a mic/transcribe/rewrite failure, for the caller to surface
-    heard = pyqtSignal(str)    # the raw transcription (re-emitted from the worker)
+    heard = pyqtSignal(str)    # what was said (re-emitted from the worker)
     request = pyqtSignal(object)  # a SpokenRequest: one step of "Request … over"
 
     def __init__(self, *, listener=None, worker=None, command_matcher=None,
-                 bare_matcher=None, dictation=None, transcribe_bias=None,
+                 bare_matcher=None, dictation=None, phrases=(), never_repaired=(),
                  parent=None):
         super().__init__(parent)
-        self._listener = listener if listener is not None else Listener(
-            floor=config.VOICE_VAD_THRESHOLD
-        )
+        # *phrases* is the vocabulary said outright, which the listener hears fast and
+        # exactly; everything else reaches the same matchers as a sentence taken down.
+        self._listener = listener if listener is not None else Hearing(
+            phrases, never_repaired=never_repaired)
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
-        self._transcribe_bias = transcribe_bias  # before _build_worker, which hands it on
-        self._transcriber = None  # set when building the real worker, for preloading
         self._worker = worker if worker is not None else self._build_worker()
         self._get_prompts = None
         self._set_prompts = None
@@ -79,16 +76,16 @@ class VoiceSteering(QObject):
         # dictation is the one piece of state here that a second one could walk
         # into mid-update.
         self._lock = threading.Lock()
-        self._listener.utterance.connect(self._on_utterance)
+        self._listener.said.connect(self._on_said)
+        self._listener.failed.connect(
+            lambda reason: self.error.emit(f"mic unavailable — {reason}"))
         self._worker.rewritten.connect(self._on_rewritten)
         self._worker.failed.connect(self.error)
         self._worker.heard.connect(self.heard)  # re-emit for on-screen feedback
         self._worker.command.connect(self._on_command)
 
     def _build_worker(self) -> VoiceWorker:
-        self._transcriber = Transcriber(prompt_bias=self._transcribe_bias)
         return VoiceWorker(
-            self._transcriber.transcribe,
             partial(
                 rewrite_prompt,
                 base_url=config.LOCAL_LLM_BASE_URL, model=config.LOCAL_LLM_MODEL,
@@ -112,19 +109,7 @@ class VoiceSteering(QObject):
         self._listen()
 
     def _listen(self) -> None:
-        if self._transcriber is not None:  # warm the model now, not on the 1st command
-            threading.Thread(target=self._preload, daemon=True).start()
-        try:
-            self._listener.start()  # already-open mics stay as they are
-        except Exception as exc:  # no mic or no audio backend
-            logger.warning("Voice: the mic could not be opened: %s", exc)
-            self.error.emit(f"mic unavailable — {exc}")
-
-    def _preload(self) -> None:
-        try:
-            self._transcriber.preload()
-        except Exception as exc:
-            logger.warning("Voice: whisper preload failed: %s", exc)
+        self._listener.start()  # already-open mics stay as they are
 
     def stop(self) -> None:
         self._get_prompts = None  # a late utterance after stop is then ignored
@@ -175,17 +160,16 @@ class VoiceSteering(QObject):
         with self._lock:
             return self._dictation.push(text) if self._dictation is not None else None
 
-    def _on_utterance(self, audio) -> None:
+    def _on_said(self, text: str) -> None:
         if self._get_prompts is None and self._execute_command is None:
             return
         prompts = self._get_prompts() if self._get_prompts is not None else None
-        logger.info("Voice: processing utterance (positive %r)",
-                    (prompts or {}).get("positive"))
+        logger.info("Voice: heard %r (positive %r)", text, (prompts or {}).get("positive"))
         if self._async:
             QThreadPool.globalInstance().start(
-                ProcessTask(self._worker, audio, prompts, self._interpret))
+                ProcessTask(self._worker, text, prompts, self._interpret))
         else:
-            self._worker.process(audio, prompts, self._interpret)
+            self._worker.process(text, prompts, self._interpret)
 
     def _interpret(self, text: str):
         """What one transcription meant, or ``None`` to let it steer the prompt.

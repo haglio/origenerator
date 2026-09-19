@@ -154,7 +154,7 @@ from origenerator.gallery.tree import (
 from origenerator.gallery.voice_commands import (
     ENHANCE_COMMAND,
     GENAU_COMMAND,
-    command_bias,
+    command_phrases,
     match_command,
     recognized_spelling,
 )
@@ -190,7 +190,7 @@ __all__ = [
     "build_image_config_index",
     "child_groups",
     "combined_params",
-    "command_bias",
+    "command_phrases",
     "config_folder_key",
     "config_folder_name",
     "config_tab_title",

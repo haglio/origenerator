@@ -154,6 +154,19 @@ def match_fix_command(text: str) -> tuple:
     return tuple(part for part in table if named & set(part.spoken))
 
 
+def fix_command_phrases() -> frozenset[str]:
+    """Every fix a recognizer that listens for words should hear: one part by each word it
+    answers to, two parts at once, and the lot.  More than two is still a command -- the
+    matcher above takes as many as are named -- but it is said rarely enough to be left to
+    the engine that takes sentences down."""
+    table = part_table()
+    one = {word: part for part in table for word in part.spoken}
+    phrases = {f"fix {word}" for word in (*one, *ALL_PARTS_WORDS)}
+    phrases |= {f"fix {first} and {second}" for first in one for second in one
+                if one[first] is not one[second]}
+    return frozenset(phrases)
+
+
 def fix_command_spelling(text: str) -> str | None:
     """A fix command written the way the app names it — "Six teeth." read back
     as "fix teeth" — or ``None`` when the utterance is no fix.
@@ -167,21 +180,6 @@ def fix_command_spelling(text: str) -> str | None:
         return None
     heard = words(text)
     return " ".join(["fix", *heard[1:]])
-
-
-def fix_command_bias() -> str:
-    """The command vocabulary as whisper's initial prompt.
-
-    Off a quiet mic the base/small models mangle a short imperative — a
-    captured "fix <part>" transcribed as "thick stick" — and the matcher can
-    only stretch so far. Handing the expected phrases to whisper up front is
-    what actually fixed that capture, so the transcriber is biased with every
-    word a command may use, overlay parts included.
-    """
-    words = ["fix", "fixed", *ALL_PARTS_WORDS]
-    for part in part_table():
-        words += [w for w in part.spoken if w not in words]
-    return "Voice commands: " + ", ".join(words) + "."
 
 
 def _basename(filename: str) -> str:

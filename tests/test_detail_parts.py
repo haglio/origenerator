@@ -203,16 +203,21 @@ def test_malformed_overlay_entries_are_skipped_not_fatal(monkeypatch):
     assert detail_parts.part_table() == detail_parts._BUILTIN_PARTS
 
 
-def test_the_whisper_bias_names_every_spoken_word_once(monkeypatch):
-    # What the transcriber is taught to expect: fix itself and every part
-    # word, the overlay's private vocabulary included — whisper can only
-    # come back with "fix <part>" if it has heard of the part.
+def test_the_recognizer_is_asked_to_hear_a_fix_of_each_part_of_two_and_of_all(monkeypatch):
+    # The overlay's private vocabulary included: a part nobody can be heard asking for
+    # is a part that cannot be fixed by voice.
     _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
-    bias = detail_parts.fix_command_bias()
-    for word in ("fix", "fixed", "all", "everything",
-                 "teeth", "hands", "eyes", "zeta", "zetas"):
-        assert word in bias
-    assert bias.count("fix,") == 1  # each word once, not once per part
+    heard = detail_parts.fix_command_phrases()
+    for phrase in ("fix teeth", "fix mouth", "fix zetas", "fix all", "fix everything",
+                   "fix hands and mouth", "fix zeta and eyes"):
+        assert phrase in heard
+    assert "fix hand and hands" not in heard  # one part twice is one part
+
+
+def test_every_fix_the_recognizer_is_asked_to_hear_is_a_fix(monkeypatch):
+    _with_overlay(monkeypatch, [{"name": "zeta", "spoken": ["zeta", "zetas"]}])
+    assert [phrase for phrase in detail_parts.fix_command_phrases()
+            if not detail_parts.match_fix_command(phrase)] == []
 
 
 # --- the passes one enhancement's settings ask for ---------------------------

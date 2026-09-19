@@ -12,7 +12,6 @@ from player_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
-    console_rows,
 )
 from player_core.console_hud import ConsoleHud, ConsolePainter
 from player_core.modes import Osr2State
@@ -198,6 +197,38 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
                  "robot_hand_cycle_shape", "quarter_button",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
+
+
+def test_the_console_declares_the_buttons_this_app_answers(qtbot):
+    """Genau's transport, its pace and the motion's own row -- declared here
+    rather than left to the players' stock set, which offers verbs this app
+    has no answer for."""
+    _panel_, motion, host = _panel(qtbot)
+
+    hud = console_hud(motion, host, control=OSR2_DRIVING)
+
+    assert [[b.action for b in row] for row in hud.console.rows] == [
+        ["genau_prev_clip", "genau_next_clip", "main_lock", "genau_weird_clip"],
+        ["", "genau_clip_seconds_down", "", "genau_clip_seconds_up"],
+        ["robot_hand_toggle_cruise", "robot_hand_toggle_learned", "robot_hand_cycle_shape",
+         "quarter_button", "osr2_control_off", "robot_hand_park", "robot_hand_retract",
+         "robot_hand_release"],
+    ]
+    assert hud.console.osr2_controls == ()
+
+
+def test_every_button_the_console_declares_does_something_here(qtbot):
+    control = FakeControl()
+    panel, motion, host = _panel(qtbot, control=control)
+    motion.active = True
+    panel.render_console()
+    declared = [b.action for row in console_hud(motion, host, control=control.state()).console.rows
+                for b in row if b.action]
+
+    for action in declared:
+        before = len(motion.calls) + len(host.calls) + len(control.asked)
+        _press(panel, action)
+        assert len(motion.calls) + len(host.calls) + len(control.asked) > before, action
 
 
 def test_the_motion_buttons_reach_the_driver(qtbot):
@@ -435,8 +466,8 @@ def test_the_slideshows_pace_rides_the_console(qtbot):
     hud = console_hud(motion, host)
     assert hud.console.advance_interval == 7
     assert hud.drive.advance_interval == 7
-    assert isinstance(hud, ConsoleHud) and not hud.modes_row
-    assert len(console_rows(hud.console, modes=False)) == 3
+    assert isinstance(hud, ConsoleHud)
+    assert len(hud.console.rows) == 3
 
 
 def test_the_panel_actually_paints(qtbot):

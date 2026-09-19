@@ -174,7 +174,7 @@ class ElidingTabBar(QTabBar):
             size.setWidth(min(size.width(), self.width() // self.count()))
         return size
 
-    # --- each tab's own close button ---------------------------------------
+    # --- closing a tab: its own ✕, or a middle click on it -------------------
 
     def tabInserted(self, index: int):
         super().tabInserted(index)
@@ -205,3 +205,20 @@ class ElidingTabBar(QTabBar):
             if self.tabButton(index, QTabBar.ButtonPosition.RightSide) is button:
                 self.tabCloseRequested.emit(index)
                 return
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton and self.tabsClosable():
+            index = self.tabAt(event.position().toPoint())
+            if index >= 0:
+                self.tabCloseRequested.emit(index)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        # Qt 6.11 closes a tab on this release itself, which after the press above
+        # would be a second tab: the row has shifted under the cursor by then.
+        if event.button() == Qt.MouseButton.MiddleButton:
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)

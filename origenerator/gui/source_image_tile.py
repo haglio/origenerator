@@ -15,14 +15,10 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.media import MediaType
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import BORDER_SUBTLE
 
 _THUMB = 120
 # What the tile says and draws when a showing names neither: a video's start

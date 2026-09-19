@@ -19,11 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core.hud_status import SHUFFLE_LABEL  # noqa: E402
+from player_core.hud_status import SHUFFLE_LABEL
 
 
 @dataclass(frozen=True)

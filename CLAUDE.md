@@ -24,6 +24,18 @@ already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that clip, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
+## The shared packages come from the install, at the versions `pyproject.toml` names
+
+`app_support`, `player_core`, `shared_ui` and `voice_core` are pinned
+dependencies installed into `.venv` — never the checkouts beside this one.
+Both launchers run that venv and nothing else, and a Fun Time session starts
+this app through it too. To try an unlanded change of one of them here,
+install its checkout over the pin (`pip install -e ../player_core
+--config-settings editable_mode=compat`), and reinstall this repo afterwards
+to put the pin back; moving a pin is this repo's own commit, with its own
+suite to answer for it. Never reinstall `.venv` while Origenerator or a Fun
+Time session may be running.
+
 ## A model picker offers only what its graph can run
 
 `ComfyUI/models/<category>` is a folder, not a catalogue. `checkpoints` holds WAN

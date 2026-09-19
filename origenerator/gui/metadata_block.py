@@ -25,17 +25,13 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 
 from origenerator.generation_metadata import MetaItem, MetaSection, basic_section
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.reveal import show_in_explorer
-
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 
 _SELECTABLE = Qt.TextInteractionFlag.TextSelectableByMouse
 

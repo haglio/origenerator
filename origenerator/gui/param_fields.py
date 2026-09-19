@@ -9,17 +9,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
+from shared_ui.tick_control import TickControl
 
 from origenerator.gui import diff_text
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
-
-ensure_shared_ui_on_path()
-from shared_ui.tick_control import TickControl
 
 # Zero-width spaces / joiners / BOM that can ride invisibly on a pasted path.
 # The metadata block inserts zero-width spaces into displayed paths for on-screen

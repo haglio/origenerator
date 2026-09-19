@@ -36,13 +36,6 @@ from functools import cache
 from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
-
-from origenerator.gallery.sides import PORTRAIT
-from origenerator.media import MediaType
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
 from shared_ui.colors import (
     AMBER,
     BG_PRIMARY,
@@ -55,6 +48,9 @@ from shared_ui.colors import (
     TEXT_SECONDARY,
 )
 from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
+
+from origenerator.gallery.sides import PORTRAIT
+from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
 

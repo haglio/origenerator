@@ -30,6 +30,7 @@ from dataclasses import replace
 from functools import partial
 from typing import Protocol
 
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -59,15 +60,10 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
-from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.win32 import place_window_in_device_pixels
-
-ensure_player_core_on_path()
-
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

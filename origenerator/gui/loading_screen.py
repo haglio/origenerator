@@ -3,13 +3,9 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout
+from shared_ui.fonts import FONT_UI, SIZE_BODY, SIZE_HEADING, make_font
 
 from origenerator.config import PROJECT_DIR
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
-from shared_ui.fonts import FONT_UI, SIZE_BODY, SIZE_HEADING, make_font
 
 
 class LoadingScreen(QDialog):

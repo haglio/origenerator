@@ -52,6 +52,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import AMBER, BG_PRIMARY
+from shared_ui.icons import glyph_pixmap
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
 from origenerator.gui import palette
@@ -59,12 +61,6 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_block import label_column_width, meta_cells
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import AMBER, BG_PRIMARY
-from shared_ui.icons import glyph_pixmap
 
 # A dragged enhancement level carries the params that produced it under this
 # type; the Enhance subpanel reads it to absorb those settings.

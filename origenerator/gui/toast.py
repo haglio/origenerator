@@ -24,13 +24,10 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
-
-from origenerator.gui.media_overlay import float_over_media, raise_over_media
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
 from shared_ui.colors import AMBER, BG_SECONDARY, GREEN, RED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
+
+from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
 # The gap from the top edge of the surface, matching
 # ``fun_time.notice_overlay.NOTICE_TOP_MARGIN`` — the two land on the same line

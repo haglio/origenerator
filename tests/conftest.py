@@ -87,11 +87,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 os.environ.setdefault("QSG_RENDER_LOOP", "threaded")
 
-from origenerator.paths import ensure_shared_ui_on_path
-
-# Make shared_ui importable for tests regardless of checkout depth.
-ensure_shared_ui_on_path()
-
 
 # One recognizable tensor name per architecture, matching the signatures in
 # origenerator.workflows.model_arch. Fabricated, not lifted from a real file —

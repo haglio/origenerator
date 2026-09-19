@@ -4,11 +4,7 @@ the pace an unheld slide moves on at, and the motion's own row.  Only what
 
 from __future__ import annotations
 
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core.console import (  # noqa: E402
+from player_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
@@ -17,8 +13,8 @@ from player_core.console import (  # noqa: E402
     VALUE_W,
     shape_label,
 )
-from player_core.hud_button import Button  # noqa: E402
-from player_core.hud_marks import shared_mark  # noqa: E402
+from player_core.hud_button import Button
+from player_core.hud_marks import shared_mark
 
 Rows = tuple[tuple[Button, ...], ...]
 

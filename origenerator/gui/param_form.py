@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
 from origenerator.gui import diff_text, param_sections, tracked_prompt
@@ -27,14 +28,10 @@ from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
 from origenerator.workflows.model_files import is_no_lora
-
-ensure_shared_ui_on_path()
-from shared_ui.tick_control import TickControl
 
 _SEED_MAX = (1 << 63) - 1
 # The params one scenes editor speaks for: the story (stored as the positive

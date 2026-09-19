@@ -14,11 +14,11 @@ from PyQt6.QtWidgets import QSplitter
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.toast import WARNING
+from tests.show_hud_support import hud_button_names
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
     _image,
-    hud_button_names,
 )
 
 
@@ -41,7 +41,7 @@ def _fun_time_view(qtbot, rows=()):
 def _lit(model, action: str) -> bool:
     """Whether the button posting *action* is drawn lit on the show's panel."""
     return next(button.lit for row in model.rows for button in row
-                if button.action == action)
+                if button.command == action)
 
 
 def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
@@ -353,7 +353,7 @@ def test_the_huds_map_names_the_set_in_the_players_vocabulary(qtbot, tmp_path, m
     assert model.playing == expected      # the item on screen is the lit cell
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the player under the show.
-    assert [(button.action, button.lit) for button in model.rows[0]] == [
+    assert [(button.command, button.lit) for button in model.rows[0]] == [
         ("satellites_video_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
 

@@ -10,7 +10,7 @@ def _band(**fields) -> tuple:
 
 
 def _names(buttons) -> list[str]:
-    return [button.action.removeprefix("portrait_") for button in buttons]
+    return [button.command.removeprefix("portrait_") for button in buttons]
 
 
 def test_the_band_is_the_controls_a_show_answers_in_the_players_order():
@@ -28,8 +28,8 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
     on hover."""
     for side in ("portrait", "landscape"):
         for button in show_rows(side)[-1]:
-            assert button.action.startswith(f"{side}_"), button.action
-            assert button.tooltip, button.action
+            assert button.command.startswith(f"{side}_"), button.command
+            assert button.tooltip, button.command
 
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
@@ -60,7 +60,7 @@ def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
     to park, so the mode pair leads the panel with this mode lit — and the
     minimize a player's band ends with is not declared at all."""
     rows = show_rows("portrait", hosted=True)
-    mode_row = [button.action for button in rows[0]]
+    mode_row = [button.command for button in rows[0]]
 
     assert mode_row == ["satellites_video_activate", "origenerator_activate"]
     assert [button.lit for button in rows[0]] == [False, True]
@@ -121,7 +121,7 @@ def test_every_declared_button_is_answered_by_the_show():
     so every one of them, minimize aside, reaches the show."""
     host = _Host()
     for button in show_rows("portrait", hosted=True, own_window=False)[0]:
-        assert answer(host, button.action.removeprefix("portrait_")), button.action
+        assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
                           "enhanced", "reset"]
@@ -165,7 +165,7 @@ def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
     """Hosted it is the region's base state — that side's whole library, the
     way a player's reset leaves it browsing its own; standalone there is no
     such state and it is this set from the top."""
-    hosted = next(b for b in _band(hosted=True) if b.action == "portrait_reset")
-    alone = next(b for b in _band() if b.action == "portrait_reset")
+    hosted = next(b for b in _band(hosted=True) if b.command == "portrait_reset")
+    alone = next(b for b in _band() if b.command == "portrait_reset")
 
     assert "library" in hosted.tooltip and "library" not in alone.tooltip

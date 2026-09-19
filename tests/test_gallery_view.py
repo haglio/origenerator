@@ -6413,6 +6413,7 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
     # show wears — and the view's own furnishings come off, because the map
     # says all of it.
     from origenerator.gui.show_hud import ShowHud
+    from tests.show_hud_support import hud_button_names
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6429,6 +6430,7 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     # drawn rather than drawn dead.  The window IS this show's, though, so the
     # minimize a hosted one leaves off is on it.
     from origenerator.gui.show_hud import ShowHud
+    from tests.show_hud_support import hud_button_names
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6588,6 +6590,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     # The button sits beside F-mode on the HUD every show wears, and pressing it
     # lands on the show itself, hosted or not; the status line names the cut.
     from origenerator.gui.show_hud import ShowHud, show_hud_model
+    from tests.show_hud_support import hud_button_names
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -6607,7 +6610,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     assert show.hud_enhanced_mode is True
     assert [item[2] for item in show._playlist._items] == ["i2"]
     model = show_hud_model(hud._side, show, hosted=False)
-    lit = {button.action: button.lit for row in model.rows for button in row}
+    lit = {button.command: button.lit for row in model.rows for button in row}
     assert lit[f"{hud._side}_enhanced"] and "Enhanceds" in model.lock_label
     show.close()
 

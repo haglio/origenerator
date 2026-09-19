@@ -224,9 +224,9 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
 
     model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
 
-    assert model.side == "portrait"
+    assert model.player == "portrait"
     assert model.seed_count == 3
-    assert [button.action for row in model.rows for button in row] == [
+    assert [button.command for row in model.rows for button in row] == [
         "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
         "portrait_fmode", "portrait_enhanced", "portrait_reset"]
 

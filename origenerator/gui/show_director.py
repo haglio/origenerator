@@ -7,11 +7,12 @@ standalone or on one of Fun Time's satellite regions, kept up with the folder it
 is playing as generations land there, frozen with the room, and let go when it
 closes (which puts a satellite region back on its base state).
 
-The seven pieces of state a show needs are here and only here: the show that is
-up, every show that is up (hosted, two run at once), what each satellite region
-holds, whether the session still wants its regions filled, whether the room is
-frozen, where the last show left off, and which runs the open show has already
-turned down as slides of their own frames.
+The eight pieces of state a show needs are here and only here: the show that is
+up, the shape a show on its own was opened on, every show that is up (hosted,
+two run at once), what each satellite region holds, whether the session still
+wants its regions filled, whether the room is frozen, where the last show left
+off, and which runs the open show has already turned down as slides of their
+own frames.
 
 The spoken words about a show are here too -- close it, hold it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a shelf. They
@@ -58,10 +59,15 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
+from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.win32 import place_window_in_device_pixels
+
+ensure_player_core_on_path()
+
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +177,7 @@ class ShowDirector:
         # double-clicking a picture (that folder in order, held at a pace of
         # nought). One slot, because it is one view.
         self._slideshow = None
+        self._standalone_side: str | None = None
         # Every show currently up, each with the shelf/folder key it opened
         # from: what a landing generation is offered to, so a show keeps up
         # with an auto-generating folder however far the browser has moved on.
@@ -285,16 +292,16 @@ class ShowDirector:
         # set shuffles — and the show's HUD status line says which.
         base, orientation = _split_shelf_key(location)
         latest = base == _RECENTS_KEY
-        self.open(
-            items, location=location, side=side or orientation,
-            resume=self._show_state,
-            shuffle=(lambda order: None) if latest else None,
-            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
-                         starred_ids=self._starred_prompt_ids()),
-        )
+        self.open(items, location=location, side=side or orientation,
+                  resume=self._show_state, **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
                     "latest" if latest else "shuffled")
+
+    def _order(self, latest: bool) -> dict:
+        return {"shuffle": in_order if latest else None,
+                "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
+                                starred_ids=self._starred_prompt_ids())}
 
     def open_on_preview(self, media, frame):
         """A double-click on a tab's preview: open its folder as a slideshow held
@@ -408,6 +415,7 @@ class ShowDirector:
             lock=(self._open_generate_tab_for
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
+            reorder=self.reorder_show,
             # Space reaches the one OSR2 switch, like every other surface's,
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
@@ -539,6 +547,7 @@ class ShowDirector:
         """
         if self._fun_time is None:
             view.showFullScreen()
+            self._standalone_side = side
             self._wear_the_hud(view, side)
             return
         occupant = self._region_shows.get(side)
@@ -718,7 +727,7 @@ class ShowDirector:
 
     # --- the satellite regions ----------------------------------------------
 
-    def region_base_location(self, side: str) -> str:
+    def base_location(self, side: str) -> str:
         """Where a region plays from with nothing else asked for: the whole
         library, narrowed to that region's shape.
 
@@ -743,7 +752,7 @@ class ShowDirector:
         for side in _ORIENTATIONS:
             if self.region_show(side) is not None:
                 continue
-            key = self.region_base_location(side)
+            key = self.base_location(side)
             items = self.items_of(self.rows_at(key))
             if not items:
                 # Not a dead end: the tree this reads is built by the first
@@ -772,7 +781,7 @@ class ShowDirector:
         """
         if not self._regions_wanted or self.region_show(side) is not None:
             return
-        key = self.region_base_location(side)
+        key = self.base_location(side)
         items = self.items_of(self.rows_at(key))
         if not items:
             return
@@ -800,16 +809,33 @@ class ShowDirector:
         if side is None:
             show.reset_in_place()
             return
-        key = self.region_base_location(side)
+        key = self.base_location(side)
         items = self.items_of(self.rows_at(key))
         if not items:
             show.reset_in_place()
             return
-        # The show is being re-pointed, so what feeds it has to move with it:
-        # a generation landing in the library must reach a reset region.
+        self._repoint(show, key)
+        show.retune(items, enhanced_ids=self._enhanced_prompt_ids(items))
+
+    def _repoint(self, show, key: str) -> None:
         self._live_shows = [(held, key if held is show else where)
                             for held, where in self._live_shows]
-        show.retune(items, enhanced_ids=self._enhanced_prompt_ids(items))
+
+    def _base_side(self, show) -> str | None:
+        if self._fun_time is not None:
+            return self._side_of(show)
+        return self._standalone_side if show is self._slideshow else None
+
+    def reorder_show(self, show, latest: bool) -> None:
+        side = self._base_side(show)
+        key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
+        items = self.items_of(self.rows_at(key))
+        if not items:
+            show.note_voice_command("Nothing there to play", kind=WARNING)
+            return
+        self._repoint(show, key)
+        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_prompt_ids(items))
+        show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and
@@ -1076,13 +1102,8 @@ class ShowDirector:
         if not items:
             self._host.say("🎤 nothing there to play")
             return
-        latest = command.shelf_key == _RECENTS_KEY
-        self.open(
-            items, location=key, side=command.side,
-            shuffle=(lambda order: None) if latest else None,
-            hud=HudFacts(order_label="Latest" if latest else "Shuffle",
-                         starred_ids=self._starred_prompt_ids()),
-        )
+        self.open(items, location=key, side=command.side,
+                  **self._order(command.shelf_key == _RECENTS_KEY))
 
     def toggle_f_mode(self, side) -> None:
         """The spoken "favorites": the show's own F-mode switch, flipped.

@@ -844,6 +844,33 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     assert [where for _show, where in view._shows._live_shows] == ["__all__::portrait"]
 
 
+def test_latest_on_a_hosted_shows_panel_plays_its_side_newest_first(
+        qtbot, tmp_path, monkeypatch):
+    from origenerator.gui.show_hud import ShowHud, show_hud_model
+
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    newest_first = [(str(tall), "image", f"new-{n}", str(tall)) for n in range(4)]
+    monkeypatch.setattr(view._shows, "rows_at",
+                        lambda key: newest_first if key == "__recents__::portrait" else [])
+    _open_slideshow(view, monkeypatch, tmp_path, "folder", 100, 200, count=2)
+    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    show = view.region_show("portrait")
+    qtbot.addWidget(show)
+    hud, = show.findChildren(ShowHud)
+
+    hud._deliver("portrait_latest")
+
+    playlist = show._playlist
+    assert [playlist.items[index][2] for index in playlist.order] == [
+        "new-0", "new-1", "new-2", "new-3"]
+    assert _lit(show_hud_model("portrait", show), "portrait_latest")
+    assert not _lit(show_hud_model("portrait", show), "portrait_shuffle")
+    assert not (tmp_path / "dashboard_cmd.txt").exists()
+
+
 def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypatch):
     """Standalone there is no base state to go back to, so reset is the show's
     own: F-mode off, the hold released, the top of its set on screen."""

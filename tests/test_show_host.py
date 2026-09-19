@@ -36,6 +36,7 @@ THE_SET = (
     # drivers reach for it — the HUD's button, the session console's, and the
     # spoken word — and it was the last of the switches still being probed for.
     "hud_enhanced_mode", "toggle_enhanced_mode", "set_enhanced_mode",
+    "show_order",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so
@@ -118,6 +119,7 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     host = pace_only
 
     assert host.show_reset() is None
+    assert host.show_order(latest=True) is None
     assert host.toggle_f_mode() is None
     assert host.show_item("anything", hold=True) is None
     assert host.hud_enhanced_mode is False

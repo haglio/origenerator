@@ -6,8 +6,8 @@ with :mod:`~origenerator.workflows.detail_parts` owning the parts and the match;
 "genau it" animates the picture as a Genau clip; "enhance" asks for the better
 version of it. :func:`match_command` is the one matcher the voice surface
 is given, so adding a verb here is all it takes to teach it — and
-:func:`command_bias` hands every word to whisper up front, which is what makes a
-short imperative off a quiet mic land at all.
+:func:`command_phrases` is what the recognizer is asked to hear, which is what makes
+a short imperative off a quiet mic land at all.
 
 The vocabulary is a set of renderings per command, not one word each, so what
 the mic heard is rarely how the command is spelled. :func:`recognized_spelling`
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from origenerator.voice.text import words
 from origenerator.workflows.detail_parts import (
-    fix_command_bias,
+    fix_command_phrases,
     fix_command_spelling,
     match_fix_command,
 )
@@ -146,7 +146,12 @@ def recognized_spelling(text: str) -> str | None:
     return None
 
 
-def command_bias() -> str:
-    """Every command word as whisper's initial prompt — fixes, Genau, enhance."""
-    spoken = ", ".join([*GENAU_PHRASES, *ENHANCE_PHRASES])
-    return f"{fix_command_bias().rstrip('.')}, {spoken}."
+# What a speaker says for Genau: the sound-alike Fun Time settled on. The rest of
+# GENAU_PHRASES are whisper's spellings of it, which nobody pronounces.
+_GENAU_AS_SAID = "go now"
+
+
+def command_phrases() -> frozenset[str]:
+    """Every command about the picture that a recognizer listening for words should hear."""
+    bare = (_GENAU_AS_SAID, ENHANCE_COMMAND)
+    return fix_command_phrases() | {phrase for verb in bare for phrase in (verb, f"{verb} it")}

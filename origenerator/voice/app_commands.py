@@ -265,6 +265,20 @@ for _dial in _DIALS:
         _say(DialSetting(_dial, _value), f"{_label} {_dial}")
 
 
+def phrases_heard_only_outright() -> frozenset[str]:
+    """What a recognizer's near miss is never repaired into: the switch with no spoken way
+    back, and the word that takes a picture away."""
+    return frozenset(phrase for phrase in spoken_phrases()
+                     if _PHRASES[phrase] in (AppCommand.MIC_OFF, AppCommand.CULL))
+
+
+def spoken_phrases() -> frozenset[str]:
+    """Every phrase of the vocabulary as a speaker says it, for a recognizer that
+    listens for words: the spellings with digits in them are whisper's."""
+    return frozenset(phrase for phrase in _PHRASES
+                     if not any(character.isdigit() for character in phrase))
+
+
 def match_app_command(text: str) -> AppCommand | DialSetting | None:
     """The command an utterance is, or ``None`` when it is not one of them.
 
@@ -277,37 +291,3 @@ def match_app_command(text: str) -> AppCommand | DialSetting | None:
     utterance said once and it is not the speaker who chose which.
     """
     return _PHRASES.get(" ".join(words(text, keep_digits=True)))
-
-
-# What the bias leaves out. The initial prompt is whisper's hint about the words
-# it is about to hear, and it has a hard budget — 224 tokens, past which
-# faster-whisper keeps the TAIL and silently drops the head, which here is the
-# fix vocabulary that needs the hint most (``tests/test_voice_bias.py`` guards
-# the total). So the budget goes to words whisper would otherwise get wrong:
-# "recents", "genau", "amp". Plain connectives and numbers are not those — it
-# has never once mis-heard "fifty" — and listing them only crowds out a word
-# that would have been mis-heard.
-_BIAS_SKIP = frozenset(
-    ("go", "to", "it", "this", "shelf", "on", "off", "min", "max", "one", "hundred",
-     "osr", "o", "s", "r", "two", "2")
-    + tuple(_TENS)
-    + tuple(str(value) for value in _TENS.values())
-)
-
-
-def app_command_bias() -> str:
-    """Every word the vocabulary uses, as part of whisper's initial prompt.
-
-    Derived from the phrases rather than listed again, so a command added above
-    reaches the transcriber without a second list to keep in step — the same
-    reason the fix vocabulary derives its bias from the parts. The connectives
-    and numbers of ``_BIAS_SKIP`` are the exception, and being a skip list
-    rather than a keep list is what preserves that: a new command's own words
-    still arrive on their own.
-    """
-    words: dict[str, None] = {}  # an ordered set: first-said order reads best
-    for phrase in _PHRASES:
-        for word in phrase.split():
-            if word not in _BIAS_SKIP:
-                words.setdefault(word, None)
-    return "App commands: " + ", ".join(words) + "."

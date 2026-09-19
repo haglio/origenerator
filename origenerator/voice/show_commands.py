@@ -15,10 +15,8 @@ console steps by hand, spoken.
 
 Whisper's own renderings are what these are matched against, so "slide show"
 arrives as two words about as often as one, and punctuation and case are its to
-choose. :func:`show_command_bias` hands the vocabulary to the transcriber up
-front for the same reason the fix commands do it (see
-:mod:`origenerator.workflows.detail_parts`): off a quiet mic a short imperative
-comes back mangled, and telling whisper what to expect is what makes it land.
+choose. :func:`show_command_phrases` is what the recognizer is asked to hear, the
+show named both ways.
 """
 from __future__ import annotations
 
@@ -78,8 +76,7 @@ def match_show_command(text: str) -> ShowCommand | None:
     return None
 
 
-def show_command_bias() -> str:
-    """The show vocabulary as part of whisper's initial prompt."""
-    return "Slideshow commands: " + ", ".join(
-        list(_VERBS) + ["slideshow"]
-    ) + "."
+def show_command_phrases() -> frozenset[str]:
+    """Each verb with the show named after it, as one word and as the two it is as often
+    heard as."""
+    return frozenset(f"{verb} {show}" for verb in _VERBS for show in ("slideshow", "slide show"))

@@ -35,10 +35,11 @@ origenerator = "origenerator.app:main"
 [project.optional-dependencies]
 dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-qt>=4,<5", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3",
        "ruff==0.16.6"]
-# Voice-command prompt editing: local speech-to-text + mic capture. Heavy and
-# optional — the mic button degrades gracefully when these aren't installed.
+# What voice_core, the family's listener, reads each command with a second time and
+# takes sentences down with. voice_core imports it only when an app asks for either;
+# this app asks for both, so it installs it. Vosk and the microphone come with voice_core.
 # Install with:  pip install -e .[voice]
-voice = ["faster-whisper>=1,<2", "sounddevice>=0.5,<0.6"]
+voice = ["faster-whisper>=1,<2"]
 
 [tool.pytest.ini_options]
 # The content guard's enforcement check, adopted the way every repo in the
@@ -64,7 +65,7 @@ qt_api = "pyqt6"
 # the CI workflow. None is published, so none can go in [project.dependencies];
 # tests/test_dependencies.py holds this list against the tree instead.
 [tool.haglio]
-siblings = ["app_support", "player_core", "shared_ui"]
+siblings = ["app_support", "player_core", "shared_ui", "voice_core"]
 
 # What Origenerator's two launchers start: launch_origenerator.vbs, the file the
 # pinned shortcut runs, and launch_preview_branch.vbs, which runs a worktree's

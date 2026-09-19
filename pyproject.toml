@@ -15,7 +15,16 @@ requires-python = ">=3.14"
 # what this repo's venv holds today, and opencv's ceiling is the next major
 # rather than the current one because 5 is what this repo actually runs and its
 # suite is green on it.
+# The family repos this one runs are named at the tags it was built against
+# rather than left to be whatever checkouts sit beside it. Unpinned, a change
+# landing in one of them reached every consumer the same minute, and one whose
+# other half had not landed turned all of them red at once. Moving to a newer
+# one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.156",
+    "player-core @ git+https://github.com/haglio/player_core@v0.1.275",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.129",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.17",
     "PyQt6>=6,<7",
     "pillow>=12,<13",
     "opencv-python>=4.8,<6",

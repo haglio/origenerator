@@ -50,7 +50,11 @@ from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
-from origenerator.voice.app_commands import AppCommand, DialSetting, app_command_bias
+from origenerator.voice.app_commands import (
+    AppCommand,
+    DialSetting,
+    phrases_heard_only_outright,
+)
 from origenerator.voice.commands import (
     ShelfCommand,
     ShowControl,
@@ -58,9 +62,9 @@ from origenerator.voice.commands import (
     match_voice_command,
     sided_app_command,
     split_side,
-    voice_command_bias,
+    spoken_phrases,
 )
-from origenerator.voice.dictation import COMPLETED, RequestDictation, request_bias
+from origenerator.voice.dictation import COMPLETED, RequestDictation
 from origenerator.voice.steering import VoiceSteering
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts
@@ -222,15 +226,14 @@ class VoiceRouter(QObject):
         self._client = client
         # One listener over three vocabularies: the spoken commands, the prompt
         # steering, and the dictation that collects "Request … over" across as
-        # many utterances as it takes. The bias teaches whisper all three,
-        # without which a quiet mic's "fix <part>" — or the marker words the
-        # whole request hangs on — transcribe as other words entirely.
+        # many utterances as it takes. The commands said outright are what the
+        # recognizer is asked to hear; everything else is taken down as a sentence.
         self.listener = VoiceSteering(
             command_matcher=match_voice_command,
             bare_matcher=sided_app_command,
             dictation=RequestDictation(),
-            transcribe_bias=(f"{voice_command_bias()} {app_command_bias()} "
-                             f"{request_bias()}"),
+            phrases=spoken_phrases(),
+            never_repaired=phrases_heard_only_outright(),
         )
         self.listener.error.connect(
             lambda msg: logger.warning("Voice steering: %s", msg))

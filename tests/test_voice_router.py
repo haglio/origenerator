@@ -18,8 +18,17 @@ from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
-from origenerator.voice.app_commands import AppCommand, DialSetting
-from origenerator.voice.commands import ShelfCommand, ShowControl, SurfaceCommand
+from origenerator.voice.app_commands import (
+    AppCommand,
+    DialSetting,
+    phrases_heard_only_outright,
+)
+from origenerator.voice.commands import (
+    ShelfCommand,
+    ShowControl,
+    SurfaceCommand,
+    spoken_phrases,
+)
 from origenerator.voice.dictation import COMPLETED
 from origenerator.voice.show_commands import ShowCommand
 
@@ -315,6 +324,15 @@ def _row(prompt_id="g1", *, workflow_name="sdxl_t2i"):
 
 
 # --- the microphone ---------------------------------------------------------
+
+
+def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
+    voice, _host, _shows = router()
+
+    built_with = voice.listener.built_with
+    assert built_with["phrases"] == spoken_phrases()
+    assert built_with["never_repaired"] == phrases_heard_only_outright()
+    assert "transcribe_bias" not in built_with
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(router):

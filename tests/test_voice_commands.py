@@ -71,12 +71,17 @@ def test_a_fix_that_names_no_part_falls_through_like_any_other_miss():
     assert voice_commands.match_command("fix the lighting") is None
 
 
-def test_the_bias_offers_whisper_every_command_word():
-    bias = voice_commands.command_bias()
-    for phrase in voice_commands.GENAU_PHRASES:
-        assert phrase in bias
-    assert "fix" in bias      # the older command's vocabulary is still in there
-    assert bias.endswith(".")
+def test_the_recognizer_is_asked_to_hear_every_command_about_the_picture():
+    heard = voice_commands.command_phrases()
+    for phrase in ("go now", "go now it", "enhance", "enhance it", "fix teeth", "fix all"):
+        assert phrase in heard
+    assert [phrase for phrase in heard if voice_commands.match_command(phrase) is None] == []
+
+
+def test_genau_is_listened_for_by_its_sound_alike_alone():
+    # The other renderings are whisper's misspellings of it, which nobody says.
+    assert {phrase for phrase in voice_commands.command_phrases()
+            if voice_commands.match_genau_command(phrase)} == {"go now", "go now it"}
 
 
 def test_the_gallery_facade_exposes_the_one_matcher():
@@ -84,20 +89,12 @@ def test_the_gallery_facade_exposes_the_one_matcher():
     # reach it without the caller changing.
     assert gallery.match_command("genau it") == gallery.GENAU_COMMAND
     assert gallery.match_command("enhance") == gallery.ENHANCE_COMMAND
-    assert gallery.command_bias() == voice_commands.command_bias()
+    assert gallery.command_phrases() == voice_commands.command_phrases()
 
 
 def test_enhance_asks_for_the_better_version_of_what_is_on_screen():
     assert voice_commands.match_enhance_command("enhance") == voice_commands.ENHANCE_COMMAND
     assert voice_commands.match_enhance_command("Enhance it!") == voice_commands.ENHANCE_COMMAND
-
-
-def test_whisper_is_offered_the_enhance_word_too():
-    # Off a quiet mic a short imperative is mangled unless the transcriber is
-    # told to expect it, which is what actually made "fix <part>" land.
-    bias = voice_commands.command_bias()
-    for phrase in voice_commands.ENHANCE_PHRASES:
-        assert phrase in bias
 
 
 def test_a_sentence_that_merely_wants_something_nicer_is_not_the_command():

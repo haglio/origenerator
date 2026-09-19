@@ -26,8 +26,9 @@ from origenerator.voice.commands import (
     ShowControl,
     SurfaceCommand,
     match_voice_command,
+    sided_app_command,
     split_side,
-    voice_command_bias,
+    spoken_phrases,
 )
 from origenerator.voice.show_commands import ShowCommand
 
@@ -77,14 +78,17 @@ def test_anything_else_is_left_to_the_prompt_rewriter(text):
     assert match_voice_command(text) is None
 
 
-def test_the_bias_teaches_whisper_the_whole_vocabulary():
-    """A quiet mic mangles a short imperative, and the sides and shelf names
-    are as manglable as the fix words — so all of them are handed to whisper
-    up front."""
-    bias = voice_command_bias()
+def test_the_recognizer_is_asked_to_hear_the_whole_vocabulary():
+    heard = spoken_phrases()
 
-    for word in ("fix", "teeth", "portrait", "landscape", "favorites", "latest"):
-        assert word in bias
+    for phrase in ("fix teeth", "go now it", "enhance", "start slideshow", "favorites",
+                   "latest", "undo", "amp fifty", "mic off"):
+        assert phrase in heard
+
+
+def test_every_phrase_the_recognizer_is_asked_to_hear_means_something():
+    assert [phrase for phrase in spoken_phrases()
+            if sided_app_command(phrase) is None and match_voice_command(phrase) is None] == []
 
 
 @pytest.mark.parametrize("text, side", [

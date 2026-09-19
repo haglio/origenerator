@@ -1,9 +1,11 @@
 """VoiceSteering — always-listening: each utterance rewrites the prompt pair.
 
-An injected listener (a fake mic) and an inline worker (faked transcribe/rewrite)
-drive the whole flow synchronously, without audio, a model, or a server.
+An injected listener (a fake mic that says text) and an inline worker (a faked
+rewrite) drive the whole flow synchronously, without audio, a model, or a server.
 """
 from __future__ import annotations
+
+from unittest.mock import Mock
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -12,12 +14,17 @@ from origenerator.voice.worker import VoiceWorker
 
 
 class FakeListener(QObject):
-    utterance = pyqtSignal(object)
+    said = pyqtSignal(str)
+    failed = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, says="no hat"):
         super().__init__()
+        self.says = says
         self.started = False
         self.stopped = False
+
+    def hear(self):
+        self.said.emit(self.says)
 
     def start(self):
         self.started = True
@@ -26,12 +33,9 @@ class FakeListener(QObject):
         self.stopped = True
 
 
-def _steering(transcribe=None, rewrite=None, listener=None):
+def _steering(rewrite=None, listener=None):
     listener = listener if listener is not None else FakeListener()
-    worker = VoiceWorker(
-        transcribe or (lambda audio: "no hat"),
-        rewrite or (lambda pos, neg, instr: (f"{pos}, {instr}", neg)),
-    )
+    worker = VoiceWorker(rewrite or (lambda pos, neg, instr: (f"{pos}, {instr}", neg)))
     return VoiceSteering(listener=listener, worker=worker), listener
 
 
@@ -41,7 +45,7 @@ def test_an_utterance_rewrites_the_prompt_pair_in_place(qtbot):
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
     assert listener.started
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert prompts["positive"] == "a woman, no hat"
 
@@ -52,7 +56,7 @@ def test_stop_ends_listening_and_ignores_later_utterances(qtbot):
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
     steering.stop()
-    listener.utterance.emit(object())  # a late callback after stop
+    listener.hear()  # a late callback after stop
 
     assert listener.stopped
     assert prompts["positive"] == "a woman"  # ignored
@@ -67,26 +71,18 @@ def test_a_rewrite_error_surfaces(qtbot):
     steering.error.connect(errors.append)
     steering.start(lambda: {"positive": "a woman", "negative": ""}, lambda new: None)
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert errors and "no LLM server" in errors[0]
 
 
 def test_a_listener_failure_surfaces(qtbot):
-    class BrokenListener(QObject):
-        utterance = pyqtSignal(object)
-
-        def start(self):
-            raise RuntimeError("no mic")
-
-        def stop(self):
-            pass
-
-    steering, _ = _steering(listener=BrokenListener())
+    steering, listener = _steering()
     errors = []
     steering.error.connect(errors.append)
-
     steering.start(lambda: {"positive": "a woman", "negative": ""}, lambda new: None)
+
+    listener.failed.emit("no mic")
 
     assert errors and "no mic" in errors[0]
 
@@ -94,10 +90,9 @@ def test_a_listener_failure_surfaces(qtbot):
 # --- spoken commands: the same mic, a second use ----------------------------
 
 
-def _command_steering(transcribe="fix teeth"):
-    listener = FakeListener()
-    worker = VoiceWorker(lambda audio: transcribe,
-                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+def _command_steering(says="fix teeth"):
+    listener = FakeListener(says)
+    worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(
         listener=listener, worker=worker,
         command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
@@ -111,7 +106,7 @@ def test_commands_alone_open_the_mic_and_execute_what_they_match(qtbot):
     steering.start_commands(ran.append)
 
     assert listener.started
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert ran == ["teeth"]
 
@@ -125,20 +120,20 @@ def test_a_matched_command_is_consumed_not_steered(qtbot):
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
     steering.start_commands(ran.append)
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert ran == ["teeth"]
     assert prompts["positive"] == "a woman"
 
 
 def test_an_unmatched_utterance_still_steers_the_prompt(qtbot):
-    steering, listener = _command_steering(transcribe="no hat")
+    steering, listener = _command_steering(says="no hat")
     prompts = {"positive": "a woman", "negative": ""}
     ran = []
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
     steering.start_commands(ran.append)
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert ran == []
     assert prompts["positive"] == "a woman, no hat"
@@ -156,11 +151,13 @@ def test_the_mic_stays_open_while_either_use_still_wants_it(qtbot):
     assert listener.stopped
 
 
-def test_the_transcribe_bias_reaches_the_transcriber(qtbot):
-    # The vocabulary bias only helps if the real worker's transcriber holds it.
-    steering = VoiceSteering(listener=FakeListener(),
-                             transcribe_bias="Voice commands: fix.")
-    assert steering._transcriber._prompt_bias == "Voice commands: fix."
+def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypatch):
+    built = Mock()
+    monkeypatch.setattr("origenerator.voice.steering.Hearing", built)
+
+    VoiceSteering(phrases={"fix teeth", "mic off"}, never_repaired={"mic off"})
+
+    built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"})
 
 
 def test_stopping_commands_ends_their_execution(qtbot):
@@ -169,7 +166,7 @@ def test_stopping_commands_ends_their_execution(qtbot):
     steering.start_commands(ran.append)
     steering.stop_commands()
 
-    listener.utterance.emit(object())  # a late utterance after the surface closed
+    listener.hear()  # a late utterance after the surface closed
 
     assert ran == []
     assert listener.stopped
@@ -178,12 +175,11 @@ def test_stopping_commands_ends_their_execution(qtbot):
 # --- spoken requests: a third use of the same mic ----------------------------
 
 
-def _request_steering(transcribe="Request, no hat, over."):
+def _request_steering(says="Request, no hat, over."):
     from origenerator.voice.dictation import RequestDictation
 
-    listener = FakeListener()
-    worker = VoiceWorker(lambda audio: transcribe,
-                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+    listener = FakeListener(says)
+    worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(
         listener=listener, worker=worker, dictation=RequestDictation(),
         command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
@@ -198,7 +194,7 @@ def test_a_request_is_re_emitted_rather_than_steering_the_prompt(qtbot):
     steering.request.connect(spoken.append)
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert [s.text for s in spoken] == ["no hat"]
     assert prompts["positive"] == "a woman"  # not also rewritten
@@ -207,15 +203,15 @@ def test_a_request_is_re_emitted_rather_than_steering_the_prompt(qtbot):
 def test_an_open_request_swallows_what_would_be_a_command(qtbot):
     # The words of a request are a sentence, not instructions: "fix teeth" said
     # inside one belongs to the request.
-    steering, listener = _request_steering(transcribe="Request.")
+    steering, listener = _request_steering(says="Request.")
     ran = []
     spoken = []
     steering.request.connect(spoken.append)
     steering.start_commands(ran.append)
 
-    listener.utterance.emit(object())          # opens the request
-    steering._worker._transcribe = lambda audio: "fix teeth"
-    listener.utterance.emit(object())
+    listener.hear()          # opens the request
+    listener.says = "fix teeth"
+    listener.hear()
 
     assert ran == []
     assert len(spoken) == 2
@@ -229,15 +225,15 @@ def test_requests_ride_along_wherever_the_mic_is_open(qtbot):
     steering.request.connect(spoken.append)
     steering.start(lambda: {"positive": "", "negative": ""}, lambda new: None)
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert spoken and spoken[0].text == "no hat"
 
 
 def test_closing_the_mic_drops_a_half_said_request(qtbot):
-    steering, listener = _request_steering(transcribe="Request.")
+    steering, listener = _request_steering(says="Request.")
     steering.start_commands(lambda part: None)
-    listener.utterance.emit(object())
+    listener.hear()
     assert steering._dictation.listening
 
     steering.stop_commands()
@@ -248,14 +244,13 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
 # --- the bare vocabulary, which outranks an opening request ------------------
 
 
-def _bare_steering(transcribe):
+def _bare_steering(says):
     """Steering wired as the gallery wires it: a dictation, a loose matcher, and
     a strict whole-utterance one that gets its say before a request can open."""
     from origenerator.voice.dictation import RequestDictation
 
-    listener = FakeListener()
-    worker = VoiceWorker(lambda audio: transcribe,
-                         lambda pos, neg, instr: (f"{pos}, {instr}", neg))
+    listener = FakeListener(says)
+    worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(
         listener=listener, worker=worker, dictation=RequestDictation(),
         command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
@@ -274,7 +269,7 @@ def test_a_bare_command_word_beats_an_opening_request(qtbot):
     steering.request.connect(spoken.append)
     steering.start_commands(ran.append)
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert ran == ["requests"]
     assert spoken == []
@@ -289,9 +284,9 @@ def test_an_open_request_takes_the_word_back(qtbot):
     steering.request.connect(spoken.append)
     steering.start_commands(ran.append)
 
-    listener.utterance.emit(object())          # opens the request
-    steering._worker._transcribe = lambda audio: "requests"
-    listener.utterance.emit(object())
+    listener.hear()          # opens the request
+    listener.says = "requests"
+    listener.hear()
 
     assert ran == []
     assert len(spoken) == 2
@@ -304,25 +299,17 @@ def test_a_bare_command_needs_a_surface_listening_for_commands(qtbot):
     prompts = {"positive": "a woman", "negative": ""}
     steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
 
-    listener.utterance.emit(object())
+    listener.hear()
 
     assert prompts["positive"] == "a woman, weird"
 
 
 def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
-    class BrokenListener(QObject):
-        utterance = pyqtSignal(object)
-
-        def start(self):
-            raise RuntimeError("No module named 'sounddevice'")
-
-        def stop(self):
-            pass
-
-    steering, _ = _steering(listener=BrokenListener())
+    steering, listener = _steering()
     errors = []
     steering.error.connect(errors.append)
-
     steering.start_commands(lambda part: None)
 
-    assert errors and "mic unavailable" in errors[0]
+    listener.failed.emit("No module named 'sounddevice'")
+
+    assert errors == ["mic unavailable — No module named 'sounddevice'"]

@@ -7,7 +7,7 @@ import pytest
 from origenerator.voice.show_commands import (
     ShowCommand,
     match_show_command,
-    show_command_bias,
+    show_command_phrases,
 )
 
 
@@ -60,7 +60,9 @@ def test_an_empty_utterance_asks_for_nothing():
     assert match_show_command(None) is None
 
 
-def test_the_bias_hands_whisper_every_word_a_command_may_use():
-    bias = show_command_bias()
-    for word in ("start", "open", "pause", "stop", "end", "close", "slideshow"):
-        assert word in bias
+def test_the_recognizer_is_asked_to_hear_each_verb_with_the_show_named_either_way():
+    heard = show_command_phrases()
+    for phrase in ("start slideshow", "open slideshow", "pause slide show", "stop slideshow",
+                   "end slideshow", "close slide show", "play slideshow"):
+        assert phrase in heard
+    assert [phrase for phrase in heard if match_show_command(phrase) is None] == []

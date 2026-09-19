@@ -42,7 +42,7 @@ def wired(qtbot):
     actions = ShowActions(
         delete=record("delete"),
         enhance=record("enhance", result=True),
-        star=record("star"),
+        favorite=record("star"),
         lock=record("lock"),
         reset=record("reset"),
         drive_toggle=record("drive_toggle"),
@@ -82,7 +82,7 @@ def test_a_show_handed_no_acts_at_all_just_does_less(qtbot):
 def test_the_hud_facts_travel_as_one_record(qtbot):
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
                          hud=HudFacts(order_label="Latest", looping=False,
-                                      starred_ids={"id-b"}))
+                                      favorite_ids={"id-b"}))
     qtbot.addWidget(view)
 
     assert view.hud_order_label == "Latest"
@@ -92,7 +92,7 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
     assert view.hud_is_favorite is True
 
 
-def test_the_hud_facts_default_to_a_shuffled_loop_of_nothing_starred(qtbot):
+def test_the_hud_facts_default_to_a_shuffled_loop_of_nothing_favorite(qtbot):
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
@@ -104,10 +104,10 @@ def test_retuning_a_show_dresses_it_as_a_base_state(qtbot):
     # A hosted reset points the show at the region's base set, which is one KIND
     # of set and always the same one: shuffled, and not a loop anyone asked for.
     # Its two callers used to spell that out and could have disagreed; there is
-    # one answer now, and the stars it already had are not part of it.
+    # one answer now, and the favorites it already had are not part of it.
     view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
                          hud=HudFacts(order_label="Latest", looping=True,
-                                      starred_ids={"id-c"}))
+                                      favorite_ids={"id-c"}))
     qtbot.addWidget(view)
 
     view.retune([("c.png", "image", "id-c", None)])

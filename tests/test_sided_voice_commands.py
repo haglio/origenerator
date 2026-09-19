@@ -16,9 +16,9 @@ import pytest
 
 from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.gui.gallery_tree import (
+    FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    STARRED_KEY,
     TRASH_KEY,
 )
 from origenerator.voice.commands import (
@@ -47,8 +47,8 @@ def test_a_fix_can_name_the_side_it_means(text, side):
 
 
 @pytest.mark.parametrize("text, key, side", [
-    ("favorites", STARRED_KEY, None),
-    ("landscape favorites", STARRED_KEY, "landscape"),
+    ("favorites", FAVORITES_KEY, None),
+    ("landscape favorites", FAVORITES_KEY, "landscape"),
     ("portrait latest", RECENTS_KEY, "portrait"),
     ("trash", TRASH_KEY, None),
     ("requests", REQUESTS_KEY, None),
@@ -62,8 +62,8 @@ def test_a_shelf_name_is_an_order_to_play_it(text, key, side):
 def test_the_shelf_names_are_the_tree_s_own():
     """Spoken by the label the shelf wears, so a rename carries into the
     vocabulary rather than leaving it answering to the old word — "favorites"
-    is what the shelf says, where the key still says starred."""
-    assert match_voice_command("favorites") == ShelfCommand(STARRED_KEY, None)
+    is what the shelf says, where the key still says favorited."""
+    assert match_voice_command("favorites") == ShelfCommand(FAVORITES_KEY, None)
     assert match_voice_command("starred") is None
 
 

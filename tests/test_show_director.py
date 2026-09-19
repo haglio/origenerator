@@ -90,13 +90,13 @@ class FakeShow:
         self.visible = True
         self.live = False
         self.held = set()
-        self.hud_f_mode = False
+        self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
         self.enhanced_items = []
         self.steps = []
         self.culled = 0
-        self.starrable = True
-        self.stars = 0
+        self.favoritable = True
+        self.favorites = 0
         self.hud_panel = None
         self.released = []
         self.pause_raises = False
@@ -131,8 +131,8 @@ class FakeShow:
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
 
-    def note_added(self, path, media_type, prompt_id, thumb, *, starred, enhanced):
-        self.added.append((prompt_id, starred, enhanced))
+    def note_added(self, path, media_type, prompt_id, thumb, *, favorite, enhanced):
+        self.added.append((prompt_id, favorite, enhanced))
 
     def note_generating(self, prompt_id, frame):
         self.generating.append((prompt_id, frame))
@@ -176,15 +176,15 @@ class FakeShow:
     def osr2_drive_target(self):
         return self.opened_with.get("drive_target")
 
-    def toggle_f_mode(self):
-        self.hud_f_mode = not self.hud_f_mode
+    def toggle_favorites_filter(self):
+        self.hud_favorites_filter = not self.hud_favorites_filter
 
     def set_enhanced_mode(self, on):
         self.hud_enhanced_mode = on and bool(self.enhanced_items)
         return self.hud_enhanced_mode
 
     def clear_modes(self):
-        self.hud_f_mode = False
+        self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
 
     def hud_items(self):
@@ -196,9 +196,9 @@ class FakeShow:
     def cull(self):
         self.culled += 1
 
-    def star(self):
-        self.stars += 1
-        return self.starrable
+    def favorite(self):
+        self.favorites += 1
+        return self.favoritable
 
     def set_held(self, held):
         return held
@@ -325,7 +325,7 @@ class FakeHost:
         self.said = []
         self.followed = []
         self.trashed = []
-        self.starred = []
+        self.favorited = []
         self.enhanced = []
         self.drive_toggles = 0
         self.reconciles = 0
@@ -377,8 +377,8 @@ class FakeHost:
     def trash_generation(self, prompt_id):
         self.trashed.append(prompt_id)
 
-    def star_generation(self, prompt_id):
-        self.starred.append(prompt_id)
+    def favorite_generation(self, prompt_id):
+        self.favorited.append(prompt_id)
 
     def enhance_from_slideshow(self, prompt_id):
         self.enhanced.append(prompt_id)
@@ -398,13 +398,13 @@ class FakeHost:
         self.said.append(message)
 
 
-def _row(prompt_id, *, workflow_name="sdxl_t2i", starred=False, params=None,
+def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
          files=("one.png",)):
     return {
         "prompt_id": prompt_id,
         "workflow_name": workflow_name,
         "workflow": workflow_name,
-        "starred": starred,
+        "starred": favorite,
         "source": "generated",
         "params": json.dumps(params or {}),
         "output_files": json.dumps([{"filename": name} for name in files]),
@@ -519,7 +519,7 @@ def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     director.open([("a.png", "image", "g1", None)], location="shelf/a")
     director.open([("b.png", "image", "g2", None)], location="shelf/b")
 
-    director.note_finished(_row("g9", starred=True))
+    director.note_finished(_row("g9", favorite=True))
 
     assert made[0].added == [("g9", True, False)]
     assert made[1].added == []
@@ -786,10 +786,10 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(shows):
 
 def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
     # On a player that word is F-mode, and a show is meant to read the same way.
-    from origenerator.gui.gallery_tree import STARRED_KEY
+    from origenerator.gui.gallery_tree import FAVORITES_KEY
 
     class Spoken:
-        shelf_key = STARRED_KEY
+        shelf_key = FAVORITES_KEY
         side = None
 
     director, host, made = shows()
@@ -797,7 +797,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
 
     director.play_shelf(Spoken())
 
-    assert made[0].hud_f_mode is True
+    assert made[0].hud_favorites_filter is True
     assert len(made) == 1  # no second show opened
     assert host.said == ["🎤 F-mode on"]
 
@@ -829,24 +829,24 @@ def test_the_transport_words_step_the_slide_and_say_which_way(shows):
     assert made[0].said_kinds == [NOTICE, NOTICE]
 
 
-def test_a_star_over_a_slide_with_nothing_to_star_says_so(shows):
+def test_a_favorite_over_a_slide_with_nothing_to_favorite_says_so(shows):
     director, _host, made = shows()
     director.open([("a.png", "image", "g1", None)])
-    made[0].starrable = False
+    made[0].favoritable = False
 
     director.run_on_slide(AppCommand.STAR)
 
-    assert made[0].said == ["🎤 nothing here to star"]
+    assert made[0].said == ["🎤 nothing here to favorite"]
     assert made[0].said_kinds == [WARNING]
 
 
-def test_a_star_that_lands_says_so_in_the_favorites_green(shows):
+def test_a_favorite_that_lands_says_so_in_the_favorites_green(shows):
     director, _host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
     director.run_on_slide(AppCommand.STAR)
 
-    assert made[0].said == ["🎤 starred"]
+    assert made[0].said == ["🎤 favorited"]
     assert made[0].said_kinds == [FAVORITE]
 
 
@@ -1000,13 +1000,13 @@ def test_clearing_the_filter_takes_f_mode_with_it(shows):
     # "clear filter" is the way out of ALL of the narrowing, on every satellite
     # in this family.
     show = FakeShow()
-    show.hud_f_mode = True
+    show.hud_favorites_filter = True
     director, _host, _made = shows()
     director._slideshow = show
 
     director.filter_enhanced(False)
 
-    assert show.hud_f_mode is False
+    assert show.hud_favorites_filter is False
     assert show.said == ["🎤 showing all of them"]
 
 

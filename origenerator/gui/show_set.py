@@ -36,7 +36,7 @@ class ShowSet:
         # playlist's own random shuffle, here and on the way back in.
         self._shuffle = shuffle
         self._on_pass_change = on_pass_change
-        self.f_mode = False
+        self.favorites_filter = False
         self.enhanced_mode = False
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`set_modes`).
@@ -89,7 +89,7 @@ class ShowSet:
 
     # --- the two switches --------------------------------------------------
 
-    def set_modes(self, *, f_mode: bool, enhanced: bool) -> bool:
+    def set_modes(self, *, favorites_filter: bool, enhanced: bool) -> bool:
         """Deal the pass from what answers the switches as asked — both on
         meaning what answers both, the way every pair of filters in this family
         stacks — and say whether anything moved.
@@ -98,13 +98,13 @@ class ShowSet:
         empty show is not a mode, and the HUD's button staying dark is the
         answer.  Widening can never empty a set, so the way back is always open.
         """
-        if (f_mode, enhanced) == (self.f_mode, self.enhanced_mode):
+        if (favorites_filter, enhanced) == (self.favorites_filter, self.enhanced_mode):
             return False
         narrowed = [item for item in self.all_items
-                    if self.passes(item, f_mode=f_mode, enhanced=enhanced)]
+                    if self.passes(item, favorites_filter=favorites_filter, enhanced=enhanced)]
         if not narrowed:
             return False
-        self.f_mode, self.enhanced_mode = f_mode, enhanced
+        self.favorites_filter, self.enhanced_mode = favorites_filter, enhanced
         self.replace_items(narrowed, keep_slide=True)
         return True
 
@@ -114,9 +114,9 @@ class ShowSet:
         ``False`` when neither was on: there is nothing to widen back to, and
         the pass is left exactly as it is for the surface to start over in.
         """
-        if not (self.f_mode or self.enhanced_mode):
+        if not (self.favorites_filter or self.enhanced_mode):
             return False
-        self.f_mode = self.enhanced_mode = False
+        self.favorites_filter = self.enhanced_mode = False
         self.replace_items(self.all_items, keep_slide=False)
         return True
 
@@ -128,20 +128,20 @@ class ShowSet:
         switches come off, the pass is a fresh deal, and what the HUD says
         about it is re-dressed.
         """
-        self.f_mode = self.enhanced_mode = False
+        self.favorites_filter = self.enhanced_mode = False
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud)
         self.replace_items(self.all_items, keep_slide=False)
 
-    def passes(self, item, *, f_mode=None, enhanced=None) -> bool:
+    def passes(self, item, *, favorites_filter=None, enhanced=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
         about a setting the show is not in yet.  An item with no id (a test's,
-        or a run's frames) is neither starred nor enhanced, so any switch that
+        or a run's frames) is neither favorited nor enhanced, so any switch that
         is on leaves it out."""
-        f_mode = self.f_mode if f_mode is None else f_mode
+        favorites_filter = self.favorites_filter if favorites_filter is None else favorites_filter
         enhanced = self.enhanced_mode if enhanced is None else enhanced
         prompt_id = item.prompt_id
-        if f_mode and prompt_id not in self.starred_ids:
+        if favorites_filter and prompt_id not in self.favorite_ids:
             return False
         if enhanced and prompt_id not in self.enhanced_ids:
             return False
@@ -193,7 +193,7 @@ class ShowSet:
         carry an enhancement."""
         self.order_label = hud.order_label
         self.looping = hud.looping
-        self.starred_ids = set(hud.starred_ids or ())
+        self.favorite_ids = set(hud.favorite_ids or ())
         self.enhanced_ids = set(hud.enhanced_ids or ())
 
     def hud_items(self):
@@ -215,4 +215,4 @@ class ShowSet:
     def is_favorite(self) -> bool:
         """Whether the item on screen is one of the favorites — the star the
         HUD marks at the head of the line naming that very item."""
-        return self.current_prompt_id() in self.starred_ids
+        return self.current_prompt_id() in self.favorite_ids

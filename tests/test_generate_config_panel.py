@@ -1170,15 +1170,15 @@ def test_a_preview_corner_relays_the_act_with_the_id_it_is_about(saved_panel):
     assert got == [("img1", corner_controls.STAR)]
 
 
-def test_a_starred_preview_stays_starred_through_an_enhance_setting_change(saved_panel):
+def test_a_favorite_preview_stays_favorite_through_an_enhance_setting_change(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
-    db.set_generation_starred("img1", True)
+    db.set_generation_favorite("img1", True)
 
     panel.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert panel._preview._controls.buttons()[0].toolTip() == "Unstar this item"
+    assert panel._preview._controls.buttons()[0].toolTip() == "Unfavorite this item"
 
 
 def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):

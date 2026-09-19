@@ -19,6 +19,8 @@ from origenerator.gallery import (
     build_image_config_index,
     child_groups,
     config_tab_title,
+    favorite_folders,
+    favorite_generations,
     find_source_image_id,
     folder_detail,
     folder_id,
@@ -40,8 +42,6 @@ from origenerator.gallery import (
     rows_under,
     settings_signature,
     source_image_id_for,
-    starred_folders,
-    starred_generations,
     unreviewed_experiments,
     videos_from_source_image,
 )
@@ -1071,7 +1071,7 @@ def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
-def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
+def test_lora_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
     model = build_gallery_tree(rows)[0].children[0]
     a, b = model.children
@@ -1082,8 +1082,8 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_stars():
     loras = build_gallery_tree(rows, meta)[0].children[0].children
     assert [lora.key for lora in loras] == [a.key, b.key]  # order unchanged — no reshuffle
     assert loras[1].label == "Style B"     # custom name applied in place
-    assert loras[1].starred is True
-    assert loras[0].starred is False
+    assert loras[1].favorite is True
+    assert loras[0].favorite is False
 
 
 def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
@@ -1116,7 +1116,7 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
 
 
-def test_model_folders_get_stable_keys_and_apply_custom_names_and_stars():
+def test_model_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     rows = [
         _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
         _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
@@ -1129,8 +1129,8 @@ def test_model_folders_get_stable_keys_and_apply_custom_names_and_stars():
     models = build_gallery_tree(rows, meta)[0].children
     assert [m.key for m in models] == [reapony.key, dream.key]  # order unchanged
     assert models[1].label == "Dreamy"     # custom name applied in place
-    assert models[1].starred is True
-    assert models[0].starred is False
+    assert models[1].favorite is True
+    assert models[0].favorite is False
 
 
 def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
@@ -1307,7 +1307,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert again_model.children[0].children[0].key == settings.key
 
 
-def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
+def test_build_gallery_tree_applies_custom_names_and_favorites_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_lora = build_gallery_tree(rows)[0] \
         .children[0].children[0]  # the "(no add-on)" level
@@ -1319,8 +1319,8 @@ def test_build_gallery_tree_applies_custom_names_and_stars_in_place():
 
     assert [s.key for s in settings] == [cat.key, dog.key]  # order unchanged — no reshuffle
     assert settings[1].label == "Doggos"      # custom name applied in place
-    assert settings[1].starred is True
-    assert settings[0].starred is False
+    assert settings[1].favorite is True
+    assert settings[0].favorite is False
 
 
 def test_a_new_generation_in_an_older_folder_leaves_the_folder_where_it_was():
@@ -1384,8 +1384,8 @@ def test_an_unnamed_tree_credits_nothing():
     assert named_folders_by_row(build_gallery_tree(rows), {}) == {}
 
 
-def test_starred_folders_collects_starred_across_every_level():
-    # Star a whole workflow folder and one deep settings leaf; the collector
+def test_favorite_folders_collects_favorite_across_every_level():
+    # Favorite a whole workflow folder and one deep settings leaf; the collector
     # returns both, top-down in tree order, regardless of how deep each sits.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     workflow = build_gallery_tree(rows)[0]
@@ -1395,13 +1395,13 @@ def test_starred_folders_collects_starred_across_every_level():
         workflow.key: {"custom_name": None, "starred": True},
         cat_leaf.key: {"custom_name": None, "starred": True},
     }
-    starred = starred_folders(build_gallery_tree(rows, meta))
-    assert [g.key for g in starred] == [workflow.key, cat_leaf.key]
+    favorite = favorite_folders(build_gallery_tree(rows, meta))
+    assert [g.key for g in favorite] == [workflow.key, cat_leaf.key]
 
 
-def test_starred_folders_is_empty_when_nothing_is_starred():
+def test_favorite_folders_is_empty_when_nothing_is_favorite():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
-    assert starred_folders(tree) == []
+    assert favorite_folders(tree) == []
 
 
 def test_recent_generations_keeps_the_callers_newest_first_order():
@@ -1463,24 +1463,24 @@ def test_rows_of_media_types_defaults_to_every_media_type():
     assert [r["prompt_id"] for r in rows_of_media_types(rows)] == ["v1", "i1"]
 
 
-def test_starred_generations_collects_starred_items_newest_first():
+def test_favorite_generations_collects_favorite_items_newest_first():
     rows = [_img("i3", "c", 50, 3, starred=1), _img("i2", "b", 50, 2),
             _img("i1", "a", 50, 1, starred=1)]
-    assert [r["prompt_id"] for r in starred_generations(rows)] == ["i3", "i1"]
+    assert [r["prompt_id"] for r in favorite_generations(rows)] == ["i3", "i1"]
 
 
-def test_starred_generations_includes_imported_files():
-    # A bookmark is a bookmark: an imported image the user starred belongs on the
-    # Starred shelf.
+def test_favorite_generations_includes_imported_files():
+    # A bookmark is a bookmark: an imported image the user favorited belongs on the
+    # Favorites shelf.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))
-    assert [r["prompt_id"] for r in starred_generations([imported])] == ["imp"]
+    assert [r["prompt_id"] for r in favorite_generations([imported])] == ["imp"]
 
 
-def test_starred_generations_excludes_rows_with_no_output():
-    # A starred row that produced nothing (in-flight/failed) has nothing to show.
-    starred_wip = _row(prompt_id="wip", starred=1, output_files=None)
-    assert starred_generations([starred_wip]) == []
+def test_favorite_generations_excludes_rows_with_no_output():
+    # A favorited row that produced nothing (in-flight/failed) has nothing to show.
+    favorite_wip = _row(prompt_id="wip", starred=1, output_files=None)
+    assert favorite_generations([favorite_wip]) == []
 
 
 def test_recent_generations_reaches_a_lone_old_match_of_the_selected_type():

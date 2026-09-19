@@ -287,7 +287,7 @@ def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
 @pytest.mark.parametrize("table", sorted(ADDED_COLUMNS))
 def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, table):
     """The other half: the column can arrive with the right name and the wrong
-    shape. ``starred`` is ``INTEGER NOT NULL DEFAULT 0`` in the DDL, and an
+    shape. ``favorited`` is ``INTEGER NOT NULL DEFAULT 0`` in the DDL, and an
     upgrade that spelt it a plain ``INTEGER`` would give two users' databases
     two different tables under one name."""
     path = tmp_path / f"older-{table}.db"

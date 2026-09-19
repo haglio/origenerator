@@ -52,20 +52,20 @@ def test_find_clips_answers_a_missing_folder_with_silence(tmp_path, folder):
 
 # --- the overlay's folder --------------------------------------------------
 
-def test_a_relative_ambient_folder_hangs_off_the_suite_root():
+def test_a_relative_ambient_folder_hangs_off_the_library_root():
     resolved = ambient_audio_dir(
-        {"suite_root": "C:/root", "ambient_audio_dir": "videos/clips"})
+        {"library_root": "C:/root", "ambient_audio_dir": "videos/clips"})
     assert resolved == Path("C:/root") / "videos/clips"
 
 
 def test_an_absolute_ambient_folder_is_taken_as_given():
     resolved = ambient_audio_dir(
-        {"suite_root": "C:/root", "ambient_audio_dir": "D:/elsewhere/clips"})
+        {"library_root": "C:/root", "ambient_audio_dir": "D:/elsewhere/clips"})
     assert resolved == Path("D:/elsewhere/clips")
 
 
 def test_an_overlay_naming_no_ambient_folder_gives_none():
-    assert ambient_audio_dir({"suite_root": "C:/root"}) is None
+    assert ambient_audio_dir({"library_root": "C:/root"}) is None
 
 
 # --- the rotation ----------------------------------------------------------

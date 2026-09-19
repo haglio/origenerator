@@ -633,7 +633,7 @@ class PreviewWidget(QWidget):
         video = getattr(self, "_video_size", None)
         return tuple(video) if video else None
 
-    def set_actions(self, prompt_id: str | None, *, starred: bool = False,
+    def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
                     enhance: str | None = None) -> None:
         """Arm the corner controls and the right-click menu over the shown media.
 
@@ -652,7 +652,7 @@ class PreviewWidget(QWidget):
         if prompt_id is None:
             self._controls.hide_all()
             return
-        self._controls.show_for(starred=starred, enhance=enhance)
+        self._controls.show_for(favorite=favorite, enhance=enhance)
         self._place_controls()
 
     def actions_id(self) -> str | None:

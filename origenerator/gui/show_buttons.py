@@ -61,7 +61,7 @@ CONTROL_FACES = {
 CONTROL_TOOLTIPS = {
     "prev": "Previous slide",
     "next": "Next slide",
-    "lock": "Hold this one on screen — starring it, and asking for a better version",
+    "lock": "Hold this one on screen — favoriting it, and asking for a better version",
     "trash": "Delete this one and move on",
     "fmode": f"{F_MODE_LABEL} — play only the favorites",
     "enhanced": "Enhanced only — play just the pictures that have been enhanced",
@@ -77,7 +77,7 @@ RESET_TOOLTIPS = {
 }
 
 
-def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
+def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
               enhanced: bool = False, hosted: bool = False,
               own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
     """The rows a show's HUD draws, for the surface it is drawn on.
@@ -92,7 +92,7 @@ def show_rows(side: str, *, locked: bool = False, f_mode: bool = False,
     minimize = own_window and not hosted
     names = [name for group in CONTROL_GROUPS for name in group
              if minimize or name != "minimize"]
-    lit = {"lock": locked, "fmode": f_mode, "enhanced": enhanced}
+    lit = {"lock": locked, "fmode": favorites_filter, "enhanced": enhanced}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
@@ -121,7 +121,7 @@ def answer(host, action: str, argument: str = "") -> bool:
     elif action == "reset":
         host.show_reset()
     elif action == "fmode":
-        host.toggle_f_mode()
+        host.toggle_favorites_filter()
     elif action == "enhanced":
         host.toggle_enhanced_mode()
     elif action in ("no_loop", "seed_loop"):

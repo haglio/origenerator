@@ -2,7 +2,7 @@
 
 The pane is two trees, one per shape, each under a standing label and each
 scrolling on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`).
-Each carries the whole table of contents: the Recents, Starred, Experiments,
+Each carries the whole table of contents: the Recents, Favorites, Experiments,
 Requests and Trash shelves, the folders the user composed, and the All row over
 the workflow → model → LoRA → [source image] → settings hierarchy — all
 built from that shape's rows alone. Standing anywhere means standing on one
@@ -24,7 +24,7 @@ The folders the user composed by hand ride between the shelves and the media
 roots, rendered flat like a shelf: a custom folder's items can sit anywhere in
 the hierarchy, so nesting them under it would draw the same folder twice and put
 two rows in ``item_by_key`` for one key. Its contents show as tiles in the browser
-pane instead, exactly as the Starred shelf shows its bookmarked folders.
+pane instead, exactly as the Favorites shelf shows its bookmarked folders.
 """
 from __future__ import annotations
 
@@ -37,12 +37,12 @@ from origenerator import gallery
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL,
+    FAVORITES_KEY,
+    FAVORITES_LABEL,
     RECENTS_KEY,
     RECENTS_LABEL,
     REQUESTS_KEY,
     REQUESTS_LABEL,
-    STARRED_KEY,
-    STARRED_LABEL,
     TRASH_KEY,
     TRASH_LABEL,
 )
@@ -113,7 +113,7 @@ class GalleryTree:
         ``sides`` are the :class:`SideModel`s to fill the halves with, one per
         shape. ``folder_meta`` is the same label/star overlay the tree models
         were built with, so the All row each side wraps around its model can be
-        renamed and starred like any folder under it.
+        renamed and favorited like any folder under it.
 
         ``recently_worked`` are the ``(side, folder key)`` pairs of the folders
         worked in lately (:func:`~origenerator.gallery.recently_worked_folders`),
@@ -162,7 +162,7 @@ class GalleryTree:
         """The synthetic shelves leading a side: Recents (in-flight work plus
         recently finished items) whenever there is anything to show — so a first
         generation is visible while it runs, before any folder exists — then
-        Favorites (starred folders and items) once folders do, then Experiments,
+        Favorites (favorited folders and items) once folders do, then Experiments,
         Requests and Trash, all three always present: the first hosts the
         background experimenter's review queue, the second is where everything
         you asked for out loud lands, and the third is where every delete goes —
@@ -173,15 +173,15 @@ class GalleryTree:
             self._add_shelf(side_item, RECENTS_LABEL, RECENTS_KEY, side,
                             icons.clock_icon(), "Recently generated")
         if side.tree_model:
-            starred = self._add_shelf(
-                side_item, STARRED_LABEL, STARRED_KEY, side,
+            favorite = self._add_shelf(
+                side_item, FAVORITES_LABEL, FAVORITES_KEY, side,
                 icons.star_icon(filled=True),
                 "Your favorite folders and items — drop a folder here to add it"
             )
             # Favoriting is what the shelf does with a dropped folder, so it
             # collects. A star is the folder's own, not this side's, so the drop
             # key is the shelf's plain key.
-            starred.setData(0, DROP_KEY_ROLE, STARRED_KEY)
+            favorite.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
         self._add_shelf(
             side_item, EXPERIMENTS_LABEL,
             EXPERIMENTS_KEY, side, icons.flask_icon(),
@@ -263,7 +263,7 @@ class GalleryTree:
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, orientation) -> QTreeWidgetItem:
-        # Starred state shows as the row's star icon (the delegate reads it from
+        # Favorites state shows as the row's star icon (the delegate reads it from
         # the group), so the label itself carries no ★ prefix.
         item = QTreeWidgetItem([group.label])
         if gallery.is_renamable(group):

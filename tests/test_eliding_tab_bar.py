@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QPixmap
-from PyQt6.QtWidgets import QApplication, QTabWidget, QWidget
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QIcon, QPainter, QPixmap
+from PyQt6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
 
 from origenerator.gui.eliding_tab_bar import (
     EDGE,
@@ -12,6 +12,7 @@ from origenerator.gui.eliding_tab_bar import (
     ElidingTabBar,
     tab_mark,
 )
+from origenerator.gui.stylesheet import build_stylesheet
 
 
 def _tabs_with(qtbot, n, width=600):
@@ -116,7 +117,6 @@ def _closable_bar(qtbot, count=2):
 
 
 def _close_button(bar, index):
-    from PyQt6.QtWidgets import QTabBar
     return bar.tabButton(index, QTabBar.ButtonPosition.RightSide)
 
 
@@ -130,8 +130,6 @@ def test_every_tab_wears_the_bars_own_close_button(qtbot):
 
 
 def test_the_close_mark_is_padded_off_the_tabs_edge(qtbot):
-    from PyQt6.QtWidgets import QStyle
-
     bar = _closable_bar(qtbot)
     button = _close_button(bar, 0)
     mark = bar.style().pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
@@ -171,6 +169,93 @@ def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
     assert asked == [1]  # it is the second tab now, and says so
 
 
+def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
+    # A tab dragged along the row takes its ✕ with it, and the ✕ must still close
+    # the tab it rides on rather than whatever has taken its old slot.
+    bar = _closable_bar(qtbot, count=3)
+    first = _close_button(bar, 0)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+    bar.moveTab(0, 2)
+
+    first.click()
+
+    assert asked == [2]
+
+
+# --- a middle click closes the tab under it ----------------------------------
+
+def _middle_press(qtbot, widget, pos):
+    qtbot.mousePress(widget, Qt.MouseButton.MiddleButton, pos=pos)
+
+
+def test_a_middle_click_asks_for_the_tab_under_it_on_the_press(qtbot):
+    bar = _closable_bar(qtbot, count=3)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+
+    _middle_press(qtbot, bar, bar.tabRect(1).center())
+
+    assert asked == [1]
+
+
+def test_the_release_ending_a_middle_click_asks_for_nothing_more(qtbot):
+    # Qt 6.11 closes a tab on the middle button's RELEASE of its own accord, and
+    # that would take a second tab: the row has shifted under the cursor by then,
+    # the press having closed the first.
+    bar = _closable_bar(qtbot, count=3)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+    middle = bar.tabRect(1).center()
+
+    _middle_press(qtbot, bar, middle)
+    qtbot.mouseRelease(bar, Qt.MouseButton.MiddleButton, pos=middle)
+
+    assert asked == [1]
+
+
+def test_a_middle_click_on_the_close_mark_closes_that_tab_too(qtbot):
+    # The ✕ rides on the tab and answers the left button alone, so a middle click
+    # landing on it has to fall through to the bar rather than stop at the button.
+    bar = _closable_bar(qtbot, count=3)
+    bar.resize(bar.sizeHint())
+    mark = _close_button(bar, 1)
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+
+    _middle_press(qtbot, mark, mark.rect().center())
+
+    assert asked == [1]
+
+
+def test_a_middle_click_beside_the_tabs_closes_nothing(qtbot):
+    bar = _closable_bar(qtbot, count=2)
+    bar.setExpanding(False)  # so the row is wider than the tabs standing on it
+    bar.resize(600, bar.sizeHint().height())
+    beside = QPoint(bar.tabRect(1).right() + 40, bar.tabRect(1).center().y())
+    assert bar.tabAt(beside) == -1
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+
+    _middle_press(qtbot, bar, beside)
+
+    assert asked == []
+
+
+def test_a_middle_click_closes_nothing_in_a_row_that_offers_no_close(qtbot):
+    # A tab with no ✕ on it is a tab this bar doesn't close, whichever button asks.
+    bar = ElidingTabBar()
+    qtbot.addWidget(bar)
+    bar.addTab("tab 0")
+    bar.addTab("tab 1")
+    asked = []
+    bar.tabCloseRequested.connect(asked.append)
+
+    _middle_press(qtbot, bar, bar.tabRect(1).center())
+
+    assert asked == []
+
+
 # --- the preview tab, drawn in italic ----------------------------------------
 
 def _painted_label_font(bar, index):
@@ -180,8 +265,6 @@ def _painted_label_font(bar, index):
     platform this suite runs on paints italic and upright text identically, so a
     picture of the bar cannot tell them apart.
     """
-    from PyQt6.QtGui import QPainter, QPixmap
-
     pixmap = QPixmap(400, 60)
     painter = QPainter(pixmap)
     try:
@@ -241,10 +324,6 @@ def test_the_bars_style_is_owned_by_the_bar(qtbot):
 
 
 def test_the_italic_mark_survives_the_app_being_themed(qtbot):
-    from PyQt6.QtWidgets import QApplication
-
-    from origenerator.gui.stylesheet import build_stylesheet
-
     app = QApplication.instance()
     prior = app.styleSheet()
     bar = _closable_bar(qtbot)
@@ -255,20 +334,6 @@ def test_the_italic_mark_survives_the_app_being_themed(qtbot):
     finally:
         app.setStyleSheet(prior)
     assert _painted_label_font(bar, 0).italic() is True
-
-
-def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
-    # Reordering by drag is new; a tab's ✕ must still close the tab it rides on
-    # rather than whatever has taken its old slot.
-    bar = _closable_bar(qtbot, count=3)
-    first = _close_button(bar, 0)
-    asked = []
-    bar.tabCloseRequested.connect(asked.append)
-    bar.moveTab(0, 2)
-
-    first.click()
-
-    assert asked == [2]
 
 
 # --- the mark a tab wears, and the space around it ---------------------------

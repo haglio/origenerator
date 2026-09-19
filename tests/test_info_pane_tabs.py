@@ -135,6 +135,19 @@ def test_close_subtab_removes_the_panel(tabs):
     assert tabs.config_panels() == [tabs.widget(0)]
 
 
+def test_a_middle_click_on_a_tab_closes_it(tabs, qtbot):
+    # The ✕ is not the only way out of a tab: the middle button closes the one
+    # it lands on, wherever on the tab that is.
+    keeper = tabs.widget(0)
+    going = tabs._add_subtab()
+    bar = tabs.tabBar()
+
+    qtbot.mousePress(bar, Qt.MouseButton.MiddleButton,
+                     pos=bar.tabRect(tabs.indexOf(going)).center())
+
+    assert tabs.config_panels() == [keeper]
+
+
 def test_the_pane_carries_no_corner_controls(tabs):
     # The "+" is gone with the empty pane it existed to refill, and close-all with
     # it: a tab is always open, and the tab menu closes the rest.

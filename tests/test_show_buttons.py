@@ -2,12 +2,9 @@
 face, its tooltip and the state it draws."""
 from __future__ import annotations
 
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+
 from origenerator.gui.show_buttons import answer, show_rows
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 
 def _band(**fields) -> tuple:

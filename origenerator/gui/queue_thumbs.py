@@ -46,13 +46,10 @@ import os
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QLabel
+from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui.combination import Combination, draw_plus, draw_recipe, plus_width
 from origenerator.gui.grayscale import grayscale_pixmap
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import BORDER_SUBTLE
 
 # The gap between cells, in pixels. One is enough to read as separate pictures;
 # two at this size is a visible stripe between them.

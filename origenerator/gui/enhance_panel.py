@@ -37,6 +37,16 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import (
+    AMBER,
+    BG_PRIMARY,
+    BG_SECONDARY,
+    BORDER_SUBTLE,
+    TEXT_MUTED,
+    hovered,
+)
+from shared_ui.tick_control import TickControl
+from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.gallery import (
     ENHANCE_SETTING_KEYS,
@@ -52,7 +62,6 @@ from origenerator.gui.no_wheel import (
     NoWheelSpinBox,
 )
 from origenerator.gui.param_help import param_help
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
@@ -60,21 +69,6 @@ from origenerator.workflows.detail_parts import (
     detector_for_part,
     part_table,
 )
-
-# Before any shared_ui import: that checkout is a sibling on the path, not a
-# dependency the launch interpreter has installed (see tests/test_sibling_imports).
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import (
-    AMBER,
-    BG_PRIMARY,
-    BG_SECONDARY,
-    BORDER_SUBTLE,
-    TEXT_MUTED,
-    hovered,
-)
-from shared_ui.tick_control import TickControl
-from shared_ui.toggle_switch import ToggleSwitch
 
 _AUTO_TOOLTIP = (
     "Enhance every image generated from now on, as it lands — with the settings "

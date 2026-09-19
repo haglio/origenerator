@@ -26,19 +26,16 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
-
-from origenerator.fun_time_mode import FunTimeSession
-from origenerator.gui.show_buttons import answer
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
 from player_core.file_channel import (
     append_command,
     consume_command_file,
     publish_whole,
     read_paused_state,
 )
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+
+from origenerator.fun_time_mode import FunTimeSession
+from origenerator.gui.show_buttons import answer
 
 logger = logging.getLogger(__name__)
 

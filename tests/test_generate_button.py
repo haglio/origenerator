@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from shared_ui.colors import BLUE
 
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.stylesheet import build_stylesheet
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-
-from shared_ui.colors import BLUE
 
 
 @pytest.fixture

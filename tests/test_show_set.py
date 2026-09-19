@@ -10,15 +10,11 @@ from __future__ import annotations
 import random
 
 import pytest
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.gui.show_set import ShowSet
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import in_order
-
-ensure_player_core_on_path()
-
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]

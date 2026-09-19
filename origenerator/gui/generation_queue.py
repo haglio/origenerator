@@ -65,6 +65,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import BLUE
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
@@ -83,11 +84,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.queue_thumbs import QueueThumbs
-from origenerator.paths import ensure_shared_ui_on_path
 from origenerator.workflows.derived_size import resolve_input_image_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import BLUE
 
 # The strip's opening height, its floor, and so the widest the live thumbnail
 # ever gets: it takes the lower-left corner whole, being the one thing here worth

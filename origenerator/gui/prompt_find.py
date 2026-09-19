@@ -13,13 +13,10 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QScrollArea, QTextEdit
+from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, TEXT_PRIMARY
 
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.deferred import defer
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, TEXT_PRIMARY
 
 # Every hit wears the dim blue and the one you're standing on wears amber, so
 # stepping reads as a cursor moving through the matches rather than as the set of

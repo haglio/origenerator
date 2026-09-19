@@ -18,14 +18,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+
 from origenerator.gui.neighbor_previews import still_for
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.paths import ensure_player_core_on_path
 from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
-
-ensure_player_core_on_path()
-
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL  # noqa: E402
 
 
 class ShowSet:

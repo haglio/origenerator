@@ -4,10 +4,6 @@ from typing import NamedTuple
 
 from PyQt6.QtCore import QRect, QSize, Qt
 from PyQt6.QtGui import QFont, QPainter, QPixmap
-
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
 from shared_ui.colors import TEXT_MUTED
 
 # The plus, as a fraction of a picture's side — big enough to read as the operator

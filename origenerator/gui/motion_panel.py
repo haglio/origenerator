@@ -22,6 +22,33 @@ carries, and a second pair here would be two switches for one thing.
 
 from __future__ import annotations
 
+from player_core import drive_layout
+from player_core.console import (
+    OSR2_CONTROL_BUTTONS,
+    OSR2_CONTROL_UNANSWERED,
+    OSR2_DRIVING,
+    OSR2_PARKED,
+    OSR2_RETRACTED,
+    ConsoleModel,
+)
+from player_core.console_hud import (
+    ConsoleHud,
+    ConsolePainter,
+    ModeHud,
+    hud_xy,
+)
+from player_core.drive_readout import (
+    DRIVEN_BY_FUNSCRIPT,
+    DRIVEN_BY_NOTHING,
+    DRIVEN_BY_ROBOT_HAND,
+    DriveHud,
+)
+from player_core.modes import MainMode, Osr2State
+from player_core.robot_hand import (
+    PARK_CENTER,
+    POSITION_MAX,
+    RETRACT_CENTER,
+)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtWidgets import QWidget
@@ -31,37 +58,6 @@ from origenerator.gui.console_buttons import console_rows
 from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
-from origenerator.paths import ensure_player_core_on_path
-
-ensure_player_core_on_path()
-
-from player_core import drive_layout  # noqa: E402
-from player_core.console import (  # noqa: E402
-    OSR2_CONTROL_BUTTONS,
-    OSR2_CONTROL_UNANSWERED,
-    OSR2_DRIVING,
-    OSR2_PARKED,
-    OSR2_RETRACTED,
-    ConsoleModel,
-)
-from player_core.console_hud import (  # noqa: E402
-    ConsoleHud,
-    ConsolePainter,
-    ModeHud,
-    hud_xy,
-)
-from player_core.drive_readout import (  # noqa: E402
-    DRIVEN_BY_FUNSCRIPT,
-    DRIVEN_BY_NOTHING,
-    DRIVEN_BY_ROBOT_HAND,
-    DriveHud,
-)
-from player_core.modes import MainMode, Osr2State  # noqa: E402
-from player_core.robot_hand import (  # noqa: E402
-    PARK_CENTER,
-    POSITION_MAX,
-    RETRACT_CENTER,
-)
 
 # Which of the console's four control buttons asks for which state, read off
 # player_core's own mapping so a press cannot drift from the button that lights.

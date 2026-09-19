@@ -38,13 +38,10 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtWidgets import QWidget
+from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE
 
 from origenerator.gui.generation_queue import GenerationQueue, QueueRow
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
-from origenerator.paths import ensure_shared_ui_on_path
-
-ensure_shared_ui_on_path()
-from shared_ui.colors import BG_PRIMARY, BORDER_SUBTLE
 
 # How far the plate floats off the screen's left and lower edges — the position
 # counter's own margin, so the two sit on one baseline across the foot of the

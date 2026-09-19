@@ -22,13 +22,9 @@ from __future__ import annotations
 from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor
 from PyQt6.QtWidgets import QPlainTextEdit
-
-from origenerator.paths import ensure_shared_ui_on_path
-from origenerator.prompt_diff import ADDED, REMOVED, diff_spans
-
-ensure_shared_ui_on_path()
-
 from shared_ui.colors import RED
+
+from origenerator.prompt_diff import ADDED, REMOVED, diff_spans
 
 # What went is struck through in red; what arrived is lit. Red rather than a
 # dimmed gray: the words are still in the field, and a reader skimming a long

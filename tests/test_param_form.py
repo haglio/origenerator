@@ -1287,11 +1287,9 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
     # repolish -- so without one the card would go read-only while still looking
     # like an ordinary field. Rendered rather than asserted on the property:
     # that is the half a missing repolish breaks.
-    from origenerator.gui.stylesheet import build_stylesheet
-    from origenerator.paths import ensure_shared_ui_on_path
-
-    ensure_shared_ui_on_path()
     from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
+
+    from origenerator.gui.stylesheet import build_stylesheet
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)

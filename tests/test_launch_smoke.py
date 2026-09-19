@@ -70,9 +70,9 @@ def _run_in_a_fresh_interpreter(statements: list[str]) -> subprocess.CompletedPr
     """Run them the way ``launch_origenerator.vbs`` runs the app.
 
     The launcher cds to this repo and puts nothing on ``PYTHONPATH``: the
-    siblings resolve through the venv's editable installs.  Any ``PYTHONPATH`` a
-    developer or pytest happens to be carrying is dropped, because the icon does
-    not get it.
+    siblings resolve through the venv, at the versions the pyproject names.  Any
+    ``PYTHONPATH`` a developer or pytest happens to be carrying is dropped,
+    because the icon does not get it.
     """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["QT_QPA_PLATFORM"] = "offscreen"

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,
@@ -17,6 +18,7 @@ from origenerator.voice.app_commands import (
     phrases_heard_only_outright,
     spoken_phrases,
 )
+from origenerator.voice.commands import ShelfCommand, match_voice_command
 
 # --- the shelves that lead the tree, each by the name on its row -------------
 
@@ -24,7 +26,6 @@ from origenerator.voice.app_commands import (
     ("experiments", AppCommand.EXPERIMENTS),
     ("requests", AppCommand.REQUESTS),
     ("recents", AppCommand.RECENTS),
-    ("starred", AppCommand.STARRED),
     ("trash", AppCommand.TRASH),
 ])
 def test_a_shelf_answers_to_its_own_bare_name(said, wanted):
@@ -132,7 +133,9 @@ def test_a_two_word_command_is_not_shadowed_by_its_first_word():
 @pytest.mark.parametrize("said, wanted", [
     ("undo", AppCommand.UNDO),
     ("redo", AppCommand.REDO),
-    ("star", AppCommand.STAR),
+    ("favorite", AppCommand.FAVORITE),
+    ("favorite it", AppCommand.FAVORITE),
+    ("favorite this", AppCommand.FAVORITE),
     ("delete", AppCommand.CULL),
     ("group", AppCommand.GROUP),
 ])
@@ -181,9 +184,15 @@ def test_the_show_filter_is_said_either_way_round_not_toggled():
     assert match_app_command("no filter") is AppCommand.FILTER_OFF
 
 
-def test_the_star_button_and_the_starred_shelf_are_different_words():
-    assert match_app_command("star") is AppCommand.STAR
-    assert match_app_command("starred") is AppCommand.STARRED
+def test_marking_a_favorite_and_standing_in_the_favorites_shelf_are_different_words():
+    assert match_app_command("favorite") is AppCommand.FAVORITE
+    assert match_app_command("go to favorites") is AppCommand.FAVORITES
+    assert match_app_command("favorites shelf") is AppCommand.FAVORITES
+
+
+def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_shelf():
+    assert match_app_command("favorites") is None
+    assert match_voice_command("favorites") == ShelfCommand(FAVORITES_KEY, None)
 
 
 # --- what must NOT match: everything else steers a prompt --------------------
@@ -216,7 +225,8 @@ def test_an_empty_utterance_asks_for_nothing():
 
 def test_the_recognizer_is_asked_to_hear_every_way_a_command_is_said_in_words():
     heard = spoken_phrases()
-    for phrase in ("experiments", "go to trash", "weird", "star it", "auto generate on",
+    for phrase in ("experiments", "go to trash", "weird", "favorite it", "go to favorites",
+                   "auto generate on",
                    "mic off", "o s r two off", "clear filter", "slow down",
                    "human inspired off", "amp fifty", "center one hundred", "max speed"):
         assert phrase in heard

@@ -46,7 +46,7 @@ class AppCommand(Enum):
 
     # The shelves that lead the tree, each reached by its own name.
     RECENTS = "recents"
-    STARRED = "starred"
+    FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
     REQUESTS = "requests"
     TRASH = "trash"
@@ -60,7 +60,7 @@ class AppCommand(Enum):
     CULL = "cull"        # Fun Time's "weird": take this one away
     LOCK = "lock"        # hold the slide (which favorites it and asks for the better version)
     UNLOCK = "unlock"    # let it go again
-    STAR = "star"
+    FAVORITE = "favorite"
     UNDO = "undo"
     REDO = "redo"
     GROUP = "group"      # the picked folders into a folder of their own
@@ -162,7 +162,7 @@ def _say(command: AppCommand | DialSetting, *phrases: str) -> None:
 # after it, for a speaker who would rather say a sentence.
 _SHELF_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.RECENTS: ("recents", "recent"),
-    AppCommand.STARRED: ("starred",),
+    AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
     # The singular is the request dictation's opening word — see the module
     # docstring. Only the plural, which is also what the row is labeled.
@@ -170,9 +170,12 @@ _SHELF_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.TRASH: ("trash",),
 }
 _SHELF_VERBS = ("go to", "open", "show")
+# Said on its own, this one already plays the shelf, or narrows a show to it
+# (origenerator.voice.commands.SHELF_KEYS), so standing in it takes the sentence.
+_NEVER_SAID_BARE = frozenset({"favorites"})
 for _shelf, _names in _SHELF_NAMES.items():
     for _name in _names:
-        _say(_shelf, _name, f"{_name} shelf",
+        _say(_shelf, *(() if _name in _NEVER_SAID_BARE else (_name,)), f"{_name} shelf",
              *(f"{_verb} {_name}" for _verb in _SHELF_VERBS))
 
 # The transport. Fun Time's "next"/"previous"/"skip"/"back" all land here,
@@ -186,7 +189,7 @@ _say(AppCommand.FORWARD, "forward", "go forward", "next", "next slide", "skip")
 _say(AppCommand.CULL, "weird", "delete", "delete it")
 _say(AppCommand.LOCK, "lock", "hold")
 _say(AppCommand.UNLOCK, "unlock", "release")
-_say(AppCommand.STAR, "star", "star it", "star this")
+_say(AppCommand.FAVORITE, "favorite", "favorite it", "favorite this")
 _say(AppCommand.UNDO, "undo")
 _say(AppCommand.REDO, "redo")
 _say(AppCommand.GROUP, "group", "group folders")

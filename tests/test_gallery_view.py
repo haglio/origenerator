@@ -13849,7 +13849,7 @@ def _listening(qtbot, tmp_path, db=None):
     ("experiments", gallery_view_module._EXPERIMENTS_KEY),
     ("trash", gallery_view_module._TRASH_KEY),
     ("recents", gallery_view_module._RECENTS_KEY),
-    ("starred", gallery_view_module._FAVORITES_KEY),
+    ("go to favorites", gallery_view_module._FAVORITES_KEY),
     ("go to experiments", gallery_view_module._EXPERIMENTS_KEY),
 ])
 def test_a_spoken_shelf_name_stands_you_in_that_shelf(qtbot, tmp_path, said, key):
@@ -13881,7 +13881,7 @@ def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(
     db = Database(tmp_path / "empty.db")
     view = _listening(qtbot, tmp_path, db=db)
 
-    view._voice.listener.speak("starred")
+    view._voice.listener.speak("go to favorites")
 
     assert view._voice.status.text() == "🎤 no Favorites shelf yet"
 
@@ -13922,7 +13922,7 @@ def test_a_spoken_favorite_over_a_show_bookmarks_the_slide(qtbot, tmp_path):
     surface = _VoiceSurface("orig")
     view._shows._slideshow = surface
 
-    view._voice.listener.speak("star")
+    view._voice.listener.speak("favorite")
 
     assert surface.favorited == 1 and surface.said == "🎤 favorited"
 
@@ -13959,7 +13959,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
     aimed = view._bank.favorite.toolTip()
     assert aimed.startswith("Favorite folder")
 
-    view._voice.listener.speak("star")
+    view._voice.listener.speak("favorite")
 
     assert view._voice.status.text() == f"🎤 {aimed}"
     assert view._bank.favorite.toolTip().startswith("Unfavorite folder")

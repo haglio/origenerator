@@ -85,7 +85,7 @@ _WANTS = {
 # host's answer, so a row renamed is renamed in one place.
 _SHELVES = {
     AppCommand.RECENTS: _RECENTS_KEY,
-    AppCommand.STARRED: _FAVORITES_KEY,
+    AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
     AppCommand.REQUESTS: _REQUESTS_KEY,
     AppCommand.TRASH: _TRASH_KEY,
@@ -152,7 +152,7 @@ _BANK_REFUSALS = {
     AppCommand.BACK: "nowhere back",
     AppCommand.FORWARD: "nowhere forward",
     AppCommand.CULL: None,
-    AppCommand.STAR: None,
+    AppCommand.FAVORITE: None,
     AppCommand.UNDO: None,
     AppCommand.REDO: None,
     AppCommand.GROUP: "pick some folders first",
@@ -172,7 +172,7 @@ _FILTERS = {
 # undoing a cull you regret is exactly a thing to do mid-show.
 _ABOUT_THE_SLIDE = frozenset({
     AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
-    AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.STAR,
+    AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.FAVORITE,
 })
 
 

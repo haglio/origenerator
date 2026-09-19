@@ -133,7 +133,7 @@ def sided_app_command(text: str):
     """The bare app command *text* is, wrapped with the side it named.
 
     The bare vocabulary (:mod:`origenerator.voice.app_commands`) is whole
-    utterances only — "undo", "star", "experiments" — which is strict enough to
+    utterances only — "undo", "favorite", "experiments" — which is strict enough to
     be asked ahead of an opening request.  A side may still lead one, for the
     same reason it may lead any other order here: hosted, two shows run and
     neither is the active window, so "landscape lock" is the only way to say

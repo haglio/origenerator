@@ -1138,7 +1138,7 @@ class ShowDirector:
         elif command is AppCommand.CULL:
             show.cull()
             said = "🎤 gone"
-        elif command is AppCommand.STAR:
+        elif command is AppCommand.FAVORITE:
             said, kind = (("🎤 favorited", FAVORITE) if show.favorite()
                           else ("🎤 nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:

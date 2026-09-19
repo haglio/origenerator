@@ -104,7 +104,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     # is looping, so the base state reads "Unlocked · Shuffle" exactly as a
     # satellite browsing its library does.
     return HudModel(
-        side=side,
+        player=side,
         locked=locked,
         # The line names both narrowings beside the rest — F-mode over the
         # favorites, and the enhanced-only switch a show's HUD is the one panel

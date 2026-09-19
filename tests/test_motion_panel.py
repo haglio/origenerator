@@ -15,6 +15,7 @@ from player_core.console import (
     console_rows,
 )
 from player_core.console_hud import ConsoleHud, ConsolePainter
+from player_core.modes import Osr2State
 from player_core.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -109,7 +110,7 @@ def _press(panel, action):
     The painter takes window coordinates and its rects are panel ones, so the
     margin goes back on — the same conversion the widget does with the pointer.
     """
-    rect = next(r for r, b in panel._painter.buttons if b.action == action)
+    rect = next(r for r, b in panel._painter.buttons if b.command == action)
     x, y, w, h = rect
     margin = MotionPanel.MARGIN
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
@@ -122,7 +123,7 @@ def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     panel, _motion, _host = _panel(qtbot)
     panel.render_console()
     for action in ("main_fmode", "genau_filter_enhanced"):
-        assert action not in [b.action for _r, b in panel._painter.buttons]
+        assert action not in [b.command for _r, b in panel._painter.buttons]
 
 
 def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
@@ -188,7 +189,7 @@ def test_the_mode_row_is_the_only_thing_left_off(qtbot):
     # three players that row switches between and has none of its own to park.
     panel, motion, host = _panel(qtbot)
     panel.render_console()
-    actions = [b.action for _rect, b in panel._painter.buttons]
+    actions = [b.command for _rect, b in panel._painter.buttons]
     assert "main_minimize" not in actions
     assert not any(a.endswith("_activate") for a in actions)
     for kept in ("genau_prev_clip", "genau_next_clip", "main_lock",
@@ -299,7 +300,7 @@ def test_a_script_with_the_device_draws_its_own_line_in_green(qtbot):
 
     assert hud.drive.driven == "funscript"
     assert hud.drive.waveform == script.trace(80, 12.0)
-    assert hud.console.osr2 == "funscript"
+    assert hud.console.osr2 is Osr2State.FUNSCRIPT
 
 
 def test_the_dot_sits_where_the_script_has_the_device_now(qtbot):
@@ -321,7 +322,7 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
     hud = console_hud(motion, host, control=control.state(), script=script)
 
     assert hud.drive.driven == "robot_hand"
-    assert hud.console.osr2 == "robot_hand"
+    assert hud.console.osr2 is Osr2State.ROBOT_HAND
 
 
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
@@ -334,7 +335,7 @@ def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     hud = console_hud(motion, host, device_on=False, control=control.state(),
                       script=script)
 
-    assert hud.console.osr2 == "off"
+    assert hud.console.osr2 is Osr2State.OFF
 
 
 def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):
@@ -356,7 +357,7 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     panel, motion, _host = _panel(qtbot)
     panel.render_console()
     marks = [b for _r, b in panel._painter.buttons
-             if b.action.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
+             if b.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
     assert marks and all(b.dim for b in marks)
 
 
@@ -391,9 +392,9 @@ def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
     motion = FakeMotion()
     assert drive_hud(motion.state, False).driven == DRIVEN_BY_NOTHING
     assert drive_hud(motion.state, True).driven == DRIVEN_BY_ROBOT_HAND
-    assert console_hud(motion, FakeHost()).console.osr2 == "off"
+    assert console_hud(motion, FakeHost()).console.osr2 is Osr2State.OFF
     motion.active = True
-    assert console_hud(motion, FakeHost()).console.osr2 == "robot_hand"
+    assert console_hud(motion, FakeHost()).console.osr2 is Osr2State.ROBOT_HAND
 
 
 def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
@@ -408,7 +409,7 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
 
     hud = console_hud(motion, FakeHost(), device_on=False)
 
-    assert hud.console.osr2 == "off"
+    assert hud.console.osr2 is Osr2State.OFF
     assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
 
 

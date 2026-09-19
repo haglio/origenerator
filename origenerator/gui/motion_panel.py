@@ -45,7 +45,6 @@ from player_core.console import (  # noqa: E402
     ConsoleModel,
 )
 from player_core.console_hud import (  # noqa: E402
-    OSR2_ROBOT_HAND,
     ConsoleHud,
     ConsolePainter,
     ModeHud,
@@ -57,6 +56,7 @@ from player_core.drive_readout import (  # noqa: E402
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
+from player_core.modes import MainMode, Osr2State  # noqa: E402
 from player_core.robot_hand import (  # noqa: E402
     PARK_CENTER,
     POSITION_MAX,
@@ -166,9 +166,9 @@ def console_hud(motion, host, *, device_on: bool = True,
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
-            mode="genau", active=True, locked=host.locked,
-            osr2=(DRIVEN_BY_FUNSCRIPT if scripted
-                  else OSR2_ROBOT_HAND if driving else "off"),
+            main_mode=MainMode.GENAU, active=True, locked=host.locked,
+            osr2=(Osr2State.FUNSCRIPT if scripted
+                  else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
             osr2_control=control,
             cruise=motion.state.cruise.active,
             learned=motion.state.learned.active,

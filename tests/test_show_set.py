@@ -372,3 +372,77 @@ def test_a_slide_that_joined_the_pass_mid_loop_is_mapped_as_itself():
 
     assert shown.corner.prompt_id == "id-new"
     assert (shown.playing, shown.loop) == (("corner", 0), "")
+
+
+_ROW = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b"),
+        ("one-c.png", "image", "id-1c")]
+
+
+def _row_mates(prompt_id):
+    """Every slide of the one row is every other's seed, as a folder's pictures are."""
+    in_the_row = any(item[2] == prompt_id for item in _ROW)
+    return MapNeighbors(seeds=tuple(Slide.of(item) for item in _ROW
+                                    if in_the_row and item[2] != prompt_id), label="fox")
+
+
+def test_a_set_that_is_one_seed_row_opens_as_that_row_looping():
+    """A folder played as a show is its seeds played round and round, which is
+    all a seed loop is — so the map says so from the first slide."""
+    show_set, dealt = _set(items=_ROW, neighbors=_row_mates)
+
+    shown = show_set.map()
+
+    assert (shown.loop, shown.playing) == ("seed", ("corner", 0))
+    assert _ids(shown.seeds) == ["id-1b", "id-1c"]
+    assert dealt == []                           # it was already playing the row
+
+
+def test_a_row_opened_part_way_along_lights_its_cells_in_the_order_they_play():
+    show_set, _dealt = _set(items=_ROW, neighbors=_row_mates, start=1)
+
+    show_set.playlist.advance()
+    shown = show_set.map()
+
+    assert _ids((shown.corner, *shown.seeds)) == ["id-1b", "id-1c", "id-1"]
+    assert shown.playing == ("seed", 0)
+
+
+def test_a_set_with_a_slide_from_outside_the_row_opens_browsing():
+    show_set, _dealt = _set(items=[*_ROW, ("two.png", "image", "id-2")], neighbors=_row_mates)
+
+    assert show_set.map().loop == ""
+
+
+def test_a_lone_slide_is_no_loop():
+    show_set, _dealt = _set(items=_ROW[:1], neighbors=_row_mates)
+
+    assert show_set.map().loop == ""
+
+
+def test_the_loop_button_over_a_row_opened_looping_ends_the_loop():
+    show_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
+
+    assert show_set.end_loop() is True
+    assert show_set.map().loop == ""
+
+
+def test_a_new_set_that_is_one_row_is_taken_up_looping_too():
+    show_set, _dealt = _set(neighbors=_row_mates)
+    assert show_set.map().loop == ""
+
+    show_set.reseed(_ROW)
+
+    assert show_set.map().loop == "seed"
+
+
+def test_a_generation_landing_in_a_row_that_is_looping_joins_the_loop():
+    show_set, _dealt = _set(items=_ROW[:2], neighbors=_row_mates)
+    landed = Slide.of(_ROW[2])
+
+    show_set.remember(landed)
+    show_set.playlist.add(landed)
+    show_set.playlist.advance()
+
+    shown = show_set.map()
+    assert _ids((shown.corner, *shown.seeds)) == ["id-1", "id-1b", "id-1c"]
+    assert (shown.loop, shown.playing) == ("seed", ("seed", 1))

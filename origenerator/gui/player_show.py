@@ -181,6 +181,8 @@ class PlayerShow(QObject):
         and sent to this show's own when it did not.  The panel follows at
         once, so a loop lights its button on the press rather than a tick
         later."""
+        if self._set.loop is not None:
+            self._let_go()
         self._hand_over(land=not kept)
         self._publish()
 

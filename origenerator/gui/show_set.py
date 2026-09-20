@@ -81,6 +81,7 @@ class ShowSet:
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
         self.playlist = self._deal(items, image_dwell_ms=image_dwell_ms, start=start)
+        self._a_row_played_whole_is_its_loop()
 
     # --- the pass ----------------------------------------------------------
 
@@ -104,8 +105,21 @@ class ShowSet:
         self._known.clear()
         self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
                                    start=start, shuffle=shuffle)
+        self._a_row_played_whole_is_its_loop()
 
-    def replace_items(self, items, *, keep_slide: bool, shuffle=None) -> bool:
+    def _a_row_played_whole_is_its_loop(self) -> None:
+        current = self.playlist.current()
+        if current is None or current.prompt_id is None or len(self.playlist) < 2:
+            return
+        row = {current.prompt_id,
+               *(seed.prompt_id for seed in self.neighbors(current.prompt_id).seeds)}
+        played = self.playlist.in_play_order()
+        if all(slide.prompt_id in row for slide in played):
+            at = self.playlist.index
+            self.loop = Loop(SEED_AXIS, (*played[at:], *played[:at]))
+
+    def replace_items(self, items, *, keep_slide: bool, shuffle=None,
+                      new_set: bool = False) -> bool:
         """Stand a fresh pass up over *items*, keeping the pace and the pause;
         say whether the slide on screen survived into it.
 
@@ -124,6 +138,8 @@ class ShowSet:
         self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
                                    start=start, shuffle=shuffle)
         self.playlist.set_paused(paused)
+        if new_set:
+            self._a_row_played_whole_is_its_loop()
         kept = start is not None
         if self._on_pass_change is not None:
             self._on_pass_change(kept)
@@ -187,7 +203,7 @@ class ShowSet:
         if not kept:
             self.favorites_filter = self.enhanced_mode = False
             kept = self.all_items
-        self.replace_items(kept, keep_slide=False)
+        self.replace_items(kept, keep_slide=False, new_set=True)
 
     def passes(self, item, *, favorites_filter=None, enhanced=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
@@ -217,11 +233,21 @@ class ShowSet:
         """Take *item* into the whole set, in place of the entry with its id.
         The library moved, so what it says about every item is asked again."""
         self._known.clear()
+        self._take_into_a_looping_row(item)
         for index, kept in enumerate(self.all_items):
             if self._same(kept, item):
                 self.all_items[index] = item
                 return
         self.all_items.append(item)
+
+    def _take_into_a_looping_row(self, item: Slide) -> None:
+        loop = self.loop
+        if (loop is None or loop.axis != SEED_AXIS or item.prompt_id is None
+                or loop.position_of(item) is not None):
+            return
+        row = self.neighbors(loop.pool[0].prompt_id).seeds
+        if any(self._same(seed, item) for seed in row):
+            self.loop = Loop(loop.axis, (*loop.pool, item))
 
     def forget(self, item) -> None:
         self._known.clear()

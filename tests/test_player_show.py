@@ -656,3 +656,36 @@ def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     assert _sent(show) == ["LOCK_OFF", "NEXT"]
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]   # still in the list
+
+
+def test_entering_a_loop_lets_go_of_a_held_item_as_a_player_does(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.show_loop("seed")
+
+    assert _sent(show)[0] == "LOCK_OFF"
+    assert show.locked is False
+    assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).locked is False
+
+
+def test_the_loop_key_lets_go_of_a_held_item_when_it_finds_a_row_to_loop(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    show.show_toggle_hold()
+    _sent(show)
+
+    show.show_loop_cycle()
+
+    assert "LOCK_OFF" in _sent(show)
+    assert (show.locked, show.hud_map().loop) == (False, "seed")
+
+
+def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path):
+    folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
+    show = _show(qtbot, tmp_path, items=folder, actions=ShowActions(neighbors=_around))
+
+    model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
+
+    assert (model.active_loop, model.filter_query) == ("seed", "fox")
+

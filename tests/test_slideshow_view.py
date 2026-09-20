@@ -606,7 +606,8 @@ def _around(prompt_id):
 
 
 def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
-    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    browsing = [*_KEYED, ("z.png", "image", "id-z")]     # more than one row, so nothing loops yet
+    view = _view(qtbot, browsing, actions=ShowActions(neighbors=_around))
 
     _press(view, Qt.Key.Key_E)
     assert view.hud_map().loop == "seed"
@@ -619,7 +620,7 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
 
     _press(view, Qt.Key.Key_E)
     assert view.hud_map().loop == ""
-    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b"]  # the set it was browsing
+    assert [item[2] for item in view._playlist._items] == ["id-a", "id-b", "id-z"]  # its own set
     assert view._note.text() == "Loop off"
 
 
@@ -669,6 +670,29 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
     view.show_nav("down")
 
     assert shown == ["id-b", "id-a", "id-c"]
+
+
+def test_entering_a_loop_lets_go_of_a_held_slide_as_a_player_does(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+    _press(view, Qt.Key.Key_Down)                 # hold the slide on screen
+    assert view.locked
+
+    view.show_loop("seed")
+    view._pane.media_ended.emit()                 # the slide that was held runs out
+
+    assert view.locked is False
+    assert view._playlist.current()[2] == "id-b"  # and the loop moves on to its next seed
+
+
+def test_a_folder_played_as_a_show_opens_with_its_seed_loop_lit(qtbot):
+    """The pictures of one folder are one configuration's seeds, so playing the
+    folder is looping that row — and the map's loop light says so from the start."""
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+
+    assert view.hud_map().loop == "seed"
+
+    view.show_loop("")                            # the lit button, pressed
+    assert view.hud_map().loop == ""
 
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):

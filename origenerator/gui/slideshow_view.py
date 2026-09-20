@@ -105,7 +105,7 @@ from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
-    LOOP_IS_A_HOLD,
+    LOOP_IS_A_LOCK,
     LOOP_OFF,
     ShowSet,
     looping_note,
@@ -754,10 +754,10 @@ class SlideshowView(QWidget):
 
     def show_loop_cycle(self) -> None:
         """The loop key, as on a player: seeds, then configs, then off — and
-        the hold when there is nothing on either axis to loop, which is Down's
+        the lock when there is nothing on either axis to loop, which is Down's
         whole gesture here."""
         stepped = self._set.step_loop()
-        if stepped == LOOP_IS_A_HOLD:
+        if stepped == LOOP_IS_A_LOCK:
             self._hold_current()
             self._flash_note("Locked" if self._playlist.locked else "Unlocked")
         elif stepped == LOOP_OFF:

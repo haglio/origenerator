@@ -76,7 +76,7 @@ class ShowHost(Protocol):
         screen, or end the loop for "".  No set, nothing to loop."""
 
     def show_loop_cycle(self) -> None:
-        """The loop key: seeds, then configs, then off — or the hold, with
+        """The loop key: seeds, then configs, then off — or the lock, with
         nothing on either axis to loop."""
 
     def show_more_seeds(self) -> None:

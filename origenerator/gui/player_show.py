@@ -44,7 +44,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.show_map import SEED_AXIS
-from origenerator.gui.show_set import LOOP_IS_A_HOLD, LOOP_OFF, ShowSet, looping_note
+from origenerator.gui.show_set import LOOP_IS_A_LOCK, LOOP_OFF, ShowSet, looping_note
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.toast import NOTICE, WARNING
@@ -447,10 +447,10 @@ class PlayerShow(QObject):
             self._note("Nothing to loop", kind=WARNING)
 
     def show_loop_cycle(self) -> None:
-        """The loop key: seeds, then configs, then off — and the hold when
+        """The loop key: seeds, then configs, then off — and the lock when
         there is nothing on either axis to loop."""
         stepped = self._set.step_loop()
-        if stepped == LOOP_IS_A_HOLD:
+        if stepped == LOOP_IS_A_LOCK:
             self.set_held(not self._locked)
             self._note("Locked" if self._locked else "Unlocked")
         elif stepped == LOOP_OFF:

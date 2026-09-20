@@ -259,10 +259,10 @@ def test_an_axis_with_nothing_to_loop_is_stepped_over():
     assert show_set.step_loop() == "off"
 
 
-def test_with_nothing_on_either_axis_the_loop_key_is_the_hold():
+def test_with_nothing_on_either_axis_the_loop_key_is_the_lock():
     show_set, dealt = _set()
 
-    assert show_set.step_loop() == "hold"
+    assert show_set.step_loop() == "lock"
     assert dealt == []
 
 
@@ -353,7 +353,7 @@ def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
     show_set, dealt = _set(items=[], neighbors=_neighbors, widen=lambda pid: ())
 
     assert show_set.map() is None
-    assert show_set.step_loop() == "hold"
+    assert show_set.step_loop() == "lock"
     assert show_set.more_seeds() is False
     assert show_set.row_slide("fox") is None
     assert show_set.nav_target("right") is None

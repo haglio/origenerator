@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout
 from shared_ui.fonts import FONT_UI, SIZE_BODY, SIZE_HEADING, make_font
-
-from origenerator.config import PROJECT_DIR
 
 
 class LoadingScreen(QDialog):
@@ -37,10 +34,6 @@ class LoadingScreen(QDialog):
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
-
-        icon_path = PROJECT_DIR / "icon.ico"
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)

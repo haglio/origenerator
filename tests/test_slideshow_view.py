@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPointF, QSize, Qt, QUrl
-from PyQt6.QtGui import QKeyEvent, QMouseEvent, QResizeEvent
+from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
@@ -24,6 +24,7 @@ from origenerator.funscript import (
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.gui.stylesheet import dress_application
 from origenerator.gui.toast import ERROR, FAVORITE, WARNING, Toast
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
 from origenerator.motion_engine import Motion
@@ -1438,6 +1439,20 @@ def test_closing_detaches_the_player_from_its_surface(qtbot, tmp_path):
     view = _view(qtbot, [(str(tmp_path / "c.mp4"), "video")])
     view.close()
     view._preview._player.setVideoOutput.assert_called_with(None)
+
+
+def test_a_show_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
+    # The show is a window of its own with no frame and no icon of its own, and
+    # the switcher drew it a blank page until the app carried one for every
+    # window it opens.
+    before = qapp.windowIcon()
+    qapp.setWindowIcon(QIcon())
+    try:
+        dress_application(qapp)
+
+        assert not _view(qtbot).windowIcon().isNull()
+    finally:
+        qapp.setWindowIcon(before)
 
 
 def test_closing_lets_go_of_the_still_it_was_pushing(qtbot):

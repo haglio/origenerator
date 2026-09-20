@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PyQt6.QtGui import QIcon
 from shared_ui.chrome import family_stylesheet
 from shared_ui.colors import (
     BG_BUTTON,
@@ -16,6 +17,8 @@ from shared_ui.colors import (
     family_palette,
     hovered,
 )
+
+from origenerator.config import PROJECT_DIR
 
 
 def _h(color) -> str:
@@ -393,15 +396,20 @@ def build_stylesheet() -> str:
 
 
 def dress_application(app) -> None:
-    """Put the family's palette and this app's sheet on the QApplication.
+    """Put the family's palette, this app's sheet and its icon on the QApplication.
 
-    The application and not a window, for two reasons that arrived separately.
+    The application and not a window, for three reasons that arrived separately.
     A QToolTip popup is a top-level widget no window-level sheet reaches, so
     styling per window left every tooltip on the native Windows 11 dark palette
     -- unreadable, which is to say missing.  And a palette is the application's
     to begin with: a sheet dresses the widgets it names, while the colors it
     names none of -- a selection's ground, a link's ink -- stay whatever the
-    desktop handed the app, which here was the user's accent orange.
+    desktop handed the app, which here was the user's accent orange.  The icon
+    is the third: a show on a satellite region is a window of its own that sets
+    none, and the window switcher drew it a blank page.
     """
     app.setPalette(family_palette(app.palette()))
     app.setStyleSheet(build_stylesheet())
+    icon_path = PROJECT_DIR / "icon.ico"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))

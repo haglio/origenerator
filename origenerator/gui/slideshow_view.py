@@ -578,6 +578,15 @@ class SlideshowView(QWidget):
             self._playlist.back()
         self._show_current()
 
+    @property
+    def has_other_versions(self) -> bool:
+        """Whether the item on screen was filed more than once — what draws the
+        band's versions button live rather than faded."""
+        return len(self._levels.levels(base=self._current_base())) > 1
+
+    def show_step_version(self, delta: int) -> None:
+        self._step_level(delta)
+
     def _step_level(self, delta: int) -> None:
         """Step ``delta`` versions within the item on screen: an image's
         enhancement levels, or a video's Evolver upscale and the video itself.

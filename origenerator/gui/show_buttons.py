@@ -27,6 +27,7 @@ CONTROL_GROUPS = (
     ("lock", "trash", "fmode"),
     ("enhanced", "reset"),
     ("shuffle", "latest"),
+    ("cycle_version",),
     ("minimize",),
 )
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
@@ -49,8 +50,12 @@ CONTROL_FACES = {
     "trash": shared_mark("trash"), "fmode": FMODE_ICON,
     "enhanced": shared_mark("enhance_filter"), "reset": shared_mark("reset"),
     "shuffle": shared_mark("shuffle"), "latest": shared_mark("latest"),
-    "minimize": MINIMIZE_ICON,
+    "cycle_version": shared_mark("versions"), "minimize": MINIMIZE_ICON,
 }
+
+# Said after the versions tooltip on an item filed once, so a faded button says
+# what is missing rather than looking broken.
+_NO_OTHER_VERSION = " (none for this one)"
 
 # What each one is, in this app's words rather than a player's: these act on the
 # generations this app made, so the bin is the toolbar's Delete and the hold is
@@ -64,6 +69,8 @@ CONTROL_TOOLTIPS = {
     "enhanced": "Enhanced only — play just the pictures that have been enhanced",
     "shuffle": f"{SHUFFLE_LABEL} — every picture and video of this shape, shuffled",
     "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
+    "cycle_version": "Other versions of this one — an enhancement, the picture it was "
+                "made from, the upscale Evolver made of a video",
     "minimize": "Minimize this show — bring it back from the taskbar",
 }
 # Reset means what the side goes back TO, which is not the same in both places:
@@ -78,7 +85,8 @@ RESET_TOOLTIPS = {
 
 def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
               enhanced: bool = False, order: str = "", hosted: bool = False,
-              own_window: bool = True) -> tuple[tuple[Button, ...], ...]:
+              own_window: bool = True,
+              has_other_versions: bool = False) -> tuple[tuple[Button, ...], ...]:
     """The rows a show's HUD draws, for the surface it is drawn on.
 
     *own_window* is whether this show has a window of this app's — which is
@@ -95,6 +103,7 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
            "shuffle": order == SHUFFLE_LABEL, "latest": order == LATEST_LABEL}
     band = tuple(
         _control(side, name, hosted=hosted, lit=lit.get(name, False),
+                 dim=name == "cycle_version" and not has_other_versions,
                  group_break=index > 0 and _GROUP_OF[name] != _GROUP_OF[names[index - 1]])
         for index, name in enumerate(names)
     )
@@ -134,6 +143,8 @@ def answer(host, action: str, argument: str = "") -> bool:
         # cannot start a loop it is not in.
         if host.hud_looping:
             host.show_reset()
+    elif action in ("cycle_version", "cycle_version_back"):
+        host.show_step_version(-1 if action.endswith("_back") else 1)
     elif action in ("play_video", "lock_video"):
         # A thumbnail on the map: a click plays it, a double-click holds it.
         host.show_item(argument, hold=action == "lock_video")
@@ -149,8 +160,11 @@ def _mode_row() -> tuple[Button, ...]:
     )
 
 
-def _control(side: str, name: str, *, hosted: bool, lit: bool, group_break: bool) -> Button:
+def _control(side: str, name: str, *, hosted: bool, lit: bool, dim: bool,
+             group_break: bool) -> Button:
     tooltip = RESET_TOOLTIPS[hosted] if name == "reset" else CONTROL_TOOLTIPS[name]
-    return Button(f"{side}_{name}", CONTROL_FACES[name], tooltip, lit=lit,
+    if dim:
+        tooltip += _NO_OTHER_VERSION
+    return Button(f"{side}_{name}", CONTROL_FACES[name], tooltip, lit=lit, dim=dim,
                   favorite=name in ("lock", "fmode"), enhanced=name == "enhanced",
                   danger=name == "trash", group_break=group_break)

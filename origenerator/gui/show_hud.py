@@ -112,8 +112,10 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         is_favorite=host.hud_is_favorite,
         # The buttons this show answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
-        rows=show_rows(side, locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
-                       order=order_label, hosted=hosted, own_window=own_window),
+        rows=show_rows(side, locked=locked, favorites_filter=favorites_filter,
+                       enhanced=enhanced, order=order_label, hosted=hosted,
+                       own_window=own_window,
+                       has_other_versions=host.has_other_versions),
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),

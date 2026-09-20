@@ -739,7 +739,8 @@ def test_a_set_handed_to_a_running_show_brings_its_own_versions_with_it(shows):
 
 
 def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there(shows):
-    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g9"), _row("g4")]})
+    two_pictures = [_picture("g9", "a red fox", seed=9), _picture("g4", "a blue car", seed=4)]
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: two_pictures})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=LANDSCAPE)
@@ -1245,3 +1246,61 @@ def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
     actions.favorite("g1")
     actions.unfavorite("g1")
     assert host.favorited == []
+
+
+def _a_sitting():
+    """Newest first, as a shelf lists: two seeds of one picture, another picture,
+    then two more seeds of the first."""
+    return [_picture("g5", "a red fox", seed=5), _picture("g4", "a red fox", seed=4),
+            _picture("g3", "a blue car", seed=3),
+            _picture("g2", "a red fox", seed=2), _picture("g1", "a red fox", seed=1)]
+
+
+def _played(show) -> list[str]:
+    return [item[2] for item in show.items]
+
+
+def test_a_show_of_latest_plays_one_of_each_run_of_a_folders_generations(shows):
+    rows = _a_sitting()
+    director, _host, made = shows(FakeHost(location=LATEST_PORTRAIT, rows=rows))
+
+    director.start()
+
+    assert _played(made[0]) == ["g4", "g3", "g1"]
+
+
+def test_a_show_of_favorites_plays_one_of_each_run_too(shows):
+    from origenerator.gui.gallery_tree import FAVORITES_KEY
+    rows = _a_sitting()
+    director, _host, made = shows(
+        FakeHost(location=oriented_key(FAVORITES_KEY, PORTRAIT), rows=rows))
+
+    director.start()
+
+    assert _played(made[0]) == ["g4", "g3", "g1"]
+
+
+def test_a_show_of_a_folder_plays_every_one_of_its_seeds(shows):
+    rows = _a_sitting()
+    director, _host, made = shows(FakeHost(location="workflow/a", rows=rows))
+
+    director.start()
+
+    assert _played(made[0]) == ["g5", "g4", "g3", "g2", "g1"]
+
+
+def test_a_seed_landing_in_the_run_latest_already_shows_one_of_stays_out(shows):
+    sitting = _a_sitting()
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: sitting})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open(director.items_of(director.rows_at(LATEST_PORTRAIT)),
+                  location=LATEST_PORTRAIT, side=PORTRAIT)
+    another_seed = _picture("g6", "a red fox", seed=6)
+    a_new_picture = _picture("g7", "a green hill", seed=7)
+
+    browser.shelves[LATEST_PORTRAIT] = [another_seed, *sitting]
+    director.note_finished(another_seed)
+    browser.shelves[LATEST_PORTRAIT] = [a_new_picture, another_seed, *sitting]
+    director.note_finished(a_new_picture)
+
+    assert [added[0] for added in made[0].added] == ["g7"]

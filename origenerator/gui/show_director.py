@@ -64,7 +64,12 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
-from origenerator.nav_map import config_family, seed_family, widened_family
+from origenerator.nav_map import (
+    config_family,
+    one_per_stretch,
+    seed_family,
+    widened_family,
+)
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
@@ -270,11 +275,12 @@ class ShowDirector:
         as a fullscreen slideshow, shuffled and running at the app-wide pace,
         and standing where the last show was closed when that slide is in
         here."""
-        rows = self._host.rows_to_play()
+        location = self._host.show_location()
+        rows = self._one_per_stretch_on_a_shelf_of_them(
+            location, self._host.rows_to_play())
         items = self.items_of(rows)
         if not items:
             return
-        location = self._host.show_location()
         # Recents is Latest, exactly as on a Fun Time player: the shelf lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the show's HUD status line says which.
@@ -599,9 +605,18 @@ class ShowDirector:
             return []
         rows = self._browser.rows_for_shelf(location)
         if rows is not None:
-            return rows
+            return self._one_per_stretch_on_a_shelf_of_them(location, rows)
         group = self._host.group_for_key(location)
         return gallery.rows_under(group) if group is not None else []
+
+    def _one_per_stretch_on_a_shelf_of_them(self, location, rows) -> list[dict]:
+        """Latest and Favorites list a sitting's generations one after another,
+        several seeds of a configuration at a time; their shows play one of
+        each such run, and the map's row reaches the rest."""
+        base, _side = _split_shelf_key(location)
+        if base not in (_RECENTS_KEY, _FAVORITES_KEY):
+            return rows
+        return one_per_stretch(rows, image_index=self._host.image_config_index())
 
     # --- putting one on screen ----------------------------------------------
 
@@ -1173,7 +1188,7 @@ class ShowDirector:
         orientation = (command.side if command.side and self._fun_time is not None
                        else self._host.side_in_view())
         key = oriented_key(command.shelf_key, orientation)
-        rows = self._browser.rows_for_shelf(key) or []
+        rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
             self._host.say("🎤 nothing there to play")

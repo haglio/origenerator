@@ -14,6 +14,17 @@ from origenerator.gui.gallery_view import GalleryView
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image
 
 
+def _will_move_on(view) -> bool:
+    """Whether the show pages on by itself when the item on screen runs out.
+
+    The engine holds a picture for the pace and ends it the way it ends a
+    finished clip, so there is no clock of the view's own to ask: what decides
+    is the same three things that decided whether one was armed -- the room is
+    not frozen, the slide is not locked, and the pace is not nought."""
+    return (not view._paused and not view._playlist.holding()
+            and bool(view._dwell_s))
+
+
 def _session(tmp_path):
     return FunTimeSession(
         main_rect=Rect(0, 206, 853, 1234),
@@ -296,15 +307,15 @@ def test_filter_enhanced_with_no_show_up_is_dropped(qtbot, tmp_path):
 def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert show._advance_timer.isActive()  # an image slide dwells on its timer
+    assert _will_move_on(show)  # an image slide dwells on its timer
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    assert not show._advance_timer.isActive()
+    assert not _will_move_on(show)
 
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
-    assert show._advance_timer.isActive()
+    assert _will_move_on(show)
 
 
 def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
@@ -358,7 +369,7 @@ def test_a_show_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
 
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    assert not show._advance_timer.isActive()  # no dwell armed: it opened frozen
+    assert not _will_move_on(show)  # no dwell armed: it opened frozen
 
 
 def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkeypatch):
@@ -375,7 +386,7 @@ def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkey
     bridge._tick()
 
     assert show._playlist.index == (before + 1) % 3  # the step still lands
-    assert not show._advance_timer.isActive()                # but the slide holds
+    assert not _will_move_on(show)                # but the slide holds
 
 
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):

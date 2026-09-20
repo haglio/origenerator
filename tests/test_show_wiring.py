@@ -10,7 +10,6 @@ the show still reads its wiring off them.
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from unittest.mock import MagicMock
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -18,6 +17,7 @@ from PyQt6.QtGui import QKeyEvent
 
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
+from tests.show_surface_fakes import FakeEngine
 
 _ITEMS = [("a.png", "image", "id-a", None), ("b.png", "image", "id-b", None)]
 
@@ -47,7 +47,7 @@ def wired(qtbot):
         reset=record("reset"),
         drive_toggle=record("drive_toggle"),
     )
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          actions=actions)
     qtbot.addWidget(view)
     return view, calls
@@ -71,7 +71,7 @@ def test_the_six_acts_travel_as_one_record_and_land_where_they_did(wired):
 def test_a_show_handed_no_acts_at_all_just_does_less(qtbot):
     # Every field defaults to nothing, which is what a show opened by a test or
     # standing alone gets: the presses still work, they just ask nobody.
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
     _press(view, Qt.Key.Key_Down)
@@ -80,7 +80,7 @@ def test_a_show_handed_no_acts_at_all_just_does_less(qtbot):
 
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          hud=HudFacts(order_label="Latest", looping=False,
                                       favorite_ids={"id-b"}))
     qtbot.addWidget(view)
@@ -93,7 +93,7 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
 
 
 def test_the_hud_facts_default_to_a_shuffled_loop_of_nothing_favorite(qtbot):
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
 
     assert (view.hud_order_label, view.hud_looping) == ("Shuffle", True)
@@ -105,7 +105,7 @@ def test_retuning_a_show_dresses_it_as_a_base_state(qtbot):
     # of set and always the same one: shuffled, and not a loop anyone asked for.
     # Its two callers used to spell that out and could have disagreed; there is
     # one answer now, and the favorites it already had are not part of it.
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None,
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          hud=HudFacts(order_label="Latest", looping=True,
                                       favorite_ids={"id-c"}))
     qtbot.addWidget(view)

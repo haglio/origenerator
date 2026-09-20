@@ -6,10 +6,6 @@ static images are scaled to fit (and rescaled on resize), animated images
 default, so selecting one gives an immediate moving preview without stealing audio,
 while the fullscreen slideshow opts in to sound.
 
-The fullscreen show's own pane draws its stills on a
-:class:`~origenerator.gui.ken_burns_still.KenBurnsStill`, which pushes into
-each on a thread of its own; every other pane draws them as fitted pixmaps.
-
 A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
 three controls a gallery thumbnail of the same generation wears in its corners,
 and offers the same right-click menu over the picture — because it IS the same
@@ -58,7 +54,6 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.ken_burns_still import KenBurnsStill
 from origenerator.gui.media_overlay import float_over_media
 from origenerator.media import MediaType
 
@@ -90,7 +85,7 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
                  show_funscript_strip: bool = False, mute_audio: bool = True,
-                 pushes_stills: bool = False, on_double_click=None, on_press=None):
+                 on_double_click=None, on_press=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -122,8 +117,6 @@ class PreviewWidget(QWidget):
         # left-press point while measuring whether a move is a drag or just a click.
         self._draggable_id: str | None = None
         self.drag_out = DragOut()
-        self._pushes_stills = pushes_stills
-        self._still: KenBurnsStill | None = None
 
         # The shown generation's prompt_id when the owner has armed the corner
         # controls and the right-click menu over it, else None. Armed separately
@@ -255,11 +248,6 @@ class PreviewWidget(QWidget):
         app = QApplication.instance()
         if player is None and app is not None:
             app.aboutToQuit.connect(self.release_player)
-        # And a Ken Burns scene still being drawn deadlocks the same shutdown
-        # against Qt Quick's render thread (KenBurnsStill.release), whatever
-        # player this pane was given.
-        if pushes_stills and app is not None:
-            app.aboutToQuit.connect(self.release_still)
 
     def _take_the_pane(self, media, *, stop_player: bool = True,
                        enhancing: bool = False,
@@ -320,15 +308,8 @@ class PreviewWidget(QWidget):
 
     def _show_picture(self, pixmap: QPixmap) -> None:
         self._pixmap = pixmap
-        if not self._pushes_stills:
-            self._rescale()
-            self._stack.setCurrentWidget(self._image_label)
-            return
-        if self._still is None:
-            self._still = KenBurnsStill()
-            self._stack.addWidget(self._still)
-        self._still.show_picture(pixmap.toImage())
-        self._stack.setCurrentWidget(self._still)
+        self._rescale()
+        self._stack.setCurrentWidget(self._image_label)
 
     def show_video(self, path) -> None:
         self._take_the_pane((path, MediaType.VIDEO), stop_player=False)
@@ -555,44 +536,12 @@ class PreviewWidget(QWidget):
         if self._movie is not None:
             scaled = self._movie.scaledSize()
             return scaled if scaled.isValid() else None
-        if self._still is not None and self._stack.currentWidget() is self._still:
-            return self._pixmap.size().scaled(self._media_host.size(),
-                                              Qt.AspectRatioMode.KeepAspectRatio)
         pixmap = self._image_label.pixmap()
         return None if pixmap is None or pixmap.isNull() else pixmap.size()
 
     def player(self) -> QMediaPlayer:
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
-
-    def start_push(self, dwell_ms: int, progress: float) -> None:
-        self._on_still(lambda still: still.start(dwell_ms, progress))
-
-    def pause_push(self) -> None:
-        self._on_still(lambda still: still.pause())
-
-    def resume_push(self) -> None:
-        self._on_still(lambda still: still.resume())
-
-    def retime_push(self, dwell_ms: int) -> None:
-        self._on_still(lambda still: still.retime(dwell_ms))
-
-    def stop_push(self) -> None:
-        self._on_still(lambda still: still.stop())
-
-    def release_still(self) -> None:
-        """Let go of the Ken Burns scene, for a pane about to be dropped and for
-        the app about to quit (:meth:`KenBurnsStill.release`). A pane asked to
-        push again builds a fresh one."""
-        still, self._still = self._still, None
-        if still is None:
-            return
-        still.release()
-        still.deleteLater()
-
-    def _on_still(self, command) -> None:
-        if self._still is not None:
-            command(self._still)
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this pane's playback outright."""

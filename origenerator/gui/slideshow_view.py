@@ -1,11 +1,12 @@
 """The fullscreen player — the one way this app fills the screen with a picture.
 
 It plays a set of generations: a folder's, a shelf's (Recents, Favorites), or the
-one folder a double-clicked picture came from. Reuses :class:`PreviewWidget` (in
-play-once mode) for the actual image/video rendering and a
-:class:`~origenerator.slideshow.SlideshowPlaylist` for the order and pacing.
-Images advance on a dwell timer; videos play once and advance when they end
-(``PreviewWidget.video_ended``). The arrows step, Shift+arrows step the
+one folder a double-clicked picture came from.  The players' own engine shows
+the slides (:class:`~origenerator.gui.show_surface.ShowSurface`) and a
+:class:`~origenerator.slideshow.SlideshowPlaylist` says their order.  A picture
+and a clip move on the same way: the engine holds the picture for the pace and
+ends it as it ends a finished clip, and the show pages on
+(``ShowSurface.media_ended``).  The arrows step, Shift+arrows step the
 versions of the item on screen, Up culls, Down locks the slide
 against the advance (a locked clip replays, and the hold both favorites the slide and
 asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
@@ -53,11 +54,11 @@ pane that opened it hands over the finished file (:meth:`show_landed`), at which
 point it is an ordinary show of that file. So a generation can be watched
 full-screen while it's made, not only once it lands.
 
-An image does not simply sit there while it holds the screen: the view creeps
-into it, ending a tenth of the way in by the time the dwell runs out — the Ken
-Burns move, paced by the dwell rather than by a clock of its own, so turning the
-pace up slows the creep instead of cropping harder
-(see :mod:`origenerator.ken_burns`).
+A picture does not simply sit there while it holds the screen: the engine creeps
+into it, ending a tenth of the way in by the time the hold runs out, paced by
+the hold rather than by a clock of its own -- so turning the pace up slows the
+creep instead of cropping harder.  That is the engine's, not this window's,
+which is why a show handed to one of a session's players creeps the same way.
 
 Every show wears the players' own HUD (:meth:`SlideshowView.adopt_hud`,
 :mod:`origenerator.gui.show_hud`) — hosted on a satellite region and fullscreen
@@ -100,8 +101,8 @@ from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
-from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.show_set import ShowSet
+from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
@@ -129,7 +130,7 @@ class SlideshowView(QWidget):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
-                 shuffle=None, actions=None, hud=None, player=None, motion=None,
+                 shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, parent=None):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
@@ -191,20 +192,16 @@ class SlideshowView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         # Already the fullscreen view, so a double-click leaves it rather than
-        # spawning a nested one. It plays sound (mute_audio=False), unlike the
-        # muted inline preview, and wears the funscript strip a scripted clip's
-        # motion shows in.
-        self._preview = PreviewWidget(player=player, loop_videos=False,
-                                      allow_fullscreen=False,
-                                      show_funscript_strip=True, mute_audio=False,
-                                      pushes_stills=True, on_double_click=self.close,
-                                      on_press=self._toggle_pause)
-        self._preview.video_ended.connect(self._on_video_ended)
-        self._preview.video_unplayable.connect(self._on_video_unplayable)
+        # spawning a nested one. It plays sound, unlike the muted inline pane.
+        self._pane = ShowSurface(engine=engine, muted=False,
+                                    on_double_click=self.close,
+                                    on_press=self._toggle_pause)
+        self._pane.media_ended.connect(self._on_media_ended)
+        self._pane.media_unplayable.connect(self._on_media_unplayable)
         # The media is refitted a beat after the window resizes (and again when a
         # video's resolution arrives), so re-place the neighbors when it lands.
-        self._preview.media_resized.connect(self._reposition_neighbors)
-        layout.addWidget(self._preview, 1)
+        self._pane.media_resized.connect(self._reposition_neighbors)
+        layout.addWidget(self._pane, 1)
 
         # The items either side of this one, floated over the black surround.
         self._neighbors = NeighborPreviews(self)
@@ -243,11 +240,8 @@ class SlideshowView(QWidget):
             motion, self, host=self, control=self._actions.osr2_control,
         ) if motion is not None else None
         self._hud = None
-        self._preview.media_resized.connect(self._place_console)
+        self._pane.media_resized.connect(self._place_console)
 
-        self._advance_timer = QTimer(self)
-        self._advance_timer.setSingleShot(True)
-        self._advance_timer.timeout.connect(self._advance)
         # A pause — the hosting session's OmniPause, or a click on a show with no
         # session — held here so it survives navigation: a step lands on a NEW
         # slide (the freeze does not un-aim the transport), but the slide must
@@ -284,14 +278,14 @@ class SlideshowView(QWidget):
     # --- playback ----------------------------------------------------------
 
     def _show_current(self):
-        """Render the current item and arm the dwell timer if it's an image."""
-        self._advance_timer.stop()
+        """Put the current item on the engine, which holds a picture for the
+        pace and ends it the way it ends a finished clip."""
         if self._live:
             # Nothing on disk yet: the run's own frames stand in for a slide.
             if self._frame is not None:
-                self._preview.show_frame(self._frame)
+                self._pane.show_frame(self._frame)
             else:
-                self._preview.show_message(_GENERATING)  # opened before the first one
+                self._pane.show_message(_GENERATING)  # opened before the first one
             self._update_counter()
             self._update_neighbors()
             return
@@ -301,48 +295,33 @@ class SlideshowView(QWidget):
         self._levels.restart()  # a new item, so its own versions from the top
         if slide.is_live:
             # Still being made: what it looks like so far, rather than a file.
-            self._preview.show_frame(slide.path)
+            self._pane.show_frame(slide.path)
         else:
-            self._preview.show_media(slide.path, slide.media_type)
+            # The hold before the file: the engine reads it as it opens one.
+            self._pane.set_pace(self._dwell_s)
+            self._pane.show_media(slide.path, slide.media_type)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
         self._place_console()  # back over whatever media widget the slide put up
-        pace = self._playlist.pace_ms()
-        if pace is None:
-            self._preview.stop_push()
-        else:
-            self._preview.start_push(pace, 0.0)
-            if self._frozen():
-                self._preview.pause_push()
-        if self._paused:
-            self._preview.set_playback_paused(True)  # arrive holding
-        else:
-            self._arm_advance()
+        self._apply_freeze()  # a slide arrived at under a hold arrives holding
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
-    # --- the slide's own clock: the advance, and what holds the push ---------
+    # --- the slide's own clock, which is the engine's -----------------------
 
-    def _arm_advance(self) -> None:
-        dwell = self._playlist.dwell_ms()
-        if dwell is not None:
-            self._advance_timer.start(dwell)
+    def _apply_freeze(self) -> None:
+        """Hand the engine whatever is holding the show still.
 
-    def _frozen(self) -> bool:
-        return self._paused or self._playlist.paused
-
-    def _follow_the_freeze(self, was_frozen: bool) -> None:
-        if self._frozen() == was_frozen:
-            return
-        pushing = self._playlist.pace_ms() is not None
-        if was_frozen:
-            if pushing:
-                self._preview.resume_push()
-            self._arm_advance()
-        else:
-            self._advance_timer.stop()
-            if pushing:
-                self._preview.pause_push()
+        The room's freeze stops everything.  A spoken request stops the show
+        moving on rather than stopping the clip: it is about what is on screen,
+        and a clip that stopped mid-sentence would be answering a question
+        nobody asked.  A picture under one holds where the creep had got to,
+        since the alternative is its hold running out and starting over under
+        the speaker.
+        """
+        request_holds_a_still = (self._playlist.paused
+                                 and not self._pane.is_showing_video())
+        self._pane.set_paused(self._paused or request_holds_a_still)
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -493,7 +472,7 @@ class SlideshowView(QWidget):
             return  # already following one run full-screen; this is that job
         if self._playlist.update_live(prompt_id, frame):
             if self._current_prompt_id() == prompt_id:
-                self._preview.show_frame(frame)
+                self._pane.show_frame(frame)
             else:
                 self._update_neighbors()  # it may be the still riding either side
             return
@@ -541,7 +520,7 @@ class SlideshowView(QWidget):
     def release_media(self, paths):
         """Let go of any of ``paths`` on screen — a file about to be deleted (its
         own Up key condemns the item it's playing)."""
-        self._preview.release_media(paths)
+        self._pane.release_media(paths)
 
     def _delete_current(self):
         """Delete the current item (if a deleter is wired) and advance to the next.
@@ -592,7 +571,7 @@ class SlideshowView(QWidget):
         if level is None:
             return
         self._live = False
-        self._preview.show_media(*level[:2])
+        self._pane.show_media(*level[:2])
         self._refresh_note()
         self.media_changed.emit()
 
@@ -608,7 +587,7 @@ class SlideshowView(QWidget):
         it has landed (or the show has stepped away), which is no longer this run."""
         if self._live:
             self._frame = data
-            self._preview.show_frame(data)
+            self._pane.show_frame(data)
 
     def show_landed(self, media: tuple) -> None:
         """The followed generation finished: show the saved file in place of its
@@ -719,10 +698,10 @@ class SlideshowView(QWidget):
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does
         to a show landing on a satellite region."""
-        self._preview.set_audio_muted(muted)
+        self._pane.set_audio_muted(muted)
 
     def audio_muted(self) -> bool:
-        return self._preview.audio_muted()
+        return self._pane.audio_muted()
 
     def set_held(self, held: bool) -> bool:
         """Hold the slide on screen or let it go, saying which way rather than
@@ -774,7 +753,7 @@ class SlideshowView(QWidget):
 
     def current_media_path(self) -> str:
         """The file on screen — what a hosting Fun Time session's status says."""
-        return self._preview.current_media_path()
+        return self._pane.current_media_path()
 
     def is_showing(self) -> bool:
         """Whether this show is on screen — what says a region is occupied."""
@@ -857,15 +836,12 @@ class SlideshowView(QWidget):
         a click on a show standing on its own.
 
         Distinct from the lock: a lock holds one slide by choice and replays
-        its clip; this stops time itself — the dwell clock and any playing
-        video — and hands both back on resume.  Held as state rather than
-        applied once: a step while frozen lands on a new slide, and that slide
-        must arrive holding too (see :meth:`_show_current`).
+        its clip; this stops time itself.  The engine's clock is the show's, so
+        a frozen picture stops counting down its hold and a frozen clip stops
+        playing, and a slide stepped to while frozen arrives holding.
         """
-        was_frozen = self._frozen()
         self._paused = paused
-        self._follow_the_freeze(was_frozen)
-        self._preview.set_playback_paused(paused)
+        self._apply_freeze()
 
     def _toggle_pause(self) -> None:
         if self._actions.omnipause is not None:
@@ -886,19 +862,15 @@ class SlideshowView(QWidget):
         self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
+        self._pane.set_pace(seconds)
         if not self._playlist.locked:
+            # The engine reads the hold when it opens the file, so the picture
+            # on screen takes the new pace by being opened again.
             self._show_current()
-            return
-        if self._frozen():
-            return
-        pace = self._playlist.pace_ms()
-        if pace is None:
-            self._preview.pause_push()
-        else:
-            self._preview.retime_push(pace)
 
-    def _on_video_ended(self):
-        """A clip finished: replay it while held, else move on. A lock is
+    def _on_media_ended(self):
+        """The item ran out — a clip that finished, or a picture whose hold
+        expired.  Replay it while held, else move on. A lock is
         repeat-one here, as it is on a Fun Time satellite — and a pace of nought
         holds the clip the same way, since nought means nothing moves on its own.
         A request being spoken holds it too: paging on mid-sentence is exactly
@@ -909,8 +881,8 @@ class SlideshowView(QWidget):
         else:
             self._advance()
 
-    def _on_video_unplayable(self):
-        """A clip this backend cannot open: step past it, whatever holds it.
+    def _on_media_unplayable(self):
+        """A file the engine will not open: step past it, whatever holds it.
 
         Unlike a clip that ended, this one never will, so the replay a lock or
         a pace of nought asks for would hold a black screen for the rest of the
@@ -936,7 +908,6 @@ class SlideshowView(QWidget):
         what the corner should say while it holds — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
-        was_frozen = self._frozen()
         self._playlist.set_paused(holding)
         if holding:
             self._note_timer.stop()  # it holds, rather than fading after a beat
@@ -944,7 +915,7 @@ class SlideshowView(QWidget):
         else:
             self._request_note = ""
         self._refresh_note()
-        self._follow_the_freeze(was_frozen)
+        self._apply_freeze()
 
     def note_request(self, message: str, request=None, *,
                      working: bool = False, kind: str = NOTICE) -> None:
@@ -1032,7 +1003,7 @@ class SlideshowView(QWidget):
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._levels.restart()  # its versions are a level deeper now
-                self._preview.show_media(path, media_type)
+                self._pane.show_media(path, media_type)
                 self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
@@ -1164,7 +1135,6 @@ class SlideshowView(QWidget):
         it twice in two ways.
         """
         if self._playlist.toggle_lock():
-            self._advance_timer.stop()
             self.favorite()
             self._update_counter()
             if self._actions.lock is not None:
@@ -1172,7 +1142,7 @@ class SlideshowView(QWidget):
                 if prompt_id is not None:
                     self._actions.lock(prompt_id)
             return True
-        self._show_current()  # released, re-arming the dwell timer
+        self._show_current()  # released, so the hold starts counting again
         return False
 
     def _open_current(self):
@@ -1186,7 +1156,7 @@ class SlideshowView(QWidget):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
         an image or a video with no funscript — mirrors the config panel's target so
         the gallery can point its one driver at whichever surface is foreground."""
-        return drive_target_for(self._preview.current_video_path(), self._preview.player())
+        return drive_target_for(self._pane.current_video_path(), self._pane)
 
     # --- the neighboring items ---------------------------------------------
 
@@ -1256,8 +1226,8 @@ class SlideshowView(QWidget):
 
     def _media_rect(self):
         """Where the media is drawn, in this view's coordinates."""
-        rect = self._preview.media_rect()
-        rect.moveTopLeft(self._preview.mapTo(self, rect.topLeft()))
+        rect = self._pane.media_rect()
+        rect.moveTopLeft(self._pane.mapTo(self, rect.topLeft()))
         return rect
 
     # --- caption -----------------------------------------------------------
@@ -1323,11 +1293,8 @@ class SlideshowView(QWidget):
         slide nobody held (Escape, a double-click, the spoken "close", the last
         item culled), it hands nothing over and leaves the gallery alone.
         """
-        self._advance_timer.stop()
-        self._preview.stop_push()
-        self._preview.clear()  # release any held video file so it can be deleted
-        self._preview.release_player()
-        self._preview.release_still()
+        self._pane.clear()  # release any held file so it can be deleted
+        self._pane.close_engine()
         landing = self._land_on
         if landing is None and self._playlist.locked:
             landing = self._current_prompt_id()

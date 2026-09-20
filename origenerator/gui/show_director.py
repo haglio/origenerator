@@ -265,7 +265,8 @@ class ShowDirector:
         as a fullscreen slideshow, shuffled and running at the app-wide pace,
         and standing where the last show was closed when that slide is in
         here."""
-        items = self.items_of(self._host.rows_to_play())
+        rows = self._host.rows_to_play()
+        items = self.items_of(rows)
         if not items:
             return
         location = self._host.show_location()
@@ -274,7 +275,7 @@ class ShowDirector:
         # set shuffles — and the show's HUD status line says which.
         base, orientation = _split_shelf_key(location)
         latest = base == _RECENTS_KEY
-        self.open(items, location=location, side=side or orientation,
+        self.open(items, rows=rows, location=location, side=side or orientation,
                   resume=self._show_state, **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
@@ -301,20 +302,25 @@ class ShowDirector:
         that run's latest, and goes on following it until the pane hands over the
         file it lands as.
         """
-        folder = self.items_of(self._folder_rows())
+        folder_rows = self._folder_rows()
+        folder = self.items_of(folder_rows)
         selected = self._host.selected_prompt_id()
         index = next((i for i, item in enumerate(folder) if item[2] == selected), None)
-        items = folder if index is not None else []
+        items, rows = (folder, folder_rows) if index is not None else ([], [])
         if media is None:  # following a run: it has no place among the files yet
             items, index = [], 0
         elif not items:  # the shown item isn't in the folder listing: play it alone
             items, index = [(media[0], media[1], None, None)], 0
+            # Its own row all the same, so the one picture on screen still
+            # knows its other versions -- the listing is what it is missing
+            # from, not the library.
+            rows = [row for row in [self._host.row_for(selected)] if row is not None]
         # Neither shuffled nor newest-first, and not a loop: this is one folder
         # in the browser's own order, held on one picture.  Said plainly rather
         # than left at the defaults, because the HUD reads them now — an order
         # slot saying "Shuffle" over a folder listed in its own order would be
         # the panel making something up.
-        return self.open(items, start=index, frame=frame,
+        return self.open(items, rows=[*rows, *folder_rows], start=index, frame=frame,
                          image_dwell_ms=0, shuffle=in_order,
                          folder_items=folder,
                          hud=HudFacts(
@@ -326,7 +332,7 @@ class ShowDirector:
         rows = (self._host.row_for(pid) for pid in self._host.visible_prompt_ids())
         return [row for row in rows if row is not None]
 
-    def open(self, items, *, folder_items=None, location=None,
+    def open(self, items, *, rows=(), folder_items=None, location=None,
              side=None, resume=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
@@ -336,6 +342,11 @@ class ShowDirector:
         generation with, since that one has no items of its own yet, and
         ``resume`` where a closed show left off, for one picking that back up
         rather than naming its own opening slide.
+
+        ``rows`` are the library rows *items* were built from, and the folder
+        rows for a live show armed with one: the enhanced switch and the
+        versions each item steps are both read off them, and a show asked for
+        them itself would be asking the library what its caller already knows.
 
         ``location`` is the shelf or folder key the set came from, kept so the
         show can be fed what lands there while it runs (:meth:`note_finished`) —
@@ -355,15 +366,17 @@ class ShowDirector:
             return None  # a player is handed files, and a run being made has none yet
         self._show_refused = set()  # a new show, a new set to be judged against
         # Which of its items carry an enhancement, for the switch beside F-mode
-        # on its HUD -- over the set it plays and the folder a live show is
-        # armed with, since either is what the switch narrows.
+        # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
-                      enhanced_ids=self._enhanced_prompt_ids(
-                          [*items, *(folder_items or [])]))
+                      enhanced_ids=self._enhanced_ids_of(rows))
+        # And the other axis: the versions of whichever item is on screen, which
+        # the shifted step keys and the band's versions button walk.
+        levels = self.versions_of(rows)
         if channel is not None:
-            show = self._hand_to_the_player(items, where, channel, hud=hud, **kwargs)
+            show = self._hand_to_the_player(items, where, channel, hud=hud,
+                                            levels=levels, **kwargs)
         else:
-            show = self._open_a_window(items, where, hud=hud,
+            show = self._open_a_window(items, where, hud=hud, levels=levels,
                                        folder_items=folder_items, **kwargs)
         self._slideshow = show
         already_live = any(held is show for held, _where in self._live_shows)
@@ -406,7 +419,7 @@ class ShowDirector:
                        if self._session_channel is not None else None),
         )
 
-    def _hand_to_the_player(self, items, side: str, channel, *, hud, **kwargs):
+    def _hand_to_the_player(self, items, side: str, channel, *, hud, levels, **kwargs):
         """A show on one of the session's players: the set goes to the player
         and the panel this app publishes goes with it — no window of ours.
 
@@ -417,15 +430,12 @@ class ShowDirector:
         occupant = self.region_show(side)
         if occupant is not None:
             occupant.play(items, hud=hud, **kwargs)
-            occupant.set_levels(self.versions_of(self._folder_rows()))
+            occupant.set_levels(levels)
             return occupant
         show = PlayerShow(items, side=side, channel=channel,
                           actions=self._show_actions(), pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
-        # The same axis a window show is armed with: the versions of whichever
-        # item is on screen, stepped by the band's versions button and by the
-        # session's shifted step keys.
-        show.set_levels(self.versions_of(self._folder_rows()))
+        show.set_levels(levels)
         self._region_shows[side] = show
         # A show opened while the hosting session is frozen opens frozen, the
         # way a window one does.
@@ -433,7 +443,7 @@ class ShowDirector:
             show.set_paused(True)
         return show
 
-    def _open_a_window(self, items, side: str, *, hud, folder_items=None, **kwargs):
+    def _open_a_window(self, items, side: str, *, hud, levels, folder_items=None, **kwargs):
         """A show in a window of this app's: over the whole monitor standalone,
         or over one of the session's regions.
 
@@ -455,10 +465,9 @@ class ShowDirector:
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
             view.set_playlist(folder_items, 0)
-        # Shift+Left/Right gets its own axis: the versions of whichever item is
-        # on screen, so a level can be compared against the one below it at full
-        # size rather than in a thumbnail.
-        view.set_levels(self.versions_of(self._folder_rows()))
+        # Shift+Left/Right gets its own axis, so a level can be compared against
+        # the one below it at full size rather than in a thumbnail.
+        view.set_levels(levels)
         if built:
             self._present_surface(view, side)
             # The queue it floats in its corner is the same widget as the lower
@@ -747,7 +756,8 @@ class ShowDirector:
             if self.region_show(side) is not None:
                 continue
             key = self.base_location(side)
-            items = self.items_of(self.rows_at(key))
+            rows = self.rows_at(key)
+            items = self.items_of(rows)
             if not items:
                 # Not a dead end: the tree this reads is built by the first
                 # refresh, and the session's OPEN_SHOWS can arrive before it
@@ -760,7 +770,7 @@ class ShowDirector:
                 continue
             logger.info("The %s region opens on the library of its shape: %d items",
                         side, len(items))
-            self.open(items, location=key, side=side,
+            self.open(items, rows=rows, location=key, side=side,
                       hud=HudFacts(
                           looping=False,
                           favorite_ids=self._favorite_prompt_ids()))
@@ -776,10 +786,11 @@ class ShowDirector:
         if not self._regions_wanted or self.region_show(side) is not None:
             return
         key = self.base_location(side)
-        items = self.items_of(self.rows_at(key))
+        rows = self.rows_at(key)
+        items = self.items_of(rows)
         if not items:
             return
-        self.open(items, location=key, side=side,
+        self.open(items, rows=rows, location=key, side=side,
                   hud=HudFacts(
                       looping=False,
                       favorite_ids=self._favorite_prompt_ids()))
@@ -804,12 +815,14 @@ class ShowDirector:
             show.reset_in_place()
             return
         key = self.base_location(side)
-        items = self.items_of(self.rows_at(key))
+        rows = self.rows_at(key)
+        items = self.items_of(rows)
         if not items:
             show.reset_in_place()
             return
         self._repoint(show, key)
-        show.retune(items, enhanced_ids=self._enhanced_prompt_ids(items))
+        show.set_levels(self.versions_of(rows))
+        show.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
 
     def _repoint(self, show, key: str) -> None:
         self._live_shows = [(held, key if held is show else where)
@@ -823,12 +836,14 @@ class ShowDirector:
     def reorder_show(self, show, latest: bool) -> None:
         side = self._base_side(show)
         key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
-        items = self.items_of(self.rows_at(key))
+        rows = self.rows_at(key)
+        items = self.items_of(rows)
         if not items:
             show.note_voice_command("Nothing there to play", kind=WARNING)
             return
         self._repoint(show, key)
-        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_prompt_ids(items))
+        show.set_levels(self.versions_of(rows))
+        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows))
         show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
 
     def set_session_paused(self, paused: bool) -> None:
@@ -1096,7 +1111,7 @@ class ShowDirector:
         if not items:
             self._host.say("🎤 nothing there to play")
             return
-        self.open(items, location=key, side=command.side,
+        self.open(items, rows=rows, location=key, side=command.side,
                   **self._order(command.shelf_key == _RECENTS_KEY))
 
     def toggle_favorites_filter(self, side) -> None:
@@ -1187,19 +1202,7 @@ class ShowDirector:
         return {row["prompt_id"] for row in self._db.list_generations()
                 if row.get("starred")}
 
-    def _enhanced_prompt_ids(self, items) -> set[str]:
-        """Which of *items* carry an enhancement, for the switch beside F-mode
-        on a show's HUD — the question the thumbnails' yellow plus answers,
-        asked of the set a show plays.
-
-        Of that set rather than of the whole library: reading whether a row is
-        enhanced means parsing its params, and a library of thousands would
-        pay that on every show opened for the sake of rows the show never
-        plays.  What lands mid-show is judged as it arrives
-        (:meth:`note_finished`).
-        """
-        wanted = {item[2] for item in items if len(item) > 2 and item[2] is not None}
-        if not wanted:
-            return set()
-        return {row["prompt_id"] for row in self._db.list_generations()
-                if row["prompt_id"] in wanted and gallery.is_enhanced_row(row)}
+    def _enhanced_ids_of(self, rows) -> set[str]:
+        """Which of *rows* carry an enhancement, for the switch beside F-mode
+        on a show's HUD — the question the thumbnails' yellow plus answers."""
+        return {row["prompt_id"] for row in rows if gallery.is_enhanced_row(row)}

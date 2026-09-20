@@ -523,19 +523,22 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regi
     assert made[1].fullscreen == 0
 
 
-def test_a_show_on_a_player_is_armed_with_its_items_versions_like_one_in_a_window(shows):
-    """The versions button on a player's band and the session's shifted step
-    keys both step this map, so a show handed to a player is armed with it the
-    way a window one is — a band armed on one surface only is a button that
-    does nothing on the other."""
-    director, _host, made = shows(fun_time=FakeSession())
-    director.versions_of = lambda rows: {"g1.png": [("g1_enhanced.png", "image", "Enhance 1"),
-                                                    ("g1.png", "image", "Original")]}
+def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
+    """A show on a player opens on its side's whole library, which the browser
+    is not listing — so versions read off the browser's rows named none of the
+    pictures on screen, and every versions button on the band was drawn faded
+    however many enhancements that library held (2026-09-19)."""
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   ALL_LANDSCAPE: [_row("g5")]})
+    director, host, made = shows(browser=browser, fun_time=FakeSession())
+    assert host.visible == []  # the browser is somewhere else entirely
+    director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
+                                         for row in rows}
 
-    director.open([("g1.png", "image", "g1", None)], side=PORTRAIT)
+    director.fill_the_regions()
 
-    assert made[-1].levels == {"g1.png": [("g1_enhanced.png", "image", "Enhance 1"),
-                                          ("g1.png", "image", "Original")]}
+    assert director.region_show(PORTRAIT).levels == {"g4.png": ["newer", "older"]}
+    assert director.region_show(LANDSCAPE).levels == {"g5.png": ["newer", "older"]}
 
 
 def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_show(shows):
@@ -690,6 +693,28 @@ def test_a_region_reset_re_points_what_feeds_it(shows):
 
     assert director._live_shows == [(made[0], ALL_LANDSCAPE)]
     assert made[0].retuned == ([("g4.png", "image", "g4", None)], set())
+
+
+def test_a_set_handed_to_a_running_show_brings_its_own_versions_with_it(shows):
+    """Latest, Shuffle and a region reset each hand the show a different set of
+    its side's library.  A versions map still armed on the set the show opened
+    with names none of the pictures now on screen, so the band's versions button
+    goes faded over a whole library of enhancements (2026-09-19)."""
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g9")],
+                                   ALL_LANDSCAPE: [_row("g4")]})
+    director, _host, made = shows(browser=browser,
+                                  db=FakeDB([_row("g9"), _row("g4")]),
+                                  fun_time=FakeSession())
+    director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
+                                         for row in rows}
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    director.reorder_show(made[0], True)
+    assert made[0].levels == {"g9.png": ["newer", "older"]}
+
+    director.reset_region(made[0])
+    assert made[0].levels == {"g4.png": ["newer", "older"]}
 
 
 def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there(shows):

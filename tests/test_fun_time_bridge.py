@@ -48,7 +48,8 @@ def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
     still = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(still)
     items = [(str(still), "image", f"id{n}", str(still)) for n in range(count)]
-    monkeypatch.setattr(view, "rows_to_play", lambda: [object()])
+    monkeypatch.setattr(view, "rows_to_play",
+                        lambda: [{"prompt_id": item[2]} for item in items])
     monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
     view._shows.start()
@@ -112,8 +113,9 @@ def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path,
     still = str(tmp_path / "tall.png")
     library = {key: [(still, "image", f"{key}-{n}", still) for n in range(3)]
                for key in ("__recents__::portrait", "__all__::portrait")}
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "rows_at",
+                        lambda key: [_row_of(item) for item in library.get(key, [])])
+    monkeypatch.setattr(view._shows, "items_of", _items_of)
     orders = []
 
     for verb in ("PORTRAIT_LATEST", "PORTRAIT_SHUFFLE"):
@@ -220,8 +222,12 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in portrait],
         "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in landscape],
     }
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    # The library's own row under the fabricated still, so whether a picture
+    # carries an enhancement is read where the app reads it.
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: [
+        {**(view.row_for(item[2]) or {}), **_row_of(item)}
+        for item in library.get(key, [])])
+    monkeypatch.setattr(view._shows, "items_of", _items_of)
     view.fill_the_regions()
     shows = [view.region_show(side) for side in ("portrait", "landscape")]
     for show in shows:
@@ -523,8 +529,9 @@ def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
     Image.new("RGB", (200, 100)).save(wide)
     library = {"__all__::portrait": [(str(tall), "image", "id-tall", str(tall))],
                "__all__::landscape": [(str(wide), "image", "id-wide", str(wide))]}
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "rows_at",
+                        lambda key: [_row_of(item) for item in library.get(key, [])])
+    monkeypatch.setattr(view._shows, "items_of", _items_of)
 
     _press(bridge, tmp_path, "OPEN_SHOWS")
 

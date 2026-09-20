@@ -1138,10 +1138,10 @@ class GalleryView(QWidget):
         the motion is what drives — stilled there, which is how the device gets
         to that end and stays — and the funscript stands down however scripted
         the video in front is, or it would drive straight through the hold.
-        Otherwise a funscript wins wherever there is one — a slideshow showing a
-        scripted video, else the front tab's — and the self-generated motion
-        fills every other moment, which is most of them: a folder of images, a
-        clip with no script, an empty tab.
+        Otherwise the surface in front picks: a funscript when what it has on
+        screen carries one, and the self-generated motion every other moment,
+        which is most of them — a folder of images, a clip with no script, an
+        empty tab.
 
         Idempotent, so tab switches, browsing, completions and opening or closing
         a show all resolve without churning the device. The guard makes it
@@ -1185,16 +1185,16 @@ class GalleryView(QWidget):
     def _osr2_drive_source(self):
         """The funscript target to follow, or ``None`` when there is none to
         follow — in which case the motion is what drives (see
-        :meth:`reconcile_osr2`). An open slideshow wins when it's showing a
-        scripted video, otherwise the front tab's video.
+        :meth:`reconcile_osr2`). The surface in front answers: a show while one
+        is up, else the front tab.
 
         The switch governs both surfaces alike: double-clicking a clip open used
         to take the device on its own, so a clip watched with the switch off
         drove anyway — the switch is what decides now, whichever surface the
         video is on."""
-        target = self._shows.drive_target()
-        if target is not None:
-            return target
+        show = self._shows.surface_for(None)
+        if show is not None:
+            return show.osr2_drive_target()
         panel = self._info_tabs.current_config_panel()
         if panel is not None:
             return panel.osr2_drive_target()

@@ -11703,17 +11703,21 @@ def test_the_shows_video_overrides_the_toggle_target_then_hands_back(qtbot):
     assert driver.started[-1] == ("pA", "aA")  # back to the toggle's video
 
 
-def test_a_show_of_an_image_leaves_the_toggle_driving(qtbot):
-    # A show with no scripted video (an image) has no target, so the toggle's
-    # front-tab video keeps driving uninterrupted — no restart, no stop.
+def test_a_show_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
+    # The surface in front answers for the device alone: a show opening on a
+    # picture hands the OSR2 to the motion, the way a player hands back to it
+    # between scripted clips.  Falling through to the front tab left that tab's
+    # funscript driving under a show it has nothing to do with, until the show
+    # happened to reach a scripted video of its own.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
-    show = _double_click_show(view, qtbot)
+    show = _double_click_show(view, qtbot)  # a picture: nothing scripted on screen
 
-    assert driver.started == [("pA", "aA")] and driver.stopped == 0
+    assert driver.stopped >= 1
+    assert view._osr2_motion.active
     show.close()
 
 

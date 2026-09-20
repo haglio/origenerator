@@ -4,7 +4,7 @@ import base64
 import logging
 
 from PyQt6.QtCore import QByteArray, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow
 
 from origenerator import ui_scale
@@ -12,7 +12,6 @@ from origenerator.app_state import AppState
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import PROJECT_DIR
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_mode import FunTimeSession
@@ -90,9 +89,6 @@ class OrigeneratorWindow(QMainWindow):
         # gallery's own pane floors keep content readable at those slot sizes; only
         # a manual drag below that compresses it.
         self.setMinimumSize(600, 400)
-        icon_path = PROJECT_DIR / "icon.ico"
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
         # The rect this window is pinned to once shown, or None standalone.
         self._device_rect = None
         if fun_time is not None:

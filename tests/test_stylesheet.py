@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from origenerator.gui.stylesheet import build_stylesheet
+from PyQt6.QtGui import QIcon
+
+from origenerator.gui.stylesheet import build_stylesheet, dress_application
 
 
 def test_build_stylesheet_resolves_shared_ui_and_returns_qss():
@@ -291,3 +293,17 @@ def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):
     seam = selected.topRight().x()
 
     assert image.pixelColor(seam, selected.center().y()) == BORDER_SUBTLE
+
+
+def test_dressing_the_app_hands_it_the_icon_every_window_wears(qapp):
+    """A show on a satellite region is a frameless window of its own that sets
+    no icon, so the window switcher drew it a blank page. The icon belongs to
+    the application, where every window it opens picks it up."""
+    before = qapp.windowIcon()
+    qapp.setWindowIcon(QIcon())
+    try:
+        dress_application(qapp)
+
+        assert not qapp.windowIcon().isNull()
+    finally:
+        qapp.setWindowIcon(before)

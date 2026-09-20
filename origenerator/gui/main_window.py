@@ -187,6 +187,8 @@ class OrigeneratorWindow(QMainWindow):
         self._gallery_view.osr2_control.the_session_has_it(held)
 
     def become_hosted(self, session: FunTimeSession) -> None:
+        logger.info("Taken into a Fun Time session; the OSR2 and the appliance "
+                    "switches are the session's from here")
         self._persist_session()
         self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())
         self._fun_time = session
@@ -199,6 +201,7 @@ class OrigeneratorWindow(QMainWindow):
         self.showMinimized()
 
     def become_standalone(self) -> None:
+        logger.info("Handed back by the Fun Time session; standalone again")
         geometry, scale, minimized = self._found
         self._bridge.deleteLater()
         self._bridge = None

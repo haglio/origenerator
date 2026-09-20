@@ -8,6 +8,7 @@ reached this window is driving it anyway.
 """
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -21,6 +22,8 @@ from origenerator.fun_time_mode import (
     take_the_takeover,
 )
 from origenerator.win32 import this_process_creation_time
+
+logger = logging.getLogger(__name__)
 
 _POLL_MS = 250
 
@@ -57,8 +60,11 @@ class FunTimeWatch(QObject):
         try:
             if offer.read_text(encoding="utf-8") == mine:
                 return
-        except OSError:
+            logger.info("The offer to Fun Time named someone else; standing ours again")
+        except FileNotFoundError:
             pass
+        except OSError:
+            logger.info("The offer to Fun Time could not be read; standing ours again")
         offer.write_text(mine, encoding="utf-8")
 
     def _answer_the_session(self) -> None:
@@ -67,6 +73,7 @@ class FunTimeWatch(QObject):
         session = take_the_takeover(self._state_dir, pid=os.getpid())
         if session is None:
             return
+        logger.info("A Fun Time session asked for this window")
         self.withdraw()
         self._take_over(session)
 

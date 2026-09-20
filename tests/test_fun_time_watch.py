@@ -125,3 +125,47 @@ def test_a_window_taken_over_stops_standing_its_offer(qtbot, tmp_path):
 
     assert not (tmp_path / "fun_time_offer.txt").exists()
     del watch
+
+
+def test_an_offer_another_instance_overwrote_is_recorded_when_it_is_taken_back(
+        qtbot, tmp_path, caplog):
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
+    offer = tmp_path / "fun_time_offer.txt"
+
+    with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
+        caplog.clear()
+        offer.write_text("999999 12345", encoding="utf-8")
+        qtbot.waitUntil(lambda: offer.read_text(encoding="utf-8").startswith(
+            f"{os.getpid()} "))
+
+    assert [record.message for record in caplog.records] == [
+        "The offer to Fun Time named someone else; standing ours again"]
+    watch.withdraw()
+
+
+def test_an_offer_simply_missing_is_put_back_without_a_word(qtbot, tmp_path, caplog):
+    # Withdrawn and renewed is the ordinary course of a session; only another
+    # writer is worth a line.
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
+    offer = tmp_path / "fun_time_offer.txt"
+
+    with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
+        caplog.clear()
+        offer.unlink()
+        qtbot.waitUntil(offer.exists)
+
+    assert caplog.records == []
+    watch.withdraw()
+
+
+def test_a_takeover_arriving_is_recorded(qtbot, tmp_path, caplog):
+    taken = []
+    watch = FunTimeWatch(tmp_path, take_over=taken.append)
+
+    with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
+        caplog.clear()
+        _takeover(tmp_path, pid=os.getpid())
+        qtbot.waitUntil(lambda: bool(taken))
+
+    assert "A Fun Time session asked for this window" in caplog.text
+    del watch

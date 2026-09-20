@@ -865,6 +865,22 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
 
     assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
                      QSystemTrayIcon.MessageIcon.Information)]
+def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path, caplog):
+    # Nothing said either transition, so a log could not tell a window a session
+    # had taken from one it had missed -- and those behave differently.
+    win = _window(qtbot, tmp_path)
+
+    with caplog.at_level("INFO", logger="origenerator.gui.main_window"):
+        caplog.clear()
+        win.become_hosted(_fun_time_session())
+        win.become_standalone()
+
+    assert [record.message for record in caplog.records] == [
+        "Taken into a Fun Time session; the OSR2 and the appliance switches are "
+        "the session's from here",
+        "Handed back by the Fun Time session; standalone again"]
+
+
 def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
 

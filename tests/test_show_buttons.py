@@ -18,7 +18,7 @@ def _names(buttons) -> list[str]:
 def test_the_band_is_the_controls_a_show_answers_in_the_players_order():
     assert _names(_band()) == [
         "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
-        "shuffle", "latest", "minimize"]
+        "shuffle", "latest", "cycle_version", "minimize"]
 
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
@@ -36,7 +36,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
     """A run of evenly spaced squares reads as one undifferentiated strip; the
     wider gap opens at the seams the players' own band opens them at."""
     assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
-        "lock", "enhanced", "shuffle", "minimize"]
+        "lock", "enhanced", "shuffle", "cycle_version", "minimize"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
@@ -91,7 +91,8 @@ def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
 
     assert len(rows) == 1
     assert _names(rows[0]) == [
-        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "shuffle", "latest"]
+        "prev", "next", "lock", "trash", "fmode", "enhanced", "reset", "shuffle",
+        "latest", "cycle_version"]
 
 
 class _Host:
@@ -125,6 +126,17 @@ class _Host:
     def show_item(self, path, *, hold=False):
         self.calls.append(("item", path, hold))
 
+    def show_step_version(self, delta):
+        self.calls.append(("version", delta))
+
+
+def test_the_versions_button_is_dim_where_the_item_has_only_itself():
+    """A picture nobody enhanced, a video Evolver never upscaled: there is
+    nothing to step to, so the button is drawn faded rather than offered."""
+    assert dict(zip(_names(_band()), _band()))["cycle_version"].dim
+    lively = _band(has_other_versions=True)
+    assert not dict(zip(_names(lively), lively))["cycle_version"].dim
+
 
 def test_every_declared_button_is_answered_by_the_show():
     """A button this panel declares and nothing answers would be drawn dead —
@@ -134,7 +146,19 @@ def test_every_declared_button_is_answered_by_the_show():
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
-                          "enhanced", "reset", ("order", False), ("order", True)]
+                          "enhanced", "reset", ("order", False), ("order", True),
+                          ("version", 1)]
+
+
+def test_the_versions_button_steps_forward_and_the_shifted_key_either_way():
+    """The band has one versions button, which steps on; the session's shifted
+    step keys reach the same show with the pair, as they do on a video."""
+    host = _Host()
+
+    assert answer(host, "cycle_version")
+    assert answer(host, "cycle_version_back")
+
+    assert host.calls == [("version", 1), ("version", -1)]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it():

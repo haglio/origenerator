@@ -227,7 +227,7 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
     assert [button.command for row in model.rows for button in row] == [
         "portrait_prev", "portrait_next", "portrait_lock", "portrait_trash",
         "portrait_fmode", "portrait_enhanced", "portrait_reset",
-        "portrait_shuffle", "portrait_latest"]
+        "portrait_shuffle", "portrait_latest", "portrait_cycle_version"]
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_holds_it(qtbot, tmp_path):
@@ -378,3 +378,68 @@ def test_a_hosted_reset_lets_go_of_the_hold_before_handing_over_the_base_set(qtb
 
     assert _sent(show)[0] == "LOCK_OFF"
     assert show.locked is False
+
+
+_LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhance 2"),
+                       ("one.png", "image", "Original")]}
+
+
+class TestVersions:
+    """Stepping an item's own copies on the player, the axis the shifted keys
+    and the band's versions button share with a show in a window."""
+
+    def test_a_step_plays_the_other_copy_of_the_item_on_screen(self, qtbot, tmp_path):
+        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show.set_levels(_LEVELS)
+
+        show.show_step_version(1)
+
+        assert _sent(show) == ["PLAY_FILE one.png"]
+
+    def test_stepping_on_and_back_walks_the_copies_in_order(self, qtbot, tmp_path):
+        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show.set_levels(_LEVELS)
+
+        show.show_step_version(1)
+        _sent(show)
+        show.show_step_version(-1)
+
+        assert _sent(show) == ["PLAY_FILE one_enhanced.png"]
+
+    def test_an_item_filed_once_is_left_alone_rather_than_stepping_the_set(
+            self, qtbot, tmp_path):
+        """Nothing to compare it against, and the shift was the whole point of
+        the press — so it does nothing rather than walking to the neighbor."""
+        show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+        show.set_levels(_LEVELS)
+
+        show.show_step_version(1)
+
+        assert _sent(show) == []
+
+    def test_the_band_lights_its_versions_button_only_where_there_are_some(
+            self, qtbot, tmp_path):
+        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        assert show.has_other_versions is False
+
+        show.set_levels(_LEVELS)
+
+        assert show.has_other_versions is True
+
+    def test_moving_to_another_item_starts_that_ones_copies_from_the_top(
+            self, qtbot, tmp_path):
+        """A step on the new item must offer its own newest copy, not carry the
+        place the last item was stepped to."""
+        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show.set_levels({**_LEVELS,
+                         "two.png": [("two_enhanced.png", "image", "Enhance 1"),
+                                     ("two.png", "image", "Original")]})
+        show.show_step_version(1)
+        _sent(show)
+
+        _says(show, video="two.png")
+        show.tick()
+        _sent(show)
+        show.show_step_version(1)
+
+        assert _sent(show) == ["PLAY_FILE two.png"]

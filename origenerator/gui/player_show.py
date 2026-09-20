@@ -15,10 +15,10 @@ switches are the same ones a window show keeps
 the way the window does (:class:`~origenerator.gui.show_host.ShowHost`), and
 what is on screen is read back from the player rather than rendered here.
 
-Four things a window show has are the player's to learn next: the versions
-Shift+Left steps through, the frames of a generation still being made, the
-queue plate in the corner, and the lines this app flashes over a show — which
-go to the gallery's own caption instead, where the speaker can still see them.
+Three things a window show has are the player's to learn next: the frames of a
+generation still being made, the queue plate in the corner, and the lines this
+app flashes over a show — which go to the gallery's own caption instead, where
+the speaker can still see them.
 """
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ from player_core.satellite_hud import hud_text
 from player_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.show_set import ShowSet
 from origenerator.gui.show_wiring import ShowActions
@@ -92,6 +93,7 @@ class PlayerShow(QObject):
         self._showing = ""
         self._locked = False
         self._published = ""
+        self._levels = LevelStepper()
         # Holding a slide is also how you ask for it: a hold asks for a better
         # version of what is on screen, unless the gallery wired none.
         self._enhance_on_hold = self._actions.enhance is not None
@@ -192,6 +194,43 @@ class PlayerShow(QObject):
     def _player_status(self):
         return parse_status(_read_fields(self.channel.status_file))
 
+    def set_levels(self, levels_by_path: dict) -> None:
+        """Arm the versions button and the shifted step keys for this set.
+
+        ``levels_by_path`` maps the file the set shows an item under to that
+        item's versions, newest first, as ``(path, media_type, label)`` — the
+        same map a window show is armed with, from the same gallery.
+        """
+        self._levels.arm(levels_by_path)
+        self._publish()
+
+    @property
+    def has_other_versions(self) -> bool:
+        """Whether the item on screen was filed more than once — what draws
+        the band's versions button live rather than faded."""
+        return len(self._levels.levels(base=self._current_base())) > 1
+
+    def show_step_version(self, delta: int) -> None:
+        """Put another copy of the item on screen up: an image's enhancement
+        levels, or a video's Evolver upscale and the video itself.
+
+        An item filed once is left alone rather than paged, since the shift was
+        the whole point of the press.  The player is told which file to play
+        rather than asked to step its own way through them, because the place
+        within the versions is held here, ahead of the status the player is
+        still publishing.
+        """
+        level = self._levels.step(delta, base=self._current_base())
+        if level is None:
+            return
+        self._send(play_file(PlaylistItem(Path(str(level[0])))))
+
+    def _current_base(self) -> str:
+        """The file the set lists the item on screen under — what its versions
+        are keyed by."""
+        item = self._set.playlist.current()
+        return "" if item is None else str(item.path)
+
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the player just moved to.
 
@@ -202,6 +241,7 @@ class PlayerShow(QObject):
         for index, item in enumerate(self._set.playlist.items):
             if str(item.path) == video:
                 self._set.playlist.jump_to(index)
+                self._levels.restart()  # a new item, so its own versions from the top
                 self.media_changed.emit()
                 return
 

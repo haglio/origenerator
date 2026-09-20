@@ -542,14 +542,30 @@ def _stills(tmp_path, prefix, count, size):
     return items
 
 
+def _row_of(item) -> dict:
+    """An item of ``_stills`` as the row the gallery lists it from.
+
+    Rows and items are different things — a show is built from items and armed
+    with the versions read off rows — so the stubs hand over each in its own
+    shape rather than one standing in for both.
+    """
+    return {"prompt_id": item[2], "output_files": "[]", "thumbnail_path": item[3]}
+
+
+def _items_of(rows) -> list:
+    return [(row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
+            for row in rows]
+
+
 def _players_playing_their_libraries(qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     library = {"__all__::landscape": _stills(tmp_path, "library-wide", 3, (200, 100)),
                "__all__::portrait": _stills(tmp_path, "library-tall", 1, (100, 200))}
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
+    monkeypatch.setattr(view._shows, "rows_at",
+                        lambda key: [_row_of(item) for item in library.get(key, [])])
+    monkeypatch.setattr(view._shows, "items_of", _items_of)
     _press(bridge, tmp_path, "OPEN_SHOWS")
     for side in ("landscape", "portrait"):
         _told(tmp_path, side)
@@ -571,8 +587,8 @@ def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
     folder = _stills(tmp_path, "scene-wide", 2, (200, 100))
     clicked = folder[1]
     monkeypatch.setattr(view, "visible_prompt_ids", lambda: [item[2] for item in folder])
-    monkeypatch.setattr(view, "row_for",
-                        lambda pid: next((i for i in folder if i[2] == pid), None))
+    monkeypatch.setattr(view, "row_for", lambda pid: next(
+        (_row_of(item) for item in folder if item[2] == pid), None))
     monkeypatch.setattr(view, "selected_prompt_id", lambda: clicked[2])
 
     view._shows.open_on_preview((clicked[0], "image"), None)

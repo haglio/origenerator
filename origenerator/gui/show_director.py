@@ -417,10 +417,15 @@ class ShowDirector:
         occupant = self.region_show(side)
         if occupant is not None:
             occupant.play(items, hud=hud, **kwargs)
+            occupant.set_levels(self.versions_of(self._folder_rows()))
             return occupant
         show = PlayerShow(items, side=side, channel=channel,
                           actions=self._show_actions(), pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
+        # The same axis a window show is armed with: the versions of whichever
+        # item is on screen, stepped by the band's versions button and by the
+        # session's shifted step keys.
+        show.set_levels(self.versions_of(self._folder_rows()))
         self._region_shows[side] = show
         # A show opened while the hosting session is frozen opens frozen, the
         # way a window one does.

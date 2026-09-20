@@ -523,6 +523,21 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regi
     assert made[1].fullscreen == 0
 
 
+def test_a_show_on_a_player_is_armed_with_its_items_versions_like_one_in_a_window(shows):
+    """The versions button on a player's band and the session's shifted step
+    keys both step this map, so a show handed to a player is armed with it the
+    way a window one is — a band armed on one surface only is a button that
+    does nothing on the other."""
+    director, _host, made = shows(fun_time=FakeSession())
+    director.versions_of = lambda rows: {"g1.png": [("g1_enhanced.png", "image", "Enhance 1"),
+                                                    ("g1.png", "image", "Original")]}
+
+    director.open([("g1.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[-1].levels == {"g1.png": [("g1_enhanced.png", "image", "Enhance 1"),
+                                          ("g1.png", "image", "Original")]}
+
+
 def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_show(shows):
     director, _host, made = shows(fun_time=FakeSession())
     director.fill_the_regions()

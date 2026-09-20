@@ -105,6 +105,7 @@ class FakeShow:
         self.released = []
         self.pause_raises = False
         self.state_at_close = "where-it-got-to"
+        self.played = []
 
     # what a show is, and what it holds
     def queue(self):
@@ -123,6 +124,11 @@ class FakeShow:
         return self.visible
 
     # what the director tells it
+    def play(self, items, *, hud=None, **kwargs):
+        self.items = list(items)
+        self.hud = hud
+        self.played.append(list(items))
+
     def set_playlist(self, items, index):
         self.playlist = (list(items), index)
 
@@ -478,6 +484,20 @@ def test_the_last_show_closing_lets_the_videos_go(shows):
     assert director._reroll.holds == [True, False]
 
 
+def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
+    # Standalone there is one screen, so there is one show. A second set asked
+    # for while one is up -- by voice, or from the window Alt+Tab reaches --
+    # re-points the show that is there rather than stacking another over it.
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)], location="shelf/a")
+
+    again = director.open([("b.png", "image", "g2", None)], location="shelf/b")
+
+    assert made == [again]
+    assert again.played == [[("b.png", "image", "g2", None)]]
+    assert director._live_shows == [(again, "shelf/b")]
+
+
 def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):
     # Hosted, two run at once: closing the portrait one must not forget the
     # landscape one, and the videos stay held while it is still playing them.
@@ -521,10 +541,14 @@ def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullsc
 def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     # Asked of each show's OWN location rather than of the browser, which has
     # usually moved on by the time a generation lands.
+    # On the two regions, which is the only place two shows are up at once:
+    # standalone the monitor's one show takes over the new set instead.
     browser = FakeBrowser(shelves={"shelf/a": [_row("g9")], "shelf/b": []})
-    director, _host, made = shows(browser=browser)
-    director.open([("a.png", "image", "g1", None)], location="shelf/a")
-    director.open([("b.png", "image", "g2", None)], location="shelf/b")
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a",
+                  side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="shelf/b",
+                  side=PORTRAIT)
 
     director.note_finished(_row("g9", favorite=True))
 

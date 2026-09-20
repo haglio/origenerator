@@ -150,38 +150,14 @@ class SlideshowView(QWidget):
         # the side holding the jobs knows which of them is on the GPU.
         self._enhance_status: dict[str, str] = {}
         self._motion = motion  # the gallery's app-global motion driver, or None
-        # Following a generation still in flight: no items of its own, so the pane
-        # that opened this feeds the frames and hands over the file that lands.
-        self._live = not items
-        # Every run this show has already taken in as a slide of its own frames.
-        # A run is offered once: one culled off the show would otherwise be put
-        # straight back by its next frame, which is the opposite of what Up says.
-        self._seen_live: set[str] = set()
-        self._frame = frame  # the frame the double-click landed on, if any
-        # The item to hand the gallery on the way out, once there is one: Enter
-        # names it outright, and a lock names it by being the slide the show
-        # ended on. Read in :meth:`closeEvent`, which is where every way out of
-        # the show meets.
-        self._land_on: str | None = None
-        # The versions of each item that has any, and the place within the one
-        # being stepped: Shift+Left/Right moves there rather than along the set.
-        self._levels = LevelStepper()
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
         # same number. An explicit dwell (a double-clicked picture's nought,
         # or a test's) wins until the console next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
-        if image_dwell_ms is None:
-            image_dwell_ms = self._pace.dwell_ms
-        self._dwell_s = image_dwell_ms // 1000
         self._pace.changed.connect(self._on_pace_changed)
-        # The set this show plays, the pass dealt from it, and what its two
-        # switches keep of it — all of it the same whether a window or one of
-        # a session's players is showing the slides (see ShowSet).  What this
-        # view answers for is the slide on screen, so a re-dealt pass comes
-        # back here as :meth:`_pass_changed`.
-        self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                            start=start, hud=hud, on_pass_change=self._pass_changed)
+        self._take_set(items, frame=frame, start=start,
+                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
         self.setWindowTitle("Slideshow")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAutoFillBackground(True)  # a solid black surround under the media
@@ -255,6 +231,49 @@ class SlideshowView(QWidget):
         self._show_current()
 
     # --- the set, and the pass dealt from it --------------------------------
+
+    def play(self, items, *, frame=None, start=None, image_dwell_ms=None,
+             shuffle=None, hud=None) -> None:
+        """Take a new set into this window and start it on that set.
+
+        Standalone the monitor holds one show, so a second set asked for while
+        this one is up arrives here rather than in a window of its own (see
+        :meth:`~origenerator.gui.show_director.ShowDirector._open_a_window`) —
+        the same re-pointing a region's player gets when the set it is showing
+        changes.  It takes the set exactly as construction does, so a window
+        re-pointed cannot drift from one freshly opened.
+        """
+        self._take_set(items, frame=frame, start=start,
+                       image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
+        self._show_current()
+
+    def _take_set(self, items, *, frame, start, image_dwell_ms, shuffle, hud) -> None:
+        # Following a generation still in flight: no items of its own, so the pane
+        # that opened this feeds the frames and hands over the file that lands.
+        self._live = not items
+        # Every run this show has already taken in as a slide of its own frames.
+        # A run is offered once: one culled off the show would otherwise be put
+        # straight back by its next frame, which is the opposite of what Up says.
+        self._seen_live: set[str] = set()
+        self._frame = frame  # the frame the double-click landed on, if any
+        # The item to hand the gallery on the way out, once there is one: Enter
+        # names it outright, and a lock names it by being the slide the show
+        # ended on. Read in :meth:`closeEvent`, which is where every way out of
+        # the show meets.
+        self._land_on: str | None = None
+        # The versions of each item that has any, and the place within the one
+        # being stepped: Shift+Left/Right moves there rather than along the set.
+        self._levels = LevelStepper()
+        if image_dwell_ms is None:
+            image_dwell_ms = self._pace.dwell_ms
+        self._dwell_s = image_dwell_ms // 1000
+        # The set this show plays, the pass dealt from it, and what its two
+        # switches keep of it — all of it the same whether a window or one of
+        # a session's players is showing the slides (see ShowSet).  What this
+        # view answers for is the slide on screen, so a re-dealt pass comes
+        # back here as :meth:`_pass_changed`.
+        self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+                            start=start, hud=hud, on_pass_change=self._pass_changed)
 
     @property
     def _playlist(self):

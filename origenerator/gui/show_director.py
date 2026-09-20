@@ -301,7 +301,8 @@ class ShowDirector:
         # the newest is what it is opened for.
         latest = base == _RECENTS_KEY
         show = self.open(items, rows=rows, location=location, side=side,
-                         resume=self._show_state, **self._order(latest))
+                         resume=None if latest else self._show_state,
+                         **self._order(latest))
         if favorites:
             show.set_favorites_filter(True)
         logger.info("Slideshow of %s: %d items, %s",

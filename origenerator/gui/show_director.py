@@ -276,18 +276,34 @@ class ShowDirector:
         and standing where the last show was closed when that slide is in
         here."""
         location = self._host.show_location()
-        rows = self._one_per_stretch_on_a_shelf_of_them(
-            location, self._host.rows_to_play())
+        base, orientation = _split_shelf_key(location)
+        side = side or orientation
+        # Favorites is not a set of its own: it is the whole library with the
+        # favorites switch held down, so the switch can be let go to widen and
+        # the order pair means the library rather than the bookmarks.  It is the
+        # one set whose shape its own items cannot name, since it is the side's
+        # whole library before the switch narrows it.
+        favorites = base == _FAVORITES_KEY
+        if favorites:
+            side = side or self._host.side_in_view()
+            location = self.base_location(side)
+            rows = self.rows_at(location)
+        else:
+            rows = self._one_per_run_where_the_order_is_newest_first(
+                location, self._host.rows_to_play())
         items = self.items_of(rows)
         if not items:
             return
         # Recents is Latest, exactly as on a Fun Time player: the shelf lists
         # newest first and its slideshow plays that order, where every other
-        # set shuffles — and the show's HUD status line says which.
-        base, orientation = _split_shelf_key(location)
+        # set shuffles — and the show's HUD status line says which.  Latest
+        # opens on the newest rather than where the last Latest show stopped:
+        # the newest is what it is opened for.
         latest = base == _RECENTS_KEY
-        self.open(items, rows=rows, location=location, side=side or orientation,
-                  resume=self._show_state, **self._order(latest))
+        show = self.open(items, rows=rows, location=location, side=side,
+                         resume=self._show_state, **self._order(latest))
+        if favorites:
+            show.set_favorites_filter(True)
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
                     "latest" if latest else "shuffled")
@@ -605,16 +621,17 @@ class ShowDirector:
             return []
         rows = self._browser.rows_for_shelf(location)
         if rows is not None:
-            return self._one_per_stretch_on_a_shelf_of_them(location, rows)
+            return self._one_per_run_where_the_order_is_newest_first(location, rows)
         group = self._host.group_for_key(location)
         return gallery.rows_under(group) if group is not None else []
 
-    def _one_per_stretch_on_a_shelf_of_them(self, location, rows) -> list[dict]:
-        """Latest and Favorites list a sitting's generations one after another,
-        several seeds of a configuration at a time; their shows play one of
-        each such run, and the map's row reaches the rest."""
+    def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
+        """Latest lists a sitting's generations one after another, several seeds
+        of a configuration at a time; its show plays one of each such run, and
+        the map's row reaches the rest.  Every other set is shuffled, where a
+        run is not a run of anything."""
         base, _side = _split_shelf_key(location)
-        if base not in (_RECENTS_KEY, _FAVORITES_KEY):
+        if base != _RECENTS_KEY:
             return rows
         return one_per_stretch(rows, image_index=self._host.image_config_index())
 
@@ -1277,12 +1294,21 @@ class ShowDirector:
     # --- what the HUD's two switches judge items by -------------------------
 
     def _favorite_prompt_ids(self) -> set[str]:
-        """Which generations are favorites (favorited), for the shows' HUD: the
-        star readout on the current item, and the F-mode narrowing — the same
-        concepts the players' HUD wears, over the same collection the
-        Favorites shelf lists."""
-        return {row["prompt_id"] for row in self._db.list_generations()
-                if row.get("starred")}
+        """Which generations are favorites, for the shows' HUD: the star readout
+        on the current item, and the favorites narrowing — the same concepts the
+        players' HUD wears, over the same collection the Favorites shelf lists.
+
+        That collection, and not merely the marked rows: a folder bookmarked
+        there stands for everything under it, so a show narrowed to the
+        favorites keeps what the shelf would have shown.
+        """
+        marked = {row["prompt_id"] for row in self._db.list_generations()
+                  if row.get("starred")}
+        for side in _ORIENTATIONS:
+            key = oriented_key(_FAVORITES_KEY, side)
+            marked.update(row["prompt_id"]
+                          for row in (self._browser.rows_for_shelf(key) or ()))
+        return marked
 
     def _enhanced_ids_of(self, rows) -> set[str]:
         """Which of *rows* carry an enhancement, for the switch beside F-mode

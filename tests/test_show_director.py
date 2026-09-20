@@ -22,6 +22,7 @@ from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
+from origenerator.slideshow import ShowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 
@@ -192,6 +193,10 @@ class FakeShow:
 
     def toggle_favorites_filter(self):
         self.hud_favorites_filter = not self.hud_favorites_filter
+
+    def set_favorites_filter(self, on):
+        self.hud_favorites_filter = bool(on)
+        return True
 
     def set_enhanced_mode(self, on):
         self.hud_enhanced_mode = on and bool(self.enhanced_items)
@@ -1266,18 +1271,7 @@ def test_a_show_of_latest_plays_one_of_each_run_of_a_folders_generations(shows):
 
     director.start()
 
-    assert _played(made[0]) == ["g4", "g3", "g1"]
-
-
-def test_a_show_of_favorites_plays_one_of_each_run_too(shows):
-    from origenerator.gui.gallery_tree import FAVORITES_KEY
-    rows = _a_sitting()
-    director, _host, made = shows(
-        FakeHost(location=oriented_key(FAVORITES_KEY, PORTRAIT), rows=rows))
-
-    director.start()
-
-    assert _played(made[0]) == ["g4", "g3", "g1"]
+    assert _played(made[0]) == ["g5", "g3", "g2"]
 
 
 def test_a_show_of_a_folder_plays_every_one_of_its_seeds(shows):
@@ -1289,7 +1283,7 @@ def test_a_show_of_a_folder_plays_every_one_of_its_seeds(shows):
     assert _played(made[0]) == ["g5", "g4", "g3", "g2", "g1"]
 
 
-def test_a_seed_landing_in_the_run_latest_already_shows_one_of_stays_out(shows):
+def test_a_seed_landing_while_latest_plays_reaches_it_as_its_runs_newest(shows):
     sitting = _a_sitting()
     browser = FakeBrowser(shelves={LATEST_PORTRAIT: sitting})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
@@ -1303,4 +1297,46 @@ def test_a_seed_landing_in_the_run_latest_already_shows_one_of_stays_out(shows):
     browser.shelves[LATEST_PORTRAIT] = [a_new_picture, another_seed, *sitting]
     director.note_finished(a_new_picture)
 
-    assert [added[0] for added in made[0].added] == ["g7"]
+    assert [added[0] for added in made[0].added] == ["g6", "g7"]
+
+
+def test_a_show_of_favorites_plays_the_sides_whole_library_with_the_filter_on(shows):
+    """Favorites is the Shuffle playlist with the favorites switch held down,
+    so the switch can be let go to widen and the order pair still means the
+    library rather than the bookmarks."""
+    from origenerator.gui.gallery_tree import FAVORITES_KEY
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
+    browser = FakeBrowser(shelves={oriented_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
+                                   ALL_PORTRAIT: rows})
+    director, _host, made = shows(FakeHost(location=oriented_key(FAVORITES_KEY, PORTRAIT),
+                                           rows=rows),
+                                  browser=browser)
+
+    director.start()
+
+    assert _played(made[0]) == ["g1", "g2"]
+    assert made[0].hud_favorites_filter is True
+    assert director._live_shows == [(made[0], ALL_PORTRAIT)]
+
+
+def test_a_show_of_latest_opens_on_the_newest_rather_than_where_the_last_one_stopped(shows):
+    """Latest is newest-first and the newest is the whole point of opening it,
+    so it does not pick up where a Latest show left off."""
+    rows = _a_sitting()
+    director, _host, made = shows(FakeHost(location=LATEST_PORTRAIT, rows=rows))
+    director._show_state = ShowState(order=["g1"], current="g1")
+
+    director.start()
+
+    assert made[0].resumed is None
+
+
+def test_a_show_of_a_folder_still_picks_up_where_the_last_one_stopped(shows):
+    director, _host, made = shows(FakeHost(location="workflow/a",
+                                           rows=[_picture("g1", "a red fox", seed=1)]))
+    director._show_state = ShowState(order=["g1"], current="g1")
+
+    director.start()
+
+    assert made[0].resumed is director._show_state
+

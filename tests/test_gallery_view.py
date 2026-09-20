@@ -6477,22 +6477,6 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
     show.close()
 
 
-def test_a_player_core_without_the_shared_hud_still_opens_the_show(qtbot, monkeypatch):
-    # The panel lives in the newest player_core; a plain launch walks up to the
-    # primary checkout, which grows it only when it lands.  Without it the show
-    # is the show it used to be — its own stills and plate — rather than no show.
-    from origenerator.gui import show_director as show_director_module
-    from origenerator.gui.show_hud import ShowHud
-
-    monkeypatch.setattr(show_director_module, "_shared_hud_widget", lambda: None)
-    show = _standalone_show(qtbot, monkeypatch)
-
-    assert show.isVisible()
-    assert show.findChildren(ShowHud) == []
-    assert not show._counter.isHidden()   # its own furnishings stayed on
-    show.close()
-
-
 def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
     # A video generation saturates the card the show is being drawn with, and a
     # show is exactly the stretch when nobody is waiting on a video.

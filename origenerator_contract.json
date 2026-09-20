@@ -1,0 +1,49 @@
+{
+  "module": "origenerator",
+  "window_title": "Origenerator",
+  "show_titles": {
+    "portrait": "Origenerator Portrait",
+    "landscape": "Origenerator Landscape"
+  },
+  "check_launch_flag": "--check-launch",
+  "required_flags": [
+    "--fun-time",
+    "--x",
+    "--y",
+    "--width",
+    "--height",
+    "--taskbar-identity",
+    "--command-file",
+    "--paused-file",
+    "--status-file",
+    "--dashboard-cmd-file"
+  ],
+  "region_flags": {
+    "portrait": [
+      "--portrait-x",
+      "--portrait-y",
+      "--portrait-width",
+      "--portrait-height"
+    ],
+    "landscape": [
+      "--landscape-x",
+      "--landscape-y",
+      "--landscape-width",
+      "--landscape-height"
+    ]
+  },
+  "player_flags": {
+    "portrait": [
+      "--portrait-playlist",
+      "--portrait-cmd-file",
+      "--portrait-status-file",
+      "--portrait-hud-file"
+    ],
+    "landscape": [
+      "--landscape-playlist",
+      "--landscape-cmd-file",
+      "--landscape-status-file",
+      "--landscape-hud-file"
+    ]
+  }
+}

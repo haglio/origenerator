@@ -34,13 +34,128 @@ from origenerator.win32 import process_creation_time
 
 logger = logging.getLogger(__name__)
 
-# The window captions Fun Time resolves the shows by (with the process pid), the
-# way it resolves its own satellites by "Portrait AI Player"/"Landscape AI
-# Player".  Per REGION, not per view class: whatever view occupies a region
-# carries that region's caption.
+# --- the declared launch contract ------------------------------------------
+#
+# Everything a host must know to start this app inside a session and then find
+# the windows it opens.  Declared once here, published as CONTRACT_FILE at the
+# checkout root for a host that cannot import this package, and used below to
+# BUILD the parser -- so the flags a host writes, the flags this app reads and
+# the document a host checks itself against are all one thing.  They were three
+# hand-kept copies with nothing comparing them, which is how a flag renamed on
+# one side could become a window that never appeared on the other (audit
+# cross/boundaries/cross/017).
+
+#: The module a host runs.
+MODULE = "origenerator"
+
+#: Present iff this app is being hosted.
+MODE_FLAG = "--fun-time"
+
+#: The main window's rect -- the Random Favs Browser's, which it covers -- and
+#: the two satellite regions a show of this app's opens over when the session
+#: hands no player for that side.
+RECT_FIELDS = ("x", "y", "width", "height")
+MAIN_RECT_PREFIX = ""
+REGION_RECT_PREFIXES = {side: f"{side}-" for side in ("portrait", "landscape")}
+
+#: The session's own channel to this app: how it drives it and reads it back.
+SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-file")
+
+#: The two satellite players a session hands over, and the four files each
+#: player contract trades through (see :class:`PlayerChannel`).  All four of a
+#: side or none of it: a session that names none for a side still wants a
+#: window of this app's over that region instead.
+SIDES = ("portrait", "landscape")
+PLAYER_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
+
+#: Whose taskbar button this window joins.
+TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
+
+#: Boot and exit without opening anything -- how a host's suite proves the real
+#: launch works (see :func:`build_parser`).
+CHECK_LAUNCH_FLAG = "--check-launch"
+
+#: The caption the main window wears, which a host resolves it by (together
+#: with the pid).  The splash deliberately wears another ("Origenerator
+#: Loading"), so a caption match cannot reach it.
+WINDOW_TITLE = "Origenerator"
+
+# The captions a host resolves the shows by (with the process pid), the way it
+# resolves its own satellites by "Portrait AI Player"/"Landscape AI Player".
+# Per REGION, not per view class: whatever view occupies a region carries that
+# region's caption.
 PORTRAIT_SHOW_TITLE = "Origenerator Portrait"
 LANDSCAPE_SHOW_TITLE = "Origenerator Landscape"
 SHOW_TITLES = {"portrait": PORTRAIT_SHOW_TITLE, "landscape": LANDSCAPE_SHOW_TITLE}
+
+#: Beside the launcher at the checkout root, which is the path a host is
+#: already told.  Running this module rewrites it.
+CONTRACT_FILE = "origenerator_contract.json"
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+
+def _rect_flags(prefix: str) -> tuple[str, ...]:
+    return tuple(f"--{prefix}{field}" for field in RECT_FIELDS)
+
+
+def required_flags() -> tuple[str, ...]:
+    """The flags every hosted launch carries, in the order a host writes them.
+
+    Required in the strict sense: :func:`parse_app_args` refuses a hosted
+    launch missing one.  argparse already refuses a flag this app does not
+    know, so a rename on the host's side fails at its launch with a message --
+    and this is the other half of the same drift, a host that stopped SENDING
+    one, which used to fall through to a default of nothing at all.
+    """
+    return (
+        MODE_FLAG,
+        *_rect_flags(MAIN_RECT_PREFIX),
+        TASKBAR_IDENTITY_FLAG,
+        *(f"--{name}" for name in SESSION_FILES),
+    )
+
+
+def region_flags(side: str) -> tuple[str, ...]:
+    """One region's rect, for the show this app opens over it itself.
+
+    Not required: a host that names a player for the side opens no window of
+    ours there at all, so the rect it would take is beside the point.
+    """
+    return _rect_flags(REGION_RECT_PREFIXES[side])
+
+
+def player_flags(side: str) -> tuple[str, ...]:
+    """One side's player channel: all four of them, or none of them."""
+    return tuple(f"--{side}-{name}" for name in PLAYER_FILES)
+
+
+def declaration() -> dict:
+    """The published document, as a host reads it."""
+    return {
+        "module": MODULE,
+        "window_title": WINDOW_TITLE,
+        "show_titles": dict(SHOW_TITLES),
+        "check_launch_flag": CHECK_LAUNCH_FLAG,
+        "required_flags": list(required_flags()),
+        "region_flags": {side: list(region_flags(side)) for side in SIDES},
+        "player_flags": {side: list(player_flags(side)) for side in SIDES},
+    }
+
+
+def published_text() -> str:
+    return json.dumps(declaration(), indent=2) + "\n"
+
+
+def contract_path(root: Path | None = None) -> Path:
+    return (root if root is not None else PROJECT_DIR) / CONTRACT_FILE
+
+
+def publish(root: Path | None = None) -> Path:
+    """Write the document out, in the shape the tracked copy holds."""
+    path = contract_path(root)
+    path.write_text(published_text(), encoding="utf-8")
+    return path
 
 
 @dataclass(frozen=True)
@@ -101,29 +216,32 @@ class AppArgs:
 
 
 def _add_rect_arguments(parser: argparse.ArgumentParser, prefix: str) -> None:
-    for field in ("x", "y", "width", "height"):
+    for field in RECT_FIELDS:
         parser.add_argument(f"--{prefix}{field}", type=int, default=0)
 
 
 def _rect(args: argparse.Namespace, prefix: str) -> Rect:
-    return Rect(*(getattr(args, f"{prefix}{field}") for field in ("x", "y", "width", "height")))
+    held = prefix.replace("-", "_")
+    return Rect(*(getattr(args, f"{held}{field}") for field in RECT_FIELDS))
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="origenerator")
-    parser.add_argument("--fun-time", action="store_true")
-    _add_rect_arguments(parser, "")           # the main window's rect (the RFB's)
-    _add_rect_arguments(parser, "portrait_")  # the portrait satellite region
-    _add_rect_arguments(parser, "landscape_")  # the landscape satellite region
-    for name in ("command-file", "paused-file", "status-file", "dashboard-cmd-file"):
+    """The contract above, as the parser that reads it off a command line.
+
+    Every flag comes from the declaration, so the document a host reads and the
+    argv this app accepts cannot come to disagree.
+    """
+    parser = argparse.ArgumentParser(prog=MODULE)
+    parser.add_argument(MODE_FLAG, action="store_true")
+    _add_rect_arguments(parser, MAIN_RECT_PREFIX)
+    for prefix in REGION_RECT_PREFIXES.values():
+        _add_rect_arguments(parser, prefix)
+    for name in SESSION_FILES:
         parser.add_argument(f"--{name}", type=Path, default=None)
-    # Each player's own channel (see PlayerChannel).  Optional, because a
-    # session that hands its players over is the newer one: until it does, its
-    # shows open windows of this app's over the regions instead.
-    for side in ("portrait", "landscape"):
-        for name in ("playlist", "cmd-file", "status-file", "hud-file"):
+    for side in SIDES:
+        for name in PLAYER_FILES:
             parser.add_argument(f"--{side}-{name}", type=Path, default=None)
-    parser.add_argument("--taskbar-identity", default=None)
+    parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
     # Boot far enough to prove this launch works, then exit 0 without opening
     # anything.  A hosting session's integration suite runs the REAL launch
     # command it would use in production through this, which is how a break
@@ -132,7 +250,7 @@ def build_parser() -> argparse.ArgumentParser:
     # instead of by a session coming up with a window missing.  It stops short
     # of the database, ComfyUI and any window, so a run costs the machine
     # nothing and contends with no live app.
-    parser.add_argument("--check-launch", action="store_true")
+    parser.add_argument(CHECK_LAUNCH_FLAG, action="store_true")
     return parser
 
 
@@ -222,8 +340,8 @@ def _player(args: argparse.Namespace, side: str) -> PlayerChannel | None:
     list for and never hear back from, which is worse than the window it would
     otherwise open.
     """
-    files = [getattr(args, f"{side}_{name}")
-             for name in ("playlist", "cmd_file", "status_file", "hud_file")]
+    files = [getattr(args, flag.removeprefix("--").replace("-", "_"))
+             for flag in player_flags(side)]
     return PlayerChannel(*files) if all(files) else None
 
 
@@ -231,9 +349,9 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
     if not args.fun_time:
         return None
     return FunTimeSession(
-        main_rect=_rect(args, ""),
-        portrait_rect=_rect(args, "portrait_"),
-        landscape_rect=_rect(args, "landscape_"),
+        main_rect=_rect(args, MAIN_RECT_PREFIX),
+        portrait_rect=_rect(args, REGION_RECT_PREFIXES["portrait"]),
+        landscape_rect=_rect(args, REGION_RECT_PREFIXES["landscape"]),
         command_file=args.command_file,
         paused_file=args.paused_file,
         status_file=args.status_file,
@@ -243,9 +361,23 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
     )
 
 
+def _missing_required(argv: list[str]) -> list[str]:
+    """Which of :func:`required_flags` a hosted *argv* does not carry."""
+    written = {word.split("=", 1)[0] for word in argv}
+    return [flag for flag in required_flags() if flag not in written]
+
+
 def parse_app_args(argv: list[str]) -> AppArgs:
-    """The launch contract, parsed.  ``argv`` excludes the program name."""
-    args = build_parser().parse_args(argv)
+    """The launch contract, parsed.  ``argv`` excludes the program name.
+
+    A hosted launch short of a required flag is refused rather than started:
+    see :func:`required_flags` for why silence was the worse answer.
+    """
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.fun_time and (missing := _missing_required(argv)):
+        parser.error(f"{MODE_FLAG} without {', '.join(missing)}; the launch "
+                     f"contract is {CONTRACT_FILE}")
     return AppArgs(fun_time=_session_of(args), taskbar_identity=args.taskbar_identity,
                    check_launch=args.check_launch)
 
@@ -288,3 +420,7 @@ def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:
     finally:
         takeover.unlink(missing_ok=True)
     return None if unknown else _session_of(args)
+
+
+if __name__ == "__main__":
+    print(publish())

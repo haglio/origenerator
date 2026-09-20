@@ -16,6 +16,7 @@ from origenerator.fun_time_mode import (
     take_the_takeover,
 )
 from origenerator.slideshow import Slide
+from tests.hosted_launch import hosted_launch
 
 
 def _png(path: Path, width: int, height: int) -> Path:
@@ -33,10 +34,10 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
     args = parse_app_args([
         "--fun-time",
         "--x", "10", "--y", "206", "--width", "840", "--height", "1200",
-        "--portrait_x", "2560", "--portrait_y", "0",
-        "--portrait_width", "1440", "--portrait_height", "1870",
-        "--landscape_x", "853", "--landscape_y", "0",
-        "--landscape_width", "1707", "--landscape_height", "1400",
+        "--portrait-x", "2560", "--portrait-y", "0",
+        "--portrait-width", "1440", "--portrait-height", "1870",
+        "--landscape-x", "853", "--landscape-y", "0",
+        "--landscape-width", "1707", "--landscape-height", "1400",
         "--command-file", "st/origenerator_cmd.txt",
         "--paused-file", "st/origenerator_paused.txt",
         "--status-file", "st/origenerator_status.txt",
@@ -60,17 +61,13 @@ def test_a_session_hands_over_each_players_own_channel():
     """Inside a session the players are what shows the slides, so the launch
     names each one's channel: the list it plays, the verbs it answers, the
     status it publishes, and the panel this app publishes for it."""
-    args = parse_app_args([
-        "--fun-time",
-        "--portrait-playlist", "st/portrait.tsv",
-        "--portrait-cmd-file", "st/portrait_cmd.txt",
-        "--portrait-status-file", "st/portrait_status.txt",
-        "--portrait-hud-file", "st/origenerator_portrait_hud.json",
-        "--landscape-playlist", "st/landscape.tsv",
-        "--landscape-cmd-file", "st/landscape_cmd.txt",
-        "--landscape-status-file", "st/landscape_status.txt",
-        "--landscape-hud-file", "st/origenerator_landscape_hud.json",
-    ])
+    args = parse_app_args(hosted_launch(players=True, **{
+        "--portrait-playlist": "st/portrait.tsv",
+        "--portrait-cmd-file": "st/portrait_cmd.txt",
+        "--portrait-status-file": "st/portrait_status.txt",
+        "--portrait-hud-file": "st/origenerator_portrait_hud.json",
+        "--landscape-playlist": "st/landscape.tsv",
+    }))
     portrait = args.fun_time.player("portrait")
 
     assert portrait.playlist == Path("st/portrait.tsv")
@@ -84,7 +81,7 @@ def test_a_session_that_names_no_player_hands_over_none():
     """A session too old to name them is one whose shows still open windows of
     their own, so the answer has to be "there is no player here" rather than a
     channel of empty paths."""
-    args = parse_app_args(["--fun-time", "--command-file", "st/cmd.txt"])
+    args = parse_app_args(hosted_launch())
 
     assert args.fun_time.player("portrait") is None
     assert args.fun_time.player("landscape") is None

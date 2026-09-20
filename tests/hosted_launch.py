@@ -7,16 +7,25 @@ actually cares about and the rest follows.
 """
 from __future__ import annotations
 
-from origenerator.fun_time_mode import MODE_FLAG, SIDES, player_flags, required_flags
+from origenerator.fun_time_mode import (
+    MODE_FLAG,
+    SIDES,
+    headset_flags,
+    player_flags,
+    required_flags,
+)
 
 #: A rect, a path, an identity: anything this file does not care about.
 _ANYTHING = "0"
 
 
-def hosted_launch(*, players: bool = False, **named: str) -> list[str]:
+def hosted_launch(
+    *, players: bool = False, headset: bool = False, **named: str,
+) -> list[str]:
     """Every required flag, with *named* overriding the ones a test cares about.
 
-    *players* also hands both satellite players over, the way a session does.
+    *players* also hands both satellite players over, the way a session does,
+    and *headset* names the pair a room in the headset hands its window over by.
     """
     argv = [MODE_FLAG]
     for flag in required_flags():
@@ -26,4 +35,7 @@ def hosted_launch(*, players: bool = False, **named: str) -> list[str]:
         for side in SIDES:
             for flag in player_flags(side):
                 argv += [flag, named.get(flag, _ANYTHING)]
+    if headset:
+        for flag in headset_flags():
+            argv += [flag, named.get(flag, _ANYTHING)]
     return argv

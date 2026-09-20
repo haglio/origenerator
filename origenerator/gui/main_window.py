@@ -18,6 +18,7 @@ from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.win32 import place_window_in_device_pixels
 
@@ -111,6 +112,9 @@ class OrigeneratorWindow(QMainWindow):
             # for the gallery to hand over. Parented to the window, so it lives
             # exactly as long as the app.
             FunTimeBridge(fun_time, self._gallery_view, parent=self)
+        self.hands_its_window_over: HeadsetWindow | None = None
+        if fun_time is not None and fun_time.in_a_headset:
+            self._hand_the_window_over(fun_time)
 
         # Ctrl+Alt+Q quits from anywhere in the app: an application-scoped shortcut
         # fires no matter which widget holds focus. close() runs closeEvent — which
@@ -194,10 +198,27 @@ class OrigeneratorWindow(QMainWindow):
         self._wear_the_session(session)
         self._bridge = FunTimeBridge(session, self._gallery_view, parent=self)
         self._bridge.released.connect(self.become_standalone)
-        self.showMinimized()
+        if session.in_a_headset:
+            self._hand_the_window_over(session)
+        else:
+            self.showMinimized()
+
+    def _hand_the_window_over(self, session: FunTimeSession) -> None:
+        """Publish this window's picture for a room in the headset, which has no
+        monitor to put it on.  Shown rather than parked: Qt draws nothing for a
+        window Windows has unmapped, so a parked one has no picture to hand."""
+        self.show()
+        self.hands_its_window_over = HeadsetWindow(self, session, parent=self)
+
+    def _take_the_window_back(self) -> None:
+        if self.hands_its_window_over is not None:
+            self.hands_its_window_over.close()
+            self.hands_its_window_over.deleteLater()
+            self.hands_its_window_over = None
 
     def become_standalone(self) -> None:
         logger.info("Handed back by the Fun Time session; standalone again")
+        self._take_the_window_back()
         geometry, scale, minimized = self._found
         self._bridge.deleteLater()
         self._bridge = None

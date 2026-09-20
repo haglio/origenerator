@@ -498,16 +498,19 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
 
 
 def _build_window(client, db, app_state, fun_time):
-    """The main window, shown -- or parked, when a session hosts it."""
+    """The main window: shown, parked for a session on the monitors, or shown for
+    one in the headset, which has no monitor to park it on."""
     from origenerator.gui.main_window import OrigeneratorWindow
 
     window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
-    if fun_time is not None:
+    if fun_time is None:
+        window.show()
+    elif not fun_time.in_a_headset:
         # Parked until the session's own mode switch restores it: the session
         # may be in player mode, where popping over the RFB would be wrong.
+        # A room in the headset shows this window's PICTURE instead, and the
+        # window shows itself for it (OrigeneratorWindow).
         window.showMinimized()
-    else:
-        window.show()
     return window
 
 

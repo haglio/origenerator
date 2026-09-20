@@ -68,6 +68,23 @@ SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-fi
 SIDES = ("portrait", "landscape")
 PLAYER_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
 
+#: Where a session in the headset asks for this window's PICTURE instead: the
+#: memory-mapped file to write it into (``app_support.frame_channel``) and the
+#: file its pointer's presses arrive through.  Both or neither; named, they say
+#: this window has no monitor to be seen on.
+HEADSET_FILES = ("frames-file", "input-file")
+
+#: The words that file carries, one per line, each with the pixel it happened
+#: at: ``press 40 12``.  Declared here because the host writes them and this
+#: app reads them, and neither may import the other.
+HEADSET_PRESS = "press"
+HEADSET_RELEASE = "release"
+HEADSET_DRAG = "drag"
+HEADSET_HOVER = "hover"
+HEADSET_SCROLL = "scroll"
+HEADSET_WORDS = (HEADSET_PRESS, HEADSET_RELEASE, HEADSET_DRAG, HEADSET_HOVER,
+                 HEADSET_SCROLL)
+
 #: Whose taskbar button this window joins.
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 
@@ -130,6 +147,12 @@ def player_flags(side: str) -> tuple[str, ...]:
     return tuple(f"--{side}-{name}" for name in PLAYER_FILES)
 
 
+def headset_flags() -> tuple[str, ...]:
+    """The pair a session in the headset hands this window over by: both or
+    neither, and neither on the monitors."""
+    return tuple(f"--{name}" for name in HEADSET_FILES)
+
+
 def declaration() -> dict:
     """The published document, as a host reads it."""
     return {
@@ -140,6 +163,8 @@ def declaration() -> dict:
         "required_flags": list(required_flags()),
         "region_flags": {side: list(region_flags(side)) for side in SIDES},
         "player_flags": {side: list(player_flags(side)) for side in SIDES},
+        "headset_flags": list(headset_flags()),
+        "headset_words": list(HEADSET_WORDS),
     }
 
 
@@ -199,6 +224,15 @@ class FunTimeSession:
     # still wants a window of this app's over that region instead.
     portrait_player: PlayerChannel | None = None
     landscape_player: PlayerChannel | None = None
+    # Where this window's picture goes when the room is in the headset, and
+    # where the pointer's presses on it come back through.
+    frames_file: Path | None = None
+    input_file: Path | None = None
+
+    @property
+    def in_a_headset(self) -> bool:
+        """Whether this window is shown as a picture rather than on a monitor."""
+        return self.frames_file is not None and self.input_file is not None
 
     def region_rect(self, side: str) -> Rect:
         return self.portrait_rect if side == "portrait" else self.landscape_rect
@@ -236,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_rect_arguments(parser, MAIN_RECT_PREFIX)
     for prefix in REGION_RECT_PREFIXES.values():
         _add_rect_arguments(parser, prefix)
-    for name in SESSION_FILES:
+    for name in (*SESSION_FILES, *HEADSET_FILES):
         parser.add_argument(f"--{name}", type=Path, default=None)
     for side in SIDES:
         for name in PLAYER_FILES:
@@ -358,6 +392,8 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
         dashboard_cmd_file=args.dashboard_cmd_file,
         portrait_player=_player(args, "portrait"),
         landscape_player=_player(args, "landscape"),
+        frames_file=args.frames_file,
+        input_file=args.input_file,
     )
 
 

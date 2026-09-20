@@ -3333,7 +3333,7 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
 
 # --- the controls a tile wears in its own corners -----------------------------
 
-def test_a_tiles_star_corner_bookmarks_that_tile(qtbot):
+def test_a_star_pressed_on_one_tile_bookmarks_it_at_once_and_leaves_the_rest(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)

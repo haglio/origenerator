@@ -122,3 +122,24 @@ def widened_family(current: dict, rows, *, image_index,
     if not ranked:
         return None
     return [*own, *(scored[-1] for scored in ranked[:max(additions, 0)])]
+
+
+def one_per_stretch(rows, *, image_index) -> list[dict]:
+    """*rows* with every run of neighbors from one settings folder stood for by
+    the last of the run — the first of them made, in a list that is newest
+    first, so a seed landing in a run already shown changes nothing."""
+    kept: list[dict] = []
+    folder_of_the_run = object()
+    stands_for_the_run = 0
+    for row in rows:
+        if gallery.is_enhanced_row(row):
+            kept.append(row)     # a better version, not another try at the seed
+            continue
+        folder = gallery.settings_folder_key(row, image_index)
+        if folder == folder_of_the_run:
+            kept[stands_for_the_run] = row
+        else:
+            stands_for_the_run = len(kept)
+            kept.append(row)
+            folder_of_the_run = folder
+    return kept

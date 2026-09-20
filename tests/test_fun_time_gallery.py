@@ -189,7 +189,8 @@ def _open_slideshow(view, monkeypatch, tmp_path, name, width, height, count=1):
     items = [(str(still), "image", f"id-{name}-{n}", str(still))
              for n in range(count)]
     monkeypatch.setattr(view, "rows_to_play",
-                        lambda: [{"prompt_id": item[2]} for item in items])
+                        lambda: [{"prompt_id": item[2], "workflow_name": item[2]}
+                                 for item in items])
     monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: name)
     view._shows.start()
@@ -481,7 +482,8 @@ def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatc
              (str(still_b), "image", "id-b", str(still_b))]
     Image.new("RGB", (100, 200)).save(tmp_path / "tall.png")
     monkeypatch.setattr(view, "rows_to_play",
-                        lambda: [{"prompt_id": item[2]} for item in items])
+                        lambda: [{"prompt_id": item[2], "workflow_name": item[2]}
+                                 for item in items])
     monkeypatch.setattr(view._shows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
     view._shows.start()

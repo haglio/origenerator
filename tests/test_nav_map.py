@@ -9,7 +9,12 @@ from __future__ import annotations
 import json
 
 from origenerator import gallery
-from origenerator.nav_map import config_family, seed_family, widened_family
+from origenerator.nav_map import (
+    config_family,
+    one_per_stretch,
+    seed_family,
+    widened_family,
+)
 
 
 def _image(prompt_id, prompt, *, seed, steps=50, checkpoint="model_a.safetensors"):
@@ -135,3 +140,27 @@ def test_a_generation_with_no_prompt_words_is_as_far_from_every_other_as_can_be(
     row = widened_family(current, [current, wordy, wordless], image_index={})
 
     assert _ids(row) == ["g1", "g2", "g3"]      # nothing to tell them apart but their ids
+
+
+def test_a_run_of_generations_from_one_folder_is_stood_for_by_the_first_of_them_made():
+    """A shelf lists newest first, and a sitting usually makes several seeds of
+    one configuration in a row: the shelf's show plays one of each such run, and
+    a folder come back to later is a run of its own."""
+    newest_first = [_image("g5", "a red fox", seed=5), _image("g4", "a red fox", seed=4),
+                    _image("g3", "a blue car", seed=3),
+                    _image("g2", "a red fox", seed=2), _image("g1", "a red fox", seed=1)]
+
+    assert _ids(one_per_stretch(newest_first, image_index={})) == ["g4", "g3", "g1"]
+
+
+def test_an_enhanced_version_is_not_one_of_the_seeds_a_run_stands_for():
+    """A better version of a picture is not another try at the configuration:
+    it is the one thing enhanced-only exists to show, so it is never the seed
+    that gets left out."""
+    better = _image("g3", "a red fox", seed=2)
+    better["params_json"] = json.dumps({**json.loads(better["params_json"]), "enhance": True})
+    newest_first = [_image("g4", "a red fox", seed=4), better,
+                    _image("g2", "a red fox", seed=2), _image("g1", "a red fox", seed=1)]
+
+    assert _ids(one_per_stretch(newest_first, image_index={})) == ["g1", "g3"]
+

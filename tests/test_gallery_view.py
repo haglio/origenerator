@@ -6476,7 +6476,9 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
         played.append((show.hud_order_label,
                        sorted(playlist.items[index][2] for index in playlist.order)))
 
-    assert played == [("Latest", ["i1", "i2"]), ("Shuffle", ["i1", "i2"])]
+    # Latest plays one of a sitting's run of one configuration, and these two
+    # pictures are such a run; Shuffle plays the shape's whole library.
+    assert played == [("Latest", ["i2"]), ("Shuffle", ["i1", "i2"])]
     show.close()
 
 

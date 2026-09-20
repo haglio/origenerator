@@ -577,18 +577,17 @@ def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     assert view._note.isHidden()
 
 
-def test_e_turns_the_whole_behavior_off(qtbot):
+def test_locking_a_slide_always_enhances_it(qtbot):
+    # There is no switch for this any more.  E used to turn it off, and E is
+    # already spoken for in a Fun Time session, so the setting went rather than
+    # move to a second key nobody would find: a lock asks for a better version,
+    # every time.
     asked = []
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
 
     _press(view, Qt.Key.Key_E)
     _press(view, Qt.Key.Key_Down)
-    assert asked == []
-    assert "off" in view._note.text()
 
-    _press(view, Qt.Key.Key_E)      # and back on
-    _press(view, Qt.Key.Key_Down)   # release the hold
-    _press(view, Qt.Key.Key_Down)   # hold again
     assert asked == ["id-a"]
 
 
@@ -1698,20 +1697,6 @@ def test_a_reopened_show_shows_the_version_that_was_on_screen(qtbot, tmp_path):
     reopened.resume(closed.state())
 
     assert reopened._pane._media[0] == original
-
-
-def test_a_reopened_show_keeps_the_enhance_on_hold_switch(qtbot):
-    # Turned off because it was in the way; a show that came back with it on
-    # would fire a run on the next hold.
-    closed = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: True))
-    _press(closed, Qt.Key.Key_E)
-
-    asked = []
-    reopened = _view(qtbot, _THREE, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
-    reopened.resume(closed.state())
-    _press(reopened, Qt.Key.Key_Down)
-
-    assert asked == []
 
 
 def test_a_show_following_a_running_generation_resumes_nothing(qtbot):

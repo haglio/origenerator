@@ -142,9 +142,7 @@ class SlideshowView(QWidget):
         # Holding a slide is also how you ask for it: Down enhances what is on
         # screen if it has never been enhanced, so the one you stopped on is the
         # one that gets the better version — and one that already has a better
-        # version is left alone. ``E`` turns that off for the session, for when
-        # it is in the way.
-        self._enhance_on_hold = self._actions.enhance is not None
+        # version is left alone.
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         # How each enhancement in flight is actually going, as the gallery
         # reads it (``prompt_id`` -> "running"/"queued"). Pushed in by
@@ -405,7 +403,6 @@ class SlideshowView(QWidget):
             current=self._current_prompt_id(),
             locked=self._playlist.locked,
             level_index=self._levels.index,
-            enhance_on_hold=self._enhance_on_hold,
         )
 
     def resume(self, state: ShowState) -> bool:
@@ -422,8 +419,6 @@ class SlideshowView(QWidget):
         Called after :meth:`set_levels`, because which version a slide was showing
         is only a version once the levels under it are armed.
         """
-        if self._actions.enhance is not None:
-            self._enhance_on_hold = state.enhance_on_hold
         if self._live or not self._playlist.resume(state.order, state.current):
             return False
         self._playlist.set_locked(state.locked)
@@ -998,15 +993,6 @@ class SlideshowView(QWidget):
         if held:
             self._enhance_current()
 
-    def _toggle_enhance_on_hold(self):
-        """E: stop (or resume) holding a slide meaning "enhance this"."""
-        if self._actions.enhance is None:
-            return
-        self._enhance_on_hold = not self._enhance_on_hold
-        self._flash_note(
-            "Enhance on hold: on" if self._enhance_on_hold else "Enhance on hold: off"
-        )
-
     def _enhance_current(self):
         """Ask the gallery to enhance the slide on screen, if it wants one.
 
@@ -1015,7 +1001,7 @@ class SlideshowView(QWidget):
         ``True`` back means a run started, and the note says so until the
         finished version arrives.
         """
-        if self._actions.enhance is None or not self._enhance_on_hold:
+        if self._actions.enhance is None:
             return
         if self._playlist.current_is_live():
             return  # no file yet to make a better version of; the hold still holds
@@ -1277,8 +1263,6 @@ class SlideshowView(QWidget):
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
             self._hold_current()    # hold it, favorite it, and enhance it
-        elif key == Qt.Key.Key_E:
-            self._toggle_enhance_on_hold()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_motion_key(self._motion, key,

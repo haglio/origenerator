@@ -1,6 +1,7 @@
 """The show's own pane: what it asks the players' engine for."""
 from __future__ import annotations
 
+import os
 from io import BytesIO
 
 from PIL import Image
@@ -8,6 +9,7 @@ from PyQt6.QtCore import QPointF, QSize, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
+from origenerator.gui import show_surface
 from origenerator.gui.show_surface import ShowSurface, _NotYetOpened
 from origenerator.media import MediaType
 from tests.show_surface_fakes import FakeEngine
@@ -329,3 +331,27 @@ def test_letting_go_of_a_file_lets_the_engine_go_of_it_too(qtbot, tmp_path):
     surface.release_media([str(picture)])
 
     assert engine.stopped is True
+
+
+def test_the_engine_copy_beside_the_checkouts_goes_in_front(monkeypatch, tmp_path):
+    """The engine is one file, fetched once for the machine, with a copy beside
+    the checkouts. The machine-wide folder has answered nothing at all to this
+    app while answering every other process, so the copy beside goes first."""
+    beside = tmp_path / "player_core" / "vendor"
+    beside.mkdir(parents=True)
+    (beside / "libmpv-2.dll").write_bytes(b"")
+    monkeypatch.setattr(show_surface, "project_dir", lambda name: tmp_path / name)
+    monkeypatch.setenv("PATH", r"C:\somewhere\else")
+
+    show_surface._offer_the_copy_beside_the_checkouts()
+
+    assert os.environ["PATH"].split(os.pathsep)[0] == str(beside)
+
+
+def test_no_copy_beside_the_checkouts_leaves_the_path_alone(monkeypatch, tmp_path):
+    monkeypatch.setattr(show_surface, "project_dir", lambda name: tmp_path / name)
+    monkeypatch.setenv("PATH", r"C:\somewhere\else")
+
+    show_surface._offer_the_copy_beside_the_checkouts()
+
+    assert os.environ["PATH"] == r"C:\somewhere\else"

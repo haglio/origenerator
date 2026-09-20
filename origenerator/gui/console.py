@@ -163,15 +163,19 @@ def console_hud(motion, host, *, device_on: bool = True,
 
 @dataclass(frozen=True)
 class ShowDevice:
-    """The device half of this app's console: the rows that aim the OSR2 and
-    set the pace, who has the device, and the motion being sent.
+    """The device half of this app's console: the pace, the rows that aim the
+    OSR2, who has the device, and the motion being sent.
 
     Handed to the one panel a show wears (:mod:`origenerator.gui.show_hud`) so
     it says all of it without a second panel underneath, and used to build the
     whole console for the surface that has no show under it at all.
     """
 
+    # The pace an unheld slide moves on at -- about the SET, so it rides with
+    # the rows that step it rather than with the device.
     rows: tuple
+    # And the rows that aim the OSR2, which ride with the device.
+    osr2_rows: tuple
     osr2: str
     # Which of the four states the app's one OSR2 switch is in, or empty where
     # nobody handed a switch over -- the panel resolves the pair into one word.
@@ -192,12 +196,14 @@ def show_device(motion, host, *, device_on: bool = True,
     """
     scripted = script is not None and script.active and device_on
     driving = motion.active and device_on and not scripted
+    pace, aim = device_rows(control=control, pace_s=host.dwell_s,
+                            cruise=motion.state.cruise.active,
+                            learned=motion.state.learned.active,
+                            shape=motion.state.state.shape.value)
     return ShowDevice(
         osr2_control=control,
-        rows=device_rows(control=control, pace_s=host.dwell_s,
-                         cruise=motion.state.cruise.active,
-                         learned=motion.state.learned.active,
-                         shape=motion.state.state.shape.value),
+        rows=(pace,),
+        osr2_rows=(aim,),
         osr2=(Osr2State.FUNSCRIPT if scripted
               else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
         drive=(script_hud(script, motion.state, host.dwell_s) if scripted

@@ -6478,7 +6478,7 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
 
     # Latest plays one of a sitting's run of one configuration, and these two
     # pictures are such a run; Shuffle plays the shape's whole library.
-    assert played == [("Latest", ["i2"]), ("Shuffle", ["i1", "i2"])]
+    assert played == [("Latest", ["i1"]), ("Shuffle", ["i1", "i2"])]
     show.close()
 
 
@@ -6575,7 +6575,7 @@ def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, m
     # switch is the show's own, beside F-mode on the HUD it wears.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
-                               _enhanced_image("i2", "a cat", 50, 2)]))
+                               _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -6599,7 +6599,7 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
-                               _enhanced_image("i2", "a cat", 50, 2)]))
+                               _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -6650,7 +6650,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _row("i2", "sdxl_t2i",
-                                    {"positive_prompt": "a cat", "steps": 50, "seed": 2,
+                                    {"positive_prompt": "a dog", "steps": 50, "seed": 2,
                                      "enhance": True},
                                     "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
@@ -6673,7 +6673,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
 def test_filter_enhanced_turns_the_shows_switch_on_and_says_what_is_left(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
-                               _enhanced_image("i2", "a cat", 50, 2)]))
+                               _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
@@ -6874,7 +6874,7 @@ def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkey
                                _image("i3", "a fox", 50, 3)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    _open_leaf(view)
     view._shows.start()
     first = view._shows.showing
     qtbot.addWidget(first)

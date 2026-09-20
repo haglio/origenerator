@@ -125,21 +125,25 @@ def widened_family(current: dict, rows, *, image_index,
 
 
 def one_per_stretch(rows, *, image_index) -> list[dict]:
-    """*rows* with every run of neighbors from one settings folder stood for by
-    the last of the run — the first of them made, in a list that is newest
-    first, so a seed landing in a run already shown changes nothing."""
-    kept: list[dict] = []
-    folder_of_the_run = object()
-    stands_for_the_run = 0
-    for row in rows:
-        if gallery.is_enhanced_row(row):
-            kept.append(row)     # a better version, not another try at the seed
-            continue
+    """*rows* with every stretch of generating into one settings folder stood
+    for by the newest of that stretch.
+
+    A sitting makes several seeds of a configuration one after another, so a
+    listing of everything newest-first is mostly runs; a show of it plays one
+    of each, and the map's seed row reaches the rest.  What counts as one
+    stretch is read off when the generations were MADE, not off where they sit
+    in the listing handed over: Latest moves a picture to where its
+    enhancement falls, which breaks a sitting's run into pieces wherever a
+    picture of it was enhanced later.  The listing's own order is what comes
+    back, minus what the stretches swallowed.
+    """
+    made = sorted(rows, key=lambda row: row.get("id") or 0, reverse=True)
+    stands_for_the_stretch: list[str] = []
+    folder_of_the_stretch = object()
+    for row in made:
         folder = gallery.settings_folder_key(row, image_index)
-        if folder == folder_of_the_run:
-            kept[stands_for_the_run] = row
-        else:
-            stands_for_the_run = len(kept)
-            kept.append(row)
-            folder_of_the_run = folder
-    return kept
+        if folder != folder_of_the_stretch:
+            stands_for_the_stretch.append(row["prompt_id"])
+            folder_of_the_stretch = folder
+    kept = set(stands_for_the_stretch)
+    return [row for row in rows if row["prompt_id"] in kept]

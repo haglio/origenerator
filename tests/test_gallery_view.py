@@ -5366,9 +5366,11 @@ def _reroll_client():
     return client
 
 
-def _png_bytes(color=(10, 120, 200)):
+def _png_bytes() -> bytes:
+    """An 8x8 PNG. Tests compare frames to this helper's own output, so the
+    only thing that matters is that every call returns the same bytes."""
     buf = BytesIO()
-    Image.new("RGB", (8, 8), color).save(buf, "PNG")
+    Image.new("RGB", (8, 8), (10, 120, 200)).save(buf, "PNG")
     return buf.getvalue()
 
 
@@ -8044,12 +8046,6 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
 
 
 # --- Recents shelf: in-flight cards for queued/running generations ------------
-
-def _png_bytes():
-    buf = BytesIO()
-    Image.new("RGB", (8, 8), (10, 20, 30)).save(buf, format="PNG")
-    return buf.getvalue()
-
 
 class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
@@ -10814,16 +10810,6 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
 
     assert job.state == "canceled"
     assert view._reroll.all_jobs == []
-
-
-def _png_bytes() -> bytes:
-    import io
-
-    from PIL import Image
-
-    buffer = io.BytesIO()
-    Image.new("RGB", (8, 8), (120, 30, 30)).save(buffer, "PNG")
-    return buffer.getvalue()
 
 
 def _enhanced_in_place(db, pid="g0"):

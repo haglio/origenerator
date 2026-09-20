@@ -950,6 +950,25 @@ def test_a_pushing_pane_hands_each_push_command_to_its_still(make_preview, tmp_p
     getattr(w._still, still_method).assert_called_once_with(*args)
 
 
+def test_releasing_a_panes_still_takes_its_scene_down_and_drops_it(make_preview, tmp_path):
+    w = make_preview(pushes_stills=True)
+    w.show_image(_big_png(tmp_path / "p.png"))
+    still = w._still = MagicMock()
+
+    w.release_still()
+
+    still.release.assert_called_once_with()
+    assert w._still is None
+
+
+def test_releasing_a_still_is_harmless_on_a_pane_that_never_pushed_one(make_preview):
+    w = make_preview(pushes_stills=True)
+
+    w.release_still()
+
+    assert w._still is None
+
+
 @pytest.mark.parametrize("command, args", [
     ("start_push", (4000, 0.0)),
     ("pause_push", ()),

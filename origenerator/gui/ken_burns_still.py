@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import QObject, Qt, QUrl
+from PyQt6.QtCore import QCoreApplication, QObject, Qt, QUrl
 from PyQt6.QtGui import QImage
 from PyQt6.QtQml import QQmlComponent, QQmlEngine
 from PyQt6.QtQuick import QQuickImageProvider, QQuickWindow
@@ -144,6 +144,20 @@ class KenBurnsStill(QWidget):
     def stop(self) -> None:
         self._push.setProperty("running", False)
         self._picture.setProperty("scale", 1.0)
+
+    def release(self) -> None:
+        """Put the render thread down here, where its requests can still be
+        answered.
+
+        Hiding a shown scene waits for that thread, and a destructor cannot
+        answer what it asks for on the way: stopping first means no further
+        frame is asked for, and the pumps deliver what it has already posted.
+        Left to the widget's death instead, the two wait on each other for good.
+        """
+        self.stop()
+        QCoreApplication.processEvents()
+        self._view.hide()
+        QCoreApplication.processEvents()
 
     def _run_from(self, progress: float) -> None:
         self._push.setProperty("running", False)

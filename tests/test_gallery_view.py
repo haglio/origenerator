@@ -11162,6 +11162,12 @@ class _FakeDriver:
         self.stopped += 1
         self.active = False
 
+    def trace(self, count, seconds):
+        """What the console asks a driver for while it has the device. These
+        cases carry no scripted clip, so there is no line to draw — the same
+        empty answer the real driver gives for one."""
+        return ()
+
 
 def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
                        target=None):

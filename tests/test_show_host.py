@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from unittest.mock import MagicMock
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,6 +19,7 @@ import pytest
 from origenerator.gui.show_host import ShowHost
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
+from tests.show_surface_fakes import FakeEngine
 
 # What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
@@ -56,7 +56,7 @@ def test_the_protocol_is_exactly_the_attributes_written_down_here():
 
 @pytest.fixture
 def slideshow(qtbot):
-    view = SlideshowView([("a.png", "image")], player=MagicMock(),
+    view = SlideshowView([("a.png", "image")], engine=FakeEngine(),
                          shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view

@@ -22,6 +22,17 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
 )
 
 
+def _will_move_on(view) -> bool:
+    """Whether the show pages on by itself when the item on screen runs out.
+
+    The engine holds a picture for the pace and ends it the way it ends a
+    finished clip, so there is no clock of the view's own to ask: what decides
+    is the same three things that decided whether one was armed -- the room is
+    not frozen, the slide is not locked, and the pace is not nought."""
+    return (not view._paused and not view._playlist.holding()
+            and bool(view._dwell_s))
+
+
 def _session(tmp_path=None):
     return FunTimeSession(
         main_rect=Rect(0, 206, 853, 1234),
@@ -316,7 +327,7 @@ def test_a_click_on_a_hosted_show_asks_the_room_for_omnipause(qtbot, tmp_path, m
     qtbot.addWidget(show)
     channel = tmp_path / "dashboard_cmd.txt"
 
-    qtbot.mouseClick(show._preview, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(show._pane, Qt.MouseButton.LeftButton)
 
     qtbot.waitUntil(lambda: channel.exists() and channel.read_text(
         encoding="utf-8").split() == ["omnipause_toggle"])
@@ -958,7 +969,7 @@ def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
     view.set_session_paused(True)
 
     assert show._paused is True
-    assert not show._advance_timer.isActive()
+    assert not _will_move_on(show)
 
 
 def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, monkeypatch):
@@ -972,7 +983,7 @@ def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, mo
     view.set_session_paused(True)
     at = show._playlist.index
 
-    show._preview.video_unplayable.emit()
+    show._pane.media_unplayable.emit()
 
     assert show._playlist.index == at
 

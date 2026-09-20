@@ -86,6 +86,17 @@ _CTRL = Qt.KeyboardModifier.ControlModifier
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
+def _will_move_on(view) -> bool:
+    """Whether the show pages on by itself when the item on screen runs out.
+
+    The engine holds a picture for the pace and ends it the way it ends a
+    finished clip, so there is no clock of the view's own to ask: what decides
+    is the same three things that decided whether one was armed -- the room is
+    not frozen, the slide is not locked, and the pace is not nought."""
+    return (not view._paused and not view._playlist.holding()
+            and bool(view._dwell_s))
+
+
 class FakeActions:
     """Records what the view asks of its action controller."""
 
@@ -7471,7 +7482,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     win = _preview_of(view).open_fullscreen()  # the double-click, mid-generation
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
-    assert not win._preview._pixmap.isNull()  # seeded with the frame
+    assert not win._pane._frame.isNull()  # seeded with the frame
 
     buf = BytesIO()
     Image.new("RGB", (8, 8), (200, 30, 30)).save(buf, format="PNG")  # a later, redder frame
@@ -7486,7 +7497,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     # Ends on the result, not the last frame.
-    assert win._preview._media == (done, "image")
+    assert win._pane._media == (done, "image")
     assert not win.is_live()
     win.close()
 
@@ -12966,7 +12977,7 @@ def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeyp
     assert view._shows.showing is not None
     qtbot.addWidget(view._shows.showing)
     assert view._shows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert view._shows.showing._advance_timer.isActive()
+    assert _will_move_on(view._shows.showing)
     view._shows.showing.close()
 
 
@@ -12991,7 +13002,7 @@ def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
 
     assert view._shows.showing is show          # the open one, not a second window
     assert show.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert show._advance_timer.isActive()
+    assert _will_move_on(show)
     show.close()
 
 
@@ -13004,7 +13015,7 @@ def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
     view._voice.listener.speak_command("pause slideshow")
 
     assert show.dwell_s == 0
-    assert not show._advance_timer.isActive()
+    assert not _will_move_on(show)
     assert view._shows.showing is show  # paused, not closed
     show.close()
 

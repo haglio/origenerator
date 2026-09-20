@@ -20,7 +20,6 @@ from origenerator.gui import drag_thumbnail, preview_widget
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
-from origenerator.gui.ken_burns_still import KenBurnsStill
 from origenerator.gui.preview_widget import PreviewWidget
 
 
@@ -905,126 +904,6 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
 
     assert drags == []
-
-
-# --- the show's slow push into the still -------------------------------------
-
-def _big_png(path):
-    """Big enough that a crop of it still has pixels to spare when scaled up."""
-    Image.new("RGB", (400, 300), (10, 120, 200)).save(path, "PNG")
-    return path
-
-
-def _bordered_png(path):
-    """Blue inside a fat red border, so the crop shows in a corner pixel: the
-    border is the first thing a push into the middle throws away."""
-    image = Image.new("RGB", (400, 300), (200, 0, 0))
-    image.paste(Image.new("RGB", (320, 220), (0, 0, 200)), (40, 40))
-    image.save(path, "PNG")
-    return path
-
-
-def test_a_pushing_pane_draws_its_still_on_the_render_thread(make_preview, tmp_path):
-    w = make_preview(pushes_stills=True)
-
-    w.show_image(_big_png(tmp_path / "p.png"))
-
-    assert isinstance(w._stack.currentWidget(), KenBurnsStill)
-
-
-@pytest.mark.parametrize("command, args, still_method", [
-    ("start_push", (4000, 0.25), "start"),
-    ("pause_push", (), "pause"),
-    ("resume_push", (), "resume"),
-    ("retime_push", (8000,), "retime"),
-    ("stop_push", (), "stop"),
-])
-def test_a_pushing_pane_hands_each_push_command_to_its_still(make_preview, tmp_path,
-                                                             command, args, still_method):
-    w = make_preview(pushes_stills=True)
-    w.show_image(_big_png(tmp_path / "p.png"))
-    w._still = MagicMock()
-
-    getattr(w, command)(*args)
-
-    getattr(w._still, still_method).assert_called_once_with(*args)
-
-
-def test_releasing_a_panes_still_takes_its_scene_down_and_drops_it(make_preview, tmp_path):
-    w = make_preview(pushes_stills=True)
-    w.show_image(_big_png(tmp_path / "p.png"))
-    still = w._still = MagicMock()
-
-    w.release_still()
-
-    still.release.assert_called_once_with()
-    assert w._still is None
-
-
-def test_releasing_a_still_is_harmless_on_a_pane_that_never_pushed_one(make_preview):
-    w = make_preview(pushes_stills=True)
-
-    w.release_still()
-
-    assert w._still is None
-
-
-@pytest.mark.parametrize("command, args", [
-    ("start_push", (4000, 0.0)),
-    ("pause_push", ()),
-    ("resume_push", ()),
-    ("retime_push", (8000,)),
-    ("stop_push", ()),
-])
-def test_push_commands_are_harmless_on_a_pane_with_no_still_yet(make_preview,
-                                                                command, args):
-    w = make_preview(pushes_stills=True)
-
-    getattr(w, command)(*args)
-
-    assert w._still is None
-
-
-def test_a_pushing_pane_draws_a_live_frame_on_its_still(make_preview):
-    w = make_preview(pushes_stills=True)
-
-    w.show_frame(_png_bytes())
-
-    assert isinstance(w._stack.currentWidget(), KenBurnsStill)
-
-
-def test_a_pushed_picture_is_measured_where_it_is_drawn(make_preview, tmp_path):
-    w = make_preview(pushes_stills=True)
-    w.resize(200, 300)
-    w.layout().activate()
-
-    w.show_image(_big_png(tmp_path / "p.png"))
-
-    rect = w.media_rect()
-    assert (rect.width(), rect.height()) == (200, 150)
-    assert rect.center() == w._media_host.geometry().center()
-
-
-def test_presses_over_a_pushed_picture_reach_the_pane(make_preview, tmp_path):
-    # A double-click over the picture is how a show is closed, and a press is how
-    # one is dragged out: whatever draws the picture must not keep them.
-    w = make_preview(pushes_stills=True)
-    w.resize(200, 300)
-    w.layout().activate()
-    w.show_image(_big_png(tmp_path / "p.png"))
-
-    under = w.childAt(w.media_rect().center())
-
-    assert under is None or not (under is w._still or w._still.isAncestorOf(under))
-
-
-def test_a_pane_nobody_pushes_draws_its_stills_as_it_always_has(make_preview, tmp_path):
-    w = make_preview()
-
-    w.show_image(_big_png(tmp_path / "p.png"))
-
-    assert w._stack.currentWidget() is w._image_label
-    assert w._still is None
 
 
 # --- the notice: this picture isn't what the settings beside it would make ---

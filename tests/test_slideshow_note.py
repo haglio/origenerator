@@ -8,14 +8,13 @@ no panels is indistinguishable from the request having been dropped.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from PyQt6.QtCore import QRunnable
 from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
 
 from origenerator.gui import voice_router
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import ERROR, WARNING
+from tests.show_surface_fakes import FakeEngine
 from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
@@ -30,7 +29,7 @@ _ASKED_AGAIN = object()
 
 
 def _view(qtbot):
-    view = SlideshowView(_ITEMS, player=MagicMock(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view
 

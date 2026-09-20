@@ -158,21 +158,27 @@ class TestTheRoomsPressesReachTheWindow:
     def test_the_window_is_published_once_for_each_way_it_looks(self, tmp_path, qtbot):
         """A window nobody is touching looks the same every frame, and a frame
         the room already has is a frame not worth the write."""
-        from app_support.frame_channel import FrameReader
+        import struct
+
+        def published() -> tuple[int, int, int]:
+            """(sequence, width, height) off the channel's header -- read here
+            rather than through a reader of our own, the reader being the
+            session's (``app_support.frame_channel``)."""
+            header = (tmp_path / "frame.bin").read_bytes()[:20]
+            sequence, _token, width, height = struct.unpack("<QIII", header)
+            return sequence, width, height
 
         window = self._window(qtbot)
         window.show()
-        session = self._hosted(tmp_path)
-        headset = HeadsetWindow(window, session)
-        reader = FrameReader(tmp_path / "frame.bin")
+        headset = HeadsetWindow(window, self._hosted(tmp_path))
         try:
             headset.publish(now=1.0)
-            first = reader.latest(0)
+            first = published()
             headset.publish(now=2.0)
-            again = reader.latest(0)
+            again = published()
         finally:
-            reader.close()
             headset.close()
 
-        assert first is not None and first[0] == window.width()
-        assert again is None, "the same picture was published twice"
+        assert first[1] == window.width(), "the window was not published at its own width"
+        assert first[0] % 2 == 0, "the frame was left mid-write"
+        assert again == first, "the same picture was published twice"

@@ -68,7 +68,7 @@ class FunTimeBridge(QObject):
         self._session = session
         self._gallery = gallery
         self._paused = False
-        self._last_status: str | None = None
+        self._published = False
         # The verbs about the session's shows as a whole, rather than one side's.
         self._session_verbs = {
             "OPEN_SHOWS": lambda: self._gallery.fill_the_regions(),
@@ -182,21 +182,21 @@ class FunTimeBridge(QObject):
 
     # --- status out ---------------------------------------------------------
 
+    #: The whole of it: this app is up and answering.  It published six keys
+    #: for years -- which side held a show, what it was showing, whether it was
+    #: held -- and the session read none of them; it waits on this file
+    #: appearing, and nothing else, to know the mode can be opened.  The owner
+    #: settled that on 2026-09-05 (audit Q13): nothing was to be wired to read
+    #: those six, so the channel goes and the signal stays.
+    READY = "ready=1"
+
     def _publish_status(self) -> None:
         if self._session.status_file is None:
             return
-        lines = []
-        for side in _SIDES:
-            show = self._gallery.region_show(side)
-            lines.append(f"{side}_active={'1' if show is not None else '0'}")
-            path = show.current_media_path() if show is not None else ""
-            lines.append(f"{side}_video={path}")
-            locked = show is not None and bool(show.locked)
-            lines.append(f"{side}_locked={'1' if locked else '0'}")
-        text = "".join(f"{line}\n" for line in lines)
-        if text == self._last_status:
+        # Republished when it is not there as well as when it changes: the
+        # session clears this file as it opens the mode, and a signal written
+        # once would never come back for the session that cleared it.
+        if self._published and self._session.status_file.exists():
             return
-        # Written whole, and remembered only once it lands — a failed write
-        # must retry next tick, not be treated as published.
-        if publish_whole(self._session.status_file, text):
-            self._last_status = text
+        self._published = publish_whole(self._session.status_file,
+                                        self.READY + "\n")

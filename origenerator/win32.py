@@ -180,6 +180,13 @@ def force_foreground_window(hwnd: int) -> bool:
     return int(_user32.GetForegroundWindow() or 0) == hwnd
 
 
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_kernel32.OpenProcess.argtypes = [
+    ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD,
+]
+_kernel32.OpenProcess.restype = ctypes.wintypes.HANDLE
+_kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
+_kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
 _kernel32.GetCurrentProcess.restype = ctypes.wintypes.HANDLE
 _kernel32.GetProcessTimes.argtypes = [
     ctypes.wintypes.HANDLE, *[ctypes.POINTER(ctypes.wintypes.FILETIME)] * 4,
@@ -191,3 +198,21 @@ def this_process_creation_time() -> int:
     times = [ctypes.wintypes.FILETIME() for _ in range(4)]
     _kernel32.GetProcessTimes(_kernel32.GetCurrentProcess(), *map(ctypes.byref, times))
     return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+
+
+def process_creation_time(pid: int) -> int | None:
+    """The creation time of whatever holds *pid* now, or None where nothing does.
+
+    Windows hands a freed pid out again within seconds, so a pid alone names no
+    process; with the creation time beside it, a recycled one is recognized.
+    """
+    handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None
+    try:
+        times = [ctypes.wintypes.FILETIME() for _ in range(4)]
+        if not _kernel32.GetProcessTimes(handle, *map(ctypes.byref, times)):
+            return None
+        return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+    finally:
+        _kernel32.CloseHandle(handle)

@@ -185,7 +185,13 @@ class Osr2MotionDriver(QObject):
         rather than trailing it, through the glide as much as after it: given
         longer, it is also sent further, so it arrives where the motion has got
         to instead of where the motion was when the command left.
+
+        A tick that lands after the device was given up sends nothing: the park
+        stop() left on the wire is where whoever has it next expects to find the
+        device, and one stale position after it takes the device back.
         """
+        if not self._active:
+            return
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:

@@ -204,3 +204,43 @@ def test_a_switch_handed_its_drivers_back_drives_them_again():
     control.set_state(OSR2_DRIVING)
 
     assert control.state() == OSR2_DRIVING and control.source() == "funscript"
+
+
+def test_a_session_taking_the_device_puts_the_switch_off_and_keeps_it_there():
+    control = _control()
+    control.setChecked(True)
+    changes = []
+    control.changed.connect(lambda: changes.append(control.state()))
+
+    control.the_session_has_it(True)
+
+    assert changes == [OSR2_CONTROL_OFF]
+    assert not control.isEnabled()
+    control.setChecked(True)
+    control.set_state(OSR2_DRIVING)
+    assert control.state() == OSR2_CONTROL_OFF
+
+
+def test_a_session_letting_the_device_go_hands_the_switch_back():
+    control = _control()
+    control.the_session_has_it(True)
+    changes = []
+    control.changed.connect(lambda: changes.append(control.state()))
+
+    control.the_session_has_it(False)
+
+    assert changes == [OSR2_CONTROL_OFF]
+    assert control.isEnabled()
+    control.setChecked(True)
+    assert control.state() == OSR2_DRIVING
+
+
+def test_the_same_claim_said_again_changes_nothing():
+    control = _control()
+    control.the_session_has_it(True)
+    changes = []
+    control.changed.connect(lambda: changes.append(control.state()))
+
+    control.the_session_has_it(True)
+
+    assert changes == []

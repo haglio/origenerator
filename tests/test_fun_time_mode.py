@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -196,3 +197,20 @@ def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
         (str(tmp_path / "also-gone.mp4"), "video", "b", None),
     ]
     assert region_for_items(items) == "landscape"
+
+
+def test_a_live_sessions_claim_on_the_device_is_read_off_its_process(tmp_path):
+    from origenerator.fun_time_mode import a_session_holds_the_device
+    from origenerator.win32 import this_process_creation_time
+
+    assert not a_session_holds_the_device(tmp_path)
+
+    claim = tmp_path / "fun_time_session.txt"
+    claim.write_text(f"{os.getpid()} {this_process_creation_time()}", encoding="utf-8")
+    assert a_session_holds_the_device(tmp_path)
+
+    claim.write_text(f"{os.getpid()} {this_process_creation_time() - 1}", encoding="utf-8")
+    assert not a_session_holds_the_device(tmp_path)
+
+    claim.write_text("not a claim", encoding="utf-8")
+    assert not a_session_holds_the_device(tmp_path)

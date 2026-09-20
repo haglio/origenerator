@@ -331,3 +331,18 @@ def test_the_dials_answer_again_once_the_hold_is_let_go(qtbot):
     driver.set_amplitude(80)
 
     assert driver.state.state.amplitude == 80
+
+
+def test_a_tick_that_lands_after_the_device_is_given_up_sends_nothing(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    clock.t += 0.025
+    driver.poll()
+    sent = len(broker.positions)
+
+    driver.stop()
+    clock.t += 0.025
+    driver.poll()
+
+    assert broker.parked == 1
+    assert len(broker.positions) == sent

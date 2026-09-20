@@ -30,6 +30,7 @@ from pathlib import Path
 
 from origenerator.media import MediaType
 from origenerator.slideshow import Slide
+from origenerator.win32 import process_creation_time
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +252,28 @@ def parse_app_args(argv: list[str]) -> AppArgs:
 
 OFFER_NAME = "fun_time_offer.txt"
 TAKEOVER_NAME = "fun_time_takeover.json"
+SESSION_NAME = "fun_time_session.txt"
+
+
+def a_session_holds_the_device(state_dir: Path) -> bool:
+    """Whether a live Fun Time session has claimed the OSR2.
+
+    A session leaves its own pid and creation time here for as long as it runs,
+    the way a standalone window leaves its own in the offer.  Read that way
+    rather than as a heartbeat because a session that died without clearing it
+    names a pid that is gone, so the claim expires with the session.
+
+    The claim stands whether or not the session took this window over: a
+    takeover can miss -- an app still booting when the room opened, an offer
+    another instance overwrote -- and a window the session never reached must
+    still keep off the one device it is driving.
+    """
+    try:
+        pid, created_at = map(int, (state_dir / SESSION_NAME)
+                              .read_text(encoding="utf-8").split())
+    except (OSError, ValueError):
+        return False
+    return process_creation_time(pid) == created_at
 
 
 def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:

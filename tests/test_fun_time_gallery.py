@@ -1108,6 +1108,54 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     assert view._arrangement.folder_panes.count() == built._arrangement.folder_panes.count()
 
 
+def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(qtbot):
+    from tests.test_gallery_view import _SignalMotion
+
+    motion = _SignalMotion()
+    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    qtbot.addWidget(view)
+    view.osr2_control.setChecked(True)
+    assert motion.active
+
+    view.become_hosted(_session())
+
+    assert not motion.active
+    assert motion.calls[-1] == ("stop",)
+
+
+def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(qtbot):
+    # The takeover can miss -- a window still booting when the room opened, an
+    # offer a second instance overwrote -- and a window that kept its switch
+    # keeps streaming into the one device the session is driving.
+    from tests.test_gallery_view import _SignalMotion
+
+    motion = _SignalMotion()
+    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    qtbot.addWidget(view)
+    view.osr2_control.setChecked(True)
+
+    view.osr2_control.the_session_has_it(True)
+
+    assert not motion.active
+    assert not view.osr2_control.isEnabled()
+    view.toggle_osr2_drive()
+    assert not motion.active
+
+
+def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qtbot):
+    from tests.test_gallery_view import _SignalMotion
+
+    motion = _SignalMotion()
+    view = GalleryView(FakeDB([]), osr2_motion=motion)
+    qtbot.addWidget(view)
+    view.osr2_control.the_session_has_it(True)
+
+    view.osr2_control.the_session_has_it(False)
+    view.toggle_osr2_drive()
+
+    assert motion.active
+
+
 def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_built(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
@@ -1250,6 +1298,22 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
 
     assert answers == [(f"🎤 {name} is the session's here", WARNING)
                        for name in ("the audio bed", "OSR2 control", "the mic")]
+
+
+def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
+        qtbot, monkeypatch):
+    from origenerator.voice.app_commands import AppCommand
+
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    answers = []
+    monkeypatch.setattr(view._shows, "answer",
+                        lambda line, kind=None: answers.append((line, kind)))
+
+    view.osr2_control.the_session_has_it(True)
+    view._voice.on_command(AppCommand.DRIVE_ON)
+
+    assert answers == [("🎤 OSR2 control can't be switched here", WARNING)]
 
 
 def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):

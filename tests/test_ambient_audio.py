@@ -163,7 +163,8 @@ class FakePlayer:
         self._on_status(QMediaPlayer.MediaStatus.EndOfMedia)
 
 
-def _bed(tmp_path, clip_names=("a.mp4", "b.mp4", "c.mp4", "d.mp4"), voices=3):
+def _bed(tmp_path, clip_names=("a.mp4", "b.mp4", "c.mp4", "d.mp4"), voices=3,
+         now=None):
     for name in clip_names:
         (tmp_path / name).touch()
     made = []
@@ -172,8 +173,19 @@ def _bed(tmp_path, clip_names=("a.mp4", "b.mp4", "c.mp4", "d.mp4"), voices=3):
         made.append(FakePlayer())
         return made[-1]
 
+    kwargs = {} if now is None else {"now": now}
     return AmbientAudio(clips_dir=tmp_path, voices=voices,
-                        make_player=make_player), made
+                        make_player=make_player, **kwargs), made
+
+
+class FakeClock:
+    """A clock the test winds itself, so a clip takes exactly as long as it says."""
+
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
 
 
 def test_starting_plays_one_clip_per_voice(qtbot, tmp_path):
@@ -271,3 +283,54 @@ def test_the_bed_can_restart_after_being_stopped(qtbot, tmp_path):
 
     assert len(players) == 6  # a fresh set of three
     assert [p.play_count for p in players[3:]] == [1, 1, 1]
+
+
+# --- a voice with nothing to play to ---------------------------------------
+
+def test_a_voice_whose_clips_are_over_before_they_begin_gives_up(qtbot, tmp_path, caplog):
+    # A lost audio device made every clip end at once, and the voice asked for
+    # the next as fast as the event loop turned: 30,000 Qt warnings in three
+    # minutes, and every older line in the log gone with them (2026-09-17).
+    clock = FakeClock()
+    bed, players = _bed(tmp_path, voices=1, now=clock)
+    bed.start()
+
+    with caplog.at_level("WARNING", logger="origenerator.gui.ambient_audio"):
+        caplog.clear()
+        for _ in range(50):
+            players[0].finish()  # the clock never moves: nothing ever played
+
+    assert players[0].play_count == 5
+    assert [record.message for record in caplog.records] == [
+        "Ambient audio: voice 0 has stopped — 5 clips in a row were over before "
+        "they began, so nothing here is reaching an audio device"]
+
+
+def test_a_clip_that_really_plays_clears_what_a_voice_has_against_it(qtbot, tmp_path):
+    clock = FakeClock()
+    bed, players = _bed(tmp_path, voices=1, now=clock)
+    bed.start()
+
+    for _ in range(4):
+        players[0].finish()
+    clock.t += 30  # one clip plays the whole way through
+    players[0].finish()
+    for _ in range(4):
+        players[0].finish()
+
+    assert players[0].play_count == 10  # still taking clips
+
+
+def test_one_voice_giving_up_leaves_the_others_playing(qtbot, tmp_path):
+    clock = FakeClock()
+    bed, players = _bed(tmp_path, voices=3, now=clock)
+    bed.start()
+
+    for _ in range(50):
+        players[1].finish()
+    clock.t += 30
+    players[0].finish()
+
+    assert players[1].play_count == 5
+    assert players[0].play_count == 2
+    assert players[2].play_count == 1

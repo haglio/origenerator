@@ -12,6 +12,7 @@ is doing until it's switched off.
 from __future__ import annotations
 
 import logging
+import time
 
 from PyQt6.QtCore import QObject, QUrl
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
@@ -21,15 +22,30 @@ from origenerator.config import AMBIENT_AUDIO_DIR, AMBIENT_AUDIO_VOICES
 
 logger = logging.getLogger(__name__)
 
+# A clip that is over sooner than this never played: nothing decoded it, or
+# there was no audio device to play it to.
+_TOO_SOON_S = 1.0
+# How many of those in a row one voice takes before it stops asking for clips.
+# Without it the voice loads the next one as fast as the event loop turns: on
+# 2026-09-17 a lost audio device had the bed do that for six minutes, and the
+# 30,000 Qt warnings it drew spent every rotation of the log.
+_GIVE_UP_AFTER = 5
+
 
 class AmbientAudio(QObject):
     """The audio bed's players -- built when it starts, released when it stops."""
 
     def __init__(self, parent=None, *, clips_dir=AMBIENT_AUDIO_DIR,
-                 voices: int = AMBIENT_AUDIO_VOICES, make_player=None):
+                 voices: int = AMBIENT_AUDIO_VOICES, make_player=None,
+                 now=time.monotonic):
         super().__init__(parent)
         self._clips_dir = clips_dir
         self._voices = voices
+        self._now = now
+        # Per voice: when its clip started, and how many in a row have been
+        # over before they began -- see _on_status.
+        self._started: list[float] = []
+        self._failures: list[int] = []
         # Injectable so unit tests can drive playback intent without spinning up
         # the real (WMF) backend, the same seam the preview and slideshow use.
         self._make_player = make_player if make_player is not None else self._real_player
@@ -52,6 +68,8 @@ class AmbientAudio(QObject):
                 "Ambient audio: no clips under %s — staying silent", self._clips_dir)
             return
         self._rotation = AmbientRotation(clips, self._voices)
+        self._started = [0.0] * self._voices
+        self._failures = [0] * self._voices
         for voice in range(self._voices):
             player = self._make_player()
             player.mediaStatusChanged.connect(
@@ -68,6 +86,7 @@ class AmbientAudio(QObject):
         teardown itself can't hand a dying voice one more clip.
         """
         self._rotation = None
+        self._started, self._failures = [], []
         players, self._players = self._players, []
         for player in players:
             player.stop()
@@ -83,6 +102,7 @@ class AmbientAudio(QObject):
         if clip is None:
             return
         player = self._players[voice]
+        self._started[voice] = self._now()
         player.setSource(QUrl.fromLocalFile(str(clip)))
         player.play()
 
@@ -95,6 +115,14 @@ class AmbientAudio(QObject):
         (measured at 0.75s -> 0.38s of CPU over five seconds of three voices).
         At the end -- or on a clip that won't decode at all -- the voice moves
         on; the others are untouched, each keeping its own place in its own pass.
+
+        A voice that is handed clip after clip and is done with each one before
+        it starts is playing to nobody, and asking it for the next one is what
+        turns a lost audio device into a loop as fast as the event loop turns.
+        So it counts those and gives up, and the count is cleared by any clip
+        that actually plays -- so a device that comes back is one whole clip
+        away from the bed running normally again, and a voice that has given up
+        stays that way until the switch is turned off and on.
         """
         if voice >= len(self._players):
             return  # a status change out of the teardown: this voice is gone
@@ -102,6 +130,18 @@ class AmbientAudio(QObject):
             self._players[voice].setActiveVideoTrack(-1)  # -1 deselects it
         elif status in (QMediaPlayer.MediaStatus.EndOfMedia,
                         QMediaPlayer.MediaStatus.InvalidMedia):
+            if self._failures[voice] >= _GIVE_UP_AFTER:
+                return  # this voice has stopped; it said so once and means it
+            if self._now() - self._started[voice] >= _TOO_SOON_S:
+                self._failures[voice] = 0
+            else:
+                self._failures[voice] += 1
+                if self._failures[voice] >= _GIVE_UP_AFTER:
+                    logger.warning(
+                        "Ambient audio: voice %d has stopped — %d clips in a row "
+                        "were over before they began, so nothing here is reaching "
+                        "an audio device", voice, self._failures[voice])
+                    return
             self._advance(voice)
 
     def _real_player(self) -> QMediaPlayer:

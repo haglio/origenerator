@@ -1029,13 +1029,6 @@ class ShowDirector:
         if self._slideshow is not None:
             self._slideshow.note_voice_run(prompt_id, message, kind=kind)
 
-    def drive_target(self):
-        """The funscript the show on screen is playing, or ``None`` — what the
-        one device switch follows in preference to a tab's video."""
-        if self._slideshow is None:
-            return None
-        return self._slideshow.osr2_drive_target()
-
     def release_media(self, paths) -> None:
         """Drop every surface's hold on ``paths`` — the files a delete is about
         to move. Windows won't move a file while a handle on it is open."""

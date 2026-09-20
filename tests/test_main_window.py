@@ -865,6 +865,14 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
 
     assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
                      QSystemTrayIcon.MessageIcon.Information)]
+def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.the_session_has_the_device(True)
+
+    assert not win._gallery_view.osr2_control.isEnabled()
+
+
 def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
 

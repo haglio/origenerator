@@ -49,6 +49,8 @@ class Osr2Control(QObject):
         # the gallery, can still say what has the device.
         self.script = script
         self._checked = False
+        # Whether a Fun Time session beside this window has claimed the device.
+        self._session_has_it = False
 
     def drive_with(self, motion, script) -> None:
         self.setChecked(False)
@@ -59,9 +61,11 @@ class Osr2Control(QObject):
         """Whether this app may drive the device at all.
 
         False where the OSR2 is not its: hosted by Fun Time, the session's main
-        player owns the device for the session's whole length.
+        player owns the device for the session's whole length -- and so it does
+        beside a standalone window the session never took over, which is one
+        device driven by two apps until this says otherwise.
         """
-        return self._motion is not None
+        return self._motion is not None and not self._session_has_it
 
     def isChecked(self) -> bool:  # noqa: N802 - a button's name, deliberately
         return self._checked
@@ -104,6 +108,20 @@ class Osr2Control(QObject):
                 self._motion.release()
         was = self._checked
         self.setChecked(state != OSR2_CONTROL_OFF)
+        if self._checked == was:
+            self.changed.emit()
+
+    def the_session_has_it(self, held: bool) -> None:
+        """A Fun Time session has claimed the OSR2, or has let it go.
+
+        Switching off is what stops whatever this app had on the device: the
+        view's one reconcile answers the change, as it does for a press.
+        """
+        if held == self._session_has_it:
+            return
+        self._session_has_it = held
+        was = self._checked
+        self.setChecked(False)
         if self._checked == was:
             self.changed.emit()
 

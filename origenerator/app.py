@@ -673,19 +673,20 @@ def main(argv: list[str] | None = None) -> int:
         # in the Z-order, and unpumped that lands *after* the request below and
         # undoes it.
         app.processEvents()
-    offer = None
+    watch = None
     if fun_time is None:
         # Hosted, the session decides what is in front — this window is parked
         # until the satellites switch to origenerator mode, and asking for the
         # foreground here would pull it over the room mid-boot.
         _bring_to_front(window)
-        from origenerator.gui.fun_time_offer import FunTimeOffer
-        offer = FunTimeOffer(STATE_DIR, take_over=window.become_hosted)
-        window.handed_back.connect(offer.renew)
+        from origenerator.gui.fun_time_watch import FunTimeWatch
+        watch = FunTimeWatch(STATE_DIR, take_over=window.become_hosted,
+                             device_claimed=window.the_session_has_the_device)
+        window.handed_back.connect(watch.renew)
 
     exit_code = app.exec()
-    if offer is not None:
-        offer.withdraw()
+    if watch is not None:
+        watch.withdraw()
     client.stop()
     client.wait(3000)
     return exit_code

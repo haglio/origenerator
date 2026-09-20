@@ -182,6 +182,10 @@ class OrigeneratorWindow(QMainWindow):
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
 
+    def the_session_has_the_device(self, held: bool) -> None:
+        """A Fun Time session running beside this window has the OSR2, or not."""
+        self._gallery_view.osr2_control.the_session_has_it(held)
+
     def become_hosted(self, session: FunTimeSession) -> None:
         self._persist_session()
         self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())

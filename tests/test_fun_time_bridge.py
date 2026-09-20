@@ -339,24 +339,31 @@ def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monke
     assert tiles == [True, False] and tabs == [True, False]
 
 
-def test_status_reports_which_regions_are_occupied(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    bridge._tick()
-    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert "portrait_active=0" in text
-    assert "landscape_active=0" in text
+def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
+    """All the session asks of this file, and all it has ever asked: that it is
+    there and reads.  It waits on it before opening the mode, because a mode
+    opened over an app still booting has nothing under it."""
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
 
-    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     bridge._tick()
-    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert "portrait_active=1" in text
-    assert "tall.png" in text  # the current item's path rides along
-    assert "landscape_active=0" in text
 
-    show.close()
-    bridge._tick()
     text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert "portrait_active=0" in text
+    assert text.strip() == FunTimeBridge.READY
+
+
+def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
+    """The session clears this file as it opens the mode, so that last
+    session's does not answer for this one.  A signal written once and
+    remembered would never come back for the session that cleared it, and the
+    mode would sit closed forever."""
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
+    bridge._tick()
+    (tmp_path / "origenerator_status.txt").unlink()
+
+    bridge._tick()
+
+    assert (tmp_path / "origenerator_status.txt").read_text(
+        encoding="utf-8").strip() == FunTimeBridge.READY
 
 
 def test_a_show_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
@@ -524,29 +531,6 @@ def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
     assert [str(item.path) for item in read_playlist(tmp_path / "portrait.tsv")] == [str(tall)]
     assert [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")] == [str(wide)]
     assert view.region_show("portrait").is_showing()
-
-
-def test_the_status_says_what_the_player_says_it_is_showing(qtbot, tmp_path, monkeypatch):
-    """The file on a player is the player's own answer, so that is what the
-    session reads back about the side."""
-    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
-    qtbot.addWidget(view)
-    bridge = FunTimeBridge(view._fun_time, view, parent=view)
-    tall = tmp_path / "tall.png"
-    Image.new("RGB", (100, 200)).save(tall)
-    library = {"__all__::portrait": [(str(tall), "image", "id-tall", str(tall))]}
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(view._shows, "items_of", lambda rows: list(rows))
-    _press(bridge, tmp_path, "OPEN_SHOWS")
-    (tmp_path / "portrait_status.txt").write_text(f"video={tall}\nlocked=1\n", encoding="utf-8")
-    view.region_show("portrait").tick()
-
-    bridge._tick()
-
-    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert "portrait_active=1" in text
-    assert f"portrait_video={tall}" in text
-    assert "portrait_locked=1" in text
 
 
 def _stills(tmp_path, prefix, count, size):

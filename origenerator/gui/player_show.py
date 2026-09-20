@@ -96,7 +96,6 @@ class PlayerShow(QObject):
         self._levels = LevelStepper()
         # Holding a slide is also how you ask for it: a hold asks for a better
         # version of what is on screen, unless the gallery wired none.
-        self._enhance_on_hold = self._actions.enhance is not None
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
@@ -501,7 +500,7 @@ class PlayerShow(QObject):
     def _enhance_current(self) -> None:
         """Ask the gallery for a better version of the item on screen, if it
         wants one — holding a slide is how that is asked for here too."""
-        if self._actions.enhance is None or not self._enhance_on_hold:
+        if self._actions.enhance is None:
             return
         prompt_id = self._set.current_prompt_id()
         if prompt_id is None or prompt_id in self._enhancing:
@@ -595,14 +594,11 @@ class PlayerShow(QObject):
             order=tuple(self._set.playlist.order_ids()),
             current=self._set.current_prompt_id(),
             locked=self._locked,
-            enhance_on_hold=self._enhance_on_hold,
         )
 
     def resume(self, state: ShowState) -> bool:
         """Open where a closed show left off rather than at the top of a fresh
         pass.  Returns whether the place carried."""
-        if self._actions.enhance is not None:
-            self._enhance_on_hold = state.enhance_on_hold
         if not self._set.playlist.resume(state.order, state.current):
             return False
         self._hand_over(land=True)

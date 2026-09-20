@@ -26,6 +26,7 @@ does back in the window. :class:`ShowHost` names each of those.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import replace
 from functools import partial
 from typing import Protocol
@@ -755,10 +756,7 @@ class ShowDirector:
         for side in _ORIENTATIONS:
             if self.region_show(side) is not None:
                 continue
-            key = self.base_location(side)
-            rows = self.rows_at(key)
-            items = self.items_of(rows)
-            if not items:
+            if not self._fill_region(side):
                 # Not a dead end: the tree this reads is built by the first
                 # refresh, and the session's OPEN_SHOWS can arrive before it
                 # (the launch races the boot).  A region owed its base state
@@ -767,13 +765,31 @@ class ShowDirector:
                 # exists to not be.
                 logger.info("Nothing of %s shape to open on the %s region yet",
                             side, side)
-                continue
-            logger.info("The %s region opens on the library of its shape: %d items",
-                        side, len(items))
-            self.open(items, rows=rows, location=key, side=side,
-                      hud=HudFacts(
-                          looping=False,
-                          favorite_ids=self._favorite_prompt_ids()))
+
+    def _fill_region(self, side: str) -> bool:
+        """Put *side* on its base state, and say whether there was anything to
+        put there.
+
+        Timed, because what the owner judges this mode by is the wait between
+        the press that opens it and the pictures arriving -- and that press is
+        answered on the same thread as everything else this window does, so a
+        slow fill is a report about that thread rather than about how big the
+        library has grown.
+        """
+        began = time.perf_counter()
+        key = self.base_location(side)
+        rows = self.rows_at(key)
+        items = self.items_of(rows)
+        if not items:
+            return False
+        self.open(items, rows=rows, location=key, side=side,
+                  hud=HudFacts(
+                      looping=False,
+                      favorite_ids=self._favorite_prompt_ids()))
+        logger.info("The %s region opens on the library of its shape: "
+                    "%d items, filled in %d ms",
+                    side, len(items), (time.perf_counter() - began) * 1000)
+        return True
 
     def _refill_region(self, side: str) -> None:
         """Put *side* back on its base state, if the mode still wants it there.
@@ -785,15 +801,7 @@ class ShowDirector:
         """
         if not self._regions_wanted or self.region_show(side) is not None:
             return
-        key = self.base_location(side)
-        rows = self.rows_at(key)
-        items = self.items_of(rows)
-        if not items:
-            return
-        self.open(items, rows=rows, location=key, side=side,
-                  hud=HudFacts(
-                      looping=False,
-                      favorite_ids=self._favorite_prompt_ids()))
+        self._fill_region(side)
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""

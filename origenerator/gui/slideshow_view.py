@@ -1327,6 +1327,7 @@ class SlideshowView(QWidget):
         self._preview.stop_push()
         self._preview.clear()  # release any held video file so it can be deleted
         self._preview.release_player()
+        self._preview.release_still()
         landing = self._land_on
         if landing is None and self._playlist.locked:
             landing = self._current_prompt_id()

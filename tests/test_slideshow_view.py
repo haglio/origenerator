@@ -1440,6 +1440,20 @@ def test_closing_detaches_the_player_from_its_surface(qtbot, tmp_path):
     view._preview._player.setVideoOutput.assert_called_with(None)
 
 
+def test_closing_lets_go_of_the_still_it_was_pushing(qtbot):
+    # The push is drawn by a thread of its own, and taking that scene down is a
+    # round trip with it. Left to the widget tree's death there is no event loop
+    # to answer that thread, and the two wait on each other for good -- so a
+    # closed show has already let its still go.
+    view = _view(qtbot)
+    still = view._preview._still = MagicMock()
+
+    view.close()
+
+    still.release.assert_called_once_with()
+    assert view._preview._still is None
+
+
 def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
     clip = str(tmp_path / "c.mp4")
     view = _view(qtbot, [(clip, "video")])

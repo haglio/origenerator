@@ -52,6 +52,29 @@ def test_the_push_keeps_drawing_while_the_window_is_busy(qtbot):
     assert len(swaps) - before >= 5
 
 
+def test_a_released_still_draws_nothing_more(qtbot):
+    """What makes a still safe to take apart: nothing is being drawn for it.
+
+    Taking a shown Qt Quick scene down is a round trip with the render thread
+    drawing it, and reached from a destructor -- a parent widget going away, a
+    suite reaping what a test built -- the window's thread has no event loop
+    left to answer that thread with, so the two wait on each other for good.
+    A released still has stopped asking for frames and let its scene go, so
+    whatever takes the widget apart afterwards finds nothing to wait for.
+    """
+    still = _shown_still(qtbot, 200, 150)
+    still.show_picture(_picture())
+    still.start(dwell_ms=4000, progress=0.0)
+    qtbot.wait(200)
+    swaps = QSignalSpy(still._view.frameSwapped)
+
+    still.release()
+
+    drawn = len(swaps)
+    time.sleep(0.5)
+    assert len(swaps) == drawn
+
+
 def test_a_push_started_part_way_begins_that_far_into_the_picture(qtbot):
     still = _shown_still(qtbot, 400, 300)
     still.show_picture(_bordered_picture())

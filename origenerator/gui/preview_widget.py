@@ -252,10 +252,14 @@ class PreviewWidget(QWidget):
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test
         # players don't touch the backend and don't need (or want) this hook.
-        if player is None:
-            app = QApplication.instance()
-            if app is not None:
-                app.aboutToQuit.connect(self.release_player)
+        app = QApplication.instance()
+        if player is None and app is not None:
+            app.aboutToQuit.connect(self.release_player)
+        # And a Ken Burns scene still being drawn deadlocks the same shutdown
+        # against Qt Quick's render thread (KenBurnsStill.release), whatever
+        # player this pane was given.
+        if pushes_stills and app is not None:
+            app.aboutToQuit.connect(self.release_still)
 
     def _take_the_pane(self, media, *, stop_player: bool = True,
                        enhancing: bool = False,
@@ -575,6 +579,16 @@ class PreviewWidget(QWidget):
 
     def stop_push(self) -> None:
         self._on_still(lambda still: still.stop())
+
+    def release_still(self) -> None:
+        """Let go of the Ken Burns scene, for a pane about to be dropped and for
+        the app about to quit (:meth:`KenBurnsStill.release`). A pane asked to
+        push again builds a fresh one."""
+        still, self._still = self._still, None
+        if still is None:
+            return
+        still.release()
+        still.deleteLater()
 
     def _on_still(self, command) -> None:
         if self._still is not None:

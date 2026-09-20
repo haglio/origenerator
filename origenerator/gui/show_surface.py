@@ -26,6 +26,7 @@ file to open.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from app_support.funscript import read_actions
@@ -40,7 +41,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.config import COMFYUI_OUTPUT_DIR, project_dir
 from origenerator.funscript import funscript_of
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.media import MediaType
@@ -139,6 +140,7 @@ class ShowSurface(QWidget):
         application = QApplication.instance()
         if application is None or application.platformName() == "offscreen":
             return
+        _offer_the_copy_beside_the_checkouts()
         from player_core.mpv_player import MpvPlayer  # noqa: PLC0415
 
         waiting = self._engine
@@ -325,6 +327,28 @@ class ShowSurface(QWidget):
                    if video_path else [])
         self._strip.set_actions(actions)
         self._strip.setVisible(bool(actions))
+
+
+def _offer_the_copy_beside_the_checkouts() -> None:
+    """Put the copy of the engine's file that sits beside the checkouts first.
+
+    The engine is one ~117 MB file, fetched once into a folder for the whole
+    machine, and a player_core checkout keeps its own copy beside it.  The
+    engine is found by walking the folders in PATH, and the machine-wide one
+    has answered "nothing here" to this app while answering for every other
+    process on the same machine -- with the file plainly sitting in it.  So the
+    copy beside the checkouts goes in front of it: a second folder, in another
+    part of the disk, holding the same engine.
+    """
+    beside = project_dir("player_core") / "vendor"
+    try:
+        if not (beside / "libmpv-2.dll").is_file():
+            return
+    except OSError:
+        return
+    rest = [entry for entry in os.environ.get("PATH", "").split(os.pathsep)
+            if entry != str(beside)]
+    os.environ["PATH"] = os.pathsep.join([str(beside), *rest])
 
 
 class _NotYetOpened:

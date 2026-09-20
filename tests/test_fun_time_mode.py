@@ -77,6 +77,30 @@ def test_a_session_hands_over_each_players_own_channel():
     assert args.fun_time.player("landscape").playlist == Path("st/landscape.tsv")
 
 
+def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
+    """A room in the headset has no monitor to put this window on, so the
+    session asks for its picture instead: the file to write it into, and the
+    file its pointer's presses come back through."""
+    args = parse_app_args(hosted_launch(headset=True, **{
+        "--frames-file": "st/origenerator_frame.bin",
+        "--input-file": "st/origenerator_input.txt",
+    }))
+    session = args.fun_time
+
+    assert session.frames_file == Path("st/origenerator_frame.bin")
+    assert session.input_file == Path("st/origenerator_input.txt")
+    assert session.in_a_headset is True
+
+
+def test_a_session_on_the_monitors_asks_for_no_picture():
+    """The window itself is what it shows there, so nothing is handed over and
+    this app must not spend a frame drawing one."""
+    args = parse_app_args(hosted_launch())
+
+    assert args.fun_time.frames_file is None
+    assert args.fun_time.in_a_headset is False
+
+
 def test_a_session_that_names_no_player_hands_over_none():
     """A session too old to name them is one whose shows still open windows of
     their own, so the answer has to be "there is no player here" rather than a

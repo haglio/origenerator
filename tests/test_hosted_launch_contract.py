@@ -42,6 +42,7 @@ def test_the_parser_accepts_exactly_the_flags_the_document_names():
         *document["required_flags"],
         *(flag for group in ("region_flags", "player_flags")
           for side in document[group] for flag in document[group][side]),
+        *document["headset_flags"],
         document["check_launch_flag"],
     }
     accepted = {option

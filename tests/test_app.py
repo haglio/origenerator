@@ -478,6 +478,22 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     window.show.assert_not_called()
 
 
+def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
+    """The room shows this window's picture there, and Qt draws nothing for a
+    window Windows has unmapped: parked, it would hand over an empty frame."""
+    window = MagicMock()
+
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+    }):
+        assert main(hosted_launch(headset=True, **{
+            "--frames-file": str(tmp_path / "frame.bin"),
+            "--input-file": str(tmp_path / "input.txt"),
+        })) == 0
+
+    window.showMinimized.assert_not_called()
+
+
 def test_main_in_fun_time_mode_shows_no_splash(qapp):
     """Hosted, the app boots with no splash at all: the session's own loading
     screen owns the boot's feedback, and an always-on-top splash of ours can

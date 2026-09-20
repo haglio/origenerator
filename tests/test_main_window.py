@@ -798,6 +798,55 @@ def _fun_time_session(main=(10, 20, 800, 600)):
     )
 
 
+def _headset_session(tmp_path, main=(10, 20, 200, 100)):
+    from dataclasses import replace
+
+    return replace(_fun_time_session(main),
+                   frames_file=tmp_path / "frame.bin",
+                   input_file=tmp_path / "input.txt")
+
+
+def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_path):
+    """Its picture is what the room shows, and a parked window has no picture:
+    Qt draws nothing for one Windows has unmapped."""
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_headset_session(tmp_path),
+    )
+    qtbot.addWidget(win)
+
+    assert not win.isMinimized()
+    assert win.hands_its_window_over is not None
+
+
+def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
+    """There the window itself is what is seen, so a frame written every tick
+    would be work for nobody."""
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_fun_time_session(),
+    )
+    qtbot.addWidget(win)
+
+    assert win.hands_its_window_over is None
+
+
+def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
+    """A standalone window a headset session takes over is in the same place as
+    one it launched, and the hand-back stops it again."""
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_headset_session(tmp_path))
+    handing_over = win.hands_its_window_over
+
+    assert handing_over is not None
+    assert not win.isMinimized()
+
+    win.become_standalone()
+
+    assert win.hands_its_window_over is None
+
+
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):
     win = OrigeneratorWindow(
         ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),

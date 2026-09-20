@@ -45,5 +45,16 @@
       "--landscape-status-file",
       "--landscape-hud-file"
     ]
-  }
+  },
+  "headset_flags": [
+    "--frames-file",
+    "--input-file"
+  ],
+  "headset_words": [
+    "press",
+    "release",
+    "drag",
+    "hover",
+    "scroll"
+  ]
 }

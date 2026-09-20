@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from PIL import Image
 from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QSplitter
 
 from origenerator.fun_time_mode import FunTimeSession, Rect
@@ -70,8 +71,6 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     # Space and friends belong to Fun Time's own hotkeys while hosted; nothing
     # here may swallow them, let alone drive the device.
     view = _fun_time_view(qtbot)
-    from PyQt6.QtCore import QEvent
-    from PyQt6.QtGui import QKeyEvent
     view.show()
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J,
                       Qt.KeyboardModifier.NoModifier)

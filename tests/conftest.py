@@ -371,7 +371,14 @@ def _deliver_the_deletions_already_scheduled():
     """
     if QApplication.instance() is None:
         return
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    from tests import reap_watchdog  # TEMPORARY probe, not for landing
+    reap_watchdog.arm(_the_config[0])
+    with reap_watchdog.watching(_the_test_being_reaped[0]):
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+_the_test_being_reaped = ["<none>"]
+_the_config = [None]
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -421,7 +428,7 @@ def _widgets_registered_this_test():
 
 
 @pytest.fixture(autouse=True)
-def _collect_widgets_between_tests(_widgets_registered_this_test):
+def _collect_widgets_between_tests(_widgets_registered_this_test, request):
     """Reap each test's widgets before the next one builds its own.
 
     The GUI widgets (a config panel's param form, the gallery's panes) form Python
@@ -438,6 +445,8 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
     here cannot free anything Qt is still drawing.
     """
     yield
+    _the_test_being_reaped[0] = request.node.nodeid
+    _the_config[0] = request.config
     _widgets_registered_this_test.clear()
     gc.collect()
     _deliver_the_deletions_already_scheduled()

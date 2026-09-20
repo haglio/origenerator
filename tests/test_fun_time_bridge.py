@@ -7,6 +7,7 @@ session's hotkeys reach the region shows and its choreography can see them.
 from __future__ import annotations
 
 from PIL import Image
+from player_core.playlist import read_playlist
 
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gui.fun_time_bridge import FunTimeBridge
@@ -489,7 +490,6 @@ def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
         qtbot, tmp_path, monkeypatch):
     """Entering the mode with the players handed over: each player is given the
     list of its own side's shape, and no window of this app's opens at all."""
-    from player_core.playlist import read_playlist
 
     from origenerator.gui import show_director
 
@@ -569,7 +569,6 @@ def _told(tmp_path, side):
 
 def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
         qtbot, tmp_path, monkeypatch):
-    from player_core.playlist import read_playlist
     from player_core.satellite_hud import parse_hud
 
     view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)

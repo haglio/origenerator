@@ -45,6 +45,7 @@ DRIVERS = (
     "origenerator/gui/show_hud.py",
     "origenerator/gui/fun_time_bridge.py",
     "origenerator/gui/motion_panel.py",
+    "origenerator/gui/console.py",
 )
 
 

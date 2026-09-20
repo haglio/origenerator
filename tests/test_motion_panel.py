@@ -19,7 +19,8 @@ from player_core.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
-from origenerator.gui.motion_panel import MotionPanel, console_hud, drive_hud
+from origenerator.gui.console import console_hud, drive_hud
+from origenerator.gui.motion_panel import MotionPanel
 from origenerator.motion_engine import Motion
 
 

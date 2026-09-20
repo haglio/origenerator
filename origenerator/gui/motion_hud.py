@@ -2,10 +2,11 @@
 
 The motion driver is app-global — the device shouldn't care which window is in
 front — so every surface that can drive it (the gallery window, the fullscreen
-show) answers the same keys through this helper,
-and floats the same drive panel
-(:mod:`origenerator.gui.motion_panel`). The keys are genau's own, so the muscle
-memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
+show) answers the same keys through this helper, and each shows the same drive
+readout: in the main window's foot on a console of its own
+(:mod:`origenerator.gui.motion_panel`), and over a show on the one panel it
+wears (:mod:`origenerator.gui.show_hud`).  The keys are genau's own, so the
+muscle memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
 I shape, / cruise control, ; human-inspired motion, backslash nudges a quarter cycle.
 """
 from __future__ import annotations

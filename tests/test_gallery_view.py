@@ -6723,24 +6723,23 @@ def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
     assert not view._bank.slideshow.isHidden()   # everything is still there to play
 
 
-def test_the_console_sits_under_the_hud_rather_than_beneath_it(qtbot, monkeypatch):
-    # Both panels take the corner Fun Time puts each in, and the HUD -- native,
-    # re-raised every tick -- covered the console entirely, OSR2 controls and
-    # all.  The console now seats itself directly under the HUD, flush with its
-    # left edge, and follows it when the map changes size.
+def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
+    # A show used to float two: the players' HUD over the set, and Genau's whole
+    # console under it for the device.  Between them the status was said twice
+    # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
+    # now -- the HUD, carrying the device's line, the readout and the two rows
+    # that aim them.
+    from origenerator.gui.motion_panel import MotionPanel
     from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
     hud, = show.findChildren(ShowHud)
-    console = show._motion_panel
-    assert console is not None
 
-    assert console.x() == hud.x()
-    assert console.y() == hud.geometry().bottomLeft().y() + 1 + hud.x()
-    assert not console.geometry().intersects(hud.geometry())
-
-    hud.resize(hud.width(), hud.height() + 40)   # the map grew: the console follows
-    assert console.y() == hud.geometry().bottomLeft().y() + 1 + hud.x()
+    assert show.findChildren(MotionPanel) == []
+    posted = [button.command for _rect, button in hud._targets.buttons]
+    assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
+    assert "genau_clip_seconds_up" in posted    # and the pace's
+    assert hud._model.drive is not None         # with the readout under them
     show.close()
 
 

@@ -21,79 +21,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from origenerator import motion_engine
 from origenerator.gui.console import console_hud, drive_hud
 from origenerator.gui.motion_panel import MotionPanel
-from origenerator.motion_engine import Motion
-
-
-class FakeMotion:
-    """Stands in for the driver: records what the console asked it to do."""
-
-    def __init__(self):
-        self.state = Motion()
-        self.active = False
-        self.calls = []
-
-    def toggle_cruise(self):
-        self.calls.append("cruise")
-        self.state.cruise.active = not self.state.cruise.active
-
-    def toggle_learned(self):
-        self.calls.append("learned")
-        self.state.learned.active = not self.state.learned.active
-
-    def cycle_shape(self):
-        self.calls.append("shape")
-
-    def quarter_offset(self):
-        self.calls.append("quarter")
-
-    def adjust_speed(self, delta):
-        self.calls.append(("speed", delta))
-
-    def adjust_amplitude(self, delta):
-        self.calls.append(("amp", delta))
-
-    def adjust_center(self, delta):
-        self.calls.append(("center", delta))
-
-    def set_speed(self, value):
-        self.calls.append(("set_speed", value))
-
-    def set_amplitude(self, value):
-        self.calls.append(("set_amp", value))
-
-    def set_center(self, value):
-        self.calls.append(("set_center", value))
-
-    held_at = None
-
-    def hold(self, center):
-        self.calls.append(("hold", center))
-
-    def release(self):
-        self.calls.append("release")
-
-
-class FakeHost:
-    """Stands in for the slideshow the transport and the pace act on."""
-
-    def __init__(self):
-        self.dwell_s = 4
-        self.locked = True
-        self.calls = []
-
-    def show_step(self, delta):
-        self.calls.append(("step", delta))
-
-    def show_toggle_hold(self):
-        self.calls.append("hold")
-
-    def show_cull(self):
-        self.calls.append("cull")
-
-    def set_dwell_s(self, seconds):
-        from origenerator.gui.slideshow_pace import MAX_S, MIN_S
-        self.dwell_s = max(MIN_S, min(MAX_S, seconds))
-        self.calls.append(("dwell", self.dwell_s))
+from tests.motion_doubles import FakeHost, FakeMotion
 
 
 def _panel(qtbot, motion=None, host=None, control=None):
@@ -124,37 +52,6 @@ def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     panel.render_console()
     for action in ("main_fmode", "genau_filter_enhanced"):
         assert action not in [b.command for _r, b in panel._painter.buttons]
-
-
-def test_the_console_seats_itself_under_a_panel_already_in_the_corner(qtbot):
-    # A show wears the players' HUD in the corner this console takes, so given
-    # that HUD's rect the console goes directly beneath it, flush with its left
-    # edge and a panel-inset apart — one column of panels, neither over the other.
-    from PyQt6.QtCore import QRect
-    from PyQt6.QtWidgets import QWidget
-
-    parent = QWidget()
-    qtbot.addWidget(parent)
-    panel = MotionPanel(FakeMotion(), parent, host=FakeHost())
-
-    panel.reposition()
-    assert (panel.x(), panel.y()) == (MotionPanel.MARGIN, MotionPanel.MARGIN)
-
-    panel.reposition(below=QRect(12, 12, 300, 140))
-    assert (panel.x(), panel.y()) == (12, 12 + 140 + 12)
-
-
-def test_the_console_is_a_native_window_that_does_not_ask_for_a_translucent_surface(qtbot):
-    # Native, so it stacks over a clip's video surface like the HUD does; and
-    # like the HUD it leaves the translucent-surface flag alone.  A native child
-    # that asked for one drew twice over a show on Windows -- once where Qt
-    # painted it and once more at double its offset -- while its see-through
-    # ground needs nothing but the RGBA picture over the parent's own paint.
-    from PyQt6.QtCore import Qt
-
-    panel, _motion, _host = _panel(qtbot)
-    assert panel.testAttribute(Qt.WidgetAttribute.WA_NativeWindow)
-    assert not panel.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
 
 def test_the_console_is_here_whether_or_not_a_motion_is_running(qtbot):

@@ -121,6 +121,18 @@ class TestTheOnePanelAShowWears:
 
         assert "shape" in show._motion.calls
 
+    def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
+        """The device rows are checked before the session's transport now, so a
+        side verb that fell into them would be swallowed instead of posted."""
+        show = self._show(qtbot)
+        channel = tmp_path / "dashboard_cmd.txt"
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=channel)
+        qtbot.addWidget(hud)
+
+        hud._deliver("portrait_next")
+
+        assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
+
     def test_a_press_on_the_transport_still_reaches_the_show(self, qtbot):
         """The device rows sit beside the side's own band, not in place of it."""
         show = self._show(qtbot)

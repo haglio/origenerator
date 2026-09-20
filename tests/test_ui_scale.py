@@ -8,6 +8,7 @@ import pytest
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
+from tests.hosted_launch import hosted_launch
 
 
 @pytest.fixture(autouse=True)
@@ -174,4 +175,4 @@ def test_only_a_hosted_launch_turns_the_scale_on():
     from origenerator.fun_time_mode import parse_app_args
 
     assert parse_app_args([]).fun_time is None          # standalone: unscaled
-    assert parse_app_args(["--fun-time"]).fun_time is not None
+    assert parse_app_args(hosted_launch()).fun_time is not None

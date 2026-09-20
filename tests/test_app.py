@@ -24,6 +24,7 @@ from origenerator.app import (
 )
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
+from tests.hosted_launch import hosted_launch
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
 
@@ -448,6 +449,7 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     mock_stamp.assert_not_called()
 
 
+
 def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     window = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
@@ -464,8 +466,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        assert main(["--fun-time", "--x", "5", "--y", "6",
-                     "--width", "700", "--height", "900"]) == 0
+        assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
@@ -496,8 +497,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
-        assert main(["--fun-time", "--x", "5", "--y", "6",
-                     "--width", "700", "--height", "900"]) == 0
+        assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
     mock_loading.assert_not_called()
 
@@ -957,8 +957,7 @@ class TestAnOverlayShortOfAKey:
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
             "PyQt6.QtWidgets.QMessageBox.critical": told,
         }):
-            code = main(["--fun-time", "--x", "5", "--y", "6",
-                         "--width", "700", "--height", "900"])
+            code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
         assert code != 0
         told.assert_not_called()

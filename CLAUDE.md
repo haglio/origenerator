@@ -78,7 +78,10 @@ feature and a follow-up. Four shapes it takes: a verb in
 branches), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
-`windows_bridge_sequencer.py`), and the offer, takeover and session-claim files
+`windows_bridge_sequencer.py`; that module declares the flags and the window
+captions once and publishes them as `origenerator_contract.json` for the
+session to read, and `tests/test_hosted_launch_contract.py` holds the parser
+and the windows to what it says), and the offer, takeover and session-claim files
 a standalone window meets a session through (`fun_time_mode.py` here,
 `standalone_origenerator.py` there) — renamed on one side only, every session
 quietly launches a second copy beside the one already open, and the copy it

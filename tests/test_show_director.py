@@ -1199,22 +1199,80 @@ def _picture(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
     return row
 
 
+def _animation(prompt_id, *, frame, act, width=100, height=200):
+    """A finished video animated from the picture that wrote *frame*, showing
+    *act* — picked for it in Combine, which is where an act is written down."""
+    params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame,
+              "width": width, "height": height}
+    row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
+               files=(f"{prompt_id}.mp4",))
+    row["params_json"] = json.dumps(params)
+    row["recipe_category"] = act
+    return row
+
+
+def _library(rows):
+    """A director over *rows*, its gallery indexing the pictures among them the
+    way the real one does."""
+    host = FakeHost(rows=rows)
+    index = gallery.build_image_config_index(
+        [row for row in rows if row["workflow_name"] != "wan22_i2v"])
+    host.image_config_index = lambda: index
+    return host
+
+
 def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(shows):
-    """The same configuration under other seeds is the row and the same seed
-    under other configurations the column, each configuration named by its
-    folder — read off every generation of that side's shape, whatever set the
-    show itself is playing."""
-    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
-            _picture("g3", "a red fox at dawn", seed=1),
+    """The same configuration under other seeds is the row and the videos
+    animated from the picture are the column, each named for its act — read
+    off every generation of that side's shape, whatever set the show itself is
+    playing."""
+    fox = _picture("g1", "a red fox", seed=1)
+    fox["output_files"] = json.dumps([{"filename": "g1.png"}])
+    rows = [fox, _picture("g2", "a red fox", seed=2),
+            _animation("v1", frame="g1.png", act="alpha"),
+            _animation("v2", frame="g1.png", act="beta"),
+            _animation("v3", frame="g1.png", act="beta"),
             _picture("w1", "a red fox", seed=3, width=200, height=100)]
-    director, _host, _made = shows(FakeHost(rows=rows), db=FakeDB(rows))
+    director, _host, _made = shows(_library(rows), db=FakeDB(rows))
 
     around = director.neighbors_of("g1", side="portrait")
 
     assert [slide.prompt_id for slide in around.seeds] == ["g2"]
-    assert [slide.prompt_id for slide in around.configs] == ["g3"]
-    assert around.label and around.config_labels != (around.label,)
-    assert len(around.config_labels) == 1
+    assert [slide.prompt_id for slide in around.actions] == ["v1", "v2"]
+    assert (around.label, around.action_labels) == ("Source image", ("alpha", "beta"))
+    assert [slide.prompt_id for slide in around.group] == ["v1", "v2", "v3"]
+
+
+def _fox(prompt_id, *, seed):
+    picture = _picture(prompt_id, "a red fox", seed=seed)
+    picture["output_files"] = json.dumps([{"filename": f"{prompt_id}.png"}])
+    return picture
+
+
+def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(shows):
+    """A video's own sampler seed says nothing about which picture it is of, so
+    its row is its act animated from its picture's other seeds, and its column
+    opens on the picture it was animated from."""
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2),
+            _animation("v1", frame="g1.png", act="alpha"),
+            _animation("v2", frame="g2.png", act="alpha"),
+            _animation("v3", frame="g1.png", act="beta")]
+    director, _host, _made = shows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("v1", side="portrait")
+
+    assert [slide.prompt_id for slide in around.seeds] == ["v2"]
+    assert [slide.prompt_id for slide in around.actions] == ["g1", "v3"]
+    assert (around.label, around.action_labels) == ("alpha", ("Source image", "beta"))
+
+
+def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named_for(shows):
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2),
+            _animation("v1", frame="g1.png", act="alpha")]
+    director, _host, _made = shows(_library(rows), db=FakeDB(rows))
+
+    assert director.acts_of(["g1", "v1", "nobody"], side="portrait") == {
+        "g1": "Source image", "v1": "alpha"}
 
 
 def test_beyond_the_row_lies_the_nearest_of_the_models_other_configurations(shows):
@@ -1233,7 +1291,7 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
     director, _host, _made = shows()
 
     assert director.neighbors_of("nobody", side="portrait").seeds == ()
-    assert director.neighbors_of("", side="landscape").configs == ()
+    assert director.neighbors_of("", side="landscape").actions == ()
 
 
 def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
@@ -1248,6 +1306,7 @@ def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
     actions = made[0].actions
     assert [slide.prompt_id for slide in actions.neighbors("g1").seeds] == ["g2"]
     assert actions.widen("g1") == ()
+    assert actions.acts(["g1"]) == {"g1": ""}
     actions.favorite("g1")
     actions.unfavorite("g1")
     assert host.favorited == []

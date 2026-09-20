@@ -128,6 +128,7 @@ from origenerator.gallery.source_image import (
     build_image_config_index,
     find_source_image_id,
     source_image_id_for,
+    source_image_id_in,
     videos_from_source_image,
 )
 from origenerator.gallery.time_sections import new_work_opens_a_section, section_headings
@@ -265,6 +266,7 @@ __all__ = [
     "settings_folder_key",
     "settings_signature",
     "source_image_id_for",
+    "source_image_id_in",
     "start_frame_index",
     "unreviewed_experiments",
     "videos_from_source_image",

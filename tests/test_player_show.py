@@ -449,13 +449,14 @@ class TestVersions:
 # --- the map, and the loops along it ------------------------------------------
 
 def _around(prompt_id):
-    """A library in which the first item has one seed sibling and one
-    configuration sibling, and the rest have nobody."""
+    """A library in which the first item has one seed sibling and one other
+    act down its column, and the rest have nobody."""
     if prompt_id != "id-1":
         return MapNeighbors()
+    other_act = (Slide("one-x.png", "image", "id-1x"),)
     return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
-                        configs=(Slide("one-x.png", "image", "id-1x"),),
-                        label="fox", config_labels=("dawn",))
+                        actions=other_act, label="fox", action_labels=("dawn",),
+                        group=other_act)
 
 
 def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
@@ -507,49 +508,64 @@ def _plays(show) -> list[str]:
     return [verb for verb in _sent(show) if verb.startswith("PLAY_FILE")]
 
 
-def test_a_rows_button_loops_the_seeds_of_the_row_on_screen_without_leaving_it(qtbot, tmp_path):
+_NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}
+
+
+def _acts(prompt_ids):
+    return {prompt_id: _NAMED_FOR.get(prompt_id, "") for prompt_id in prompt_ids}
+
+
+def test_a_rows_button_narrows_the_show_to_that_act_and_hands_the_player_what_is_left(
+        qtbot, tmp_path):
     said = []
-    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)
     _sent(show)
 
-    show.show_filter("fox")
+    show.show_filter("alpha")
 
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
-    assert played == ["one.png", "one-b.png"]
-    assert _plays(show) == []
-    assert said == ["Looping seeds: 2"]
+    assert played == ["one.png", "three.png"]
+    assert _plays(show) == []                       # the item on screen shows that act
+    assert said == ["Filter: 'alpha' (2)"]
 
 
-def test_a_rows_button_plays_that_rows_picture_even_with_no_seeds_to_loop(qtbot, tmp_path):
+def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
     said = []
-    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)
+
+    show.show_filter("source_image,_alpha")
+
+    assert said == ["Filter: 'source image, alpha' (1)"]
+    assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).filter_query == (
+        "source image, alpha")
+
+
+def test_a_filter_past_the_item_on_screen_sends_the_player_to_what_is_left(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts))
     _sent(show)
 
-    show.show_filter("dawn")
+    show.show_filter("beta")
 
-    assert _sent(show) == ["PLAY_FILE one-x.png"]
-    assert show.hud_prompt_id == "id-1x"
-    assert said == ["Nothing to loop"]
+    assert _plays(show) == ["PLAY_FILE two.png"]
 
 
-def test_a_rows_button_lets_go_of_a_hold_before_it_moves(qtbot, tmp_path):
-    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
-    show.show_toggle_hold()
-    _sent(show)
-
-    show.show_filter("dawn")
-
-    assert _sent(show) == ["LOCK_OFF", "PLAY_FILE one-x.png"]
-
-
-def test_a_rows_button_no_row_wears_says_so_and_moves_nothing(qtbot, tmp_path):
+def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path):
     said = []
-    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)
     _sent(show)
 
-    show.show_filter("nobody")
+    show.show_filter("gamma")
 
-    assert (_sent(show), said) == ([], ["Nothing to loop"])
+    assert (_sent(show), said) == ([], ["Filter: no matches for 'gamma'"])
+
+
+def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts))
+    show.show_filter("beta")
+
+    assert show.clear_modes() is True
+
+    assert show.pass_size() == 3
 
 
 def test_the_pass_is_as_long_as_what_the_player_was_handed(qtbot, tmp_path):

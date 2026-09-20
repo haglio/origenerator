@@ -600,9 +600,10 @@ def _around(prompt_id):
 
     if prompt_id != "id-a":
         return MapNeighbors()
+    other_act = (Slide("c.png", "image", "id-c"),)
     return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
-                        configs=(Slide("c.png", "image", "id-c"),),
-                        label="fox", config_labels=("dawn",))
+                        actions=other_act, label="fox", action_labels=("dawn",),
+                        group=other_act)
 
 
 def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
@@ -615,7 +616,7 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
     assert view._note.text() == "Looping seeds: 2"
 
     _press(view, Qt.Key.Key_E)
-    assert view.hud_map().loop == "config"
+    assert view.hud_map().loop == "action"
     assert [item[2] for item in view._playlist._items] == ["id-a", "id-c"]
 
     _press(view, Qt.Key.Key_E)
@@ -630,35 +631,48 @@ def _put_up(view) -> list:
     return shown
 
 
-def test_a_rows_button_loops_the_seeds_of_the_row_on_screen_without_redrawing_it(qtbot):
-    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+def _acts(prompt_ids):
+    named_for = {"id-a": "Source image, alpha", "id-b": "beta"}
+    return {prompt_id: named_for.get(prompt_id, "") for prompt_id in prompt_ids}
+
+
+def test_a_rows_button_narrows_the_show_to_that_act_without_redrawing_what_shows_it(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
     shown = _put_up(view)
 
-    view.show_filter("fox")
+    view.show_filter("source_image,_alpha")
 
-    assert view.hud_map().loop == "seed"
+    assert (view.hud_act_filter, view.pass_size()) == ("source image, alpha", 1)
     assert shown == []
-    assert view._note.text() == "Looping seeds: 2"
+    assert view._note.text() == "Filter: 'source image, alpha' (1)"
 
 
-def test_a_rows_button_puts_that_rows_picture_up_even_with_no_seeds_to_loop(qtbot):
-    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+def test_a_filter_past_the_slide_on_screen_puts_up_what_is_left(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
     shown = _put_up(view)
 
-    view.show_filter("dawn")
+    view.show_filter("beta")
 
-    assert shown == ["id-c"]
-    assert view._note.text() == "Nothing to loop"
+    assert shown == ["id-b"]
 
 
-def test_a_rows_button_no_row_wears_says_so_and_moves_nothing(qtbot):
-    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
+def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
     shown = _put_up(view)
 
-    view.show_filter("nobody")
+    view.show_filter("gamma")
 
-    assert shown == []
-    assert view._note.text() == "Nothing to loop"
+    assert (shown, view.hud_act_filter) == ([], "")
+    assert view._note.text() == "Filter: no matches for 'gamma'"
+
+
+def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
+    view.show_filter("beta")
+
+    assert view.clear_modes() is True
+
+    assert (view.hud_act_filter, view.pass_size()) == ("", 2)
 
 
 def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):

@@ -46,10 +46,12 @@ class ShowActions:
     picture asks the room to pause, where a show on its own pauses itself.
 
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
-    the show cannot see: what shares that generation's configuration and its
-    seed (the map's two axes, as :class:`~origenerator.gui.show_map.MapNeighbors`),
-    and what lies just beyond the exact configuration (the slides "more
-    seeds" adds to the row).
+    the show cannot see: what shows that generation's act under other seeds
+    and what else was made of its picture (the map's two axes, as
+    :class:`~origenerator.gui.show_map.MapNeighbors`), and what lies just
+    beyond the row (the slides "more seeds" adds to it).  ``acts`` takes
+    prompt_ids and answers what each one's map row is named for, which is
+    what an act filter matches it on.
     """
 
     delete: Callable[[str], None] | None = None
@@ -64,6 +66,7 @@ class ShowActions:
     omnipause: Callable[[], None] | None = None
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
+    acts: Callable[[list], dict] | None = None
 
 
 @dataclass(frozen=True)

@@ -18,8 +18,8 @@ than faked — see :func:`show_hud_model` for the mode row and
 
 The map is the players' map drawn over this app's generations
 (:mod:`origenerator.gui.show_map`): the slide on screen in the corner, the
-same configuration under other seeds running right as the seed row, the same
-seed under other configurations running down as the column, the loop button
+same act under other seeds running right as the seed row, what else was made
+of the same picture running down as the column, the loop button
 lit for whichever axis is playing round and round, and the cell actually on
 screen the lit one — exactly a satellite mapping its clip against its
 library.  A thumbnail click jumps the show to that item, the way a map click
@@ -73,7 +73,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.gui.show_buttons import answer, show_rows
-from origenerator.gui.show_map import CONFIG_AXIS, SEED_AXIS
+from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import thumb_of
 from origenerator.ui_scale import (
     to_bitmap_pos,
@@ -97,12 +97,6 @@ _THE_SHOWS_OWN = frozenset({
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
     "cycle_action",
 })
-
-# The map's second axis, in the players' spelling: their column is the
-# subject's other acts, and the panel names it so wherever it says which axis
-# a loop or a lit cell is on.
-_PANEL_AXIS = {CONFIG_AXIS: "action"}
-
 
 def _cell(slide, label: str = "") -> HudCell:
     return HudCell(path=str(slide.path), thumb=thumb_of(slide), label=label)
@@ -147,8 +141,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     favorites_filter = host.hud_favorites_filter
     enhanced = host.hud_enhanced_mode
     order_label = host.hud_order_label
-    loop = _PANEL_AXIS.get(shown.loop, shown.loop)
-    bucket, index = shown.playing
+    act_filter = host.hud_act_filter
     return HudModel(
         player=side,
         locked=locked,
@@ -161,7 +154,8 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         # panel here to carry.
         lock_label=status_line(playing_set=looping_label(shown.loop) if shown.loop else "",
                                locked=locked, order=order_label,
-                               f_mode=favorites_filter, enhanced=enhanced),
+                               f_mode=favorites_filter, enhanced=enhanced,
+                               filter_label=act_filter),
         # The players' favorite star, over the same collection the Favorites
         # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
@@ -182,16 +176,18 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         corner=_cell(shown.corner),
         seeds=tuple(_cell(slide) for slide in shown.seeds),
         actions=tuple(_cell(slide, label)
-                      for slide, label in zip(shown.configs, shown.config_labels)),
+                      for slide, label in zip(shown.actions, shown.action_labels)),
         current_action=shown.label,
-        # The row the show is narrowed to — a satellite's act filter, here the
-        # configuration whose seed row is looping — so its button lights and a
-        # second press on it lifts the loop rather than starting it again.
-        filter_query=shown.label if shown.loop == SEED_AXIS else "",
+        # The act(s) the show is narrowed to, so the rows the filter keeps
+        # light their buttons and a second press on the row it already is
+        # lifts it, exactly as on a satellite.  With no filter on, a seed
+        # loop lights the row it is playing, which is what the button on
+        # that row says about it.
+        filter_query=act_filter or (shown.label if shown.loop == SEED_AXIS else ""),
         seed_count=len(shown.seeds) + 1,
-        action_count=len(shown.configs) + 1,
-        playing=(_PANEL_AXIS.get(bucket, bucket), index),
-        active_loop=loop,
+        action_count=len(shown.actions) + 1,
+        playing=shown.playing,
+        active_loop=shown.loop,
     )
 
 

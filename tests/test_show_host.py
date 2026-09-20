@@ -35,7 +35,9 @@ THE_SET = (
     # The map's own chrome and the session's keys over it: the loops along
     # its two axes, the loop key that steps them, the expand mark, and a step
     # to a neighboring cell.
-    "show_loop", "show_loop_cycle", "show_more_seeds", "show_nav", "show_filter",
+    "show_loop", "show_loop_cycle", "show_more_seeds", "show_nav",
+    # The act filter: the button at the head of each map row, and what lights it.
+    "show_filter", "hud_act_filter", "clear_modes",
     # The enhanced-only switch beside F-mode: declared here because three
     # drivers reach for it — the HUD's button, the session console's, and the
     # spoken word — and it was the last of the switches still being probed for.

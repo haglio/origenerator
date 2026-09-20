@@ -4,8 +4,8 @@ holds it still.
 The players' map is a gamma: the clip on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
 show draws the same gamma over its own generations — the seed row is the same
-configuration under other seeds, the column the same seed under other
-configurations (:mod:`origenerator.nav_map` says which is which) — and the
+act under other seeds, the column what else was made of the same picture
+(:mod:`origenerator.nav_map` says which is which) — and the
 map hangs on whatever is on screen until a loop is started along one of its
 axes, when it hangs on the slide the loop began on and the lit cell walks the
 axis instead.
@@ -24,23 +24,26 @@ from origenerator.slideshow import Slide
 # the column, then off.  "" is the off stop, and where a show that is not
 # looping already stands, so the first press starts a seed loop.
 SEED_AXIS = "seed"
-CONFIG_AXIS = "config"
-LOOP_CYCLE: tuple[str, ...] = (SEED_AXIS, CONFIG_AXIS, "")
+ACTION_AXIS = "action"
+LOOP_CYCLE: tuple[str, ...] = (SEED_AXIS, ACTION_AXIS, "")
 
-Cell = tuple[str, int]  # ("corner", 0) | ("seed", i) | ("config", i)
+Cell = tuple[str, int]  # ("corner", 0) | ("seed", i) | ("action", i)
 CORNER: Cell = ("corner", 0)
 
 
 @dataclass(frozen=True)
 class MapNeighbors:
-    """What the library says about one generation: the slides that share its
-    configuration (the seed row) and its seed (the config column), what its own
-    row is labeled, and what each configuration down the column is called."""
+    """What the library says about one generation: the slides showing its act
+    under other seeds (the seed row), one slide for each other act of the
+    picture it is or was animated from (the action column), the act its own
+    row is named for and the act each row down the column is, and the rest
+    of that picture's whole group — what a loop down the column plays."""
 
     seeds: tuple[Slide, ...] = ()
-    configs: tuple[Slide, ...] = ()
+    actions: tuple[Slide, ...] = ()
     label: str = ""
-    config_labels: tuple[str, ...] = ()
+    action_labels: tuple[str, ...] = ()
+    group: tuple[Slide, ...] = ()
 
 
 NO_NEIGHBORS = MapNeighbors()
@@ -70,14 +73,14 @@ class ShowMap:
 
     corner: Slide
     seeds: tuple[Slide, ...]
-    configs: tuple[Slide, ...]
+    actions: tuple[Slide, ...]
     playing: Cell
     loop: str
     label: str
-    config_labels: tuple[str, ...]
+    action_labels: tuple[str, ...]
 
     def cells(self) -> tuple[Slide, ...]:
-        return (self.corner, *self.seeds, *self.configs)
+        return (self.corner, *self.seeds, *self.actions)
 
 
 def build_map(current: Slide, loop: Loop | None,
@@ -86,31 +89,31 @@ def build_map(current: Slide, loop: Loop | None,
 
     A running loop keeps the map where it started and walks the lit cell along
     the looped axis, so the row does not re-orient as it plays.  The column
-    belongs to the lit seed rather than to the corner: it is the same seed
-    under other configurations, and along the row every seed has its own.
+    belongs to the lit seed rather than to the corner: it is what else was
+    made of that seed's picture, and along the row every seed has its own.
     """
     at = loop.position_of(current) if loop is not None else None
     if loop is None or at is None:
         around = neighbors_of(current.prompt_id)
-        return ShowMap(current, around.seeds, around.configs, CORNER, "",
-                       around.label, around.config_labels)
+        return ShowMap(current, around.seeds, around.actions, CORNER, "",
+                       around.label, around.action_labels)
     anchor = loop.pool[0]
     playing = CORNER if at == 0 else (loop.axis, at - 1)
     at_anchor = neighbors_of(anchor.prompt_id)
     if loop.axis == SEED_AXIS:
         lit = neighbors_of(current.prompt_id)
-        return ShowMap(anchor, loop.pool[1:], lit.configs, playing, loop.axis,
-                       at_anchor.label, lit.config_labels)
+        return ShowMap(anchor, loop.pool[1:], lit.actions, playing, loop.axis,
+                       at_anchor.label, lit.action_labels)
     labels = tuple(neighbors_of(slide.prompt_id).label for slide in loop.pool[1:])
     return ShowMap(anchor, at_anchor.seeds, loop.pool[1:], playing, loop.axis,
                    at_anchor.label, labels)
 
 
-def label_query(label: str) -> str:
-    """*label* as the players' HUD posts it when its row's filter button is
-    pressed: lower-cased, its spaces collapsed and then written as
-    underscores — the one spelling a show has to recognize a row by."""
-    return "_".join(str(label or "").split()).lower()
+def acts_posted(query: str) -> str:
+    """The act(s) a row's filter button posted, put back into words: the
+    players' HUD lower-cases the row's label and writes its spaces as
+    underscores, and a spoken act arrives the same way."""
+    return " ".join(str(query or "").replace("_", " ").split()).lower()
 
 
 def step_in_ring(cells: tuple[Slide, ...], at: int, step: int) -> Slide | None:

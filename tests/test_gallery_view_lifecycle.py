@@ -17,8 +17,8 @@ from origenerator.gui.gallery_view import GalleryView
 from tests.test_gallery_view import FakeDB, _image
 
 
-def _gallery(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "scene one", 50, 1)]))
+def _gallery(qtbot, db=None):
+    view = GalleryView(db or FakeDB([_image("i1", "scene one", 50, 1)]))
     qtbot.addWidget(view)
     return view
 
@@ -72,3 +72,34 @@ def test_a_gallery_shown_after_a_close_takes_the_keys_back(qtbot, monkeypatch):
     _press_escape_elsewhere(qtbot)
 
     assert reached
+
+
+def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, monkeypatch):
+    """Windows answers a minimize with a hide and then a show, so a gallery
+    hosted by a Fun Time session is shown again every time the session parks
+    it -- and drawing four thousand generations afresh is seconds of the one
+    thread that also answers the session's commands.  Nothing has moved at a
+    show, so nothing is drawn afresh."""
+    view = _gallery(qtbot)
+    view.refresh()
+    drawn = []
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: drawn.append(rows))
+
+    view.show()
+
+    assert drawn == []
+
+
+def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatch):
+    """The skip is the 1.5 s poll's own test, not a blanket one: a generation
+    that finished while the window was parked is there the moment it is back."""
+    db = FakeDB([_image("i1", "scene one", 50, 1)])
+    view = _gallery(qtbot, db)
+    view.refresh()
+    drawn = []
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: drawn.append(rows))
+    db._rows.append(_image("i2", "scene two", 50, 2))
+
+    view.show()
+
+    assert drawn

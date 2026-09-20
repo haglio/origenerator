@@ -1593,7 +1593,7 @@ class GalleryView(QWidget):
         super().showEvent(event)
         self._poll_timer.start()
         self._intercept_the_rooms_keys(True)  # back on screen: back on the keys
-        self.refresh()
+        self.refresh(only_if_moved=True)
 
     def hideEvent(self, event):
         super().hideEvent(event)
@@ -1618,16 +1618,30 @@ class GalleryView(QWidget):
 
     # --- data loading & live update ---------------------------------------
 
-    def refresh(self):
+    def refresh(self, *, only_if_moved: bool = False):
+        """Re-read the library and draw everything off it again.
+
+        ``only_if_moved`` draws again only when the rows or their folder meta
+        differ from what is already on screen -- the same test the 1.5 s poll
+        applies, asked by a caller who is not itself a change.  Being shown is
+        such a caller, and an expensive one to answer blindly: Windows answers
+        a minimize with a hide and then a show, so a hosted window is shown
+        again every time the session parks it, and drawing a four-thousand-row
+        library afresh takes seconds of the one thread that also answers the
+        session's commands.
+        """
         rows = self._db.list_generations()
         meta = self._db.folder_meta_map()
-        self._fingerprint = _fingerprint(rows, meta)
-        self._rebuild(rows, meta)
+        fingerprint = _fingerprint(rows, meta)
+        moved = fingerprint != self._fingerprint
+        self._fingerprint = fingerprint
+        if moved or not only_if_moved:
+            self._rebuild(rows, meta)
         if self._shows.regions_wanted:
-            # The tree this rebuild just made is what the base state is read
-            # from, and the session's OPEN_SHOWS can land before the first one
-            # (its launch races this app's boot).  Filling here costs nothing
-            # when both regions are already playing, and is the only thing that
+            # The tree a rebuild makes is what the base state is read from, and
+            # the session's OPEN_SHOWS can land before the first one (its
+            # launch races this app's boot).  Filling here costs nothing when
+            # both regions are already playing, and is the only thing that
             # rescues a session that opened into the mode a moment too early.
             self.fill_the_regions()
 

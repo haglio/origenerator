@@ -11,6 +11,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -539,6 +540,23 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
 
     assert director.region_show(PORTRAIT).levels == {"g4.png": ["newer", "older"]}
     assert director.region_show(LANDSCAPE).levels == {"g5.png": ["newer", "older"]}
+
+
+def test_a_region_says_how_long_it_took_to_fill(shows, caplog):
+    """The wait the owner is judging when he presses the button that brings
+    this mode up -- the one between the press and the pictures -- named in the
+    line that says the region opened, so a slow one can be read off the log
+    instead of counted off a stopwatch."""
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, _made = shows(browser=browser, fun_time=FakeSession())
+
+    with caplog.at_level("INFO", logger="origenerator.gui.show_director"):
+        director.fill_the_regions()
+
+    opened = [record.message for record in caplog.records if "region opens" in record.message]
+    assert len(opened) == 2
+    assert all(re.search(r", filled in \d+ ms$", message) for message in opened), opened
 
 
 def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_show(shows):

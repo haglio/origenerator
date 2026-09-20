@@ -17,7 +17,7 @@ from player_core.console import (
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
 
@@ -14247,3 +14247,18 @@ def test_the_poll_fetch_reads_nothing_with_no_client():
     facts = gallery_view_module._fetch_poll_facts(None, [("q1", "queued")])
 
     assert facts == gallery_view_module._PollFacts({}, {}, None)
+
+
+def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot):
+    """The gallery watches the whole application for its keys, so it is handed
+    events about every object in it — a show's own timer among them, which is
+    destroyed with the show while events about it are still in flight.  Asking
+    the base class about one of those dereferences a freed object and takes the
+    process down with it (2026-09-19 21:26, a Latest show closing)."""
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    doomed = QTimer()
+    sip.delete(doomed)
+
+    assert view.eventFilter(doomed, QEvent(QEvent.Type.Timer)) is False
+

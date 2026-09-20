@@ -613,7 +613,11 @@ class GalleryView(QWidget):
                                              on_drive_toggle=self.toggle_osr2_drive)):
                     self._motion_panel.refresh()
                     return True
-        return super().eventFilter(obj, event)
+        # Not the base class's answer, which is this one anyway: this filter is
+        # on the whole application, so it is handed events about objects that
+        # are being destroyed, and handing one of those back to C++ dereferences
+        # a freed pointer and aborts the process.
+        return False
 
     def _handle_escape(self) -> bool:
         """Esc turns off everything the app is doing, wherever focus is: the OSR2

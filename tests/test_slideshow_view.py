@@ -293,6 +293,33 @@ def test_the_consoles_transport_releases_the_lock_too(qtbot):
     assert view._playlist.current() == Slide("b.mp4", "video")
 
 
+def test_a_new_set_played_into_an_open_show_starts_it_over_on_that_set(qtbot):
+    # Standalone the monitor holds one show, so a second set asked for while
+    # this one is up arrives here rather than in a window of its own: it plays
+    # the new set from the top, the way a show opened on it would.
+    view = _view(qtbot, [("a.png", "image", "id-a")])
+
+    view.play([("b.png", "image", "id-b"), ("c.png", "image", "id-c")],
+              shuffle=in_order)
+
+    assert view._playlist.current() == Slide("b.png", "image", "id-b")
+    assert [slide.path for slide in view._set.playlist.in_play_order()] == ["b.png", "c.png"]
+
+
+def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
+    # A fresh show opens with neither switch on, so a re-pointed one does too:
+    # the favorites filter belonged to the set it was narrowing, and carrying
+    # it over would hide most of a set nobody had narrowed.
+    view = _view(qtbot, [("a.png", "image", "id-a")], favorite_ids={"id-a"})
+    view.toggle_favorites_filter()
+    assert view.hud_favorites_filter
+
+    view.play([("b.png", "image", "id-b")], shuffle=in_order)
+
+    assert not view.hud_favorites_filter
+    assert not view.hud_enhanced_mode
+
+
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None,

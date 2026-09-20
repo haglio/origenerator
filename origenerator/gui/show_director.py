@@ -132,6 +132,12 @@ class ShowHost(Protocol):
         """Flash a line on the gallery's own caption."""
 
 
+def _still_up(show):
+    """*show* if it is still on screen, else None — a closed one is no
+    occupant of anything, however recently it was one."""
+    return show if show is not None and show.is_showing() else None
+
+
 class ShowDirector:
     """Every fullscreen show this window has open, and the words about them."""
 
@@ -231,8 +237,12 @@ class ShowDirector:
     def region_show(self, side: str):
         """The show occupying satellite region *side*, or None — a closed
         window is no occupant, however recently it was one."""
-        show = self._region_shows.get(side)
-        return show if show is not None and show.is_showing() else None
+        return _still_up(self._region_shows.get(side))
+
+    def _window_up(self):
+        """The fullscreen window this app has on the monitor, or None — asked
+        standalone, where that window is the whole of what is up."""
+        return _still_up(self._slideshow)
 
     def is_in_front(self) -> bool:
         """True when the window ahead of the gallery is our own fullscreen
@@ -420,10 +430,22 @@ class ShowDirector:
 
     def _open_a_window(self, items, side: str, *, hud, folder_items=None, **kwargs):
         """A show in a window of this app's: over the whole monitor standalone,
-        or over one of the session's regions."""
-        view = SlideshowView(items, actions=self._show_actions(),
-                             pace=self._pace, motion=self._motion, hud=hud,
-                             **kwargs)
+        or over one of the session's regions.
+
+        Standalone the monitor holds one show and only one, so a second set
+        asked for while one is up re-points the window that is there rather
+        than stacking another over it -- the same reuse a region's player gets
+        (:meth:`_hand_to_the_player`).  Inside a session the regions do their
+        own replacing (:meth:`_present_surface`).
+        """
+        view = self._window_up() if self._fun_time is None else None
+        built = view is None
+        if built:
+            view = SlideshowView(items, actions=self._show_actions(),
+                                 pace=self._pace, motion=self._motion, hud=hud,
+                                 **kwargs)
+        else:
+            view.play(items, hud=hud, **kwargs)
         if folder_items and view.is_live():
             # Watching something render is no reason to lose the folder it is
             # being made in: the first arrow leaves the live frames for it.
@@ -432,17 +454,18 @@ class ShowDirector:
         # on screen, so a level can be compared against the one below it at full
         # size rather than in a thumbnail.
         view.set_levels(self.versions_of(self._folder_rows()))
-        self._present_surface(view, side)
-        # The queue it floats in its corner is the same widget as the lower
-        # strip and asks for the same things, so it goes to the same handlers:
-        # a row dragged there re-lines the queue, and its Clear drops another
-        # app's work off ComfyUI.
-        view.queue().reorder_requested.connect(self._reroll.reorder)
-        view.queue().clear_queue_requested.connect(self._host.clear_foreign_queue)
-        # And fill it at once rather than a poll later: the hold on videos is
-        # this opening's own doing, so the corner comes up already saying what
-        # is waiting on it rather than blank for a second and a half.
-        view.set_queue(*self._host.queue_now())
+        if built:
+            self._present_surface(view, side)
+            # The queue it floats in its corner is the same widget as the lower
+            # strip and asks for the same things, so it goes to the same
+            # handlers: a row dragged there re-lines the queue, and its Clear
+            # drops another app's work off ComfyUI.
+            view.queue().reorder_requested.connect(self._reroll.reorder)
+            view.queue().clear_queue_requested.connect(self._host.clear_foreign_queue)
+            # And fill it at once rather than a poll later: the hold on videos is
+            # this opening's own doing, so the corner comes up already saying what
+            # is waiting on it rather than blank for a second and a half.
+            view.set_queue(*self._host.queue_now())
         return view
 
     def items_of(self, rows) -> list:

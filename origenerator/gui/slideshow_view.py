@@ -77,27 +77,29 @@ The lower strip's queue is floated into the lower-left corner
 their buttons — since the strip that carries it is under this window, and a show
 is exactly when the line stops moving and when the user keeps adding to it. The
 shared OSR2 motion keys ride along too (Space and friends — see
-:mod:`origenerator.gui.motion_hud`) with genau's drive panel floated up top,
-directly under the HUD (:meth:`SlideshowView._place_console`) — Fun Time puts
-each of the two in a top-left corner of its own window, and a show wearing both
-has one corner, so the console takes the slot beneath the map rather than the
-same slot, where the map covered it — so the device can run over a show of
-stills; a clip that carries a funscript instead offers itself as an
-:meth:`osr2_drive_target`. Being the deliberate foreground view, it plays sound
-— the inline preview stays muted.
+:mod:`origenerator.gui.motion_hud`), and what they are doing to the device is on
+that same one panel: :attr:`SlideshowView.hud_device` hands the HUD the pace and
+motion rows, who has the OSR2 and the drive readout, and
+:meth:`SlideshowView.press_console` takes the presses back.  Fun Time splits
+those across two windows — the main player's console for the device, each
+satellite's HUD for the set — because there they are two players; a show is one
+host doing both, and wearing both panels said the status twice, in two lines
+that disagreed, with prev/next/lock/trash drawn on each.  A clip that carries a
+funscript offers itself as an :meth:`osr2_drive_target` instead. Being the
+deliberate foreground view, it plays sound — the inline preview stays muted.
 """
 from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
+from origenerator import osr2 as osr2_device
+from origenerator.gui.console import post_console_action, show_device
 from origenerator.gui.level_stepper import LevelStepper
-from origenerator.gui.media_overlay import raise_over_media
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
@@ -209,14 +211,7 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        # Genau's console, seated under the players' HUD once the show wears
-        # one (see :meth:`adopt_hud`): the two share the corner Fun Time puts
-        # each in, and the console used to sit UNDER the map, unreachable.
-        self._motion_panel = MotionPanel(
-            motion, self, host=self, control=self._actions.osr2_control,
-        ) if motion is not None else None
         self._hud = None
-        self._pane.media_resized.connect(self._place_console)
 
         # A pause — the hosting session's OmniPause, or a click on a show with no
         # session — held here so it survives navigation: a step lands on a NEW
@@ -322,7 +317,6 @@ class SlideshowView(QWidget):
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
-        self._place_console()  # back over whatever media widget the slide put up
         self._apply_freeze()  # a slide arrived at under a hold arrives holding
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
@@ -722,6 +716,26 @@ class SlideshowView(QWidget):
         """Whether this set is a loop someone asked for, which is what lights
         the map's loop button."""
         return self._set.looping
+
+    @property
+    def hud_device(self):
+        """What this window is doing to the OSR2, for the one panel to draw —
+        None with no motion wired, and so no device half at all."""
+        if self._motion is None:
+            return None
+        control = self._actions.osr2_control
+        return show_device(
+            self._motion, self, device_on=bool(osr2_device.device_on()),
+            control=control.state() if control is not None else "",
+            script=control.script if control is not None else None)
+
+    def press_console(self, action: str) -> bool:
+        """Take a press off the device rows of that panel — the pace, the
+        motion, the four control states, a level dragged on the readout."""
+        if self._motion is None:
+            return False
+        return post_console_action(action, motion=self._motion, host=self,
+                                   control=self._actions.osr2_control)
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does
@@ -1197,43 +1211,14 @@ class SlideshowView(QWidget):
         own: the map is the same map either way, and a show that kept its own
         stills and plate beside it would be saying everything twice.
 
-        *hud* is the panel itself, when the caller has it: the console seats
-        itself under it and follows it — the map grows and shrinks with the
-        set, and a console placed once would end up under it again.
+        *hud* is the panel itself, when the caller has it: the device rows and
+        the readout ride on it, so a motion key has to reach it to redraw.
         """
         self._hud_dressed = True
         self._neighbors.set_neighbors(None, None)
         self._counter.hide()
         if hud is not None:
             self._hud = hud
-            hud.installEventFilter(self)
-        self._place_console()
-
-    def eventFilter(self, watched, event):
-        """Follow the HUD: every change to where it is or how big it is moves
-        the console with it."""
-        if watched is self._hud and event.type() in (
-                QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show, QEvent.Type.Hide):
-            self._place_console()
-        return super().eventFilter(watched, event)
-
-    def _place_console(self) -> None:
-        """Seat genau's console: under the HUD while the show wears one, in the
-        corner itself otherwise — and back on top of the media either way.
-
-        Fun Time draws its console on the main player and the satellite HUD on
-        the satellites, two windows with a top-left corner each; a show wears
-        both in one window, and two panels in one corner is one panel, the HUD
-        re-raising itself over the console every tick.  So the console takes
-        the slot beneath.
-        """
-        if self._motion_panel is None:
-            return
-        below = None
-        if self._hud is not None and not self._hud.isHidden():
-            below = self._hud.geometry()
-        self._motion_panel.reposition(below=below)
-        raise_over_media(self._motion_panel)
 
     def _update_neighbors(self):
         """Draw the items either side of this one — nothing on a set too short
@@ -1299,8 +1284,11 @@ class SlideshowView(QWidget):
         elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
             # Space belongs to the motion cluster now, everywhere — locking the
-            # slideshow is Down, matching the auto-generate view's lock.
-            self._motion_panel.refresh()
+            # slideshow is Down, matching the auto-generate view's lock.  The
+            # panel redraws on its own beat, and this is the one moment the
+            # answer can have changed under a driver that emits no signal.
+            if self._hud is not None:
+                self._hud._tick()
         else:
             super().keyPressEvent(event)
 
@@ -1310,7 +1298,6 @@ class SlideshowView(QWidget):
         self._reposition_queue()
         self._reposition_neighbors()
         self._reposition_note()
-        self._place_console()
 
     def closeEvent(self, event):
         """Leave, handing the gallery the item the show ended on if there is one.

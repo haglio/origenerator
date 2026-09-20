@@ -14,6 +14,8 @@ states the app's one OSR2 switch is in.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from player_core import drive_layout
 from player_core.console import (
     OSR2_CONTROL_BUTTONS,
@@ -38,7 +40,7 @@ from player_core.robot_hand import (
 )
 
 from origenerator import motion_engine
-from origenerator.gui.console_buttons import console_rows
+from origenerator.gui.console_buttons import console_rows, device_rows
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which of the console's four control buttons asks for which state, read off
@@ -141,21 +143,63 @@ def console_hud(motion, host, *, device_on: bool = True,
     only where the host hands over a set to narrow, and here the show's own HUD
     carries them instead.
     """
-    scripted = script is not None and script.active and device_on
-    driving = motion.active and device_on and not scripted
+    device = show_device(motion, host, device_on=device_on, control=control,
+                         script=script)
     return ConsoleHud(
         modes=ModeHud(),
         console=ConsoleModel(
             main_mode=MainMode.GENAU, active=True, locked=host.locked,
-            osr2=(Osr2State.FUNSCRIPT if scripted
-                  else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
-            osr2_control=control,
+            osr2=device.osr2, osr2_control=control,
             advance_interval=host.dwell_s,
-            rows=console_rows(locked=host.locked, pace_s=host.dwell_s, control=control,
+            rows=console_rows(locked=host.locked, pace_s=host.dwell_s,
+                              control=control,
                               cruise=motion.state.cruise.active,
                               learned=motion.state.learned.active,
                               shape=motion.state.state.shape.value),
         ),
+        drive=device.drive,
+    )
+
+
+@dataclass(frozen=True)
+class ShowDevice:
+    """The device half of this app's console: the rows that aim the OSR2 and
+    set the pace, who has the device, and the motion being sent.
+
+    Handed to the one panel a show wears (:mod:`origenerator.gui.show_hud`) so
+    it says all of it without a second panel underneath, and used to build the
+    whole console for the surface that has no show under it at all.
+    """
+
+    rows: tuple
+    osr2: str
+    # Which of the four states the app's one OSR2 switch is in, or empty where
+    # nobody handed a switch over -- the panel resolves the pair into one word.
+    osr2_control: str
+    drive: DriveHud
+
+
+def show_device(motion, host, *, device_on: bool = True,
+                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ShowDevice:
+    """What the device is doing, as a panel takes it — see :class:`ShowDevice`.
+
+    ``script`` is the funscript driver, when this app has one: while it has the
+    device the readout is the script's line rather than the motion's, and the
+    line says FunScript.  ``device_on`` is whether the OSR2 is answering at all;
+    with it off nothing here is being received, so the line reads Off, the
+    readout greys and the trace holds still rather than animating a wave nobody
+    is riding.
+    """
+    scripted = script is not None and script.active and device_on
+    driving = motion.active and device_on and not scripted
+    return ShowDevice(
+        osr2_control=control,
+        rows=device_rows(control=control, pace_s=host.dwell_s,
+                         cruise=motion.state.cruise.active,
+                         learned=motion.state.learned.active,
+                         shape=motion.state.state.shape.value),
+        osr2=(Osr2State.FUNSCRIPT if scripted
+              else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
         drive=(script_hud(script, motion.state, host.dwell_s) if scripted
                else drive_hud(motion.state, driving, host.dwell_s)),
     )
@@ -166,7 +210,7 @@ def panel_size(motion, host, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[in
     return ConsolePainter().rgba(console_hud(motion, host, control=control))[1]
 
 
-def post_console_action(action: str, *, motion, host, control=None) -> None:
+def post_console_action(action: str, *, motion, host, control=None) -> bool:
     """Do what a press on the console asks, wherever the console was drawn.
 
     The verbs are the console's own — the same strings Fun Time routes to
@@ -178,15 +222,18 @@ def post_console_action(action: str, *, motion, host, control=None) -> None:
     *control* is that switch, or None where nobody handed one over — a panel
     outside the gallery, and a test's bare console.  The two holds still reach
     the motion there, which is what such a panel can do about the device.
+
+    Answers whether this was one of the console's verbs at all, so a panel
+    carrying other buttons beside them can go on routing the rest.
     """
     if not action:
-        return
+        return False
     if action.startswith("robot_hand_") and "_" in action[11:]:
         axis, _, value = action[11:].rpartition("_")
         if value.isdigit() and axis in ("amp", "center", "speed"):
             {"amp": motion.set_amplitude, "center": motion.set_center,
              "speed": motion.set_speed}[axis](int(value))
-            return
+            return True
     step = {
         "robot_hand_speed_up": (motion.adjust_speed, 5),
         "robot_hand_speed_down": (motion.adjust_speed, -5),
@@ -216,6 +263,9 @@ def post_console_action(action: str, *, motion, host, control=None) -> None:
     elif action in ("genau_clip_seconds_up", "genau_clip_seconds_down"):
         delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
         host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
+    else:
+        return False
+    return True
 
 
 def _ask_for_control(state: str, motion, control) -> None:

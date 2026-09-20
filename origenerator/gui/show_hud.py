@@ -23,14 +23,27 @@ corner says "Seeds: N" for the whole set, and the cell actually on screen is
 the lit one — exactly a satellite playing through a seed family.  A thumbnail
 click jumps the show to that item, the way a map click switches a player.
 
+It is the ONE panel a show wears.  Fun Time splits what is here across two
+windows — each satellite's HUD for the set, the main player's console for the
+device — because there they are two players; a show is one host doing both, and
+wearing both panels put two status lines that disagreed on one screen with
+prev/next/lock/trash drawn on each.  So the host hands over its device half
+(:attr:`~origenerator.gui.show_host.ShowHost.hud_device`) and it rides here,
+under the control band: the clip-seconds pace, the motion's hands-free row and
+the four OSR2 control states, then the line naming whichever driver has the
+device and the readout of what is being sent, all the main console's own code.
+
 Presses that mean something to the session — the mode pair, this side's
 prev/next/lock/trash — post onto the dashboard command file, the channel the
 players' HUDs and the global hotkeys share.  The two filter switches — F-mode,
 and the enhanced-only switch beside it that only a show's HUD grows — are the
-show's own and land on it directly, hosted or not (:meth:`ShowHud._deliver`).
-The map's own chrome is the panel's rather than this show's, so a press on a
-concept a hosted show does not have (the loops) is swallowed here, where it can
-never reach the blacked player underneath.
+show's own and land on it directly, hosted or not (:meth:`ShowHud._deliver`), and
+so is everything about the device: the OSR2 is this app's to drive wherever the
+show is drawn, so those go back to the host
+(:meth:`~origenerator.gui.show_host.ShowHost.press_console`) rather than out to
+the session.  The map's own chrome is the panel's rather than this show's, so a
+press on a concept a hosted show does not have (the loops) is swallowed here,
+where it can never reach the blacked player underneath.
 """
 
 from __future__ import annotations
@@ -39,6 +52,7 @@ import time
 
 from player_core.file_channel import append_command
 from player_core.hud_status import looping_label, status_line
+from player_core.modes import Osr2State
 from player_core.satellite_hud import (
     MARGIN,
     HudCell,
@@ -51,6 +65,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.gui.show_buttons import answer, show_rows
 from origenerator.ui_scale import (
@@ -61,6 +76,10 @@ from origenerator.ui_scale import (
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
 
+# The two states with a line that moves: something is being sent, so the trace
+# scrolls and the panel has to keep up with it.
+_MOVING = frozenset({Osr2State.ROBOT_HAND, Osr2State.FUNSCRIPT})
+
 # The presses a show answers for itself wherever it is drawn.  The transport is
 # the other half, which a hosted window hands to its session instead.
 _THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "shuffle", "latest",
@@ -68,7 +87,7 @@ _THE_SHOWS_OWN = frozenset({"fmode", "enhanced", "reset", "shuffle", "latest",
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
-                   own_window: bool = True) -> HudModel | None:
+                   own_window: bool = True, device=None) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_items`` empty or unanswered).
 
@@ -78,6 +97,14 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     :func:`~origenerator.gui.show_buttons.show_rows`) and what reset goes back
     to.  Both default to what a region show wants, which is what every reading
     of one wants; :class:`ShowHud` and a show handed to a player pass their own.
+
+    *device* is what this window is doing to the OSR2
+    (:class:`~origenerator.gui.console.ShowDevice`), for the one panel a show
+    wears in a window of its own: the pace and motion rows under the control
+    band, who has the device, and the readout.  None where this app is not the
+    one driving -- a show handed to a session's player, whose device half is on
+    the session's own main console, and any reading of the model that only wants
+    the set.
     """
     cells, position, locked = host.hud_items()
     if not cells:
@@ -112,10 +139,18 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         is_favorite=host.hud_is_favorite,
         # The buttons this show answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
-        rows=show_rows(side, locked=locked, favorites_filter=favorites_filter,
-                       enhanced=enhanced, order=order_label, hosted=hosted,
-                       own_window=own_window,
-                       has_other_versions=host.has_other_versions),
+        rows=(*show_rows(side, locked=locked, favorites_filter=favorites_filter,
+                         enhanced=enhanced, order=order_label, hosted=hosted,
+                         own_window=own_window,
+                         has_other_versions=host.has_other_versions),
+              *(device.rows if device is not None else ())),
+        # The device's own line and readout, where this window is the one
+        # driving: on the panel the set is on, because a show is one host doing
+        # both and a second panel underneath said everything twice.
+        osr2_rows=device.osr2_rows if device is not None else (),
+        osr2=device.osr2 if device is not None else "",
+        osr2_control=device.osr2_control if device is not None else "",
+        drive=device.drive if device is not None else None,
         corner=hud_cells[0],
         seeds=hud_cells[1:],
         seed_count=len(hud_cells),
@@ -172,7 +207,8 @@ class ShowHud(QLabel):
 
     def _tick(self) -> None:
         model = show_hud_model(self._side, self._host,
-                               hosted=self._dashboard_cmd_file is not None)
+                               hosted=self._dashboard_cmd_file is not None,
+                               device=self._host.hud_device)
         if model != self._model:
             self._model = model
             self._draw()
@@ -183,6 +219,19 @@ class ShowHud(QLabel):
         due = self._clicks.due(now=time.monotonic())
         if due:
             self._deliver(due)
+        self._sync_beat()
+
+    def _sync_beat(self) -> None:
+        """Beat fast enough for the trace while something is driving, and back
+        to the panel's own beat when nothing is.
+
+        The trace scrolls with the phase, so at the panel's resting beat it
+        stepped in visible jumps; ten a second is what the console redraws a
+        moving line at.  A still panel redrawn that often is the same picture at
+        Pillow's price, paid for the whole show.
+        """
+        driving = self._model is not None and self._model.osr2 in _MOVING
+        self._timer.setInterval(REPAINT_MS if driving else _REFRESH_MS)
 
     def _file_on_screen(self) -> str:
         """The muted line under the status: what is on this region right now.
@@ -242,12 +291,21 @@ class ShowHud(QLabel):
         if command:
             self._deliver(command)
 
+    def mouseReleaseEvent(self, event):
+        """Let go of whichever readout band the press took hold of."""
+        self._clicks.release()
+
     def mouseMoveEvent(self, event):
         if self._targets is None:
             return
         from player_core.satellite_hud import button_tooltip, hit_test_targets
 
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        if self._clicks.holding:
+            # A band the press took hold of goes on being set as the pointer
+            # moves, so a level can be dragged and not only clicked.
+            self._deliver(self._clicks.drag_to(px, py))
+            return
         hover = hit_test_targets(self._targets.loop, px, py)
         tip = button_tooltip(self._targets, px, py)
         if hover == self._hover_loop and tip == self._hover_tip:
@@ -260,10 +318,17 @@ class ShowHud(QLabel):
         and the session's transport goes out on the dashboard channel — or, with
         no session under this show, onto the show as well (:meth:`_act_here`).
 
+        The console's own verbs -- the pace, the motion, the four control
+        states, a level dragged on the readout -- land on this window's motion
+        and its OSR2 switch, hosted or not: the device is this app's to drive
+        wherever the show is drawn, and the session has no say in it.
+
         The map's own chrome that a show has no counterpart for (the expand
         mark) is swallowed either way, so it can never reach the player a
         region window covers.
         """
+        if not command:
+            return
         verb, _, path = command.partition("|")
         action = verb.removeprefix(f"{self._side}_")
         if action in _THE_SHOWS_OWN:
@@ -271,6 +336,9 @@ class ShowHud(QLabel):
             # mean on a show what they mean on a player, and the show owns what
             # each is — so they land here, hosted or not.
             answer(self._host, action, path)
+            self._tick()
+            return
+        if self._host.press_console(verb):
             self._tick()
             return
         if self._dashboard_cmd_file is None:

@@ -612,7 +612,7 @@ class ShowDirector:
         itself, and no session to switch modes on, so no mode row.
         """
         # The view is handed the panel itself rather than only told one is on:
-        # its console seats itself under the panel and follows it as it resizes.
+        # a motion key redraws the device rows riding on it.
         view.adopt_hud(ShowHud(view, side=side,
                                dashboard_cmd_file=self._session_channel,
                                label_for=self._item_label))

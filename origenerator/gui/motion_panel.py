@@ -1,12 +1,11 @@
-"""Genau's console, shown here — the same one Fun Time draws, minus its mode row.
+"""Genau's console, in the foot of the main window — the same one Fun Time draws.
 
 Nothing on it is drawn here. :class:`player_core.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the status
 line, the transport, the clip-seconds pace, the hands-free row, the OSR2 line
-and the drive readout under them, all the code Fun Time runs. What a press posts
-is that console's own answer too — the same command strings Fun Time routes —
-and this only routes them to what this app has: the slideshow for the transport
-and the pace, the motion driver for everything about the motion.
+and the drive readout under them, all the code Fun Time runs.  What goes on it
+and what a press takes off it are :mod:`origenerator.gui.console`'s, which a
+show's own panel asks the same questions of.
 
 The one row left off is the one naming the three players, and the minimize
 button riding it. This console is inside another app's window, so it is not one
@@ -14,17 +13,20 @@ of those three and has no borderless window of its own to park.
 
 The on/off switch IS on it: the control-state group -- parked, retracted,
 driving, control off -- is the app's one OSR2 switch now, and the toolbar's
-separate one is gone.  What is not on it are the two switches saying what
-a show may play: over a show those are on the players' HUD this panel sits
-under (:mod:`origenerator.gui.show_hud`), the same buttons a satellite's HUD
-carries, and a second pair here would be two switches for one thing.
+separate one is gone.
+
+This is the surface with no show under it.  A show does not float one of these:
+it wears ONE panel (:mod:`origenerator.gui.show_hud`), which carries the device
+rows, the OSR2 line and the readout itself -- two panels in one corner said the
+status twice, in two lines that disagreed, and drew prev/next/lock/trash on
+each.
 """
 
 from __future__ import annotations
 
 from player_core.console import OSR2_CONTROL_UNANSWERED
 from player_core.console_hud import ConsolePainter, hud_xy
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtWidgets import QWidget
 
@@ -77,23 +79,6 @@ class MotionPanel(QWidget):
         self._host = host if host is not None else PaceOnlyHost(
             pace if pace is not None else SlideshowPace(parent=self))
         self._painter = ConsolePainter()
-        # A video surface is a native window on Windows, and a plain sibling
-        # widget cannot paint over one however it is stacked — which is why
-        # every other panel floated over a show (the HUD, the toast, the queue)
-        # is native too.  Native itself, this stacks against the media by
-        # Z-order like any other window, so the console is reachable over a
-        # clip that fills the corner it sits in, not only over a still.
-        #
-        # Native and NOT translucent, exactly like the HUD beside it.  The
-        # slab's rounded corners and see-through ground come from the RGBA
-        # picture the painter hands over, composited onto whatever the parent
-        # paints beneath — Qt does that for any child that neither fills its
-        # own background nor claims to paint opaquely.  Asking for a
-        # translucent surface as well used to be harmless on a plain child
-        # widget, but on a native child it asks Windows for an alpha surface,
-        # and the console then came out TWICE over a show: once where Qt drew
-        # it and once more at double its offset, where that surface ended up.
-        self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
         self.setFixedSize(*panel_size(motion, self._host, self._osr2_control()))
         # A show's console is built while its video is already driving, so the
@@ -143,26 +128,6 @@ class MotionPanel(QWidget):
         if self._control is not None:
             return self._control.source() is not None
         return bool(getattr(self._motion, "active", False))
-
-    def reposition(self, below=None) -> None:
-        """The parent's top-left corner, where Fun Time puts the same console —
-        or, given the rect of a panel already in that corner, directly under
-        it, in the same column and a panel-inset apart.
-
-        *below* is the players' HUD a show wears: Fun Time draws its console on
-        the main player and that HUD on the satellites, two windows, but a show
-        wears both in one, and the two are in the same corner, so the console
-        takes the slot beneath.  It follows the HUD's left edge rather than its
-        own margin, so the two read as one column of panels rather than as two
-        panels that missed each other.
-        """
-        parent = self.parentWidget()
-        if parent is None:
-            return
-        if below is None:
-            self.move(self.MARGIN, self.MARGIN)
-        else:
-            self.move(below.x(), below.bottomLeft().y() + 1 + below.x())
 
     def showEvent(self, event):
         super().showEvent(event)

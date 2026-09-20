@@ -273,8 +273,9 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     # the last through ShowHost — and the view calls them outright.
     stub.set_audio_muted = lambda muted: None
     stub.set_paused = lambda paused: None
-    stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
+    stub.adopt_hud = lambda panel: None  # handed the panel itself
     stub.hud_items = lambda: ((), 0, False)  # a host with no set draws no map
+    stub.hud_device = None  # and no device of its own to put on that panel
     view._shows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 

@@ -100,6 +100,30 @@ class ShowHost(Protocol):
         return True
 
     @property
+    def hud_device(self):
+        """What this window is doing to the OSR2, as the one panel a show wears
+        takes it (:class:`~origenerator.gui.console.ShowDevice`) — or None where
+        this app is not the one driving.
+
+        The show is one host doing two things: browsing a set and driving the
+        device.  It wore two panels for that, the players' HUD over the set and
+        Genau's whole console under it, which said the status twice and drew
+        prev/next/lock/trash twice.  One panel now, and this is the half of it
+        the host answers for.
+        """
+        return None
+
+    def press_console(self, action: str) -> bool:
+        """Do what a press on the console's own rows asks — the pace, the
+        motion, the four OSR2 control states, a level dragged on the readout —
+        and say whether this was one of those verbs at all.
+
+        False for a host with no device to drive, which leaves the panel to
+        route the press the way it routes every other.
+        """
+        return False
+
+    @property
     def hud_is_favorite(self) -> bool:
         """Whether the item on screen is favorited — the players' star readout."""
         return False

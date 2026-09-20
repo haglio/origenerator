@@ -432,6 +432,15 @@ class PlayerShow(QObject):
     def hud_looping(self) -> bool:
         return self._set.looping
 
+    @property
+    def hud_device(self):
+        """Nothing: the panel this show publishes is drawn on a session's own
+        player, and the device half of it is on that session's main console."""
+        return None
+
+    def press_console(self, _action: str) -> bool:
+        return False
+
     def toggle_favorites_filter(self) -> bool:
         return self.set_favorites_filter(not self._set.favorites_filter)
 

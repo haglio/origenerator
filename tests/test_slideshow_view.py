@@ -26,8 +26,8 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
 from origenerator.gui.toast import ERROR, FAVORITE, WARNING, Toast
 from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
-from origenerator.motion_engine import Motion
 from origenerator.slideshow import LIVE, Slide, in_order
+from tests.motion_doubles import FakeMotion
 from tests.show_surface_fakes import FakeEngine
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -331,52 +331,18 @@ def test_culling_releases_the_lock(qtbot):
     assert _will_move_on(view)   # so the rest keeps rotating
 
 
-class _FakeMotion:
-    """Enough of the motion driver for the shared keys and the drive panel."""
-
-    def __init__(self):
-        self.active = False
-        self.calls = []
-        self.state = Motion()
-
-    def toggle(self):
-        self.active = not self.active
-        self.calls.append(("toggle", self.active))
-        return self.active
-
-    def adjust_speed(self, delta):
-        self.calls.append(("speed", delta))
-
-    def status_text(self):
-        return "OSR2 stub"
-
-
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     # Space belongs to the app-global OSR2 motion everywhere; locking the
-    # slideshow is Down. The standing caption comes with the wired motion.
-    motion = _FakeMotion()
+    # slideshow is Down. The device rides on the show's one panel.
+    motion = FakeMotion()
     view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          motion=motion)
     qtbot.addWidget(view)
-    assert view._motion_panel is not None  # the drive panel rides along
+    assert view.hud_device is not None  # the device half of the panel is there
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in motion.calls
     assert not view._playlist.locked
 
-
-def test_the_console_restacks_its_own_window_when_it_is_seated(qtbot, monkeypatch):
-    raised = []
-    monkeypatch.setattr("origenerator.gui.media_overlay.raise_window_without_activating",
-                        raised.append)
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
-                         motion=_FakeMotion())
-    qtbot.addWidget(view)
-    view.show()
-    raised.clear()
-
-    view._place_console()
-
-    assert raised == [int(view._motion_panel.winId())]
 
 
 def test_escape_closes_the_view(qtbot):

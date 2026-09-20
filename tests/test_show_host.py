@@ -37,6 +37,9 @@ THE_SET = (
     # spoken word — and it was the last of the switches still being probed for.
     "hud_enhanced_mode", "toggle_enhanced_mode", "set_enhanced_mode",
     "show_order",
+    # The device half of the one panel a show wears: what to draw on it, and
+    # what a press on its rows asks for.
+    "hud_device", "press_console",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so

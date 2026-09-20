@@ -28,10 +28,12 @@ windows — each satellite's HUD for the set, the main player's console for the
 device — because there they are two players; a show is one host doing both, and
 wearing both panels put two status lines that disagreed on one screen with
 prev/next/lock/trash drawn on each.  So the host hands over its device half
-(:attr:`~origenerator.gui.show_host.ShowHost.hud_device`) and it rides here,
-under the control band: the clip-seconds pace, the motion's hands-free row and
-the four OSR2 control states, then the line naming whichever driver has the
-device and the readout of what is being sent, all the main console's own code.
+(:attr:`~origenerator.gui.show_host.ShowHost.hud_device`) and it rides here, all
+the main console's own code: the clip-seconds pace with the rows that step the
+set, since the pace is about the set — and then, together at the foot of the
+panel, every control that acts on the OSR2 itself, the hands-free switches and
+the four control states above the line naming whichever driver has the device
+and the readout of what is being sent.
 
 Presses that mean something to the session — the mode pair, this side's
 prev/next/lock/trash — post onto the dashboard command file, the channel the
@@ -100,8 +102,9 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
 
     *device* is what this window is doing to the OSR2
     (:class:`~origenerator.gui.console.ShowDevice`), for the one panel a show
-    wears in a window of its own: the pace and motion rows under the control
-    band, who has the device, and the readout.  None where this app is not the
+    wears in a window of its own: the pace row under the control band, then the
+    rows that aim the device, who has it, and the readout, all three together at
+    the foot.  None where this app is not the
     one driving -- a show handed to a session's player, whose device half is on
     the session's own main console, and any reading of the model that only wants
     the set.

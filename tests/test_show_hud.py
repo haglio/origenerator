@@ -95,12 +95,25 @@ class TestTheOnePanelAShowWears:
         assert model.osr2 != ""          # who has the device
         assert model.drive is not None   # and the motion it is being sent
 
-    def test_the_pace_and_the_motion_are_rows_on_it(self, qtbot):
+    def test_the_pace_rides_with_the_rows_that_step_the_set(self, qtbot):
+        """It sets how long an unheld slide stays up, which is about the set."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
         assert "genau_clip_seconds_up" in posted
-        assert "robot_hand_cycle_shape" in posted
-        assert "osr2_control_off" in posted
+        assert "robot_hand_cycle_shape" not in posted
+
+    def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
+        """Cruise, human-inspired, the waveform, the quarter nudge and the four
+        control states act on the OSR2, so they sit in its own block at the foot
+        of the panel rather than up among the rows that act on the set."""
+        model = self._model(qtbot)
+        aiming = [button.command for row in model.osr2_rows for button in row]
+
+        assert "robot_hand_toggle_cruise" in aiming
+        assert "robot_hand_toggle_learned" in aiming
+        assert "robot_hand_cycle_shape" in aiming
+        assert "quarter_button" in aiming
+        assert "osr2_control_off" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):
         """The console's own prev/next/lock/trash row is off it: the side's

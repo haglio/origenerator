@@ -72,19 +72,25 @@ class ShowHost(Protocol):
         """Play the side's whole library newest first, or shuffled."""
 
     def show_loop(self, axis: str) -> None:
-        """Loop the map's *axis* — "seed" or "config" — around what is on
+        """Loop the map's *axis* — "seed" or "action" — around what is on
         screen, or end the loop for "".  No set, nothing to loop."""
 
     def show_loop_cycle(self) -> None:
-        """The loop key: seeds, then configs, then off — or the lock, with
+        """The loop key: seeds, then actions, then off — or the lock, with
         nothing on either axis to loop."""
 
     def show_more_seeds(self) -> None:
-        """Widen the seed row past the exact configuration and loop it."""
+        """Widen the seed row past what exactly matches and loop it."""
 
     def show_filter(self, query: str) -> None:
-        """Narrow to the configuration whose map row is labeled *query*: jump
-        to it and loop its seed row."""
+        """Narrow the set to the act(s) *query* names, as the button at the
+        head of a map row posts them."""
+
+    def clear_modes(self) -> bool:
+        """Every narrowing off at once — the favorites, the enhanced ones and
+        the act filter — which is what "no filter" means said to a show.
+        ``False`` where nothing moved, a host with no set's answer always."""
+        return False
 
     def show_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one."""
@@ -101,6 +107,12 @@ class ShowHost(Protocol):
     def hud_favorites_filter(self) -> bool:
         """Whether the set is narrowed to the favorites. No set, no mode."""
         return False
+
+    @property
+    def hud_act_filter(self) -> str:
+        """The act(s) the set is narrowed to, as the players' HUD posts them
+        — what lights the map's row buttons.  No set, no filter."""
+        return ""
 
     @property
     def hud_order_label(self) -> str:

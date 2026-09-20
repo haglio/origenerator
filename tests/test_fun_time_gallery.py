@@ -19,6 +19,7 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
     MODE_VERBS,
     FakeDB,
     _image,
+    _row,
 )
 
 
@@ -373,12 +374,17 @@ def _session_with_dashboard(tmp_path):
 
 
 def _fox_library(tmp_path):
-    """Four portrait pictures: two of one configuration under two seeds, a
-    third of the first seed under an edited prompt, and a stranger."""
+    """Four portrait pictures — two of one configuration under two seeds, a
+    third of the first seed under an edited prompt, and a stranger — and a
+    video animated from the first of them."""
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
     rows = [_image("g1", "a red fox", 50, 1), _image("g2", "a red fox", 50, 2),
-            _image("g3", "a red fox at dawn", 50, 1), _image("g4", "a blue car", 30, 9)]
+            _image("g3", "a red fox at dawn", 50, 1), _image("g4", "a blue car", 30, 9),
+            _row("v1", "wan22_i2v",
+                 {"positive_prompt": "the fox runs", "noise_seed": 5,
+                  "input_image": "sdxl_t2i_g1.png"},
+                 "wan22_i2v_v1.mp4", recipe_category="alpha")]
     for row in rows:
         row["thumbnail_path"] = str(tall)
     return rows
@@ -386,6 +392,7 @@ def _fox_library(tmp_path):
 
 def _open_the_fox_show(qtbot, view, monkeypatch, rows):
     """The fox library as a portrait show, standing on the first fox."""
+    view.refresh()      # the pictures are indexed, as they are once the app is up
     monkeypatch.setattr(view, "rows_to_play", lambda: rows)
     monkeypatch.setattr(view._shows, "items_of", _as_items)
     monkeypatch.setattr(view, "slideshow_subject", lambda: "the fox folder")
@@ -398,10 +405,10 @@ def _open_the_fox_show(qtbot, view, monkeypatch, rows):
 
 def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, monkeypatch):
     """The slide in the corner; the same configuration under its other seed
-    running right; the same seed under another configuration running down,
-    labeled by that configuration's folder; the corner lit and no loop — the
-    players' map, drawn against this app's library of that side's shape."""
-    from origenerator import gallery
+    running right; the video animated from it running down, named for its
+    act, and the picture's own row named as that video's source; the corner
+    lit and no loop — the players' map, drawn against this app's library of
+    that side's shape."""
     from origenerator.gui.show_hud import show_hud_model
 
     rows = _fox_library(tmp_path)
@@ -413,18 +420,11 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
     assert model.corner.path == "g1.png"
     assert [cell.path for cell in model.seeds] == ["g2.png"]
-    assert [cell.path for cell in model.actions] == ["g3.png"]
+    assert [(cell.path, cell.label) for cell in model.actions] == [("v1.png", "alpha")]
+    assert model.current_action == "Source image"
     assert (model.seed_count, model.action_count) == (2, 2)
     assert model.playing == ("corner", 0) and model.active_loop == ""
     assert model.lock_label == "Unlocked · Shuffle"
-    # Each configuration down the column is named by its folder, as the
-    # corner's row is by its own — the tree's name for it, its short code here.
-    folder = gallery.config_folder_name(
-        "sdxl_t2i", gallery.settings_signature(
-            "sdxl_t2i", rows[0]["params_json"],
-            workflow_version=rows[0]["workflow_version"]), {})
-    assert model.current_action == folder
-    assert model.actions[0].label and model.actions[0].label != folder
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the player under the show.
     assert [(button.command, button.lit) for button in model.rows[0]] == [
@@ -452,11 +452,12 @@ def test_the_map_re_homes_on_whatever_the_show_moves_to(qtbot, tmp_path, monkeyp
 
 def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, tmp_path, monkeypatch):
     """The column can name a generation outside the set a show opened with —
-    another configuration of this seed, which lives in another folder — and a
+    a video of this picture, which lives in a folder of its own — and a
     click on it plays it, spliced in after the slide on screen."""
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
+    view.refresh()
     monkeypatch.setattr(view, "rows_to_play", lambda: rows[:2])   # the fox folder alone
     monkeypatch.setattr(view._shows, "items_of", _as_items)
     monkeypatch.setattr(view, "slideshow_subject", lambda: "the fox folder")
@@ -465,10 +466,10 @@ def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, t
     qtbot.addWidget(show)
     show.show_item("g1.png")
 
-    show.show_item("g3.png")
+    show.show_item("v1.png")
 
-    assert show._playlist.current()[2] == "g3"
-    assert show.hud_map().corner.path == "g3.png"    # and the map re-homed on it
+    assert show._playlist.current()[2] == "v1"
+    assert show.hud_map().corner.path == "v1.png"    # and the map re-homed on it
 
 
 def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatch):
@@ -638,7 +639,9 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert [item[2] for item in show._playlist.items] == ["g1", "g2"]
     model = show_hud_model("portrait", show)
     assert model.active_loop == "seed"
-    assert model.filter_query == model.current_action   # its row's button lights too
+    # A seed loop lights the row it is playing, which is what that row's
+    # button says about it; an act filter would light every row it keeps.
+    assert model.filter_query == model.current_action == "Source image"
     assert model.lock_label.startswith("Looping seeds")
     assert "Unlocked" not in model.lock_label
     assert show._note.text() == "Looping seeds: 2"
@@ -646,7 +649,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     hud._deliver("portrait_no_loop")
 
     assert show.isVisible()                      # the region is not handed back
-    assert show.pass_size() == 4                 # it browses its set again
+    assert show.pass_size() == 5                 # it browses its set again
     assert show._playlist.current()[2] == "g1"
     dropped = show_hud_model("portrait", show)
     assert dropped.active_loop == ""

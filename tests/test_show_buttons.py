@@ -143,6 +143,9 @@ class _Host:
     def show_step_version(self, delta):
         self.calls.append(("version", delta))
 
+    def clear_modes(self):
+        self.calls.append("every narrowing off")
+
 
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():
     """A picture nobody enhanced, a video Evolver never upscaled: there is
@@ -186,10 +189,11 @@ def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
 
 
 def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
-    """The two loop buttons, the loop key, the expand mark and the map's
-    keys — each in the players' spelling, each meaning on a show what it
-    means on a player.  The players' second axis is their action column; on
-    a show it is the config column, the same seed under other configurations."""
+    """The two loop buttons, the loop key, the expand mark, the map's keys
+    and the button at the head of each row — each in the players' spelling,
+    each meaning on a show what it means on a player.  Lifting the filter is
+    the one that means more: said to a show, "no filter" is the way out of
+    every narrowing, so the press is too."""
     host = _Host()
 
     for action in ("seed_loop", "action_loop", "no_loop", "loop", "more_seeds",
@@ -199,9 +203,9 @@ def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     assert answer(host, "filter", "dawn")
 
     assert host.calls == [
-        ("loop", "seed"), ("loop", "config"), ("loop", ""), "loop key", "more seeds",
+        ("loop", "seed"), ("loop", "action"), ("loop", ""), "loop key", "more seeds",
         ("nav", "left"), ("nav", "right"), ("nav", "up"), ("nav", "down"),
-        ("nav", "right"), ("nav", "down"), ("loop", ""), ("filter", "dawn"),
+        ("nav", "right"), ("nav", "down"), "every narrowing off", ("filter", "dawn"),
     ]
 
 

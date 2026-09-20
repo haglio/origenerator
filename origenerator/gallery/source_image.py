@@ -60,6 +60,15 @@ def find_source_image_id(row: dict, image_rows: list[dict]) -> str | None:
     )
 
 
+def source_image_id_in(row: dict, image_index: dict) -> str | None:
+    """The prompt_id of the image ``row``'s start frame is, read off
+    ``image_index`` (see :func:`build_image_config_index`) rather than searched
+    for: what a walk of the whole library asks of every video in it. ``None``
+    for a row with no input image, or one no indexed generation produced."""
+    entry = image_index.get(_frame_name(parse_params(row.get("params_json")).get("input_image")))
+    return (entry.prompt_id or None) if entry is not None else None
+
+
 def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
     """Map each image's output filename to the generation that produced it.
 

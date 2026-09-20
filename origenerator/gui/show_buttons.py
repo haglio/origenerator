@@ -111,10 +111,8 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
 
 
 # The map's own chrome and the session's own keys, in the players' spelling,
-# each with the axis or the direction it means on a show.  The players' second
-# axis is their action column; here it is the config column, the same seed
-# under other configurations.
-_LOOPS = {"seed_loop": "seed", "action_loop": "config", "no_loop": ""}
+# each with the axis or the direction it means on a show.
+_LOOPS = {"seed_loop": "seed", "action_loop": "action", "no_loop": ""}
 _NAV = {"nav_left": "left", "nav_right": "right", "nav_up": "up", "nav_down": "down",
         # The players' spoken "next seed" / "next action": one step along the
         # row, one step down the column.
@@ -153,11 +151,14 @@ def answer(host, action: str, argument: str = "") -> bool:
     elif action == "more_seeds":
         host.show_more_seeds()
     elif action == "filter":
-        # The button at the head of a map row: narrow to that configuration,
-        # the way a satellite's narrows to that act.
+        # The button at the head of a map row, and the session's spoken
+        # acts: narrow to that act, the way a satellite's does.
         host.show_filter(argument)
     elif action == "no_filter":
-        host.show_loop("")
+        # A press on the row the filter already is.  Said to a show, "no
+        # filter" is the way out of every narrowing, and a hosted panel's
+        # press arrives as those very words -- so the press means that here.
+        host.clear_modes()
     elif action in _NAV:
         host.show_nav(_NAV[action])
     elif action in ("cycle_version", "cycle_version_back"):

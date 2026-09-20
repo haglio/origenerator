@@ -16,8 +16,9 @@ re-renders; a player is handed a new playlist), so it arrives as
 ``on_pass_change(kept)``: whether the slide that was on screen survived into
 the new pass.
 
-The map is the players' own (:mod:`origenerator.gui.show_map`): what shares
-the slide's configuration runs right, what shares its seed runs down, and a
+The map is the players' own (:mod:`origenerator.gui.show_map`): the slide's
+act under other seeds runs right, what else was made of its picture runs
+down, and a
 loop along either axis deals THAT row or column as the pass, the way a
 satellite loops a seed family, until it is stepped off or ended.  The set it
 was browsing waits underneath and comes back when the loop ends.
@@ -27,18 +28,19 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from player_core.satellite_hud import label_is_filtered
 
 from origenerator.gui.neighbor_previews import still_for
 from origenerator.gui.show_map import (
-    CONFIG_AXIS,
+    ACTION_AXIS,
     LOOP_CYCLE,
     NO_NEIGHBORS,
     SEED_AXIS,
     Loop,
     MapNeighbors,
     ShowMap,
+    acts_posted,
     build_map,
-    label_query,
     step_in_ring,
 )
 from origenerator.gui.show_wiring import HudFacts
@@ -59,23 +61,29 @@ class ShowSet:
                  hud: HudFacts | None = None,
                  on_pass_change: Callable[[bool], None] | None = None,
                  neighbors: Callable[[str], MapNeighbors] | None = None,
-                 widen: Callable[[str], tuple[Slide, ...]] | None = None) -> None:
+                 widen: Callable[[str], tuple[Slide, ...]] | None = None,
+                 acts: Callable[[list], dict] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this show's was: a
         # double-clicked picture's show reads its folder in order, and a filter
         # applied over one must not quietly shuffle it.  None means the
         # playlist's own random shuffle, here and on the way back in.
         self._shuffle = shuffle
         self._on_pass_change = on_pass_change
-        # What the library says about an item — its seed row and its config
+        # What the library says about an item — its seed row and its action
         # column — and what lies beyond the exact row.  None for a show with
         # no library under it (a test's, a lone file's), whose map is the
         # slide alone.
         self._neighbors_of = neighbors
         self._widen = widen
         self._known: dict[str, MapNeighbors] = {}
+        # What each generation's map row is named for, by id -- the acts an
+        # act filter matches it on.  None for a show with no library under it.
+        self._acts_of = acts
+        self._named: dict[str, str] = {}
         self.loop: Loop | None = None
         self.favorites_filter = False
         self.enhanced_mode = False
+        self.act_filter = ""
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`set_modes`).
         self.all_items = [Slide.of(item) for item in items]
@@ -102,7 +110,7 @@ class ShowSet:
         """
         self.all_items = [Slide.of(item) for item in items]
         self.loop = None
-        self._known.clear()
+        self._library_moved()
         self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
                                    start=start, shuffle=shuffle)
         self._a_row_played_whole_is_its_loop()
@@ -152,10 +160,12 @@ class ShowSet:
 
     # --- the two switches --------------------------------------------------
 
-    def set_modes(self, *, favorites_filter: bool, enhanced: bool) -> bool:
-        """Deal the pass from what answers the switches as asked — both on
-        meaning what answers both, the way every pair of filters in this family
-        stacks — and say whether anything moved.
+    def set_modes(self, *, favorites_filter: bool, enhanced: bool,
+                  act_filter: str | None = None) -> bool:
+        """Deal the pass from what answers the switches as asked — all on
+        meaning what answers all of them, the way every set of filters in this
+        family stacks — and say whether anything moved.  *act_filter* left
+        unsaid stays as it is.
 
         A switch that would leave nothing is refused rather than obeyed: an
         empty show is not a mode, and the HUD's button staying dark is the
@@ -163,61 +173,91 @@ class ShowSet:
         A loop ends with it: the switch is a narrowing of the browse, and the
         pass it deals is the browse.
         """
-        if (favorites_filter, enhanced) == (self.favorites_filter, self.enhanced_mode):
+        act_filter = self.act_filter if act_filter is None else act_filter
+        if (favorites_filter, enhanced, act_filter) == (
+                self.favorites_filter, self.enhanced_mode, self.act_filter):
             return False
         narrowed = [item for item in self.all_items
-                    if self.passes(item, favorites_filter=favorites_filter, enhanced=enhanced)]
+                    if self.passes(item, favorites_filter=favorites_filter,
+                                   enhanced=enhanced, act_filter=act_filter)]
         if not narrowed:
             return False
-        self.favorites_filter, self.enhanced_mode = favorites_filter, enhanced
+        self.favorites_filter, self.enhanced_mode, self.act_filter = (
+            favorites_filter, enhanced, act_filter)
         self.loop = None
         self.replace_items(narrowed, keep_slide=True)
         return True
 
-    def drop_the_switches(self) -> bool:
-        """Both switches off, the pass re-dealt over the whole set — a reset.
+    def set_act_filter(self, query: str) -> bool:
+        """Narrow the pass to what is named for the act(s) *query* names — the
+        third switch, stacked on the other two — or lift it for ""."""
+        return self.set_modes(favorites_filter=self.favorites_filter,
+                              enhanced=self.enhanced_mode, act_filter=query)
 
-        ``False`` when neither was on: there is nothing to widen back to, and
+    def drop_the_switches(self) -> bool:
+        """Every switch off, the pass re-dealt over the whole set — a reset.
+
+        ``False`` when none was on: there is nothing to widen back to, and
         the pass is left exactly as it is for the surface to start over in.
         """
-        if not (self.favorites_filter or self.enhanced_mode):
+        if not self._narrowed():
             return False
-        self.favorites_filter = self.enhanced_mode = False
+        self._widen_back()
         self.loop = None
         self.replace_items(self.all_items, keep_slide=False)
         return True
 
+    def _narrowed(self) -> bool:
+        return bool(self.favorites_filter or self.enhanced_mode or self.act_filter)
+
+    def _widen_back(self) -> None:
+        self.favorites_filter = self.enhanced_mode = False
+        self.act_filter = ""
+
     def retune(self, items, *, enhanced_ids=()) -> None:
         """Point the set at the side's base set: a hosted reset."""
-        self.favorites_filter = self.enhanced_mode = False
+        self._widen_back()
         self.reorder(items, latest=False, enhanced_ids=enhanced_ids)
 
     def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
         self._shuffle = in_order if latest else None
         self.loop = None
-        self._known.clear()
+        self._library_moved()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                            favorite_ids=self.favorite_ids, enhanced_ids=enhanced_ids))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:
-            self.favorites_filter = self.enhanced_mode = False
+            self._widen_back()
             kept = self.all_items
         self.replace_items(kept, keep_slide=False, new_set=True)
 
-    def passes(self, item, *, favorites_filter=None, enhanced=None) -> bool:
+    def passes(self, item, *, favorites_filter=None, enhanced=None, act_filter=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
         about a setting the show is not in yet.  An item with no id (a test's,
         or a run's frames) is neither favorited nor enhanced, so any switch that
         is on leaves it out."""
         favorites_filter = self.favorites_filter if favorites_filter is None else favorites_filter
         enhanced = self.enhanced_mode if enhanced is None else enhanced
+        act_filter = self.act_filter if act_filter is None else act_filter
         prompt_id = item.prompt_id
         if favorites_filter and prompt_id not in self.favorite_ids:
             return False
         if enhanced and prompt_id not in self.enhanced_ids:
             return False
-        return True
+        return not act_filter or label_is_filtered(self._named_for(prompt_id), act_filter)
+
+    def _named_for(self, prompt_id) -> str:
+        """The act(s) *prompt_id*'s map row is named for.  The whole set is
+        asked about at once, the first time anything is: the answer costs a
+        walk of the library, and a filter asks it of every item."""
+        if prompt_id is None or self._acts_of is None:
+            return ""
+        if prompt_id not in self._named:
+            asked = [prompt_id, *(item.prompt_id for item in self.all_items
+                                  if item.prompt_id is not None)]
+            self._named = {**dict.fromkeys(asked, ""), **self._acts_of(asked)}
+        return self._named[prompt_id]
 
     # --- keeping the whole set current -------------------------------------
     # Kept in step with the pass by id where an item has one, so an arrival,
@@ -232,7 +272,7 @@ class ShowSet:
     def remember(self, item) -> None:
         """Take *item* into the whole set, in place of the entry with its id.
         The library moved, so what it says about every item is asked again."""
-        self._known.clear()
+        self._library_moved()
         self._take_into_a_looping_row(item)
         for index, kept in enumerate(self.all_items):
             if self._same(kept, item):
@@ -250,11 +290,11 @@ class ShowSet:
             self.loop = Loop(loop.axis, (*loop.pool, item))
 
     def forget(self, item) -> None:
-        self._known.clear()
+        self._library_moved()
         self.all_items = [kept for kept in self.all_items if not self._same(kept, item)]
 
     def forget_id(self, prompt_id) -> None:
-        self._known.clear()
+        self._library_moved()
         self.all_items = [kept for kept in self.all_items if kept.prompt_id != prompt_id]
 
     def live_ids(self) -> list:
@@ -272,6 +312,10 @@ class ShowSet:
         return None
 
     # --- the map, and the loops along it -----------------------------------
+
+    def _library_moved(self) -> None:
+        self._known.clear()
+        self._named.clear()
 
     def neighbors(self, prompt_id) -> MapNeighbors:
         """What the library says about *prompt_id*, asked once per item: the
@@ -296,7 +340,7 @@ class ShowSet:
         if current is None:
             return []
         around = self.neighbors(current.prompt_id)
-        return [current, *(around.seeds if axis == SEED_AXIS else around.configs)]
+        return [current, *(around.seeds if axis == SEED_AXIS else around.group)]
 
     def start_loop(self, axis: str, pool=None) -> bool:
         """Play *pool* — *axis*'s row or column around the slide on screen, by
@@ -326,7 +370,7 @@ class ShowSet:
         return True
 
     def step_loop(self) -> str:
-        """One press of the loop key: the seed row, then the config column, then
+        """One press of the loop key: the seed row, then the action column, then
         off — each axis stepped over when it holds only the slide on screen, and
         with neither able to loop the press is the lock instead
         (:data:`LOOP_IS_A_LOCK`), so the key never lands on nothing."""
@@ -344,7 +388,7 @@ class ShowSet:
         return LOOP_IS_A_LOCK
 
     def more_seeds(self) -> bool:
-        """Widen the row past the exact configuration and loop what it becomes —
+        """Widen the row past what exactly matches and loop what it becomes —
         the map's expand mark.  ``False`` when nothing lies beyond the row."""
         current = self.playlist.current()
         if current is None or self._widen is None:
@@ -353,14 +397,6 @@ class ShowSet:
         if not additions:
             return False
         return self.start_loop(SEED_AXIS, [*self.loop_pool(SEED_AXIS), *additions])
-
-    def row_slide(self, query: str) -> Slide | None:
-        shown = self.map()
-        if shown is None:
-            return None
-        rows = ((shown.corner, shown.label), *zip(shown.configs, shown.config_labels))
-        return next((slide for slide, label in rows
-                     if label and label_query(label) == query), None)
 
     def slide_for_path(self, path) -> Slide | None:
         """The slide playing *path* — in the pass, or drawn on the map — or ``None``."""
@@ -371,7 +407,7 @@ class ShowSet:
     def jump_to(self, slide: Slide) -> bool:
         """Stand the pass on *slide*, splicing it in after the slide on screen
         when the pass has never held it — a map cell can name a generation the
-        set does not: a configuration sibling, a widened seed.  A jump off a
+        set does not: a video of a picture it holds, a widened seed.  A jump off a
         running loop's axis ends the loop first.  ``False`` when it is the slide
         already on screen."""
         current = self.playlist.current()
@@ -398,16 +434,16 @@ class ShowSet:
             return None
         bucket, index = shown.playing
         along_the_row = direction in ("right", "left")
-        axis = SEED_AXIS if along_the_row else CONFIG_AXIS
+        axis = SEED_AXIS if along_the_row else ACTION_AXIS
         if bucket in ("corner", axis):
-            cells = (shown.corner, *(shown.seeds if along_the_row else shown.configs))
+            cells = (shown.corner, *(shown.seeds if along_the_row else shown.actions))
             at = 0 if bucket == "corner" else index + 1
         else:
             # Off the lit cell's own axis — down from a seed, sideways from a
-            # config — into that cell's other axis, as if it were the corner.
+            # act — into that cell's other axis, as if it were the corner.
             current = self.playlist.current()
             around = self.neighbors(current.prompt_id)
-            cells = (current, *(around.seeds if along_the_row else around.configs))
+            cells = (current, *(around.seeds if along_the_row else around.actions))
             at = 0
         return step_in_ring(cells, at, 1 if direction in ("right", "down") else -1)
 
@@ -443,6 +479,18 @@ class ShowSet:
         unfavorite(prompt_id)
         self.favorite_ids.discard(prompt_id)  # the star readout and F-mode follow it
         return True
+
+
+def narrow_to_acts(show_set: ShowSet, posted: str) -> tuple[str, bool]:
+    """Narrow *show_set* to the act(s) a row's button or a spoken act *posted*
+    — or lift the filter, for nothing posted — and answer with what a show
+    says about it, the way a satellite says it, and whether that is a dead
+    end: an act nothing here is named for leaves the pass alone."""
+    acts = acts_posted(posted)
+    if not (show_set.set_act_filter(acts) or acts == show_set.act_filter):
+        return f"Filter: no matches for '{acts}'", False
+    summary = f"'{acts}'" if acts else "cleared"
+    return f"Filter: {summary} ({len(show_set.playlist)})", True
 
 
 def looping_note(show_set: ShowSet) -> str:

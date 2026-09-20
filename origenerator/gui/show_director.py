@@ -65,10 +65,10 @@ from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.nav_map import (
-    config_family,
+    act_labels,
+    beyond_the_row,
     one_per_stretch,
-    seed_family,
-    widened_family,
+    surroundings,
 )
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
 from origenerator.voice.app_commands import AppCommand
@@ -452,6 +452,7 @@ class ShowDirector:
                        if self._session_channel is not None else None),
             neighbors=partial(self.neighbors_of, side=side),
             widen=partial(self.beyond_the_row_of, side=side),
+            acts=partial(self.acts_of, side=side),
         )
 
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
@@ -575,39 +576,46 @@ class ShowDirector:
 
     def neighbors_of(self, prompt_id: str, *, side: str) -> MapNeighbors:
         """What the library says about one generation, for the map a show on
-        *side* draws around it: the same configuration under other seeds along
-        the row, the same seed under other configurations down the column,
-        each configuration named by its folder (:mod:`origenerator.nav_map`).
-        Nothing at all for a generation the gallery does not have a row for —
-        a file being written, a set assembled without ids."""
+        *side* draws around it: its act under other seeds along the row, and
+        down the column what else was made of its picture — the videos animated
+        from it, and for a video the picture itself — each named for the act it
+        shows (:mod:`origenerator.nav_map`).  Nothing at all for a generation
+        the gallery does not have a row for — a file being written, a set
+        assembled without ids."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return MapNeighbors()
-        index = self._host.image_config_index()
-        library = self._library_of(side)
-        seeds = seed_family(row, library, image_index=index)[1:]
-        configs = config_family(row, library, image_index=index)[1:]
+        around = surroundings(row, self._library_of(side),
+                              image_index=self._host.image_config_index())
+        # Each act with the slide it names, so a row with no file to play
+        # drops out of both at once rather than shifting the names along.
+        column = [(slide, label) for generation, label in around.actions
+                  for slide in self._slides_of([generation])]
         return MapNeighbors(
-            seeds=self._slides_of(seeds),
-            configs=self._slides_of(configs),
-            label=self._folder_name(row),
-            config_labels=tuple(self._folder_name(sibling) for sibling in configs),
+            seeds=self._slides_of(around.seeds),
+            actions=tuple(slide for slide, _label in column),
+            label=around.label,
+            action_labels=tuple(label for _slide, label in column),
+            group=self._slides_of(around.group),
         )
 
     def beyond_the_row_of(self, prompt_id: str, *, side: str) -> tuple[Slide, ...]:
-        """The slides "more seeds" adds to a show's row around *prompt_id*: the
-        nearest other configurations of the same model, or nothing when the
-        model holds nothing else."""
+        """The slides "more seeds" adds to a show's row around *prompt_id*, or
+        nothing when nothing lies beyond it."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return ()
-        index = self._host.image_config_index()
-        library = self._library_of(side)
-        widened = widened_family(row, library, image_index=index)
-        if widened is None:
-            return ()
-        exact = len(seed_family(row, library, image_index=index))
-        return self._slides_of(widened[exact:])
+        return self._slides_of(beyond_the_row(
+            row, self._library_of(side), image_index=self._host.image_config_index()))
+
+    def acts_of(self, prompt_ids, *, side: str) -> dict[str, str]:
+        """What the map names each of *prompt_ids* for, among the library of
+        *side*'s shape — what an act filter matches a generation on.  One the
+        library does not hold is left out, and answers to no act."""
+        named_for = act_labels(self._library_of(side),
+                               image_index=self._host.image_config_index())
+        return {prompt_id: named_for[prompt_id] for prompt_id in prompt_ids
+                if prompt_id in named_for}
 
     def rows_at(self, location) -> list[dict]:
         """What a show opened at *location* would play if it opened now.
@@ -1243,9 +1251,8 @@ class ShowDirector:
         once. Said even when the switch was already that way — a word that did
         nothing and said nothing reads as a mic that missed it.
 
-        Turning it off takes F-mode with it: "clear filter" is the way out of
-        ALL of the narrowing, which is what the same phrase means on every
-        satellite in this family.
+        Turning it off takes F-mode and the act filter with it: said to a
+        show, "clear filter" is the way out of ALL of the narrowing.
         """
         show = self.surface_for(side)
         if show is None:

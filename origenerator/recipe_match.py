@@ -188,6 +188,14 @@ def category_for_prompt(prompt: str) -> str | None:
     return best
 
 
+def act_of(row: dict) -> str:
+    """The act ``row`` shows: the one picked for it in Combine, else the one its
+    prompt reads as depicting, and "" for a prompt that names none."""
+    return (row.get("recipe_category")
+            or category_for_prompt(row.get("positive_prompt"))
+            or "")
+
+
 def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     """The acts a picked dropdown entry can actually answer: those ``video_rows``
     holds at least one usable video of (a recipe can be mined), plus those the

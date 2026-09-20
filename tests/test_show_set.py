@@ -161,14 +161,15 @@ from origenerator.gui.show_map import MapNeighbors  # noqa: E402
 from origenerator.slideshow import Slide  # noqa: E402
 
 _SEEDS = {"id-1": (Slide("one-b.png", "image", "id-1b"), Slide("one-c.png", "image", "id-1c"))}
-_CONFIGS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
+_ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
             "id-1b": (Slide("one-bx.png", "image", "id-1bx"),)}
 
 
 def _neighbors(prompt_id):
-    configs = _CONFIGS.get(prompt_id, ())
-    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()), configs=configs,
-                        label="fox", config_labels=("dawn",) * len(configs))
+    actions = _ACTIONS.get(prompt_id, ())
+    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()), actions=actions,
+                        label="fox", action_labels=("dawn",) * len(actions),
+                        group=actions)
 
 
 def _mapped(**fields):
@@ -189,9 +190,9 @@ def test_the_map_is_the_slide_on_screen_with_its_seeds_right_and_its_configs_dow
 
     assert shown.corner.prompt_id == "id-1"
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
-    assert _ids(shown.configs) == ["id-1x"]
+    assert _ids(shown.actions) == ["id-1x"]
     assert (shown.playing, shown.loop) == (("corner", 0), "")
-    assert (shown.label, shown.config_labels) == ("fox", ("dawn",))
+    assert (shown.label, shown.action_labels) == ("fox", ("dawn",))
 
 
 def test_the_map_re_homes_on_whatever_comes_up():
@@ -201,7 +202,7 @@ def test_the_map_re_homes_on_whatever_comes_up():
 
     shown = show_set.map()
     assert shown.corner.prompt_id == "id-2"
-    assert (shown.seeds, shown.configs, shown.playing) == ((), (), ("corner", 0))
+    assert (shown.seeds, shown.actions, shown.playing) == ((), (), ("corner", 0))
 
 
 def test_looping_the_seeds_plays_the_row_round_under_a_map_that_holds_still():
@@ -221,7 +222,7 @@ def test_looping_the_seeds_plays_the_row_round_under_a_map_that_holds_still():
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
     assert shown.playing == ("seed", 0)
     assert shown.loop == "seed"
-    assert _ids(shown.configs) == ["id-1bx"]      # the lit seed's column
+    assert _ids(shown.actions) == ["id-1bx"]      # the lit seed's column
 
 
 def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
@@ -245,10 +246,25 @@ def test_the_loop_key_steps_seeds_then_configs_then_off_and_round_again():
     show_set, _dealt = _mapped()
 
     assert show_set.step_loop() == "seed"
-    assert show_set.step_loop() == "config"
+    assert show_set.step_loop() == "action"
     assert _ids(show_set.playlist.items) == ["id-1", "id-1x"]
     assert show_set.step_loop() == "off"
     assert show_set.step_loop() == "seed"
+
+
+def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
+    """The column steps between acts, so twins of one act share a row; the
+    loop is the picture and every video of it, and its map is the loop."""
+    twin = Slide("one-y.png", "image", "id-1y")
+    whole = lambda pid: MapNeighbors(  # noqa: E731
+        actions=_ACTIONS.get(pid, ()), action_labels=("dawn",) * len(_ACTIONS.get(pid, ())),
+        group=(*_ACTIONS.get(pid, ()), twin) if pid == "id-1" else ())
+    show_set, _dealt = _set(neighbors=whole)
+
+    assert show_set.start_loop("action") is True
+
+    assert _ids(show_set.playlist.items) == ["id-1", "id-1x", "id-1y"]
+    assert _ids(show_set.map().actions) == ["id-1x", "id-1y"]
 
 
 def test_an_axis_with_nothing_to_loop_is_stepped_over():
@@ -337,25 +353,13 @@ def test_a_switch_ends_a_loop_and_deals_the_browse():
     assert _ids(show_set.playlist.items) == ["id-2"]
 
 
-def test_a_rows_button_names_the_cell_at_the_head_of_that_row():
-    """The button at the head of a map row — a satellite's act filter — names a
-    configuration here, spelled the way the panel posts it: the corner for its
-    own row, that row's cell for any other."""
-    show_set, dealt = _mapped()
-
-    assert show_set.row_slide("fox").prompt_id == "id-1"
-    assert show_set.row_slide("dawn").prompt_id == "id-1x"
-    assert show_set.row_slide("nobody") is None
-    assert dealt == []                               # asking moves nothing
-
-
 def test_a_set_with_nothing_in_it_has_nothing_to_map_loop_widen_or_walk():
     show_set, dealt = _set(items=[], neighbors=_neighbors, widen=lambda pid: ())
 
     assert show_set.map() is None
     assert show_set.step_loop() == "lock"
     assert show_set.more_seeds() is False
-    assert show_set.row_slide("fox") is None
+    assert show_set.set_act_filter("fox") is False
     assert show_set.nav_target("right") is None
     assert dealt == []
 
@@ -446,3 +450,70 @@ def test_a_generation_landing_in_a_row_that_is_looping_joins_the_loop():
     shown = show_set.map()
     assert _ids((shown.corner, *shown.seeds)) == ["id-1", "id-1b", "id-1c"]
     assert (shown.loop, shown.playing) == ("seed", ("seed", 1))
+
+
+# --- the act filter: the map's row buttons, and the session's spoken acts ------
+
+_NAMED_FOR = {"id-1": "Source image, alpha", "id-2": "beta", "id-3": "alpha"}
+
+
+def _acts(prompt_ids):
+    return {prompt_id: _NAMED_FOR.get(prompt_id, "") for prompt_id in prompt_ids}
+
+
+def _filterable(**fields):
+    return _set(acts=_acts, **fields)
+
+
+def test_an_act_filter_narrows_the_pass_to_what_is_named_for_that_act():
+    show_set, dealt = _filterable()
+
+    assert show_set.set_act_filter("alpha") is True
+
+    assert _ids(show_set.playlist.items) == ["id-1", "id-3"]
+    assert show_set.act_filter == "alpha"
+    assert dealt == [True]                      # the slide on screen shows that act
+
+
+def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
+    """A filter that selected nothing is a dead end, not a mode: the set plays
+    on, and the row's button stays dark."""
+    show_set, dealt = _filterable()
+
+    assert show_set.set_act_filter("gamma") is False
+
+    assert (show_set.act_filter, dealt, len(show_set.playlist)) == ("", [], 3)
+
+
+def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
+    """Set from a row carrying two acts it names both, and only a generation
+    carrying both answers it — the rule the panel lights its rows by."""
+    show_set, _dealt = _filterable()
+
+    assert show_set.set_act_filter("source image, alpha") is True
+
+    assert _ids(show_set.playlist.items) == ["id-1"]
+
+
+def test_a_reset_drops_the_act_filter_with_the_other_switches():
+    show_set, dealt = _filterable()
+    show_set.set_act_filter("beta")
+    dealt.clear()
+
+    assert show_set.drop_the_switches() is True
+
+    assert (show_set.act_filter, len(show_set.playlist), dealt) == ("", 3, [False])
+
+
+def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
+    """A video landing makes its picture a source, so what the library said
+    before it landed is not what a filter may go on matching by."""
+    named_for = dict(_NAMED_FOR)
+    show_set, _dealt = _set(acts=lambda ids: {pid: named_for.get(pid, "") for pid in ids})
+    show_set.set_act_filter("alpha")
+    assert show_set.passes(Slide("two.png", "image", "id-2")) is False
+
+    named_for["id-2"] = "Source image, alpha"
+    show_set.remember(Slide("four.mp4", "video", "id-4"))
+
+    assert show_set.passes(Slide("two.png", "image", "id-2")) is True

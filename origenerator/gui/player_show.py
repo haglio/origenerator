@@ -43,8 +43,13 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.show_hud import show_hud_model
-from origenerator.gui.show_map import SEED_AXIS
-from origenerator.gui.show_set import LOOP_IS_A_LOCK, LOOP_OFF, ShowSet, looping_note
+from origenerator.gui.show_set import (
+    LOOP_IS_A_LOCK,
+    LOOP_OFF,
+    ShowSet,
+    looping_note,
+    narrow_to_acts,
+)
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.toast import NOTICE, WARNING
@@ -116,7 +121,8 @@ class PlayerShow(QObject):
         self._dwell_s = image_dwell_ms // 1000
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
                             start=start, hud=hud, on_pass_change=self._pass_changed,
-                            neighbors=self._actions.neighbors, widen=self._actions.widen)
+                            neighbors=self._actions.neighbors, widen=self._actions.widen,
+                            acts=self._actions.acts)
 
     def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
              hud=None) -> None:
@@ -447,7 +453,7 @@ class PlayerShow(QObject):
             self._note("Nothing to loop", kind=WARNING)
 
     def show_loop_cycle(self) -> None:
-        """The loop key: seeds, then configs, then off — and the lock when
+        """The loop key: seeds, then actions, then off — and the lock when
         there is nothing on either axis to loop."""
         stepped = self._set.step_loop()
         if stepped == LOOP_IS_A_LOCK:
@@ -465,14 +471,10 @@ class PlayerShow(QObject):
             self._note("Widening net failed", kind=WARNING)
 
     def show_filter(self, query: str) -> None:
-        slide = self._set.row_slide(query)
-        if slide is None:
-            self._note("Nothing to loop", kind=WARNING)
-            return
-        if slide is not self._set.playlist.current():
-            self._let_go()
-            self._jump_to(slide)
-        self.show_loop(SEED_AXIS)
+        """Narrow to the act(s) *query* names — the button at the head of a
+        map row, and the session's spoken acts."""
+        said, narrowed = narrow_to_acts(self._set, query)
+        self._note(said, kind=NOTICE if narrowed else WARNING)
 
     def show_nav(self, direction: str) -> None:
         target = self._set.nav_target(direction)
@@ -502,6 +504,10 @@ class PlayerShow(QObject):
         return self._set.enhanced_mode
 
     @property
+    def hud_act_filter(self) -> str:
+        return self._set.act_filter
+
+    @property
     def hud_order_label(self) -> str:
         return self._set.order_label
 
@@ -527,7 +533,7 @@ class PlayerShow(QObject):
         return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
 
     def clear_modes(self) -> bool:
-        return self._set.set_modes(favorites_filter=False, enhanced=False)
+        return self._set.set_modes(favorites_filter=False, enhanced=False, act_filter="")
 
     def current_media_path(self) -> str:
         """The file on screen — the player's own answer, which is what the

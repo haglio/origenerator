@@ -103,12 +103,12 @@ from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
-from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
     LOOP_IS_A_LOCK,
     LOOP_OFF,
     ShowSet,
     looping_note,
+    narrow_to_acts,
 )
 from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
@@ -281,7 +281,8 @@ class SlideshowView(QWidget):
         # back here as :meth:`_pass_changed`.
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
                             start=start, hud=hud, on_pass_change=self._pass_changed,
-                            neighbors=self._actions.neighbors, widen=self._actions.widen)
+                            neighbors=self._actions.neighbors, widen=self._actions.widen,
+                            acts=self._actions.acts)
 
     @property
     def _playlist(self):
@@ -753,7 +754,7 @@ class SlideshowView(QWidget):
             self._flash_note(_NOTHING_TO_LOOP, kind=WARNING)
 
     def show_loop_cycle(self) -> None:
-        """The loop key, as on a player: seeds, then configs, then off — and
+        """The loop key, as on a player: seeds, then actions, then off — and
         the lock when there is nothing on either axis to loop, which is Down's
         whole gesture here."""
         stepped = self._set.step_loop()
@@ -766,7 +767,7 @@ class SlideshowView(QWidget):
             self._flash_note(looping_note(self._set))
 
     def show_more_seeds(self) -> None:
-        """Widen the seed row past the exact configuration and loop it — the
+        """Widen the seed row past what exactly matches and loop it — the
         map's expand mark."""
         if self._set.more_seeds():
             self._flash_note(_MORE_SEEDS)
@@ -774,15 +775,16 @@ class SlideshowView(QWidget):
             self._flash_note(_WIDENING_FAILED, kind=WARNING)
 
     def show_filter(self, query: str) -> None:
-        """Narrow to the configuration whose map row is labeled *query* — the
-        button at the head of that row."""
-        slide = self._set.row_slide(query)
-        if slide is None:
-            self._flash_note(_NOTHING_TO_LOOP, kind=WARNING)
-            return
-        if slide is not self._playlist.current():
-            self._jump_to(slide)
-        self.show_loop(SEED_AXIS)
+        """Narrow to the act(s) *query* names — the button at the head of a
+        map row, and the session's spoken acts."""
+        said, narrowed = narrow_to_acts(self._set, query)
+        self._flash_note(said, kind=NOTICE if narrowed else WARNING)
+
+    @property
+    def hud_act_filter(self) -> str:
+        """The act(s) the set is narrowed to — what lights the map's row
+        buttons (see :class:`~origenerator.gui.show_host.ShowHost`)."""
+        return self._set.act_filter
 
     def show_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one, the way a
@@ -925,9 +927,9 @@ class SlideshowView(QWidget):
         return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
 
     def clear_modes(self) -> bool:
-        """Both switches off at once — what "clear filter" has to mean once
-        there is more than one to clear, and what it means on every satellite."""
-        return self._set.set_modes(favorites_filter=False, enhanced=False)
+        """Every switch off at once — what "clear filter" has to mean once
+        there is more than one to clear."""
+        return self._set.set_modes(favorites_filter=False, enhanced=False, act_filter="")
 
     def show_item(self, path, *, hold: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
@@ -1346,7 +1348,7 @@ class SlideshowView(QWidget):
             self._hold_current()    # hold it, favorite it, and enhance it
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
-            # satellites: seeds, then configs, then off.
+            # satellites: seeds, then actions, then off.
             self.show_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder

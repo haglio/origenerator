@@ -283,3 +283,20 @@ def test_category_for_prompt_prefers_the_more_specific_reading():
     assert recipe_match.category_for_prompt("beta form") == "beta"
     # A prompt naming two acts outright resolves to the longer keyword it matched.
     assert recipe_match.category_for_prompt("striptease, then a beta") == "dancing"
+
+
+# --- act_of: what a generation shows -------------------------------------------
+
+
+def test_a_generation_shows_the_act_picked_for_it_in_combine():
+    row = {"recipe_category": "beta", "positive_prompt": "she is dancing on a table"}
+
+    assert recipe_match.act_of(row) == "beta"
+
+
+def test_a_generation_nothing_was_picked_for_shows_what_its_prompt_reads_as():
+    assert recipe_match.act_of({"positive_prompt": "a beta form, slowly"}) == "beta"
+
+
+def test_a_generation_whose_prompt_names_no_act_shows_none():
+    assert recipe_match.act_of({"positive_prompt": "a portrait by a window"}) == ""

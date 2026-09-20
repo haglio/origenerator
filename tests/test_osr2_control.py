@@ -244,3 +244,33 @@ def test_the_same_claim_said_again_changes_nothing():
     control.the_session_has_it(True)
 
     assert changes == []
+
+
+def test_every_move_of_the_control_group_is_recorded(caplog):
+    # The drivers log their own engage and release, which left the two holds
+    # and the off silent -- so the log could not say whether the device was
+    # under this app at all.
+    control = _control()
+
+    with caplog.at_level("INFO", logger="origenerator.gui.osr2_control"):
+        caplog.clear()
+        for state in (OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED, OSR2_CONTROL_OFF):
+            control.set_state(state)
+
+    assert [record.message for record in caplog.records] == [
+        f"OSR2 control: {state}" for state in
+        (OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED, OSR2_CONTROL_OFF)]
+
+
+def test_the_device_changing_hands_with_a_session_is_recorded(caplog):
+    control = _control()
+    control.setChecked(True)
+
+    with caplog.at_level("INFO", logger="origenerator.gui.osr2_control"):
+        caplog.clear()
+        control.the_session_has_it(True)
+        control.the_session_has_it(False)
+
+    assert [record.message for record in caplog.records] == [
+        "The OSR2 is Fun Time's", f"OSR2 control: {OSR2_CONTROL_OFF}",
+        "The OSR2 is ours again"]  # the release moved no state, so it says none

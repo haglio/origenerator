@@ -18,6 +18,8 @@ keep in step.
 """
 from __future__ import annotations
 
+import logging
+
 from player_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
@@ -27,6 +29,8 @@ from player_core.console import (
 from player_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6.QtCore import QObject, pyqtSignal
+
+logger = logging.getLogger(__name__)
 
 _HELD_AT = {OSR2_PARKED: PARK_CENTER, OSR2_RETRACTED: RETRACT_CENTER}
 _HELD_STATE = {center: state for state, center in _HELD_AT.items()}
@@ -80,6 +84,7 @@ class Osr2Control(QObject):
         if on == self._checked:
             return
         self._checked = on
+        self._say_where_the_device_stands()
         self.changed.emit()
 
     def state(self) -> str:
@@ -109,6 +114,7 @@ class Osr2Control(QObject):
         was = self._checked
         self.setChecked(state != OSR2_CONTROL_OFF)
         if self._checked == was:
+            self._say_where_the_device_stands()
             self.changed.emit()
 
     def the_session_has_it(self, held: bool) -> None:
@@ -119,11 +125,22 @@ class Osr2Control(QObject):
         """
         if held == self._session_has_it:
             return
+        logger.info("The OSR2 is %s", "Fun Time's" if held else "ours again")
         self._session_has_it = held
         was = self._checked
         self.setChecked(False)
         if self._checked == was:
             self.changed.emit()
+
+    def _say_where_the_device_stands(self) -> None:
+        """Record which of the four the app just moved to.
+
+        The drivers log their own engage and release, which leaves the two
+        holds and the off silent -- so a log could not answer whether the OSR2
+        was under this app at all, which is the first question anyone debugging
+        two apps on one device asks.
+        """
+        logger.info("OSR2 control: %s", self.state())
 
     def restore(self, saved) -> None:
         """Put back the state a saved session was left in.  True is a session

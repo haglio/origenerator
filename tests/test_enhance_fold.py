@@ -126,7 +126,7 @@ def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_source(db, "first", filename="sdxl_t2i_twin.png")
     _add_source(db, "second", filename="sdxl_t2i_twin.png")
-    enhance = _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
     db.set_enhance_target("e1", "second")
 
     assert fold_enhancement(db, db.get_generation("e1")) == "second"

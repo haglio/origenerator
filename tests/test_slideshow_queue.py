@@ -114,7 +114,6 @@ def test_it_gives_up_width_rather_than_move_off_the_corner(plate):
 
 
 def test_a_counter_clear_of_the_plate_costs_it_no_width(plate):
-    host = plate.parentWidget()
     plate.set_items([_item(typical_seconds=30)])
     plate.reposition()
     full = plate.width()

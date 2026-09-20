@@ -479,7 +479,7 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
 
 def _enhanced_row(db, output_dir, pid="p1"):
     """An image enhanced once: the enhanced file leads, the original stays."""
-    row = _completed_row(db, output_dir, pid, "base.png", subfolder="image")
+    _completed_row(db, output_dir, pid, "base.png", subfolder="image")
     (output_dir / "image" / "enhanced.png").write_bytes(b"better")
     db.update_generation(
         pid,

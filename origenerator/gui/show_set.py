@@ -45,10 +45,10 @@ from origenerator.gui.show_wiring import HudFacts
 from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
 
 # What the loop key answers: the axis it started looping, that it ended the
-# loop, or — with nothing on either axis to loop — that the press is the hold
+# loop, or — with nothing on either axis to loop — that the press is the lock
 # instead, which the surface owns.
 LOOP_OFF = "off"
-LOOP_IS_A_HOLD = "hold"
+LOOP_IS_A_LOCK = "lock"
 
 
 class ShowSet:
@@ -328,8 +328,8 @@ class ShowSet:
     def step_loop(self) -> str:
         """One press of the loop key: the seed row, then the config column, then
         off — each axis stepped over when it holds only the slide on screen, and
-        with neither able to loop the press is the hold instead
-        (:data:`LOOP_IS_A_HOLD`), so the key never lands on nothing."""
+        with neither able to loop the press is the lock instead
+        (:data:`LOOP_IS_A_LOCK`), so the key never lands on nothing."""
         running = self.loop.axis if self.loop is not None else ""
         start = LOOP_CYCLE.index(running) + 1 if running in LOOP_CYCLE else 0
         for step in range(len(LOOP_CYCLE)):
@@ -341,7 +341,7 @@ class ShowSet:
                 continue
             if self.start_loop(axis):
                 return axis
-        return LOOP_IS_A_HOLD
+        return LOOP_IS_A_LOCK
 
     def more_seeds(self) -> bool:
         """Widen the row past the exact configuration and loop what it becomes —

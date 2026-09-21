@@ -15,6 +15,7 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import main_window
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
@@ -528,6 +529,39 @@ def test_close_event_persists_gallery_selection(qtbot, tmp_path):
     win.close()  # fires closeEvent
 
     assert AppState(path).get("gallery_selection") == "xyz"
+
+
+def test_a_crash_reopens_where_the_user_was_because_the_session_is_saved_as_it_changes(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(main_window, "SESSION_PERSIST_INTERVAL_MS", 10)
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+
+    win._gallery_view.select_generation("xyz")
+
+    qtbot.waitUntil(lambda: AppState(path).get("gallery_selection") == "xyz", timeout=30_000)
+
+
+def test_a_session_save_the_disk_refuses_is_tried_again_rather_than_ending_the_app(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(main_window, "SESSION_PERSIST_INTERVAL_MS", 10)
+    path = tmp_path / "ui.json"
+    state = AppState(path)
+    refusals = [PermissionError("the state file is open in another program")]
+    write = state.save
+
+    def save_once_the_disk_allows():
+        if refusals:
+            raise refusals.pop()
+        write()
+
+    monkeypatch.setattr(state, "save", save_once_the_disk_allows)
+    win = _window(qtbot, tmp_path, state)
+
+    win._gallery_view.select_generation("xyz")
+
+    qtbot.waitUntil(lambda: AppState(path).get("gallery_selection") == "xyz", timeout=30_000)
+    assert not refusals
 
 
 def test_default_window_is_not_maximized(qtbot, tmp_path):

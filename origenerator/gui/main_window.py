@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 
-from PyQt6.QtCore import QByteArray, Qt, pyqtSignal
+from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow
 
@@ -70,6 +70,8 @@ _GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 _SWITCHES_THE_SESSION_OWNS = frozenset({"audio_enabled", "osr2_enabled", "mic_enabled"})
 
+SESSION_PERSIST_INTERVAL_MS = 5_000
+
 
 class OrigeneratorWindow(QMainWindow):
     handed_back = pyqtSignal()
@@ -125,6 +127,7 @@ class OrigeneratorWindow(QMainWindow):
         quit_shortcut.activated.connect(self.close)
 
         self._restore_session()
+        self._persist_the_session_as_it_changes()
         # Background experiments belong to the closed app, so the ones the last
         # absence left in ComfyUI's queue are dropped before anything is adopted:
         # an open app never has one competing for the GPU. The live install's
@@ -153,6 +156,18 @@ class OrigeneratorWindow(QMainWindow):
             self._restore_geometry()
         for key, _getter, setter in SESSION_PREFS:
             setter(self._gallery_view, self._app_state.get(key))
+
+    def _persist_the_session_as_it_changes(self) -> None:
+        saver = QTimer(self)
+        saver.setInterval(SESSION_PERSIST_INTERVAL_MS)
+        saver.timeout.connect(self._persist_session_or_try_again_next_time)
+        saver.start()
+
+    def _persist_session_or_try_again_next_time(self) -> None:
+        try:
+            self._persist_session()
+        except Exception as e:
+            logger.warning("Could not save the session; trying again shortly: %s", e)
 
     def _restore_geometry(self):
         """Reapply the saved window geometry: screen, size, and maximized state.

@@ -15,6 +15,7 @@ class AppState:
     def __init__(self, path: Path):
         self.path = Path(path)
         self._data = self._load()
+        self._last_written: str | None = None
 
     def _load(self) -> dict:
         try:
@@ -30,8 +31,13 @@ class AppState:
         self._data[key] = value
 
     def save(self) -> None:
-        """Write the state to disk, replacing the file atomically."""
+        """Write the state to disk if it has changed since this store last wrote
+        it, replacing the file atomically."""
+        text = json.dumps(self._data, indent=2)
+        if text == self._last_written:
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(self.path.name + ".tmp")
-        tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+        tmp.write_text(text, encoding="utf-8")
         tmp.replace(self.path)
+        self._last_written = text

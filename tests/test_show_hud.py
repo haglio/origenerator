@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from player_core.hud_placement import HudCorner
 from player_core.satellite_hud import MARGIN
-from PyQt6.QtCore import QEvent, QPointF, Qt
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt6.QtGui import QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import media_overlay
+from origenerator.gui.hud_queue import CANCEL, CLEAR, OPEN
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.show_hud import ShowHud, show_hud_model
@@ -16,6 +18,52 @@ from origenerator.slideshow import in_order
 from origenerator.ui_scale import to_logical_size
 from tests.motion_doubles import FakeMotion
 from tests.show_surface_fakes import FakeEngine
+
+
+def _inflight(key="j1", status="queued", cancel=None, **kw):
+    reading = {name: kw.pop(name) for name in list(kw)
+               if name in ("frame", "progress", "started_at", "typical_seconds")}
+    return InFlightItem(key=key, caption="Alpha Workflow › a paper kite",
+                        reading=RunReading(status=status, **reading),
+                        reveal=kw.pop("reveal", lambda: None), cancel=cancel, **kw)
+
+
+def _mouse(kind, x, y, buttons=Qt.MouseButton.LeftButton):
+    return QMouseEvent(kind, QPointF(x, y), QPointF(x, y), Qt.MouseButton.LeftButton,
+                       buttons, Qt.KeyboardModifier.NoModifier)
+
+
+def _rect_of(hud, command):
+    return next(rect for rect, button in hud._targets.buttons
+                if button.command == command)
+
+
+def _press_and_release(hud, command, travel=(0, 0)):
+    """Press the panel where *command* was drawn, and let go *travel* away."""
+    x, y, width, height = _rect_of(hud, command)
+    start = (x + width // 2, y + height // 2)
+    hud.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, *start))
+    if travel != (0, 0):
+        hud.mouseMoveEvent(_mouse(QEvent.Type.MouseMove, start[0] + travel[0],
+                                  start[1] + travel[1]))
+    hud.mouseReleaseEvent(_mouse(QEvent.Type.MouseButtonRelease,
+                                 start[0] + travel[0], start[1] + travel[1],
+                                 buttons=Qt.MouseButton.NoButton))
+
+
+def _below(hud, command) -> int:
+    """How far a press has to travel to let go over the lower half of that row."""
+    row, target = _rect_of(hud, f"{OPEN}|j2"), _rect_of(hud, command)
+    return target[1] + target[3] - 2 - (row[1] + row[3] // 2)
+
+
+def _wheel(hud, command, delta):
+    """Turn the wheel over the panel where *command* was drawn."""
+    x, y, width, height = _rect_of(hud, command)
+    where = QPointF(x + width // 2, y + height // 2)
+    hud.wheelEvent(QWheelEvent(where, where, QPoint(0, 0), QPoint(0, delta),
+                               Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                               Qt.ScrollPhase.NoScrollPhase, False))
 
 
 def _lit_order(model) -> list[str]:
@@ -288,3 +336,131 @@ def test_a_picture_still_being_generated_is_drawn_on_the_map_without_its_frame_b
     corner = show_hud_model("portrait", show).corner
 
     assert (corner.path, corner.thumb) == ("", "")
+
+
+class TestTheQueueOnTheOnePanel:
+    """The lower strip's queue rides on the panel a show already wears.
+
+    A show covers the strip, and a show is both when the line stops moving (its
+    videos are held) and when the user keeps adding to it (locking a slide asks
+    for an enhancement).  It used to float in the lower-left corner as a plate
+    of its own, which is a second panel over the same picture.
+    """
+
+    @staticmethod
+    def _show(qtbot, **actions):
+        show = SlideshowView([("scene one.png", "image"), ("scene two.png", "image")],
+                             engine=FakeEngine(), shuffle=in_order,
+                             actions=ShowActions(**actions))
+        qtbot.addWidget(show)
+        return show
+
+    def _hud(self, qtbot, show):
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+        qtbot.addWidget(hud)
+        return hud
+
+    def test_what_is_in_flight_is_a_block_of_the_panel(self, qtbot):
+        show = self._show(qtbot)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", job_kind="Image", typical_seconds=30)], 0)
+
+        hud._tick()
+
+        assert [line.key for line in hud._model.foot.lines] == ["j1"]
+
+    def test_a_panel_over_an_idle_queue_grows_no_block(self, qtbot):
+        show = self._show(qtbot)
+        hud = self._hud(qtbot, show)
+        show.set_queue([], 0)
+
+        hud._tick()
+
+        assert hud._model.foot is None
+
+    def test_a_press_on_a_row_button_throws_that_job_away(self, qtbot):
+        stopped = []
+        show = self._show(qtbot)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", cancel=lambda: stopped.append("j1"),
+                                  typical_seconds=30)], 0)
+        hud._tick()
+
+        _press_and_release(hud, f"{CANCEL}|j1")
+
+        assert stopped == ["j1"]
+
+    def test_a_press_on_a_row_goes_to_the_folder_its_job_will_land_in(self, qtbot):
+        opened = []
+        show = self._show(qtbot)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", reveal=lambda: opened.append("j1"),
+                                  typical_seconds=30)], 0)
+        hud._tick()
+
+        _press_and_release(hud, f"{OPEN}|j1")
+
+        assert opened == ["j1"]
+
+    def test_clear_drops_another_apps_work(self, qtbot):
+        cleared = []
+        show = self._show(qtbot, clear_queue=lambda: cleared.append(True))
+        hud = self._hud(qtbot, show)
+        show.set_queue([], 3)
+        hud._tick()
+
+        _press_and_release(hud, CLEAR)
+
+        assert cleared == [True]
+
+    def test_a_row_dragged_down_the_line_re_lines_the_queue(self, qtbot):
+        asked = []
+        show = self._show(qtbot, requeue=asked.append)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", status="running", typical_seconds=30),
+                        _inflight("j2", typical_seconds=30),
+                        _inflight("j3", typical_seconds=30)], 0)
+        hud._tick()
+
+        _press_and_release(hud, f"{OPEN}|j2", travel=(0, _below(hud, f"{OPEN}|j3")))
+
+        assert asked == [["j1", "j3", "j2"]]
+
+    def test_a_row_that_was_dragged_does_not_also_open_its_folder(self, qtbot):
+        opened = []
+        show = self._show(qtbot, requeue=lambda keys: None)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", typical_seconds=30),
+                        _inflight("j2", reveal=lambda: opened.append("j2"),
+                                  typical_seconds=30)], 0)
+        hud._tick()
+
+        _press_and_release(hud, f"{OPEN}|j2", travel=(0, -20))
+
+        assert opened == []
+
+    def test_the_job_being_made_cannot_be_picked_up(self, qtbot):
+        """Nothing can be moved in front of what ComfyUI is already rendering,
+        itself included."""
+        asked = []
+        show = self._show(qtbot, requeue=asked.append)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight("j1", status="running", typical_seconds=30),
+                        _inflight("j2", typical_seconds=30)], 0)
+        hud._tick()
+
+        _press_and_release(hud, f"{OPEN}|j1", travel=(0, 40))
+
+        assert asked == []
+
+    def test_the_wheel_scrolls_a_line_longer_than_the_rows_drawn(self, qtbot):
+        show = self._show(qtbot)
+        hud = self._hud(qtbot, show)
+        show.set_queue([_inflight(f"j{index}", typical_seconds=30)
+                        for index in range(7)], 0)
+        hud._tick()
+        assert [line.key for line in hud._model.foot.drawn][0] == "j0"
+
+        _wheel(hud, f"{OPEN}|j2", -120)
+
+        assert [line.key for line in hud._model.foot.drawn][0] == "j1"

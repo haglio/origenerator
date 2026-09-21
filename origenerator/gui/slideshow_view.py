@@ -24,6 +24,10 @@ two lines that can disagree, with prev/next/lock/trash drawn on each.
 Being the deliberate foreground view, it plays sound — the inline preview pane
 stays muted.
 
+The lower strip's queue rides on that one panel too
+(:mod:`origenerator.gui.hud_queue`), since the strip that carries it is
+under this window, and a show is exactly when the line stops moving.
+
 What every key does, what the lock takes with it, what a filter narrows and
 where a closing show leaves you are `tests/test_slideshow_view.py`'s to state:
 each is a test named for the claim.
@@ -58,7 +62,6 @@ from origenerator.gui.show_set import (
 from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import ShowState, Slide, in_order
@@ -133,15 +136,20 @@ class SlideshowView(QWidget):
 
         # Where in the set this one is, floated over the foot of the media.
         self._counter = PositionCaption(self)
-        # The lower strip's queue itself — the live frame, the bar, the rows and
-        # their buttons — floated into the corner this view leaves empty. The
-        # strip that normally carries it is under this window, and a show is
-        # both when the queue stops moving (its videos are held) and when the
-        # user keeps adding to it (a locked slide asks for an enhancement).
-        self._queue = SlideshowQueue(self)
-        # For a beat, whatever a switch or a spoken fix just did. It is a Fun
-        # Time notice, at the top center where Fun Time flashes the same kind of
-        # line over a player, because this surface wears the players' own HUD.
+        # What is in flight, for the block its HUD hangs at the panel's foot:
+        # the strip that normally carries the line is under this window, and a
+        # show is both when the queue stops moving (its videos are held) and
+        # when the user keeps adding to it (a locked slide asks for an
+        # enhancement).
+        self._queue_items: list = []
+        self._foreign_queued = 0
+        # A note about the item on screen: which of its versions this is, that an
+        # enhancement of it is being made, and for a beat whatever a switch or a
+        # spoken fix just did — the only way to tell, in a view with no panels,
+        # that a press did anything. It is a Fun Time notice, at the top center
+        # where Fun Time flashes the same kind of line over a player, because
+        # this surface wears the players' own HUD and had no business saying
+        # things in a second dialect at the other end of the screen.
         self._note = NoticeOverlay(self)
         # What the corner reads while a spoken request pauses the show; empty
         # whenever nothing is being dictated.
@@ -330,23 +338,35 @@ class SlideshowView(QWidget):
     def add_levels(self, levels_by_path: dict) -> None:
         self._levels.add(levels_by_path)
 
-    def queue(self) -> SlideshowQueue:
-        """The floated queue, for the gallery to wire its reorder and clear to —
-        it is the same widget as the lower strip and asks the same things."""
-        return self._queue
-
     def set_queue(self, items, foreign_queued: int = 0) -> None:
-        """Show what is in flight in the corner — the same list, in the same
-        order, the lower strip this view is covering would be showing."""
-        self._queue.set_items(items, foreign_queued)
-        self._reposition_queue()
+        """Take what is in flight — the same list, in the same order, the lower
+        strip this view is covering would be showing."""
+        self._queue_items = list(items)
+        self._foreign_queued = foreign_queued
 
-    def _reposition_queue(self) -> None:
-        """Place the queue, keeping it clear of the position counter — the two
-        share the foot of the screen, and the counter's width moves with what it
-        says."""
-        counter = None if self._counter.isHidden() else self._counter.geometry()
-        self._queue.reposition(avoid=counter)
+    @property
+    def hud_queue(self) -> tuple[list, int]:
+        """What is in flight, and how much of ComfyUI's queue is another app's —
+        what the panel draws at its foot."""
+        return self._queue_items, self._foreign_queued
+
+    def requeue(self, keys) -> None:
+        """Re-line the queue in this order — a row dragged somewhere else on the
+        panel.
+
+        Re-listed here and then, rather than waiting for the poll that confirms
+        it: the queue's agreement is a second and a half away, and a row that
+        springs back to where it was reads as a failure.
+        """
+        by_key = {item.key: item for item in self._queue_items}
+        self._queue_items = [by_key[key] for key in keys if key in by_key]
+        if self._actions.requeue is not None:
+            self._actions.requeue(list(keys))
+
+    def clear_foreign_queue(self) -> None:
+        """Drop another app's work off ComfyUI, as the block's Clear asks."""
+        if self._actions.clear_queue is not None:
+            self._actions.clear_queue()
 
     # --- picking a closed show back up --------------------------------------
 
@@ -486,8 +506,8 @@ class SlideshowView(QWidget):
         and only the second condemns it.  A slide that is still being made has
         nothing to condemn: the run is on the GPU and its row is a record of
         that, not a picture that has been judged.  Up takes such a slide off
-        the show and leaves the run alone — calling one off is the queue
-        plate's Cancel, in the corner of this very screen.
+        the show and leaves the run alone — calling one off is the Cancel on
+        that run's own row of the panel.
         """
         self._playlist.unlock()  # the locked slide is the one being culled
         item = self._playlist.current()
@@ -1316,7 +1336,6 @@ class SlideshowView(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._counter.reposition()
-        self._reposition_queue()
         self._reposition_neighbors()
         self._reposition_note()
 

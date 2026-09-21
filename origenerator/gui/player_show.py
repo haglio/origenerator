@@ -749,8 +749,20 @@ class PlayerShow(QObject):
         return False
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
-        """What is in flight, for the queue plate a window floats in its
-        corner."""
+        """What is in flight, for the block a window's own panel hangs at its
+        foot.  Nothing to do with it here: a player draws the panel it is
+        published, and a published panel carries no block of a host's own."""
+
+    @property
+    def hud_queue(self) -> tuple[list, int]:
+        """And so this show has none to report."""
+        return [], 0
+
+    def requeue(self, keys) -> None:
+        """Nor a row of one to drag anywhere."""
+
+    def clear_foreign_queue(self) -> None:
+        """Nor a Clear to press."""
 
     def osr2_drive_target(self):
         """What the one device switch would follow here.  Nothing: inside a

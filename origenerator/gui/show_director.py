@@ -121,10 +121,10 @@ class ShowHost(Protocol):
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
-        app's -- the plate a show floats in its corner."""
+        app's -- the block a show's panel hangs at its foot."""
 
     def clear_foreign_queue(self) -> None:
-        """Drop another app's work off ComfyUI, as that plate's Clear does."""
+        """Drop another app's work off ComfyUI, as that block's Clear does."""
 
     def follow_link(self, prompt_id: str) -> None:
         """Land on this generation: its folder, its tile, its config tab."""
@@ -453,6 +453,11 @@ class ShowDirector:
             reset=(self.reset_region if self._fun_time is not None else None),
             reorder=self.reorder_show,
             browse_all=self.browse_it_all,
+            # The queue's own two: a row dragged down the block the panel hangs
+            # at its foot re-lines the line, and its Clear drops another app's
+            # work off ComfyUI.
+            requeue=self._jobs.reorder,
+            clear_queue=self._host.clear_foreign_queue,
             # Space reaches the one OSR2 switch, like every other surface's,
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
@@ -517,15 +522,9 @@ class ShowDirector:
         view.set_levels(levels)
         if built:
             self._present_surface(view, side)
-            # The queue it floats in its corner is the same widget as the lower
-            # strip and asks for the same things, so it goes to the same
-            # handlers: a row dragged there re-lines the queue, and its Clear
-            # drops another app's work off ComfyUI.
-            view.queue().reorder_requested.connect(self._jobs.reorder)
-            view.queue().clear_queue_requested.connect(self._host.clear_foreign_queue)
-            # And fill it at once rather than a poll later: the hold on videos is
-            # this opening's own doing, so the corner comes up already saying what
-            # is waiting on it rather than blank for a second and a half.
+            # Fill the line at once rather than a poll later: the hold on videos
+            # is this opening's own doing, so the panel comes up already saying
+            # what is waiting on it rather than blank for a second and a half.
             view.set_queue(*self._host.queue_now())
         return view
 
@@ -1156,8 +1155,9 @@ class ShowDirector:
             surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
-        """Redraw the queue plate a show floats in its corner — the same widget
-        as the window's lower strip, saying the same thing."""
+        """Hand an open show what is in flight, for the block its panel hangs at
+        its foot — the same line as the window's lower strip, saying the same
+        thing."""
         if self._slideshow is not None:
             self._slideshow.set_queue(items, foreign_total)
 

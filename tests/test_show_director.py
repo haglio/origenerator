@@ -1238,8 +1238,9 @@ def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(s
     around = director.neighbors_of("g1", side="portrait")
 
     assert [slide.prompt_id for slide in around.seeds] == ["g2"]
-    assert [slide.prompt_id for slide in around.actions] == ["v1", "v2"]
-    assert (around.label, around.action_labels) == ("Source image", ("alpha", "beta"))
+    assert [row.slide.prompt_id for row in around.column] == ["v1", "v2"]
+    assert (around.label, tuple(row.label for row in around.column)) == (
+        "Source image", ("alpha", "beta"))
     assert [slide.prompt_id for slide in around.group] == ["v1", "v2", "v3"]
 
 
@@ -1247,6 +1248,25 @@ def _fox(prompt_id, *, seed):
     picture = _picture(prompt_id, "a red fox", seed=seed)
     picture["output_files"] = json.dumps([{"filename": f"{prompt_id}.png"}])
     return picture
+
+
+def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(shows):
+    """Both halves, in that order: the same seed under another configuration,
+    named by its folder as the tree names it, and then the videos animated from
+    this picture, named by the act each shows."""
+    fox = _fox("g1", seed=1)
+    tweaked = _picture("g2", "a red fox at dawn", seed=1)
+    tweaked["output_files"] = json.dumps([{"filename": "g2.png"}])
+    rows = [fox, tweaked, _fox("g3", seed=2),
+            _animation("v1", frame="g1.png", act="alpha")]
+    director, _host, _made = shows(_library(rows), db=FakeDB(rows))
+
+    around = director.neighbors_of("g1", side="portrait")
+
+    assert [row.slide.prompt_id for row in around.column] == ["g2", "v1"]
+    folder, act = (row.label for row in around.column)
+    assert act == "alpha"
+    assert folder and folder not in ("alpha", "Source image")   # the tree's name for it
 
 
 def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(shows):
@@ -1262,8 +1282,9 @@ def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(s
     around = director.neighbors_of("v1", side="portrait")
 
     assert [slide.prompt_id for slide in around.seeds] == ["v2"]
-    assert [slide.prompt_id for slide in around.actions] == ["g1", "v3"]
-    assert (around.label, around.action_labels) == ("alpha", ("Source image", "beta"))
+    assert [row.slide.prompt_id for row in around.column] == ["g1", "v3"]
+    assert (around.label, tuple(row.label for row in around.column)) == (
+        "alpha", ("Source image", "beta"))
 
 
 def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named_for(shows):
@@ -1291,7 +1312,7 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
     director, _host, _made = shows()
 
     assert director.neighbors_of("nobody", side="portrait").seeds == ()
-    assert director.neighbors_of("", side="landscape").actions == ()
+    assert director.neighbors_of("", side="landscape").column == ()
 
 
 def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):

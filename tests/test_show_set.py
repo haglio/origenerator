@@ -157,7 +157,7 @@ def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded
 
 # --- the map around the slide on screen, and the loops along it -------------
 
-from origenerator.gui.show_map import MapNeighbors  # noqa: E402
+from origenerator.gui.show_map import MapNeighbors, MapRow  # noqa: E402
 from origenerator.slideshow import Slide  # noqa: E402
 
 _SEEDS = {"id-1": (Slide("one-b.png", "image", "id-1b"), Slide("one-c.png", "image", "id-1c"))}
@@ -167,9 +167,9 @@ _ACTIONS = {"id-1": (Slide("one-x.png", "image", "id-1x"),),
 
 def _neighbors(prompt_id):
     actions = _ACTIONS.get(prompt_id, ())
-    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()), actions=actions,
-                        label="fox", action_labels=("dawn",) * len(actions),
-                        group=actions)
+    return MapNeighbors(seeds=_SEEDS.get(prompt_id, ()),
+                        column=tuple(MapRow(slide, "dawn") for slide in actions),
+                        label="fox", group=actions)
 
 
 def _mapped(**fields):
@@ -192,7 +192,7 @@ def test_the_map_is_the_slide_on_screen_with_its_seeds_right_and_its_configs_dow
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
     assert _ids(shown.actions) == ["id-1x"]
     assert (shown.playing, shown.loop) == (("corner", 0), "")
-    assert (shown.label, shown.action_labels) == ("fox", ("dawn",))
+    assert (shown.label, tuple(row.label for row in shown.column)) == ("fox", ("dawn",))
 
 
 def test_the_map_re_homes_on_whatever_comes_up():
@@ -257,7 +257,7 @@ def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_act():
     loop is the picture and every video of it, and its map is the loop."""
     twin = Slide("one-y.png", "image", "id-1y")
     whole = lambda pid: MapNeighbors(  # noqa: E731
-        actions=_ACTIONS.get(pid, ()), action_labels=("dawn",) * len(_ACTIONS.get(pid, ())),
+        column=tuple(MapRow(slide, "dawn") for slide in _ACTIONS.get(pid, ())),
         group=(*_ACTIONS.get(pid, ()), twin) if pid == "id-1" else ())
     show_set, _dealt = _set(neighbors=whole)
 
@@ -517,3 +517,19 @@ def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():
     show_set.remember(Slide("four.mp4", "video", "id-4"))
 
     assert show_set.passes(Slide("two.png", "image", "id-2")) is True
+
+
+def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
+    """Half the column is configurations and half is acts, and the two are
+    pressed differently — so the map says which a row is rather than leaving it
+    to be guessed from the words in its gutter."""
+    a_configuration = Slide("one-x.png", "image", "id-1x")
+    an_act = Slide("one-y.png", "image", "id-1y")
+    both = lambda pid: MapNeighbors(  # noqa: E731
+        column=(MapRow(a_configuration, "E629425B", configuration=True),
+                MapRow(an_act, "alpha")) if pid == "id-1" else ())
+    show_set, _dealt = _set(neighbors=both)
+
+    assert show_set.configuration_row("e629425b") is a_configuration
+    assert show_set.configuration_row("alpha") is None
+    assert show_set.configuration_row("nobody") is None

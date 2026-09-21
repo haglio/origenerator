@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from origenerator.slideshow import Slide
 
@@ -31,18 +32,31 @@ Cell = tuple[str, int]  # ("corner", 0) | ("seed", i) | ("action", i)
 CORNER: Cell = ("corner", 0)
 
 
+class MapRow(NamedTuple):
+    """One row down the column: the slide it draws, the name in its gutter, and
+    whether that name is a configuration's folder rather than an act.
+
+    The two are pressed differently — a configuration's button jumps to it and
+    loops its seed row, an act's narrows the show to that act — so which it is
+    travels with the row rather than being guessed from the words.
+    """
+
+    slide: Slide
+    label: str
+    configuration: bool = False
+
+
 @dataclass(frozen=True)
 class MapNeighbors:
     """What the library says about one generation: the slides showing its act
-    under other seeds (the seed row), one slide for each other act of the
-    picture it is or was animated from (the action column), the act its own
-    row is named for and the act each row down the column is, and the rest
-    of that picture's whole group — what a loop down the column plays."""
+    under other seeds (the seed row), the column of rows under it — the same
+    seed under other configurations, then what else was made of its picture —
+    the act its own row is named for, and the rest of that picture's whole
+    group, which is what a loop down the column plays."""
 
     seeds: tuple[Slide, ...] = ()
-    actions: tuple[Slide, ...] = ()
+    column: tuple[MapRow, ...] = ()
     label: str = ""
-    action_labels: tuple[str, ...] = ()
     group: tuple[Slide, ...] = ()
 
 
@@ -73,11 +87,15 @@ class ShowMap:
 
     corner: Slide
     seeds: tuple[Slide, ...]
-    actions: tuple[Slide, ...]
+    column: tuple[MapRow, ...]
     playing: Cell
     loop: str
     label: str
-    action_labels: tuple[str, ...]
+
+    @property
+    def actions(self) -> tuple[Slide, ...]:
+        """The slides down the column, in the order it draws them."""
+        return tuple(row.slide for row in self.column)
 
     def cells(self) -> tuple[Slide, ...]:
         return (self.corner, *self.seeds, *self.actions)
@@ -95,18 +113,21 @@ def build_map(current: Slide, loop: Loop | None,
     at = loop.position_of(current) if loop is not None else None
     if loop is None or at is None:
         around = neighbors_of(current.prompt_id)
-        return ShowMap(current, around.seeds, around.actions, CORNER, "",
-                       around.label, around.action_labels)
+        return ShowMap(current, around.seeds, around.column, CORNER, "",
+                       around.label)
     anchor = loop.pool[0]
     playing = CORNER if at == 0 else (loop.axis, at - 1)
     at_anchor = neighbors_of(anchor.prompt_id)
     if loop.axis == SEED_AXIS:
         lit = neighbors_of(current.prompt_id)
-        return ShowMap(anchor, loop.pool[1:], lit.actions, playing, loop.axis,
-                       at_anchor.label, lit.action_labels)
-    labels = tuple(neighbors_of(slide.prompt_id).label for slide in loop.pool[1:])
-    return ShowMap(anchor, at_anchor.seeds, loop.pool[1:], playing, loop.axis,
-                   at_anchor.label, labels)
+        return ShowMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
+                       at_anchor.label)
+    # A loop down the column plays the whole group, twins of an act included,
+    # so every slide in it is a row of its own, named as the library names it.
+    column = tuple(MapRow(slide, neighbors_of(slide.prompt_id).label)
+                   for slide in loop.pool[1:])
+    return ShowMap(anchor, at_anchor.seeds, column, playing, loop.axis,
+                   at_anchor.label)
 
 
 def acts_posted(query: str) -> str:

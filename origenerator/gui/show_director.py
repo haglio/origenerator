@@ -59,7 +59,7 @@ from origenerator.gui.orientation import (
 )
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
-from origenerator.gui.show_map import MapNeighbors
+from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
@@ -577,26 +577,30 @@ class ShowDirector:
     def neighbors_of(self, prompt_id: str, *, side: str) -> MapNeighbors:
         """What the library says about one generation, for the map a show on
         *side* draws around it: its act under other seeds along the row, and
-        down the column what else was made of its picture — the videos animated
-        from it, and for a video the picture itself — each named for the act it
-        shows (:mod:`origenerator.nav_map`).  Nothing at all for a generation
-        the gallery does not have a row for — a file being written, a set
+        down the column the same seed under other configurations, then what
+        else was made of its picture — the videos animated from it, and for a
+        video the picture itself (:mod:`origenerator.nav_map`).  A
+        configuration is named by its folder, as the tree names it, and the
+        rest by the act each shows.  Nothing at all for a generation the
+        gallery does not have a row for — a file being written, a set
         assembled without ids."""
         row = self._host.row_for(prompt_id) if prompt_id else None
         if row is None:
             return MapNeighbors()
         around = surroundings(row, self._library_of(side),
                               image_index=self._host.image_config_index())
-        # Each act with the slide it names, so a row with no file to play
-        # drops out of both at once rather than shifting the names along.
-        column = [(slide, label) for generation, label in around.actions
-                  for slide in self._slides_of([generation])]
+        named = [(generation, self._folder_name(generation), True)
+                 for generation in around.configs]
+        named += [(generation, label, False) for generation, label in around.actions]
+        # A generation with no file to play drops out of the column whole,
+        # so its name can never end up on another row's cell.
         return MapNeighbors(
             seeds=self._slides_of(around.seeds),
-            actions=tuple(slide for slide, _label in column),
-            label=around.label,
-            action_labels=tuple(label for _slide, label in column),
-            group=self._slides_of(around.group),
+            column=tuple(MapRow(slide, label, configuration)
+                         for generation, label, configuration in named
+                         for slide in self._slides_of([generation])),
+            label=around.label or self._folder_name(row),
+            group=self._slides_of((*around.configs, *around.group)),
         )
 
     def beyond_the_row_of(self, prompt_id: str, *, side: str) -> tuple[Slide, ...]:

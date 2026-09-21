@@ -175,8 +175,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         drive=device.drive if device is not None else None,
         corner=_cell(shown.corner),
         seeds=tuple(_cell(slide) for slide in shown.seeds),
-        actions=tuple(_cell(slide, label)
-                      for slide, label in zip(shown.actions, shown.action_labels)),
+        actions=tuple(_cell(row.slide, row.label) for row in shown.column),
         current_action=shown.label,
         # The act(s) the show is narrowed to, so the rows the filter keeps
         # light their buttons and a second press on the row it already is
@@ -185,7 +184,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         # that row says about it.
         filter_query=act_filter or (shown.label if shown.loop == SEED_AXIS else ""),
         seed_count=len(shown.seeds) + 1,
-        action_count=len(shown.actions) + 1,
+        action_count=len(shown.column) + 1,
         playing=shown.playing,
         active_loop=shown.loop,
     )

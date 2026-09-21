@@ -291,12 +291,20 @@ class ShowSet:
             self.loop = Loop(loop.axis, (*loop.pool, item))
 
     def forget(self, item) -> None:
-        self._library_moved()
-        self.all_items = [kept for kept in self.all_items if not self._same(kept, item)]
+        self._forget(lambda kept: self._same(kept, item))
 
     def forget_id(self, prompt_id) -> None:
+        self._forget(lambda kept: kept.prompt_id == prompt_id)
+
+    def _forget(self, is_gone) -> None:
+        """Take slides out of the whole set — and out of a running loop's pool,
+        which the map is drawn from rather than from the library, so a picture
+        left in it goes on being drawn after it has gone."""
         self._library_moved()
-        self.all_items = [kept for kept in self.all_items if kept.prompt_id != prompt_id]
+        self.all_items = [kept for kept in self.all_items if not is_gone(kept)]
+        if self.loop is not None:
+            kept = tuple(slide for slide in self.loop.pool if not is_gone(slide))
+            self.loop = Loop(self.loop.axis, kept) if kept else None
 
     def live_ids(self) -> list:
         """Every run the whole set holds as frames rather than as a file — in

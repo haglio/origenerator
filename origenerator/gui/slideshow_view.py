@@ -583,10 +583,12 @@ class SlideshowView(QWidget):
     def _lock_what_the_cull_left(self) -> None:
         """A row worn down to one picture plays that picture over and over,
         which is the lock — so the cull that wore it down ends the loop and
-        locks what is left, as a satellite's does.  The lock is flipped on
-        rather than asked for, because the cull released it three lines up, and
-        no better version is asked for: nobody pressed for one."""
-        self._flip_lock()
+        locks what is left, as a satellite's does.  The lock is the state and
+        nothing else: none of what a pressed lock also does — the star, the
+        better version, the gallery — happened, because nobody pressed one.
+        The flip is a lock because the cull released it three lines up."""
+        self._playlist.toggle_lock()
+        self._update_counter()
         self._flash_note("Locked")
 
     def _step(self, delta: int):

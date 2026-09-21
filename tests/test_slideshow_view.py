@@ -609,11 +609,12 @@ def _around(prompt_id):
 def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot):
     """A row worn down to one picture is that picture over and over, which is
     the lock — so the cull that wore it down ends the loop and locks what is
-    left, as a satellite's does.  No better version is asked for: nobody
-    pressed for one."""
-    asked = []
+    left, as a satellite's does.  Only the lock: none of what a pressed lock
+    also does, since nobody pressed one."""
+    asked, starred, opened = [], [], []
     view = _view(qtbot, _KEYED,
                  actions=ShowActions(neighbors=_around, delete=lambda prompt_id: None,
+                                     favorite=starred.append, lock=opened.append,
                                      enhance=lambda prompt_id: asked.append(prompt_id) or True))
     _press(view, Qt.Key.Key_E)                   # loop the seed row: id-a, id-b
 
@@ -621,7 +622,7 @@ def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot):
 
     assert view._playlist.locked is True
     assert view.hud_map().loop == ""
-    assert asked == []
+    assert (asked, starred, opened) == ([], [], [])
 
 
 def test_a_picture_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):

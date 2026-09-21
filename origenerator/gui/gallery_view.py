@@ -51,7 +51,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls
+from origenerator.gui import corner_controls, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     BrowserPane,
@@ -117,7 +117,6 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.job_queue import JobQueue
-from origenerator.gui.looping_preview import set_all_previews_paused
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import ERROR, NOTICE
@@ -3171,27 +3170,21 @@ class GalleryView(QWidget):
                 if self.current_group() is not None else None)
 
     def set_session_paused(self, paused: bool) -> None:
-        """The hosting session's OmniPause, applied to every open show and
-        remembered for the ones not opened yet (the director keeps that flag).
-        The bridge calls this on the flag's edges; the memory is what makes
-        the freeze cover a show the user opens mid-pause.
+        """The hosting session's OmniPause: the room stops, not just the shows.
 
-        And to this window's own moving pictures — OmniPause means the room
-        stops, not the shows stop.  Two kinds, held in the two places that
-        build them rather than widget by widget here: every looping WebP
-        thumbnail, wherever it is drawn (the grid, the shelves, a tab's history
-        strip, the "Animated in" strip), through
-        :mod:`origenerator.gui.looping_preview`; and the real video a generate
-        tab plays, through the tabs.  Wiring each widget separately is how a
-        strip nobody remembered went on playing through a frozen room.
+        The director keeps its own flag for a show not opened yet, because a
+        show is built from a set rather than held as a widget. Everything else
+        that moves in this window — every looping thumbnail wherever it is
+        drawn, and the video a generate tab plays — asks
+        :mod:`~origenerator.gui.omnipause`, so one write here reaches the ones
+        built after it as well.
 
-        The shows come first and the rest cannot be skipped if one of them
-        raises, so each is its own step: a freeze that stopped at the shows
-        left the thumbnails running with no sign of why.
+        The shows come first and the freeze cannot be skipped if they raise, so
+        each is its own step: a freeze that stopped at the shows left the
+        thumbnails running with no sign of why.
         """
         self._shows.set_session_paused(paused)
-        set_all_previews_paused(paused)
-        self._info_tabs.set_previews_paused(paused)
+        omnipause.freeze(paused)
 
     def region_show(self, side: str):
         """The show occupying satellite region *side*, or None. The hosting

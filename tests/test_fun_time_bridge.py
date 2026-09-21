@@ -11,10 +11,9 @@ from player_core.file_channel import consume_command_file
 from player_core.playlist import read_playlist
 from player_core.satellite_hud import parse_hud
 
-import origenerator.gui.gallery_view as gallery_view_module
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
-from origenerator.gui import show_director
+from origenerator.gui import omnipause, show_director
 from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.show_buttons import answer
@@ -338,24 +337,21 @@ def test_the_paused_flag_freezes_and_resumes_an_open_show(qtbot, tmp_path, monke
     assert _will_move_on(show)
 
 
-def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monkeypatch):
+def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path):
     """Every video tile loops a little clip of itself and the generate tabs
     play the real thing, so a paused room with the gallery in it was a wall of
-    clips still going.  OmniPause stops the room, not only its shows — the
-    looping previews app-wide, wherever they are drawn, and the tabs' videos
-    through the tabs."""
+    clips still going. OmniPause stops the room, not only its shows, and one
+    freeze covers every one of them — wherever drawn, and whenever built."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    tiles, tabs = [], []
-    monkeypatch.setattr(gallery_view_module, "set_all_previews_paused", tiles.append)
-    monkeypatch.setattr(view._info_tabs, "set_previews_paused", tabs.append)
+    assert omnipause.frozen() is False
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
     bridge._tick()
-    assert tiles == [True] and tabs == [True]
+    assert omnipause.frozen() is True
 
     (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
     bridge._tick()
-    assert tiles == [True, False] and tabs == [True, False]
+    assert omnipause.frozen() is False
 
 
 def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):

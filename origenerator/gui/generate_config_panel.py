@@ -1710,10 +1710,6 @@ class GenerateConfigPanel(QWidget):
 
     # --- Drive OSR2: what the (global) driver should stream for this tab -------
 
-    def set_preview_paused(self, paused: bool) -> None:
-        """Freeze or resume this tab's preview video (the session's OmniPause)."""
-        self._preview.set_playback_paused(paused)
-
     def release_media(self, paths) -> None:
         """Let go of any of ``paths`` this tab is showing — files about to be
         moved or deleted, which Windows will not let go of while a player holds

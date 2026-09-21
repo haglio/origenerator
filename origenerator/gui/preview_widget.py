@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
+from origenerator.gui import omnipause
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_controls import CornerControls
@@ -134,9 +135,6 @@ class PreviewWidget(QWidget):
         # already gone (test_the_player_is_torn_down_before_the_surface_it_renders_to).
         # The player is injectable so unit tests can drive playback intent
         # without spinning up the real (WMF) backend, which deadlocks at exit.
-        # A hosting session's OmniPause over this pane, held rather than edged:
-        # the pane is re-pointed constantly and each new media starts playing.
-        self._playback_paused = False
         self._player = player if player is not None else QMediaPlayer(self)
         self._audio = QAudioOutput(self)
         self._audio.setMuted(mute_audio)
@@ -249,6 +247,10 @@ class PreviewWidget(QWidget):
         if player is None and app is not None:
             app.aboutToQuit.connect(self.release_player)
 
+        # Last, once there is something to hold: a pane built into a frozen room
+        # is told so here rather than by whoever built it (see the module).
+        omnipause.holds(self)
+
     def _take_the_pane(self, media, *, stop_player: bool = True,
                        enhancing: bool = False,
                        live: bool = False, live_frame: bytes | None = None) -> None:
@@ -317,7 +319,7 @@ class PreviewWidget(QWidget):
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
         self._player.play()
-        if self._playback_paused:
+        if omnipause.frozen():
             self._player.pause()  # a clip loaded into a frozen room opens held
         self._update_strip(path)  # …and wears its funscript, if it has one
 
@@ -550,27 +552,21 @@ class PreviewWidget(QWidget):
     def audio_muted(self) -> bool:
         return self._audio.isMuted()
 
-    def set_playback_paused(self, paused: bool) -> None:
-        """Freeze or resume whatever is moving here (a hosted session's
-        OmniPause): a playing video, or an animated image's own movie.
+    def set_frozen(self, frozen: bool) -> None:
+        """Hold what is moving here, or let it go: a playing video, or an
+        animated image's own movie.
 
-        Remembered rather than only applied, because this pane is re-pointed
-        constantly — a click, a landing generation, a tab change — and each of
-        those starts the new media playing.  A pane frozen once has to stay
-        frozen through every one of them until the room resumes.  A still takes
-        the flag inertly; its advance is the owning view's dwell timer, not
-        this pane's.
+        This pane is re-pointed constantly — a click, a landing generation, a
+        tab change — and each of those starts the new media playing, so every
+        one of them asks :mod:`~origenerator.gui.omnipause` again rather than
+        this pane keeping the answer. A still takes it inertly; its advance is
+        the owning view's dwell timer, not this pane's.
         """
-        self._playback_paused = paused
-        self._apply_playback_pause()
-
-    def _apply_playback_pause(self) -> None:
-        """Hold what is on screen now, if the freeze is on."""
         if self._movie is not None:
-            self._movie.setPaused(self._playback_paused)
+            self._movie.setPaused(frozen)
         if not self.is_showing_video():
             return
-        if self._playback_paused:
+        if frozen:
             self._player.pause()
         else:
             self._player.play()
@@ -820,7 +816,7 @@ class PreviewWidget(QWidget):
             self._image_label.setMovie(movie)
             self._scale_movie()
             movie.start()
-            movie.setPaused(self._playback_paused)  # an animated still, in a frozen room
+            movie.setPaused(omnipause.frozen())  # an animated still, in a frozen room
 
     def _scale_movie(self) -> None:
         if self._movie is None or self._movie_native is None or not self._movie_native.isValid():

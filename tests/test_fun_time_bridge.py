@@ -12,12 +12,12 @@ from player_core.playlist import read_playlist
 from player_core.satellite_hud import parse_hud
 
 import origenerator.gui.gallery_view as gallery_view_module
+from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
 from origenerator.gui import show_director
-from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.show_buttons import answer
+from origenerator.show_buttons import answer
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image
 
 

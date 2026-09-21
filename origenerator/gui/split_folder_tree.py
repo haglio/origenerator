@@ -1,7 +1,7 @@
 """The TOC pane's two halves: one folder tree per shape, each under a standing label.
 
 The gallery's table of contents exists twice over, once per shape (see
-:mod:`origenerator.gui.orientation`), and this is how the pane shows both at
+:mod:`origenerator.orientation`), and this is how the pane shows both at
 once: a :class:`~origenerator.gui.folder_tree.FolderTree` per side, stacked
 under a label that never scrolls away, on a splitter so either half can be
 given the room.

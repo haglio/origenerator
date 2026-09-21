@@ -37,8 +37,8 @@ _.active_filter  # noqa  # origenerator/gui/show_hud.py:207
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `gallery_view._VOICE_MOTION` maps AppCommand.CRUISE_ON/CRUISE_OFF to the string
 # "set_cruise", which `_turn_motion_dial` hands to getattr.
-_.set_cruise  # noqa  # origenerator/gui/osr2_motion_driver.py:257
-_.set_learned  # noqa  # origenerator/gui/osr2_motion_driver.py:273
+_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:257
+_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:273
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231

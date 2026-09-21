@@ -55,7 +55,7 @@ THE_SET = (
 # a probe put back in one of them cannot be paid for by one removed in another.
 DRIVERS = (
     "origenerator/gui/show_hud.py",
-    "origenerator/gui/fun_time_bridge.py",
+    "origenerator/fun_time_bridge.py",
     "origenerator/gui/motion_panel.py",
     "origenerator/gui/console.py",
 )

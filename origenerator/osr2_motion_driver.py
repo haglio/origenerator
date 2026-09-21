@@ -1,6 +1,6 @@
 """Drive the OSR2 from a self-generated motion — no video, no funscript.
 
-The counterpart to :class:`~origenerator.gui.osr2_driver.Osr2Driver` for stills:
+The counterpart to :class:`~origenerator.osr2_driver.Osr2Driver` for stills:
 where that one follows a playing video's script, this one *is* the motion
 source, advancing a :class:`~origenerator.motion_engine.Motion` on a clock
 of its own and streaming each sampled position as T-code. Same broker etiquette,

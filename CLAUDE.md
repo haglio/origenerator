@@ -74,7 +74,7 @@ This app runs two ways — on its own, and hosted inside a Fun Time session as o
 of the room's managed windows — so anything added here that the session touches
 has a matching half over there, and the two are one piece of work rather than a
 feature and a follow-up. Four shapes it takes: a verb in
-`gui/fun_time_bridge.py` (answered by fun_time's dispatch table and its loop
+`fun_time_bridge.py` (answered by fun_time's dispatch table and its loop
 branches), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's

@@ -38,9 +38,9 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR
 from origenerator.evolver_upscales import EvolverUpscales
+from origenerator.fun_time_bridge import ask_for_omnipause
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
 from origenerator.generation_state import GenerationSource, source_of
-from origenerator.gui.fun_time_bridge import ask_for_omnipause
 from origenerator.gui.gallery_tree import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
@@ -48,16 +48,6 @@ from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
 )
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
-from origenerator.gui.orientation import (
-    ORIENTATIONS as _ORIENTATIONS,
-)
-from origenerator.gui.orientation import (
-    filter_rows,
-    oriented_key,
-)
-from origenerator.gui.orientation import (
-    split_key as _split_shelf_key,
-)
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
 from origenerator.gui.show_map import MapNeighbors, MapRow
@@ -69,6 +59,16 @@ from origenerator.nav_map import (
     beyond_the_row,
     one_per_stretch,
     surroundings,
+)
+from origenerator.orientation import (
+    ORIENTATIONS as _ORIENTATIONS,
+)
+from origenerator.orientation import (
+    filter_rows,
+    oriented_key,
+)
+from origenerator.orientation import (
+    split_key as _split_shelf_key,
 )
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
 from origenerator.voice.app_commands import AppCommand

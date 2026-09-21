@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.gui.show_buttons import answer, show_rows
+from origenerator.show_buttons import answer, show_rows
 
 
 def _band(**fields) -> tuple:

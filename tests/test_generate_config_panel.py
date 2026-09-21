@@ -13,7 +13,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter
 
 import origenerator.workflows.derived_size as ds
-from origenerator import evolver_export, gallery
+from origenerator import evolver_export, gallery, osr2_driver
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
@@ -25,7 +25,7 @@ from origenerator.funscript import (
 )
 from origenerator.gallery.keys import settings_key
 from origenerator.generation_config import ConfigSnapshot
-from origenerator.gui import corner_controls, icons, osr2_driver
+from origenerator.gui import corner_controls, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module

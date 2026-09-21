@@ -36,7 +36,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.console_commands import side_press, side_spoken_to
 from origenerator.fun_time_mode import FunTimeSession
-from origenerator.gui.show_buttons import answer
+from origenerator.show_buttons import answer
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ class FunTimeBridge(QObject):
         """A press on *side*'s panel, onto whatever holds that side.
 
         The same answers a show's own panel gets
-        (:func:`~origenerator.gui.show_buttons.answer`): the session routes a
+        (:func:`~origenerator.show_buttons.answer`): the session routes a
         player's presses back here verbatim, and its own hotkeys spell the
         transport the same way, so one table says what every one of them means.
         """

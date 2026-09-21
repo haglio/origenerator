@@ -7,8 +7,8 @@ import pytest
 from PyQt6.QtMultimedia import QMediaPlayer
 
 from origenerator.ambient_audio import AmbientRotation, find_clips
+from origenerator.ambient_audio_players import AmbientAudio
 from origenerator.config import ambient_audio_dir
-from origenerator.gui.ambient_audio import AmbientAudio
 
 
 def _clips(*names):
@@ -295,7 +295,7 @@ def test_a_voice_whose_clips_are_over_before_they_begin_gives_up(qtbot, tmp_path
     bed, players = _bed(tmp_path, voices=1, now=clock)
     bed.start()
 
-    with caplog.at_level("WARNING", logger="origenerator.gui.ambient_audio"):
+    with caplog.at_level("WARNING", logger="origenerator.ambient_audio_players"):
         caplog.clear()
         for _ in range(50):
             players[0].finish()  # the clock never moves: nothing ever played

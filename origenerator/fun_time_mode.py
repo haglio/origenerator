@@ -17,7 +17,7 @@ shows open a window of this app's over each region instead.
 
 This module is the pure half: the argv contract, the session dataclass, and the
 orientation policy that picks a region.  The Qt half — placing windows, polling
-the channels — lives in :mod:`origenerator.gui.fun_time_bridge`.
+the channels — lives in :mod:`origenerator.fun_time_bridge`.
 """
 
 from __future__ import annotations

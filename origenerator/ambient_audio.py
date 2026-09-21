@@ -3,7 +3,7 @@
 Qt-free, so the choosing can be unit-tested without a media backend or a clock:
 :func:`find_clips` reads the folder and :class:`AmbientRotation` owns every
 voice's endless walk through it.  The half that actually makes sound — the
-players — is :mod:`origenerator.gui.ambient_audio`.
+players — is :mod:`origenerator.ambient_audio_players`.
 """
 
 from __future__ import annotations

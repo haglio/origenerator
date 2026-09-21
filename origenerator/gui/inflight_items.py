@@ -18,8 +18,8 @@ from collections.abc import Callable
 from origenerator import gallery, timing
 from origenerator.gui.generation_job import JobState, display_status
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.orientation import row_orientation
 from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.orientation import row_orientation
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 

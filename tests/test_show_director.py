@@ -21,8 +21,8 @@ from origenerator import gallery
 from origenerator.gui import show_director as module
 from origenerator.gui.gallery_tree import FAVORITES_KEY, RECENTS_KEY
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
-from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
+from origenerator.orientation import oriented_key
 from origenerator.slideshow import ShowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand

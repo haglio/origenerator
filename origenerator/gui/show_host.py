@@ -3,7 +3,7 @@
 Three things drive whatever is holding a region or sitting under a console:
 the players' own HUD (:mod:`origenerator.gui.show_hud`), the on-video console
 (:mod:`origenerator.gui.motion_panel`), and, inside a session, Fun Time's file
-channels (:mod:`origenerator.gui.fun_time_bridge`). They reached it through
+channels (:mod:`origenerator.fun_time_bridge`). They reached it through
 sixteen ``hasattr``/``getattr`` probes spread over those three modules, each
 re-discovering the interface by guessing at attribute names — and the three did
 not agree: the console called five of the names with no guard at all while the

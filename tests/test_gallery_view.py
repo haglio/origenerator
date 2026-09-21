@@ -6106,6 +6106,43 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
     assert panel._generating is False
 
 
+def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
+    # And it still ends up on screen: the press was a press for a picture, so a
+    # tab opens on the run rather than the pane going on showing work the press
+    # had nothing to do with. The tab that was up keeps what it was holding.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    parked = _folder_tab(view, db)
+    parked._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+
+    _reroll_tile(view).add_requested.emit()
+
+    opened = view._info_tabs.current_config_panel()
+    assert opened is not parked
+    assert opened.watched_key() == key
+    assert parked.watched_key() is None
+
+
+def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
+    # That run's Cancel and its filling bar are in the opened tab, so it is no
+    # longer one a later click may replace — the rule a tab that claimed the
+    # same press already follows.
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    parked = _folder_tab(view, db)
+    parked._param_form.set_values({"positive_prompt": "an entirely different recipe"})
+
+    _reroll_tile(view).add_requested.emit()
+
+    assert view._info_tabs._preview_panel is None
+
+
 def test_auto_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):
     # Never hidden: a loop runs until it is stopped, and a switch that went away
     # with its folder would leave one running with nothing on screen to say so.
@@ -7551,9 +7588,10 @@ def test_a_cancelled_generation_leaves_a_show_of_a_saved_file_alone(qtbot, tmp_p
     show.close()
 
 
-def test_clicking_add_selects_the_reroll_so_its_preview_shows_at_once(qtbot, tmp_path):
-    # One click on "+" both starts the re-roll and selects it, so the info pane
-    # shows its live preview without a second click on the now-running tile.
+def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
+    # One click on "+" starts the run and puts it up in a tab, which is where it
+    # can be watched full size — the tile's own picture is a thumbnail. The tile
+    # is lit as well, the gallery's selection being that run now.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -7561,6 +7599,7 @@ def test_clicking_add_selects_the_reroll_so_its_preview_shows_at_once(qtbot, tmp
 
     _reroll_tile(view).add_requested.emit()
 
+    assert view._info_tabs.current_config_panel().watched_key() == key
     assert view._selected_reroll_key == key
     assert _reroll_tile(view).is_selected()
 

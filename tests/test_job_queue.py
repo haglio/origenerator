@@ -872,10 +872,31 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
     ended = []
     queue.run_ended.connect(ended.append)
 
+    made = queue.job_for("k").prompt_id
+
     queue.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
 
     assert ended == [RunOutcome(kind="Video", recipe=_I2V.display_name, seconds=252.0,
-                                ok=True, source=GenerationSource.GENERATED)]
+                                ok=True, source=GenerationSource.GENERATED,
+                                generation=made)]
+
+
+def test_an_enhance_reports_the_picture_it_improved_rather_than_itself(qtbot, tmp_path):
+    # An enhance is an upgrade of a picture already in the gallery: its own row is
+    # folded into that picture and deleted the moment it lands, so a notice
+    # pointing at the run's own id would point at nothing by the time it is read.
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("k", _I2V, _params())
+    job = queue.job_for("k")
+    db.set_enhance_target(job.prompt_id, "the-picture-it-improved")
+    ended = []
+    queue.run_ended.connect(ended.append)
+
+    job.finished.emit([{"filename": "out.png"}], None, 252.0)
+
+    assert ended[0].generation == "the-picture-it-improved"
 
 
 def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):

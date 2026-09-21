@@ -1,35 +1,19 @@
 """The gallery's info pane as a tabbed workspace of editable generate tabs.
 
 Every tab is the same plain :class:`GenerateConfigPanel`, and the pane always
-holds at least one: closing the last opens a fresh blank one in its place, so
-the resting state is a whole generate form waiting on a workflow rather than an
-empty black rectangle — which is why this row carries no "+" of its own.
+holds at least one: closing the last opens a fresh blank one in its place, which
+is why this row carries no "+" of its own.
 
 Tabs open the way an IDE opens files, so browsing does not pile up a row of
 them: one tab at a time is the *preview* tab, drawn in italic, and the next
 single click replaces it. A double-click pins it upright, and so does editing
-anything in it, because that is work someone did and the next open must land
-beside it rather than throw it away. A run the user starts from a folder's own
-tile — including the "+" beside it — opens the same way, so it can be watched
-full size, unless a tab is already that run's.
-
-**What counts as an edit is what a person did, never what a load did.** An open
-writes the picker and every field exactly as typing would, so the panel says
-which was which (:attr:`GenerateConfigPanel.user_edited`) rather than the
-widgets being asked after the fact.
-
-**What a tab's preview shows is only ever that tab's own** — the generation it
-was opened on, the run it launched or was pointed at, or its settings' newest
-result. Nothing here paints "the tab in front" from outside, which is how a tab
-came to show a picture it was not about.
+anything in it. What counts as an edit is what a person did, never what a load
+did (:attr:`GenerateConfigPanel.user_edited`), and what a tab's preview shows is
+only ever that tab's own — nothing here paints "the tab in front" from outside.
 
 A tab's Generate runs nothing here: it emits :attr:`generate_requested` for the
-gallery to launch. The gallery owns every job and reconnects the ones left
-running after a restart, so the tabs carry no job state at all.
-
-Which tab a click lands in, what each is named, what its menu offers, and what
-happens with no ComfyUI client are `tests/test_info_pane_tabs.py`'s to state:
-each is a test named for the claim.
+gallery, which owns every job and reconnects the ones left running after a
+restart, so the tabs carry no job state at all.
 """
 from __future__ import annotations
 
@@ -306,14 +290,11 @@ class InfoPaneTabs(QTabWidget):
         """The right-click menu for the tab at ``index``: where its settings
         have been generating, then what to close.
 
-        "Go to folder" is the one act here — the tab is a folder's settings, and
-        this is how you get from the settings to the pictures they made. It is
-        left off until they have made something, since until then the tree has no
-        row to open (:meth:`GenerateConfigPanel.settings_folder_key`).
-
-        Only what this tab can actually do: on the last tab there is nothing to
-        its right, and on the only tab there are no others and no all — an entry
-        that would close nothing is left out rather than listed dead.
+        "Go to folder" is left off until they have made something, since until
+        then the tree has no row to open
+        (:meth:`GenerateConfigPanel.settings_folder_key`). Only what this tab can
+        actually do is listed: an entry that would close nothing is left out
+        rather than listed dead.
         """
         menu = QMenu(self)
         panel = self.widget(index)
@@ -360,14 +341,10 @@ class InfoPaneTabs(QTabWidget):
     def _italic_panel(self) -> GenerateConfigPanel | None:
         """The tab drawn slanted: the one an open would take over.
 
-        The preview tab when there is one; else the pane's untouched resting
-        tab, which makes the same promise — nothing has been done in it, so the
-        next open lands there. Read rather than stored, so the resting tab loses
-        its slant the moment a workflow is picked in it and it becomes work.
-
-        The preview tab loses its own slant the same way, through
-        :meth:`_pin_panel`: an edit to any of its fields makes it a tab someone
-        is working in, and there is nothing left for an open to take over.
+        The preview tab when there is one; else the pane's untouched resting tab,
+        which makes the same promise. Read rather than stored, so a tab loses its
+        slant the moment it becomes work — the resting tab when a workflow is
+        picked in it, the preview tab through :meth:`_pin_panel`.
         """
         if self._preview_panel is not None:
             return self._preview_panel
@@ -510,14 +487,10 @@ class InfoPaneTabs(QTabWidget):
 
         The front tab takes it when that tab is the clicked row's own settings
         folder already, pinned or not; anything else lands where an open lands
-        (:meth:`_landing_panel`).
+        (:meth:`_landing_panel`). So a browse through a folder's items reuses one
+        italic tab however many are clicked.
 
-        So a browse through a folder's items reuses one italic tab however many
-        are clicked, while a tab that was pinned (double-clicked) or edited into a
-        different folder is left where it is.
-
-        ``request`` is the spoken request that made this row, when one did, so the
-        tab can mark what it changed and link back to what it was asked about.
+        ``request`` is the spoken request that made this row, when one did.
         """
         image_index = build_image_config_index(
             [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
@@ -534,21 +507,13 @@ class InfoPaneTabs(QTabWidget):
     def panel_that_launched(self, origin: str | None):
         """The tab that launched the run beginning at ``origin``, or ``None``.
 
-        A run's result belongs to the tab that asked for it: that tab ends showing
-        the finished image/video rather than the live-frame placeholder. Every
-        other tab is left alone — including the pane's resting tab, which the
-        auto-generate loop used to fill with a picture nothing in it had asked
-        for. That left the resting tab no longer blank, so the next clicked
-        generation opened a tab beside it instead of loading into it, and a loop
-        running while the user browsed grew a row of them.
+        A run's result belongs to the tab that asked for it; every other tab is
+        left alone, including the pane's resting tab, which an auto-generate loop
+        used to fill with a picture nothing in it had asked for — leaving it no
+        longer blank, so the next clicked generation opened a tab beside it and a
+        loop running while the user browsed grew a row of them.
 
-        A tab claims a gallery-side launch only while it is showing that very
-        folder (see ``GalleryView._claim_launch``), so what a loop lands in is a
-        tab already following it, never one parked elsewhere. The tile's "+" is
-        the one gallery-side launch that opens a tab of its own, somebody having
-        pressed it.
-
-        Read *before* the finish is reconciled — a tab lets go of its runs as they
+        Read *before* the finish is reconciled: a tab lets go of its runs as they
         end (see ``GalleryView._reconcile_generating``).
         """
         if not origin:

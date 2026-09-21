@@ -48,13 +48,17 @@ logger = logging.getLogger(__name__)
 _PROGRESS_PERSIST_INTERVAL_S = 1.0
 
 
-def _outcome_of(job, *, ok: bool, seconds: float | None = None) -> RunOutcome:
+def _outcome_of(db, job, *, ok: bool, seconds: float | None = None) -> RunOutcome:
     """What *job* came to, in the record whoever reports a run reads.
 
     *seconds* is ComfyUI's own measure of the run, which only a finished one
     has: a prompt that died left no ``execution_success`` to measure to. So a
     failure is timed by the clock it ran under instead, which is the same span
     the bar was counting up while it ran.
+
+    Read before the finish is announced, because the announcement is what folds
+    an enhance away (:func:`origenerator.gallery.fold_enhancement`): the row is
+    still there to name the picture the run improved.
     """
     return RunOutcome(
         kind=gallery.job_kind_label(job.workflow.name),
@@ -62,7 +66,19 @@ def _outcome_of(job, *, ok: bool, seconds: float | None = None) -> RunOutcome:
         seconds=elapsed_since(job.started_at) if seconds is None else seconds,
         ok=ok,
         source=job.source,
+        generation=_the_item_it_is_about(db, job),
     )
+
+
+def _the_item_it_is_about(db, job) -> str:
+    """The generation a run is a run of, as the gallery will hold it afterwards.
+
+    Its own, except for an enhance: that is an upgrade of a picture already in
+    the gallery, and its own row is folded into that picture and deleted as it
+    lands, so its id names nothing by the time anyone can answer a notice of it.
+    """
+    row = db.get_generation(job.prompt_id) or {}
+    return row.get("enhance_of") or job.prompt_id
 
 
 def _off_the_gui_thread(run) -> None:
@@ -740,8 +756,9 @@ class JobQueue(QObject):
         self._drop(key, job)
         self._pump()  # the machine is free: start whatever is next
         mark_generation_completed(self._db, job.prompt_id, files, thumb_path, duration)
+        outcome = _outcome_of(self._db, job, ok=True, seconds=duration)
         self.finished.emit(key, job.prompt_id, job.origin)
-        self.run_ended.emit(_outcome_of(job, ok=True, seconds=duration))
+        self.run_ended.emit(outcome)
 
     def _on_failed(self, key, job, message):
         self._drop(key, job)
@@ -751,4 +768,4 @@ class JobQueue(QObject):
                                    error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)
         self.failed.emit(key, message)
-        self.run_ended.emit(_outcome_of(job, ok=False))
+        self.run_ended.emit(_outcome_of(self._db, job, ok=False))

@@ -46,18 +46,14 @@ def _write_string_values(key_path: str, values: dict[str, str]) -> None:
 
 def register_notification_identity(app_id: str, *, name: str, icon: Path,
                                    write=_write_string_values) -> None:
-    """Say what Windows calls this app over a notification, and what mark it draws.
+    """Say what Windows calls this app over a notification, and what mark
+    it draws.
 
     It takes both from whatever is registered under the AppUserModelID the
-    process claims. With nothing registered it prints the id itself and falls
-    back to a generic glyph — which is how this app's first notification came
-    out headed "FunTime.Origenerator" beside an (i). Every app on a desktop
-    whose notifications read properly carries these two values, and Windows
-    writes them itself for a tray app that claims no id of its own.
-
-    Written on every launch rather than once, so a mark that has moved or been
-    deleted comes back. Failures are logged and never fatal: a notification
-    with the wrong heading beats a launch that stopped over one.
+    process claims; with nothing registered it prints the id itself beside a
+    generic glyph, which is how this app's first notification came out headed
+    "FunTime.Origenerator". Written on every launch rather than once, so a mark
+    that has moved or been deleted comes back, and never fatal.
     """
     try:
         write(rf"Software\Classes\AppUserModelId\{app_id}",
@@ -65,6 +61,24 @@ def register_notification_identity(app_id: str, *, name: str, icon: Path,
     except OSError as exc:
         logging.getLogger(__name__).warning(
             "Could not register the notification identity: %s", exc)
+
+
+def register_link_handler(scheme: str, *, name: str, command: str,
+                          write=_write_string_values) -> None:
+    """Say what Windows runs to follow a link of this app's.
+
+    A notification carries a link rather than a way back to the process that
+    raised it, because it outlives that process (:mod:`origenerator.app_link` is
+    what Windows runs and why). Written on every launch and again with every
+    notice raised, so the copy that raised the notice answers the click, and
+    never fatal.
+    """
+    try:
+        write(rf"Software\Classes\{scheme}", {"": f"URL:{name}", "URL Protocol": ""})
+        write(rf"Software\Classes\{scheme}\shell\open\command", {"": command})
+    except OSError as exc:
+        logging.getLogger(__name__).warning(
+            "Could not register the link handler: %s", exc)
 
 
 # argtypes matter on 64-bit: without them ctypes marshals an HWND as a 32-bit

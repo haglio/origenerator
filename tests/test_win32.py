@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from origenerator.win32 import (
     raise_window_without_activating,
+    register_link_handler,
     register_notification_identity,
     this_process_creation_time,
     window_exists,
@@ -76,6 +77,32 @@ class TestNotificationIdentity:
 
         register_notification_identity("Origenerator", name="Origenerator",
                                        icon=Path("C:/marks/o.png"), write=refuse)
+
+
+class TestLinkHandler:
+    def test_it_registers_the_command_windows_runs_for_this_apps_links(self):
+        # What makes a clicked notification reach the app at all: Windows follows
+        # the link the notification carries, and follows it by running whatever
+        # stands here for its scheme.
+        written = {}
+
+        register_link_handler(
+            "origenerator", name="Origenerator", command='"py.exe" "handler" "%1"',
+            write=lambda key, values: written.update({key: values}))
+
+        assert written == {
+            r"Software\Classes\origenerator": {
+                "": "URL:Origenerator", "URL Protocol": ""},
+            r"Software\Classes\origenerator\shell\open\command": {
+                "": '"py.exe" "handler" "%1"'},
+        }
+
+    def test_a_registry_that_refuses_the_write_costs_the_launch_nothing(self):
+        def refuse(key, values):
+            raise OSError("access denied")
+
+        register_link_handler("origenerator", name="Origenerator",
+                              command='"py.exe" "handler" "%1"', write=refuse)
 
 
 def test_this_process_was_created_in_filetime_ticks_before_now():

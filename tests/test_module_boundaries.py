@@ -32,6 +32,10 @@ QT_FREE = (
     # makes, so the splash is already up before the slow ones run. Importing it
     # costs nothing, which is what tests/test_launch_smoke.py replays off its AST.
     "origenerator.app",
+    # What a click on a notification runs: a fresh process every time, whose
+    # whole job is over before the app it starts has drawn anything.
+    "origenerator.app_link",
+    "origenerator.windows_toast",
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",

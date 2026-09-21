@@ -49,7 +49,7 @@ from origenerator.fun_time_mode import (
     TAKE_BACK,
     FunTimeSession,
 )
-from origenerator.show_buttons import PANEL_PLACES, answer
+from origenerator.show_buttons import ORIGENERATOR_MODE, PANEL_PLACES, answer
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,18 @@ _POLL_MS = 150
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
+
+
+def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
+    """Ask the room to show this app — the mode its own HUD button asks for.
+
+    The session parks this window under the players in video mode, so anything
+    that has to be seen here (a clicked notification, arriving from outside the
+    room entirely) has to ask for the mode before it shows anything. An older
+    session names no channel to ask on, and there the asking is simply skipped.
+    """
+    if dashboard_cmd_file is not None:
+        append_command(dashboard_cmd_file, ORIGENERATOR_MODE)
 
 
 def _split_argument(line: str) -> tuple[str, str, str]:

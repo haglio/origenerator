@@ -273,7 +273,16 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 18754 when a picked thing took the family's blue: the line on a picked tile's
 # picture lightening its frame is test_a_picked_tiles_picture_wears_a_white_frame.
-MAX_PROSE_LINES = 18754
+#
+# 18731 when every video a tab plays gained the players' own timeline,
+# taken down to what the tree measured: the notes on how the track is framed,
+# where the cursor rides, that a video with no script carries one too, and that
+# a pane with no room for a track draws nothing are
+# test_the_track_is_framed_the_way_the_players_frame_theirs,
+# test_the_cursor_rides_the_videos_own_length,
+# test_an_unscripted_video_carries_the_cursor_too and
+# test_a_pane_with_no_room_for_a_track_draws_nothing.
+MAX_PROSE_LINES = 18731
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

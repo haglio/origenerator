@@ -33,7 +33,6 @@ import threading
 import time
 from pathlib import Path
 
-from app_support.funscript import read_actions
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -44,10 +43,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, FRAMES_BEING_MADE_DIR, project_dir
-from origenerator.funscript import funscript_of
+from origenerator.config import FRAMES_BEING_MADE_DIR, project_dir
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
@@ -106,12 +103,6 @@ class ShowSurface(QWidget):
         self._engine_pane = _EnginePane(self)
         self._stack.addWidget(self._engine_pane)
 
-        # A scripted clip shows its motion along the lower edge, as the inline
-        # pane does for the same file.
-        self._strip = FunscriptStrip(self)
-        self._strip.hide()
-        outer.addWidget(self._strip)
-
         # The engine is handed a window, so it cannot exist before there is
         # one to hand it.  Until the pane is first shown -- and where the
         # platform has no windows in it at all -- what stands in for the
@@ -163,14 +154,12 @@ class ShowSurface(QWidget):
         # -- is asked in the caller's own spelling.
         self._frames.forget(_ON_SCREEN)
         self._open(Path(path), media=(path, media_type))
-        self._update_strip(str(path) if media_type == MediaType.VIDEO else None)
 
     def show_frame(self, data: bytes) -> None:
         self._frames.forget(_ON_SCREEN)
         path = self._frames.write(_ON_SCREEN, data)
         if path is not None:
             self._open(path, media=None)
-            self._update_strip(None)
 
     def _open(self, path: Path, *, media) -> None:
         self._media = media
@@ -226,8 +215,6 @@ class ShowSurface(QWidget):
         self._said = False
         self._picture.clear()
         self._picture.setText("")
-        self._strip.set_actions([])
-        self._strip.hide()
         self._stack.setCurrentWidget(self._picture)
 
     def set_paused(self, paused: bool) -> None:
@@ -335,12 +322,6 @@ class ShowSurface(QWidget):
         elif self._engine.eof:
             self._said = True
             self.media_ended.emit()
-
-    def _update_strip(self, video_path) -> None:
-        actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
-                   if video_path else [])
-        self._strip.set_actions(actions)
-        self._strip.setVisible(bool(actions))
 
 
 def _offer_the_copy_beside_the_checkouts() -> None:

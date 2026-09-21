@@ -1296,11 +1296,11 @@ class ShowDirector:
             said, kind = (("🎤 favorited", FAVORITE) if show.favorite()
                           else ("🎤 nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
-            said, kind = (("🎤 holding this one", NOTICE) if show.set_locked(True)
-                          else ("🎤 already holding it", WARNING))
+            said, kind = (("🎤 locked this one", NOTICE) if show.set_locked(True)
+                          else ("🎤 already locked", WARNING))
         else:  # UNLOCK
             said, kind = (("🎤 let go", NOTICE) if show.set_locked(False)
-                          else ("🎤 nothing was held", WARNING))
+                          else ("🎤 nothing was locked", WARNING))
         self.answer(said, kind=kind)
 
     # --- what the HUD's two switches judge items by -------------------------

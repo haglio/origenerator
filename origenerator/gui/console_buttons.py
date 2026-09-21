@@ -53,7 +53,7 @@ def _transport_row(*, locked: bool, pace_s: int) -> tuple[Button, ...]:
         Button("genau_next_clip", "⏭", "Next clip"),
         Button("main_lock", "🔒",
                f"Locked — this clip repeats; press to move on every {pace_s}s" if locked
-               else f"Unlocked — moving on every {pace_s}s; press to hold this clip",
+               else f"Unlocked — moving on every {pace_s}s; press to lock this clip",
                lit=locked, favorite=True, group_break=True),
         Button("genau_weird_clip", shared_mark("trash"), "Mark weird — move it out",
                danger=True, group_break=True),

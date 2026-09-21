@@ -34,10 +34,8 @@ LIBRARY_ROOT = Path(overlay_value(_CONTENT, "library_root"))
 def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
     """The folders that hold the suite's own app checkouts, in search order.
 
-    ``library_root`` used to answer this as well as naming where the media library
-    and the third-party apps are, and one folder was the answer to all of it.
-    The suite's *own* repos then moved out of the file-synced tree the library
-    stays in, so they get their own key; everything that did not move --
+    A key of its own, because the suite's *own* repos live outside the
+    file-synced tree the media library stays in; everything that does not --
     the library, ComfyUI -- keeps reading ``library_root``.
 
     A *list*, because the move runs one repo at a time: with a single path there

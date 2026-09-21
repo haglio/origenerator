@@ -3,9 +3,19 @@ from __future__ import annotations
 import time
 
 import pytest
+from PIL import Image
+from PyQt6 import sip
+from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPointF, Qt
+from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
+from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.combination import Combination
-from origenerator.gui.generation_queue import GenerationQueue, QueueRow
+from origenerator.gui.generation_queue import (
+    _STRIP_HEIGHT,
+    QUEUE_ROW_MIME,
+    GenerationQueue,
+    QueueRow,
+)
 from origenerator.gui.inflight import InFlightItem, RunReading
 
 
@@ -39,17 +49,12 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
 
 def _picture(path, color=(0, 0, 255)):
     """A file standing in for a finished render, for the row's picture block."""
-    from PIL import Image
-
     Image.new("RGB", (60, 40), color).save(path)
     return str(path)
 
 
 def _png_bytes(side=200):
     """A plain square PNG, standing in for a live frame off ComfyUI."""
-    from PyQt6.QtCore import QBuffer
-    from PyQt6.QtGui import QPixmap
-
     pixmap = QPixmap(side, side)
     pixmap.fill()
     buffer = QBuffer()
@@ -79,7 +84,6 @@ def test_an_empty_line_says_what_it_is_for(queue):
     # most of the time — and a blank half of a laid-out strip reads as something
     # that failed to draw. Dim letters, so it is a note about the space rather
     # than a row sitting in it.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([])
     QApplication.processEvents()
@@ -93,7 +97,6 @@ def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
     # The space it explains is the strip, not the part of it left over beside a
     # live half with nothing in it: centered in that sliver, it reads as pushed
     # off to the right.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([])
     QApplication.processEvents()
@@ -106,7 +109,6 @@ def test_the_hint_sits_in_the_middle_of_the_whole_strip(queue):
 def test_the_live_half_stands_down_when_it_has_nothing_in_it(queue):
     # With no frame, no bar and nothing to report it is an empty third of the
     # strip, and the only thing it does there is push the hint off center.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([])
     QApplication.processEvents()
@@ -116,7 +118,6 @@ def test_the_live_half_stands_down_when_it_has_nothing_in_it(queue):
 
 def test_the_live_half_keeps_its_place_to_report_another_apps_backlog(queue):
     # There it has something to say, and the hint centers in what is left.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([], foreign_queued=2)
     QApplication.processEvents()
@@ -129,8 +130,6 @@ def test_the_live_half_keeps_its_place_to_report_another_apps_backlog(queue):
 
 
 def test_the_live_half_comes_back_with_the_first_job(queue):
-    from PyQt6.QtWidgets import QApplication
-
     queue.set_items([])
     queue.set_items([_item(key="a")])
     QApplication.processEvents()
@@ -139,8 +138,6 @@ def test_the_live_half_comes_back_with_the_first_job(queue):
 
 
 def test_the_first_job_takes_the_space_back_from_the_hint(queue):
-    from PyQt6.QtWidgets import QApplication
-
     queue.set_items([])
     queue.set_items([_item(key="a")])
     QApplication.processEvents()
@@ -150,8 +147,6 @@ def test_the_first_job_takes_the_space_back_from_the_hint(queue):
 
 
 def test_the_hint_comes_back_when_the_queue_drains(queue):
-    from PyQt6.QtWidgets import QApplication
-
     queue.set_items([_item(key="a")])
     queue.set_items([])
     QApplication.processEvents()
@@ -172,7 +167,6 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
     # One object, not a line of text with a separate stripe under it: the numbers
     # are read off the face of the bar they measure, the way an in-flight card's
     # are.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running", progress=(10, 20),
                            started_at=time.time() - 90.5, typical_seconds=725.0)])
@@ -188,7 +182,6 @@ def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_cor
     # The live frame is what the left half is for, so it takes the biggest square
     # the strip has room for, right into its corner. The splitter handle above
     # the strip is its top border, so no line of the strip's own sits over it.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running")])
     QApplication.processEvents()
@@ -202,9 +195,7 @@ def test_the_thumbnail_fills_the_strip_from_its_top_edge_into_its_lower_left_cor
 def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
     # It is opened to read the queue, not to be shown one enormous frame: the
     # thumbnail stops at the strip's own opening height and the rows take the rest.
-    from PyQt6.QtWidgets import QApplication
 
-    from origenerator.gui.generation_queue import _STRIP_HEIGHT
 
     queue.set_items([_item(status="running")])
     queue.resize(800, 400)
@@ -215,8 +206,6 @@ def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
 
 
 def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
-    from origenerator.gui.generation_queue import _STRIP_HEIGHT
-
     assert queue.minimumHeight() == _STRIP_HEIGHT
     assert queue.maximumHeight() > _STRIP_HEIGHT  # not pinned to its opening height
 
@@ -224,7 +213,6 @@ def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):
 def test_the_live_frame_is_drawn_at_the_size_of_that_square(queue):
     # Sizing the label alone would leave the picture its old size in the middle
     # of a bigger blank square.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="running", frame=_png_bytes())])
     QApplication.processEvents()
@@ -238,7 +226,6 @@ def test_the_corner_stands_the_start_frame_until_a_live_one_arrives(queue, tmp_p
     # before ComfyUI streams a preview, and this corner was blank for all of it.
     # It shows what the config tab shows for the same job — the frame being
     # animated — until there is a frame of the run itself.
-    from PyQt6.QtWidgets import QApplication
 
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame)])
@@ -253,7 +240,6 @@ def test_the_corner_stands_the_recipe_beside_the_frame_where_there_is_one(queue,
     # A combine's job is a picture and a past clip's settings, and that is what
     # the config tab shows above the form. The corner says the same thing, the
     # clip drawn gray beside the frame — so it needs the room for two.
-    from PyQt6.QtWidgets import QApplication
 
     frame = _picture(tmp_path / "frame.png")
     recipe = _picture(tmp_path / "recipe.png", color=(255, 0, 0))
@@ -266,7 +252,6 @@ def test_the_corner_stands_the_recipe_beside_the_frame_where_there_is_one(queue,
 
 def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path):
     # Once the run has a picture of its own, that is what the corner is for.
-    from PyQt6.QtWidgets import QApplication
 
     frame = _picture(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame, frame=_png_bytes())])
@@ -280,7 +265,6 @@ def test_a_live_frame_takes_the_corner_back_from_the_start_frame(queue, tmp_path
 def test_a_run_made_from_nothing_leaves_the_corner_empty(queue):
     # An image drawn from a prompt has no picture to its name yet, and a stand-in
     # for one would be a picture of something that has nothing to do with it.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(job_kind="Image")])
     QApplication.processEvents()
@@ -382,8 +366,6 @@ def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
 # --- clicking a row goes to the job's folder ----------------------------------
 
 def test_clicking_a_row_reveals_that_jobs_folder(queue, qtbot):
-    from PyQt6.QtCore import Qt
-
     revealed = []
     queue.set_items([
         _item(key="a", reveal=lambda: revealed.append("a")),
@@ -397,8 +379,6 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
     """A row opens on the first click, and the gesture people reach for on a
     listing is a double one — which must land on the same folder rather than
     fall between the two presses."""
-    from PyQt6.QtCore import Qt
-
     revealed = []
     queue.set_items([_item(key="a", status="queued",
                            reveal=lambda: revealed.append("a"))])
@@ -409,9 +389,6 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
 def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):
     """The picture of what is being made is a picture of a job, so it goes where
     that job's row goes — the same click, the same folder."""
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QApplication
-
     revealed = []
     queue.set_items([_item(key="a", reveal=lambda: revealed.append("a"))])
     QApplication.processEvents()
@@ -426,9 +403,6 @@ def test_the_bar_beside_the_live_frame_is_not_a_way_into_a_folder(queue, qtbot):
     """The bar is a reading of the job rather than a picture of it, and the note
     under it is about the shared server — neither is something you click through
     to a folder."""
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QApplication
-
     revealed = []
     queue.set_items([_item(key="a", reveal=lambda: revealed.append("a"))])
     QApplication.processEvents()
@@ -471,7 +445,6 @@ def test_the_row_does_not_repeat_the_wait(queue):
 def test_the_wait_is_written_under_the_bar_it_explains(queue):
     # Under the sweeping bar, not in place of it: the bar is the thing being
     # explained, and it goes on sweeping while the explanation sits beneath it.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(status="queued", foreign_ahead=3)])
     QApplication.processEvents()
@@ -606,20 +579,12 @@ def test_the_clock_keeps_the_strip_the_same_height(queue):
 # --- dragging a row up or down the line ---------------------------------------
 
 def _mouse(kind, x, y):
-    from PyQt6.QtCore import QPointF, Qt
-    from PyQt6.QtGui import QMouseEvent
-
     return QMouseEvent(kind, QPointF(x, y), QPointF(x, y), Qt.MouseButton.LeftButton,
                        Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
 
 def _press_and_drag(row, monkeypatch, *, watch=None):
     """Press the row and travel far enough to start a drag; returns what it carried."""
-    from PyQt6.QtCore import QEvent
-    from PyQt6.QtGui import QDrag
-
-    from origenerator.gui.generation_queue import QUEUE_ROW_MIME
-
     carried = []
 
     def fake_exec(self, *a):
@@ -654,10 +619,6 @@ def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch)
 
 
 def test_a_row_the_line_redraws_away_mid_drag_lets_the_drag_finish(queue, monkeypatch):
-    from PyQt6 import sip
-    from PyQt6.QtCore import QCoreApplication, QEvent
-    from PyQt6.QtGui import QDrag
-
     _four(queue)
     row = queue.rows()[2]
     drag_alive = []
@@ -696,9 +657,6 @@ def test_the_head_of_a_queue_with_nothing_running_can_be_moved(queue, monkeypatc
 
 
 def test_a_press_that_stays_put_is_a_click_not_a_drag(queue, monkeypatch):
-    from PyQt6.QtCore import QEvent
-    from PyQt6.QtGui import QDrag
-
     dragged = []
     monkeypatch.setattr(QDrag, "exec", lambda self, *a: dragged.append(True))
     _four(queue)
@@ -711,8 +669,6 @@ def test_a_press_that_stays_put_is_a_click_not_a_drag(queue, monkeypatch):
 
 
 def test_a_row_that_was_dragged_does_not_also_reveal_its_folder(queue, monkeypatch):
-    from PyQt6.QtCore import QEvent
-
     revealed = []
     queue.set_items([_item(key="a"),
                      _item(key="b", status="queued",
@@ -731,11 +687,6 @@ _HELD_MIME = []
 
 
 def _drag_event(queue, kind, key, at_row, *, on_top_half=True):
-    from PyQt6.QtCore import QMimeData, QPointF, Qt
-    from PyQt6.QtWidgets import QApplication
-
-    from origenerator.gui.generation_queue import QUEUE_ROW_MIME
-
     QApplication.processEvents()  # the rows must be laid out to be dropped between
     row = queue.rows()[at_row]
     quarter = row.height() // 4
@@ -753,8 +704,6 @@ def _drag_event(queue, kind, key, at_row, *, on_top_half=True):
 
 def _drop(queue, key, at_row, *, on_top_half=True):
     """Drop the row carrying ``key`` over the row at index ``at_row``."""
-    from PyQt6.QtGui import QDropEvent
-
     queue.dropEvent(_drag_event(queue, QDropEvent, key, at_row, on_top_half=on_top_half))
 
 
@@ -789,7 +738,6 @@ def test_nothing_can_be_dropped_in_front_of_the_job_being_made(queue):
 
 def test_a_drag_over_the_strip_marks_where_it_would_land(queue):
     # The insertion mark is the whole reason a drop is predictable.
-    from PyQt6.QtGui import QDragMoveEvent
 
     _four(queue)
 
@@ -799,8 +747,6 @@ def test_a_drag_over_the_strip_marks_where_it_would_land(queue):
 
 
 def test_the_mark_clears_when_the_drag_leaves(queue):
-    from PyQt6.QtGui import QDragLeaveEvent, QDragMoveEvent
-
     _four(queue)
     queue.dragMoveEvent(_drag_event(queue, QDragMoveEvent, "d", 2))
 
@@ -822,8 +768,6 @@ def test_a_move_that_changes_nothing_asks_for_nothing(queue):
 def test_a_drop_carrying_something_else_is_ignored(queue):
     # Gallery thumbnails are dragged around this app too; one let go over the
     # strip must not be read as a reorder.
-    from PyQt6.QtCore import QMimeData, QPointF, Qt
-    from PyQt6.QtGui import QDropEvent
 
     asked = []
     queue.reorder_requested.connect(asked.append)
@@ -1002,7 +946,6 @@ def test_a_started_job_stops_saying_it_is_starting(queue):
 def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
     # Clipped, the last word is cut mid-letter and reads as a rendering fault;
     # elided, the row says outright that there is more, and the hover has it.
-    from PyQt6.QtWidgets import QApplication
 
     queue.resize(300, 60)  # the strip squeezed narrow, as a tiled window does
     queue.set_items([_item(status="queued", held=True)])
@@ -1018,7 +961,6 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     # Straight after the button rather than out past the text: there the blocks
     # stack into a column at the edge the eye starts from, and a row whose text
     # runs long can never carry one off the far end.
-    from PyQt6.QtWidgets import QApplication
 
     queue.set_items([_item(job_kind="Image", status="queued", held=True,
                            folder_thumbnails=(_picture(tmp_path / "m.png"),))])
@@ -1043,7 +985,6 @@ def test_rows_are_the_height_that_shows_about_two_at_a_time(queue):
 def test_cancel_leads_each_row_so_nothing_can_bury_it(queue):
     # A button after a line that can elide was pushed out of sight at the
     # right-hand end, which read as no way to cancel a queued item.
-    from PyQt6.QtWidgets import QApplication
 
     _four(queue)
     QApplication.processEvents()
@@ -1053,7 +994,6 @@ def test_cancel_leads_each_row_so_nothing_can_bury_it(queue):
 
 def test_the_bar_leaves_the_strip_to_the_queue(queue):
     # It only has to read as a bar; the line beside it carries the long names.
-    from PyQt6.QtWidgets import QApplication
 
     _four(queue)
     QApplication.processEvents()

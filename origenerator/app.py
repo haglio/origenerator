@@ -1,3 +1,11 @@
+# ruff: noqa: PLC0415
+# Every import below the module header is late on purpose, and the order is
+# the boot: QT_SCALE_FACTOR has to be set before the platform plugin starts,
+# the voice runtimes' native DLLs have to load before Qt, the taskbar identity
+# has to be claimed before a window exists, and the overlay has to be checked
+# before config -- which is the first module a missing key stops from
+# importing.  A top-level import here would pull Qt, the database and the
+# gallery in ahead of all four.
 from __future__ import annotations
 
 import os

@@ -12,7 +12,7 @@ from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
-from origenerator.gui.reroll_controller import RerollController
+from origenerator.gui.reroll_controller import RerollController, _parse_progress_state
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -179,7 +179,7 @@ def test_an_experiment_never_stacks_onto_a_busy_folder(qtbot, tmp_path):
     client.submit_job.assert_called_once()
 
 
-def test_start_prepared_returns_none_without_a_client(qtbot, tmp_path):
+def test_a_generation_asked_for_with_no_server_never_starts(qtbot, tmp_path):
     controller = RerollController(Database(tmp_path / "test.db"), client=None)
 
     assert controller.start_prepared("k", _I2V, _params()) is None
@@ -772,7 +772,6 @@ def test_reorder_without_a_client_is_harmless(qtbot, tmp_path):
 
 
 def test_parse_progress_state_tolerates_absent_or_corrupt():
-    from origenerator.gui.reroll_controller import _parse_progress_state
     assert _parse_progress_state(None) is None
     assert _parse_progress_state("") is None
     assert _parse_progress_state("not json") is None

@@ -4,13 +4,14 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMenu
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtWidgets import QInputDialog, QMenu, QTabBar
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui.combination import Combination
+from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs, parse_tabs_state
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -72,7 +73,6 @@ def test_starts_with_one_editable_config_tab(tabs):
 
 
 def test_uses_the_eliding_tab_bar(tabs):
-    from origenerator.gui.eliding_tab_bar import ElidingTabBar
     assert isinstance(tabs.tabBar(), ElidingTabBar)
 
 
@@ -80,7 +80,6 @@ def test_every_tab_including_the_first_is_closable(tabs):
     # Installing a custom bar must precede setTabsClosable, or the per-tab close
     # button silently vanishes — this guards that ordering. No tab is special: the
     # very first one closes just like a forked one.
-    from PyQt6.QtWidgets import QTabBar
     tabs._add_subtab()  # a second tab at index 1
     bar = tabs.tabBar()
 
@@ -108,7 +107,6 @@ def test_closing_the_last_tab_leaves_a_fresh_blank_one(tabs):
 def test_a_double_click_on_a_tab_never_asks_for_a_name(tabs, monkeypatch):
     # The gesture used to open a rename field. A tab is named after what it shows
     # now, so nothing should be asking the user for one.
-    from PyQt6.QtWidgets import QInputDialog
     asked = []
     monkeypatch.setattr(QInputDialog, "getText",
                         lambda *a, **k: asked.append(True) or ("X", True))
@@ -258,7 +256,6 @@ def test_close_all_leaves_the_pane_on_its_resting_tab(tabs):
 def test_the_only_tab_has_no_menu_at_all(tabs):
     # Nothing to close beside it and nothing to its right; an empty menu flashed
     # at the cursor would be worse than no menu.
-    from PyQt6.QtCore import QPoint
 
     assert tabs._tab_menu(0).actions() == []
     with patch.object(QMenu, "exec") as spy:
@@ -267,8 +264,6 @@ def test_the_only_tab_has_no_menu_at_all(tabs):
 
 
 def test_a_right_click_off_the_tabs_opens_no_menu(tabs):
-    from PyQt6.QtCore import QPoint
-
     with patch.object(tabs, "_tab_menu") as spy:
         tabs._open_tab_menu(QPoint(5, 4000))  # below the row: no tab there
     spy.assert_not_called()

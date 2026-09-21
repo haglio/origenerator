@@ -1,13 +1,13 @@
-"""What a show has to say, in the toast Fun Time says it in.
+"""What a show has to say, in the overlay Fun Time says it in.
 
 Fun Time flashes its notices — "Clip saved", "No other seeds", "Next seed" — at
 the top center of the player they are about, in one shape everywhere: the panel
 gray, a hairline of the text's own color, a bold heading face, rounded corners
-(``fun_time.notice_overlay.NoticeOverlay``). This is that toast, worn by
+(``fun_time.notice_overlay.NoticeOverlay``). This is that overlay, worn by
 Origenerator's own notices: the request being spoken, the enhancement cooking,
-which version of a picture is on screen. They used to be a dark plate of body
-text down at the foot of the show — a second dialect for the same job, said in
-the same room, on a surface that already wears the players' own HUD.
+which version of a picture is on screen. A plate of its own down at the foot of
+the show would be a second dialect for the same job, said in the same room, on
+a surface that already wears the players' own HUD.
 
 Matched through the tokens rather than by eye. The color and the face come out
 of :mod:`shared_ui`, which is where Fun Time takes them from too, so a palette
@@ -41,7 +41,7 @@ FAVORITE = "favorite"
 _INK = {NOTICE: TEXT_PRIMARY, WARNING: AMBER, ERROR: RED, FAVORITE: GREEN}
 
 
-class Toast(QLabel):
+class NoticeOverlay(QLabel):
     """One line, centered across the top of the surface it belongs to."""
 
     def __init__(self, host: QWidget):

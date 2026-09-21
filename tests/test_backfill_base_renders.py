@@ -442,7 +442,7 @@ def _clock():
     return monotonic, sleep
 
 
-def test_a_repair_run_now_submits_the_base_recipe_and_returns_its_files(tmp_path,
+def test_a_repair_run_submits_the_base_recipe_and_names_the_files_it_made(tmp_path,
                                                                         monkeypatch):
     monkeypatch.setattr(
         base_backfill, "extract_completion",

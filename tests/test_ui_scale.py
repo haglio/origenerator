@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import ast
+import inspect
 import os
 
 import pytest
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QWidget
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
+from origenerator import app as app_module
 from origenerator import ui_scale
+from origenerator.fun_time_mode import parse_app_args
 from tests.hosted_launch import hosted_launch
 
 
@@ -94,8 +100,6 @@ def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypa
 def test_the_hud_bitmap_is_pinned_to_device_pixels(qapp):
     """An 18px HUD button is already the size it should be on screen, so the
     core window's scale must not shrink it: the pixmap's ratio cancels it."""
-    from PyQt6.QtGui import QPixmap
-
     ui_scale.apply_hosted_scale()
     pixmap = ui_scale.unscaled_pixmap(QPixmap(280, 140))
 
@@ -123,11 +127,6 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
     lands after the first PyQt6 import sets a variable nothing will read again.
     The ordering inside main() is the whole contract, so it is asserted here --
     off the syntax tree, so a reformat of either line leaves it standing."""
-    import ast
-    import inspect
-
-    from origenerator import app as app_module
-
     main = ast.parse(inspect.getsource(app_module.main))
     applied = min(node.lineno for node in ast.walk(main)
                   if isinstance(node, ast.Call)
@@ -139,8 +138,6 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
 
 
 def test_a_running_app_is_redrawn_at_a_new_scale_and_back(qapp):
-    from PyQt6.QtWidgets import QWidget
-
     window = QWidget()
     window.show()
 
@@ -172,7 +169,5 @@ def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):
 
 
 def test_only_a_hosted_launch_turns_the_scale_on():
-    from origenerator.fun_time_mode import parse_app_args
-
     assert parse_app_args([]).fun_time is None          # standalone: unscaled
     assert parse_app_args(hosted_launch()).fun_time is not None

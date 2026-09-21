@@ -119,6 +119,7 @@ from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.notice_overlay import ERROR, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.orientation import (
     LANDSCAPE as _LANDSCAPE,
@@ -159,7 +160,6 @@ from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.gui.toast import ERROR, NOTICE
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
     BankActs,

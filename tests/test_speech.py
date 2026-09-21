@@ -1,6 +1,7 @@
 """Her lines, spoken: which files a story's scenes need and how they are made."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -90,7 +91,6 @@ def _speaking_run(input_dir):
     calls = []
 
     def run(cmd, **kwargs):
-        import json
         calls.append((cmd, kwargs))
         job = json.loads(Path(cmd[2]).read_text(encoding="utf-8"))
         for item in job["items"]:

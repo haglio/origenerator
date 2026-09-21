@@ -134,7 +134,7 @@ def test_randomize_seeds_sets_missing_seed_keys():
     assert "seed" in out and isinstance(out["seed"], int)
 
 
-def test_find_duplicate_returns_matching_completed_generation():
+def test_a_request_already_generated_is_found_rather_than_run_again():
     rows = [_row(params={"steps": 20, "seed": 7})]
     snap = _snapshot(params={"steps": 20, "seed": 7})
     assert find_duplicate_generation(rows, snap) is rows[0]

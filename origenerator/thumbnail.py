@@ -34,7 +34,7 @@ def generate_thumbnail(
 
 
 def _first_frame_from_video(path: Path) -> Image.Image:
-    import cv2
+    import cv2  # noqa: PLC0415 (heavy; only a video needs it)
     cap = cv2.VideoCapture(str(path))
     ret, frame = cap.read()
     cap.release()
@@ -73,7 +73,7 @@ def generate_animated_thumbnail(
 def _sample_video_frames(path: Path, count: int, size: int) -> list[Image.Image]:
     """Up to ``count`` frames evenly spaced across the video, each scaled to fit
     ``size`` — RGB PIL images, or empty when the video can't be read."""
-    import cv2
+    import cv2  # noqa: PLC0415 (heavy; only a video needs it)
     cap = cv2.VideoCapture(str(path))
     try:
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

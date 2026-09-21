@@ -56,7 +56,7 @@ def test_combined_params_fills_missing_params_from_workflow_defaults():
     assert params["seed"] == 3 and params["noise_seed"] == 9   # seeds still preserved
 
 
-def test_combined_params_returns_none_when_image_has_no_output_file():
+def test_a_picture_with_no_file_on_disk_cannot_be_combined():
     video = _video_row(seed=3, noise_seed=9)
 
     assert gallery.combined_params(video, _image_row([]), _I2V) is None
@@ -224,7 +224,7 @@ def test_curated_params_rerolls_every_seed():
         assert params[key] != _I2V.default_params()[key]
 
 
-def test_curated_params_returns_none_when_image_has_no_output_file():
+def test_a_picture_with_no_file_on_disk_cannot_be_curated():
     assert gallery.curated_params(_SPEC, _image_row([]), _I2V) is None
     assert gallery.curated_params(_SPEC, _image_row(None), _I2V) is None
 

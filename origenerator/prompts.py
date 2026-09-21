@@ -2,8 +2,8 @@
 
 Behavior, not configuration: every one of these is tuned by reading what the
 model does with it, and each changes for reasons that have nothing to do with
-where the media library sits or which UDP port the OSR2 broker listens on --
-which is what they used to share a file, and a blame history, with.
+where the media library sits or which UDP port the OSR2 broker listens on, so
+they share neither a file nor a blame history with those.
 
 All local: the prompts and everything sent under them go to an
 OpenAI-compatible chat server on this machine (``config.LOCAL_LLM_BASE_URL``),

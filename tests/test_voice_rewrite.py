@@ -43,7 +43,7 @@ def test_parse_completion_tolerates_fenced_or_wrapped_json():
     assert rewrite.parse_completion(data) == {"positive": "a", "negative": "b"}
 
 
-def test_rewrite_prompt_posts_both_prompts_and_returns_the_pair():
+def test_a_rewrite_sends_both_prompts_and_answers_with_both():
     captured = {}
 
     def _fake_urlopen(request, timeout=None):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from origenerator.app_state import AppState
 
 
-def test_get_returns_default_when_file_missing(tmp_path):
+def test_a_state_file_that_was_never_written_reads_at_the_defaults(tmp_path):
     state = AppState(tmp_path / "ui_state.json")
     assert state.get("missing", "fallback") == "fallback"
 

@@ -304,7 +304,7 @@ def _measured_size(slide: Slide) -> tuple[int, int] | None:
     with no thumbnail is measured directly; a video without one is passed over
     rather than decoded, since a frame grab costs seconds on HEVC.
     """
-    from PIL import Image  # deferred: this module is imported before the splash
+    from PIL import Image  # noqa: PLC0415 (this module is read before the splash)
 
     for candidate in (slide.still,
                       slide.path if slide.media_type == MediaType.IMAGE else None):
@@ -326,7 +326,7 @@ def _probed_video_size(slides: list[Slide]) -> tuple[int, int] | None:
     otherwise measured as nothing at all, and "nothing" fell to landscape,
     which is how a portrait slideshow once landed on the landscape region.
     """
-    import cv2  # deferred: this module is imported before the splash
+    import cv2  # noqa: PLC0415 (this module is read before the splash)
 
     for slide in slides:
         if slide.media_type != MediaType.VIDEO:

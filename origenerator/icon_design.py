@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QImage, QPainter, QPainterPath
+from PyQt6.QtGui import QGuiApplication, QImage, QPainter, QPainterPath
 from shared_ui.colors import MAGENTA
+
+from origenerator.config import PROJECT_DIR
 
 CANVAS = 256  # icon master size
 INSET = 31  # the letter grid's offset within the canvas
@@ -69,10 +71,6 @@ def save_ico(path) -> None:
 
 
 def main() -> int:
-    from PyQt6.QtGui import QGuiApplication
-
-    from origenerator.config import PROJECT_DIR
-
     QGuiApplication([])
     save_ico(PROJECT_DIR / "icon.ico")
     return 0

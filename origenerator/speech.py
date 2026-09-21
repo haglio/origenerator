@@ -71,7 +71,7 @@ class SceneSpeech:
         # Imported here, not above: the workflows package imports this module
         # (its graphs read which scenes speak), so this module cannot import
         # the package back at load.
-        from origenerator.workflows.frame_rate import NATIVE_FPS
+        from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
 
         return self.frames / NATIVE_FPS
 

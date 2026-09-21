@@ -1,8 +1,10 @@
 """Draining the color out of a picture shown only for what it configures."""
 from __future__ import annotations
 
+from PIL import Image
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QImage, QPixmap
+from PyQt6.QtGui import QColor, QImage, QMovie, QPixmap
+from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 
@@ -47,10 +49,6 @@ def test_a_null_pixmap_comes_back_as_it_went_in(qapp):
 
 
 def test_a_played_movie_paints_its_frames_gray_into_the_label(qtbot, tmp_path):
-    from PIL import Image
-    from PyQt6.QtGui import QMovie
-    from PyQt6.QtWidgets import QLabel
-
     path = tmp_path / "clip.webp"
     frames = [Image.new("RGB", (16, 16), (200, 30, 30)) for _ in range(2)]
     frames[0].save(path, format="WEBP", save_all=True, append_images=frames[1:],

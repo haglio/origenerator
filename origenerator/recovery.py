@@ -2,9 +2,9 @@
 
 Deleting a generation moves its files into the trash and drops its row (see
 :class:`~origenerator.gallery_actions.GalleryActions`), which the session's undo
-stack can reverse. That hold used to end at the next launch, when the whole trash
-was cleared; here it does not end on its own at all, because the delete also
-records the row it dropped and the batch its files went into. The gallery's Trash
+stack can reverse. That hold does not end on its own at all -- not at the next
+launch, not ever -- because the delete also records the row it dropped and the
+batch its files went into. The gallery's Trash
 shelf lists those records, puts one back, or ends one for good — and ending one
 by hand is the only thing that ends one. :func:`reclaim_orphans` is all that is
 left for launch to do: clear the batch folders no record names, and leave

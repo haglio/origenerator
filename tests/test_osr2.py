@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from player_core.tcode import PARK_COMMAND
+
+from origenerator import osr2
 from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_on, format_position
 
 
@@ -32,8 +35,6 @@ def test_format_position_clamps_out_of_range():
 
 
 def test_park_tcode_is_the_familys_park_command():
-    from player_core.tcode import PARK_COMMAND
-
     assert PARK_TCODE is PARK_COMMAND
     assert PARK_TCODE == "L00000I500"
 
@@ -89,8 +90,6 @@ def test_the_staleness_window_can_be_named_like_the_file_it_reads(tmp_path):
 def test_the_window_defaults_to_the_brokers_own(tmp_path, monkeypatch):
     """Named or not, the number is the broker's, so the app and the broker never
     disagree about whether the OSR2 is there."""
-    from origenerator import osr2
-
     monkeypatch.setattr(osr2, "RX_STALE_S", 5.0)
 
     assert device_on(now=1000.0, rx_file=_rx(tmp_path, 997.0)) is True

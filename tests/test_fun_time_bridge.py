@@ -7,9 +7,15 @@ session's hotkeys reach the region shows and its choreography can see them.
 from __future__ import annotations
 
 from PIL import Image
+from player_core.file_channel import consume_command_file
+from player_core.playlist import read_playlist
+from player_core.satellite_hud import parse_hud
 
-from origenerator.fun_time_mode import FunTimeSession, Rect
+import origenerator.gui.gallery_view as gallery_view_module
+from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
+from origenerator.gui import show_director
 from origenerator.gui.fun_time_bridge import FunTimeBridge
+from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.show_buttons import answer
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image
@@ -155,8 +161,6 @@ def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch
 def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
     """End to end from the words: the phrase the session heard becomes the
     command this app would have matched had it heard it itself."""
-    from origenerator.gui.gallery_tree import FAVORITES_KEY
-
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
     monkeypatch.setattr(view._shows, "play_shelf", played.append)
@@ -340,7 +344,6 @@ def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monke
     clips still going.  OmniPause stops the room, not only its shows — the
     looping previews app-wide, wherever they are drawn, and the tabs' videos
     through the tabs."""
-    import origenerator.gui.gallery_view as gallery_view_module
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     tiles, tabs = [], []
     monkeypatch.setattr(gallery_view_module, "set_previews_paused", tiles.append)
@@ -500,8 +503,6 @@ def test_a_press_no_show_answers_is_dropped_on_the_log(qtbot, tmp_path, monkeypa
 
 
 def _players_session(tmp_path):
-    from origenerator.fun_time_mode import PlayerChannel
-
     def channel(side):
         return PlayerChannel(
             playlist=tmp_path / f"{side}.tsv",
@@ -523,10 +524,6 @@ def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
         qtbot, tmp_path, monkeypatch):
     """Entering the mode with the players handed over: each player is given the
     list of its own side's shape, and no window of this app's opens at all."""
-    from player_core.playlist import read_playlist
-
-    from origenerator.gui import show_director
-
     def no_window(*args, **kwargs):
         raise AssertionError("a window of this app's opened over a region")
 
@@ -590,16 +587,11 @@ def _players_playing_their_libraries(qtbot, tmp_path, monkeypatch):
 
 
 def _told(tmp_path, side):
-    from player_core.file_channel import consume_command_file
-
     return consume_command_file(tmp_path / f"{side}_cmd.txt", uppercase=False)
 
 
 def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
         qtbot, tmp_path, monkeypatch):
-    from player_core.playlist import read_playlist
-    from player_core.satellite_hud import parse_hud
-
     view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     folder = _stills(tmp_path, "scene-wide", 2, (200, 100))
     clicked = folder[1]

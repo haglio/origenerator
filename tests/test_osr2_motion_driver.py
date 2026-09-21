@@ -4,6 +4,7 @@ from __future__ import annotations
 import threading
 import time
 
+from player_core.learned_model import LearnedModel, Phrase, classify
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 
 from origenerator import motion_engine
@@ -203,7 +204,6 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
     # Hands off to the scripts: the tick streams where the phrases will have
     # the device when the command's own interval runs out, inside the dials'
     # range -- and cruise control, had it the motion, has let go.
-    from player_core.learned_model import LearnedModel, Phrase, classify
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
     driver, broker, clock = _driver(qtbot)

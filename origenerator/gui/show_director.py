@@ -47,6 +47,7 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_tree import (
     RECENTS_KEY as _RECENTS_KEY,
 )
+from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
 )
@@ -62,7 +63,6 @@ from origenerator.gui.show_hud import ShowHud
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.nav_map import (
     act_labels,

@@ -37,6 +37,8 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
+from origenerator.voice.app_commands import match_app_command
+from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
 from origenerator.voice.show_commands import (
     ShowCommand,
     match_show_command,
@@ -140,8 +142,6 @@ def sided_app_command(text: str):
     which picture is meant.  Unsided, it comes back bare, exactly as the
     standalone app expects it.
     """
-    from origenerator.voice.app_commands import match_app_command
-
     # The side is taken off the RAW words, not off split_side's letters-only
     # normalisation: this vocabulary says numbers ("center 30"), and a split
     # that drops the digits hands the matcher a command with nothing to set.
@@ -174,7 +174,5 @@ def spoken_phrases() -> frozenset[str]:
     Unsided: a side is for a hosting session's two shows, and that session hears for
     itself. One said here still works, by the slower road every sentence takes.
     """
-    from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
-
     return (app_command_phrases() | command_phrases() | show_command_phrases()
             | frozenset(SHELF_KEYS))

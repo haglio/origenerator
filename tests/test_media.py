@@ -32,7 +32,7 @@ def test_sibling_of_type_finds_same_stem_file_of_other_media(tmp_path):
     assert sibling_of_type(png, MediaType.VIDEO) == video
 
 
-def test_sibling_of_type_returns_none_when_absent(tmp_path):
+def test_a_media_kind_that_was_never_made_has_no_sibling(tmp_path):
     lone = tmp_path / "clip.mp4"
     lone.write_bytes(b"v")
     assert sibling_of_type(lone, MediaType.IMAGE) is None

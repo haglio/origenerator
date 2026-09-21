@@ -18,6 +18,7 @@ from origenerator.gallery import (
     fold_enhancement,
     is_enhanced_row,
 )
+from origenerator.generation_metadata import basic_section, file_item
 
 
 def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False):
@@ -287,7 +288,6 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     # The file information is per enhancement, so it belongs to the level that
     # made the file rather than to one block at the top of the pane. The top
     # block is then left with nothing to say about an image at all.
-    from origenerator.generation_metadata import basic_section, file_item
 
     db = Database(tmp_path / "t.db")
     _add_source(db)

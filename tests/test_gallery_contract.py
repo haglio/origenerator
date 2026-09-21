@@ -17,6 +17,7 @@ from pathlib import Path
 
 from origenerator import db_schema
 from origenerator import gallery_contract as contract
+from origenerator.gui.export_lane import EXPORT_LANES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,8 +49,6 @@ def test_every_lane_the_document_names_stamps_the_columns_it_promises():
     """The send and its withdrawal are one fact spelled in two places -- the
     button's column here, the reader's column over there.  A lane whose stamps
     are not the promised ones is a send the reader never sees."""
-    from origenerator.gui.export_lane import EXPORT_LANES
-
     stamped = {lane.source_key: {"sent": lane.flag, "unsent": lane.unsent_flag}
                for lane in EXPORT_LANES}
 

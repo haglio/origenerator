@@ -40,7 +40,7 @@ def test_best_recipe_picks_the_most_used_recipe_for_the_act():
     assert recipe_match.best_recipe("alpha", rows) == "a2"
 
 
-def test_best_recipe_returns_none_without_a_video_of_that_act():
+def test_an_act_no_video_does_has_no_best_recipe():
     rows = [_video("h1", "a beta", "2026-01-01", lora_high="Z")]
     assert recipe_match.best_recipe("alpha", rows) is None
 
@@ -64,7 +64,7 @@ def test_available_categories_offers_only_curated_acts_without_any_video():
 # --- curated_recipe: the overlay's hand-tuned act recipes ---------------------
 
 
-def test_curated_recipe_returns_the_overlays_entry():
+def test_a_curated_act_takes_the_recipe_the_overlay_names():
     spec = recipe_match.curated_recipe("gamma")  # curated in the example overlay
     assert spec["workflow"] == "wan22_i2v"
     assert spec["params"]["lora_high"] == "example-act-high.safetensors"
@@ -143,7 +143,7 @@ def _scene_video(pid, prompt, start_scene, created, **params):
     }
 
 
-def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_pick(monkeypatch):
+def test_the_model_is_offered_one_video_per_recipe_and_its_pick_is_used(monkeypatch):
     rows = [
         _scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X"),
         _scene_video("x2", "a alpha", "his anchor already in her grip", "2026-01-02", lora_high="X"),
@@ -166,7 +166,7 @@ def test_smart_recipe_offers_one_representative_per_recipe_and_returns_the_llms_
     assert "she waits, no anchor in frame" in seen["user"]   # Y is offered too
 
 
-def test_smart_recipe_returns_none_without_a_video_of_the_act(monkeypatch):
+def test_an_act_no_video_does_is_not_put_to_the_model_at_all(monkeypatch):
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call the model")))
     rows = [_scene_video("h1", "a beta", "her hand on it", "2026-01-01", lora_high="Z")]
@@ -185,7 +185,7 @@ def test_smart_recipe_ignores_rows_lacking_a_start_scene(monkeypatch):
                                      base_url="x", model="m", system_prompt="S", timeout=1) == "y1"
 
 
-def test_smart_recipe_returns_none_when_the_llm_finds_no_fit(monkeypatch):
+def test_a_model_that_finds_no_fit_leaves_the_recipe_unchosen(monkeypatch):
     rows = [_scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X")]
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: {"choices": [{"message": {"content": '{"choice": -1}'}}]})
@@ -193,7 +193,7 @@ def test_smart_recipe_returns_none_when_the_llm_finds_no_fit(monkeypatch):
                                      base_url="x", model="m", system_prompt="S", timeout=1) is None
 
 
-def test_smart_recipe_returns_none_when_the_llm_errors(monkeypatch):
+def test_a_model_that_fails_leaves_the_recipe_unchosen(monkeypatch):
     rows = [_scene_video("x1", "a alpha", "she kneels", "2026-01-01", lora_high="X")]
     monkeypatch.setattr(recipe_match, "_post_chat",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("model down")))

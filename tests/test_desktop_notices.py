@@ -16,7 +16,7 @@ def _outcome(**over):
     return RunOutcome(**{**fields, **over})
 
 
-def test_a_long_run_reaches_the_desktop_as_a_toast(qapp, monkeypatch):
+def test_a_long_run_reaches_the_desktop_as_a_windows_notification(qapp, monkeypatch):
     notices = DesktopNotices(QIcon())
     said = []
     monkeypatch.setattr(notices._tray, "showMessage", lambda *args: said.append(args))

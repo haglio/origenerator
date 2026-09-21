@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import builtins
+import json
 import logging
 import os
 import runpy
+import sqlite3
+import subprocess
 import sys
-from contextlib import ExitStack, contextmanager
-from datetime import UTC
+import textwrap
+from contextlib import ExitStack, closing, contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
+from PyQt6.QtGui import QColor, QPalette
+from shared_ui.colors import BLUE
 
+from origenerator import config, content, gallery
 from origenerator.app import (
+    MAINTENANCE,
     _arm_the_crash_log,
     _bring_to_front,
     _configure_logging,
@@ -24,6 +32,9 @@ from origenerator.app import (
 )
 from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
+from origenerator.config import STATE_DIR
+from origenerator.db import Database
+from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
@@ -343,9 +354,6 @@ def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
     faulthandler's own _sigsegv, so nothing is left to chance about what kind of
     death it is -- and the file it leaves has to name the frame.
     """
-    import subprocess
-    import textwrap
-
     state = tmp_path / "state"
     child = textwrap.dedent(f"""
         import logging, sys
@@ -369,7 +377,6 @@ def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
     # A crash is worth reading after the next launch, and the next launch is the
     # first thing that happens after one -- so opening the file must not be what
     # destroys the evidence.
-    import logging
 
     state = tmp_path / "state"
     state.mkdir(parents=True)
@@ -383,7 +390,6 @@ def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
 def test_an_unwritable_state_dir_costs_the_log_and_nothing_else(tmp_path):
     # Never the launch: a crash log that cannot be opened is a missing report,
     # not a reason for the app not to come up.
-    import logging
 
     _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t"))
 
@@ -519,8 +525,6 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
 
 
 def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(qapp):
-    from origenerator.config import STATE_DIR
-
     window = MagicMock()
     watch = MagicMock()
     with _a_faked_boot([], **{
@@ -562,8 +566,6 @@ def library(tmp_path, monkeypatch):
     Also what keeps these tests out of the checkout's own state/ directory, which
     is where the launch writes its log, its trash and its database by default.
     """
-    from origenerator import config
-
     state = tmp_path / "state"
     for name, path in (("STATE_DIR", state),
                        ("COMFYUI_OUTPUT_DIR", tmp_path / "output"),
@@ -581,8 +583,6 @@ def library(tmp_path, monkeypatch):
 def _boot(library_path, argv=()):
     """Run the launch, patching only the boundary: the splash, the window, and
     ComfyUI. Every maintenance pass runs for real."""
-    from origenerator.db import Database
-
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.gui.loading_screen.LoadingScreen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
@@ -595,8 +595,6 @@ def _boot(library_path, argv=()):
 
 def _completed_image(db, prompt_id, **params):
     """One finished SDXL image in the library, fabricated whole."""
-    import json
-
     values = {"positive_prompt": "a paper boat", "steps": 30, "seed": 1, **params}
     db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
                          workflow_version="v002", params_json=json.dumps(values),
@@ -615,7 +613,6 @@ def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
     # has to be the QApplication, and it has to be here — asserted by reading the
     # sheet back off the application, because the same call sitting in a comment
     # reads identically to anything that only greps app.py for the line.
-    from origenerator.gui.stylesheet import build_stylesheet
 
     prior = qapp.styleSheet()
     qapp.setStyleSheet("")  # so a sheet an earlier launch left on cannot answer for this one
@@ -633,8 +630,6 @@ def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library)
     # selected word in this dark app came to be highlighted in the accent color
     # the user picked for Windows -- an orange nothing here chose. Read back off
     # the application for the same reason the sheet above is.
-    from PyQt6.QtGui import QColor, QPalette
-    from shared_ui.colors import BLUE
 
     prior = qapp.palette()
     desktop = QPalette(prior)
@@ -653,8 +648,6 @@ def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
     # The reconcile is why a star survives a change to the key formula. Deleting
     # both its calls left the boot tests green, and the star would simply be gone
     # from the folder the user put it on.
-    from origenerator import gallery
-    from origenerator.db import Database
 
     row = _completed_image(Database(library), "p1")
     legacy = gallery.legacy_settings_folder_key(row)
@@ -670,10 +663,7 @@ def test_the_launch_heals_a_bookmark_whose_folder_key_drifted(qapp, library):
 def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
     # Estimates have no history to draw on until this runs, and throwing its
     # result away left the boot tests green.
-    from datetime import datetime
 
-    from origenerator import config
-    from origenerator.db import Database
 
     db = Database(library)
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
@@ -694,12 +684,6 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
 def _held_deletion(library_path, prompt_id, *, days_ago):
     """A deletion the bin has been holding for ``days_ago`` days."""
-    import sqlite3
-    from contextlib import closing
-    from datetime import datetime, timedelta
-
-    from origenerator.db import Database
-
     db = Database(library_path)
     row = _completed_image(db, prompt_id)
     db.delete_generation(prompt_id)
@@ -726,7 +710,6 @@ def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
     # The one thing launch still clears: a batch nothing can reach, left over
     # by a crash between the move and the record. Without it the trash only ever
     # grows.
-    from origenerator import config
 
     orphan = config.TRASH_DIR / "0123456789abcdef"
     orphan.mkdir(parents=True)
@@ -895,8 +878,6 @@ _SPLASH_LINES = (
 
 
 def test_the_boot_says_the_same_twelve_things_it_always_has():
-    from origenerator.app import MAINTENANCE
-
     assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
 
 
@@ -904,8 +885,6 @@ def test_every_pass_says_what_went_wrong_when_something_does():
     """The one thing they all share: a failure costs one warning line naming
     the operation, never the launch. A pass with no failure message would report
     a genuine bug as a bare format string."""
-    from origenerator.app import MAINTENANCE
-
     for boot_pass in MAINTENANCE:
         assert boot_pass.failure.endswith("%s"), boot_pass.run.__name__
 
@@ -943,8 +922,6 @@ class TestAnOverlayShortOfAKey:
 
     def test_it_names_every_missing_key_and_the_file_to_put_them_in(
             self, qapp, tmp_path, monkeypatch):
-        from origenerator import content
-
         # The suite pins the overlay at the committed example (tests/conftest.py),
         # so point it somewhere with the name a real install would have.
         monkeypatch.setattr(content, "LOCAL_CONTENT", tmp_path / "content.local.json")

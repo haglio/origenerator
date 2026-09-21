@@ -75,7 +75,7 @@ def test_dual_sampler_model_files_pairs_high_low_unet_and_lora():
     }
 
 
-def test_dual_sampler_model_files_returns_only_unets_without_lora():
+def test_a_dual_sampler_offers_its_unets_and_no_lora():
     # WAN t2i has the dual samplers but no LoRA loaders in the model chain.
     graph = {
         "3": {"class_type": "UNETLoader", "inputs": {"unet_name": "t2v_high.safetensors"}},

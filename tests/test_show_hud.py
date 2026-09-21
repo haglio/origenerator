@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from origenerator.gui import media_overlay
+from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.show_hud import ShowHud, show_hud_model
 from origenerator.gui.show_wiring import HudFacts, ShowActions
@@ -81,8 +82,6 @@ class TestTheOnePanelAShowWears:
         return show
 
     def test_the_show_floats_no_second_panel(self, qtbot):
-        from origenerator.gui.motion_panel import MotionPanel
-
         assert self._show(qtbot).findChildren(MotionPanel) == []
 
     def _model(self, qtbot):

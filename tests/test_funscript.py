@@ -173,7 +173,7 @@ def test_ensure_funscript_writes_no_second_copy_of_an_older_one(tmp_path):
     assert not funscript_path_for(video, output_dir=tmp_path).exists()
 
 
-def test_ensure_funscript_returns_none_without_a_duration(tmp_path):
+def test_a_video_of_unknown_length_gets_no_funscript(tmp_path):
     video = tmp_path / "clip.mp4"
     video.write_bytes(b"v")
     assert ensure_funscript(video, loop=False, hz=1.0, output_dir=tmp_path,
@@ -188,7 +188,7 @@ def test_heatmap_colors_empty_without_actions_or_buckets():
     assert heatmap_colors(synthesize_actions(2.0, hz=1.0, loop=False), 0) == []
 
 
-def test_heatmap_colors_returns_one_rgb_per_bucket():
+def test_the_heatmap_has_one_color_for_every_bucket_it_draws():
     colors = heatmap_colors(synthesize_actions(2.0, hz=1.0, loop=False), 8)
     assert len(colors) == 8
     for c in colors:

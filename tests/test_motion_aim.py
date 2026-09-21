@@ -4,7 +4,10 @@ import json
 import logging
 
 import pytest
+from PIL import Image
 
+from origenerator import content
+from origenerator.content import MissingOverlayKey
 from origenerator.workflows import motion_aim
 
 
@@ -21,8 +24,6 @@ def test_aim_fractions_map_the_rect_to_column_span_and_base():
 
 
 def test_detect_grip_aim_picks_the_most_confident_anchor(monkeypatch, tmp_path):
-    from PIL import Image
-
     frame = tmp_path / "frame.png"
     Image.new("RGB", (200, 400)).save(frame)
     monkeypatch.setattr(motion_aim, "_detect", lambda path: [
@@ -35,9 +36,7 @@ def test_detect_grip_aim_picks_the_most_confident_anchor(monkeypatch, tmp_path):
     assert aim["motion_ceiling"] == pytest.approx((100 + 0.18 * 200) / 400)
 
 
-def test_detect_grip_aim_returns_none_when_nothing_usable(monkeypatch, tmp_path):
-    from PIL import Image
-
+def test_a_frame_the_detector_finds_nothing_in_aims_nowhere(monkeypatch, tmp_path):
     frame = tmp_path / "frame.png"
     Image.new("RGB", (10, 10)).save(frame)
     monkeypatch.setattr(motion_aim, "_detect", lambda path: [
@@ -66,8 +65,6 @@ class TestAnOverlayThatIsMissingTheDetectorLabels:
     @pytest.fixture
     def incomplete(self, tmp_path, monkeypatch):
         """The committed example with `detector_labels` taken out of it."""
-        from origenerator import content
-
         example = json.loads(content.EXAMPLE_CONTENT.read_text(encoding="utf-8"))
         example.pop("detector_labels")
         overlay = tmp_path / "content.local.json"
@@ -80,8 +77,6 @@ class TestAnOverlayThatIsMissingTheDetectorLabels:
         motion_aim._detector_labels.cache_clear()
 
     def test_reading_the_labels_names_the_key_and_the_file(self, incomplete):
-        from origenerator.content import MissingOverlayKey
-
         with pytest.raises(MissingOverlayKey) as refused:
             motion_aim._detector_labels()
 
@@ -93,8 +88,6 @@ class TestAnOverlayThatIsMissingTheDetectorLabels:
         """The module's own documented failure mode: any failure returns None
         and the caller falls back to its manual numbers. What is NEW is that it
         reaches that path at all — before, the app was gone at import."""
-        from PIL import Image
-
         frame = tmp_path / "frame.png"
         Image.new("RGB", (200, 400)).save(frame)
         monkeypatch.setattr(motion_aim, "_detect", lambda path: [

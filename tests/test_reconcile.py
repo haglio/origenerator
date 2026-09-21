@@ -4,7 +4,7 @@ import json
 
 from PIL import Image
 
-from origenerator import gallery
+from origenerator import bookmark_reconcile, gallery
 from origenerator.bookmark_reconcile import (
     reconcile_bookmarks,
     reconcile_custom_folders,
@@ -409,8 +409,6 @@ def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
     """The two passes ask the same question of the same tree, and building it
     reads every row in the database — so the boot paid for two full builds back
     to back. One index now serves both."""
-    from origenerator import bookmark_reconcile
-
     db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
     builds = []
     build = gallery.build_gallery_tree
@@ -425,8 +423,6 @@ def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
 def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_path):
     """The control on sharing the index: a shared reading must not change any
     answer. Same library, both ways round."""
-    from origenerator import bookmark_reconcile
-
     shared_db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
     apart_db, _, _ = _a_library_with_both_kinds_of_bookmark(tmp_path / "apart")
 
@@ -455,8 +451,6 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
     """The order the boot ran them in, kept now that one call runs both. A
     custom folder gathers the same keys a star sits on, so the star's move is
     the one that has to be settled first."""
-    from origenerator import bookmark_reconcile
-
     db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
     ran = []
     for name in ("reconcile_folder_meta", "reconcile_custom_folders"):
@@ -472,8 +466,6 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
 def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
     """Nothing bookmarked is the common case on a fresh install, and building
     the tree to discover that would read every row for nothing."""
-    from origenerator import bookmark_reconcile
-
     db = Database(tmp_path / "t.db")
     _add_completed(db, "p1", params={"positive_prompt": "a harbor"}, filename="a.png")
     builds = []

@@ -2,8 +2,8 @@
 
 Every spoken-command matcher in this app opens the same way — the utterance cut
 down to lowercase words, punctuation and case being whisper's invention rather
-than the speaker's — and each one used to spell that out itself, in three
-variants nothing explained. The variants are real: :func:`words` keeps
+than the speaker's. Spelled out at each matcher it comes apart into variants
+nothing explains. The variants are real: :func:`words` keeps
 apostrophes where a matcher needs "don't" whole and digits where a command
 names a number, and each call site now says which it needs.
 

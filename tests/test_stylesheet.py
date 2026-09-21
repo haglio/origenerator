@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QMenu,
+    QRadioButton,
+    QSpinBox,
+    QStyle,
+    QStyleOptionSpinBox,
+    QTabBar,
+)
+from shared_ui.colors import BG_BUTTON, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 
 from origenerator.gui.stylesheet import build_stylesheet, dress_application
 
 
-def test_build_stylesheet_resolves_shared_ui_and_returns_qss():
+def test_the_stylesheet_is_qss_with_every_shared_ui_token_resolved():
     qss = build_stylesheet()
     assert isinstance(qss, str)
     # Colors come from shared_ui; a resolved import yields concrete hex values.
@@ -30,7 +42,6 @@ def test_stylesheet_greys_disabled_buttons():
     # different from the enabled one to be worth having, so it is the colour that
     # is asserted, not the presence of the selector: painting a disabled button in
     # the ordinary text colour leaves it looking perfectly pressable.
-    from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
 
     rule = build_stylesheet().split("QPushButton:disabled {", 1)[1].split("}", 1)[0]
     assert TEXT_MUTED.name() in rule
@@ -82,8 +93,6 @@ def _menu_row_colors(qtbot):
     a QMenu — they are top-level popups — looks identical in the string and shows
     nothing on screen, which is how the app's tooltips once went missing.
     """
-    from PyQt6.QtWidgets import QApplication, QMenu
-
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -105,7 +114,6 @@ def test_a_menu_lights_the_row_under_the_cursor(qtbot):
     # The app-wide QWidget rule paints a menu's items on the menu's own flat
     # background, so without this the row under the cursor looked exactly like the
     # rows either side of it and the menu said nothing about what a click hits.
-    from shared_ui.colors import BLUE
 
     hovered, other = _menu_row_colors(qtbot)
     assert hovered == BLUE
@@ -127,8 +135,6 @@ def _radio_image(qtbot, checked: bool):
     which no rule in the string describes -- only the pixels say whether the
     mark is there.
     """
-    from PyQt6.QtWidgets import QApplication, QRadioButton
-
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -162,7 +168,6 @@ def test_a_radios_ring_stays_visible_in_both_states(qtbot):
     # The ring is what says there is a choice here at all, so the disc arriving
     # must not swallow it, and neither state may leave it as dark as the panel
     # under it.
-    from shared_ui.colors import BG_PRIMARY
 
     for checked in (True, False):
         image = _radio_image(qtbot, checked=checked)
@@ -176,8 +181,6 @@ def _spin_down_rect(spinner):
     input to that answer and Qt's own default is the other, so the only thing
     that says where the button actually lands is the style itself.
     """
-    from PyQt6.QtWidgets import QStyle, QStyleOptionSpinBox
-
     option = QStyleOptionSpinBox()
     option.initFrom(spinner)
     option.rect = spinner.rect()
@@ -189,8 +192,6 @@ def _spin_down_rect(spinner):
 
 
 def _styled_spinner(qtbot):
-    from PyQt6.QtWidgets import QSpinBox
-
     spinner = QSpinBox()
     qtbot.addWidget(spinner)
     spinner.setStyleSheet(build_stylesheet())
@@ -217,8 +218,6 @@ def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
     # the radius one way and Qt either honors it or paints the corner solid.
     # Two-sided, because "not the button's ground" is also true of a button that
     # was never painted: five pixels in, the ground is exactly what it must be.
-    from PyQt6.QtCore import QPoint
-    from shared_ui.colors import BG_BUTTON
 
     spinner = _styled_spinner(qtbot)
     down = _spin_down_rect(spinner)
@@ -235,8 +234,6 @@ def _tab_bar_image(qtbot):
     geometry -- read after the sheet comes off and they describe a bar that was
     never rendered.
     """
-    from PyQt6.QtWidgets import QApplication, QTabBar
-
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -256,7 +253,6 @@ def test_the_selected_tab_is_underlined_and_the_others_are_not(qtbot):
     # The rule that draws it sets three of the four edges at once, so a rewrite
     # of it can quietly take the mark away or paint it on every tab. Both halves
     # are asserted: the underline exists, and it belongs to one tab only.
-    from shared_ui.colors import BLUE
 
     image, selected, other = _tab_bar_image(qtbot)
     low = selected.bottomLeft().y()
@@ -266,9 +262,6 @@ def test_the_selected_tab_is_underlined_and_the_others_are_not(qtbot):
 
 
 def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot):
-    from PyQt6.QtWidgets import QApplication, QLabel
-    from shared_ui.colors import BORDER_SUBTLE
-
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -287,7 +280,6 @@ def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot)
 def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):
     # The same rule's other edge: it is what says which close mark belongs to
     # which tab, and it is drawn by the declaration the underline shares.
-    from shared_ui.colors import BORDER_SUBTLE
 
     image, selected, _ = _tab_bar_image(qtbot)
     seam = selected.topRight().x()

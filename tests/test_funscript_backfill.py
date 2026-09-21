@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from origenerator import config, funscript_backfill
 from origenerator.funscript import funscript_path_for
 from origenerator.funscript_backfill import backfill
 
@@ -73,8 +74,6 @@ def test_the_output_folder_is_resolved_when_the_sweep_runs(tmp_path, monkeypatch
     evaluated at import, from a constant that was itself built by reading the
     content overlay at import. So the sweep could not be pointed anywhere the
     module had not already decided on before anything called it."""
-    from origenerator import config, funscript_backfill
-
     monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "elsewhere")
     seen = []
 
@@ -88,8 +87,6 @@ def test_the_output_folder_is_resolved_when_the_sweep_runs(tmp_path, monkeypatch
 
 def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
     """The same defect on the same line: the motion rate was bound at import."""
-    from origenerator import config, funscript_backfill
-
     monkeypatch.setattr(config, "MOTION_DEFAULT_HZ", 2.5)
     clip = tmp_path / "alpha.mp4"
     clip.write_bytes(b"not really a video")

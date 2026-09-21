@@ -1,12 +1,10 @@
 """ComfyUI's REST surface: everything this app asks the server over HTTP.
 
-Qt-free on purpose, and that is the whole point of it being its own module. It
-used to live on ``ComfyUIClient``, which is a ``QThread`` running a websocket
-event pump -- so every consumer of the eleven calls below needed Qt, including
-the ones whose own docstrings claim not to: ``completion`` says it is kept
-"Qt-free so the reconciler can use it without a running UI", and ``inflight``
-and ``base_backfill`` are pure, yet all three took a client that could only be a
-thread.
+Qt-free on purpose, and that is the whole point of it being its own module.
+``ComfyUIClient`` is a ``QThread`` running a websocket event pump, so holding
+the eleven calls below on it would make every consumer of them need Qt --
+including the ones that plainly should not: ``completion`` is read by the
+reconciler with no running UI, and ``inflight`` and ``base_backfill`` are pure.
 
 ``ComfyUIClient`` holds one of these and forwards every one of its methods, so
 nothing that already has a client had to change. What is new is that a unit

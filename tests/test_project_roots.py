@@ -54,7 +54,7 @@ class TestProjectDir:
 
         assert found == stayed
 
-    def test_returns_a_path_under_the_first_root_when_no_root_holds_it(self, tmp_path):
+    def test_a_sibling_that_is_not_installed_still_resolves_to_a_path(self, tmp_path):
         """Every consumer guards on existence; resolving must not raise."""
         found = config.project_dir("gamma_app", (tmp_path / "work", tmp_path / "old"))
 

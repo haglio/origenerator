@@ -11,6 +11,7 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import json
+import os
 import re
 
 import pytest
@@ -18,10 +19,10 @@ from PyQt6.QtCore import Qt
 
 from origenerator import gallery
 from origenerator.gui import show_director as module
-from origenerator.gui.gallery_tree import RECENTS_KEY
+from origenerator.gui.gallery_tree import FAVORITES_KEY, RECENTS_KEY
+from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.orientation import oriented_key
 from origenerator.gui.show_director import ShowDirector
-from origenerator.gui.toast import FAVORITE, NOTICE, WARNING
 from origenerator.slideshow import ShowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
@@ -671,8 +672,6 @@ def test_a_landed_enhancement_reaches_every_surface(shows, tmp_path, monkeypatch
 
 def _evolver_upscaled_video(tmp_path, monkeypatch):
     """A video row with its file on disk, and the upscale Evolver made of it."""
-    import os
-
     output = tmp_path / "output"
     video = output / "clip.mp4"
     video.parent.mkdir()
@@ -944,7 +943,6 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(shows):
 
 def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
     # On a player that word is F-mode, and a show is meant to read the same way.
-    from origenerator.gui.gallery_tree import FAVORITES_KEY
 
     class Spoken:
         shelf_key = FAVORITES_KEY
@@ -961,8 +959,6 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
 
 
 def test_a_spoken_shelf_with_nothing_in_it_opens_nothing(shows):
-    from origenerator.gui.gallery_tree import RECENTS_KEY
-
     class Spoken:
         shelf_key = RECENTS_KEY
         side = None
@@ -1384,7 +1380,6 @@ def test_a_show_of_favorites_plays_the_sides_whole_library_with_the_filter_on(sh
     """Favorites is the Shuffle playlist with the favorites switch held down,
     so the switch can be let go to widen and the order pair still means the
     library rather than the bookmarks."""
-    from origenerator.gui.gallery_tree import FAVORITES_KEY
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
     browser = FakeBrowser(shelves={oriented_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
                                    ALL_PORTRAIT: rows})

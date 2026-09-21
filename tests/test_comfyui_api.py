@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from origenerator.comfyui_api import ComfyUIApi, comfyui_responding, format_prompt_error
+from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 
 
 def _mock_response(status: int, body: bytes):
@@ -32,7 +33,7 @@ def _mock_response(status: int, body: bytes):
     resp.__exit__ = MagicMock(return_value=False)
     return resp
 
-def test_submit_job_posts_our_prompt_id_and_returns_it():
+def test_a_submitted_job_keeps_the_prompt_id_this_app_chose_for_it():
     # Origenerator supplies its own prompt_id so ComfyUI keys this job's signals
     # and history on the same id the DB row uses (the basis for reconnecting).
     client = ComfyUIApi(client_id="test-client")
@@ -91,7 +92,7 @@ def test_format_prompt_error_falls_back_when_body_is_not_the_expected_json():
         json.dumps({"error": {"message": "Prompt has no outputs"}})
     ) == "Prompt has no outputs"
 
-def test_fetch_queue_returns_running_and_pending_ids():
+def test_the_queue_names_what_is_running_and_what_is_still_waiting():
     client = ComfyUIApi()
     body = json.dumps({
         "queue_running": [[0, "run-1", {}, {}, []]],
@@ -257,7 +258,6 @@ def test_queue_reads_on_the_poll_path_use_the_short_timeout():
     # These run on the GUI thread every couple of seconds. Under the generous
     # _HTTP_TIMEOUT_S a wedged server would freeze the window half a minute at a
     # time; the shorter deadline costs a skipped reading instead.
-    from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 
     assert _POLL_TIMEOUT_S < _HTTP_TIMEOUT_S
     client, urlopen = _queue_client({"queue_running": [], "queue_pending": []})

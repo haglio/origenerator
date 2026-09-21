@@ -16,6 +16,8 @@ from typing import NamedTuple
 import pytest
 from PyQt6.QtWidgets import QWidget
 
+from origenerator import gallery
+from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_search import MIN_CHARS, GallerySearchController
 
 
@@ -241,7 +243,6 @@ def test_a_restored_query_comes_back_without_searching_again(controller):
 def test_the_count_line_says_a_capped_search_is_showing_a_slice(controller):
     # A capped search that said only "2,000 results" would read as 2,000 tiles
     # you could scroll to.
-    from origenerator.gui.browser_pane import SEARCH_DRAW_LIMIT
 
     host = FakeHost()
     found = controller(
@@ -272,5 +273,4 @@ def test_the_sort_menu_names_the_recipe_order_the_way_the_forms_do(controller):
 
 
 def _folder_key(row: dict) -> str:
-    from origenerator import gallery
     return gallery.settings_folder_key(row, {})

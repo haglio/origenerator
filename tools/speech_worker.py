@@ -23,7 +23,7 @@ import time
 
 def fit_to_seconds(wave, rate: int, seconds: float):
     """``wave`` padded with silence, or cut, to exactly ``seconds`` at ``rate``."""
-    import numpy as np
+    import numpy as np  # noqa: PLC0415
 
     wanted = int(round(seconds * rate))
     wave = np.asarray(wave, dtype=np.float32).reshape(-1)
@@ -33,8 +33,10 @@ def fit_to_seconds(wave, rate: int, seconds: float):
 
 
 def _load(model_name: str, device: str):
-    import torch
-    from qwen_tts import Qwen3TTSModel
+    # torch is seconds plus a GPU handshake, and the model package comes with
+    # it: this worker is spawned per job, so neither is paid until there is one.
+    import torch  # noqa: PLC0415
+    from qwen_tts import Qwen3TTSModel  # noqa: PLC0415
 
     try:
         return Qwen3TTSModel.from_pretrained(model_name, device_map=device, dtype=torch.bfloat16)
@@ -44,8 +46,8 @@ def _load(model_name: str, device: str):
 
 
 def main(job_path: str) -> int:
-    import soundfile as sf
-    import torch
+    import soundfile as sf  # noqa: PLC0415
+    import torch  # noqa: PLC0415
 
     with open(job_path, encoding="utf-8") as fh:
         job = json.load(fh)

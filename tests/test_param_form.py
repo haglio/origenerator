@@ -2,17 +2,24 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
+from PyQt6.QtWidgets import QApplication, QFormLayout, QLabel, QPushButton, QWidget
+from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.tick_control import TickControl
 
+import origenerator.gui.param_form as pf
 from origenerator.gui import param_sections
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
+from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, story_of
 
 
 def test_field_labels_fit_the_heading_font(qtbot):
@@ -125,7 +132,6 @@ def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
     # A prompt is the one field worth more than a few lines, so it gets the field
     # whose lower edge drags — filed under its own key, so the height the user
     # gave Positive Prompt is the height every Positive Prompt opens at.
-    from origenerator.gui.prompt_field import PromptField
 
     form = ParamForm([
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
@@ -223,7 +229,6 @@ def _field_cell_of(form, key):
     Fields live in per-section form layouts now, so search every ``QFormLayout``
     under the form, not one top-level one.
     """
-    from PyQt6.QtWidgets import QFormLayout
     for fl in form.findChildren(QFormLayout):
         for r in range(fl.rowCount()):
             item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
@@ -497,7 +502,7 @@ def sample_defs():
     ]
 
 
-def test_param_form_get_values_returns_defaults(qtbot, sample_defs):
+def test_an_untouched_form_reads_back_every_default(qtbot, sample_defs):
     form = ParamForm(sample_defs)
     qtbot.addWidget(form)
     vals = form.get_values()
@@ -669,8 +674,6 @@ def _stub_file_dialog(monkeypatch, chosen, captured=None):
     :meth:`QFileDialog.getOpenFileName` — and, when given ``captured``, records
     the directory the dialog was asked to open in.
     """
-    import origenerator.gui.param_form as pf
-
     def fake(parent, caption, directory, filt):
         if captured is not None:
             captured["dir"] = directory
@@ -703,8 +706,6 @@ def test_param_form_browse_cancel_keeps_existing_image(qtbot, monkeypatch):
 
 
 def test_param_form_browse_defaults_to_input_dir(qtbot, monkeypatch):
-    import origenerator.gui.param_form as pf
-
     captured = {}
     _stub_file_dialog(monkeypatch, "", captured)
 
@@ -738,7 +739,6 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
     # A checkout without the media library has no such folder; opening the dialog
     # on a path that isn't there drops it wherever the process happens to sit, so
     # the picker falls back to ComfyUI's input folder.
-    import origenerator.gui.param_form as pf
 
     captured = {}
     _stub_file_dialog(monkeypatch, "", captured)
@@ -874,7 +874,6 @@ def test_hidden_params_get_no_field(qtbot):
 def test_every_field_and_its_label_carry_the_params_help(qtbot):
     # The tooltip goes on the label as well as the input: the word is what you
     # are looking at when you wonder what a setting does.
-    from origenerator.gui.param_help import param_help
 
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
@@ -1206,8 +1205,6 @@ def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
 def test_each_box_on_a_card_says_what_it_is(qtbot):
     # Three fields to a card, so each is captioned and carries its param's help;
     # the lines field says as well that what goes in it is spoken.
-    from origenerator.gui.eliding import ElidingLabel
-    from origenerator.gui.param_help import param_help
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1222,7 +1219,6 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
     # The speech model renders her speaking and nothing else, so a line takes
     # the scene over: its two prompts go read-only, dim and captioned as unused,
     # rather than staying fields you can type into that change nothing.
-    from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1247,7 +1243,6 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
 def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     # The trade runs both ways: a scene is a spoken one only while it holds a
     # line, and whitespace is not a line.
-    from origenerator.gui.param_help import param_help
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1269,7 +1264,6 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
 def test_a_stored_spoken_recipe_opens_with_its_prompts_already_shut_down(qtbot):
     # Loading a recipe fills the lines through the same textChanged path typing
     # does, so a story opened from the gallery shows the trade without an edit.
-    from origenerator.workflows.base import story_of
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1287,9 +1281,7 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
     # repolish -- so without one the card would go read-only while still looking
     # like an ordinary field. Rendered rather than asserted on the property:
     # that is the half a missing repolish breaks.
-    from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
 
-    from origenerator.gui.stylesheet import build_stylesheet
 
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
@@ -1321,7 +1313,6 @@ def test_a_shut_down_prompt_actually_renders_dim(qtbot):
 def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     # The loop has no lines param, so its cards carry no field for one: a field
     # that nothing reads would be an invitation to type into the void.
-    from origenerator.gui.eliding import ElidingLabel
 
     form = ParamForm([pd for pd in _scene_defs() if pd.key != "scene_lines"])
     qtbot.addWidget(form)
@@ -1350,8 +1341,6 @@ def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbo
 
 
 def _voice_defs():
-    from origenerator.speech import VOICE_OPTIONS
-
     return [
         ParamDef("voice", "Voice", "combo", "Vivian", options=list(VOICE_OPTIONS)),
         ParamDef("voice_sample", "Voice Sample", "audio", ""),
@@ -1365,8 +1354,6 @@ def _row_visible(form, key):
 
 
 def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
-    from origenerator.speech import CUSTOM_VOICE
-
     form = ParamForm(_scene_defs() + _voice_defs() + [
         ParamDef("unet_s2v", "Speaking Model", "combo", "example_s2v.safetensors",
                  options=["example_s2v.safetensors"]),
@@ -1467,7 +1454,6 @@ def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     # A preset needs no recording, and two fields under it read as a second
     # thing to fill in; they appear when the Voice is the custom one, and go
     # with a recipe that stored it.
-    from origenerator.speech import CUSTOM_VOICE
 
     form = ParamForm(_scene_defs() + _voice_defs())
     qtbot.addWidget(form)
@@ -1483,8 +1469,6 @@ def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
 
 
 def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
-    import origenerator.gui.param_form as pf
-
     asked = {}
 
     def fake(parent, caption, directory, kinds):

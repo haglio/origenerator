@@ -14,19 +14,27 @@ from origenerator.gallery import (
     SettingsGroup,
     SourceImageGroup,
     WorkflowGroup,
+    all_group,
     animated_preview_path,
     build_gallery_tree,
     build_image_config_index,
     child_groups,
     config_tab_title,
+    enhance_params_for,
     favorite_folders,
     favorite_generations,
     find_source_image_id,
     folder_detail,
     folder_id,
+    folder_key_at_level,
     folder_level,
+    group_level,
+    is_enhanced_row,
     is_renamable,
     job_kind_label,
+    legacy_preframe_settings_folder_key,
+    legacy_preversion_settings_folder_key,
+    legacy_settings_folder_key,
     lora_label,
     lora_signature,
     media_type_of_row,
@@ -36,20 +44,27 @@ from origenerator.gallery import (
     output_disk_files,
     output_file_reference,
     recent_generations,
+    recently_worked_folders,
     resolve_preview,
     row_output_files,
+    rows_awaiting_enhancement,
     rows_of_media_types,
     rows_under,
+    settings_folder_key,
     settings_signature,
     source_image_id_for,
     unreviewed_experiments,
     videos_from_source_image,
 )
+from origenerator.gallery import output as gallery_output
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.signatures import canonical_settings
+from origenerator.generation_config import prepared_params
+from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.model_files import NO_LORA
 
 
 def test_the_all_group_gathers_the_workflow_folders_and_walks_to_every_row():
-    from origenerator.gallery import ALL_KEY, all_group, child_groups, rows_under
-
     leaf = SettingsGroup("s", "S", [{"prompt_id": "g1"}])
     workflow = WorkflowGroup(
         "w", "wf", "WF", [ModelGroup("m", "M", [LoraGroup("l", "L", [leaf])])])
@@ -125,7 +140,6 @@ def _row(**kw):
 
 def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):
     """A video row resolves to its looping WebP, generated from the on-disk file."""
-    from origenerator.gallery import output as gallery_output
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
     row = _row(prompt_id="v1", workflow_name="wan22_i2v",
@@ -146,7 +160,6 @@ def test_animated_preview_path_generates_a_cached_webp_for_a_video(tmp_path, mon
 
 def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
     """An image row has nothing to animate, so no WebP is generated."""
-    from origenerator.gallery import output as gallery_output
     image = tmp_path / "sdxl_t2i_i1.png"
     image.write_bytes(b"fake image")
     row = _row(prompt_id="i1", output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))
@@ -159,7 +172,6 @@ def test_animated_preview_path_is_none_for_an_image(tmp_path, monkeypatch):
 
 def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path, monkeypatch):
     """An unreadable video yields no WebP, so the caller falls back to the still."""
-    from origenerator.gallery import output as gallery_output
     video = tmp_path / "wan22_i2v_v1.mp4"
     video.write_bytes(b"fake video")
     row = _row(prompt_id="v1", workflow_name="wan22_i2v",
@@ -306,7 +318,6 @@ def test_settings_signature_splits_workflow_generations():
     # tail), so their rows must not share a folder. The regression this pins: an
     # old row stores none of the newer params, so default-normalization alone
     # hashes it exactly like a new run.
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     old = json.dumps({"positive_prompt": "a lighthouse", "steps": 50})  # pre-enhance row
     new = json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
@@ -324,7 +335,6 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
     # form's prospective settings pass no version at all; both take the current
     # version, so a sparse import, its full re-roll (stamped with the real
     # version), and the form that would re-run it all share one folder.
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     reroll = json.dumps(wf.default_params())
@@ -339,7 +349,6 @@ def test_settings_signature_ignores_the_enhancement():
     # same recipe with the enhance tail on and off is ONE folder. (The standalone
     # enhancer already worked this way — it folds onto the row it upgrades without
     # moving it — and the workflows' inline toggle now agrees.)
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     def sdxl(**overrides):
         return json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
@@ -363,7 +372,6 @@ def test_flux_still_groups_by_its_namesake_upscale_model():
     # Flux reads upscale_model on BOTH paths: with the toggle off it drives the
     # plain 4x upscale the workflow is named for, so there it is a genuine
     # difference between two renders and keeps splitting folders.
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     def flux(**overrides):
         return json.dumps(dict(WORKFLOW_REGISTRY["flux_t2i_upscaled"].default_params(),
@@ -395,8 +403,6 @@ def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin()
 
 
 def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
-    from origenerator.gallery import is_enhanced_row
-
     # An explicit flag is authoritative, whichever way it points.
     assert is_enhanced_row(_row(params_json=json.dumps({"enhance": True}))) is True
     assert is_enhanced_row(_row(params_json=json.dumps(
@@ -417,8 +423,6 @@ def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
 
 
 def test_rows_awaiting_enhancement_targets_only_plain_uncovered_images():
-    from origenerator.gallery import rows_awaiting_enhancement
-
     plain = _img("plain", "a cat", 30, 1)          # nothing enhanced about it
     inline = _row(prompt_id="inline",               # ran the tail itself
                   params_json=json.dumps({"positive_prompt": "a cat", "enhance": True}),
@@ -438,9 +442,6 @@ def test_rows_awaiting_enhancement_targets_only_plain_uncovered_images():
 
 
 def test_enhance_params_for_builds_an_image_enhance_config():
-    from origenerator.gallery import enhance_params_for
-    from origenerator.workflows import WORKFLOW_REGISTRY
-
     src = _row(
         prompt_id="s",
         params_json=json.dumps({
@@ -501,9 +502,6 @@ def test_a_video_reroll_on_the_same_frame_stays_in_its_folder():
     # params via prepared_params (which fills every workflow default). It must land
     # in the original's folder despite that default-filling, which canonical
     # settings absorb.
-    from origenerator.gallery import settings_folder_key
-    from origenerator.generation_config import prepared_params
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
     frame = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
@@ -527,7 +525,6 @@ def test_a_video_reroll_on_a_fresh_frame_opens_that_frames_own_folder():
     # Re-drawing the start frame makes a different picture, and a source-image
     # folder holds one picture — so the new video files under the new frame rather
     # than joining the old one's folder.
-    from origenerator.gallery import settings_folder_key
 
     frame_a = _img("fa", "a face", 30, 1)  # sdxl_t2i_fa.png
     frame_b = _img("fb", "a face", 30, 2)  # same settings, re-drawn -> sdxl_t2i_fb.png
@@ -549,8 +546,6 @@ def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
     # never stores them — but an imported graph does, along with raw sampler-node
     # fields. Those keys the workflow doesn't define must not split the import
     # into a folder of its own, away from an otherwise identical generation.
-    from origenerator.gallery import settings_folder_key
-    from origenerator.workflows import WORKFLOW_REGISTRY
 
     generated_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params())
     generated_params["positive_prompt"] = "a wave"
@@ -641,7 +636,6 @@ def test_lora_label_falls_back_when_no_lora_recorded():
 def test_lora_label_treats_the_none_sentinel_as_no_lora():
     # Picking "None" for a LoRA is not a file: it reads as no LoRA, not a literal
     # "None" folder. Both off -> "(no add-on)"; one off -> just the real one.
-    from origenerator.workflows.model_files import NO_LORA
     assert lora_label("wan22_i2v", {"lora_high": NO_LORA, "lora_low": NO_LORA}) == "(no add-on)"
     label = lora_label("wan22_i2v", {"lora_high": "styleA-high.safetensors", "lora_low": NO_LORA})
     assert label == "styleA-high"
@@ -650,7 +644,6 @@ def test_lora_label_treats_the_none_sentinel_as_no_lora():
 def test_lora_signature_merges_the_none_sentinel_with_no_lora():
     # A run generated with "None" LoRAs and a no-LoRA import (whose graph carried
     # no LoRA node, so no lora_* keys) are the same "no LoRA" bucket: one folder.
-    from origenerator.workflows.model_files import NO_LORA
     generated = json.dumps({"lora_high": NO_LORA, "lora_low": NO_LORA, "steps": 20})
     imported = json.dumps({"steps": 30})  # no lora keys at all
     assert lora_signature("wan22_i2v", generated) == lora_signature("wan22_i2v", imported)
@@ -753,7 +746,7 @@ def test_videos_from_source_image_lists_the_videos_that_animated_it():
     assert videos_from_source_image(image, [other]) == []
 
 
-def test_find_source_image_returns_none_without_a_match():
+def test_a_video_no_source_image_made_names_none():
     no_input = _row(prompt_id="vid", workflow_name="wan22_i2v", params_json="{}")
     assert find_source_image_id(no_input, []) is None
 
@@ -920,7 +913,6 @@ def test_folder_key_at_level_source_image_resolves_the_frame_through_the_index()
     # A source-image bookmark's key is recomputed from a row under it; it depends on
     # the start frame's config, so folder_key_at_level must resolve it through the
     # image index — matching the tree, not the bare filename.
-    from origenerator.gallery import folder_key_at_level
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
@@ -936,7 +928,6 @@ def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
     # The leaf key is independent of the new source-image parent, so an in-flight
     # i2v (absent from the tree) still matches the exact leaf it will join — the
     # invariant the Generate tab and re-roll reconnection rely on.
-    from origenerator.gallery import settings_folder_key
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
@@ -967,7 +958,6 @@ def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
     # The reconcile recomputes a settings bookmark's key from a row under it; for an
     # i2v that key depends on the start frame's config, so folder_key_at_level must
     # resolve it through the image index — matching the tree, not the bare filename.
-    from origenerator.gallery import folder_key_at_level, settings_folder_key
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
@@ -979,11 +969,6 @@ def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():
 def test_legacy_preframe_settings_folder_key_drops_the_frame():
     # The pre-frame-config key hashes the video's own settings with the input image
     # dropped — distinct from the current key, which folds the frame's config in.
-    from origenerator.gallery import (
-        legacy_preframe_settings_folder_key,
-        legacy_preversion_settings_folder_key,
-        settings_folder_key,
-    )
     face = _img("face", "a face", 30, 1)
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
@@ -1016,7 +1001,6 @@ def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
 def test_settings_folder_key_matches_the_rows_tree_leaf():
     # A completed row's settings-folder key equals the leaf key build_gallery_tree
     # gives it, so an in-flight sibling (absent from the tree) can be matched to it.
-    from origenerator.gallery import settings_folder_key
     row = _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)
     (lora,) = build_gallery_tree([row])[0].children[0].children
     (leaf,) = lora.children
@@ -1024,7 +1008,6 @@ def test_settings_folder_key_matches_the_rows_tree_leaf():
 
 
 def test_group_level_names_each_tier():
-    from origenerator.gallery import group_level
     rows = [_i2v("v1", "styleA")]  # wan22_i2v -> model -> lora -> source -> settings
     wf = build_gallery_tree(rows)[0]
     model = wf.children[0]
@@ -1038,7 +1021,6 @@ def test_group_level_names_each_tier():
 def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
     # A bookmark stores its tier + a row under it; recomputing the key from that row
     # must reproduce the folder's key at every tier, so the star can follow it.
-    from origenerator.gallery import folder_key_at_level, group_level
     rows = [_i2v("v1", "styleA")]
     wf = build_gallery_tree(rows)[0]
     model = wf.children[0]
@@ -1053,7 +1035,6 @@ def test_legacy_settings_key_differs_from_the_current_normalized_key():
     # canonical_settings changed the settings hash, so the legacy formula yields a
     # different key for the same row — exactly why a star set before the change no
     # longer matches its folder, and what the reconcile recomputes to re-point it.
-    from origenerator.gallery import legacy_settings_folder_key, settings_folder_key
     row = _img("i1", "a cat", 50, 1)
     assert legacy_settings_folder_key(row) != settings_folder_key(row)
     assert legacy_settings_folder_key(row).startswith("image/sdxl_t2i/")
@@ -1365,8 +1346,6 @@ def test_named_folders_credit_every_row_beneath_them():
 
 
 def test_a_folder_the_user_composed_names_what_it_gathers():
-    from origenerator.gallery import CustomGroup
-
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     tree = build_gallery_tree(rows)
     cat_leaf = tree[0].children[0].children[0].children[0]
@@ -1698,7 +1677,7 @@ def test_a_folder_with_no_prompt_to_go_by_is_described_in_the_forms_words():
     assert leaf.detail == "1280×720, Steps 50, Prompt Strength 7.5"
 
 
-def test_resolve_preview_returns_full_image_file(tmp_path):
+def test_a_picture_previews_from_its_own_full_file(tmp_path):
     out = tmp_path / "output"
     (out / "image").mkdir(parents=True)
     full = out / "image" / "sdxl_t2i_1_.png"
@@ -1708,7 +1687,7 @@ def test_resolve_preview_returns_full_image_file(tmp_path):
     assert resolve_preview(row, out) == (full, "image")
 
 
-def test_resolve_preview_returns_full_video_file(tmp_path):
+def test_a_video_previews_from_its_own_full_file(tmp_path):
     out = tmp_path / "output"
     (out / "video").mkdir(parents=True)
     full = out / "video" / "wan22_i2v_1_.mp4"
@@ -1743,7 +1722,7 @@ def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
     assert resolve_preview(row, out) == (trashed, "video")
 
 
-def test_resolve_preview_returns_none_when_nothing_exists(tmp_path):
+def test_a_row_whose_files_are_gone_previews_nothing(tmp_path):
     out = tmp_path / "output"
     out.mkdir()
     row = _row(output_files=json.dumps([{"filename": "gone.png"}]),
@@ -1758,7 +1737,7 @@ def test_resolve_preview_handles_missing_output_files(tmp_path):
     assert resolve_preview(row, tmp_path) == (thumb, "image")
 
 
-def test_output_disk_files_returns_the_referenced_file(tmp_path):
+def test_a_rows_files_on_disk_include_the_one_it_points_at(tmp_path):
     out = tmp_path / "output"
     (out / "image").mkdir(parents=True)
     png = out / "image" / "sdxl_t2i_1_.png"
@@ -1794,7 +1773,6 @@ def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     # one scene out as scene_frames. Both are the same recipe, and a scene list
     # of one that disagrees with the clip length is overruled by it in the graph
     # too, so it must not split the folder.
-    from origenerator.gallery.signatures import canonical_settings
 
     before = canonical_settings("wan22_i2v", {"frame_count": 121})
     rerolled = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [121]})
@@ -1814,9 +1792,6 @@ def _worked_tree(*leaf_ids):
 
 
 def test_the_folder_of_the_newest_generation_is_marked_lately_worked_in():
-    from origenerator.gallery import recently_worked_folders
-    from origenerator.gallery.sides import PORTRAIT
-
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2)}, [], limit=1)
 
     assert marked == {(PORTRAIT, "s2")}
@@ -1826,8 +1801,6 @@ def test_only_a_folder_with_nothing_nested_under_it_is_marked():
     # The mark goes on the folder the generations themselves are in. A folder of
     # folders is fresh whenever anything under it is, which is nearly always, so
     # marking one would say nothing about it.
-    from origenerator.gallery import recently_worked_folders
-    from origenerator.gallery.sides import PORTRAIT
 
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1)}, [])
 
@@ -1837,8 +1810,6 @@ def test_only_a_folder_with_nothing_nested_under_it_is_marked():
 def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
     # Both halves of the tree draw the same folder key over rows of their own
     # shape, so portrait work must not light the landscape copy of it.
-    from origenerator.gallery import recently_worked_folders
-    from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 
     marked = recently_worked_folders(
         {PORTRAIT: _worked_tree(2), LANDSCAPE: _worked_tree()}, [])
@@ -1850,8 +1821,6 @@ def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
 def test_only_the_last_few_folders_worked_in_are_marked():
     # Every folder marked is no folder marked, so the freshest few take it and
     # the rest of the library stays quiet.
-    from origenerator.gallery import recently_worked_folders
-    from origenerator.gallery.sides import PORTRAIT
 
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2, 3)}, [], limit=2)
 
@@ -1862,8 +1831,6 @@ def test_enhancing_an_old_image_marks_the_folder_it_sits_in():
     # Enhancing is working in the folder the image is in, and it leaves no row
     # of its own there — so a folder whose only fresh thing is an enhancement is
     # still one of the folders you were last in.
-    from origenerator.gallery import recently_worked_folders
-    from origenerator.gallery.sides import PORTRAIT
 
     old = {"prompt_id": "g1", "id": 1,
            "enhance_history": json.dumps([{"run_id": 9}])}

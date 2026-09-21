@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PIL import Image
 from PyQt6.QtCore import QSize
 
 from origenerator.gui.combination import Combination
@@ -8,8 +9,6 @@ from origenerator.gui.combination_view import combination_pixmap
 
 def _picture(path, size=(60, 40), color=(0, 0, 255)):
     """A file standing in for a start frame or a recipe clip's thumbnail."""
-    from PIL import Image
-
     Image.new("RGB", size, color).save(path)
     return str(path)
 

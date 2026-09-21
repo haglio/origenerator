@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QWidget
 from origenerator import gallery
 from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_tree import RECENTS_KEY
-from origenerator.gui.toast import ERROR, NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import (
     AppCommand,

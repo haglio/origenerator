@@ -1,6 +1,8 @@
 """The gallery handed to a session whose room is in the headset."""
 from __future__ import annotations
 
+import struct
+
 from PyQt6.QtCore import QPoint, QSize
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QLabel, QWidget
@@ -158,8 +160,6 @@ class TestTheRoomsPressesReachTheWindow:
     def test_the_window_is_published_once_for_each_way_it_looks(self, tmp_path, qtbot):
         """A window nobody is touching looks the same every frame, and a frame
         the room already has is a frame not worth the write."""
-        import struct
-
         def published() -> tuple[int, int, int]:
             """(sequence, width, height) off the channel's header -- read here
             rather than through a reader of our own, the reader being the

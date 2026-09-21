@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from origenerator import config
+from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.generation_metadata import basic_section, created_item, file_item
 
 
@@ -69,7 +71,6 @@ def test_file_item_reveals_the_absolute_output_path():
     # The File row carries the on-disk path (output folder + subfolder + name) so
     # a Show-in-Explorer button can reveal it, while its value stays the short
     # displayed path.
-    from origenerator.config import COMFYUI_OUTPUT_DIR
 
     row = _row(output_files=json.dumps([{"filename": "clip.mp4", "subfolder": "video"}]))
     file_item = basic_section(row).items[0]
@@ -218,8 +219,6 @@ def test_created_reads_the_file_in_the_folder_it_is_given(tmp_path):
 
 def test_the_output_folder_still_defaults_to_the_configured_one(tmp_path, monkeypatch):
     """Resolved when it is called, not bound when the module was imported."""
-    from origenerator import config
-
     monkeypatch.setattr(config, "COMFYUI_OUTPUT_DIR", tmp_path / "configured")
 
     item = file_item({"filename": "alpha_00001_.png", "subfolder": "image"})

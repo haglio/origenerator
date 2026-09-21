@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import gc
 from io import BytesIO
 from unittest.mock import MagicMock, call
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPointF, QSize, Qt, QUrl
+from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
 from PyQt6.QtGui import QImage, QMouseEvent, QResizeEvent
-from PyQt6.QtMultimedia import QMediaPlayer, QVideoFrame
+from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.funscript import (
@@ -16,7 +17,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import drag_thumbnail, preview_widget
+from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_widget
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
@@ -671,8 +672,6 @@ def test_the_corners_follow_the_picture_when_the_strip_takes_its_room(qtbot, tmp
     # the video surface, so the corners have to be re-placed when that surface
     # shrinks; placed once, against the pane as it was, the bin chip stayed
     # straddling the video's lower edge and the strip.
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtMultimedia import QMediaMetaData
 
     player = MagicMock()
     player.metaData.return_value.value.side_effect = (
@@ -1129,8 +1128,6 @@ def _corners(w):
 
 def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
                                                                   tmp_path):
-    from origenerator.gui import icons
-
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
 
@@ -1165,8 +1162,6 @@ def test_a_running_generation_has_no_corners_to_press(make_preview):
 
 def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
                                                                   tmp_path):
-    from origenerator.gui import corner_controls
-
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_actions("p1", favorite=False, enhance=None)
@@ -1179,8 +1174,6 @@ def test_a_corner_of_the_preview_names_the_generation_it_is_about(make_preview,
 
 
 def test_right_clicking_the_picture_asks_for_its_menu(make_preview, tmp_path):
-    from PyQt6.QtCore import QPoint
-
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_actions("p1", favorite=False, enhance=None)
@@ -1193,8 +1186,6 @@ def test_right_clicking_the_picture_asks_for_its_menu(make_preview, tmp_path):
 
 
 def test_right_clicking_an_unarmed_preview_asks_for_nothing(make_preview):
-    from PyQt6.QtCore import QPoint
-
     # The placeholder, or a slideshow's own inner preview: there is no row here.
     w = make_preview()
     asked = []
@@ -1387,7 +1378,6 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
     # crash log shows for this app whenever a show was replaced or the app quit
     # (2026-09-12 to 09-16, ~20 times). The real player, since only the real
     # one is a child of this widget.
-    import gc
 
     w = PreviewWidget()
     order = []

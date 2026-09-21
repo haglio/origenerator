@@ -188,7 +188,6 @@ def test_a_running_tile_stands_what_the_run_is_made_from(qtbot, tmp_path):
     # It stood a blurred copy of the frame, where the strip's corner stood a
     # sharp pair and the config tab stood a blank — three surfaces, three ideas
     # of one wait. All three stand the sum now.
-    from PIL import Image
 
     frame = tmp_path / "frame.png"
     Image.new("RGB", (60, 40), (0, 0, 255)).save(frame)

@@ -1,8 +1,8 @@
 """The satellite lock HUD, worn by every fullscreen show — the players' own.
 
-A show covering a satellite region covers that player's HUD, and what replaced
-it used to be a small strip of Qt buttons that only gestured at the real thing.
-This widget draws the REAL thing: the same panel the players composite into
+A show covering a satellite region covers that player's HUD, so what replaces
+it has to be the same panel rather than a strip of Qt buttons gesturing at it.
+This widget draws the real one: the same panel the players composite into
 their video, rendered by the same shared code (``player_core.satellite_hud`` /
 ``_paint``), so a show's HUD and a player's HUD cannot drift apart — the status
 line, the buttons this show declares (:mod:`origenerator.gui.show_buttons`) and
@@ -64,6 +64,8 @@ from player_core.satellite_hud import (
     HudClicks,
     HudModel,
     HudTargets,
+    button_tooltip,
+    hit_test_targets,
 )
 from player_core.satellite_hud_paint import HudRenderer
 from PyQt6.QtCore import Qt, QTimer
@@ -329,7 +331,6 @@ class ShowHud(QLabel):
     def mouseMoveEvent(self, event):
         if self._targets is None:
             return
-        from player_core.satellite_hud import button_tooltip, hit_test_targets
 
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
         if self._clicks.holding:

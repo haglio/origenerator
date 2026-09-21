@@ -492,6 +492,25 @@ def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_s
     assert said[-1] == "Loop off"
 
 
+def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
+    """A row worn down to one picture plays that picture over and over, which
+    is the lock — so the cull that wore it down ends the loop and tells the
+    player to lock what is left.  No better version is asked for: nobody
+    pressed for one."""
+    asked = []
+    show = _show(qtbot, tmp_path,
+                 actions=ShowActions(neighbors=_around, delete=lambda prompt_id: None,
+                                     enhance=lambda prompt_id: asked.append(prompt_id) or True))
+    show.show_loop("seed")                       # the row: one.png and one-b.png
+    _sent(show)
+
+    show.show_cull()                             # weird the picture on screen
+
+    assert "LOCK_ON" in _sent(show)
+    assert (show.locked, show.hud_map().loop) == (True, "")
+    assert asked == []
+
+
 def test_a_forward_step_in_a_row_down_to_one_picture_hands_the_set_back(qtbot, tmp_path):
     """A cull can leave the row holding only the picture on screen, and a
     player stepping round a list of one plays that picture again — so the step

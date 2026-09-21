@@ -195,7 +195,7 @@ class FunTimeBridge(QObject):
 
     #: The whole of it: this app is up and answering.  It published six keys
     #: for years -- which side held a show, what it was showing, whether it was
-    #: held -- and the session read none of them; it waits on this file
+    #: locked -- and the session read none of them; it waits on this file
     #: appearing, and nothing else, to know the mode can be opened.  The owner
     #: settled that on 2026-09-05 (audit Q13): nothing was to be wired to read
     #: those six, so the channel goes and the signal stays.

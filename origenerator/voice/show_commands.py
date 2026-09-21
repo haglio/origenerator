@@ -1,7 +1,7 @@
-"""Spoken control of the fullscreen show: get it going, hold it, close it.
+"""Spoken control of the fullscreen show: get it going, pause it, close it.
 
 Three things to say, because three are what a show has: **start** it (or resume
-one held at nought), **pause** it, **stop** it. Each is a verb plus the word
+one sitting at nought), **pause** it, **stop** it. Each is a verb plus the word
 "slideshow", which is what keeps them clear of prompt steering — the same mic is
 often rewriting a prompt, and an utterance this doesn't claim falls through to
 become a prompt edit. "start slideshow" is not a sentence anyone types at an
@@ -29,7 +29,7 @@ class ShowCommand(Enum):
     """What a spoken utterance asked of the show."""
 
     START = "start"   # open one if none is up, and set the pace to the standard
-    PAUSE = "pause"   # hold what is on screen: the pace goes to nought
+    PAUSE = "pause"   # stop on what is on screen: the pace goes to nought
     STOP = "stop"     # close it
 
 

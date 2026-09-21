@@ -17,7 +17,7 @@ A dwell of zero means never: the show holds whatever is on screen until an arrow
 moves it. That is the shape a double-clicked picture opens in — one show, opened
 at a pace of nought, rather than a second full-screen viewer with its own keys.
 
-A third hold — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
+A third stop — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
 the user's or the pace's: speaking a request stops the advance for as long as
 the sentence takes, and releases it without disturbing either of the others.
 
@@ -94,7 +94,7 @@ class ShowState:
     """Where a show was when it closed, for whichever one opens next.
 
     ``order`` is the pass it was playing and ``current`` the slide it stood on,
-    both as generation ids. The rest is what that slide was doing — held against
+    both as generation ids. The rest is what that slide was doing — locked against
     the advance, showing which of its versions.
     """
 
@@ -208,8 +208,8 @@ class SlideshowPlaylist:
         if current_id not in places:
             return False
         remembered = [places[pid] for pid in order_ids if pid in places]
-        held = set(remembered)
-        self._order = remembered + [i for i in self._order if i not in held]
+        placed = set(remembered)
+        self._order = remembered + [i for i in self._order if i not in placed]
         self._pos = self._order.index(places[current_id])
         return True
 
@@ -362,13 +362,13 @@ class SlideshowPlaylist:
     def image_dwell_ms(self, value: int) -> None:
         self._image_dwell_ms = max(0, int(value))
 
-    # --- lock: hold this one against the advance ---------------------------
+    # --- lock: keep this one against the advance ---------------------------
 
     @property
     def locked(self) -> bool:
-        """Whether the item on screen is being held against the advance.
+        """Whether the item on screen is locked against the advance.
 
-        "Lock" is what this hold is called everywhere else — the auto-generate
+        "Lock" is what it is called everywhere else — the auto-generate
         rotation, Fun Time's console — so it is what it is called here.
         """
         return self._locked
@@ -379,17 +379,17 @@ class SlideshowPlaylist:
 
     def set_locked(self, locked: bool) -> None:
         """Put the lock back where a closed show left it — a slide it was closed
-        holding is one it reopens holding."""
+        on locked is one it reopens locked."""
         self._locked = bool(locked)
 
     def unlock(self) -> None:
         self._locked = False
 
-    # --- pause: a hold the show puts on itself -----------------------------
+    # --- pause: a stop the show puts on itself -----------------------------
 
     @property
     def paused(self) -> bool:
-        """Whether something other than the user's lock is holding the slide.
+        """Whether something other than the user's lock is stopping the slide.
 
         Speaking a request pauses the show: the request is *about* what is on
         screen, and a set that pages on every few seconds would hand the words
@@ -403,8 +403,8 @@ class SlideshowPlaylist:
     def set_paused(self, paused: bool) -> None:
         self._paused = bool(paused)
 
-    def holding(self) -> bool:
-        """Whether anything at all is holding this slide — locked or paused."""
+    def locked_or_paused(self) -> bool:
+        """Whether anything at all is stopping this slide — locked or paused."""
         return self._locked or self._paused
 
     def current_is_video(self) -> bool:
@@ -421,5 +421,5 @@ class SlideshowPlaylist:
         when it shouldn't be timer-advanced: an empty, locked or paused playlist, a
         pace of nought (hold this one until an arrow moves it), or a video — which
         advances when it ends, not on a clock."""
-        return None if self.holding() else self.pace_ms()
+        return None if self.locked_or_paused() else self.pace_ms()
 

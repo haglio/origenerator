@@ -60,7 +60,7 @@ def _will_move_on(view) -> bool:
     what decides is the same three things that decided whether one was armed
     — the room is not frozen, the slide is not locked, and the pace is not
     nought."""
-    return (not view._paused and not view._playlist.holding()
+    return (not view._paused and not view._playlist.locked_or_paused()
             and bool(view._dwell_s))
 
 
@@ -172,14 +172,14 @@ def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
     assert sorted(item[2] for item in view._playlist._items) == ["b", "c"]
 
 
-def test_holding_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path):
+def test_locking_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path):
     # Down favorites the slide; the star readout and F-mode follow, not only the
     # database the gallery writes.
     favorite = []
     view = _view(qtbot, _named(tmp_path, "a", "b"), on_favorite=favorite.append)
     assert view.hud_is_favorite is False
 
-    view.toggle_hold()
+    view.toggle_lock()
 
     assert favorite == ["a"]
     assert view.hud_is_favorite is True
@@ -270,7 +270,7 @@ def test_down_toggles_the_lock_and_the_caption_reflects_it(qtbot):
 
 
 def test_stepping_away_releases_the_lock(qtbot):
-    # Right off a held slide is the way out of the hold — no second Down needed,
+    # Right off a locked slide is the way out of the lock — no second Down needed,
     # matching Fun Time's next/prev.
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
@@ -326,7 +326,7 @@ def test_culling_releases_the_lock(qtbot):
                          actions=ShowActions(delete=lambda prompt_id: None))
     qtbot.addWidget(view)
     _press(view, Qt.Key.Key_Down)
-    _press(view, Qt.Key.Key_Up)             # the held slide is the one condemned
+    _press(view, Qt.Key.Key_Up)             # the locked slide is the one condemned
     assert not view._playlist.locked
     assert _will_move_on(view)   # so the rest keeps rotating
 
@@ -368,7 +368,7 @@ def test_up_deletes_the_current_item_and_advances(qtbot):
     assert view._playlist.current()[2] == "id-b"   # advanced to the next
 
 
-def test_down_holds_the_slideshow(qtbot):
+def test_down_locks_the_slideshow(qtbot):
     view = _view(qtbot)
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.locked
@@ -412,7 +412,7 @@ def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
     # it was when the show started.
     view, opened = _shelf_view(qtbot)
     _press(view, Qt.Key.Key_Right)  # onto the second slide
-    _press(view, Qt.Key.Key_Down)   # hold it
+    _press(view, Qt.Key.Key_Down)   # lock it
 
     _press(view, Qt.Key.Key_Escape)
 
@@ -420,7 +420,7 @@ def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
     assert not view.isVisible()
 
 
-def test_ending_a_show_on_an_unheld_slide_hands_nothing_over(qtbot):
+def test_ending_a_show_on_an_unlocked_slide_hands_nothing_over(qtbot):
     # Every other way out is just leaving: the gallery stays where it was.
     view, opened = _shelf_view(qtbot)
 
@@ -429,7 +429,7 @@ def test_ending_a_show_on_an_unheld_slide_hands_nothing_over(qtbot):
     assert opened == []
 
 
-def test_enter_on_a_held_slide_hands_it_over_once(qtbot):
+def test_enter_on_a_locked_slide_hands_it_over_once(qtbot):
     # Enter and the lock name the same item, and the handover is closeEvent's, so
     # the gallery is asked to go there once rather than twice.
     view, opened = _shelf_view(qtbot)
@@ -461,7 +461,7 @@ def test_culling_the_last_slide_hands_nothing_over(qtbot):
     view.show()
     opened = []
     view.open_requested.connect(opened.append)
-    _press(view, Qt.Key.Key_Down)  # held, then condemned anyway
+    _press(view, Qt.Key.Key_Down)  # locked, then condemned anyway
 
     _press(view, Qt.Key.Key_Up)
 
@@ -541,12 +541,12 @@ def test_an_arrival_takes_its_place_beside_the_slide_on_screen(qtbot, tmp_path):
     assert "2" in view._counter.text()  # and the counter counts it
 
 
-# --- holding a slide asks for it to be enhanced -----------------------------
+# --- locking a slide asks for it to be enhanced -----------------------------
 
 _KEYED = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
 
 
-def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
+def test_locking_a_slide_asks_for_it_to_be_enhanced(qtbot):
     # Stopping on a picture is the gesture that says you want it, so it is also
     # the one that asks for the better version.
     asked = []
@@ -561,10 +561,10 @@ def test_holding_a_slide_asks_for_it_to_be_enhanced(qtbot):
     assert view._note.text() == "Enhancement queued"
 
 
-def test_releasing_the_hold_asks_for_nothing(qtbot):
+def test_releasing_the_lock_asks_for_nothing(qtbot):
     asked = []
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
-    _press(view, Qt.Key.Key_Down)   # hold
+    _press(view, Qt.Key.Key_Down)   # lock
     _press(view, Qt.Key.Key_Down)   # release
     assert asked == ["id-a"]        # only the stop asked, not the resume
 
@@ -686,13 +686,13 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
     assert shown == ["id-b", "id-a", "id-c"]
 
 
-def test_entering_a_loop_lets_go_of_a_held_slide_as_a_player_does(qtbot):
+def test_entering_a_loop_lets_go_of_a_locked_slide_as_a_player_does(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
-    _press(view, Qt.Key.Key_Down)                 # hold the slide on screen
+    _press(view, Qt.Key.Key_Down)                 # lock the slide on screen
     assert view.locked
 
     view.show_loop("seed")
-    view._pane.media_ended.emit()                 # the slide that was held runs out
+    view._pane.media_ended.emit()                 # the slide that was locked runs out
 
     assert view.locked is False
     assert view._playlist.current()[2] == "id-b"  # and the loop moves on to its next seed
@@ -711,7 +711,7 @@ def test_a_folder_played_as_a_show_opens_with_its_seed_loop_lit(qtbot):
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
     # The players' "weird": a favorite loses its star and the show moves on;
-    # only a picture wearing no star is condemned — so holding a slide, which
+    # only a picture wearing no star is condemned — so locking a slide, which
     # stars it, takes two presses of Up to undo all the way.
     unfavorited, deleted = [], []
     view = _view(qtbot, _KEYED, favorite_ids={"id-a"},
@@ -731,7 +731,7 @@ def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
 
 
 def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot):
-    # Holding several slides sends out several runs and ComfyUI takes them one at
+    # Locking several slides sends out several runs and ComfyUI takes them one at
     # a time, so a slide the show comes back around to is usually still waiting.
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)        # ask for this one
@@ -830,7 +830,7 @@ def test_the_upgraded_item_is_drawn_as_its_new_still_beside_the_slide(
     assert better_thumb in view._neighbors._sources
 
 
-def test_a_slideshow_with_no_enhancer_still_holds_on_down(qtbot):
+def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):
     view = _view(qtbot, _KEYED)     # nothing wired to enhance with
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.locked
@@ -929,7 +929,7 @@ def test_a_press_in_the_queue_leaves_the_arrows_stepping_the_show(qtbot):
 # --- locking also stars, and a double-click leaves ---------------------------
 
 def test_locking_favorites_the_item_on_screen(qtbot):
-    # Holding a slide is how the user says this one is worth keeping; having said
+    # Locking a slide is how the user says this one is worth keeping; having said
     # it once they should not have to say it again in a second way.
     favorite = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
@@ -961,42 +961,42 @@ def test_a_slideshow_without_a_favoriter_still_locks(qtbot):
 
 # --- the transport a spoken word drives, saying which way rather than flipping
 
-def test_asking_for_a_hold_holds_and_asking_again_changes_nothing(qtbot):
+def test_asking_for_a_lock_locks_and_asking_again_changes_nothing(qtbot):
     # Someone talking to a picture is asking for a state, not for the other one,
     # and cannot see the counter's padlock to know which the flip would give.
     favorite = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
     view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
-    assert view.set_held(True) is True
+    assert view.set_locked(True) is True
     assert view.locked and favorite == ["gen-a"]
 
-    assert view.set_held(True) is False   # already holding: nothing moved
+    assert view.set_locked(True) is False   # already locked: nothing moved
     assert view.locked and favorite == ["gen-a"]
 
 
-def test_a_spoken_hold_favorites_the_slide_like_a_pressed_one(qtbot):
-    # Holding is Down's whole gesture here; a spoken hold must not quietly mean
+def test_a_spoken_lock_favorites_the_slide_like_a_pressed_one(qtbot):
+    # Locking is Down's whole gesture here; a spoken lock must not quietly mean
     # less than a pressed one.
     favorite = []
     items = [("a.png", "image", "gen-a", None)]
     view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
 
-    view.set_held(True)
+    view.set_locked(True)
 
     assert favorite == ["gen-a"]
 
 
-def test_asking_to_let_go_releases_only_what_was_held(qtbot):
+def test_asking_to_let_go_releases_only_what_was_locked(qtbot):
     view = _view(qtbot)
 
-    assert view.set_held(False) is False   # nothing was held
-    view.set_held(True)
-    assert view.set_held(False) is True
+    assert view.set_locked(False) is False   # nothing was locked
+    view.set_locked(True)
+    assert view.set_locked(False) is True
     assert not view.locked
 
 
-def test_favoriting_the_slide_on_screen_without_holding_it(qtbot):
+def test_favoriting_the_slide_on_screen_without_locking_it(qtbot):
     favorite = []
     items = [("a.png", "image", "gen-a", None)]
     view = _view(qtbot, items=items, actions=ShowActions(favorite=favorite.append))
@@ -1029,11 +1029,11 @@ def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):
     assert view._playlist.current()[2] == "gen-b"
 
 
-def test_stepping_off_a_held_slide_releases_it(qtbot):
+def test_stepping_off_a_locked_slide_releases_it(qtbot):
     # The same rule the arrows follow: a lock holds the slide it was set on, not
     # wherever the user wanders to.
     view = _view(qtbot)
-    view.set_held(True)
+    view.set_locked(True)
 
     view.step(1)
 
@@ -1062,7 +1062,7 @@ def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.note_voice_run("id-a", "🎤 fixing teeth…")
     assert "fixing teeth" in view._note.text()
-    # The flash fades into the same note a hold's enhance earns, which follows
+    # The flash fades into the same note a lock's enhance earns, which follows
     # the run: waiting its turn, then being made, until the version lands.
     _fade(view)
     assert view._note.text() == "Enhancement queued"
@@ -1153,9 +1153,9 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
     assert view._counter.text().startswith("3 / 3")
 
 
-# --- the hold a picture keeps the screen for, and what stops the clock -------
+# --- the dwell a picture keeps the screen for, and what stops the clock ------
 # The creep into a still is the engine's own (player_core.still_push), paced by
-# the hold it was given, so the show's part is the hold it hands over and the
+# the dwell it was given, so the show's part is the dwell it hands over and the
 # freeze it hands with it.
 
 
@@ -1163,7 +1163,7 @@ def _engine(view):
     return view._pane._engine
 
 
-def test_a_still_slide_is_handed_the_hold_it_keeps_the_screen_for(qtbot):
+def test_a_still_slide_is_handed_the_dwell_it_keeps_the_screen_for(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     _press(view, Qt.Key.Key_Right)
@@ -1173,7 +1173,7 @@ def test_a_still_slide_is_handed_the_hold_it_keeps_the_screen_for(qtbot):
 
 def test_a_pace_of_nought_is_handed_over_as_nought(qtbot):
     # Nought holds one picture until an arrow moves it, which is what the
-    # engine does with a hold of nought.
+    # engine does with a dwell of nought.
     view = _view(qtbot, _KEYED, image_dwell_ms=0)
 
     _press(view, Qt.Key.Key_Right)
@@ -1181,18 +1181,18 @@ def test_a_pace_of_nought_is_handed_over_as_nought(qtbot):
     assert _engine(view).pace == 0
 
 
-def test_holding_a_slide_leaves_it_where_it_is(qtbot):
+def test_locking_a_slide_leaves_it_where_it_is(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     opened = list(_engine(view).loaded)
 
-    _press(view, Qt.Key.Key_Down)           # hold it
+    _press(view, Qt.Key.Key_Down)           # lock it
 
-    assert _engine(view).loaded == opened   # not opened again under the hold
+    assert _engine(view).loaded == opened   # not opened again under the lock
     assert not _will_move_on(view)
 
 
-def test_a_new_pace_reaches_a_held_slide_without_opening_it_again(qtbot):
-    # Not back out to the top of the move: a held slide keeps where its creep
+def test_a_new_pace_reaches_a_locked_slide_without_opening_it_again(qtbot):
+    # Not back out to the top of the move: a locked slide keeps where its creep
     # had got to, and the pace changes only how fast the rest of it goes.
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
@@ -1204,7 +1204,7 @@ def test_a_new_pace_reaches_a_held_slide_without_opening_it_again(qtbot):
     assert _engine(view).loaded == opened
 
 
-def test_a_show_reopened_on_a_held_slide_opens_it_with_its_hold(qtbot):
+def test_a_show_reopened_on_a_locked_slide_opens_it_locked(qtbot):
     closed = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(closed, Qt.Key.Key_Down)
     reopened = _view(qtbot, _KEYED, image_dwell_ms=4000)
@@ -1215,13 +1215,13 @@ def test_a_show_reopened_on_a_held_slide_opens_it_with_its_hold(qtbot):
     assert not _will_move_on(reopened)
 
 
-def test_a_request_holds_the_picture_and_its_release_lets_it_go(qtbot):
+def test_a_request_pauses_the_picture_and_its_release_lets_it_go(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
-    view.hold_for_request(True, "🎤 listening…")
+    view.pause_for_request(True, "🎤 listening…")
     assert _engine(view).paused is True
 
-    view.hold_for_request(False)
+    view.pause_for_request(False)
     assert _engine(view).paused is False
 
 
@@ -1235,13 +1235,13 @@ def test_the_rooms_freeze_holds_it_and_its_resume_lets_it_go(qtbot):
     assert _engine(view).paused is False
 
 
-def test_a_held_slide_is_held_again_by_a_request_and_by_the_rooms_freeze(qtbot):
+def test_a_locked_slide_is_stilled_again_by_a_request_and_by_the_rooms_freeze(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)
 
-    view.hold_for_request(True, "🎤 listening…")
+    view.pause_for_request(True, "🎤 listening…")
     assert _engine(view).paused is True
-    view.hold_for_request(False)
+    view.pause_for_request(False)
     assert _engine(view).paused is False
 
     view.set_paused(True)
@@ -1251,12 +1251,12 @@ def test_a_held_slide_is_held_again_by_a_request_and_by_the_rooms_freeze(qtbot):
     assert not _will_move_on(view)
 
 
-def test_a_request_released_under_the_rooms_freeze_leaves_it_held(qtbot):
+def test_a_request_released_under_the_rooms_freeze_leaves_it_frozen(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     view.set_paused(True)
-    view.hold_for_request(True, "🎤 listening…")
-    view.hold_for_request(False)
+    view.pause_for_request(True, "🎤 listening…")
+    view.pause_for_request(False)
 
     assert _engine(view).paused is True
 
@@ -1267,10 +1267,10 @@ def test_a_request_leaves_a_clip_playing_and_only_stops_the_show_moving_on(qtbot
     view = _view(qtbot, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Right)          # -> the video
 
-    view.hold_for_request(True, "🎤 listening…")
+    view.pause_for_request(True, "🎤 listening…")
 
     assert _engine(view).paused is False
-    assert view._playlist.holding()
+    assert view._playlist.locked_or_paused()
 
 
 def _click(view):
@@ -1351,7 +1351,7 @@ def test_a_re_seeded_set_wraps_at_either_end(qtbot):
 def test_a_re_seeded_set_keeps_the_pace_the_show_opened_at(qtbot):
     view = _view(qtbot, [("a.png", "image", "id-a")], image_dwell_ms=0)
     view.set_playlist([("a.png", "image", "id-a"), ("b.png", "image", "id-b")], 0)
-    assert view._playlist.dwell_ms() is None  # still held, not back at the default
+    assert view._playlist.dwell_ms() is None  # still at nought, not back at the default
 
 
 # --- Shift+Left/Right: the versions of the image on screen -------------------
@@ -1656,25 +1656,25 @@ def test_stepping_a_paused_show_still_re_aims_the_device(qtbot):
 
     assert changed == [True]
 
-# --- the hold a spoken request puts on the show -----------------------------
+# --- the pause a spoken request puts on the show ----------------------------
 
 
-def test_a_request_holds_the_advance_and_says_so(qtbot):
+def test_a_request_pauses_the_advance_and_says_so(qtbot):
     view = _view(qtbot, _KEYED)
     assert _will_move_on(view)  # an image, dwelling
 
-    view.hold_for_request(True, "🎤 Request: no hat…")
+    view.pause_for_request(True, "🎤 Request: no hat…")
 
     assert not _will_move_on(view)
     assert view._playlist.paused
     assert "Request" in view._note.text()
 
 
-def test_releasing_the_hold_resumes_the_dwell(qtbot):
+def test_releasing_the_pause_resumes_the_dwell(qtbot):
     view = _view(qtbot, _KEYED)
-    view.hold_for_request(True, "🎤 Request…")
+    view.pause_for_request(True, "🎤 Request…")
 
-    view.hold_for_request(False)
+    view.pause_for_request(False)
 
     assert _will_move_on(view)
     assert not view._playlist.paused
@@ -1682,25 +1682,25 @@ def test_releasing_the_hold_resumes_the_dwell(qtbot):
 
 
 def test_the_slide_stays_put_while_a_request_is_being_said(qtbot):
-    # The point of the hold: the request is about this slide, so the show must
+    # The point of the pause: the request is about this slide, so the show must
     # not page on while the sentence is still being spoken.
     view = _view(qtbot, _KEYED)
-    view.hold_for_request(True, "🎤 Request…")
+    view.pause_for_request(True, "🎤 Request…")
 
     view._on_media_ended()  # the clip on screen ran out mid-sentence
 
     assert view.voice_target() == "id-a"
 
 
-def test_releasing_the_hold_leaves_a_locked_slide_locked(qtbot):
+def test_releasing_the_pause_leaves_a_locked_slide_locked(qtbot):
     view = _view(qtbot, _KEYED)
-    view._hold_current()  # the user locked this one
-    view.hold_for_request(True, "🎤 Request…")
+    view._lock_current()  # the user locked this one
+    view.pause_for_request(True, "🎤 Request…")
 
-    view.hold_for_request(False)
+    view.pause_for_request(False)
 
     assert view._playlist.locked
-    assert not _will_move_on(view)  # still held — by the lock, now
+    assert not _will_move_on(view)  # still stopped — by the lock, now
 
 
 def test_a_request_targets_the_slide_on_screen(qtbot):
@@ -1736,7 +1736,7 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_show(qtbot, tmp_path):
     qtbot.waitUntil(lambda: view._playlist.current()[2] == "i-1")
 
 
-def test_an_unopenable_clip_is_stepped_past_even_while_held(qtbot, tmp_path):
+def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
     """A lock replays the clip it holds, and a pace of nought never moves on —
     both of which would hold a clip that cannot play forever.  So this one step
     happens regardless: the item stays in the set, but the screen does not stay
@@ -1797,9 +1797,9 @@ def test_a_reopened_show_carries_on_in_the_order_it_was_playing(qtbot):
     assert reopened._playlist.current()[2] == "id-a"   # the closed show's pass
 
 
-def test_a_slide_closed_under_a_hold_reopens_under_it(qtbot):
+def test_a_slide_closed_under_a_lock_reopens_locked(qtbot):
     closed = _view(qtbot, _THREE)
-    _press(closed, Qt.Key.Key_Down)    # held: this is the one
+    _press(closed, Qt.Key.Key_Down)    # locked: this is the one
     state = closed.state()
     closed.close()
 
@@ -1807,7 +1807,7 @@ def test_a_slide_closed_under_a_hold_reopens_under_it(qtbot):
     reopened.resume(state)
 
     assert reopened._playlist.locked
-    assert not _will_move_on(reopened)  # held, so nothing moves it on
+    assert not _will_move_on(reopened)  # locked, so nothing moves it on
     assert "locked" in reopened._counter.text()
 
 
@@ -1847,9 +1847,9 @@ def test_a_show_following_a_running_generation_resumes_nothing(qtbot):
     assert live.is_live()
 
 
-def test_the_state_read_as_a_show_closes_still_shows_its_hold(qtbot):
+def test_the_state_read_as_a_show_closes_still_shows_its_lock(qtbot):
     # The gallery reads it from the ``closed`` signal, and the lock is dropped
-    # immediately after — a slide closed under a hold has to still be held there,
+    # immediately after — a slide closed under a lock has to still be locked there,
     # or a reopened show would come back to it released.
     view = _view(qtbot, _THREE)
     _press(view, Qt.Key.Key_Down)
@@ -1953,8 +1953,8 @@ def test_a_culled_run_does_not_come_back_on_its_next_frame(qtbot, tmp_path):
     assert not view.holds("id-run")
 
 
-def test_holding_a_slide_being_made_asks_for_no_enhancement(qtbot, tmp_path):
-    # There is no file yet to make a better version of; the hold still holds.
+def test_locking_a_slide_being_made_asks_for_no_enhancement(qtbot, tmp_path):
+    # There is no file yet to make a better version of; the lock still holds.
     asked = []
     view = _view(qtbot, [(_png(tmp_path / "a.png"), "image", "id-a")],
                  actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))
@@ -1990,7 +1990,7 @@ def test_a_slide_still_being_made_says_so(qtbot, tmp_path):
 
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot):
     asked = []
-    view = _view(qtbot, on_reorder=lambda held, latest: asked.append((held, latest)))
+    view = _view(qtbot, on_reorder=lambda items, latest: asked.append((items, latest)))
 
     view.show_order(latest=True)
     view.show_order(latest=False)
@@ -2001,7 +2001,7 @@ def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot):
 def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"))
     view.step(1)
-    view.toggle_hold()
+    view.toggle_lock()
 
     view.reorder(_named(tmp_path, "e", "d"), latest=True)
 

@@ -114,7 +114,7 @@ class FakeShow:
         self.target = target
         self.said = []
         self.runs = []
-        self.holds = []
+        self.pauses = []
         self.requests = []
 
     def voice_target(self):
@@ -126,8 +126,8 @@ class FakeShow:
     def note_voice_run(self, prompt_id, message, *, kind):
         self.runs.append((prompt_id, message, kind))
 
-    def hold_for_request(self, holding, note):
-        self.holds.append((holding, note))
+    def pause_for_request(self, paused, note):
+        self.pauses.append((paused, note))
 
     def note_request(self, message, spoken, *, working=False, kind=NOTICE):
         self.requests.append((message, working, kind))
@@ -684,13 +684,13 @@ def test_a_clip_asked_for_with_no_picture_on_screen_says_so(router):
 # --- a request said over several breaths ------------------------------------
 
 
-def test_an_opening_request_holds_the_show_and_says_so(router):
+def test_an_opening_request_pauses_the_show_and_says_so(router):
     show = FakeShow()
     voice, _host, _shows = router(shows=FakeShows(showing=show))
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    assert show.holds == [(True, "🎤 Request: no hat…")]
+    assert show.pauses == [(True, "🎤 Request: no hat…")]
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):

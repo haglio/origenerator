@@ -102,13 +102,13 @@ def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
     assert show.hud_map().corner.prompt_id == "id-2"
 
 
-def test_the_shows_hold_is_the_players_own(qtbot, tmp_path):
+def test_the_shows_lock_is_the_players_own(qtbot, tmp_path):
     """A padlock on this panel is the player's repeat-one: it is told, and what
     it says back is what the panel draws."""
     show = _show(qtbot, tmp_path)
     _sent(show)
 
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     assert _sent(show) == ["LOCK_ON"]
     assert show.locked is True
 
@@ -117,11 +117,11 @@ def test_the_shows_hold_is_the_players_own(qtbot, tmp_path):
     assert show.locked is False
 
 
-def test_stepping_lets_go_of_a_held_slide_first(qtbot, tmp_path):
-    """Moving off a held slide releases the hold, the way the players' own
+def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
+    """Moving off a locked slide releases the lock, the way the players' own
     prev/next cancel a lock — else the player would repeat the next one too."""
     show = _show(qtbot, tmp_path)
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.show_step(1)
@@ -129,8 +129,8 @@ def test_stepping_lets_go_of_a_held_slide_first(qtbot, tmp_path):
     assert _sent(show) == ["LOCK_OFF", "NEXT"]
 
 
-def test_a_hold_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
-    """Holding is the whole gesture it is in a window: the player repeats it,
+def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
+    """Locking is the whole gesture it is in a window: the player repeats it,
     and the show favorites it, asks for the better version, and hands it to the
     gallery to open."""
     asked = []
@@ -139,7 +139,7 @@ def test_a_hold_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
                           lock=lambda pid: asked.append(("lock", pid)))
     show = _show(qtbot, tmp_path, actions=actions)
 
-    show.show_toggle_hold()
+    show.show_toggle_lock()
 
     assert asked == [("star", "id-1"), ("enhance", "id-1"), ("lock", "id-1")]
 
@@ -231,13 +231,13 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
         "portrait_shuffle", "portrait_latest", "portrait_cycle_version"]
 
 
-def test_a_map_click_plays_that_item_and_a_double_click_holds_it(qtbot, tmp_path):
+def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path):
     """The same jump a click makes on a player's own map, and the same lock its
     double-click takes."""
     show = _show(qtbot, tmp_path)
     _sent(show)
 
-    show.show_item("three.png", hold=True)
+    show.show_item("three.png", lock=True)
 
     assert _sent(show) == ["PLAY_FILE three.png", "LOCK_ON"]
 
@@ -280,7 +280,7 @@ def test_a_new_set_does_not_reload_a_player_already_on_its_slide(qtbot, tmp_path
     assert _sent(show) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
 
 
-def test_a_new_set_lets_go_of_the_hold_the_last_one_had(qtbot, tmp_path):
+def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="one.png", locked=True)
 
     show.play(_ITEMS, start=1, shuffle=in_order)
@@ -339,7 +339,7 @@ def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_path):
     asked = []
     show = _show(qtbot, tmp_path, actions=ShowActions(
-        reorder=lambda held, latest: asked.append((held, latest))))
+        reorder=lambda items, latest: asked.append((items, latest))))
 
     show.show_order(latest=True)
     show.show_order(latest=False)
@@ -349,7 +349,7 @@ def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_p
 
 def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.reorder([("five.png", "image", "id-5"), ("four.png", "image", "id-4")],
@@ -362,7 +362,7 @@ def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot,
     assert show.hud_order_label == LATEST_LABEL
 
 
-def test_a_reorder_of_a_show_not_held_sends_no_let_go(qtbot, tmp_path):
+def test_a_reorder_of_a_show_not_locked_sends_no_unlock(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
 
     show.reorder(_ITEMS, latest=True)
@@ -370,9 +370,9 @@ def test_a_reorder_of_a_show_not_held_sends_no_let_go(qtbot, tmp_path):
     assert _sent(show)[:2] == ["PLAY_FILE one.png", "RELOAD_PLAYLIST"]
 
 
-def test_a_hosted_reset_lets_go_of_the_hold_before_handing_over_the_base_set(qtbot, tmp_path):
+def test_a_hosted_reset_lets_go_of_the_lock_before_handing_over_the_base_set(qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.retune([("five.png", "image", "id-5")])
@@ -614,7 +614,7 @@ def test_a_loop_asked_of_an_item_with_nothing_beside_it_says_so(qtbot, tmp_path)
     assert (_sent(show), said) == ([], ["Nothing to loop"])
 
 
-def test_the_loop_key_is_the_hold_where_there_is_nothing_to_loop(qtbot, tmp_path):
+def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path):
     said = []
     show = _show(qtbot, tmp_path, say=said.append)
     _sent(show)
@@ -659,9 +659,9 @@ def test_a_walk_along_the_map_plays_the_next_cell(qtbot, tmp_path):
     assert show.hud_prompt_id == "id-1b"
 
 
-def test_a_walk_off_a_held_item_lets_go_of_it_first(qtbot, tmp_path):
+def test_a_walk_off_a_locked_item_lets_go_of_it_first(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.show_nav("down")
@@ -695,9 +695,9 @@ def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     assert played == ["one.png", "two.png", "three.png"]   # still in the list
 
 
-def test_entering_a_loop_lets_go_of_a_held_item_as_a_player_does(qtbot, tmp_path):
+def test_entering_a_loop_lets_go_of_a_locked_item_as_a_player_does(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.show_loop("seed")
@@ -707,9 +707,9 @@ def test_entering_a_loop_lets_go_of_a_held_item_as_a_player_does(qtbot, tmp_path
     assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).locked is False
 
 
-def test_the_loop_key_lets_go_of_a_held_item_when_it_finds_a_row_to_loop(qtbot, tmp_path):
+def test_the_loop_key_lets_go_of_a_locked_item_when_it_finds_a_row_to_loop(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     _sent(show)
 
     show.show_loop_cycle()

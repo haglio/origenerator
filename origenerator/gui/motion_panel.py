@@ -45,7 +45,7 @@ class MotionPanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
     It is always here, motion or no motion. Part of what is on it is not about a
-    running motion at all — the pace an unheld slide moves on at — and a panel
+    running motion at all — the pace an unlocked slide moves on at — and a panel
     that appeared only once the device was being driven made that reachable
     only by starting a motion first. With nothing driving, it draws itself
     exactly as Fun Time's does with the OSR2 off: the OSR2 row reads "Off", the

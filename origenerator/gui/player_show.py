@@ -94,14 +94,14 @@ class PlayerShow(QObject):
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
         self._open = True
-        # What the player last said it was showing, and whether it is holding
+        # What the player last said it was showing, and whether it has locked
         # it: the player's answer, not this app's — a picture that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
         self._published = ""
         self._levels = LevelStepper()
-        # Holding a slide is also how you ask for it: a hold asks for a better
+        # Locking a slide is also how you ask for it: a lock asks for a better
         # version of what is on screen, unless the gallery wired none.
         self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         opened_on_a_slide = start is not None
@@ -129,7 +129,7 @@ class PlayerShow(QObject):
              hud=None) -> None:
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
-        self._let_go()
+        self._unlock()
         self._hand_over(land=True)
         self._publish()
 
@@ -157,7 +157,7 @@ class PlayerShow(QObject):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds an unheld picture holds the player's screen."""
+        """The seconds an unlocked picture holds the player's screen."""
         return self._dwell_s
 
     def set_dwell_s(self, seconds: int) -> None:
@@ -189,7 +189,7 @@ class PlayerShow(QObject):
         once, so a loop lights its button on the press rather than a tick
         later."""
         if self._set.loop is not None:
-            self._let_go()
+            self._unlock()
         self._hand_over(land=not kept)
         self._publish()
 
@@ -269,38 +269,38 @@ class PlayerShow(QObject):
 
     @property
     def locked(self) -> bool:
-        """Whether the player is holding what is on screen — its own answer,
+        """Whether the player has locked what is on screen — its own answer,
         which is what the panel's padlock and its lock ring are drawn from."""
         return self._locked
 
     def show_step(self, delta: int) -> None:
-        """Step the player either way.  Moving off a held slide releases the
-        hold, the way the players' own prev/next cancel a lock."""
-        self._let_go()
+        """Step the player either way.  Moving off a locked slide releases the
+        lock, the way the players' own prev/next cancel a lock."""
+        self._unlock()
         self._send(NEXT if delta > 0 else PREV)
 
     def step(self, delta: int) -> None:
         self.show_step(delta)
 
-    def show_toggle_hold(self) -> None:
-        """Hold what is on screen, or let it go — the whole of the gesture."""
-        self.set_held(not self._locked)
+    def show_toggle_lock(self) -> None:
+        """Lock what is on screen, or let it go — the whole of the gesture."""
+        self.set_locked(not self._locked)
 
-    def toggle_hold(self) -> None:
-        self.show_toggle_hold()
+    def toggle_lock(self) -> None:
+        self.show_toggle_lock()
 
-    def set_held(self, held: bool) -> bool:
-        """Hold the item on screen or let it go, saying which way rather than
+    def set_locked(self, locked: bool) -> bool:
+        """Lock the item on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
 
-        Holding is the whole gesture it is in a window: the player repeats the
+        Locking is the whole gesture it is in a window: the player repeats the
         item, and the show favorites it, asks for a better version of it, and — in
         a session — hands it to the gallery to open.
         """
-        if held == self._locked:
+        if locked == self._locked:
             return False
-        self._hold(held)
-        if not held:
+        self._lock(locked)
+        if not locked:
             return True
         self.favorite()
         self._enhance_current()
@@ -309,16 +309,16 @@ class PlayerShow(QObject):
             self._actions.lock(prompt_id)
         return True
 
-    def _hold(self, on: bool) -> None:
+    def _lock(self, on: bool) -> None:
         # Held here as well as sent, so the panel lights on the press rather
         # than a tick later; the player's own status settles it either way.
         self._locked = on
         self._send(LOCK_ON if on else LOCK_OFF)
         self._publish()
 
-    def _let_go(self) -> None:
+    def _unlock(self) -> None:
         if self._locked:
-            self._hold(False)
+            self._lock(False)
 
     def show_cull(self) -> None:
         """The players' "weird": a favorite loses its star and the player moves
@@ -332,7 +332,7 @@ class PlayerShow(QObject):
         item = self._set.playlist.current()
         if item is None:
             return
-        self._hold(False)  # the held slide is the one being culled
+        self._lock(False)  # the locked slide is the one being culled
         if self._set.unfavorite_current(self._actions.unfavorite):
             self._note("Unfavorited")
             self._send(NEXT)
@@ -392,9 +392,9 @@ class PlayerShow(QObject):
             self._actions.reorder(self, latest)
 
     def reset_in_place(self) -> None:
-        """This show's own reset: both switches dropped, the hold released, and
+        """This show's own reset: both switches dropped, the lock released, and
         the set it is already playing started over."""
-        self._hold(False)
+        self._lock(False)
         if self._set.drop_the_switches():
             return  # the player has the fresh pass already (see _pass_changed)
         self._set.playlist.restart()
@@ -403,21 +403,21 @@ class PlayerShow(QObject):
     def retune(self, items, *, enhanced_ids=None) -> None:
         """Point this show at the region's base set instead — what a hosted
         reset does, with both switches off and a fresh pass."""
-        self._let_go()
+        self._unlock()
         self._set.retune(items, enhanced_ids=enhanced_ids)
 
     def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
-        self._let_go()
+        self._unlock()
         self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids)
 
-    def show_item(self, path, *, hold: bool = False) -> None:
+    def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
-        it makes on a player's own map; *hold* locks it there."""
+        it makes on a player's own map; *lock* keeps it there."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        self._hold(hold)
+        self._lock(lock)
 
     def _jump_to(self, slide) -> None:
         """Stand the pass on *slide* and send the player there.
@@ -458,7 +458,7 @@ class PlayerShow(QObject):
         there is nothing on either axis to loop."""
         stepped = self._set.step_loop()
         if stepped == LOOP_IS_A_LOCK:
-            self.set_held(not self._locked)
+            self.set_locked(not self._locked)
             self._note("Locked" if self._locked else "Unlocked")
         elif stepped == LOOP_OFF:
             self._note("Loop off")
@@ -480,7 +480,7 @@ class PlayerShow(QObject):
         row = self._set.configuration_row(query)
         if row is not None:
             if row is not self._set.playlist.current():
-                self._let_go()
+                self._unlock()
                 self._jump_to(row)
             self.show_loop(SEED_AXIS)
             return
@@ -492,7 +492,7 @@ class PlayerShow(QObject):
         if target is None:
             self._note("Nothing that way", kind=WARNING)
             return
-        self._let_go()
+        self._unlock()
         self._jump_to(target)
 
     # --- the two switches, and what the panel reads off the set --------------
@@ -590,7 +590,7 @@ class PlayerShow(QObject):
 
     def _enhance_current(self) -> None:
         """Ask the gallery for a better version of the item on screen, if it
-        wants one — holding a slide is how that is asked for here too."""
+        wants one — locking a slide is how that is asked for here too."""
         if self._actions.enhance is None:
             return
         prompt_id = self._set.current_prompt_id()
@@ -638,14 +638,14 @@ class PlayerShow(QObject):
         their paused flag, so there is nothing to do here — a frozen player
         holds the picture, and nothing advances until it is let go."""
 
-    def hold_for_request(self, holding: bool, note: str = "") -> None:
+    def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Stop the advance while a request is being spoken: the pace goes to
-        nought, which is how anything is held on a player, and back after.
+        nought, which is how anything is kept still on a player, and back after.
 
         A request is about what is on screen, and a set that pages on every few
         seconds would hand the words to whatever came up next.
         """
-        self._send(f"{SET_PACE} {0 if holding else self._dwell_s}")
+        self._send(f"{SET_PACE} {0 if paused else self._dwell_s}")
         if note:
             self._note(note)
 

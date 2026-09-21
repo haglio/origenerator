@@ -40,7 +40,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
 
 
 def test_the_switches_light_and_the_things_done_never_do():
-    """The hold and the two filters are states the show sits in — the hold and
+    """The lock and the two filters are states the show sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     picture's own amber; a step, the bin and reset are things done."""
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
@@ -104,8 +104,8 @@ class _Host:
     def show_step(self, delta):
         self.calls.append(("step", delta))
 
-    def show_toggle_hold(self):
-        self.calls.append("hold")
+    def show_toggle_lock(self):
+        self.calls.append("lock")
 
     def show_cull(self):
         self.calls.append("cull")
@@ -122,8 +122,8 @@ class _Host:
     def toggle_enhanced_mode(self):
         self.calls.append("enhanced")
 
-    def show_item(self, path, *, hold=False):
-        self.calls.append(("item", path, hold))
+    def show_item(self, path, *, lock=False):
+        self.calls.append(("item", path, lock))
 
     def show_loop(self, axis):
         self.calls.append(("loop", axis))
@@ -162,7 +162,7 @@ def test_every_declared_button_is_answered_by_the_show():
     for button in show_rows("portrait", hosted=True, own_window=False)[0]:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
-    assert host.calls == [("step", -1), ("step", 1), "hold", "cull", "fmode",
+    assert host.calls == [("step", -1), ("step", 1), "lock", "cull", "fmode",
                           "enhanced", "reset", ("order", False), ("order", True),
                           ("version", 1)]
 
@@ -178,7 +178,7 @@ def test_the_versions_button_steps_forward_and_the_shifted_key_either_way():
     assert host.calls == [("version", 1), ("version", -1)]
 
 
-def test_a_map_click_plays_that_item_and_a_double_click_holds_it():
+def test_a_map_click_plays_that_item_and_a_double_click_locks_it():
     host = _Host()
 
     answer(host, "play_video", "scene one.png")

@@ -95,7 +95,7 @@ class FakeShow:
         self.closes = 0
         self.visible = True
         self.live = False
-        self.held = set()
+        self.ids = set()
         self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
         self.enhanced_items = []
@@ -117,7 +117,7 @@ class FakeShow:
         return self.live
 
     def holds(self, prompt_id):
-        return prompt_id in self.held
+        return prompt_id in self.ids
 
     def state(self):
         return self.state_at_close
@@ -219,8 +219,8 @@ class FakeShow:
         self.favorites += 1
         return self.favoritable
 
-    def set_held(self, held):
-        return held
+    def set_locked(self, locked):
+        return locked
 
     def adopt_hud(self, panel):
         self.hud_panel = panel
@@ -895,7 +895,7 @@ def test_the_spoken_close_with_no_show_up_says_so(shows):
 
 
 def test_the_spoken_pause_with_no_show_sets_what_the_next_one_opens_at(shows):
-    # A show that never moves on is exactly what a held picture is here.
+    # A show that never moves on is exactly what a stopped picture is here.
     director, host, _made = shows()
 
     director.run_show_command(ShowCommand.PAUSE, None)

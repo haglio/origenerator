@@ -1,4 +1,5 @@
-"""The slideshow playlist — ordering, wrap navigation, holds, and advance policy."""
+"""The slideshow playlist — ordering, wrap navigation, the lock and the pause,
+and advance policy."""
 from __future__ import annotations
 
 from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
@@ -168,13 +169,13 @@ def test_a_paused_playlist_has_no_dwell_either():
     playlist = _playlist()
     playlist.set_paused(True)
     assert playlist.dwell_ms() is None
-    assert playlist.holding()
+    assert playlist.locked_or_paused()
 
     playlist.set_paused(False)
     assert playlist.dwell_ms() == playlist.image_dwell_ms
 
 
-def test_the_pause_and_the_lock_are_independent_holds():
+def test_the_pause_and_the_lock_are_independent():
     # Releasing one must not release the other: a slide the user locked stays
     # locked when a request ends, and stepping (which drops the lock) must not
     # quietly resume a show that is still listening.
@@ -183,11 +184,11 @@ def test_the_pause_and_the_lock_are_independent_holds():
     playlist.set_paused(True)
 
     playlist.set_paused(False)
-    assert playlist.locked and playlist.holding()
+    assert playlist.locked and playlist.locked_or_paused()
 
     playlist.set_paused(True)
     playlist.unlock()
-    assert playlist.paused and playlist.holding()
+    assert playlist.paused and playlist.locked_or_paused()
 
 
 def test_remove_current_drops_the_item_and_advances():
@@ -335,7 +336,7 @@ def test_the_lock_can_be_put_back_where_a_closed_show_left_it():
     playlist = _four()
     playlist.set_locked(True)
     assert playlist.locked
-    assert playlist.dwell_ms() is None     # held, so nothing moves it on
+    assert playlist.dwell_ms() is None     # locked, so nothing moves it on
     playlist.set_locked(False)
     assert not playlist.locked
 

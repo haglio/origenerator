@@ -30,7 +30,7 @@ def _will_move_on(view) -> bool:
     finished clip, so there is no clock of the view's own to ask: what decides
     is the same three things that decided whether one was armed -- the room is
     not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.holding()
+    return (not view._paused and not view._playlist.locked_or_paused()
             and bool(view._dwell_s))
 
 
@@ -435,7 +435,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
         ("satellites_video_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
 
-    show.show_toggle_hold()
+    show.show_toggle_lock()
     assert show_hud_model("portrait", show).locked is True
 
 
@@ -495,7 +495,7 @@ def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatc
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
-    show.show_item(str(still_b), hold=True)
+    show.show_item(str(still_b), lock=True)
 
     assert show._playlist.current()[0] == str(still_b)
     assert show.locked
@@ -818,14 +818,14 @@ def test_a_lock_on_a_hosted_show_opens_its_generate_tab(qtbot, tmp_path, monkeyp
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
-    show._toggle_lock()
+    show._flip_lock()
 
     # The item held, not a sibling of it: every seed of one recipe shares a
     # settings folder, so a tab picked by folder came up on the wrong picture.
     assert opened == ["id-tall-0"]
     assert navigated == ["id-tall-0"]  # and the browser went there too
 
-    show._toggle_lock()  # release: no second tab
+    show._flip_lock()  # release: no second tab
     assert len(opened) == 1
 
 
@@ -840,7 +840,7 @@ def test_a_standalone_show_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
 
-    view._shows.showing._toggle_lock()
+    view._shows.showing._flip_lock()
 
     assert opened == []
 
@@ -875,7 +875,7 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
 
     hud._deliver("portrait_fmode")
     show._playlist.jump_to(1)
-    show._toggle_lock()
+    show._flip_lock()
     assert show.hud_favorites_filter is True
 
     hud._deliver("portrait_reset")
@@ -1020,7 +1020,7 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
     show = view._shows.showing
     qtbot.addWidget(show)
     show._playlist.jump_to(1)
-    show._toggle_lock()
+    show._flip_lock()
 
     show.show_reset()
 

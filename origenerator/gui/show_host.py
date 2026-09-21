@@ -39,12 +39,12 @@ class ShowHost(Protocol):
 
     @property
     def locked(self) -> bool:
-        """Whether what is on screen is being held — the console's padlock."""
+        """Whether what is on screen is locked — the console's padlock."""
         ...
 
     @property
     def dwell_s(self) -> int:
-        """The seconds an unheld slide holds the screen; nought means never."""
+        """The seconds an unlocked slide holds the screen; nought means never."""
         ...
 
     def set_dwell_s(self, seconds: int) -> None:
@@ -55,8 +55,8 @@ class ShowHost(Protocol):
         """Move a slide either way — prev/next, however it was pressed."""
         ...
 
-    def show_toggle_hold(self) -> None:
-        """Hold what is on screen, or let it go."""
+    def show_toggle_lock(self) -> None:
+        """Lock what is on screen, or let it go."""
         ...
 
     def show_cull(self) -> None:
@@ -172,8 +172,8 @@ class ShowHost(Protocol):
         disagreeing.  ``False`` where it did not move."""
         return False
 
-    def show_item(self, path, *, hold: bool = False) -> None:
-        """Jump to the item the HUD map named; *hold* locks it there."""
+    def show_item(self, path, *, lock: bool = False) -> None:
+        """Jump to the item the HUD map named; *lock* keeps it there."""
 
     def current_media_path(self) -> str:
         """The file on screen — what a hosting session's status file says."""

@@ -59,7 +59,7 @@ class ShowSurface(QWidget):
     """The show's pane: the engine's picture, with a live run's frames over it."""
 
     # The item on screen ran out -- a video that finished, or a picture whose
-    # hold expired.  One signal for both, because to a show they are one thing.
+    # dwell expired.  One signal for both, because to a show they are one thing.
     media_ended = pyqtSignal()
     # Nothing opened: a file the engine would not play.
     media_unplayable = pyqtSignal()
@@ -222,7 +222,7 @@ class ShowSurface(QWidget):
 
     def set_paused(self, paused: bool) -> None:
         """Freeze or resume what is on screen, and keep it frozen across slides:
-        a step while the room is frozen must land holding, not play out from
+        a step while the room is frozen must land frozen, not play out from
         under the freeze."""
         self._paused = paused
         self._engine.set_paused(paused)

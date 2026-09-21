@@ -118,7 +118,7 @@ class RequestDictation:
 
     @property
     def listening(self) -> bool:
-        """Whether a request is open right now — the cue to hold a slideshow."""
+        """Whether a request is open right now — the cue to pause a slideshow."""
         return self._open
 
     def reset(self) -> None:

@@ -1,5 +1,5 @@
 """The buttons this app puts on Genau's console, row by row: Genau's transport,
-the pace an unheld slide moves on at, and the motion's own row.  Only what
+the pace an unlocked slide moves on at, and the motion's own row.  Only what
 :class:`origenerator.gui.motion_panel.MotionPanel` answers is declared."""
 
 from __future__ import annotations

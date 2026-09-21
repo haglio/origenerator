@@ -665,7 +665,7 @@ def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkey
         None, "🎤 couldn't launch the enhance — see the log", ERROR)
 
 
-def test_a_held_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
+def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: False)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 

@@ -27,7 +27,7 @@ MIN_S, MAX_S = 0, 60
 
 
 class SlideshowPace(QObject):
-    """The seconds an unheld slide holds the screen, and word when it changes."""
+    """The seconds an unlocked slide holds the screen, and word when it changes."""
 
     changed = pyqtSignal(int)
 
@@ -84,6 +84,6 @@ class PaceOnlyHost(ShowHost):
 
     def show_step(self, delta: int) -> None: ...
 
-    def show_toggle_hold(self) -> None: ...
+    def show_toggle_lock(self) -> None: ...
 
     def show_cull(self) -> None: ...

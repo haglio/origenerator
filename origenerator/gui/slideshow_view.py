@@ -8,15 +8,15 @@ and a clip move on the same way: the engine holds the picture for the pace and
 ends it as it ends a finished clip, and the show pages on
 (``ShowSurface.media_ended``).  The arrows step, Shift+arrows step the
 versions of the item on screen, Up culls, Down locks the slide
-against the advance (a locked clip replays, and the hold both favorites the slide and
-asks for an enhancement — see :meth:`SlideshowView._hold_current`), Enter leaves
+against the advance (a locked clip replays, and the lock both favorites the slide and
+asks for an enhancement — see :meth:`SlideshowView._lock_current`), Enter leaves
 for the shown item's own folder (``open_requested``), and Escape closes. Ending
-a show on a locked slide leaves for that slide's folder too: holding one is the
+a show on a locked slide leaves for that slide's folder too: locking one is the
 user saying this is the one, so the gallery lands there rather than back where
 it was when the show started.
 
 Closing one doesn't lose your place in it. :meth:`SlideshowView.state` is where
-a show was — the pass, the slide, the hold on it — and :meth:`SlideshowView.resume`
+a show was — the pass, the slide, the lock on it — and :meth:`SlideshowView.resume`
 opens the next one there, so the look at the folder under a picture that closing
 the show is usually for doesn't cost the picture.
 
@@ -32,10 +32,10 @@ Anything that moves off a locked slide — a step either way, a cull — release
 lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
 it was set on, not wherever the user wanders to.
 
-A second hold is the show's own: :meth:`SlideshowView.hold_for_request` stops the
+The show puts a stop of its own on the advance: :meth:`SlideshowView.pause_for_request` halts
 advance while a spoken request is being said, since the request is about what is
 on screen and a show that pages on mid-sentence would aim it at the wrong slide.
-It is independent of the lock, so releasing it never unlocks a held slide.
+It is independent of the lock, so releasing it never unlocks a locked slide.
 
 The set is not frozen at the opening. It holds only generations there is
 something to look at, and the gallery hands each one over the moment there is
@@ -55,8 +55,8 @@ point it is an ordinary show of that file. So a generation can be watched
 full-screen while it's made, not only once it lands.
 
 A picture does not simply sit there while it holds the screen: the engine creeps
-into it, ending a tenth of the way in by the time the hold runs out, paced by
-the hold rather than by a clock of its own -- so turning the pace up slows the
+into it, ending a tenth of the way in by the time the dwell runs out, paced by
+the dwell rather than by a clock of its own -- so turning the pace up slows the
 creep instead of cropping harder.  That is the engine's, not this window's,
 which is why a show handed to one of a session's players creeps the same way.
 
@@ -129,7 +129,7 @@ _WIDENING_FAILED = "Widening net failed"
 _NOTHING_TO_LOOP = "Nothing to loop"
 _NOTHING_THAT_WAY = "Nothing that way"
 # What the corner says about an enhancement of the slide on screen. Which of the
-# two is a fact about the run, not about the ask: holding slide after slide
+# two is a fact about the run, not about the ask: locking slide after slide
 # sends out a line of runs, and ComfyUI is making exactly one of them.
 _ENHANCING = "Enhancing…"
 _ENHANCE_QUEUED = "Enhancement queued"
@@ -152,7 +152,7 @@ class SlideshowView(QWidget):
         # each gesture that lands on the generation rather than on the slide.
         # None of it, for a show standing on its own (see ShowActions).
         self._actions = actions if actions is not None else ShowActions()
-        # Holding a slide is also how you ask for it: Down enhances what is on
+        # Locking a slide is also how you ask for it: Down enhances what is on
         # screen if it has never been enhanced, so the one you stopped on is the
         # one that gets the better version — and one that already has a better
         # version is left alone.
@@ -201,7 +201,7 @@ class SlideshowView(QWidget):
         # their buttons — floated into the corner this view leaves empty. The
         # strip that normally carries it is under this window, and a show is
         # both when the queue stops moving (its videos are held) and when the
-        # user keeps adding to it (a held slide asks for an enhancement).
+        # user keeps adding to it (a locked slide asks for an enhancement).
         self._queue = SlideshowQueue(self)
         # A note about the item on screen: which of its versions this is, that an
         # enhancement of it is being made, and for a beat whatever a switch or a
@@ -211,7 +211,7 @@ class SlideshowView(QWidget):
         # this surface wears the players' own HUD and had no business saying
         # things in a second dialect at the other end of the screen.
         self._note = Toast(self)
-        # What the corner reads while a spoken request holds the show; empty
+        # What the corner reads while a spoken request pauses the show; empty
         # whenever nothing is being dictated.
         self._request_note = ""
         # And what it reads afterwards, while the request said is still being
@@ -227,7 +227,7 @@ class SlideshowView(QWidget):
         # A pause — the hosting session's OmniPause, or a click on a show with no
         # session — held here so it survives navigation: a step lands on a NEW
         # slide (the freeze does not un-aim the transport), but the slide must
-        # arrive holding — no dwell armed, its video paused — rather than playing
+        # arrive frozen — no dwell armed, its video paused — rather than playing
         # out from under the freeze.
         self._paused = False
         # The players' HUD replaces this view's own furnishings (the neighbor
@@ -326,13 +326,13 @@ class SlideshowView(QWidget):
             # Still being made: what it looks like so far, rather than a file.
             self._pane.show_frame(slide.path)
         else:
-            # The hold before the file: the engine reads it as it opens one.
+            # The pace before the file: the engine reads it as it opens one.
             self._pane.set_pace(self._dwell_s)
             self._pane.show_media(slide.path, slide.media_type)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
-        self._apply_freeze()  # a slide arrived at under a hold arrives holding
+        self._apply_freeze()  # a slide arrived at under a freeze arrives frozen
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     # --- the slide's own clock, which is the engine's -----------------------
@@ -344,12 +344,12 @@ class SlideshowView(QWidget):
         moving on rather than stopping the clip: it is about what is on screen,
         and a clip that stopped mid-sentence would be answering a question
         nobody asked.  A picture under one holds where the creep had got to,
-        since the alternative is its hold running out and starting over under
+        since the alternative is its dwell running out and starting over under
         the speaker.
         """
-        request_holds_a_still = (self._playlist.paused
-                                 and not self._pane.is_showing_video())
-        self._pane.set_paused(self._paused or request_holds_a_still)
+        request_stills_a_picture = (self._playlist.paused
+                                    and not self._pane.is_showing_video())
+        self._pane.set_paused(self._paused or request_stills_a_picture)
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -428,7 +428,7 @@ class SlideshowView(QWidget):
 
         Closing a show is usually a detour — the folder under the picture, a fix
         in a tab — so coming back is coming back to that picture: the slide it
-        ended on, still held if it was held, still showing the version it had been
+        ended on, still locked if it was locked, still showing the version it had been
         stepped to. The place carries only while that slide is among these items,
         since a show of another folder has nowhere to put it.
 
@@ -552,14 +552,14 @@ class SlideshowView(QWidget):
         moves on.
 
         Two things on one key, as on a satellite, and the star on screen says
-        which: holding a slide starred it, so the first press takes that back
+        which: locking a slide starred it, so the first press takes that back
         and only the second condemns it.  A slide that is still being made has
         nothing to condemn: the run is on the GPU and its row is a record of
         that, not a picture that has been judged.  Up takes such a slide off
         the show and leaves the run alone — calling one off is the queue
         plate's Cancel, in the corner of this very screen.
         """
-        self._playlist.unlock()  # the held slide is the one being culled
+        self._playlist.unlock()  # the locked slide is the one being culled
         item = self._playlist.current()
         if item is None:
             return
@@ -580,7 +580,7 @@ class SlideshowView(QWidget):
 
     def _step(self, delta: int):
         """Manual stepping — an arrow, or the console's transport: moving off a
-        slide releases its lock, so the way out of a hold is the same key that
+        slide releases its lock, so the way out of a lock is the same key that
         got you anywhere else, not a second press of the one that set it."""
         if self._live and self._playlist.is_empty():
             return  # a run with no folder armed under it: nowhere to step to
@@ -642,18 +642,18 @@ class SlideshowView(QWidget):
 
     # --- what Genau's console acts on here ---------------------------------
     # Its transport steps Genau's clips and its clip-seconds pace how long an
-    # unheld one stays up. Here the clips are the slides, so the same four
-    # buttons step, hold and cull them, and the same pair sets the dwell.
+    # unlocked one stays up. Here the clips are the slides, so the same four
+    # buttons step, lock and cull them, and the same pair sets the dwell.
 
     @property
     def dwell_s(self) -> int:
-        """The seconds this show leaves an unheld slide up — nought while it is
-        holding one picture, which is how a double-clicked one opens."""
+        """The seconds this show leaves an unlocked slide up — nought while it is
+        standing on one picture, which is how a double-clicked one opens."""
         return self._dwell_s
 
     @property
     def locked(self) -> bool:
-        """Whether what is on screen is being held — the console's padlock."""
+        """Whether what is on screen is locked — the console's padlock."""
         return self._playlist.locked
 
     # --- the transport, for whoever is driving: a key, the console, a word ---
@@ -663,9 +663,9 @@ class SlideshowView(QWidget):
         keyboard to press them with."""
         self._step(delta)
 
-    def toggle_hold(self) -> None:
-        """Hold the slide on screen, or let it go — Down's whole gesture."""
-        self._hold_current()
+    def toggle_lock(self) -> None:
+        """Lock the slide on screen, or let it go — Down's whole gesture."""
+        self._lock_current()
 
     def cull(self) -> None:
         """Take the slide on screen away and move on — Up's."""
@@ -673,7 +673,7 @@ class SlideshowView(QWidget):
 
     def show_reset(self) -> None:
         """Put the side back how it started, the players' own reset: both
-        switches dropped, the hold released, and the base set on screen again.
+        switches dropped, the lock released, and the base set on screen again.
 
         Hosted, "how it started" is the REGION's base state, not this show's
         own: a player's reset drops its filter and leaves it browsing its whole
@@ -692,7 +692,7 @@ class SlideshowView(QWidget):
             self._actions.reorder(self, latest)
 
     def reset_in_place(self) -> None:
-        """This show's own reset: both switches dropped, the hold released, and
+        """This show's own reset: both switches dropped, the lock released, and
         the top of the set it is already playing back on screen."""
         self._playlist.unlock()
         if self._set.drop_the_switches():
@@ -706,7 +706,7 @@ class SlideshowView(QWidget):
         What a hosted reset does.  The window stays up rather than being closed
         and reopened: it covers a satellite player, and a region that blinks
         black between two shows is the thing the base state exists to avoid.
-        Both switches and the hold come off the way any reset takes them off,
+        Both switches and the lock come off the way any reset takes them off,
         and the pass is a fresh shuffle.
 
         A base state is one KIND of set and always the same one, so it is
@@ -760,7 +760,7 @@ class SlideshowView(QWidget):
         whole gesture here."""
         stepped = self._set.step_loop()
         if stepped == LOOP_IS_A_LOCK:
-            self._hold_current()
+            self._lock_current()
             self._flash_note("Locked" if self._playlist.locked else "Unlocked")
         elif stepped == LOOP_OFF:
             self._flash_note("Loop off")
@@ -833,20 +833,20 @@ class SlideshowView(QWidget):
     def audio_muted(self) -> bool:
         return self._pane.audio_muted()
 
-    def set_held(self, held: bool) -> bool:
-        """Hold the slide on screen or let it go, saying which way rather than
+    def set_locked(self, locked: bool) -> bool:
+        """Lock the slide on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
 
         Spoken "lock" and "unlock" are two words for a reason: someone talking
         to a picture is asking for a state, not for the other one — and cannot
         see the counter's padlock to know which the flip would give them.
-        Holding is Down's whole gesture here, star and enhance included, because
-        that is what holding means in this view and a spoken hold must not
+        Locking is Down's whole gesture here, star and enhance included, because
+        that is what locking means in this view and a spoken lock must not
         quietly mean less than a pressed one.
         """
-        if held == self._playlist.locked:
+        if locked == self._playlist.locked:
             return False
-        self._hold_current() if held else self._toggle_lock()
+        self._lock_current() if locked else self._flip_lock()
         return True
 
     def favorite(self) -> bool:
@@ -864,8 +864,8 @@ class SlideshowView(QWidget):
     def show_step(self, delta: int) -> None:
         self.step(delta)
 
-    def show_toggle_hold(self) -> None:
-        self.toggle_hold()
+    def show_toggle_lock(self) -> None:
+        self.toggle_lock()
 
     def show_cull(self) -> None:
         self.cull()
@@ -941,20 +941,20 @@ class SlideshowView(QWidget):
         there is more than one to clear."""
         return self._set.set_modes(favorites_filter=False, enhanced=False, act_filter="")
 
-    def show_item(self, path, *, hold: bool = False) -> None:
+    def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
-        jump a satellite's map makes; *hold* locks it there (the double-click),
+        jump a satellite's map makes; *lock* keeps it there (the double-click),
         exactly as it locks a player's clip."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
         self._jump_to(slide)
-        if hold and not self._playlist.locked:
-            self._toggle_lock()
+        if lock and not self._playlist.locked:
+            self._flip_lock()
 
     def _jump_to(self, slide) -> None:
-        """Stand the show on *slide*, wherever the map found it: the hold
-        comes off, the way any step off a held slide takes it off."""
+        """Stand the show on *slide*, wherever the map found it: the lock
+        comes off, the way any step off a locked slide takes it off."""
         self._playlist.unlock()
         self._live = False
         self._set.jump_to(slide)
@@ -966,8 +966,8 @@ class SlideshowView(QWidget):
 
         Distinct from the lock: a lock holds one slide by choice and replays
         its clip; this stops time itself.  The engine's clock is the show's, so
-        a frozen picture stops counting down its hold and a frozen clip stops
-        playing, and a slide stepped to while frozen arrives holding.
+        a frozen picture stops counting down its dwell and a frozen clip stops
+        playing, and a slide stepped to while frozen arrives frozen too.
         """
         self._paused = paused
         self._apply_freeze()
@@ -993,19 +993,19 @@ class SlideshowView(QWidget):
             return
         self._pane.set_pace(seconds)
         if not self._playlist.locked:
-            # The engine reads the hold when it opens the file, so the picture
+            # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.
             self._show_current()
 
     def _on_media_ended(self):
-        """The item ran out — a clip that finished, or a picture whose hold
-        expired.  Replay it while held, else move on. A lock is
+        """The item ran out — a clip that finished, or a picture whose dwell
+        expired.  Replay it while locked, else move on. A lock is
         repeat-one here, as it is on a Fun Time satellite — and a pace of nought
         holds the clip the same way, since nought means nothing moves on its own.
-        A request being spoken holds it too: paging on mid-sentence is exactly
+        A request being spoken stops it too: paging on mid-sentence is exactly
         what that pause exists to stop.
         """
-        if self._playlist.holding() or not self._dwell_s:
+        if self._playlist.locked_or_paused() or not self._dwell_s:
             self._show_current()
         else:
             self._advance()
@@ -1018,7 +1018,7 @@ class SlideshowView(QWidget):
         session.  The item stays in the set — the fault is the backend's, not
         the file's — but the show moves on.
 
-        A pause is the one hold this yields to: the show is frozen, and a show
+        A pause is the one stop this yields to: the show is frozen, and a show
         that walked its set looking for something playable would be moving.
         The black rectangle waits for the resume.
         """
@@ -1027,18 +1027,18 @@ class SlideshowView(QWidget):
         logger.warning("Slideshow: a clip would not play; stepping past it")
         self._advance()
 
-    # --- the hold a spoken request puts on the show ------------------------
+    # --- the pause a spoken request puts on the show -----------------------
 
-    def hold_for_request(self, holding: bool, note: str = "") -> None:
+    def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Stop (or release) the advance while a request is being spoken.
 
         Not the user's lock: a slide they had locked is still locked when the
         request ends, and one they hadn't goes back to its dwell. ``note`` is
-        what the corner should say while it holds — the only sign, in a view
+        what the corner should say while the show waits — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
-        self._playlist.set_paused(holding)
-        if holding:
+        self._playlist.set_paused(paused)
+        if paused:
             self._note_timer.stop()  # it holds, rather than fading after a beat
             self._request_note = note
         else:
@@ -1056,7 +1056,7 @@ class SlideshowView(QWidget):
         meant — the case that outlasts a flash — and a corner that empties while
         the app is still working says the request was dropped when it wasn't.
 
-        Which is why the hold comes down only for the request that took it.
+        Which is why that line comes down only for the request that put it up.
         Nothing stops a second request being said over the first, and an answer
         to the first would otherwise blank the corner while the second is still
         out at the model — the same defect, one request later. An answer to
@@ -1072,24 +1072,24 @@ class SlideshowView(QWidget):
             self._working_note, self._working_request = "", None
         self._flash_note(message, ms=3000, kind=kind)
 
-    def _hold_current(self):
-        """Down: hold the slide, favorite it, and ask for it to be enhanced.
+    def _lock_current(self):
+        """Down: lock the slide, favorite it, and ask for it to be enhanced.
 
         Stopping on a picture is the gesture that says you want it, so it is
         also the one that favorites it and the one that asks for the better version
         — nothing extra to press, and the run happens while you keep looking at
-        it. Releasing the hold asks for nothing; only stopping does, and only on
+        it. Releasing the lock asks for nothing; only stopping does, and only on
         a picture that has never been enhanced (the gallery's call).
         """
-        held = self._toggle_lock()
-        if held:
+        locked = self._flip_lock()
+        if locked:
             self._enhance_current()
 
     def _enhance_current(self):
         """Ask the gallery to enhance the slide on screen, if it wants one.
 
         The gallery decides whether it does — it is the one that knows whether
-        this image has already been enhanced, whether its Enhance-on-hold
+        this image has already been enhanced, whether its Enhance-on-lock
         switch is on at all, and an enhanced one wants nothing.  ``True`` back
         means a run started, and the note says so until the finished version
         arrives.
@@ -1097,7 +1097,7 @@ class SlideshowView(QWidget):
         if self._actions.enhance is None:
             return
         if self._playlist.current_is_live():
-            return  # no file yet to make a better version of; the hold still holds
+            return  # no file yet to make a better version of; the lock still holds
         prompt_id = self._current_prompt_id()
         if prompt_id is None or prompt_id in self._enhancing:
             return
@@ -1139,8 +1139,8 @@ class SlideshowView(QWidget):
         ``prompt_id`` -> ``"running"`` or ``"queued"``.
 
         Pushed in whenever it changes rather than asked for, because the show has
-        no way to tell: a hold launches a run and hears only that one started,
-        and a show of held slides has a line of them out at once with ComfyUI
+        no way to tell: a lock launches a run and hears only that one started,
+        and a show of locked slides has a line of them out at once with ComfyUI
         working through it one at a time. Without this the note claimed every one
         of them was being made the moment it was asked for.
 
@@ -1183,7 +1183,7 @@ class SlideshowView(QWidget):
     def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken order did and, when it launched a run
         (``prompt_id``), keep the note on that run once the flash fades — the
-        same note a hold's enhance earns, and it reads the same way: where the
+        same note a lock's enhance earns, and it reads the same way: where the
         run has got to, not merely that one was asked for."""
         if prompt_id is not None:
             self._enhancing.add(prompt_id)
@@ -1197,7 +1197,7 @@ class SlideshowView(QWidget):
 
     def _refresh_note(self):
         """Say what there is to say about the item on screen: the request being
-        spoken (which holds the show, so it outranks the rest), the one already
+        spoken (which stops the show, so it outranks the rest), the one already
         said and still being worked out, that this slide is still being made,
         where the version being made of it has got to, or — failing those —
         which of its versions this one is.
@@ -1248,10 +1248,10 @@ class SlideshowView(QWidget):
     def _reposition_note(self):
         self._note.reposition()
 
-    def _toggle_lock(self) -> bool:
-        """Flip the lock; returns whether the slide is now held.
+    def _flip_lock(self) -> bool:
+        """Flip the lock; returns whether the slide is now locked.
 
-        Locking also stars what is on screen: holding a slide is how the user says
+        Locking also stars what is on screen: locking a slide is how the user says
         this one is worth keeping, and having said it they should not have to say
         it twice in two ways.
         """
@@ -1263,7 +1263,7 @@ class SlideshowView(QWidget):
                 if prompt_id is not None:
                     self._actions.lock(prompt_id)
             return True
-        self._show_current()  # released, so the hold starts counting again
+        self._show_current()  # released, so the dwell starts counting again
         return False
 
     def _open_current(self):
@@ -1355,7 +1355,7 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Up:
             self._delete_current()  # cull this one and move on
         elif key == Qt.Key.Key_Down:
-            self._hold_current()    # hold it, favorite it, and enhance it
+            self._lock_current()    # lock it, favorite it, and enhance it
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
             # satellites: seeds, then actions, then off.
@@ -1384,9 +1384,9 @@ class SlideshowView(QWidget):
         """Leave, handing the gallery the item the show ended on if there is one.
 
         Enter names that item; so does a lock, which is the user saying this is
-        the one — so a show ended on a held slide lands on that slide, rather
+        the one — so a show ended on a locked slide lands on that slide, rather
         than leaving the gallery wherever it was before the show. Ended on a
-        slide nobody held (Escape, a double-click, the spoken "close", the last
+        slide nobody locked (Escape, a double-click, the spoken "close", the last
         item culled), it hands nothing over and leaves the gallery alone.
         """
         self._pane.clear()  # release any held file so it can be deleted
@@ -1396,8 +1396,8 @@ class SlideshowView(QWidget):
             landing = self._current_prompt_id()
         # Both cleared before a second close could read them, so the handover
         # happens once. The lock outlives the first emit because the gallery
-        # reads this show's state there, and a slide closed under a hold is one
-        # a reopened show holds.
+        # reads this show's state there, and a slide closed under a lock is one
+        # a reopened show locks.
         self._land_on = None
         self.closed.emit()
         self._playlist.unlock()

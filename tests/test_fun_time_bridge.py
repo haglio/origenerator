@@ -22,7 +22,7 @@ def _will_move_on(view) -> bool:
     finished clip, so there is no clock of the view's own to ask: what decides
     is the same three things that decided whether one was armed -- the room is
     not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.holding()
+    return (not view._paused and not view._playlist.locked_or_paused()
             and bool(view._dwell_s))
 
 
@@ -91,7 +91,7 @@ def test_a_verb_for_an_empty_region_is_dropped(qtbot, tmp_path):
     assert view.region_show("landscape") is None
 
 
-def test_lock_verb_holds_the_slide(qtbot, tmp_path, monkeypatch):
+def test_lock_verb_locks_the_slide(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
@@ -102,12 +102,12 @@ def test_lock_verb_holds_the_slide(qtbot, tmp_path, monkeypatch):
 
 
 def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
-    """The reset on the shared control band, spoken to a show: the hold
+    """The reset on the shared control band, spoken to a show: the lock
     releases and the top of the set comes back."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     show._playlist.jump_to(2)
-    show._toggle_lock()
+    show._flip_lock()
     assert show.locked
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_RESET\n", encoding="utf-8")
@@ -395,9 +395,9 @@ def test_a_show_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
     assert not _will_move_on(show)  # no dwell armed: it opened frozen
 
 
-def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkeypatch):
+def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path, monkeypatch):
     """Stepping a frozen show moves it to a new slide, but the new slide must
-    arrive holding — re-arming the dwell was the show quietly unpausing
+    arrive frozen — re-arming the dwell was the show quietly unpausing
     itself while the rest of the room stayed frozen."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -409,7 +409,7 @@ def test_a_step_while_paused_lands_on_a_slide_that_holds(qtbot, tmp_path, monkey
     bridge._tick()
 
     assert show._playlist.index == (before + 1) % 3  # the step still lands
-    assert not _will_move_on(show)                # but the slide holds
+    assert not _will_move_on(show)                # but the slide stays frozen
 
 
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):
@@ -429,7 +429,7 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:request no feet\n", encoding="utf-8")
     bridge._tick()
-    assert not begun  # still being said — the show holds rather than acting
+    assert not begun  # still being said — the show pauses rather than acting
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "PORTRAIT_SAY:over\n", encoding="utf-8")
@@ -482,7 +482,7 @@ def test_a_thumbnail_press_carries_its_path_through_the_colon_in_it(qtbot, tmp_p
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     jumps = []
-    monkeypatch.setattr(show, "show_item", lambda path, *, hold=False: jumps.append((path, hold)))
+    monkeypatch.setattr(show, "show_item", lambda path, *, lock=False: jumps.append((path, lock)))
 
     _press(bridge, tmp_path, r"portrait_lock_video|C:\fixtures\scene one.png")
 
@@ -639,7 +639,7 @@ def test_the_sessions_loop_key_reaches_the_show_on_that_side(qtbot, tmp_path, mo
     """Home and E are the session's loop keys, one per satellite; in
     origenerator mode they arrive here as the side's loop verb and step the
     show's loop.  A show of items no library maps has nothing to loop, so the
-    press is the hold — and the next lets go, the way a lone clip's is."""
+    press is the lock — and the next lets go, the way a lone clip's is."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 

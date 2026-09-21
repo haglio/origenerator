@@ -15,8 +15,15 @@ A literal that happens to match one of these but means something else — a glyp
 drawn the color of a hover frame, a caption the color of a selected border —
 stays a literal. Collapsing two meanings onto one token is what makes a palette
 impossible to change later.
+
+The last two names below are this app's words for colors the family owns, so
+they are read from `shared_ui.palette` rather than typed out again: the family
+has one blue and one green, and a second copy of either is a thing that drifts.
+`tests/test_family_colors.py` fails on any that is typed back in.
 """
 from __future__ import annotations
+
+from shared_ui.palette import BLUE, GREEN, as_hex
 
 # What a selected tile or version row is filled with, and the frame that says so.
 SELECTED_FILL = "#3a3a3a"
@@ -31,4 +38,8 @@ EMPTY_PLATE = "#2a2a2a"
 
 # The frame around something still being made — a queued enhancement, a card
 # whose generation is on the GPU.
-IN_FLIGHT_BORDER = "#3080e0"
+IN_FLIGHT_BORDER = as_hex(BLUE)
+
+# The lit edge an enhancement level wears while the row that would duplicate it
+# is hovered.
+MATCH_BORDER = as_hex(GREEN)

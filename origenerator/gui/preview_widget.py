@@ -52,9 +52,9 @@ from origenerator.gui.drag_thumbnail import (
     fit_thumbnail,
     label_thumbnail,
 )
-from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.video_surface import VideoSurface
+from origenerator.gui.video_timeline import VideoTimeline
 from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
@@ -84,7 +84,7 @@ class PreviewWidget(QWidget):
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  loop_videos: bool = True, allow_fullscreen: bool = True,
-                 show_funscript_strip: bool = False, mute_audio: bool = True,
+                 show_timeline: bool = False, mute_audio: bool = True,
                  on_double_click=None, on_press=None):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
@@ -131,8 +131,6 @@ class PreviewWidget(QWidget):
         self._audio = QAudioOutput(self)
         self._audio.setMuted(mute_audio)
 
-        # The media (image/video) fills the pane; an optional funscript strip rides
-        # along its lower edge, so a scripted clip shows its motion motion at a glance.
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -151,7 +149,7 @@ class PreviewWidget(QWidget):
         # Rescale the media whenever the label itself resizes — see eventFilter for
         # why this can't ride on the widget's own resizeEvent.
         self._image_label.installEventFilter(self)
-        # The media area itself resizes when the strip appears or goes, whichever
+        # The media area itself resizes when the timeline appears or goes, whichever
         # page is up -- and a video's page is not the label -- so what is placed
         # against the media's rect re-places off the host too (see eventFilter).
         media_host.installEventFilter(self)
@@ -210,15 +208,12 @@ class PreviewWidget(QWidget):
         self._controls = CornerControls(self)
         self._controls.triggered.connect(self._on_control)
 
-        # Opt-in funscript heatmap along the lower edge (the info-pane and fullscreen
-        # previews use it); hidden until a scripted video is shown.
-        self._strip = FunscriptStrip() if show_funscript_strip else None
-        if self._strip is not None:
-            outer.addWidget(self._strip)
-            self._strip.hide()
-            # Playback's position rides along the strip as a playhead, so a
-            # clip's length can be read off it while it plays.
-            self._player.positionChanged.connect(self._strip.set_playhead)
+        self._timeline = VideoTimeline() if show_timeline else None
+        if self._timeline is not None:
+            outer.addWidget(self._timeline)
+            self._timeline.hide()
+            self._player.durationChanged.connect(self._timeline.set_duration)
+            self._player.positionChanged.connect(self._timeline.set_position)
 
         # The real WMF backend can deadlock during Qt/Python shutdown if a player
         # is still active, so release it before the app quits. Injected test
@@ -238,7 +233,7 @@ class PreviewWidget(QWidget):
 
         This is what showing anything means, said once: the movie and the still
         are retired and the other pages put down (:meth:`_set_movie` clears the
-        combination and the wall), the motion strip drops, the playback stops,
+        combination and the wall), the timeline drops, the playback stops,
         the notice and the corner controls — both of which are about the picture
         being replaced, and so can no more outlive it than it can — go, and the
         pane records what it is about to be showing (``media``, or ``None`` for
@@ -253,7 +248,7 @@ class PreviewWidget(QWidget):
         """
         self._set_movie(None)
         self._pixmap = None
-        self._hide_strip()
+        self._hide_timeline()
         self._unplayable_report.stop()
         if stop_player:
             self._stop_playback()
@@ -295,7 +290,7 @@ class PreviewWidget(QWidget):
         self._player.play()
         if omnipause.frozen():
             self._player.pause()  # a clip loaded into a frozen room opens held
-        self._update_strip(path)  # …and wears its funscript, if it has one
+        self._show_timeline(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
         """Display one in-progress preview frame from raw encoded image bytes.
@@ -480,7 +475,7 @@ class PreviewWidget(QWidget):
         slideshows' neighbor stills) needs to know to keep clear of the picture.
         Falls back to the whole media area whenever the drawn size isn't
         knowable yet -- a video whose resolution hasn't arrived, or nothing on
-        screen at all -- and never to the strip along the foot, which is no
+        screen at all -- and never to the timeline along the foot, which is no
         picture: a corner chip laid over it, attached to the video's lower edge.
         """
         drawn = self._drawn_size()
@@ -489,8 +484,8 @@ class PreviewWidget(QWidget):
         rect = QRect(QPoint(0, 0), drawn)
         # Centered on the media area itself, not on the label: a stacked layout
         # sizes only the page it is showing, so while a video is up the label
-        # keeps whatever geometry it last had -- the pane's before the strip
-        # took its rows -- and a rect centered on it sits low by half the strip.
+        # keeps whatever geometry it last had -- the pane's before the timeline
+        # took its rows -- and a rect centered on it sits low by half the timeline.
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
@@ -607,22 +602,18 @@ class PreviewWidget(QWidget):
         self._place_controls()
         super().resizeEvent(event)
 
-    def _update_strip(self, video_path) -> None:
-        """Aim the funscript strip at ``video_path``'s script, showing it only when
-        one exists — so the strip's presence is itself the "this clip has a script"
-        cue (the same script the OSR2 drive would read for this video)."""
-        if self._strip is None:
+    def _show_timeline(self, video_path) -> None:
+        if self._timeline is None:
             return
         actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
                    if video_path else [])
-        self._strip.set_actions(actions)
-        self._strip.setVisible(bool(actions))
+        self._timeline.set_actions(actions)
+        self._timeline.setVisible(bool(video_path))
 
-    def _hide_strip(self) -> None:
-        """Drop the strip whenever the pane isn't showing a video."""
-        if self._strip is not None:
-            self._strip.set_actions([])
-            self._strip.hide()
+    def _hide_timeline(self) -> None:
+        if self._timeline is not None:
+            self._timeline.set_actions([])
+            self._timeline.hide()
 
     def current_video_path(self):
         """The on-disk video currently shown, or ``None`` for an image/placeholder/

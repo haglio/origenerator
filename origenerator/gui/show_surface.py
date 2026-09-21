@@ -29,7 +29,6 @@ import logging
 import os
 from pathlib import Path
 
-from app_support.funscript import read_actions
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
@@ -41,9 +40,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, project_dir
-from origenerator.funscript import funscript_of
-from origenerator.gui.funscript_strip import FunscriptStrip
+from origenerator.config import project_dir
 from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
@@ -108,12 +105,6 @@ class ShowSurface(QWidget):
         self._engine_pane = _EnginePane(self)
         self._stack.addWidget(self._engine_pane)
 
-        # A scripted clip shows its motion along the lower edge, as the inline
-        # pane does for the same file.
-        self._strip = FunscriptStrip(self)
-        self._strip.hide()
-        outer.addWidget(self._strip)
-
         # The engine is handed a window, so it cannot exist before there is
         # one to hand it.  Until the pane is first shown -- and where the
         # platform has no windows in it at all -- what stands in for the
@@ -166,7 +157,6 @@ class ShowSurface(QWidget):
         self._dims = (0, 0)
         self._engine.load(Path(path))
         self._engine.set_paused(self._paused)
-        self._update_strip(str(path) if media_type == MediaType.VIDEO else None)
 
     def current_media_path(self) -> str:
         return str(self._media[0]) if self._media else ""
@@ -209,8 +199,6 @@ class ShowSurface(QWidget):
         self._frame = None
         self._picture.clear()
         self._picture.setText("")
-        self._strip.set_actions([])
-        self._strip.hide()
         self._stack.setCurrentWidget(self._picture)
 
     def _draw_the_frame(self) -> None:
@@ -316,12 +304,6 @@ class ShowSurface(QWidget):
         elif self._engine.eof:
             self._said = True
             self.media_ended.emit()
-
-    def _update_strip(self, video_path) -> None:
-        actions = (read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
-                   if video_path else [])
-        self._strip.set_actions(actions)
-        self._strip.setVisible(bool(actions))
 
 
 def _offer_the_copy_beside_the_checkouts() -> None:

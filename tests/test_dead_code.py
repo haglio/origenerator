@@ -214,7 +214,14 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the maintenance record's account of its fields went as it gained the inbox,
 # and the send button's note that it re-reads the row before it redraws is
 # test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send.
-MAX_PROSE_LINES = 18930
+#
+# 18907 when every video gained the players' own timeline: the notes on what the
+# track is, what its fill says, where the cursor rides, and when a pane has no
+# room for one are test_the_track_is_framed_the_way_the_players_frame_theirs,
+# test_a_scripted_video_fills_its_timeline_with_the_motion,
+# test_the_cursor_rides_the_videos_own_length and
+# test_a_pane_with_no_room_for_a_track_draws_nothing.
+MAX_PROSE_LINES = 18907
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -305,7 +305,7 @@ class GenerateConfigPanel(QWidget):
         """The pane leading the column: a running re-roll's frames (driven from
         outside), the browsed generation's output when one is loaded, and the
         newest matching result otherwise."""
-        self._preview = PreviewWidget(show_funscript_strip=True)
+        self._preview = PreviewWidget(show_timeline=True)
         # Dragging the shown generation out of the preview onto a combine slot, like a
         # gallery thumbnail: relay the drag start/end so the view can light the slots.
         self._preview.drag_out.started.connect(self.preview_drag_started)

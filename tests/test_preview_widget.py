@@ -629,28 +629,28 @@ def test_a_pane_whose_picture_went_to_a_sessions_player_goes_on_taking_runs_and_
     assert show.channel.command_file.read_text(encoding="utf-8") == handed_over
 
 
-# --- funscript strip: proof a shown video carries a funscript -----------
+# --- the video's timeline -----------------------------------------------
 
-def _strip_preview(qtbot):
-    w = PreviewWidget(player=MagicMock(), show_funscript_strip=True)
+def _timeline_preview(qtbot):
+    w = PreviewWidget(player=MagicMock(), show_timeline=True)
     qtbot.addWidget(w)
     return w
 
 
-def test_no_strip_unless_opted_in(make_preview, tmp_path):
-    w = make_preview()  # the default (slideshow/plain) preview has no strip
-    assert w._strip is None
+def test_no_timeline_unless_opted_in(make_preview, tmp_path):
+    w = make_preview()  # the default (slideshow/plain) preview has no timeline
+    assert w._timeline is None
     w.show_video(_scripted_video(tmp_path))  # still works without one
 
 
-def test_scripted_video_shows_its_heatmap_strip(qtbot, tmp_path):
-    w = _strip_preview(qtbot)
+def test_a_scripted_video_fills_its_timeline_with_the_motion(qtbot, tmp_path):
+    w = _timeline_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
-    assert w._strip._actions
-    assert not w._strip.isHidden()
+    assert w._timeline._actions
+    assert not w._timeline.isHidden()
 
 
-def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeypatch):
+def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monkeypatch):
     """Where new scripts go: a folder under the output dir, keyed by the clip's
     name rather than by sitting next to it."""
     monkeypatch.setattr(preview_widget, "COMFYUI_OUTPUT_DIR", tmp_path)
@@ -659,87 +659,101 @@ def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeyp
     write_funscript(funscript_path_for(vid, output_dir=tmp_path),
                     synthesize_actions(2.0, hz=1.0, loop=False))
 
-    w = _strip_preview(qtbot)
+    w = _timeline_preview(qtbot)
     w.show_video(vid)
 
-    assert w._strip._actions
-    assert not w._strip.isHidden()
+    assert w._timeline._actions
+    assert not w._timeline.isHidden()
 
 
-def test_the_corners_keep_off_the_strip_while_a_videos_size_is_unknown(qtbot, tmp_path):
+def test_the_corners_keep_off_the_timeline_while_a_videos_size_is_unknown(qtbot, tmp_path):
     # A clip's resolution arrives late, or never (a backend need not report it),
     # and until it does the picture is taken to be the whole media area. That
-    # is not the whole pane: the strip along the foot is no picture, and a
+    # is not the whole pane: the timeline along the foot is no picture, and a
     # chip laid over it read as a dark tab hanging off the video's lower edge.
-    w = _strip_preview(qtbot)
+    w = _timeline_preview(qtbot)
     w.resize(320, 480)
     w.show()
     w.show_video(_scripted_video(tmp_path))
     w.set_actions("gen-1")
     w.layout().activate()
-    strip_top = w._strip.geometry().top()
-    assert not w._strip.isHidden() and strip_top > 0
-    assert w.media_rect().bottomLeft().y() < strip_top
-    assert all(b.geometry().bottomLeft().y() < strip_top
+    timeline_top = w._timeline.geometry().top()
+    assert not w._timeline.isHidden() and timeline_top > 0
+    assert w.media_rect().bottomLeft().y() < timeline_top
+    assert all(b.geometry().bottomLeft().y() < timeline_top
                for b in w._controls.buttons())
 
 
-def test_the_strip_follows_playback_position(qtbot, tmp_path):
-    # The player's position drives the strip's playhead, so the strip says how
+def test_the_cursor_follows_playback_position(qtbot, tmp_path):
+    # The player's position drives the timeline's playhead, so the timeline says how
     # far into the clip playback is -- which is how long the clip is, at a glance.
-    w = _strip_preview(qtbot)
+    w = _timeline_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     follow = w._player.positionChanged.connect.call_args.args[0]
     follow(1500)
-    assert w._strip._playhead == 1500
+    assert w._timeline._position == 1500
     w.show_video(_scripted_video(tmp_path, name="next.mp4"))
-    assert w._strip._playhead is None
+    assert w._timeline._position is None
 
 
-def test_the_corners_follow_the_picture_when_the_strip_takes_its_room(qtbot, tmp_path):
-    # The strip appears with the clip, a layout pass later, and takes its rows
+def test_the_timeline_takes_the_clips_length_from_the_player(qtbot, tmp_path):
+    # The length is the axis the playhead rides, and it arrives from the
+    # backend a beat after the video does -- unfed, the timeline has nowhere to
+    # put the mark and a playing video carries none.
+    w = _timeline_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    length = w._player.durationChanged.connect.call_args.args[0]
+    length(4000)
+    assert w._timeline._duration == 4000
+
+
+def test_the_corners_follow_the_picture_when_the_timeline_takes_its_room(qtbot, tmp_path):
+    # The timeline appears with the video, a layout pass later, and takes its rows
     # from the media area. A clip whose resolution is known is placed against
     # the video surface, so the corners have to be re-placed when that surface
     # shrinks; placed once, against the pane as it was, the bin chip stayed
-    # straddling the video's lower edge and the strip.
+    # straddling the video's lower edge and the timeline.
 
     player = MagicMock()
     player.metaData.return_value.value.side_effect = (
         lambda key: QSize(480, 864) if key == QMediaMetaData.Key.Resolution else None)
-    w = PreviewWidget(player=player, show_funscript_strip=True)
+    w = PreviewWidget(player=player, show_timeline=True)
     qtbot.addWidget(w)
     w.resize(320, 480)
     w.show()
     w.layout().activate()
     w.show_video(_scripted_video(tmp_path))
-    w.set_actions("gen-1")     # placed before the strip has its room...
+    w.set_actions("gen-1")     # placed before the timeline has its room...
     w.layout().activate()      # ...which it takes here
-    strip_top = w._strip.geometry().top()
-    assert not w._strip.isHidden() and strip_top > 0
-    assert w.media_rect().bottomLeft().y() < strip_top
-    assert all(b.geometry().bottomLeft().y() < strip_top
+    timeline_top = w._timeline.geometry().top()
+    assert not w._timeline.isHidden() and timeline_top > 0
+    assert w.media_rect().bottomLeft().y() < timeline_top
+    assert all(b.geometry().bottomLeft().y() < timeline_top
                for b in w._controls.buttons())
 
 
-def test_video_without_a_funscript_hides_the_strip(qtbot, tmp_path):
-    w = _strip_preview(qtbot)
+def test_a_video_without_a_funscript_still_gets_its_timeline(qtbot, tmp_path):
+    # Every video carries a timeline, scripted or not -- the same rule the
+    # family's players go by. What the script decides is the fill: its motion
+    # heatmap where there is one, a plain track where there is not.
+    w = _timeline_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")  # no sidecar written
-    assert not w._strip._actions
-    assert w._strip.isHidden()
+    assert not w._timeline._actions
+    assert not w._timeline.isHidden()
 
 
-def test_showing_an_image_hides_the_strip(qtbot, tmp_path):
-    w = _strip_preview(qtbot)
+def test_showing_an_image_takes_the_timeline_away(qtbot, tmp_path):
+    w = _timeline_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     w.show_image(_make_png(tmp_path / "p.png"))
-    assert w._strip.isHidden()
+    assert w._timeline.isHidden()
 
 
-def test_clearing_hides_the_strip(qtbot, tmp_path):
-    w = _strip_preview(qtbot)
+def test_clearing_takes_the_timeline_away(qtbot, tmp_path):
+    w = _timeline_preview(qtbot)
     w.show_video(_scripted_video(tmp_path))
     w.clear()
-    assert w._strip.isHidden()
+    assert w._timeline.isHidden()
 
 
 # --- dragging the shown generation out to a combine slot --------------------

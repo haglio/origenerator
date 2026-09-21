@@ -56,10 +56,10 @@ def test_the_pace_a_picture_holds_for_goes_to_the_engine(qtbot):
 
 
 def test_an_item_that_ran_out_is_said_once(qtbot, tmp_path):
-    clip = tmp_path / "made-up.mp4"
-    clip.write_bytes(b"")
+    video = tmp_path / "made-up.mp4"
+    video.write_bytes(b"")
     surface, engine = _surface(qtbot)
-    surface.show_media(str(clip), MediaType.VIDEO)
+    surface.show_media(str(video), MediaType.VIDEO)
     ended = []
     surface.media_ended.connect(lambda: ended.append(1))
 
@@ -71,10 +71,10 @@ def test_an_item_that_ran_out_is_said_once(qtbot, tmp_path):
 
 
 def test_a_file_that_would_not_open_is_said_rather_than_waited_out(qtbot, tmp_path):
-    clip = tmp_path / "made-up.mp4"
-    clip.write_bytes(b"")
+    video = tmp_path / "made-up.mp4"
+    video.write_bytes(b"")
     surface, engine = _surface(qtbot)
-    surface.show_media(str(clip), MediaType.VIDEO)
+    surface.show_media(str(video), MediaType.VIDEO)
     refused = []
     surface.media_unplayable.connect(lambda: refused.append(1))
 

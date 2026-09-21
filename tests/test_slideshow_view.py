@@ -960,8 +960,7 @@ def _inflight(**kw):
 
 
 def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):
-    # The lower strip that normally carries it is under this view, and a show
-    # is when the queue stops moving: its videos are held until it ends.
+    # A show is when the queue stops moving: its videos are held until it ends.
     view = _view(qtbot)
     view.resize(1920, 1080)
     QApplication.sendEvent(view, QResizeEvent(QSize(1920, 1080), QSize(640, 480)))
@@ -1626,15 +1625,6 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     # Filling the screen with a clip is deliberate, so it's heard.
     view = _view(qtbot)
     assert view._pane.audio_muted() is False
-
-
-def test_a_scripted_clip_shows_its_strip(qtbot, tmp_path):
-    vid = tmp_path / "c.mp4"
-    write_funscript(legacy_funscript_path_for(vid),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
-    view = _view(qtbot, [(str(vid), "video")])
-    assert view._pane._strip is not None
-    assert view._pane._strip._actions
 
 
 def test_closing_releases_the_video_file(qtbot, tmp_path):

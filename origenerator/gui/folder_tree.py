@@ -6,7 +6,7 @@ further left, a delete. Because that space is the row's existing indentation, th
 icons appear there on hover without moving the text at all. The star doubles as
 the favorited indicator: filled and always shown for a favorited leaf, an outline
 offered on hover otherwise, so clicking it to favorite a folder just leaves the star
-in place. Clicking an icon emits ``star_clicked`` / ``delete_clicked`` with the
+in place. Clicking an icon emits ``favorite_clicked`` / ``delete_clicked`` with the
 folder's key instead of selecting the row; the tree hit-tests clicks against the
 same rects it paints. Only a left click ever works the caret: a right one just
 picks the row it lands on, so opening a folder's menu never shuts the folder. A
@@ -172,12 +172,11 @@ class FolderTree(QTreeWidget):
         group = self._leaf_group(index)
         if group is None:
             return
-        favorite = bool(getattr(group, "starred", False))
         hovered = index.data(TREE_KEY_ROLE) == self._hover_key
-        if not (favorite or hovered):
+        if not (group.favorite or hovered):
             return
         star_rect, delete_rect = _action_rects(self.visualRect(index))
-        (self._star_on if favorite else self._star).paint(painter, star_rect)
+        (self._star_on if group.favorite else self._star).paint(painter, star_rect)
         if hovered:
             self._delete.paint(painter, delete_rect)
 

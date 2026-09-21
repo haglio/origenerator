@@ -606,6 +606,18 @@ def _around(prompt_id):
                         group=(other_act,))
 
 
+def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot):
+    """A row holding only the picture on screen cannot be looped, and the press
+    still means "this one" — so it locks the picture, the way a satellite's loop
+    button locks a clip whose group holds only it, rather than refusing."""
+    view = _view(qtbot, _KEYED)                  # no neighbors: every row is one picture
+
+    view.show_loop("seed")
+
+    assert view._playlist.locked is True
+    assert view._note.text() == "Locked"
+
+
 def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
     browsing = [*_KEYED, ("z.png", "image", "id-z")]     # more than one row, so nothing loops yet
     view = _view(qtbot, browsing, actions=ShowActions(neighbors=_around))

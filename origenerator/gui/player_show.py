@@ -455,7 +455,17 @@ class PlayerShow(QObject):
         if self._set.start_loop(axis):
             self._note(looping_note(self._set))
         else:
-            self._note("Nothing to loop", kind=WARNING)
+            self._lock_instead_of_looping()
+
+    def _lock_instead_of_looping(self) -> None:
+        """Tell the player to lock what it is showing: the answer a loop asked
+        of a row of one gets on a player of its own, where the loop button of a
+        group holding one clip locks that clip.  A row that size is the picture
+        itself, so the press means "this one" rather than nothing; and a lock is
+        not a loop, so a loop that was running is dropped."""
+        self._set.end_loop()
+        self.set_held(True)
+        self._note("Locked")
 
     def show_loop_cycle(self) -> None:
         """The loop key: seeds, then actions, then off — and the lock when

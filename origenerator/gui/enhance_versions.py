@@ -72,7 +72,7 @@ _PLUS = _TILE * 2 // 3
 # the same wherever it shows.
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 # The lit edge a level wears while the row that would duplicate it is hovered.
-_MATCH_BORDER = "2px solid #30a030"
+_MATCH_BORDER = f"2px solid {palette.MATCH_BORDER}"
 # Which grid column a fact's value sits in: the one that stretches, and the one
 # cell of a line that fills its height rather than sitting at the top of it.
 _VALUE_COLUMN = 1

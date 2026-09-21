@@ -34,9 +34,9 @@ from player_core.file_channel import (
 )
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from origenerator.console_commands import side_press, side_spoken_to
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.show_buttons import answer
-from origenerator.gui.show_hud import split_press
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +46,6 @@ _SIDES = ("portrait", "landscape")
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
-
-
-def _side_of(keyword: str) -> str | None:
-    """Which side a verb is said to — ``PORTRAIT_NEXT``, or the one spelled
-    the other way round, ``FILTER_PORTRAIT_<row>`` — or ``None`` for neither."""
-    for side in _SIDES:
-        if keyword.startswith((f"{side.upper()}_", f"FILTER_{side.upper()}_")):
-            return side
-    return None
 
 
 def _split_argument(line: str) -> tuple[str, str, str]:
@@ -128,11 +119,11 @@ class FunTimeBridge(QObject):
         if not marker and keyword in self._session_verbs:
             self._session_verbs[keyword]()
             return
-        side = _side_of(keyword)
+        side = side_spoken_to(keyword, _SIDES)
         if side is None:
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
-        action, argument = split_press(side, keyword.lower(), argument)
+        action, argument = side_press(side, keyword.lower(), argument)
         action = action.upper()
         if action == "SAY" and marker == ":":
             # The session owns the microphone for the whole room, so a spoken

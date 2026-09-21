@@ -40,6 +40,7 @@ from player_core.robot_hand import (
 )
 
 from origenerator import motion_engine
+from origenerator.console_commands import level_asked_for
 from origenerator.gui.console_buttons import console_rows, device_rows
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
@@ -234,12 +235,12 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
     """
     if not action:
         return False
-    if action.startswith("robot_hand_") and "_" in action[11:]:
-        axis, _, value = action[11:].rpartition("_")
-        if value.isdigit() and axis in ("amp", "center", "speed"):
-            {"amp": motion.set_amplitude, "center": motion.set_center,
-             "speed": motion.set_speed}[axis](int(value))
-            return True
+    level = level_asked_for(action)
+    if level is not None:
+        {drive_layout.AMPLITUDE: motion.set_amplitude,
+         drive_layout.CENTER: motion.set_center,
+         drive_layout.SPEED: motion.set_speed}[level.axis](level.value)
+        return True
     step = {
         "robot_hand_speed_up": (motion.adjust_speed, 5),
         "robot_hand_speed_down": (motion.adjust_speed, -5),

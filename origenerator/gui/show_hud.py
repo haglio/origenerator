@@ -72,6 +72,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from origenerator.console_commands import side_press, spelled_for
 from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.gui.show_buttons import answer, show_rows
@@ -102,17 +103,6 @@ _THE_SHOWS_OWN = frozenset({
 
 def _cell(slide, label: str = "") -> HudCell:
     return HudCell(path=str(slide.path), thumb=thumb_of(slide), label=label)
-
-
-def split_press(side: str, verb: str, argument: str = "") -> tuple[str, str]:
-    """A press as the panel spells it, taken apart into what it asks and what
-    it carries: ``<side>_<action>`` and its ``|`` payload for most, and — the
-    one verb spelled the other way round — ``filter_<side>_<row>``, whose
-    payload is the row it names."""
-    filtering = f"filter_{side}_"
-    if verb.startswith(filtering):
-        return "filter", verb[len(filtering):]
-    return verb.removeprefix(f"{side}_"), argument
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
@@ -362,7 +352,7 @@ class ShowHud(QLabel):
         if not command:
             return
         verb, _, path = command.partition("|")
-        action, path = split_press(self._side, verb, path)
+        action, path = side_press(self._side, verb, path)
         if action in _THE_SHOWS_OWN:
             # The two filters, reset, the loops, the expand mark and the map's
             # own clicks mean on a show what they mean on a player, and the
@@ -376,11 +366,9 @@ class ShowHud(QLabel):
         if self._dashboard_cmd_file is None:
             self._act_here(action)
             return
-        allowed = (
-            "satellites_video_activate", "origenerator_activate",
-            f"{self._side}_prev", f"{self._side}_next",
-            f"{self._side}_lock", f"{self._side}_trash",
-        )
+        allowed = ("satellites_video_activate", "origenerator_activate",
+                   *(spelled_for(self._side, verb)
+                     for verb in ("prev", "next", "lock", "trash")))
         if command in allowed:
             append_command(self._dashboard_cmd_file, command)
 

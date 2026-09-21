@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 
 from origenerator.gallery.enhance import enhancement_recency
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
@@ -60,6 +61,7 @@ from origenerator.gallery.labels import (
     settings_label,
     workflow_label,
 )
+from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.output import (
     is_in_progress,
     media_type_of_row,
@@ -348,8 +350,7 @@ def recent_generations(rows: list[dict]) -> list[dict]:
     is looked for on Latest. An experiment has a shelf of its own and is left
     out. As in the tree, only rows that produced an output file appear — the
     shelf is a gallery of results, so a failed or in-flight run with nothing to
-    show doesn't surface. ``rows`` arrive newest-first (the caller lists them by
-    descending id), so the result is too.
+    show doesn't surface.
 
     An image being enhanced, or lately enhanced, sits where the *enhancement*
     falls in that order rather than where its own generation does
@@ -372,17 +373,13 @@ def recent_generations(rows: list[dict]) -> list[dict]:
         if source_of(row) != GenerationSource.EXPERIMENT
         and produced_output(row)
     ]
-    # Ids are the order the caller already handed them in, so a row with no
-    # enhancement sorts exactly where it arrived, and rows that tie (a caller
-    # holding rows with no id at all) keep the order they came in — this only
-    # ever lifts an image its enhancement has moved ahead of.
     bumped = enhancement_recency(rows)
     return sorted(listed, reverse=True, key=lambda row: row_recency(row, bumped))
 
 
-def row_recency(row: dict, bumped: dict[str, int]) -> int:
-    """Where ``row`` falls in the library's order: its own place, or that of the
-    newest enhancement made of it, whichever is later.
+def row_recency(row: dict, bumped: dict[str, tuple[datetime, int]]) -> tuple[datetime, int]:
+    """Where ``row`` falls in the library's order: when it landed, then the id
+    it was asked under — each its own or its newest enhancement's, whichever is later.
 
     ``bumped`` is :func:`~origenerator.gallery.enhance.enhancement_recency` over
     the same rows. An image being enhanced is being worked on now, so it counts
@@ -390,7 +387,14 @@ def row_recency(row: dict, bumped: dict[str, int]) -> int:
     — which is what puts it at the head of the Latest shelf and what marks the
     folder it sits in as lately worked in.
     """
-    return max(bumped.get(row.get("prompt_id"), 0), row.get("id") or 0)
+    enhanced_at, enhanced_by = bumped.get(row.get("prompt_id"), (BEFORE_EVERY_RECORD, 0))
+    return (max(_joined_the_library_at(row), enhanced_at),
+            max(row.get("id") or 0, enhanced_by))
+
+
+def _joined_the_library_at(row: dict) -> datetime:
+    found_on_disk = source_of(row) == GenerationSource.IMPORTED
+    return moment_of(row.get("created_at") if found_on_disk else row.get("completed_at"))
 
 
 # How many folders the table of contents marks as lately worked in. A sitting
@@ -421,7 +425,7 @@ def recently_worked_folders(
     portrait-shaped ever touched.
     """
     bumped = enhancement_recency(rows)
-    ranked: list[tuple[int, tuple[str, str]]] = []
+    ranked: list[tuple[tuple[datetime, int], tuple[str, str]]] = []
 
     def walk(group, side: str) -> None:
         children = child_groups(group)
@@ -431,15 +435,15 @@ def recently_worked_folders(
             return
         freshest = max(
             (row_recency(row, bumped) for row in getattr(group, "rows", ())),
-            default=0,
+            default=None,
         )
-        if freshest:
+        if freshest is not None:
             ranked.append((freshest, (side, group.key)))
 
     for side, model in trees.items():
         for group in model:
             walk(group, side)
-    ranked.sort(key=lambda entry: -entry[0])
+    ranked.sort(key=lambda entry: entry[0], reverse=True)
     return {folder for _freshest, folder in ranked[:limit]}
 
 

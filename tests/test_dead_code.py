@@ -193,7 +193,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_video_of_unknown_length_gets_no_funscript, and that a script which cannot be
 # written never strands the video is
 # test_a_script_that_cannot_be_written_never_strands_a_finished_video.
-MAX_PROSE_LINES = 19109
+#
+# 19107 when Latest began listing things by when they landed, not by when they
+# were asked for: the sort's note that rows saying nothing of when they landed
+# keep the order they came in is
+# test_recent_generations_keeps_rows_that_do_not_say_when_they_landed_in_the_order_asked.
+MAX_PROSE_LINES = 19107
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

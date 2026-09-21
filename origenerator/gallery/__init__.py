@@ -12,6 +12,7 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.output` — what a generation produced on disk: media type, preview, files.
 * :mod:`.labels` — the human-facing folder and Generate-tab names.
 * :mod:`.source_image` — linking an i2v video to the image that seeded its frame.
+* :mod:`.moments` — the moment a stored stamp names, whichever way it was written.
 * :mod:`.time_sections` — where a newest-first listing breaks between one sitting
   and the next, and what each section's heading says about when it was made.
 * :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->

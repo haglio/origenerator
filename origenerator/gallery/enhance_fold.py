@@ -50,19 +50,20 @@ from origenerator.media import MediaType
 logger = logging.getLogger(__name__)
 
 
-def _history_entries(files: list[dict], params: dict,
-                     run_id: int | None) -> list[dict]:
+def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list[dict]:
     """One ``enhance_history`` entry per file this enhance produced: the file's
     name, the settings that made it — so a level can name its own settings even
-    after the transient job row is gone — and ``run_id``, the id that row had.
+    after the transient job row is gone — and ``run_id`` and ``finished_at``,
+    the id that row had and when its run finished.
 
-    The id is kept for the same reason: the row about to be deleted is what said
-    where this enhancement falls in the library's order, and the image it
+    Those two are kept for the same reason: the row about to be deleted is what
+    said where this enhancement falls in the library's order, and the image it
     upgraded sorts on the shelf by the newest one it has received
     (:func:`enhancement_recency`)."""
     settings = level_settings(params)
     return [
-        {"filename": f.get("filename"), "params": settings, "run_id": run_id}
+        {"filename": f.get("filename"), "params": settings,
+         "run_id": enhance_row.get("id"), "finished_at": enhance_row.get("completed_at")}
         for f in files if f.get("filename")
     ]
 
@@ -108,8 +109,7 @@ def fold_enhancement(db, enhance_row: dict,
     updates = {
         "output_files": json.dumps(enhanced_files + row_output_files(source)),
         "enhance_history": json.dumps(
-            _history_entries(enhanced_files, enhance_level_params(enhance_row),
-                             enhance_row.get("id"))
+            _history_entries(enhanced_files, enhance_level_params(enhance_row), enhance_row)
             + parse_file_list(source.get("enhance_history"))
         ),
     }
@@ -175,9 +175,10 @@ def disown_foreign_runs(db) -> int:
 
     A level records the id of the transient row its enhancement ran under
     (:func:`_history_entries`), and the Recents shelf seats an enhanced image by
-    that number — the image belongs where its newest enhancement falls in the
-    library's order, not where its own generation does. So an id from somewhere
-    else seats the image somewhere meaningless.
+    that number wherever the level does not also say when the run finished — the
+    image belongs where its newest enhancement falls in the library's order, not
+    where its own generation does. So an id from somewhere else seats the image
+    somewhere meaningless.
 
     Which is what a preview used to strand here. A branch session kept its own
     database, seeded from this one and counting on from where this one had

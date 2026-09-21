@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta, tzinfo
 from itertools import accumulate
 
+from origenerator.gallery.moments import moment_of
+
 BREAK_BETWEEN_SECTIONS = timedelta(hours=2)
 
 _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -17,7 +19,7 @@ def section_headings(rows, *, zone: tzinfo | None = None,
         return [None] * len(rows)
     if today is None:
         today = datetime.now(UTC).astimezone(zone).date()
-    made = [_made_at(stamp).astimezone(zone) for stamp in stamps]
+    made = [moment_of(stamp).astimezone(zone) for stamp in stamps]
     placed = list(accumulate(reversed(made), max))[::-1]
     starts = [index for index in range(len(placed))
               if index == 0 or placed[index - 1] - placed[index] >= BREAK_BETWEEN_SECTIONS]
@@ -31,12 +33,8 @@ def new_work_opens_a_section(rows, *, now: datetime | None = None) -> bool:
     stamps = [row.get("created_at") for row in rows]
     if not stamps or not all(stamps):
         return False
-    newest = max(_made_at(stamp) for stamp in stamps)
+    newest = max(moment_of(stamp) for stamp in stamps)
     return (now or datetime.now(UTC)) - newest >= BREAK_BETWEEN_SECTIONS
-
-
-def _made_at(stamp: str) -> datetime:
-    return datetime.fromisoformat(stamp).replace(tzinfo=UTC)
 
 
 def _heading(*, oldest: datetime, newest: datetime, today: date) -> str:

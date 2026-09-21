@@ -595,6 +595,97 @@ def test_the_loop_button_over_a_row_opened_looping_ends_the_loop():
     assert show_set.map().loop == ""
 
 
+def _falls_back(answer=True):
+    """A surface that takes another set when asked, and says whether it did."""
+    asked = []
+
+    def fall_back():
+        asked.append(True)
+        return answer
+
+    return fall_back, asked
+
+
+def test_a_loop_over_a_set_that_is_one_row_ends_somewhere_else_entirely():
+    """A set that is one row has nothing to browse — the row played whole is
+    the row looping — so ending the loop into it would take the rectangle off
+    the map and leave the very same pictures coming round."""
+    show_set, dealt = _set(items=_ROW, neighbors=_row_mates)
+    fall_back, asked = _falls_back()
+
+    assert show_set.end_loop(fall_back) is True
+
+    assert asked == [True]
+    assert show_set.loop is None
+    assert dealt == []          # the set fallen back to is dealt by the surface
+
+
+def test_a_loop_with_a_set_under_it_ends_into_that_set_rather_than_falling_back():
+    """Three pictures of which one has a row: the loop was a narrowing of a
+    real browse, and the browse is what it ends into."""
+    show_set, dealt = _mapped()
+    show_set.start_loop("seed")
+    fall_back, asked = _falls_back()
+    dealt.clear()
+
+    assert show_set.end_loop(fall_back) is True
+
+    assert asked == []
+    assert dealt == [True]
+    assert _ids(show_set.playlist.items) == ["id-1", "id-2", "id-3"]
+
+
+def test_a_loop_whose_way_out_has_nothing_to_play_ends_into_the_set_as_ever():
+    """Nowhere to fall back to is no reason to leave the screen blank: the row
+    comes back up and only the rectangle goes."""
+    show_set, dealt = _set(items=_ROW, neighbors=_row_mates)
+    fall_back, asked = _falls_back(answer=False)
+
+    assert show_set.end_loop(fall_back) is True
+
+    assert asked == [True]
+    assert dealt == [True]
+    assert _ids(show_set.playlist.items) == ["id-1", "id-1b", "id-1c"]
+
+
+def test_the_loop_key_stepped_off_a_row_falls_back_the_same_way():
+    """The key's off stop is the off button: one press of Home over a folder
+    with no acts to loop leaves the folder."""
+    show_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
+    fall_back, asked = _falls_back()
+
+    assert show_set.step_loop(fall_back) == "off"
+
+    assert asked == [True]
+
+
+def test_a_set_taken_up_under_the_slide_on_screen_plays_on_from_it():
+    """What a loop falls back to: the picture on screen goes on playing and
+    only what comes after it is the new set, the way a satellite's browse
+    resumes under the clip it was looping."""
+    show_set, dealt = _set()
+    show_set.playlist.jump_to(1)
+    wider = [("two.png", "image", "id-2"), ("nine.png", "image", "id-9")]
+
+    show_set.reorder(wider, latest=True, keep_slide=True)
+
+    assert dealt == [True]
+    assert show_set.current_prompt_id() == "id-2"
+    assert _pass(show_set) == ["id-2", "id-9"]
+
+
+def test_a_set_taken_up_under_the_slide_is_no_row_to_be_dealt_as_a_loop():
+    """A set read as a row would be a loop again — the press that ended one
+    putting it straight back.  Played from the top it is that row as ever."""
+    show_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
+
+    show_set.reorder(_ROW, latest=True, keep_slide=True)
+    assert show_set.loop is None
+
+    show_set.reorder(_ROW, latest=True)
+    assert show_set.loop is not None
+
+
 def test_a_new_set_that_is_one_row_is_taken_up_looping_too():
     show_set, _dealt = _set(neighbors=_row_mates)
     assert show_set.map().loop == ""

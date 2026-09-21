@@ -16,6 +16,7 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PyQt6.QtCore import Qt
 
 from origenerator import gallery
@@ -84,6 +85,7 @@ class FakeShow:
         self.resumed = None
         self.retuned = None
         self.reordered = None
+        self.kept_the_slide = None
         self.dwell_s = None
         self.paused = None
         self.audio_muted = None
@@ -98,6 +100,7 @@ class FakeShow:
         self.visible = True
         self.live = False
         self.ids = set()
+        self.hud_order_label = SHUFFLE_LABEL
         self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
         self.enhanced_items = []
@@ -147,8 +150,9 @@ class FakeShow:
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
 
-    def reorder(self, items, *, latest, enhanced_ids):
+    def reorder(self, items, *, latest, enhanced_ids, keep_slide=False):
         self.reordered = (list(items), latest, set(enhanced_ids))
+        self.kept_the_slide = keep_slide
 
     def note_added(self, path, media_type, prompt_id, thumb, *, favorite, enhanced):
         self.added.append((prompt_id, favorite, enhanced))
@@ -830,6 +834,56 @@ def test_a_show_asks_this_director_for_its_order_hosted_or_not(shows, session):
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
     assert made[0].actions.reorder == director.reorder_show
+
+
+def test_a_loop_ending_on_a_folder_show_hands_it_the_library_it_is_ordered_by(shows):
+    """A show whose whole set is the row it loops has nothing to browse, so
+    the off press leaves that folder for the side's whole library — taken up
+    under the picture already on screen, the way a satellite's browse resumes
+    under the clip it was looping."""
+    browser = FakeBrowser(shelves={ALL_LANDSCAPE: [_row("g4")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=LANDSCAPE)
+
+    assert director.browse_it_all(made[0]) is True
+
+    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
+    assert made[0].kept_the_slide is True
+    assert director._live_shows == [(made[0], ALL_LANDSCAPE)]
+    assert made[0].said == []               # the surface says "Loop off" itself
+
+
+def test_a_show_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(shows):
+    """Whichever of the pair is lit on the panel is the set it falls back to."""
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")],
+                                   ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = shows(browser=browser)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    made[0].hud_order_label = LATEST_LABEL
+
+    assert director.browse_it_all(made[0]) is True
+
+    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True, set())
+
+
+def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_show_alone(shows):
+    director, _host, made = shows(browser=FakeBrowser(shelves={}))
+    director.open([("a.png", "image", "g1", None)], location="workflow/a",
+                  side=PORTRAIT)
+
+    assert director.browse_it_all(made[0]) is False
+
+    assert made[0].reordered is None
+    assert director._live_shows == [(made[0], "workflow/a")]
+
+
+def test_a_show_asks_this_director_for_the_way_out_of_a_loop(shows):
+    director, _host, made = shows()
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made[0].actions.browse_all == director.browse_it_all
 
 
 def test_a_region_show_ending_comes_back_on_the_base_state(shows):

@@ -131,12 +131,19 @@ class ShowSet:
         current = self.playlist.current()
         if current is None or current.prompt_id is None or len(self.playlist) < 2:
             return
-        row = {current.prompt_id,
-               *(seed.prompt_id for seed in self.neighbors(current.prompt_id).seeds)}
         played = self.playlist.in_play_order()
-        if all(slide.prompt_id in row for slide in played):
+        if self._is_one_row([current, *played]):
             at = self.playlist.index
             self.loop = Loop(SEED_AXIS, (*played[at:], *played[:at]))
+
+    def _is_one_row(self, slides) -> bool:
+        """Whether *slides* are all of the first one's seed row — a set with
+        nothing to browse, since a row played whole is that row looping."""
+        if not slides:
+            return False
+        first = slides[0].prompt_id
+        row = {first, *(seed.prompt_id for seed in self.neighbors(first).seeds)}
+        return all(slide.prompt_id in row for slide in slides)
 
     def replace_items(self, items, *, keep_slide: bool, shuffle=None,
                       new_set: bool = False) -> bool:
@@ -232,7 +239,17 @@ class ShowSet:
         self._widen_back()
         self.reorder(items, latest=False, enhanced_ids=enhanced_ids)
 
-    def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
+    def reorder(self, items, *, latest: bool, enhanced_ids=(),
+                keep_slide: bool = False) -> None:
+        """Play *items* instead, newest first or shuffled, from the top.
+
+        The order pair on the panel, which is a fresh start — Latest opens on
+        the newest rather than where the last one stopped.  *keep_slide* is the
+        loop's way out (:meth:`end_loop`): the picture on screen goes on
+        playing and only what comes after it is the new set, and the set is not
+        read as a row of its own, since a row is a loop and the press that
+        ended one must not deal it straight back.
+        """
         self._shuffle = in_order if latest else None
         self.loop = None
         self._library_moved()
@@ -244,7 +261,7 @@ class ShowSet:
         if not kept:
             self._widen_back()
             kept = self.all_items
-        self.replace_items(kept, keep_slide=False, new_set=True)
+        self.replace_items(kept, keep_slide=keep_slide, new_set=not keep_slide)
 
     def passes(self, item, *, favorites_filter=None, enhanced=None, act_filter=None) -> bool:
         """Whether *item* survives the switches — the ones on, unless asked
@@ -405,14 +422,28 @@ class ShowSet:
         self.replace_items(pool, keep_slide=True, shuffle=in_order)
         return True
 
-    def end_loop(self) -> bool:
+    def end_loop(self, fall_back: Callable[[], bool] | None = None) -> bool:
         """Back to browsing the set, the slide on screen kept: a loop that
         wandered onto a stranger to the set plays it out and the browse is what
         comes next, the way a satellite's browse resumes after its loop.
-        ``False`` when nothing was looping."""
+        ``False`` when nothing was looping.
+
+        *fall_back* is what the surface plays instead where the set under the
+        loop is one seed row: a show opened on one folder is that row, which
+        has nothing to browse (:meth:`_a_row_played_whole_is_its_loop`), so
+        ending into it takes the rectangle off the map and leaves the very same
+        pictures coming round.  A satellite never meets this — its browse is
+        the whole library and a loop only narrows it — so the way out here is
+        that same library, which the surface asks the gallery for and deals
+        itself.  It answers whether it had anything to play; with nothing there
+        the loop ends into the set as usual, rather than onto a blank screen.
+        """
         if self.loop is None:
             return False
+        nowhere_to_browse = self._is_one_row(self._browse())
         self.loop = None
+        if nowhere_to_browse and fall_back is not None and fall_back():
+            return True
         browse = self._browse()
         current = self.playlist.current()
         if current is not None and not any(self._same(item, current) for item in browse):
@@ -420,18 +451,22 @@ class ShowSet:
         self.replace_items(browse, keep_slide=True)
         return True
 
-    def step_loop(self) -> str:
+    def step_loop(self, fall_back: Callable[[], bool] | None = None) -> str:
         """One press of the loop key: the seed row, then the action column, then
         off — each axis stepped over when it holds only the slide on screen, and
         with neither able to loop the press is the lock instead
-        (:data:`LOOP_IS_A_LOCK`), so the key never lands on nothing."""
+        (:data:`LOOP_IS_A_LOCK`), so the key never lands on nothing.
+
+        Its off stop is the off button, *fall_back* and all: over a folder with
+        no acts to loop, one press is the whole way out (see :meth:`end_loop`).
+        """
         running = self.loop.axis if self.loop is not None else ""
         start = LOOP_CYCLE.index(running) + 1 if running in LOOP_CYCLE else 0
         for step in range(len(LOOP_CYCLE)):
             axis = LOOP_CYCLE[(start + step) % len(LOOP_CYCLE)]
             if not axis:
                 if running:
-                    self.end_loop()
+                    self.end_loop(fall_back)
                     return LOOP_OFF
                 continue
             if self.start_loop(axis):

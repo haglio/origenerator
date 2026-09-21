@@ -787,6 +787,38 @@ def test_a_folder_played_as_a_show_opens_with_its_seed_loop_lit(qtbot):
     assert view.hud_map().loop == ""
 
 
+def _seeds_only(prompt_id):
+    """A folder's row and nothing else made of it — so the loop key's next stop
+    is off rather than the act column."""
+    return (MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
+            if prompt_id == "id-a" else MapNeighbors())
+
+
+def test_taking_the_loop_off_a_folder_show_asks_the_gallery_for_the_library(qtbot):
+    """A folder show is the row it loops and nothing else, so the off button
+    would put the same pictures straight back.  It leaves the folder instead —
+    the whole library of this show's shape, which the gallery owns."""
+    widened = []
+    view = _view(qtbot, _KEYED, actions=ShowActions(
+        neighbors=_seeds_only, browse_all=lambda show: widened.append(show) or True))
+
+    view.show_loop("")
+
+    assert widened == [view]
+    assert view._note.text() == "Loop off"
+
+
+def test_the_loop_key_off_a_folder_show_leaves_the_folder_in_one_press(qtbot):
+    widened = []
+    view = _view(qtbot, _KEYED, actions=ShowActions(
+        neighbors=_seeds_only, browse_all=lambda show: widened.append(show) or True))
+
+    _press(view, Qt.Key.Key_Home)
+
+    assert widened == [view]
+    assert view._note.text() == "Loop off"
+
+
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
     # The players' "weird": a favorite loses its star and the show moves on;
     # only a picture wearing no star is condemned — so locking a slide, which
@@ -2062,6 +2094,20 @@ def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_
     assert view._playlist.current()[2] == "e"
     assert view.locked is False
     assert view.hud_order_label == "Latest"
+
+
+def test_a_reorder_keeping_the_slide_leaves_the_picture_up_and_browses_on(qtbot, tmp_path):
+    """The loop's way out: the picture on screen stays where it is, and the
+    library is what comes after it."""
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"))
+    view.step(1)
+    shown = _put_up(view)
+
+    view.reorder(_named(tmp_path, "d", "b"), latest=True, keep_slide=True)
+
+    assert shown == []                              # nothing new was put up
+    assert view._playlist.current()[2] == "b"
+    assert [item[2] for item in view._playlist._items] == ["d", "b"]
 
 
 def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):

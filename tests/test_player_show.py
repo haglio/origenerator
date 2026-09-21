@@ -449,6 +449,20 @@ def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot,
     assert show.hud_order_label == LATEST_LABEL
 
 
+def test_a_reorder_keeping_the_slide_leaves_the_player_on_the_picture_it_has(qtbot, tmp_path):
+    """The loop's way out: the picture on screen plays to its end and the
+    library is only what comes up after it, so the player is sent nowhere."""
+    show = _show(qtbot, tmp_path)
+    _sent(show)
+
+    show.reorder([("nine.png", "image", "id-9"), ("one.png", "image", "id-1")],
+                 latest=True, keep_slide=True)
+
+    assert _sent(show) == ["RELOAD_PLAYLIST", f"SET_PACE {show.dwell_s}"]
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one.png", "nine.png"]
+
+
 def test_a_reorder_of_a_show_not_locked_sends_no_unlock(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
 
@@ -889,7 +903,6 @@ def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path
     assert (model.active_loop, model.filter_query) == ("seed", "fox")
 
 
-
 # --- what is being made of the item on screen ---------------------------------
 
 def _panel(show: PlayerShow):
@@ -1217,3 +1230,35 @@ def test_a_run_that_lands_after_the_player_moved_on_is_the_players_next_item(qtb
 
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
     assert played[:2] == ["two.png", "run.png"]
+
+
+def _row_only(prompt_id):
+    """A library holding one folder's row and nothing made of it, so the loop
+    key's stop after the seeds is off."""
+    return (MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
+            if prompt_id == "id-1" else MapNeighbors())
+
+
+def test_taking_the_loop_off_a_folder_on_a_player_asks_for_the_regions_library(
+        qtbot, tmp_path):
+    """The set under the loop is the folder, which is the loop — so the off
+    press leaves it for the whole library of that region's shape."""
+    said, widened = [], []
+    folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
+    show = _show(qtbot, tmp_path, items=folder, say=said.append, actions=ShowActions(
+        neighbors=_row_only, browse_all=lambda s: widened.append(s) or True))
+
+    show.show_loop("")
+
+    assert (widened, said) == ([show], ["Loop off"])
+
+
+def test_the_loop_key_off_a_folder_on_a_player_leaves_it_in_one_press(qtbot, tmp_path):
+    said, widened = [], []
+    folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
+    show = _show(qtbot, tmp_path, items=folder, say=said.append, actions=ShowActions(
+        neighbors=_row_only, browse_all=lambda s: widened.append(s) or True))
+
+    show.show_loop_cycle()
+
+    assert (widened, said) == ([show], ["Loop off"])

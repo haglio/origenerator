@@ -460,6 +460,7 @@ class ShowDirector:
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
             reorder=self.reorder_show,
+            browse_all=self.browse_it_all,
             # Space reaches the one OSR2 switch, like every other surface's,
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
@@ -995,17 +996,44 @@ class ShowDirector:
         return self._standalone_side if show is self._slideshow else None
 
     def reorder_show(self, show, latest: bool) -> None:
+        if not self._play_the_library(show, latest=latest, keep_slide=False):
+            show.note_voice_command("Nothing there to play", kind=WARNING)
+            return
+        show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
+
+    def browse_it_all(self, show) -> bool:
+        """Hand *show* the whole library of its shape, taken up from the slide
+        on screen — the way out of a loop over a set that has nothing under it.
+
+        A show opened on one folder is that folder's seed row played round, so
+        the loop and the set are the same pictures and ending one into the
+        other would leave them coming round exactly as before
+        (:meth:`~origenerator.gui.show_set.ShowSet.end_loop`).  The library is
+        what lies outside it, in the order the show's own panel says it is in:
+        the pair's lit button names the very set it falls back to, and a show
+        wearing neither — a folder opened in the browser's own order — falls
+        back to the shuffle, which is what a side plays with nothing asked of
+        it.  Says whether there was anything of that shape to play.
+        """
+        return self._play_the_library(
+            show, latest=show.hud_order_label == LATEST_LABEL, keep_slide=True)
+
+    def _play_the_library(self, show, *, latest: bool, keep_slide: bool) -> bool:
+        """Point *show* at its side's whole library, newest first or shuffled,
+        and say whether there was anything there to play.  *keep_slide* leaves
+        the picture on screen playing, only what comes after it being the new
+        set; without it the set starts over at the top."""
         side = self._base_side(show)
         key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
-            show.note_voice_command("Nothing there to play", kind=WARNING)
-            return
+            return False
         self._repoint(show, key)
         show.set_levels(self.versions_of(rows))
-        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows))
-        show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
+        show.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows),
+                     keep_slide=keep_slide)
+        return True
 
     def set_session_paused(self, paused: bool) -> None:
         """The hosting session's OmniPause, applied to every open show and

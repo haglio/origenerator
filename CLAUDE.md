@@ -68,6 +68,28 @@ The near miss that still counts: tightening a signature so an unfamiliar file
 lands in a family rather than in `None` — a confident wrong answer hides the
 model, where the honest shrug only leaves it listed.
 
+## An act keyword has to mean its act and nothing else in this library
+
+`recipe_categories` in the content overlay decides which act a prompt depicts,
+by plain substring, and that answer is now a name the user reads: a show's HUD
+writes it into the gutter of every map row and onto that row's filter button
+(`nav_map.act_of`). So a keyword that is also ordinary describing vocabulary
+costs more than a wrong suggestion in Combine — it names rows for an act they
+do not show, and the name they should have read, their folder's short code,
+never appears at all. One such word — the act in one sense, a measurement of a
+face in the other — sat in the quality boilerplate of 853 of this library's
+3,884 pictures and named 472 rows for an act none of them shows, until the user
+reported it off the map (2026-09-21); it is out of the overlay now.
+
+So a keyword is measured against the library before it goes in: count what it
+matches in the `positive_prompt` column of `state/origenerator.db` and read the
+words around a sample of the hits. A word that fires inside the boilerplate
+every prompt here carries is not distinctive, however plainly it names the act
+elsewhere. The near miss that still counts: keeping such a word because some
+prompts do mean the act by it — those prompts nearly always say so another way
+too, which is what the act's other keywords are for, and a row has only one
+name.
+
 ## A feature the session can reach is half a feature until Fun Time answers it
 
 This app runs two ways — on its own, and hosted inside a Fun Time session as one

@@ -478,9 +478,11 @@ class PlayerShow(QObject):
         self._unlock()
         self._set.retune(items, enhanced_ids=enhanced_ids)
 
-    def reorder(self, items, *, latest: bool, enhanced_ids=()) -> None:
+    def reorder(self, items, *, latest: bool, enhanced_ids=(),
+                keep_slide: bool = False) -> None:
         self._unlock()
-        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids)
+        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids,
+                          keep_slide=keep_slide)
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
@@ -517,7 +519,7 @@ class PlayerShow(QObject):
         for "".  The player is handed the row or the column to play, and the
         set it was browsing when the loop ends (see :meth:`_pass_changed`)."""
         if not axis:
-            if self._set.end_loop():
+            if self._set.end_loop(self._browse_it_all):
                 self._note("Loop off")
             return
         if self._set.start_loop(axis):
@@ -535,10 +537,18 @@ class PlayerShow(QObject):
         self.set_locked(True)
         self._note("Locked")
 
+    def _browse_it_all(self) -> bool:
+        """Take up the whole library of this show's shape, in the order the
+        panel says it is in — where a loop ends when the set under it was one
+        seed row, and nothing at all where the gallery wired no library."""
+        if self._actions.browse_all is None:
+            return False
+        return bool(self._actions.browse_all(self))
+
     def show_loop_cycle(self) -> None:
         """The loop key: seeds, then actions, then off — and the lock when
         there is nothing on either axis to loop."""
-        stepped = self._set.step_loop()
+        stepped = self._set.step_loop(self._browse_it_all)
         if stepped == LOOP_IS_A_LOCK:
             self.set_locked(not self._locked)
             self._note("Locked" if self._locked else "Unlocked")

@@ -586,3 +586,31 @@ def test_a_version_delete_leaves_the_row_thumbnail_alone(tmp_path):
 
     assert (tmp_path / "thumbs" / "p1.jpg").exists()
     assert row["thumbnail_path"] == str(tmp_path / "thumbs" / "p1.jpg")
+
+
+class TestTheFoldersItWasGiven:
+    """The view that owns these actions draws previews out of the same two
+    folders, and used to reach the config module for them -- so a test could
+    only point it somewhere else by patching module state, which four sites did
+    while three thousand others ran against the live ones. It asks the actions
+    now, which were handed both at construction."""
+
+    def test_the_output_folder_is_the_one_it_was_built_with(self, tmp_path):
+        actions = GalleryActions(Database(tmp_path / "test.db"), tmp_path / "output", Trash(tmp_path / "trash"))
+
+        assert actions.output_dir == tmp_path / "output"
+
+    def test_the_thumbnail_folder_comes_from_the_environment_it_was_given(self, tmp_path):
+        actions = GalleryActions(
+            Database(tmp_path / "test.db"), tmp_path / "output",
+            Trash(tmp_path / "trash"),
+            environment=GalleryEnvironment(thumb_dir=tmp_path / "thumbs"))
+
+        assert actions.thumb_dir == tmp_path / "thumbs"
+
+    def test_no_thumbnail_folder_is_answered_rather_than_raised(self, tmp_path):
+        """Every part of the environment is optional, and each absence costs
+        something rather than failing -- see GalleryEnvironment."""
+        actions = GalleryActions(Database(tmp_path / "test.db"), tmp_path / "output", Trash(tmp_path / "trash"))
+
+        assert actions.thumb_dir is None

@@ -969,3 +969,58 @@ class TestAnOverlayShortOfAKey:
 
         told.assert_not_called()
         window.show.assert_called_once()
+
+
+class TestWhenEvolverHasBeenRenamedUnderUs:
+    """Four values decide where a sent clip lands and whether Evolver picks it
+    up, and each is written down in both apps. A rename on either side used to
+    leave clips arriving nowhere with both apps silent, and the test that holds
+    the two together skips wherever there is no Evolver beside the checkout --
+    which is every run of this repo's gate. So the app asks at startup.
+
+    It says so and opens: nothing else about the app is wrong, and a launch
+    refused over a folder name would cost far more than the lane it protects.
+    """
+
+    SAID = ("the inbox a send lands in: this app has A, Evolver has B",)
+
+    def test_the_launch_says_what_disagrees_and_still_opens(self, qapp):
+        told = MagicMock()
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+            "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
+            "PyQt6.QtWidgets.QMessageBox.warning": told,
+        }):
+            assert main([]) == 0
+
+        said = " ".join(str(arg) for arg in told.call_args.args)
+        assert "the inbox a send lands in" in said
+        window.show.assert_called_once()
+
+    def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
+        """The same reason the incomplete-overlay refusal draws none: nobody is
+        at this window to dismiss a modal, and it would sit over a player."""
+        told = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
+            "PyQt6.QtWidgets.QMessageBox.warning": told,
+        }):
+            main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
+
+        told.assert_not_called()
+
+    def test_agreeing_says_nothing(self, qapp):
+        """The control, and the ordinary case: a checkout with no Evolver beside
+        it has nothing to disagree with, which is every run of this suite."""
+        told = MagicMock()
+
+        with _a_faked_boot([], **{
+            "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(),
+            "PyQt6.QtWidgets.QMessageBox.warning": told,
+        }):
+            assert main([]) == 0
+
+        told.assert_not_called()

@@ -15,11 +15,12 @@ import json
 import pytest
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import recipe_match
+from origenerator import evolver_export, recipe_match
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
 from origenerator.gui.combine_panel import CombineRequest
+from origenerator.gui.export_lane import GENAU
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 
@@ -274,14 +275,14 @@ def combine(qtbot, monkeypatch):
     built = []
 
     def build(host=None, *, db=None, jobs=None, client=object(), shows=None,
-              tabs=None):
+              tabs=None, inbox=None):
         host = host or FakeHost()
         parent = QWidget()
         qtbot.addWidget(parent)
         controller = CombineController(
             host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             client=client, info_tabs_of=lambda: tabs or FakeTabs(),
-            shows=shows or FakeShows())
+            shows=shows or FakeShows(), inbox=inbox)
         # The wait between a press and a real job is what the stand-in row is
         # for; running it straight through is what lets a test press and look.
         controller._after_painting = lambda work: work()
@@ -776,6 +777,24 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
 
     assert sent == ["clip.mp4"]
     assert db.exported == ["clip"]
+
+
+def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeypatch,
+                                                                tmp_path):
+    """No patching of anything: where a clip goes used to be a config constant
+    this module imported, so a test could only redirect it by reaching into the
+    module. It is an object now, given at construction."""
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "clip.mp4").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    inbox = tmp_path / "somebody elses inbox"
+    controller, _host = combine(db=FakeDB(),
+                                inbox=evolver_export.EvolverInbox(inbox))
+
+    controller.send_to_genau_if_requested(_video("clip", requested="now"))
+
+    assert (inbox / GENAU.source / "clip.mp4").read_bytes() == b"pixels"
 
 
 def test_a_clip_already_handed_on_is_not_sent_twice(combine, monkeypatch, tmp_path):

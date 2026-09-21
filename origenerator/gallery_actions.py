@@ -66,6 +66,22 @@ class GalleryActions:
         self._history = UndoStack(limit)
         self.custom_folders = CustomFolderActions(db, self._history)
 
+    # --- the folders this was built with ------------------------------------
+    # The view that owns these actions draws its previews out of the same two,
+    # and used to reach the config module for them -- so pointing it somewhere
+    # else meant patching module state, which four tests did while three
+    # thousand ran against the live ones. It asks here instead.
+
+    @property
+    def output_dir(self) -> Path:
+        """Where a generation's files are."""
+        return self._output_dir
+
+    @property
+    def thumb_dir(self) -> Path | None:
+        """Where their thumbnails are, or ``None`` where nothing said."""
+        return self._environment.thumb_dir
+
     # --- deletion ----------------------------------------------------------
 
     def delete_rows(self, rows: list[dict]) -> None:

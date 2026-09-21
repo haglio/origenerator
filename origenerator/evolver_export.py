@@ -14,7 +14,41 @@ from __future__ import annotations
 
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
+
+from origenerator.config import EVOLVER_INBOX_DIR
+
+
+@dataclass(frozen=True)
+class EvolverInbox:
+    """Where this app hands a finished clip over, and the only thing that knows.
+
+    The destination used to be a config constant that two Qt widgets reached for
+    in the middle of a send, so the one fact the whole hand-off turns on -- which
+    folder -- was written in no single place, and the only way to point a test
+    somewhere else was to patch the module each of them had imported it from.
+    One of these is built where the app is put together and handed to whoever
+    sends, so a view asks for a hand-off instead of performing one.
+    """
+
+    inbox_dir: Path
+
+    def hand_over(self, video: Path, source: str) -> Path:
+        """Copy *video* into the folder Evolver routes *source* by.
+
+        A lane with no folder is refused rather than dropped in the inbox root,
+        where Evolver -- which routes by folder and nothing else -- would read it
+        as belonging to no source at all.
+        """
+        if not source:
+            raise ValueError("that lane has no folder to send to")
+        return export_video(video, Path(self.inbox_dir) / source)
+
+
+def default_inbox() -> EvolverInbox:
+    """The inbox this app sends to, for whoever is not given one."""
+    return EvolverInbox(EVOLVER_INBOX_DIR)
 
 
 def export_video(src: Path, dest_dir: Path) -> Path:

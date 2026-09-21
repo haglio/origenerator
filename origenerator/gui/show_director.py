@@ -507,6 +507,13 @@ class ShowDirector:
         own replacing (:meth:`_present_surface`).
         """
         view = self._window_up() if self._fun_time is None else None
+        if self._fun_time is None:
+            # Which side that one window is playing now -- what its order pair
+            # hands it, and the library a loop over it falls back to, are that
+            # side's.  Taken on every set rather than at the opening, because a
+            # re-pointed window holding the side it was opened on would hand
+            # over the other shape's pictures.
+            self._standalone_side = side
         built = view is None
         if built:
             view = SlideshowView(items, actions=actions,
@@ -679,7 +686,6 @@ class ShowDirector:
         """
         if self._fun_time is None:
             view.showFullScreen()
-            self._standalone_side = side
             self._wear_the_hud(view, side)
             return
         occupant = self._region_shows.get(side)

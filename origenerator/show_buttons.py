@@ -40,9 +40,13 @@ _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name 
 # The mode pair, which is about the SESSION rather than about this show: the way
 # back to the Funestras' own videos, and this mode lit beside it.  Its verbs are
 # the session's dashboard commands, posted verbatim.
+#: The verb that asks the session to show this app, which is the way to
+#: anything of this app's while a session is running the room.
+ORIGENERATOR_MODE = "origenerator_activate"
+
 MODE_BUTTONS = (
     ("satellites_kino_activate", "Kino", False),
-    ("origenerator_activate", "Origenerator", True),
+    (ORIGENERATOR_MODE, "Origenerator", True),
 )
 MODE_TOOLTIPS = {
     "satellites_kino_activate": "Kino mode — the Satellite Funestras and the Random Favs Browser",

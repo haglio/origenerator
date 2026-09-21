@@ -5,6 +5,7 @@ import json
 import winsound
 from dataclasses import replace
 from unittest.mock import patch
+from xml.etree import ElementTree
 
 import pytest
 from funestra_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
@@ -12,10 +13,10 @@ from funestra_core.file_channel import append_command
 from funestra_core.hud_placement import HudCorner
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from shared_ui.preview import Preview
 
-from origenerator import gallery, recipe_match, ui_scale
+from origenerator import app_link, gallery, recipe_match, ui_scale
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -24,7 +25,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import main_window
+from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -1210,17 +1211,83 @@ def test_a_standalone_window_has_no_session_bridge(qtbot, tmp_path):
 def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     # The whole chain, because every link in it is one the app has no other
     # reason to have: the queue's news leaves the gallery, the window hands it to
-    # the tray icon, and Windows shows it wherever the user has got to.
+    # the notices, and Windows shows it wherever the user has got to.
     win = _window(qtbot, tmp_path)
     said = []
-    monkeypatch.setattr(win._notices._tray, "showMessage", lambda *args: said.append(args))
+    monkeypatch.setattr(desktop_notices, "show_toast",
+                        lambda app_id, xml: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
-                   ok=True, source=GenerationSource.GENERATED))
+                   ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
 
-    assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
-                     QSystemTrayIcon.MessageIcon.Information)]
+    toast = ElementTree.fromstring(said[0])
+    assert [text.text for text in toast.findall("./visual/binding/text")] == \
+        ["Video ready", "WAN 2.2 Image-to-Video · 4:12"]
+    assert app_link.generation_in(toast.get("launch")) == "alpha-1"
+
+
+def test_answering_a_notice_brings_the_window_forward_and_opens_the_item(
+        qtbot, tmp_path, monkeypatch):
+    # The whole point of a notice being clickable: whatever the user was doing,
+    # the app comes up in front of it showing the thing that just landed.
+    win = _window(qtbot, tmp_path)
+    win.showMinimized()
+    fronted, went = [], []
+    monkeypatch.setattr(main_window, "bring_to_front", fronted.append)
+    monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
+
+    win.go_to_generation("alpha-1")
+
+    assert not win.isMinimized()
+    assert fronted == [win]
+    assert went == ["alpha-1"]
+
+
+def test_answering_a_notice_for_an_item_that_has_since_gone_still_comes_forward(
+        qtbot, tmp_path):
+    # A notice waits in Windows' notification center until it is answered, which
+    # can be after the thing it announced was deleted.
+    win = _window(qtbot, tmp_path)
+
+    win.go_to_generation("no-such-generation")
+
+    assert win._gallery_view.selected_prompt_id() is None
+
+
+def test_answering_a_notice_in_a_session_asks_the_room_for_origenerator_mode(
+        qtbot, tmp_path, monkeypatch):
+    # Hosted, this window is the session's to show: in video mode it sits
+    # parked under the players, so taking the foreground for itself would be a
+    # window over the room rather than a way to the picture.
+    session = replace(_fun_time_session(), dashboard_cmd_file=tmp_path / "dashboard.txt")
+    win = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
+                             AppState(tmp_path / "ui.json"), fun_time=session)
+    qtbot.addWidget(win)
+    fronted, went = [], []
+    monkeypatch.setattr(main_window, "bring_to_front", fronted.append)
+    monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
+
+    win.go_to_generation("alpha-1")
+
+    assert (tmp_path / "dashboard.txt").read_text(encoding="utf-8").strip() == \
+        "origenerator_activate"
+    assert fronted == []
+    assert went == ["alpha-1"]
+
+
+def test_a_session_that_named_no_channel_still_opens_the_item(qtbot, tmp_path, monkeypatch):
+    # An older session hands this app no way to ask the room for anything; the
+    # item is still opened, so it is there when the user switches over.
+    win = OrigeneratorWindow(ComfyUIClient(), Database(tmp_path / "t.db"),
+                             AppState(tmp_path / "ui.json"), fun_time=_fun_time_session())
+    qtbot.addWidget(win)
+    went = []
+    monkeypatch.setattr(win._gallery_view, "follow_link", went.append)
+
+    win.go_to_generation("alpha-1")
+
+    assert went == ["alpha-1"]
 
 
 def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path, caplog):

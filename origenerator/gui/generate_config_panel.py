@@ -125,34 +125,16 @@ class GenerateConfigPanel(QWidget):
     for the gallery to launch as a re-roll of this config's settings folder. The
     panel is one column: a fixed preview on top, then one scroll holding the
     File/Created block above the editable form and, at its foot, the displayed
-    generation's related media, then a single button bank
-    (Send-to-Evolver, Send-to-Genau, Cancel, Generate).
-    There's no status line: Generate only ever submits, and a run in flight is
-    watched in the strip's queue and on the browser pane's card. Its caption says
-    when a press will draw a fresh seed rather than re-create a generation these
-    settings have already made. The
-    preview is driven from outside: a browsed selection's output, a running
-    re-roll's live frames, or this config's newest matching result when idle.
+    generation's related media, then a single button bank. Its caption says when a
+    press will draw a fresh seed rather than re-create what these settings have
+    already made, and the info appears only while a saved generation is on show.
 
-    The info appears only while the tab is displaying a saved generation, clicked
-    or put up for its settings: a File/Created block above the form, and at the
-    foot of the scroll the videos an image was animated into, or a clickable
-    source-image tile for a video. Send-to-Evolver and Send-to-Genau (a video), and
-    the Drive-OSR2 toggle key off the displayed row. A blank tab hides them all.
+    What acts on the generation itself is on the picture rather than in the bank:
+    the preview wears the same star / trash / plus corners a gallery thumbnail
+    does, and right-clicking it raises the same menu. Each file row carries a
+    "Go to folder" beside its Show in Explorer.
 
-    What acts on the generation itself does not live in the button bank at all:
-    the preview wears the same star / trash / plus corners a gallery thumbnail of
-    it does, and right-clicking it raises the same menu — go to its folder,
-    bookmark it, enhance it, bin it. A picture is where those belong, and a bank
-    under the settings was a strange place to keep a "Go to folder". Each file
-    row carries one too, beside its Show in Explorer: a row that says where the
-    file is offers both ways there, and neither asks for a right-click.
-
-    A fresh panel opens with no workflow picked — the picker sits on its
-    placeholder, and everything the workflow decides (its typical time, its param
-    form, its Generate) waits until one is chosen. That is the pane's resting
-    state: a tab is always open, so the pane is never a blank rectangle, and the
-    one question it asks first is which workflow to run.
+    A fresh panel opens with no workflow picked — the pane's resting state.
     """
 
     title_changed = pyqtSignal(str)     # current tab name (its mark moves with it)
@@ -418,16 +400,11 @@ class GenerateConfigPanel(QWidget):
     def _build_related_media(self, body: QVBoxLayout) -> None:
         """What the generation on display is tied to, below the form: what it
         was built from and what it was animated into
-        (:class:`~origenerator.gui.related_media.RelatedMedia`), and every
-        version an enhanced image holds. All of it hidden when the tab isn't
-        showing a saved generation.
-
-        Stacked straight under the form, with no stretch between. A stretch here
-        used to push these to the foot of the viewport, which meant folding a
-        form section opened an elastic gap above them — the space growing by
-        exactly what the fold saved, so the closer the form got the further away
-        they went. Every gap in this column is the layout's spacing now, the same
-        as between the form's own sections.
+        (:class:`~origenerator.gui.related_media.RelatedMedia`), and every version
+        an enhanced image holds. All of it hidden when the tab isn't showing a
+        saved generation, and stacked straight under the form with no stretch
+        between — a stretch grew an elastic gap above them by exactly what folding
+        a form section saved.
         """
         self._related = RelatedMedia(video_rows=self._video_rows)
         self._related.source_activated.connect(self.source_activated)
@@ -449,19 +426,11 @@ class GenerateConfigPanel(QWidget):
     def _build_button_bank(self) -> FlowLayout:
         """One bank, fixed under the scroll so Generate is always reachable.
 
-        An export lane's button shows only while displaying a saved generation,
-        and only for a video; the discard button only while a run this tab
-        launched is in flight (the gallery owns the job and drives
-        set_generating), throwing it away from the tab like the folder's tile —
-        "Cancel", or "Next seed" while that folder is auto-generating. Generate
-        only ever submits: a run in flight is watched in the strip's queue and on
-        the browser pane's card, so the button says nothing about one.
-
-        A flow rather than a row: the bank wraps onto a second line when the pane
-        is too narrow to hold it, instead of squeezing every label down to an
-        unreadable stub ("o fo", "to E", "ner"). Right-aligned, so Generate keeps
-        the corner it has always sat in, and at the family's two gaps — close
-        along a row, wider between wrapped rows — like the gallery's own bank.
+        An export lane's button shows only for a video on display, and the discard
+        button only while a run this tab launched is in flight — "Cancel", or "Next
+        seed" while that folder is auto-generating. A flow rather than a row: it
+        wraps onto a second line when the pane is too narrow, instead of squeezing
+        every label down to an unreadable stub.
         """
         btn_row = FlowLayout(spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
                              align_right=True)
@@ -491,24 +460,13 @@ class GenerateConfigPanel(QWidget):
     def minimumSizeHint(self):
         """Never narrower than the settings can be squeezed into.
 
-        The pane refuses to be dragged past what its contents fit in, rather than
-        going there and scrolling them sideways: a horizontal scroll bar under a
-        form is a bad trade for the drag it allows. Read live from the scroll's
-        contents, which is what makes the floor follow the workflow on show — a
-        form with more fields, or an image with a list of versions under it, is a
-        wider thing and says so.
-
-        No explicit ``setMinimumWidth`` here, and none on the wrapper this sits in
-        (see :mod:`origenerator.gui.gallery_view`): an explicit minimum *replaces*
-        this hint rather than joining it, so one would pin the floor at its own
-        number and put the scroll bar back. Capped at ``_FLOOR_CAP``, which is
-        where holding the floor would cost the window its tiling slot.
-
-        It *replaces* the width the layout would otherwise ask for rather than
-        joining it, and there is no comfortable-looking minimum under it: the
-        settings are the only thing here with a claim on how narrow the pane may
-        be, and any other floor — the preview's, a round number that looks about
-        right — stops the drag while there is still room to give.
+        The pane refuses to be dragged past what its contents fit in rather than
+        scrolling them sideways, read live from the scroll's contents so the floor
+        follows the workflow on show. No explicit ``setMinimumWidth`` here or on
+        the wrapper this sits in: an explicit minimum *replaces* this hint rather
+        than joining it, so one would pin the floor at its own number and put the
+        scroll bar back. Capped at ``_FLOOR_CAP``, where holding the floor would
+        cost the window its tiling slot.
         """
         hint = super().minimumSizeHint()
         hint.setWidth(min(self._contents_floor(), _FLOOR_CAP))
@@ -674,13 +632,9 @@ class GenerateConfigPanel(QWidget):
         """Re-read, shortly, whether Generate would reproduce a past run.
 
         Deferred rather than answered on the spot: the answer needs every stored
-        generation's params, a table read and a JSON parse per row — tens of
-        milliseconds, far too much to spend on each keystroke of a prompt. Every
-        cue restarts the one timer, so a burst of edits costs a single read once
-        the typing stops.
-
-        Public because the gallery has the other cue: a run of these very settings
-        completing is what makes this tab's pinned seed a duplicate.
+        generation's params, far too much to spend on each keystroke, and every
+        cue restarts the one timer. Public because the gallery has the other cue:
+        a run of these very settings completing.
         """
         self._caption_timer.start()
 
@@ -816,16 +770,11 @@ class GenerateConfigPanel(QWidget):
     def set_generating(self, generating: bool, *, auto_generating: bool = False):
         """Reflect whether a run of this config's folder is in flight.
 
-        All it moves is the discard button, which shows while there is a run of
-        this tab's to throw away. Generate itself is untouched: it submits, and
-        every reading of the run it submitted is in the strip's queue and on the
-        browser pane's in-flight card.
-
-        ``auto_generating`` says the run's folder is auto-looping, which is what
-        the discard button reads as "Next seed" rather than "Cancel" (see
-        :func:`inflight.discard_run_text`). Re-labeled ahead of the idempotence
-        guard below, because the Auto toggle flips mid-run without the generating
-        state ever changing.
+        All it moves is the discard button. ``auto_generating`` says the run's
+        folder is auto-looping, which reads that button as "Next seed" rather than
+        "Cancel" (see :func:`inflight.discard_run_text`) — re-labeled ahead of the
+        idempotence guard below, because the Auto toggle flips mid-run without the
+        generating state ever changing.
         """
         self._cancel_btn.setText(discard_run_text(auto_generating))
         self._cancel_btn.setToolTip(discard_run_tooltip(auto_generating))
@@ -882,14 +831,13 @@ class GenerateConfigPanel(QWidget):
         return key, settings_signature(key, json.dumps(params), image_index)
 
     def settings_folder_key(self) -> str | None:
-        """The gallery folder this tab's settings have been generating into, by
-        the key the tree files it under — the same key the tab is *named* off
-        (:meth:`title`), so where a tab sends you is the folder whose name it
-        wears.
+        """The gallery folder this tab's settings have been generating into,
+        by the key the tree files it under -- the same key the tab is *named* off
+        (:meth:`title`).
 
         ``None`` when there is no such folder: no workflow picked, or nothing
-        generated with these settings yet. A folder is put in the tree by the
-        generations in it, so until there are some there is nowhere to go.
+        generated with these settings yet, and a folder with nothing in it is not
+        in the tree to go to.
         """
         key = self.workflow_and_signature()
         if key is None or self._recent_matching_row() is None:
@@ -918,15 +866,10 @@ class GenerateConfigPanel(QWidget):
     def _reflow_for_the_media(self) -> None:
         """Stand the picture beside the settings when it is a PORTRAIT one.
 
-        Only hosted by Fun Time, where this tab lives in the Random Favs
-        Browser's upright rect: stacked there, a portrait picture takes the
-        whole column and pushes every prompt field off the foot.  Side by side
-        it keeps its height and the form keeps its place — settings left,
-        picture right, which is the order they are read in.
-
-        Landscape media stays stacked: a wide picture beside a form gets a
-        column too narrow to show it, and the form loses the width its prompt
-        fields need.
+        Only hosted by Fun Time, where this tab lives in the Random Favs Browser's
+        upright rect and a stacked portrait picture pushes every prompt field off
+        the foot. Landscape media stays stacked: beside a form it gets a column too
+        narrow to show it, and the form loses the width its prompt fields need.
         """
         if self._fun_time is None:
             return  # standalone the pane is wide; stacking is right at any shape
@@ -1084,15 +1027,11 @@ class GenerateConfigPanel(QWidget):
         """Open this tab as a rewrite of one folder's prompt.
 
         The folder's own settings fill the form, its prompts are marked against
-        what they say now — lit where words arrive, struck through where they go
-        (:mod:`origenerator.gui.tracked_prompt`) — and its images fill the
-        preview, all of them, tiled. Nothing about it is one generation, so the
-        tab shows no file, no footer and no "modified" notice: what the settings
-        are about is the wall above them.
-
-        ``pictures`` carries one entry per run the press will make, whether or
-        not there is a thumbnail to draw for it, so the count in the hover is
-        the number of images rather than of readable files.
+        what they say now (:mod:`origenerator.gui.tracked_prompt`), and its images
+        fill the preview, tiled. Nothing about it is one generation, so the tab
+        shows no file, no footer and no "modified" notice. ``pictures`` carries one
+        entry per run the press will make, whether or not there is a thumbnail for
+        it, so the count in the hover is of images rather than of readable files.
         """
         self.prefill(workflow_name, params)  # ends any rewrite already here
         self._folder_request = FolderRequest(
@@ -1128,31 +1067,27 @@ class GenerateConfigPanel(QWidget):
     # --- displaying a saved generation (the browsed selection) ----------------
 
     def show_saved_generation(self, row: dict, image_rows: list[dict], request=None):
-        """Display a browsed generation in this tab: seed the editable form with
-        its settings, show its output in the preview, and reveal the info for its
-        media type (an image's animations, a video's source-image tile + Evolver)
-        and, when ``request`` says a spoken request made it, a link back to the
-        item it was asked about.
+        """Display a browsed generation in this tab: its settings in the
+        editable form, its output in the preview, the info for its media type, and,
+        when ``request`` says a spoken request made it, a link back to the item it
+        was asked about.
 
-        The form is seeded first, with the newest-result autoshow held back
-        while it is, so nothing but the selection is ever put up. A workflow the
-        app can't rebuild leaves the form as it was but still shows the preview
-        and info. Whatever the tab was about before — a run it launched or
-        followed, a combination Combine opened here — it lets go of
-        (:meth:`_point_elsewhere`).
+        The form is seeded first, with the newest-result autoshow held back while
+        it is, so nothing but the selection is ever put up. A workflow the app
+        can't rebuild leaves the form as it was. Whatever the tab was about before
+        it lets go of (:meth:`_point_elsewhere`).
         """
         self._point_elsewhere(row)
         self._display_result(row, image_rows, request)
 
     def show_running_generation(self, row: dict):
-        """Point this tab at a generation still being made: its settings fill the
-        form the way a saved generation's would, and nothing else — there is no
-        file to show and no footer to reveal until the run lands. The run itself
-        is what the preview follows from here (:meth:`watch_folder`), and the tab
-        is named after the folder the run will land in.
+        """Point this tab at a generation still being made: its settings
+        fill the form the way a saved generation's would, and nothing else -- there
+        is no file to show until the run lands, which the preview follows from here
+        (:meth:`watch_folder`).
 
-        What a click on a folder's live tile lands in a tab, the way a click on
-        a thumbnail lands a saved generation: the tab is *for* this run now.
+        What a click on a folder's live tile lands in a tab: the tab is *for* this
+        run now, and is named after the folder the run will land in.
         """
         self._point_elsewhere(row)
         self._hide_footer()
@@ -1164,16 +1099,12 @@ class GenerateConfigPanel(QWidget):
     def _point_elsewhere(self, row: dict):
         """Aim this tab at ``row``'s settings, letting go of what it was about.
 
-        Pointing the tab at someone else's generation ends its claim on the runs
-        it launched and the run it was watching: the bar would otherwise sit
-        mid-run over a picture that has nothing to do with it, its Cancel would
-        stop something off screen, and the next frame would paint over the
-        picture just put here. The same goes for a combination Combine opened
-        here — the tab is about this row now, and a launch from it is not the
-        combination's.
-
-        Both callers put up a picture of their own straight after, so the one
-        the seeded settings would show is held back rather than loaded for nothing.
+        Its claim on the runs it launched and the run it was watching ends, or the
+        bar would sit mid-run over an unrelated picture, its Cancel would stop
+        something off screen, and the next frame would paint over what was just
+        put here. The same goes for a combination Combine opened here. Both
+        callers put up a picture of their own straight after, so the one the
+        seeded settings would show is held back rather than loaded for nothing.
         """
         self.forget_launched()
         self._forget_watch()
@@ -1188,18 +1119,14 @@ class GenerateConfigPanel(QWidget):
                 self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
-        """Show a generation this tab's own Generate just produced: swap the live
-        preview for the saved output and reveal its footer, leaving the form as the
-        user left it but for a seed still on Random, which takes this result's seed.
+        """Show a generation this tab's own Generate just produced: the saved
+        output in place of the live preview, its footer revealed, and the form left
+        as the user left it but for a seed still on Random, which takes this
+        result's seed.
 
-        Unlike :meth:`show_saved_generation`, the form is not re-seeded — the tab
-        already holds the settings that made this result, and the user may have kept
-        editing the next prompt while the run was in flight. Re-seeding here would
-        wipe those edits, so the completed result touches only the preview, the info
-        and a seed still on Random.
-        A tab holding a folder rewrite takes none of it: that tab is about the
-        folder, and the batch it launched lands a picture at a time — each one
-        would swap the wall of pictures for whichever finished last.
+        Re-seeding the form here would wipe edits made while the run was in flight.
+        A tab holding a folder rewrite takes none of it: its batch lands a picture
+        at a time, and each would swap the wall of pictures for the last to finish.
         """
         if self._folder_request is not None:
             return
@@ -1209,15 +1136,9 @@ class GenerateConfigPanel(QWidget):
         """``row`` has changed under this tab: re-show it if it is what the tab
         is displaying, else leave the tab alone.
 
-        A tab holds the row it was given, not a live view of the database, so a
-        change made to that row elsewhere — an enhancement folding in a new
-        level — leaves the tab describing the image as it was. The version list
-        is where that shows: it is built from the row, so without this the level
-        only appears the next time the tab is opened.
-
-        The form is left exactly as the user has it, the same deal
-        :meth:`show_completed_result` makes: nothing about the settings changed,
-        only what the image now holds.
+        A tab holds the row it was given rather than a live view of the database,
+        so an enhancement folding in a new level would otherwise show only the next
+        time the tab was opened. The form is left exactly as the user has it.
         """
         shown = self._displayed_row
         if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
@@ -1249,12 +1170,10 @@ class GenerateConfigPanel(QWidget):
         """The settings folder whose live run this tab's preview follows, or
         ``None`` while the preview is the tab's own picture.
 
-        A tab follows a folder rather than one run because a folder's runs come
-        one after another — an auto-generate loop's variations, a second
-        Generate queued after the first — and watching one is watching the
-        next. Set by this tab's own Generate and by a click on the folder's live
-        tile; ended by pointing the tab at a saved generation, or by the folder
-        running out of runs (:meth:`stop_watching`).
+        A tab follows a folder rather than one run, because a folder's runs come
+        one after another and watching one is watching the next. Set by this tab's
+        Generate and by a click on the folder's live tile; ended by pointing the
+        tab at a saved generation, or by :meth:`stop_watching`.
         """
         return self._watched_key
 
@@ -1264,13 +1183,10 @@ class GenerateConfigPanel(QWidget):
         later one as it streams (:meth:`show_live_frame`), and the picture it
         lands as.
 
-        With no frame yet the pane stands ``made_from`` — the picture and clip
-        the run was built on, shown as the sum
-        :class:`~origenerator.gui.combination_view.CombinationView` draws, the
-        same pair the strip's corner and the folder's tile stand for that job.
-        A run made from nothing has no such pair, and there the pane says it is
-        waiting instead — ``note`` where the caller knows what for, marked live
-        so a double-click opens the run fullscreen before its first frame.
+        With no frame yet the pane stands ``made_from`` — the picture and clip the
+        run was built on — or, for a run made from nothing, says it is waiting:
+        ``note`` where the caller knows what for, marked live so a double-click
+        opens the run fullscreen before its first frame.
         """
         self._watched_key = key
         self._live_note = None
@@ -1365,19 +1281,11 @@ class GenerateConfigPanel(QWidget):
     def _arm_preview_actions(self, prompt_id: str | None = None):
         """Point the preview's corners and right-click menu at what is on it.
 
-        Re-run after every change to the picture, because showing media is what
-        takes them away — a control on a picture can no more outlive that picture
-        than the "no longer these settings" notice beside it can — and because
-        everything they report moves under the picture too: the bookmark when the
-        menu toggles one, what the plus offers whenever a setting moves on the
-        Enhance panel. An autoshow arms them as readily as an explicit selection:
-        the picture is a real generation and favoriting it means exactly what
-        favoriting it anywhere means.
-
-        ``prompt_id`` names the generation when it is NOT the row this tab holds —
-        the picture a followed run landed as (:meth:`show_finished_media`) goes
-        up without the tab taking it on, and the corners have to be about the
-        picture rather than about the row under it.
+        Re-run after every change to the picture: showing media is what takes them
+        away, everything they report moves under the picture too, and an autoshow
+        arms them as readily as an explicit selection. ``prompt_id`` names the
+        generation when it is NOT the row this tab holds — a followed run's picture
+        goes up without the tab taking it on.
         """
         if prompt_id is None and self._displayed_row is not None:
             prompt_id = self._displayed_row["prompt_id"]
@@ -1402,14 +1310,13 @@ class GenerateConfigPanel(QWidget):
             self._arm_preview_actions(armed)
 
     def _note_displayed_config(self):
-        """Take the settings a generation arriving in this tab is being shown under
-        as the mark to measure edits against, and clear any notice left from the
-        last one. From here it is the form moving away from these that says the
-        picture is no longer what a Generate would make.
+        """Take the settings a generation arriving in this tab is shown
+        under as the mark to measure edits against, and clear any notice left from
+        the last one.
 
-        For a generation *arriving* — the one the form was just seeded from, or the
-        result this tab's own Generate made. What happens to the generation already
-        on display leaves the mark alone (see :meth:`_display_result`).
+        For a generation *arriving* -- the one the form was just seeded from, or
+        the result this tab's own Generate made. What happens to the generation
+        already on display leaves the mark alone (see :meth:`_display_result`).
         """
         self._displayed_config = (
             self._item_config() if self._displayed_row is not None else None
@@ -1427,16 +1334,9 @@ class GenerateConfigPanel(QWidget):
     def refresh_modified_notice(self):
         """Mark the preview when the form no longer describes the picture on it.
 
-        A tab pointed at a saved generation — a browsed selection, a finished run,
-        or the idle autoshow of this config's newest result — shows that
-        generation's output beside the settings that made it. Change any of them
-        and what's on screen stops being an answer to what the form now asks, so
-        the preview says so instead of standing there as a silent one. Putting the
-        settings back takes the notice away again.
-
-        Public because the version list re-shows a level of the same row from
-        outside the form, and anything that changes what's on screen clears the
-        notice — so whoever did that re-asserts it.
+        Putting the settings back takes the notice away again. Public because the
+        version list re-shows a level of the same row from outside the form, which
+        clears the notice, so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
                     and not self._would_remake_what_it_shows())
@@ -1458,15 +1358,13 @@ class GenerateConfigPanel(QWidget):
             lane.button.hide()
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview, request=None):
-        """Reveal the info and actions for the generation on display: the read-only
-        metadata block for every selection, the source tile + Evolver for a video,
-        and the animations strip for an image. ``preview`` is the already-resolved
-        ``(path, media_type)`` (or ``None``), so Evolver keys off the same on-disk
-        lookup.
+        """Reveal the info and actions for the generation on display: the
+        read-only metadata block for every selection, the source tile + Evolver for
+        a video, and the animations strip for an image. ``preview`` is the resolved
+        ``(path, media_type)`` (or ``None``), so Evolver keys off the same lookup.
 
-        ``request`` is the spoken request that made this row, when one did: it
-        marks the prompt fields with what it changed and points the source tile
-        at the item it was asked about."""
+        ``request`` is the spoken request that made this row, when one did.
+        """
         self.reread_folder_buttons()
         # An image's files are all listed as its versions, so its block is at
         # most the workflow version — it shows only when it has content rather
@@ -1490,25 +1388,13 @@ class GenerateConfigPanel(QWidget):
     def set_pending_enhancement(self, pending: RunningEnhancement | None):
         """Reflect an enhancement being generated for the image on display.
 
-        ``pending`` is a :class:`RunningEnhancement` while one is running,
-        ``None`` otherwise. Fed from the gallery, which owns the jobs. A new
-        frame updates the level's row in place; only a run starting or ending
-        rebuilds the list, so a stream of frames doesn't thrash the layout.
-
-        The frame also goes up to the preview — a run of this image is a run
-        you are watching, and the pane at the top of the tab is where this app
-        shows you what is being made. It was the one surface that stayed on the
-        old picture while the little row beside it streamed. When the run ends,
-        the preview goes back to the image itself (by then the enhanced one).
-
-        These frames keep whatever the pane is saying about the picture rather
-        than clearing it, which every other live frame does. An enhancement is
-        not a run of the settings beside it — it is the coming state of the very
-        image those settings are being edited away from — so a mark that the form
-        has moved off it is as true of the version being made. Clearing it here
-        left the mark and the frames trading places several times a second while
-        the form was typed in: each frame took the mark off, each keystroke put
-        it back.
+        ``pending`` is a :class:`RunningEnhancement` while one is running, ``None``
+        otherwise. A frame updates the level's row in place and goes up to the
+        preview; only a run starting or ending rebuilds the list. These frames keep
+        whatever the pane says about the picture rather than clearing it, which
+        every other live frame does: an enhancement is the coming state of that
+        very image, and clearing it left the mark and the frames trading places
+        several times a second while the form was typed in.
         """
         if pending == self._pending_enhancement:
             return

@@ -716,6 +716,12 @@ def main(argv: list[str] | None = None) -> int:
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 
+    # Before the boot rather than after it: a launch here takes a minute, and a
+    # notice clicked during one is a click that would otherwise find nobody
+    # listening and start a second copy of the app (origenerator.app_link).
+    from origenerator.gui.link_listener import LinkListener
+    clicked_notices = LinkListener(parent=app)
+
     loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
@@ -778,6 +784,9 @@ def main(argv: list[str] | None = None) -> int:
     if still_offered:
         from shared_ui.foreground import bring_to_front
         bring_to_front(window)
+    # Last, so a click that came in during the boot lands on a window that is
+    # up and in front rather than on one still being built.
+    clicked_notices.answer_with(window.go_to_generation)
 
     from origenerator.freeze_watch import watch_the_window
     if crash_log is not None:

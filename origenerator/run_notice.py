@@ -19,6 +19,9 @@ class RunOutcome:
     line — a quick image that waited its turn after a video is not a long run —
     and ``None`` from a run that died before ComfyUI ever started it.
     ``source`` is who asked for it, in the word its database row stores.
+    ``generation`` is the item the run is about, which a notice of it is a way
+    back to: the run's own id, except for an enhance, whose own row is folded
+    into the picture it improved the moment it lands.
     """
 
     kind: str
@@ -26,15 +29,18 @@ class RunOutcome:
     seconds: float | None
     ok: bool
     source: str
+    generation: str
 
 
 @dataclass(frozen=True)
 class Notice:
-    """One thing to say, in the two lines a desktop notification gives it."""
+    """One thing to say, in the two lines a desktop notification gives it, and
+    the item it takes the user to when they answer it."""
 
     title: str
     body: str
     ok: bool
+    generation: str
 
 
 def notice_for(outcome: RunOutcome) -> Notice | None:
@@ -46,6 +52,8 @@ def notice_for(outcome: RunOutcome) -> Notice | None:
         return None
     took = clock_duration(outcome.seconds)
     if outcome.ok:
-        return Notice(f"{outcome.kind} ready", f"{outcome.recipe} · {took}", ok=True)
+        return Notice(f"{outcome.kind} ready", f"{outcome.recipe} · {took}", ok=True,
+                      generation=outcome.generation)
     return Notice(f"{outcome.kind} failed",
-                  f"{outcome.recipe} · stopped after {took}", ok=False)
+                  f"{outcome.recipe} · stopped after {took}", ok=False,
+                  generation=outcome.generation)

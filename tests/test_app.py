@@ -945,6 +945,21 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
     assert window not in [fronting.args[0] for fronting in fronted.call_args_list]
 
 
+def test_a_boot_answers_a_clicked_notice_with_the_window_it_just_built(qapp):
+    # The listening starts before the window does (a launch here is slow enough
+    # to click into twice), so the window has to be handed to it once there is
+    # one -- with anything that arrived meanwhile still waiting.
+    window = MagicMock()
+    listener = MagicMock()
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.gui.link_listener.LinkListener": listener,
+    }):
+        assert main([]) == 0
+
+    listener.return_value.answer_with.assert_called_once_with(window.go_to_generation)
+
+
 def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
     window = MagicMock()
     watch = MagicMock()

@@ -280,18 +280,25 @@ def _never_take_the_real_device(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
-    """Keep the suite out of the registry and out of the real AppData.
+    """Keep the suite out of the registry, out of the real AppData, and off the
+    user's screen.
 
     Every window this suite builds builds the desktop notices with it, and those
-    name the app to Windows: a value under HKEY_CURRENT_USER and a mark written
-    beside it, both of which belong to a real launch rather than to a test's
-    fiftieth throwaway window. The registration is replaced and the mark is
-    pointed at a directory of the run's own; the test that covers either
+    name the app to Windows: two values under HKEY_CURRENT_USER — what to call
+    this app over a notification, and what a click on one runs — and a mark
+    written beside them, all of which belong to a real launch rather than to a
+    test's fiftieth throwaway window. And a notice raised here would be a
+    notification on the user's desktop and a line in their notification center,
+    from a run that never happened. All three are replaced and the marks are
+    pointed at a directory of the run's own; the test that covers any of them
     supplies its own stand-in over these.
     """
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
     monkeypatch.setattr(desktop_notices, "register_notification_identity",
                         lambda *_a, **_kw: None)
+    monkeypatch.setattr(desktop_notices, "register_link_handler",
+                        lambda *_a, **_kw: None)
+    monkeypatch.setattr(desktop_notices, "show_toast", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(autouse=True)

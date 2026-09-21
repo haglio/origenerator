@@ -7,6 +7,7 @@ from dataclasses import replace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow, QMessageBox
+from shared_ui.foreground import bring_to_front
 from shared_ui.preview import Preview, window_title
 
 from origenerator import ui_scale
@@ -16,7 +17,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
-from origenerator.fun_time_bridge import FunTimeBridge
+from origenerator.fun_time_bridge import FunTimeBridge, ask_for_origenerator_mode
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
@@ -205,6 +206,23 @@ class OrigeneratorWindow(QMainWindow):
         super().showEvent(event)
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
+
+    def go_to_generation(self, prompt_id: str) -> None:
+        """Put a generation in front of the user, from outside this window.
+
+        What a clicked notification comes to (:mod:`origenerator.app_link`).
+        Standalone that means this window over whatever they had moved on to;
+        hosted, the window is the session's to show and taking the foreground
+        for it would put it over the room instead, so the room is asked for the
+        mode this window is seen in and shows it when it gets there.
+        """
+        if self._fun_time is not None:
+            ask_for_origenerator_mode(self._fun_time.dashboard_cmd_file)
+        else:
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            self.show()
+            bring_to_front(self)
+        self._gallery_view.follow_link(prompt_id)
 
     def the_session_has_the_device(self, held: bool) -> None:
         """A Fun Time session running beside this window has the OSR2, or not."""

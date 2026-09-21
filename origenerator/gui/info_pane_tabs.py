@@ -578,6 +578,10 @@ class InfoPaneTabs(QTabWidget):
         for panel in self.config_panels():
             panel.reconcile_preview(live_ids)
 
+    def reread_folder_buttons(self):
+        for panel in self.config_panels():
+            panel.reread_folder_buttons()
+
     def release_media(self, paths):
         """Let every tab go of any of ``paths`` it's showing — files about to be
         moved or deleted.

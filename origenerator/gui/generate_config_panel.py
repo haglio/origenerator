@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QFormLayout,
     QLabel,
@@ -109,6 +109,8 @@ _WAITING_NOTE = "Waiting for preview…"
 # the button asks for is one thing — this folder, said the way it now reads.
 _REQUEST_GUARD = "Rewrite the prompt first"
 
+_GO_TO_FOLDER_TIP = "Go to the folder this item is in"
+
 
 class GenerateConfigPanel(QWidget):
     """One generation configuration: pick a workflow and set its params.
@@ -137,7 +139,9 @@ class GenerateConfigPanel(QWidget):
     the preview wears the same star / trash / plus corners a gallery thumbnail of
     it does, and right-clicking it raises the same menu — go to its folder,
     bookmark it, enhance it, bin it. A picture is where those belong, and a bank
-    under the settings was a strange place to keep a "Go to folder".
+    under the settings was a strange place to keep a "Go to folder". Each file
+    row carries one too, beside its Show in Explorer: a row that says where the
+    file is offers both ways there, and neither asks for a right-click.
 
     A fresh panel opens with no workflow picked — the picker sits on its
     placeholder, and everything the workflow decides (its typical time, its param
@@ -157,6 +161,7 @@ class GenerateConfigPanel(QWidget):
     animated_activated = pyqtSignal(str)    # an animation tile was clicked (prompt_id)
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
+    go_to_folder_requested = pyqtSignal(str)  # a file row's "Go to folder": the shown prompt_id
     generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
     # Generate clicked on a folder rewrite: (source folder key, workflow_name, form
     # params). A separate signal because it asks for something else entirely — one
@@ -236,6 +241,12 @@ class GenerateConfigPanel(QWidget):
         # than a flag because the loads nest (restore_config prefills, prefill
         # re-picks the workflow, which re-seeds the carried-over fields).
         self._loading_config = 0
+        # One for the generation on display, drawn on each of its file rows:
+        # every version of it lives in the same folder.
+        self._go_to_folder = QAction("Go to folder", self)
+        self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
+        self._go_to_folder.triggered.connect(self._on_go_to_folder)
+        self._can_go_to_folder = None   # the gallery's; see set_folder_check
         self._build_ui()
 
     @contextmanager
@@ -341,7 +352,7 @@ class GenerateConfigPanel(QWidget):
         generation). Above the form, because it names what the settings below it
         made. Params — editable or read-only — all live in that form now, so
         this block carries only those facts."""
-        self._metadata_block = MetadataBlock()
+        self._metadata_block = MetadataBlock(go_to_folder=self._go_to_folder)
         self._metadata_block.hide()
         body.addWidget(self._metadata_block)
 
@@ -417,7 +428,7 @@ class GenerateConfigPanel(QWidget):
         # earlier levels (and the original) are, each captioned with what made
         # it and draggable onto the Enhance subpanel to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
-        self._versions = EnhanceVersions()
+        self._versions = EnhanceVersions(go_to_folder=self._go_to_folder)
         # What the list is showing, in its order: the positions its rows report
         # are only good against this.
         self._listed_levels = []
@@ -1401,6 +1412,7 @@ class GenerateConfigPanel(QWidget):
         ``request`` is the spoken request that made this row, when one did: it
         marks the prompt fields with what it changed and points the source tile
         at the item it was asked about."""
+        self.reread_folder_buttons()
         # An image's files are all listed as its versions, so its block is at
         # most the workflow version — it shows only when it has content rather
         # than opening a bare gap above the form.
@@ -1494,6 +1506,26 @@ class GenerateConfigPanel(QWidget):
     def _on_enhance_requested(self):
         if self._displayed_row is not None:
             self.enhance_requested.emit(self._displayed_row["prompt_id"])
+
+    def _on_go_to_folder(self):
+        if self._displayed_row is not None:
+            self.go_to_folder_requested.emit(self._displayed_row["prompt_id"])
+
+    def set_folder_check(self, can_go) -> None:
+        """How to ask whether the generation on display has a folder to be gone
+        to. The gallery's question to answer, since it knows where it stands."""
+        self._can_go_to_folder = can_go
+
+    def reread_folder_buttons(self) -> None:
+        """Put a "Go to folder" on the file rows, or take it off.
+
+        Asked again whenever the gallery moves or the generation on display
+        changes: standing in the folder the picture is in, there is nowhere for
+        it to go, and a button that would do nothing is not drawn at all.
+        """
+        row, can_go = self._displayed_row, self._can_go_to_folder
+        self._go_to_folder.setVisible(
+            row is not None and can_go is not None and can_go(row))
 
     def _on_levels_delete_requested(self, positions: list):
         """Relay a version-list delete by filename, not by position.

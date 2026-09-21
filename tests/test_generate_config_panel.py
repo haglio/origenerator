@@ -1034,7 +1034,9 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
 def test_each_level_carries_its_own_file_row(saved_panel):
     # The file information is per enhancement, so it sits with the level that
     # made it — the same File row a metadata block renders, copy button and all,
-    # rather than a pooled block at the top labeled with a level's name.
+    # rather than a pooled block at the top labeled with a level's name. Both
+    # ways to the file stand on it, in the order they are worth reaching for:
+    # the OS folder, then the gallery folder.
 
     panel, db = saved_panel
     image = _enhanced_image_row(db)
@@ -1044,8 +1046,8 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     assert "image/image_enhance_00001_.png" in _row_texts(rows[0])
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
     for row in rows:
-        names = {b.objectName() for b in row.findChildren(QPushButton)}
-        assert "copyButton" in names and "revealButton" in names
+        names = [b.objectName() for b in row.findChildren(QPushButton)]
+        assert names == ["copyButton", "revealButton", "goToFolderButton"]
         assert "Created" in _row_texts(row)
     # ...and the block at the top has nothing left to repeat.
     assert panel._metadata_block.isHidden()

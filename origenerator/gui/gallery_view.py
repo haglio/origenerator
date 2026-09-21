@@ -1091,6 +1091,8 @@ class GalleryView(QWidget):
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self.follow_link)
         panel.animated_activated.connect(self.follow_link)
+        panel.go_to_folder_requested.connect(self.follow_link)
+        panel.set_folder_check(self._can_open_containing_folder)
         # Its preview's corners and its right-click are the same acts, on the same
         # generation, as a browser thumbnail's — so they land in the same places.
         panel.item_action_requested.connect(self.run_item_action)
@@ -2961,7 +2963,7 @@ class GalleryView(QWidget):
 
     def _re_aim(self) -> None:
         """Re-aim everything that follows what is in front of the user: the whole
-        bank, and the Enhance settings beside it.
+        bank, the Enhance settings beside it, and each tab's "Go to folder".
 
         One call rather than nine. Which buttons an event moves is not something
         a handler should have to know — that knowledge was what two bugs came out
@@ -2971,6 +2973,7 @@ class GalleryView(QWidget):
         enhance = self._enhance.offer()
         self._bank.apply(self.bank_state(enhance))
         self._enhance.sync_panel(enhance)
+        self._info_tabs.reread_folder_buttons()
 
     def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
@@ -3891,7 +3894,8 @@ class GalleryView(QWidget):
 
         A deleted one has none — it left its folder when its row did — and neither
         has one whose folder is already the pane you are standing in, where going
-        there would be a click that changes nothing.
+        there would be a click that changes nothing. Both the right-click's entry
+        and the file rows' button are simply absent when this says no.
         """
         if row.get("deleted_at") is not None:
             return False

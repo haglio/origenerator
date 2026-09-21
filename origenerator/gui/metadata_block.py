@@ -9,14 +9,16 @@ versions, listed with the level that made each. The model lives in
 :mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
 The block is a titled set of ``label: value`` rows; a row gains a
-copy-to-clipboard button when its item declares copyable text (a filename).
+copy-to-clipboard button when its item declares copyable text (a filename), and
+a file row gains the two ways to where that file is — Show in Explorer, and Go
+to folder for the gallery folder its generation sits in.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtGui import QAction, QFontMetrics
 from PyQt6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -48,8 +50,9 @@ class MetadataBlock(QWidget):
     editable form doesn't already cover.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
         super().__init__(parent)
+        self._go_to_folder = go_to_folder
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
@@ -79,12 +82,12 @@ class MetadataBlock(QWidget):
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         if section is not None:
-            layout.addWidget(_build_section(section))
+            layout.addWidget(_build_section(section, self._go_to_folder))
         self._container = container
         self._outer.addWidget(container)
 
 
-def _build_section(section: MetaSection) -> QWidget:
+def _build_section(section: MetaSection, go_to_folder: QAction | None = None) -> QWidget:
     """One titled block, folding like every other section in the pane.
 
     It sits among the form's own sections, so it folds by the same header rather
@@ -97,7 +100,7 @@ def _build_section(section: MetaSection) -> QWidget:
     layout.setSpacing(4)
     label_width = label_column_width(section.items)
     for item in section.items:
-        layout.addWidget(meta_row(item, label_width))
+        layout.addWidget(meta_row(item, label_width, go_to_folder))
     block.content_form().addRow(rows)
     return block
 
@@ -114,9 +117,11 @@ def label_column_width(items: list[MetaItem]) -> int:
     return max(metrics.horizontalAdvance(text) for text in labels) + 12
 
 
-def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
-    """One item's four cells — ``(label, value, copy, reveal)`` — the last two
-    ``None`` unless the item declares copyable text or a path to reveal.
+def meta_cells(item: MetaItem, label_width: int = 0,
+               go_to_folder: QAction | None = None) -> tuple:
+    """One item's five cells — ``(label, value, copy, reveal, folder)`` — the
+    last three ``None`` unless the item declares copyable text or a path to
+    reveal, and a path to reveal gets ``go_to_folder`` beside it.
 
     Public as cells rather than only as a finished row because the version list
     lays these into a grid of its own: a level's File line carries the same
@@ -129,10 +134,13 @@ def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
         _value_widget(item),
         CopyButton(item.copy) if item.copy is not None else None,
         _reveal_button(item.reveal) if item.reveal is not None else None,
+        _folder_button(go_to_folder)
+        if item.reveal is not None and go_to_folder is not None else None,
     )
 
 
-def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
+def meta_row(item: MetaItem, label_width: int = 0,
+             go_to_folder: QAction | None = None) -> QWidget:
     """A ``label: value`` row, gaining a copy-to-clipboard button when the item
     declares copyable text. ``label_width`` aligns keys within the section."""
     row = QWidget()
@@ -140,32 +148,64 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(8)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    label, value, copy, reveal = meta_cells(item, label_width)
+    label, value, *buttons = meta_cells(item, label_width, go_to_folder)
     layout.addWidget(label)
     layout.addWidget(value, 1)
-    for button in (copy, reveal):
+    for button in buttons:
         if button is not None:
             layout.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
     return row
 
 
+def _dressed(btn: QPushButton, name: str) -> QPushButton:
+    """The dress a file row's buttons share with the copy button beside them, so
+    the three read as one row of controls rather than three widgets."""
+    btn.setObjectName(name)
+    btn.setStyleSheet("padding: 2px 6px;")
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    return btn
+
+
 def _reveal_button(target: str) -> QPushButton:
     """A "Show in Explorer" button revealing the output file selected in the OS
-    file manager. Greyed out (with a hint) when the file is no longer on disk —
+    file manager. Grayed out (with a hint) when the file is no longer on disk —
     trashed or moved — so it never opens the wrong place.
 
     The longest label on any file row, so it is the one that decides how narrow a
     pane holding file rows can be squeezed: it elides rather than hold that width
     (see :mod:`origenerator.gui.eliding`)."""
-    btn = ElidingButton("Show in Explorer")
-    btn.setObjectName("revealButton")
-    btn.setStyleSheet("padding: 2px 6px;")
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn = _dressed(ElidingButton("Show in Explorer"), "revealButton")
     exists = Path(target).exists()
     btn.setEnabled(exists)
     btn.setToolTip("Show this file in Explorer" if exists else "File not found on disk")
     btn.clicked.connect(lambda _checked=False: show_in_explorer(Path(target)))
     return btn
+
+
+class _ActionButton(ElidingButton):
+    """A button standing for ``action``: pressing it triggers the action, and
+    whether it is there at all, whether it is live and what it says on hover are
+    the action's to move, so every button built for one act answers a change of
+    mind together."""
+
+    def __init__(self, action: QAction):
+        super().__init__(action.text())
+        self._action = action
+        self.clicked.connect(lambda _checked=False: action.trigger())
+        action.changed.connect(self._follow)
+        self._follow()
+
+    def _follow(self) -> None:
+        self.setVisible(self._action.isVisible())
+        self.setEnabled(self._action.isEnabled())
+        self.setToolTip(self._action.toolTip())
+
+
+def _folder_button(action: QAction) -> QPushButton:
+    """The "Go to folder" beside Show in Explorer: the same file's home, in the
+    gallery rather than in Explorer. Every file row of one generation shows the
+    same act, which is why they are all built for the one action."""
+    return _dressed(_ActionButton(action), "goToFolderButton")
 
 
 def _label_widget(text: str, width: int) -> QLabel:

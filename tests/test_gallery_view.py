@@ -2544,6 +2544,96 @@ def test_go_to_folder_from_a_shelf_opens_the_folder_and_lands_on_the_item(
     assert view.selected_prompt_ids() == ["i2"]
 
 
+def _folder_buttons(view):
+    """The "Go to folder" buttons the front tab is actually drawing."""
+    panel = view._info_tabs.current_config_panel()
+    return [button for button in panel.findChildren(QPushButton, "goToFolderButton")
+            if button.isVisibleTo(panel)]
+
+
+def test_the_file_rows_go_to_folder_takes_a_shelf_item_home_without_a_right_click(qtbot):
+    # Pressed and released like a real one, because going there rebuilds the
+    # file rows: the button is destroyed in the middle of its own click.
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)
+    (button,) = _folder_buttons(view)
+    button.show()   # an unshown button has no rect for a press to land in
+
+    qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+    assert view._tree.currentItem() is view._leaf_by_id["i2"]
+    assert view.selected_prompt_ids() == ["i2"]
+
+
+def test_the_file_rows_carry_no_go_to_folder_inside_the_items_own_folder(qtbot):
+    # Standing in the folder already, there is nowhere for it to take you, and a
+    # button that would do nothing is not drawn — the rule its right-click entry
+    # has always followed.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])   # which opens on i1
+
+    assert _folder_buttons(view) == []
+
+
+def test_a_deleted_items_file_row_offers_no_way_to_a_folder(qtbot):
+    view = _trash_shelf_view(qtbot, FakeActions())
+
+    view._browser._thumb_widgets["d1"].clicked.emit("d1", _NO_MOD)
+
+    assert _folder_buttons(view) == []      # it left its folder when its row did
+
+
+def test_a_videos_file_row_offers_the_same_way_to_its_folder(qtbot):
+    # A video's file is listed in the block above the form rather than among
+    # versions it has none of, and that row is a file row like any other.
+    view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._browser._thumb_widgets["v1"].clicked.emit("v1", _NO_MOD)
+
+    (button,) = _folder_buttons(view)
+    button.click()
+
+    assert view._tree.currentItem() is view._leaf_by_id["v1"]
+
+
+def test_hiding_a_kind_takes_away_the_folder_its_go_to_folder_pointed_at(qtbot):
+    # The ticks prune the tree, so a tab left showing a hidden kind is showing a
+    # picture whose folder is no longer anywhere to go.
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
+    assert _folder_buttons(view)
+
+    view._image_cb.setChecked(False)
+
+    assert _folder_buttons(view) == []
+
+
+def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    assert _folder_buttons(view) == []
+
+    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])   # the tab stays on i1
+
+    (button,) = _folder_buttons(view)
+    assert button.toolTip() == "Go to the folder this item is in"
+
+
 def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]

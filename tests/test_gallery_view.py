@@ -68,6 +68,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.media_badge import MediaBadge
@@ -9127,7 +9128,7 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
     # The show covers the strip, and a show is the one stretch where the line
-    # deliberately stops moving — so the queue follows onto the surface in front
+    # deliberately stops moving — so the queue follows onto the panel in front
     # of the user, in the same order.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
@@ -9139,26 +9140,23 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
-    floated = view._shows.showing.queue()
+    show = view._shows.showing
 
     # Filled at the opening rather than a poll and a half later, and with the
-    # same rows and the same live half the docked strip is showing.
-    assert floated.keys() == view._queue.keys() == ["gen1"]
-    assert floated._running.key == "gen1"
-    assert not floated.isHidden()
+    # same rows and the same job being made the docked strip is showing.
+    assert [item.key for item in show.hud_queue[0]] == view._queue.keys() == ["gen1"]
+    assert queue_section(*show.hud_queue).leader.key == "gen1"
 
     db.delete_generation("gen1")  # the job ends
     view._poll()
-    assert floated.isHidden()  # nothing in flight, nothing over the picture
+    assert queue_section(*show.hud_queue) is None  # nothing in flight, no block
 
-    view._shows.showing.close()
+    show.close()
 
 
 def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
-    # The float is the same widget as the lower strip and asks for the same
-    # things, so it reaches the same handler.
-
-
+    # The block on the show's panel lists the same line as the lower strip and
+    # asks for the same things, so it reaches the same handler.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("gen1", prompt="a dog"))
@@ -9173,9 +9171,10 @@ def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeyp
         _select_first_leaf(view)
         view._shows.start()
         qtbot.addWidget(view._shows.showing)
+        show = view._shows.showing
 
-        before = view._shows.showing.queue().keys()
-        view._shows.showing.queue().move_row(2, 1)  # the last waiting job, up one
+        before = [item.key for item in show.hud_queue[0]]
+        show.requeue([before[0], before[2], before[1]])  # the last waiting job, up one
 
         reorder.assert_called_once_with([before[0], before[2], before[1]])
     view._shows.showing.close()

@@ -58,6 +58,9 @@ THE_SET = (
     # The device half of the one panel a show wears: what to draw on it, and
     # what a press on its rows asks for.
     "hud_device", "press_console",
+    # The queue block at that panel's foot: what is in flight, the order a row
+    # dragged down it asks for, and the Clear that drops another app's work.
+    "hud_queue", "requeue", "clear_foreign_queue",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so

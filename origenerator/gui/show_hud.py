@@ -26,8 +26,12 @@ library.  A thumbnail click jumps the show to that item, the way a map click
 switches a player, and the map's own chrome — the two loop buttons and the
 expand mark — means here what it means there.
 
-It is the ONE panel a show wears.  Fun Time splits what is here across two
-windows — each satellite's HUD for the set, the main player's console for the
+It is the ONE panel a show wears, and everything a show has to say is on it:
+the set, the device on a host driving one, and — at its foot — the generation
+queue the covered lower strip would be showing
+(:mod:`origenerator.gui.hud_queue`), whose rows are pressed, dragged and named
+through the same declared buttons as the panel's own.  Fun Time splits what is
+here across two windows — each satellite's HUD for the set, the main player's console for the
 device — because there they are two players; a show is one host doing both, and
 wearing both panels put two status lines that disagreed on one screen with
 prev/next/lock/trash drawn on each.  So the host hands over its device half
@@ -76,6 +80,14 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.console_commands import side_press, spelled_for
 from origenerator.gui.console import REPAINT_MS
+from origenerator.gui.hud_queue import (
+    CANCEL,
+    CLEAR,
+    FRAME,
+    OPEN,
+    ROWS,
+    queue_section,
+)
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import thumb_of
@@ -87,6 +99,9 @@ from origenerator.ui_scale import (
 )
 
 _REFRESH_MS = 300  # the players re-read their published panel on a tick too
+# How far a press on a queue row has to travel before it is a drag rather than
+# the click that opens the job's folder.
+_DRAG_START = 6
 
 # The two states with a line that moves: something is being sent, so the trace
 # scrolls and the panel has to keep up with it.
@@ -111,7 +126,7 @@ def _cell(slide, label: str = "") -> HudCell:
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
-                   own_window: bool = True, device=None) -> HudModel | None:
+                   own_window: bool = True, device=None, foot=None) -> HudModel | None:
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_map`` unanswered).
 
@@ -121,6 +136,11 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     :func:`~origenerator.show_buttons.show_rows`) and what reset goes back
     to.  Both default to what a region show wants, which is what every reading
     of one wants; :class:`ShowHud` and a show handed to a player pass their own.
+
+    *foot* is the block the host paints at the panel's foot — Origenerator's own
+    generation queue (:mod:`origenerator.gui.hud_queue`), since a show covers the
+    strip that carries it and a show wears ONE panel.  None where there is
+    nothing in flight, and on any reading of the model that only wants the set.
 
     *device* is what this window is doing to the OSR2
     (:class:`~origenerator.gui.console.ShowDevice`), for the one panel a show
@@ -172,6 +192,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         osr2_control=device.osr2_control if device is not None else "",
         drive=device.drive if device is not None else None,
         max_intensity=device.max_intensity if device is not None else None,
+        foot=foot,
         corner=_cell(shown.corner),
         seeds=tuple(_cell(slide) for slide in shown.seeds),
         actions=tuple(_cell(row.slide, row.label) for row in shown.column),
@@ -216,6 +237,13 @@ class ShowHud(QLabel):
         self._hover_loop = ""
         self._hover_tip = ""
         self._hover_pos = (0, 0)
+        # The queue block's own state, which belongs to the panel rather than to
+        # the line: which row its window opens on, the press waiting to turn out
+        # a click or a drag, and where that drag would drop.
+        self._queue_first = 0
+        self._queue_press: tuple[str, int, int, bool] | None = None
+        self._queue_drag: str | None = None
+        self._queue_drop: int | None = None
         self.setMouseTracking(True)  # hover tooltips render into the bitmap
         # Its map is clicked and hovered, so the mouse stops here.
         float_over_media(self, click_through=False)
@@ -250,7 +278,8 @@ class ShowHud(QLabel):
     def _tick(self) -> None:
         model = show_hud_model(self._side, self._host,
                                hosted=self._dashboard_cmd_file is not None,
-                               device=self._host.hud_device)
+                               device=self._host.hud_device,
+                               foot=self._queue())
         if model is not None:
             model = replace(model, hud_corner=self._corner,
                             hud_minimized=self._minimized)
@@ -329,6 +358,95 @@ class ShowHud(QLabel):
         if self.isHidden():
             self.show()
 
+    # --- the queue block, which is this app's own ---------------------------
+
+    def _queue(self):
+        """What is in flight, as the block the panel hangs at its foot."""
+        items, foreign = self._host.hud_queue
+        return queue_section(items, foreign, first=self._queue_first,
+                             drop_at=self._queue_drop)
+
+    def _queue_item(self, key: str):
+        """The job that row stands for, or ``None`` once it has left the line."""
+        return next((item for item in self._host.hud_queue[0] if item.key == key), None)
+
+    def _press_queue(self, verb: str, key: str) -> None:
+        """A press on the block: throw a job away, go to the folder it will land
+        in, or drop another app's work.
+
+        A press on a ROW reaches this only once the release says it was a click
+        rather than the start of a drag down the line
+        (:meth:`mouseReleaseEvent`).
+        """
+        if verb == CLEAR:
+            self._host.clear_foreign_queue()
+        elif verb == CANCEL:
+            item = self._queue_item(key)
+            if item is not None and item.cancel is not None:
+                item.cancel()
+        else:
+            item = self._queue_item(key)
+            if item is not None:
+                item.reveal()
+        self._tick()
+
+    def _queue_rows(self) -> list[tuple[tuple, str]]:
+        """Each drawn row's rect and the job it stands for, in the order drawn."""
+        if self._targets is None:
+            return []
+        return [(rect, button.command.partition("|")[2])
+                for rect, button in self._targets.buttons
+                if button.command.startswith(f"{OPEN}|")]  # not the head's picture
+
+    def _drop_index(self, py: int) -> int:
+        """Which slot in the line a drop at ``py`` lands in: above the row whose
+        upper half it fell on, else at the end of what is drawn."""
+        rows = self._queue_rows()
+        for index, (rect, _key) in enumerate(rows):
+            if py < rect[1] + rect[3] / 2:
+                return self._queue_first + index
+        return self._queue_first + len(rows)
+
+    def _drag_to(self, key: str, target: int) -> None:
+        """Re-line the queue with *key*'s row let go at *target*.
+
+        Nothing may be moved in front of what ComfyUI is already rendering, and
+        a row let go where it already was asks for nothing.
+        """
+        items = self._host.hud_queue[0]
+        keys = [item.key for item in items]
+        if key not in keys:
+            return
+        source = keys.index(key)
+        # The slot was read with the dragged row still in place, so a drop below
+        # it names one further along than it will end up in.
+        target = min(target - 1 if target > source else target, len(keys) - 1)
+        first = next((index for index, item in enumerate(items)
+                      if not item.reading.rendering), len(items))
+        if not first <= source or not first <= target:
+            return
+        moved = list(keys)
+        moved.insert(target, moved.pop(source))
+        if moved != keys:
+            self._host.requeue(moved)
+
+    def wheelEvent(self, event):
+        """Scroll the line past the rows the block draws.
+
+        Only over the block itself: the wheel anywhere else on the panel is not
+        this app's to take, and a map that scrolled under the pointer would be a
+        surprise.
+        """
+        px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        rows = self._queue_rows()
+        if not rows or not any(rect[1] <= py < rect[1] + rect[3] for rect, _key in rows):
+            super().wheelEvent(event)
+            return
+        steps = event.angleDelta().y() // 120 or (1 if event.angleDelta().y() > 0 else -1)
+        lines = len(self._host.hud_queue[0])
+        self._queue_first = max(0, min(self._queue_first - steps, max(0, lines - ROWS)))
+        self._tick()
+
     # --- presses, the players' own grammar --------------------------------
 
     def mousePressEvent(self, event):
@@ -339,18 +457,38 @@ class ShowHud(QLabel):
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
         command = self._clicks.press(self._targets, px, py,
                                      now=time.monotonic())
+        verb, _, key = command.partition("|")
+        if verb in (OPEN, FRAME):
+            # A row is pressed for two things — its folder and a place further
+            # down the line — so the press is held until the release says which.
+            # The head's picture is pressed for the folder alone.
+            self._queue_press = (key, px, py, verb == OPEN)
+            return
         if command:
             self._deliver(command)
 
     def mouseReleaseEvent(self, event):
-        """Let go of whichever readout band the press took hold of."""
+        """Let go of whichever readout band the press took hold of, and finish
+        whatever a press on the queue turned out to be."""
         self._clicks.release()
+        pending, self._queue_press = self._queue_press, None
+        dragged, drop = self._queue_drag, self._queue_drop
+        self._queue_drag, self._queue_drop = None, None
+        if dragged is not None:
+            if drop is not None:
+                self._drag_to(dragged, drop)
+            self._tick()
+        elif pending is not None:
+            self._press_queue(OPEN, pending[0])
 
     def mouseMoveEvent(self, event):
         if self._targets is None:
             return
 
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        if self._queue_press is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            self._drag_row(px, py)
+            return
         if self._clicks.holding:
             # A band the press took hold of goes on being set as the pointer
             # moves, so a level can be dragged and not only clicked.
@@ -362,6 +500,25 @@ class ShowHud(QLabel):
             return
         self._hover_loop, self._hover_tip, self._hover_pos = hover, tip, (px, py)
         self._draw()
+
+    def _drag_row(self, px: int, py: int) -> None:
+        """A press on a row that travels is a drag, and the block marks where it
+        would land.  The row being rendered stays where it is: nothing can be
+        moved in front of what ComfyUI is already working on, itself included.
+        """
+        key, start_x, start_y, draggable = self._queue_press
+        if self._queue_drag is None:
+            if not draggable or abs(px - start_x) + abs(py - start_y) < _DRAG_START:
+                return
+            line = next((line for line in (self._model.foot.lines if self._model
+                                           and self._model.foot else ())
+                         if line.key == key), None)
+            if line is None or not line.movable:
+                self._queue_press = None
+                return
+            self._queue_drag = key
+        self._queue_drop = self._drop_index(py)
+        self._tick()
 
     def _deliver(self, command: str) -> None:
         """Route one HUD press: what the show answers for itself lands on it,
@@ -380,6 +537,9 @@ class ShowHud(QLabel):
         if not command:
             return
         verb, _, path = command.partition("|")
+        if verb in (CANCEL, CLEAR, FRAME, OPEN):
+            self._press_queue(verb, path)  # this app's own line, never a session's
+            return
         action, path = side_press(self._side, verb, path)
         if action in _COLLAPSES:
             self._collapse_here_or_out_there(command, _COLLAPSES[action])

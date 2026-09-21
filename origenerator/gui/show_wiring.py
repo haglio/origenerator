@@ -64,6 +64,11 @@ class ShowActions:
     reset: Callable[[object], None] | None = None
     reorder: Callable[[object, bool], bool] | None = None
     browse_all: Callable[[object], bool] | None = None
+    # The generation queue's own two, for the block the panel hangs at its foot:
+    # ``requeue`` takes the ids in the order the rows were dropped into, and
+    # ``clear_queue`` drops another app's work off ComfyUI.
+    requeue: Callable[[list], None] | None = None
+    clear_queue: Callable[[], None] | None = None
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None

@@ -52,12 +52,6 @@ class FakeSignal:
             slot(*args)
 
 
-class FakeQueuePlate:
-    def __init__(self):
-        self.reorder_requested = FakeSignal()
-        self.clear_queue_requested = FakeSignal()
-
-
 class FakeShow:
     """A slideshow reduced to what the director asks of one."""
 
@@ -71,7 +65,6 @@ class FakeShow:
         self.open_requested = FakeSignal()
         self.closed = FakeSignal()
         self.media_changed = FakeSignal()
-        self._queue = FakeQueuePlate()
         self.added = []
         self.generating = []
         self.enhanced = []
@@ -118,9 +111,6 @@ class FakeShow:
         self.levels_added = []
 
     # what a show is, and what it holds
-    def queue(self):
-        return self._queue
-
     def is_live(self):
         return self.live
 
@@ -302,12 +292,13 @@ class FakeSession:
 class FakeReroll:
     def __init__(self):
         self.holds = []
+        self.reordered = []
 
     def hold_videos(self, held):
         self.holds.append(held)
 
-    def reorder(self, *args):
-        pass
+    def reorder(self, keys=None):
+        self.reordered.append(keys)
 
 
 class FakePace:
@@ -1213,8 +1204,8 @@ def test_nothing_to_play_opens_no_show_at_all(shows):
     assert director.showing is None
 
 
-def test_the_queue_plate_comes_up_filled_rather_than_blank(shows):
-    # The hold on videos is this opening's own doing, so the corner says what is
+def test_the_queue_block_comes_up_filled_rather_than_blank(shows):
+    # The hold on videos is this opening's own doing, so the panel says what is
     # waiting on it rather than going blank for a second and a half.
     host = FakeHost()
     waiting = _being_made("g-waiting", frame=None)
@@ -1226,13 +1217,22 @@ def test_the_queue_plate_comes_up_filled_rather_than_blank(shows):
     assert made[0].queue_set == ([waiting], 3)
 
 
-def test_the_plate_clear_drops_another_apps_work(shows):
+def test_the_blocks_clear_drops_another_apps_work(shows):
     director, host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
-    made[0].queue().clear_queue_requested.emit()
+    made[0].actions.clear_queue()
 
     assert host.cleared_queue == 1
+
+
+def test_a_row_dragged_down_the_block_re_lines_the_queue(shows):
+    director, _host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    made[0].actions.requeue(["g2", "g1"])
+
+    assert director._jobs.reordered == [["g2", "g1"]]
 
 
 def test_the_spoken_filter_narrows_the_show_and_says_what_is_left(shows):

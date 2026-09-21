@@ -189,3 +189,17 @@ class ShowHost(Protocol):
     def current_media_path(self) -> str:
         """The file on screen — what a hosting session's status file says."""
         return ""
+
+    @property
+    def hud_queue(self) -> tuple[list, int]:
+        """What is in flight here and how much of ComfyUI's queue is another
+        app's, for the block the panel hangs at its foot
+        (:mod:`origenerator.gui.hud_queue`).  Nothing at all for a host with no
+        line to report, which draws no block."""
+        return [], 0
+
+    def requeue(self, keys) -> None:
+        """Re-line the queue in this order — a row dragged down the block."""
+
+    def clear_foreign_queue(self) -> None:
+        """Drop another app's work off ComfyUI, as that block's Clear asks."""

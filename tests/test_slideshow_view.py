@@ -981,7 +981,7 @@ def test_the_notice_wears_the_color_of_what_it_says(qtbot):
     assert GREEN.name() in notice.styleSheet()
 
 
-# --- the queue, in the corner this view leaves empty -------------------------
+# --- the queue, which rides on the one panel this view wears -----------------
 
 def _inflight(**kw):
     kw.setdefault("key", "j1")
@@ -992,47 +992,40 @@ def _inflight(**kw):
     return InFlightItem(reading=RunReading(**reading), **kw)
 
 
-def test_the_queue_rides_along_in_the_shows_lower_left(qtbot):
-    # A show is when the queue stops moving: its videos are held until it ends.
+def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
+    # The lower strip that normally carries the line is under this view, and a
+    # show is when the queue stops moving: its videos are held until it ends.
     view = _view(qtbot)
-    view.resize(1920, 1080)
-    QApplication.sendEvent(view, QResizeEvent(QSize(1920, 1080), QSize(640, 480)))
+
     view.set_queue([_inflight(status="running", typical_seconds=30, job_kind="Image"),
                     _inflight(key="j2", typical_seconds=600, job_kind="Video",
-                              held=True)])
+                              held=True)], 3)
 
-    plate = view._queue.geometry()
-    assert view._queue.keys() == ["j1", "j2"]        # the rows themselves
-    assert view._queue._running.key == "j1"  # and the live half
-    assert plate.left() < view.width() // 2      # left…
-    assert plate.top() > view.height() // 2      # …and low, clear of the console
-    assert not plate.intersects(view._counter.geometry())  # beside it, not over it
+    items, foreign = view.hud_queue
+    assert [item.key for item in items] == ["j1", "j2"]
+    assert foreign == 3
 
 
-def test_a_show_with_nothing_in_flight_shows_no_queue_at_all(qtbot):
-    view = _view(qtbot)
-    view.set_queue([])
-    assert view._queue.isHidden()
+def test_a_row_dragged_down_the_line_is_re_listed_before_the_queue_agrees(qtbot):
+    # The queue's own answer is a poll away, and a row that springs back to
+    # where it was reads as a failure.
+    asked = []
+    view = _view(qtbot, actions=ShowActions(requeue=asked.append))
+    view.set_queue([_inflight(), _inflight(key="j2"), _inflight(key="j3")])
+
+    view.requeue(["j1", "j3", "j2"])
+
+    assert [item.key for item in view.hud_queue[0]] == ["j1", "j3", "j2"]
+    assert asked == [["j1", "j3", "j2"]]
 
 
-def test_the_queue_follows_the_shows_lower_edge_on_a_resize(qtbot):
-    view = _view(qtbot)
-    view.resize(800, 600)
-    view.set_queue([_inflight(typical_seconds=30, job_kind="Image")])
+def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):
+    cleared = []
+    view = _view(qtbot, actions=ShowActions(clear_queue=lambda: cleared.append(True)))
 
-    view.resize(1200, 900)
-    QApplication.sendEvent(view, QResizeEvent(QSize(1200, 900), QSize(800, 600)))
+    view.clear_foreign_queue()
 
-    assert view._queue.y() + view._queue.height() == 900 - 24
-
-
-def test_a_press_in_the_queue_leaves_the_arrows_stepping_the_show(qtbot):
-    # A Cancel that took focus would stop the show responding to its own keys.
-    view = _view(qtbot)
-    view.set_queue([_inflight(status="running", typical_seconds=30,
-                              cancel=lambda: None)])
-    assert all(child.focusPolicy() == Qt.FocusPolicy.NoFocus
-               for child in view._queue.findChildren(QWidget))
+    assert cleared == [True]
 
 
 # --- locking also stars, and a double-click leaves ---------------------------

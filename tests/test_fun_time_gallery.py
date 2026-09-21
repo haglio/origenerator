@@ -311,6 +311,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
     stub.hud_map = lambda: None  # a host with no set draws no map
     stub.hud_device = None  # and no device of its own to put on that panel
+    stub.hud_queue = ([], 0)  # and nothing in flight for the panel's foot
     view._shows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 

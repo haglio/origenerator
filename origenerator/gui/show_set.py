@@ -245,7 +245,8 @@ class ShowSet:
             return False
         if enhanced and prompt_id not in self.enhanced_ids:
             return False
-        return not act_filter or label_is_filtered(self._named_for(prompt_id), act_filter)
+        return not act_filter or label_is_filtered(self._named_for(prompt_id), act_filter,
+                                                   camera_words=())
 
     def _named_for(self, prompt_id) -> str:
         """The act(s) *prompt_id*'s map row is named for.  The whole set is

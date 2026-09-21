@@ -8,9 +8,9 @@ version; this is where the rest are, sitting at the foot of the info pane
 beside the other cross-links (a video's source image, an image's animations).
 
 One level per row, because each is a file with a file's worth to say about it:
-the enhancement that made it, where it is on disk (with the copy and
-Show-in-Explorer buttons a file row carries anywhere in this app), and when it
-was written. That information used to sit in one ``Basic`` block at the top,
+the enhancement that made it, where it is on disk (with the copy,
+Show-in-Explorer and Go-to-folder buttons a file row carries anywhere in this
+app), and when it was written. That information used to sit in one ``Basic`` block at the top,
 pooled under labels naming levels you then had to go and find; it is per
 enhancement, so it lives with the enhancement.
 
@@ -42,7 +42,7 @@ import json
 from typing import NamedTuple
 
 from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QAction, QPixmap
 from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect,
     QGridLayout,
@@ -200,7 +200,7 @@ class _Row(QWidget):
         self._title = QLabel(title)
         self._title.setStyleSheet("font-weight: 600; background: transparent;")
         _pass_mouse_through(self._title)
-        facts.addWidget(self._title, 0, 0, 1, 4)
+        facts.addWidget(self._title, 0, 0, 1, -1)
         self._facts = facts
         self._fact_cells: list[QWidget] = []
         row.addLayout(facts, 1)
@@ -238,11 +238,11 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()   # the row is a different height in each shape
 
-    def _show_facts(self, items: list[MetaItem]) -> None:
+    def _show_facts(self, items: list[MetaItem], go_to_folder: QAction | None = None) -> None:
         """Lay this row's facts out as the same ``label: value`` cells a metadata
         block builds — so the enhancement that made a version, the file it wrote
-        and when it was written all read alike, and the file line keeps its copy
-        and Show-in-Explorer buttons. Replaces whatever was there."""
+        and when it was written all read alike, and the file line keeps its copy,
+        Show-in-Explorer and Go-to-folder buttons. Replaces whatever was there."""
         for widget in self._fact_cells:
             self._facts.removeWidget(widget)
             widget.setParent(None)
@@ -250,7 +250,7 @@ class _Row(QWidget):
         self._fact_cells = []
         key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
-            for column, widget in enumerate(meta_cells(item, key_width)):
+            for column, widget in enumerate(meta_cells(item, key_width, go_to_folder)):
                 if widget is None:
                     continue
                 if isinstance(widget, QLabel):
@@ -284,7 +284,8 @@ class _LevelRow(_Row):
     context_requested = pyqtSignal(int, QPoint)
 
     def __init__(self, level, position: int, image_path, created_fallback: str = "",
-                 held_days: int | None = None, parent=None):
+                 held_days: int | None = None, parent=None, *,
+                 go_to_folder: QAction | None = None):
         super().__init__(level.label, parent)
         self._position = position
         self._params = dict(level.params)
@@ -308,7 +309,7 @@ class _LevelRow(_Row):
             items.append(MetaItem("Enhancement", level.settings))
         items.append(file_item(level.file, held_days=held_days))
         items.append(created_item(level.file, created_fallback))
-        self._show_facts(items)
+        self._show_facts(items, go_to_folder)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)  # so Delete reaches the list
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -459,8 +460,9 @@ class EnhanceVersions(QWidget):
     enhance_requested = pyqtSignal()   # the "+ Enhance" row was pressed
     delete_requested = pyqtSignal(list)  # positions of the levels to bin
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
         super().__init__(parent)
+        self._go_to_folder = go_to_folder
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(4)
@@ -534,7 +536,8 @@ class EnhanceVersions(QWidget):
                 lambda on, at=add.duplicate_of: self._highlight_level(at, on))
             column.addWidget(card)
         for position, (level, image_path) in enumerate(items):
-            row = _LevelRow(level, position, image_path, created_fallback, held_days)
+            row = _LevelRow(level, position, image_path, created_fallback, held_days,
+                            go_to_folder=self._go_to_folder)
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             self._rows.append(row)

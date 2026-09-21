@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QMimeData, QPoint, QRect, Qt
-from PyQt6.QtGui import QDropEvent, QPixmap
+from PyQt6.QtGui import QAction, QDropEvent, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -584,17 +584,19 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
 
 
 def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
-    # The pass-through must stop at the copy and Show-in-Explorer buttons: Qt's
-    # hit test skips a container marked transparent along with everything inside
-    # it, so these are laid into the row's grid rather than into one.
+    # The pass-through must stop at the copy, Show-in-Explorer and Go-to-folder
+    # buttons: Qt's hit test skips a container marked transparent along with
+    # everything inside it, so these are laid into the row's grid rather than
+    # into one.
 
-    versions = EnhanceVersions()
+    versions = EnhanceVersions(go_to_folder=QAction("Go to folder"))
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)))
     row = _rows(versions)[0]
 
     buttons = row.findChildren(QPushButton)
-    assert {b.objectName() for b in buttons} == {"copyButton", "revealButton"}
+    assert {b.objectName() for b in buttons} == {
+        "copyButton", "revealButton", "goToFolderButton"}
     for button in buttons:
         assert row.childAt(button.mapTo(row, QPoint(3, 3))) is button
 

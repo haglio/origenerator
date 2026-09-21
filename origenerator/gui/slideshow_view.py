@@ -741,7 +741,9 @@ class SlideshowView(QWidget):
 
     def show_loop(self, axis: str) -> None:
         """Loop the map's *axis* around the slide on screen, or end the loop
-        for "" — the map's two loop buttons, and the session's spoken loops."""
+        for "" — the map's two loop buttons, and the session's spoken loops.
+        An axis holding only the slide on screen is held rather than looped
+        (:meth:`_lock_instead_of_looping`)."""
         if not axis:
             if self._set.end_loop():
                 self._flash_note("Loop off")
@@ -749,7 +751,17 @@ class SlideshowView(QWidget):
         if self._set.start_loop(axis):
             self._flash_note(looping_note(self._set))
         else:
-            self._flash_note(_NOTHING_TO_LOOP, kind=WARNING)
+            self._lock_instead_of_looping()
+
+    def _lock_instead_of_looping(self) -> None:
+        """Lock the slide on screen: the answer a loop asked of a row of one
+        gets on a player, where the loop button of a group holding one clip
+        locks that clip.  A row that size is the slide itself, so the press
+        means "this one" rather than nothing; and a lock is not a loop, so a
+        loop that was running is dropped."""
+        self._set.end_loop()
+        self.set_held(True)
+        self._flash_note("Locked")
 
     def show_loop_cycle(self) -> None:
         """The loop key, as on a player: seeds, then actions, then off — and

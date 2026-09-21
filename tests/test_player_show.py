@@ -621,14 +621,18 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
     assert said == ["Looping seeds: 2", "Loop off"]
 
 
-def test_a_loop_asked_of_an_item_with_nothing_beside_it_says_so(qtbot, tmp_path):
+def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path):
+    """A row holding only the picture on screen cannot be looped, and the press
+    still means "this one" — so the player is told to lock it, the way its own
+    loop button locks a clip whose group holds only that clip."""
     said = []
     show = _show(qtbot, tmp_path, say=said.append)
     _sent(show)
 
     show.show_loop("seed")
 
-    assert (_sent(show), said) == ([], ["Nothing to loop"])
+    assert (_sent(show), said) == (["LOCK_ON"], ["Locked"])
+    assert show.locked is True
 
 
 def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path):

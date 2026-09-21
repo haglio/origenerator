@@ -4397,7 +4397,8 @@ class GalleryView(QWidget):
         video whose file is gone or unreadable, so the tile shows its still instead.
         Feeds the grid tiles and the Recents shelf (the info pane's 'Animated in'
         strip resolves the same path through :func:`gallery.animated_preview_path`)."""
-        return gallery.animated_preview_path(row, COMFYUI_OUTPUT_DIR, THUMB_DIR)
+        return gallery.animated_preview_path(
+            row, self._actions.output_dir, self._actions.thumb_dir)
 
     def follow_link(self, prompt_id: str):
         """Follow a link to another generation — a video's source image, an

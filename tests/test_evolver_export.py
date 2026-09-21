@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from origenerator import evolver_export
+import pytest
+
+from origenerator import config, evolver_export
 from origenerator.evolver_export import export_video
 
 
@@ -61,3 +63,35 @@ def test_export_does_not_clobber_an_already_queued_video(tmp_path):
     assert first != second
     assert first.read_bytes() == b"first"
     assert second.read_bytes() == b"second"
+
+
+class TestTheInbox:
+    """Where a clip is handed over used to be a config constant two Qt widgets
+    reached for in the middle of a send, so the destination was written in no
+    single place and the only way to point a test elsewhere was to patch the
+    module each had imported it from. One of these is built where the app is put
+    together and given to whoever sends."""
+
+    def test_a_clip_lands_in_the_folder_the_lane_is_routed_by(self, tmp_path):
+        inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
+        clip = tmp_path / "clip.mp4"
+        clip.write_bytes(b"video")
+
+        landed = inbox.hand_over(clip, "example-loop-clips")
+
+        assert landed == tmp_path / "0_inbox" / "example-loop-clips" / "clip.mp4"
+        assert landed.read_bytes() == b"video"
+
+    def test_a_lane_with_no_folder_is_refused_rather_than_dropped_in_the_root(
+            self, tmp_path):
+        """An empty source name would put the clip beside every other lane's,
+        where Evolver routes by folder and would read it as none of them."""
+        inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
+        clip = tmp_path / "clip.mp4"
+        clip.write_bytes(b"video")
+
+        with pytest.raises(ValueError, match="no folder"):
+            inbox.hand_over(clip, "")
+
+    def test_the_app_s_own_inbox_is_the_one_config_names(self):
+        assert evolver_export.default_inbox().inbox_dir == config.EVOLVER_INBOX_DIR

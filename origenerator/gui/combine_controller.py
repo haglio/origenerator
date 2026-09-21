@@ -31,7 +31,6 @@ from PyQt6.QtCore import QObject
 from origenerator import evolver_export, gallery, recipe_match
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
-    EVOLVER_INBOX_DIR,
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
 )
@@ -106,11 +105,16 @@ class CombineController(QObject):
     """The combine panel, and every way a recipe reaches a dropped picture."""
 
     def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
-                 info_tabs_of, shows):
+                 info_tabs_of, shows, inbox: evolver_export.EvolverInbox | None = None):
         super().__init__(parent)
         self._host = host
         self._db = db
         self._jobs = jobs
+        # Where a clip is handed to Evolver. Asked for rather than performed
+        # here: the destination is one object's to know, and a test points it at
+        # a directory of its own instead of patching a constant this module
+        # imported (origenerator.evolver_export).
+        self._inbox = inbox or evolver_export.default_inbox()
         self._client = client
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a prepared combination reaches whichever tabs
@@ -740,9 +744,9 @@ class CombineController(QObject):
         is logged rather than shown — the clip is safe in the gallery either way,
         and Send-to-Genau is still there to retry with.
 
-        The folder it goes to is read off the lane rather than spelled again
-        here, so a spoken send and a pressed one cannot differ about where a
-        clip lands.
+        Where it goes is the inbox's to know, and the lane names the folder
+        inside it, so a spoken send and a pressed one cannot differ about where
+        a clip lands.
         """
         if not row or not row.get("genau_requested_at") or row.get("genau_exported_at"):
             return
@@ -750,8 +754,7 @@ class CombineController(QObject):
         if preview is None or preview[1] != MediaType.VIDEO:
             return
         try:
-            evolver_export.export_video(preview[0],
-                                        EVOLVER_INBOX_DIR / GENAU_LANE.source)
+            self._inbox.hand_over(preview[0], GENAU_LANE.source)
         except Exception as e:
             logger.warning("Automatic send to Genau failed for %s: %s",
                            row.get("prompt_id"), e)

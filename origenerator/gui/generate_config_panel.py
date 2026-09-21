@@ -24,7 +24,6 @@ from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_OUTPUT_DIR,
-    EVOLVER_INBOX_DIR,
     EVOLVER_SOURCE,
     EVOLVER_UPSCALED_DIR,
 )
@@ -171,9 +170,15 @@ class GenerateConfigPanel(QWidget):
     levels_delete_requested = pyqtSignal(str, list)  # bin these versions of this image (prompt_id, filenames)
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
-                 *, fun_time=None, heights=None):
+                 *, fun_time=None, heights=None,
+                 inbox: evolver_export.EvolverInbox | None = None):
         super().__init__(parent)
         self._heights = heights  # the window's prompt heights, for its forms
+        # Where a clip is handed to Evolver. Asked for rather than performed
+        # here: the destination is one object's to know, and a test points it at
+        # a directory of its own instead of patching a constant this module
+        # imported (origenerator.evolver_export).
+        self._inbox = inbox or evolver_export.default_inbox()
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
         self._param_form: ParamForm | None = None
@@ -1659,7 +1664,7 @@ class GenerateConfigPanel(QWidget):
         if path is None:
             return
         try:
-            evolver_export.export_video(path, EVOLVER_INBOX_DIR / lane.source)
+            self._inbox.hand_over(path, lane.source)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
             QMessageBox.warning(self._preview, lane.failure_title,

@@ -2054,6 +2054,28 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
+def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
+        qtbot, tmp_path, monkeypatch, lane):
+    """Nothing patched about where it goes: the inbox used to be a config
+    constant this module imported, so a test could only redirect a send by
+    reaching into the module. It is an object now, given at construction."""
+    db = Database(tmp_path / "t.db")
+    inbox = tmp_path / "somebody elses inbox"
+    panel = GenerateConfigPanel(ComfyUIClient(), db,
+                                inbox=evolver_export.EvolverInbox(inbox))
+    qtbot.addWidget(panel)
+    panel._preview.show_media = MagicMock()
+    clip = tmp_path / "vid1.mp4"
+    clip.write_bytes(b"pixels")
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
+
+    panel.show_saved_generation(_video_row(db, "vid1"), [])
+    panel._on_send(panel._lanes[lane.name])
+
+    assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"
+
+
+@pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane):
     # Re-checked against the persisted flag rather than the button's disabled
     # state, so a stale press cannot repeat the handoff.

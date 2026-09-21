@@ -560,6 +560,37 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     return 1
 
 
+def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
+    """Name every value the two apps have stopped spelling the same, and open.
+
+    A send copies a clip into a folder of Evolver's and the gallery reads its
+    upscale back out of another; four values decide where, and each is written
+    down in both apps (:mod:`origenerator.evolver_agreement`). A rename on
+    either side left clips arriving nowhere with both apps silent, and the test
+    that holds the two together skips wherever no Evolver sits beside the
+    checkout -- which is every run of this repo's gate, so on the one machine
+    with both apps installed nothing compared anything.
+
+    Said, not refused: nothing else about this app is wrong, and a launch
+    declined over a folder name would cost far more than the one lane it
+    protects. No dialog under a Fun Time session, for the reason the refusal
+    above draws none -- nobody is at this window, and it would sit over a player.
+    """
+    from origenerator import evolver_agreement
+
+    said = evolver_agreement.disagreements(
+        evolver_agreement.our_side(), evolver_agreement.evolver_checkout())
+    if not said:
+        return
+    message = ("Origenerator and Evolver no longer agree about the hand-off, so a "
+               "sent clip may arrive where nothing reads it:\n\n"
+               + "\n".join(f"    {line}" for line in said))
+    print(f"Origenerator: {message}", file=sys.stderr)
+    if fun_time is None:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.warning(None, "Origenerator: Evolver has moved", message)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Boot the app and run it; return the code the process should exit with.
 
@@ -612,6 +643,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     logger = _configure_logging(STATE_DIR)
+
+    # Now that there is a log to record it in, and before the first window.
+    _say_what_evolver_no_longer_agrees_with(fun_time)
 
     # The one place the app is dressed — palette and stylesheet both, and both
     # on the application rather than on a window. origenerator.gui.stylesheet

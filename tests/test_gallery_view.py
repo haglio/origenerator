@@ -123,9 +123,17 @@ def _will_move_on(view) -> bool:
 
 
 class FakeActions:
-    """Records what the view asks of its action controller."""
+    """Records what the view asks of its action controller.
 
-    def __init__(self):
+    Including where the generations are: the view draws its previews out of the
+    folders its actions were built with rather than reaching the config module
+    for them, so a double pointed at somewhere of its own is how a test says
+    which library the view is looking at.
+    """
+
+    def __init__(self, output_dir=COMFYUI_OUTPUT_DIR, thumb_dir=THUMB_DIR):
+        self.output_dir = output_dir
+        self.thumb_dir = thumb_dir
         self.deleted = []   # each entry is one delete batch (list of rows)
         self.renamed = []   # (key, name) pairs
         self.rejected = []  # experiment rows handed to reject_experiment
@@ -14217,3 +14225,23 @@ def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot)
 
     assert view.eventFilter(doomed, QEvent(QEvent.Type.Timer)) is False
 
+
+
+def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_path,
+                                                                    monkeypatch):
+    """The two folders a preview is resolved out of used to be read off the config
+    module in the middle of the method, so the only way to point a view at a
+    library of its own was to patch module state -- which four tests did while
+    three thousand ran against the live one. They are the actions' now, and the
+    actions are handed both at construction."""
+    asked = []
+    monkeypatch.setattr(
+        gallery, "animated_preview_path",
+        lambda row, output_dir, thumb_dir: asked.append((output_dir, thumb_dir)))
+    view = GalleryView(_bin_db(), actions=FakeActions(output_dir=tmp_path / "output",
+                                                 thumb_dir=tmp_path / "thumbs"))
+    qtbot.addWidget(view)
+
+    view.animated_preview({"prompt_id": "p1"})
+
+    assert asked == [(tmp_path / "output", tmp_path / "thumbs")]

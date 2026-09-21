@@ -1227,7 +1227,7 @@ class SlideshowView(QWidget):
         Stepping levels is invisible without the last line: two versions of one
         picture differ by texture, which is exactly what you cannot tell apart
         from memory. And an early iteration looks exactly like a bad generation,
-        so a slide that is still cooking says so, in the same corner and for the
+        so a slide that is still in flight says so, in the same corner and for the
         same reason an enhancement in flight does.
         """
         if self._request_note:

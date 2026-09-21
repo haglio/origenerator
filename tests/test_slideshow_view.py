@@ -848,7 +848,7 @@ def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
     view.note_enhanced("id-a", better)
 
     assert view._playlist.current()[0] == better
-    assert view._note.isHidden()   # nothing cooking for this slide any more
+    assert view._note.isHidden()   # nothing in flight for this slide any more
 
 
 def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(

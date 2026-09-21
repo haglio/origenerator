@@ -74,10 +74,10 @@ def test_row_orientation_reads_the_stored_thumbnail(tmp_path):
 def test_a_generation_with_no_picture_yet_goes_by_the_size_it_asked_for():
     """Its folder joins the tree the moment it starts running, and it has to
     join on the side the picture will land on rather than move there later."""
-    cooking = _row("c1", "sdxl_t2i",
+    in_flight = _row("c1", "sdxl_t2i",
                    {"positive_prompt": "scene three", "width": 720, "height": 1280},
                    "sdxl_t2i_c1.png")  # nothing on disk yet, so only the size answers
-    assert row_orientation(cooking) == "portrait"
+    assert row_orientation(in_flight) == "portrait"
 
 
 def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path):
@@ -87,21 +87,21 @@ def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path)
     # Landscape side's Latest shelf and jumped sides the moment it landed.
     frame = tmp_path / "frame.png"
     Image.new("RGB", (90, 160)).save(frame)  # a tall start frame, named absolutely
-    cooking = _row("v1", "wan22_i2v",
+    in_flight = _row("v1", "wan22_i2v",
                    {"positive_prompt": "scene four", "input_image": str(frame)},
                    "wan22_i2v_v1.mp4", status="running", output_files="[]")
-    assert row_orientation(cooking) == "portrait"
+    assert row_orientation(in_flight) == "portrait"
 
 
 def test_a_size_asked_for_outranks_the_start_frame(tmp_path):
     # Unlocking the Dimensions field pins the output's shape whatever the frame's.
     frame = tmp_path / "frame.png"
     Image.new("RGB", (90, 160)).save(frame)
-    cooking = _row("v2", "wan22_i2v",
+    in_flight = _row("v2", "wan22_i2v",
                    {"positive_prompt": "scene five", "input_image": str(frame),
                     "width": 1280, "height": 720},
                    "wan22_i2v_v2.mp4", status="running", output_files="[]")
-    assert row_orientation(cooking) == "landscape"
+    assert row_orientation(in_flight) == "landscape"
 
 
 def test_an_unreadable_shape_files_under_landscape():
@@ -118,7 +118,7 @@ def _start_frame(tmp_path: Path, name: str, width: int, height: int) -> Path:
     return path
 
 
-def _cooking_video(prompt_id: str, frame: Path, **params) -> dict:
+def _video_in_flight(prompt_id: str, frame: Path, **params) -> dict:
     """A wan22_i2v row still in flight: queued, with no file of its own yet."""
     return _row(prompt_id, "wan22_i2v",
                 {"positive_prompt": "scene four", "seed": 4,
@@ -140,15 +140,15 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
              {"positive_prompt": "scene three", "steps": 50, "seed": 3},
              "sdxl_t2i_p3.png"),
         tmp_path, 90, 160)
-    cooking = _cooking_video("v3", frame, width=1280, height=720)
+    in_flight = _video_in_flight("v3", frame, width=1280, height=720)
 
-    view = GalleryView(FakeDB([portrait_image, cooking]))
+    view = GalleryView(FakeDB([portrait_image, in_flight]))
     qtbot.addWidget(view)
     view.refresh()
     view._update_queue()
 
     folder = gallery.settings_folder_key(
-        cooking, gallery.build_image_config_index([portrait_image]))
+        in_flight, gallery.build_image_config_index([portrait_image]))
     (row,) = view._queue.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
     assert view.selected_folder_key() == oriented_key(folder, "landscape")

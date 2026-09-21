@@ -35,10 +35,10 @@ class InFlightItems:
     passes its own signals -- so nothing here needs to be a widget.
     """
 
-    def __init__(self, *, db, reroll, auto, tree, image_rows: Callable[[], list],
+    def __init__(self, *, db, jobs, auto, tree, image_rows: Callable[[], list],
                  on_cancel: Callable[[str], None], on_reveal: Callable[[str], None]):
         self._db = db
-        self._reroll = reroll
+        self._jobs = jobs
         self._auto = auto
         self._tree = tree
         self._image_rows = image_rows
@@ -56,7 +56,7 @@ class InFlightItems:
         session grafts on its live frame, progress, cancel and start time from its
         :class:`GenerationJob`; an untracked running row shows a plain card.
 
-        The queue's own line orders them (:attr:`RerollController.queue_order`):
+        The queue's own line orders them (:attr:`JobQueue.queue_order`):
         nothing a row records says whether an image jumped ahead of a video, or
         whether a drag moved one. A row the line holds no job for — one a restart
         hasn't re-adopted — sorts to the back rather than jumping the queue on
@@ -69,12 +69,12 @@ class InFlightItems:
         take a listing the caller already read (the poll reads its own on the
         pool); left off, both tables are read here.
         """
-        reroll_by_pid = {job.prompt_id: (key, job)
-                         for key, jobs in self._reroll.jobs_by_folder.items()
+        job_by_pid = {job.prompt_id: (key, job)
+                         for key, jobs in self._jobs.jobs_by_folder.items()
                          for job in jobs}
         # The jobs the queue is holding back rather than waiting on the GPU for,
         # so a row can say why the line isn't moving.
-        held = {job.prompt_id for job in self._reroll.held_jobs()}
+        held = {job.prompt_id for job in self._jobs.held_jobs()}
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
         requested = {r["prompt_id"]: r["source_prompt_id"]
@@ -95,7 +95,7 @@ class InFlightItems:
             if not gallery.is_in_progress(row):
                 continue
             pid = row["prompt_id"]
-            tracked = reroll_by_pid.get(pid)
+            tracked = job_by_pid.get(pid)
             if tracked is not None:
                 folder_key, job = tracked
                 frame, progress = job.last_preview, job.last_progress
@@ -173,7 +173,7 @@ class InFlightItems:
                     and gallery.prompts_differ_from(params, recipe, workflow)),
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
             ))
-        place = {pid: i for i, pid in enumerate(self._reroll.queue_order)}
+        place = {pid: i for i, pid in enumerate(self._jobs.queue_order)}
         items.sort(key=lambda it: (place.get(it.key, len(place)),
                                    not it.reading.rendering))
         return items

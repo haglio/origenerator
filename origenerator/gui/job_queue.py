@@ -1,31 +1,20 @@
-"""Owns the gallery's in-flight generation jobs: launching a fresh variation of a
-settings folder (re-roll) or a video from an arbitrary image + another video's
-recipe (combine, via :meth:`start_prepared`), chaining an i2v's image->video
-stages, reconnecting jobs a prior session left running, and finalizing or failing
-each in the database. Both kinds are keyed by their settings-folder key, so a
-combine reconnects and lands in its folder exactly as a re-roll does.
+"""Every generation this app makes, from the press to the saved row.
 
-Pure job/database machinery with no widget knowledge — it reports what the view
-must redraw through signals (``changed`` to re-render the open folder, ``preview``
-to mirror a live frame, ``finished``/``failed`` for a job's outcome) so the
-GalleryView owns all presentation while this owns the lifecycle. View-initiated
-actions (:meth:`start`, :meth:`cancel`, :meth:`reorder`) let their sole caller
-drive the follow-up UI directly; the signals carry the events that arrive
-asynchronously from a job.
+Two shapes arrive — a fresh variation of a settings folder (a re-roll) and a
+video built from an arbitrary image on another video's recipe (a combine) — and
+both are keyed by their settings folder, so a combine reconnects and lands in
+its folder exactly as a re-roll does.
 
-It also *is* the queue. ComfyUI is handed one prompt at a time and the rest of
-the line waits here, in the order :mod:`origenerator.queue_line` decides — images
-in front, videos at the back, and no video started at all while the slideshow is
-playing. A job waiting its turn has never been sent, so it can be re-ordered,
-gated or dropped for free; a job already on the server can only be interrupted,
-which is why the line lives on this side of the wire. :attr:`queue_order` is what
-that line looks like to whatever displays it.
+The line lives on this side of the wire because that is the only side a job can
+be moved on: waiting here it has never been sent, so it can be re-ordered,
+gated or dropped for free, where a job already on ComfyUI can only be
+interrupted. :mod:`origenerator.queue_line` decides the order.
 
-A waiting job still gets its database row up front (status ``pending``, the same
-row it will run under), so a queue held overnight is still there after a restart
-— :meth:`reconnect_running` picks the sent ones back up and re-adopts the unsent
-ones — and so the app closing can hand ComfyUI everything left
-(:meth:`flush_to_server`) rather than take it to the grave.
+A waiting job gets its database row up front, under the status it will run
+with, so a line held overnight survives a restart — :meth:`reconnect_running`
+picks the sent ones back up and re-adopts the unsent — and so closing the app
+can hand ComfyUI everything left (:meth:`flush_to_server`) rather than take it
+to the grave.
 """
 from __future__ import annotations
 
@@ -89,7 +78,7 @@ def _off_the_gui_thread(run) -> None:
     the new row is painted, the poll runs, a Cancel is taken. Still on the
     calling thread's stack, so everything around the wait stays in order and
     every caller of the line stays synchronous; what the pumping lets in is
-    handled where it arrives (:meth:`RerollController._pump` stands down while
+    handled where it arrives (:meth:`JobQueue._pump` stands down while
     a hand-over is out). Without an application to pump, it just runs.
     """
     app = QCoreApplication.instance()
@@ -125,36 +114,34 @@ def _parse_progress_state(raw):
     return state if isinstance(state, dict) else None
 
 
-class RerollController(QObject):
-    """Tracks the in-flight jobs (re-rolls and combines) of each settings-folder
-    key and drives each to completion, emitting the redraws the view should make
-    along the way.
+class JobQueue(QObject):
+    """The jobs of each settings-folder key, driven to completion, with the
+    redraws the view should make emitted along the way.
 
-    It is also the queue: a launched job joins a line kept here and is handed to
-    ComfyUI only when the machine is free and the queue's rules say it may go
-    (see :mod:`origenerator.queue_line`), which is what lets an image jump ahead
-    of a video and a slideshow keep videos off the GPU entirely.
+    A launched job joins the line and is handed to ComfyUI only when the machine
+    is free and the order allows it, which is what lets an image jump ahead of a
+    video and a playing show keep videos off the GPU entirely.
 
     User work owns the GPU: launching any user job first cancels every in-flight
-    background experiment (the one generator of jobs the user didn't ask for), so
-    a Generate starts at once instead of queuing after a long experiment run. And
-    the user's image work owns it outright: whatever is being rendered when a
+    background experiment, the one generator of jobs the user didn't ask for, so
+    a Generate starts at once instead of queuing after a long experiment run.
+    And the user's image work owns it outright: whatever is being rendered when a
     picture is asked for is set aside -- stopped, and put back in the line to
-    start over once the pictures are done (see :meth:`_set_aside_for`)."""
+    start over once the pictures are done (:meth:`_set_aside_for`)."""
 
-    changed = pyqtSignal()            # the set of live re-rolls changed (add/reconnect)
+    changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
     # as by folder: a folder can have several in flight at once, and a surface
     # that shows the frame as the run itself — a slideshow slide of a generation
     # being made — has to know which of them it just saw.
     preview = pyqtSignal(str, str, bytes)
-    # (folder key, prompt_id, origin) a re-roll finished and was saved. The
+    # (folder key, prompt_id, origin) a job finished and was saved. The
     # prompt_id tells the view whose completion this is — a background experiment
     # leaves the tabs alone. The origin is the id the run began under (its own,
     # unless a chained i2v carried it across the hand-off), which is how the view
     # finds the tab that launched it — the only tab its result belongs in.
     finished = pyqtSignal(str, str, str)
-    failed = pyqtSignal(str, str)     # (folder key, message) a re-roll failed
+    failed = pyqtSignal(str, str)     # (folder key, message) a job failed
     # A run ended, as one :class:`~origenerator.run_notice.RunOutcome`. The two
     # signals above say which folder to redraw; this says what the run *was*,
     # which is all anyone reporting it outside the window has to go on — by then
@@ -292,7 +279,7 @@ class RerollController(QObject):
         )
         return self.has(key)
 
-    def start(self, key: str, group, image_rows: list[dict]):
+    def start_reroll(self, key: str, group, image_rows: list[dict]):
         """Launch a fresh variation of the settings folder ``key`` names — both
         seeds re-rolled (a new start frame *and* a new video seed).
 

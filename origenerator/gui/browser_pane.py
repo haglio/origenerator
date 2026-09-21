@@ -281,19 +281,19 @@ class BrowserPane(QObject):
     selection_changed = pyqtSignal()        # the multi-selection moved or cleared
     pane_reset = pyqtSignal()  # the outgoing pane's state is being dropped
 
-    def __init__(self, scroll, db, reroll, auto, tree: TreeNavigation,
+    def __init__(self, scroll, db, jobs, auto, tree: TreeNavigation,
                  host: PaneHost):
         super().__init__()
         self._scroll = scroll  # the pane's canvas: the middle scroll area it fills
         self._db = db          # the generations the cards and corners re-read
-        self._reroll = reroll  # the live jobs and the queue's own line
+        self._jobs = jobs  # the live jobs and the queue's own line
         self._auto = auto      # whether a folder is auto-generating (its card says)
         self._tree = tree      # the three questions the pane may ask the tree
         self._host = host      # the rest of what it asks the gallery (see PaneHost)
         # The queue's cards are a join over four sources and no rendering at all,
         # so they are built outside the pane and handed the same collaborators.
         self._queue_model = InFlightItems(
-            db=db, reroll=reroll, auto=auto, tree=tree,
+            db=db, jobs=jobs, auto=auto, tree=tree,
             image_rows=host.image_rows,
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
@@ -627,7 +627,7 @@ class BrowserPane(QObject):
         a thumbnail does inside a folder — and double-clicking it jumps to its
         own folder.
 
-        In-flight cards first (the newest, still-cooking work), then the
+        In-flight cards first (the newest work, still in flight), then the
         finished thumbnails a page at a time; a hint when the media-type filter
         leaves neither. Both the cards and the thumbnails obey that filter.
 
@@ -792,7 +792,7 @@ class BrowserPane(QObject):
         already read (``rows``/``requests``); left off, they are read here.
 
         Whichever pane drew them — the Recents shelf, or a settings folder with
-        a batch cooking in it. Only the shelf re-renders on a change to the
+        a batch in flight. Only the shelf re-renders on a change to the
         *set* of jobs (a defensive guard — a started or finished re-roll
         normally moves the DB fingerprint and forces a full rebuild anyway); a
         folder is rebuilt by that same fingerprint and must not be redrawn as
@@ -926,15 +926,15 @@ class BrowserPane(QObject):
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
         container, flow = self._new_tile_pane()
-        cooking = {item.key: item for item in self.inflight_items()}
+        in_flight = {item.key: item for item in self.inflight_items()}
         shown = [item for item in self._request_items
                  if self._shelf_orientation is None
                  or row_orientation(item["row"]) == self._shelf_orientation]
         drawn = [item["row"] for item in shown
-                 if item["row"]["prompt_id"] in cooking or gallery.produced_output(item["row"])]
+                 if item["row"]["prompt_id"] in in_flight or gallery.produced_output(item["row"])]
 
         def draw(row):
-            live = cooking.get(row["prompt_id"])
+            live = in_flight.get(row["prompt_id"])
             if live is None:
                 self._add_shelf_thumbnail(flow, row)
             else:
@@ -1192,7 +1192,7 @@ class BrowserPane(QObject):
         self.show_widget(container)
 
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
-        """Every other run still cooking in this folder, for a card each.
+        """Every other run of this folder still in flight, for a card each.
 
         The re-roll tile shows the one in front, and used to be the whole of
         what a folder said about work in flight — so a request over a folder,
@@ -1204,11 +1204,11 @@ class BrowserPane(QObject):
 
         Newest first, like everything else in the grid: an in-flight row is
         the newest thing in the folder, so the cards lead the finished
-        pictures. Costs nothing in a folder with nothing cooking, which is
+        pictures. Costs nothing in a folder with nothing in flight, which is
         almost all of them — the listing under the cards is only built once
         there is a card to build.
         """
-        leading = self._reroll.job_for(group.key)
+        leading = self._jobs.job_for(group.key)
         in_front = leading.prompt_id if leading is not None else None
         waiting = [row["prompt_id"] for row in group.rows
                    if not gallery.produced_output(row)

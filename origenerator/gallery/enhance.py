@@ -320,8 +320,8 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
     """``(image ids, file names)`` with an un-folded standalone enhance among
     ``rows`` — normally just the jobs still in flight, since a completed one
     folds into its source and vanishes. Ids where the run stamped one, names
-    for the rest. Keeps a second button press from re-queuing an image already
-    cooking."""
+    for the rest. Keeps a second button press from re-queuing an image that
+    already has one in flight."""
     ids, names = set(), set()
     for row in rows:
         if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW:
@@ -449,15 +449,15 @@ def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     """What a folder's Enhance All button targets: finished images
     that aren't enhanced and don't have an enhance already in flight (checked
     against ``all_rows``, where the transient job rows live)."""
-    cooking_ids, cooking_names = _enhances_in_flight(all_rows)
+    in_flight_ids, in_flight_names = _enhances_in_flight(all_rows)
     awaiting = []
     for row in folder_rows:
         if not is_enhanceable_row(row) or is_enhanced_row(row):
             continue
-        if row.get("prompt_id") in cooking_ids:
+        if row.get("prompt_id") in in_flight_ids:
             continue
         names = {_frame_name(f.get("filename")) for f in row_output_files(row)}
-        if names & cooking_names:
+        if names & in_flight_names:
             continue
         awaiting.append(row)
     return awaiting

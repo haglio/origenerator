@@ -224,11 +224,11 @@ def enhance(monkeypatch):
     """A controller whose panel and surfaces are all recorders."""
     monkeypatch.setattr(module, "EnhancePanel", FakePanel)
 
-    def build(host=None, *, db=None, reroll=None, browser=None, shows=None,
+    def build(host=None, *, db=None, jobs=None, browser=None, shows=None,
               tabs=None):
         host = host or FakeHost()
         return EnhanceController(
-            host, db=db or FakeDB(), reroll=reroll or FakeReroll(),
+            host, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             browser=browser or FakeBrowser(), shows=shows or FakeShows(),
             info_tabs_of=lambda: tabs or FakeTabs()), host
     return build
@@ -316,12 +316,12 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     db = FakeDB([_image("i1"), _image("i2")])
-    reroll = FakeReroll()
-    controller, _host = enhance(db=db, reroll=reroll)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=db, jobs=jobs)
 
     controller.enhance_items(["i1", "i2"])
 
-    assert [key for key, _params in reroll.prepared] == [
+    assert [key for key, _params in jobs.prepared] == [
         "image/image_enhance/abc", "image/image_enhance/abc"]
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
 
@@ -330,12 +330,12 @@ def test_a_picture_with_no_file_to_enhance_is_skipped_not_launched(enhance,
                                                                    monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: None)
-    reroll = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
 
     controller.enhance_items(["i1"])
 
-    assert reroll.prepared == []
+    assert jobs.prepared == []
 
 
 def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
@@ -347,7 +347,7 @@ def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     controller, _host = enhance(db=FakeDB([_image("i1")]),
-                                reroll=FakeReroll(launches=None))
+                                jobs=FakeReroll(launches=None))
 
     with caplog.at_level("WARNING"):
         controller.enhance_items(["i1"])
@@ -365,13 +365,13 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
-    reroll = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
     controller.restore_settings(json.dumps({"auto": True}))
 
     controller.enhance_when_wanted(_image("i1"))
 
-    assert len(reroll.prepared) == 1
+    assert len(jobs.prepared) == 1
 
 
 def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance,
@@ -384,22 +384,22 @@ def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
-    reroll = FakeReroll()
+    jobs = FakeReroll()
     controller, _host = enhance(FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]),
-                                browser=FakeBrowser(["i1"]), reroll=reroll)
+                                browser=FakeBrowser(["i1"]), jobs=jobs)
 
     controller.panel.enhance_requested.emit()
 
-    assert [params for _key, params in reroll.prepared] == [{"input_image": "one.png"}]
+    assert [params for _key, params in jobs.prepared] == [{"input_image": "one.png"}]
 
 
 def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
-    reroll = FakeReroll()
-    controller, _host = enhance(reroll=reroll)
+    jobs = FakeReroll()
+    controller, _host = enhance(jobs=jobs)
 
     controller.enhance_when_wanted(_image("i1"))
 
-    assert reroll.prepared == []
+    assert jobs.prepared == []
 
 
 # --- the settings ------------------------------------------------------------
@@ -467,14 +467,14 @@ def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(en
 def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
                                                                  monkeypatch):
     # A batch of enhances goes out whole and its jobs share a settings key, so
-    # all but the first would read as not-cooking off the folder-facing view.
+    # all but the first would read as not in flight off the folder-facing view.
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, input_image, row: target == row["prompt_id"])
     jobs = [FakeJob("run-a"), FakeJob("run-b")]
     db = FakeDB([_image("i1"), _image("i2")])
     db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
     db.rows["run-b"] = {"prompt_id": "run-b", "enhance_of": "i2"}
-    controller, _host = enhance(db=db, reroll=FakeReroll(jobs))
+    controller, _host = enhance(db=db, jobs=FakeReroll(jobs))
 
     assert controller.run_of(_image("i2")) is not None
 
@@ -483,7 +483,7 @@ def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_picture(enhance,
                                                                       monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    controller, _host = enhance(reroll=FakeReroll([FakeJob("run-a", state="queued")]))
+    controller, _host = enhance(jobs=FakeReroll([FakeJob("run-a", state="queued")]))
 
     run = controller.run_of(_image("i1"))
 
@@ -501,7 +501,7 @@ def test_the_tile_the_version_list_and_the_show_all_learn_of_a_run(enhance,
     tab = FakeConfigPanel(row)
     browser, shows = FakeBrowser(), FakeShows()
     controller, _host = enhance(
-        FakeHost(rows=[row]), reroll=FakeReroll([FakeJob("run-a")]),
+        FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
         browser=browser, shows=shows, tabs=FakeTabs([tab]))
 
     controller.reconcile()
@@ -516,7 +516,7 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
                         lambda target, image, row: True)
     db = FakeDB([_image("i1")])
     db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
-    controller, _host = enhance(db=db, reroll=FakeReroll([FakeJob("run-a")]))
+    controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-a")]))
     controller.run_of(_image("i1"))  # reads and keeps the stamp
 
     controller.forget("run-a")
@@ -532,12 +532,12 @@ def test_a_delete_takes_the_runs_being_made_of_what_it_deletes(enhance,
     # A video-length wait can sit after an enhance nobody wants any more.
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: row["prompt_id"] == "i1")
-    reroll = FakeReroll([FakeJob("run-a")])
-    controller, _host = enhance(reroll=reroll)
+    jobs = FakeReroll([FakeJob("run-a")])
+    controller, _host = enhance(jobs=jobs)
 
     controller.cancel_for_delete([_image("i1"), _image("i2")])
 
-    assert reroll.cancelled == ["run-a"]
+    assert jobs.cancelled == ["run-a"]
 
 
 def test_cancelling_from_a_tile_leaves_the_picture_exactly_as_it_was(enhance,
@@ -545,16 +545,16 @@ def test_cancelling_from_a_tile_leaves_the_picture_exactly_as_it_was(enhance,
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     browser = FakeBrowser()
-    reroll = FakeReroll([FakeJob("run-a")])
-    controller, _host = enhance(reroll=reroll, browser=browser)
+    jobs = FakeReroll([FakeJob("run-a")])
+    controller, _host = enhance(jobs=jobs, browser=browser)
 
     controller.cancel_for([_image("i1")])
 
-    assert reroll.cancelled == ["run-a"]
+    assert jobs.cancelled == ["run-a"]
     assert browser.enhancing == {}  # the scrim comes off in the same breath
 
 
-def test_cancelling_with_nothing_cooking_redraws_nothing(enhance):
+def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
     browser = FakeBrowser()
     controller, _host = enhance(browser=browser)
 
@@ -635,7 +635,7 @@ def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch):
     assert kind == WARNING
 
 
-def test_a_spoken_enhance_over_a_picture_already_cooking_one_is_refused(enhance,
+def test_a_spoken_enhance_over_a_picture_that_has_one_in_flight_is_refused(enhance,
                                                                         monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
@@ -644,7 +644,7 @@ def test_a_spoken_enhance_over_a_picture_already_cooking_one_is_refused(enhance,
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]),
-                                reroll=FakeReroll([FakeJob("run-a")]))
+                                jobs=FakeReroll([FakeJob("run-a")]))
 
     assert controller.enhance_it("i1") == (
         None, "🎤 an enhance of this image is already running", WARNING)

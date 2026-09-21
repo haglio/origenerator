@@ -74,7 +74,7 @@ def reconcile_in_flight(db, client, output_dir: Path, thumb_dir: Path) -> dict:
     # Only rows whose prompt ComfyUI was given. A ``pending`` row is the other
     # kind of in-flight: one the queue was still holding when the app closed,
     # which the server has never heard of and cannot be asked about — the app
-    # takes those back itself (see :meth:`RerollController.reconnect_running`),
+    # takes those back itself (see :meth:`JobQueue.reconnect_running`),
     # so checking them here would only delete a queue the user is still waiting on.
     rows = [r for r in db.list_generations()
             if r.get("status") == GenerationStatus.RUNNING]

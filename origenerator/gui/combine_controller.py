@@ -105,12 +105,12 @@ class CombineHost(Protocol):
 class CombineController(QObject):
     """The combine panel, and every way a recipe reaches a dropped picture."""
 
-    def __init__(self, host: CombineHost, *, parent: QObject, db, reroll, client,
+    def __init__(self, host: CombineHost, *, parent: QObject, db, jobs, client,
                  info_tabs_of, shows):
         super().__init__(parent)
         self._host = host
         self._db = db
-        self._reroll = reroll
+        self._jobs = jobs
         self._client = client
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a prepared combination reaches whichever tabs
@@ -495,12 +495,12 @@ class CombineController(QObject):
             if choice in (REROLL_IMAGE, REROLL_BOTH):
                 # Re-draw the dropped image (a new frame) and run the video on it,
                 # carrying whatever video seed we settled on just above.
-                if self._reroll.start_reroll_from_image(
+                if self._jobs.start_reroll_from_image(
                     key, image_row, image_workflow, workflow, params
                 ):
                     self._host.reveal_launch(key)
                 return
-        prompt_id = self._reroll.start_prepared(key, workflow, params)
+        prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             self._db.set_recipe_source(prompt_id, category=category,
                                        video_prompt_id=video_id)
@@ -637,7 +637,7 @@ class CombineController(QObject):
         logger.info("combine: category=%s intent=%s image=%s -> curated recipe",
                     category, intent, image_id)
         key = self._host.folder_key_for(workflow.name, params, workflow.version)
-        prompt_id = self._reroll.start_prepared(key, workflow, params)
+        prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             # The act, with no video under it: a curated recipe is pinned in the
             # overlay, so there is no past run for the queue row to show in gray.

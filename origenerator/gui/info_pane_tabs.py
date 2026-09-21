@@ -541,7 +541,7 @@ class InfoPaneTabs(QTabWidget):
         key = self._row_settings_key(row, image_index)
         cur = self.current_config_panel()
         if (cur is not None and not cur.is_blank()
-                and cur.settings_key(image_index) == key):
+                and cur.workflow_and_signature(image_index) == key):
             target = cur  # already this generation's own tab, pinned or not
         else:
             target = self._landing_panel()

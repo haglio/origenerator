@@ -354,7 +354,7 @@ def test_a_row_from_an_auto_generating_folder_says_next_seed(queue):
 
 
 def test_a_row_relabels_in_place_when_its_folders_loop_is_switched_off(queue):
-    # Auto off with the run still cooking: the same row's press is a plain cancel
+    # Auto off with the run still in flight: the same row's press is a plain cancel
     # again, and rows are updated in place rather than rebuilt.
     queue.set_items([_item(key="a", cancel=lambda: None, auto_generating=True)])
 

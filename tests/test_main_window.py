@@ -335,7 +335,7 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     assert client.canceled == ["exp-1"]
     assert client.interrupted == ["exp-1"]  # in case it is mid-render: dequeuing alone wouldn't stop it
     assert db.get_generation("exp-1") is None
-    assert win._gallery_view._reroll_jobs == {}  # and it is not adopted as a live job
+    assert win._gallery_view._live_jobs == {}  # and it is not adopted as a live job
 
 
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
@@ -402,7 +402,7 @@ def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
 
     key = gallery.settings_folder_key(db.get_generation("rr"))
-    assert key in win._gallery_view._reroll_jobs
+    assert key in win._gallery_view._live_jobs
 
 
 def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
@@ -435,7 +435,7 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
 
     index = gallery.build_image_config_index([db.get_generation("img")])
     key = gallery.settings_folder_key(db.get_generation("rr"), index)
-    assert key in win._gallery_view._reroll_jobs
+    assert key in win._gallery_view._live_jobs
 
 
 def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
@@ -578,7 +578,7 @@ def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
     # the rest alone.
 
     win = _window(qtbot, tmp_path)
-    with patch.object(type(win._gallery_view._reroll), "flush_to_server") as flush:
+    with patch.object(type(win._gallery_view._jobs), "flush_to_server") as flush:
         win.close()
 
     flush.assert_called_once_with()
@@ -704,8 +704,8 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()               # emits generate_requested -> a folder re-roll
-    (folder_key,) = list(gv._reroll_jobs)
-    pid = gv._reroll_jobs[folder_key].prompt_id
+    (folder_key,) = list(gv._live_jobs)
+    pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert pid in gv._browser._inflight_cards   # the running generation shows as a card
@@ -939,7 +939,7 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
     said = []
     monkeypatch.setattr(win._notices._tray, "showMessage", lambda *args: said.append(args))
 
-    win._gallery_view._reroll.run_ended.emit(
+    win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED))
 

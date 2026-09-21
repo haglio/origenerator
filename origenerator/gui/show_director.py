@@ -151,12 +151,12 @@ def _still_up(show):
 class ShowDirector:
     """Every fullscreen show this window has open, and the words about them."""
 
-    def __init__(self, host: ShowHost, *, db, browser, reroll, pace, motion,
+    def __init__(self, host: ShowHost, *, db, browser, jobs, pace, motion,
                  fun_time):
         self._host = host
         self._db = db
         self._browser = browser
-        self._reroll = reroll
+        self._jobs = jobs
         self._pace = pace
         self._motion = motion
         self._fun_time = fun_time
@@ -425,7 +425,7 @@ class ShowDirector:
         # video generation would saturate that card, and a show is exactly the
         # stretch when nobody is waiting on a video. The queue holds them until it
         # closes and keeps making images.
-        self._reroll.hold_videos(True)
+        self._jobs.hold_videos(True)
         return show
 
     def _show_actions(self, side: str) -> ShowActions:
@@ -512,7 +512,7 @@ class ShowDirector:
             # strip and asks for the same things, so it goes to the same
             # handlers: a row dragged there re-lines the queue, and its Clear
             # drops another app's work off ComfyUI.
-            view.queue().reorder_requested.connect(self._reroll.reorder)
+            view.queue().reorder_requested.connect(self._jobs.reorder)
             view.queue().clear_queue_requested.connect(self._host.clear_foreign_queue)
             # And fill it at once rather than a poll later: the hold on videos is
             # this opening's own doing, so the corner comes up already saying what
@@ -529,7 +529,7 @@ class ShowDirector:
 
         A row with no file is left out, whether it never got one or is still
         being made: a slide with nothing to look at is a gap between pictures,
-        and one still cooking joins the running show the moment it lands (see
+        and one still in flight joins the running show the moment it lands (see
         :meth:`note_finished`)."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
         items = []
@@ -782,7 +782,7 @@ class ShowDirector:
         if show is None or self._slideshow is show:
             self._slideshow = next((s for s, _loc in reversed(self._live_shows)), None)
         if self._slideshow is None:
-            self._reroll.hold_videos(False)
+            self._jobs.hold_videos(False)
         self._host.reconcile_osr2()
         if side is not None:
             # Whatever ended it -- the loop button pressed off, an Escape, a set

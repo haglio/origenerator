@@ -24,7 +24,7 @@ image keeps its folder, its star and its other versions — and the delete is
 undoable like every other. What is refused is emptying the row: an image with no
 file left is a deleted generation, and that is the gallery's own delete.
 
-An enhancement still cooking takes the ``+ Enhance`` row's own slot at the head
+An enhancement still in flight takes the ``+ Enhance`` row's own slot at the head
 of the list, mirroring the run's streamed frames the way the in-flight cards do
 everywhere else — the row becomes the thing it asked for, and the level being
 made appears where the level will be.
@@ -374,7 +374,7 @@ class _PendingRow(_Row):
         # The settings row a finished level carries, in the same place: what is
         # being made is as much a question of "at what" as the levels already
         # there, and it is the only place to read it back before the run lands.
-        # No file and no timestamp yet — that is exactly what is still cooking.
+        # No file and no timestamp yet — that is exactly what is still in flight.
         self._settings = ""
         self.setToolTip("An enhancement of this image is being generated")
 

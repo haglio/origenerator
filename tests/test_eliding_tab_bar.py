@@ -369,7 +369,6 @@ def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
     # The whole point of the arithmetic above: painted under the real stylesheet,
     # a tab's mark starts EDGE in from the tab's left edge — the same inset the ✕
     # keeps at the other end.
-    from origenerator.gui.stylesheet import build_stylesheet
 
     app = QApplication.instance()
     prior = app.styleSheet()

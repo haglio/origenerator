@@ -56,11 +56,12 @@ def _detector_labels() -> tuple[tuple[str, ...], frozenset[str]]:
     Library vocabulary, so it comes from the content overlay rather than from
     source. Read on first use rather than at module scope: this module is
     imported by ``wan21_ati_i2v``, which ``workflows/__init__`` imports, which
-    twelve modules depend on -- so an overlay written before ``detector_labels``
-    existed used to take the whole app down with a bare ``KeyError``, at import,
-    before there was a window to say which key or which file was wrong. Now it
-    is a :class:`~origenerator.content.MissingOverlayKey` that names both, and
-    only auto-aim is lost.
+    twelve modules depend on. Read at module scope, an overlay without
+    ``detector_labels`` would take the whole app down with a bare ``KeyError``
+    at import, before there is a window to say which key or which file is
+    wrong. Read here it is a
+    :class:`~origenerator.content.MissingOverlayKey` that names both, and only
+    auto-aim is lost.
 
     One call for both, cached: the labels index every decoded rect and the anchor
     classes filter every one of them.
@@ -94,7 +95,7 @@ def detect_grip_aim(image_path: Path | None) -> dict | None:
     if image_path is None:
         return None
     try:
-        from PIL import Image
+        from PIL import Image  # noqa: PLC0415 (heavy, and only a detection needs it)
 
         best = _best_anchor(_detect(str(image_path)))
         if best is None:
@@ -122,8 +123,8 @@ def _detect(path: str) -> list[dict]:
     """Run the (lazily created, cached) censor detector over an image file,
     returning ``{"class", "score", "rect": (x, y, w, h)}`` dicts in image
     pixels. Isolated so tests can monkeypatch detection without the model."""
-    import numpy as np
-    from PIL import Image
+    import numpy as np  # noqa: PLC0415
+    from PIL import Image  # noqa: PLC0415
 
     session = _session()
     with Image.open(path) as img:
@@ -142,7 +143,7 @@ def _detect(path: str) -> list[dict]:
 def _decode_yolo(out, scale: float, pad_x: int, pad_y: int) -> list[dict]:
     """YOLOv8 output ``(4 + n_classes, anchors)`` → scored, NMS-pruned rects
     mapped back through the letterbox into original image pixels."""
-    import numpy as np
+    import numpy as np  # noqa: PLC0415
 
     model_labels, _ = _detector_labels()
     rects_cxcywh = out[:4].T
@@ -184,8 +185,10 @@ def _session():
     weights fetched once through the Hugging Face cache."""
     global _detector
     if _detector is None:
-        import onnxruntime
-        from huggingface_hub import hf_hub_download
+        # The detector's stack, and the weights it fetches once: seconds and a
+        # network round trip that a workflow without a censor never spends.
+        import onnxruntime  # noqa: PLC0415
+        from huggingface_hub import hf_hub_download  # noqa: PLC0415
 
         model_path = hf_hub_download(_MODEL_REPO, _MODEL_FILE)
         _detector = onnxruntime.InferenceSession(

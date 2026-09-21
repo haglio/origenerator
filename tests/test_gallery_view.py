@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+from PIL import Image as _Image
 from player_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
@@ -17,9 +19,21 @@ from player_core.console import (
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
-from PyQt6.QtWidgets import QLineEdit, QMessageBox, QPushButton, QSplitter, QWidget
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QTabWidget,
+    QToolButton,
+    QWidget,
+)
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator import evolver_export, gallery, motion_engine, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
@@ -35,8 +49,13 @@ from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_actions import GalleryActions
 from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import voice_router as voice_router_module
+from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
+from origenerator.gui.enhance_versions import _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
+from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
 from origenerator.gui.gallery_tree import (
     EXPERIMENTS_KEY,
@@ -46,26 +65,32 @@ from origenerator.gui.gallery_tree import (
     TRASH_KEY,
 )
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.orientation import (
     LANDSCAPE,
     base_of,
     oriented_key,
 )
 from origenerator.gui.preview_widget import PreviewWidget
+from origenerator.gui.prompt_find import _CURRENT_BG
 from origenerator.gui.request_worker import RevisionWorker
+from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.show_buttons import MODE_BUTTONS
+from origenerator.gui.show_hud import ShowHud, show_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
-from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.motion_engine import Motion
 from origenerator.prompt_edit import apply_request
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import SurfaceCommand
+from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
@@ -348,8 +373,6 @@ def _amber_matches(field) -> int:
     """How many of ``field``'s find highlights are the current-match amber. The
     find re-lays every field's highlights on each step, so across the fields
     exactly one of them is ever amber."""
-    from origenerator.gui.prompt_find import _CURRENT_BG
-
     return sum(sel.format.background().color() == _CURRENT_BG
                for sel in field.extraSelections())
 
@@ -2755,7 +2778,6 @@ def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
 
 def _write_looping_webp(path, size=(64, 48)):
     """A tiny two-frame looping WebP standing in for a video's moving preview."""
-    from PIL import Image as _Image
     frames = [_Image.new("RGB", size, c) for c in ((255, 0, 0), (0, 255, 0))]
     frames[0].save(path, format="WEBP", save_all=True,
                    append_images=frames[1:], duration=100, loop=0)
@@ -3161,7 +3183,6 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
 
 
 def test_toolbar_is_a_group_of_compact_icon_buttons(qtbot):
-    from PyQt6.QtWidgets import QToolButton
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     # Back, forward, undo and delete are one group of icon-only tool buttons, not
@@ -4041,7 +4062,6 @@ def _animated_strip(view):
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
-    from origenerator.gui.animated_strip import _VideoTile
     image = _image("img1", "a cat", 50, 1)  # output: sdxl_t2i_img1.png
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "input_image": "sdxl_t2i_img1.png"},
@@ -4060,7 +4080,6 @@ def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
 
 
 def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
-    from origenerator.gui.animated_strip import _VideoTile
     image = _image("img1", "a cat", 50, 1)
     lonely = _image("img2", "a dog", 50, 2)  # never animated
     video = _row("vid1", "wan22_i2v",
@@ -4080,7 +4099,6 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
-    from origenerator.gui import generate_config_panel as gcp_module
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -4096,7 +4114,6 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
-    from origenerator.gui import generate_config_panel as gcp_module
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -4156,9 +4173,6 @@ def test_the_info_panes_floor_is_the_tab_it_holds(qtbot):
 
 
 def test_info_pane_is_a_tab_widget_of_editable_config_tabs(qtbot):
-    from PyQt6.QtWidgets import QTabWidget
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     # The info pane is a tab widget of identical editable generate panels — no
@@ -4281,7 +4295,7 @@ def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, 
     assert view._info_tabs.current_config_panel()._displayed_row["prompt_id"] == "unreg"
 
 
-def test_selected_folder_returns_current_folder_key(qtbot):
+def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -6419,7 +6433,6 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
     # the same set played the same way, so it wears the same panel a region
     # show wears — and the view's own furnishings come off, because the map
     # says all of it.
-    from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6435,7 +6448,6 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     # player under a standalone show and no session to tell, so the row is not
     # drawn rather than drawn dead.  The window IS this show's, though, so the
     # minimize a hosted one leaves off is on it.
-    from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
 
@@ -6450,7 +6462,6 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
     # Hosted, prev/next/lock/trash go out on the session's command file and come
     # back through its dispatch onto this very show.  With no file to post on,
     # the press reaches the show directly instead of being swallowed.
-    from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
     hud, = show.findChildren(ShowHud)
@@ -6466,8 +6477,6 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
 
 
 def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monkeypatch):
-    from origenerator.gui.show_hud import ShowHud
-
     show = _standalone_show(qtbot, monkeypatch)
     hud, = show.findChildren(ShowHud)
     played = []
@@ -6597,7 +6606,6 @@ def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, m
 def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     # The button sits beside F-mode on the HUD every show wears, and pressing it
     # lands on the show itself, hosted or not; the status line names the cut.
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -6733,8 +6741,6 @@ def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
     # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
     # now -- the HUD, carrying the device's line, the readout and the two rows
     # that aim them.
-    from origenerator.gui.motion_panel import MotionPanel
-    from origenerator.gui.show_hud import ShowHud
 
     show = _standalone_show(qtbot, monkeypatch)
     hud, = show.findChildren(ShowHud)
@@ -7473,7 +7479,6 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     # The reported gap, end to end: double-clicking the preview mid-generation did
     # nothing. Now it opens over the live frames, keeps streaming them, and lands on
     # the finished image when the run completes.
-    from origenerator.gui import generate_config_panel as gcp_module
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
@@ -7922,7 +7927,6 @@ def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
 def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     # Mirror the real app: the gallery is the window's central widget, and the
     # app-wide Delete key filter must still reach it.
-    from PyQt6.QtWidgets import QMainWindow
     db = Database(tmp_path / "g.db")
     out = tmp_path / "output"
     out.mkdir()
@@ -7957,7 +7961,6 @@ def test_gallery_hands_off_keys_while_a_config_form_is_focused(qtbot, tmp_path, 
     # The grid and an editable config form are now visible together, so the app-wide
     # Delete/Undo filter must disarm while a config field has focus — its combos and
     # buttons aren't text fields, so without this it would wipe a gallery thumbnail.
-    from PyQt6.QtWidgets import QApplication
     view = GalleryView(Database(tmp_path / "t.db"), client=ComfyUIClient())
     qtbot.addWidget(view)
     view.show()
@@ -8474,9 +8477,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
     # The float is the same widget as the lower strip and asks for the same
     # things, so it reaches the same handler.
-    from unittest.mock import patch
 
-    from origenerator.gui.reroll_controller import RerollController
 
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -8514,10 +8515,6 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
 
 
 def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
-    from unittest.mock import patch
-
-    from origenerator.gui.reroll_controller import RerollController
-
     db = FakeDB([
         _running_row("running-one", prompt="a dog"),
         _row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
@@ -8942,8 +8939,6 @@ def _combine_db(tmp_path):
 def _loop_recipe(db, prompt_id="loop"):
     """A past looping clip for the Genau lane to mine, sampled the long way --
     21 frames at 16fps, which is a cycle and a half and the whole problem."""
-    from origenerator.workflows import WORKFLOW_REGISTRY
-
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]
     db.insert_generation(
         prompt_id=prompt_id, workflow_name=wf.name, workflow_version=wf.version,
@@ -10164,7 +10159,6 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     # The tab holds the row it was handed, not a live view of the database, so
     # an enhancement folding a new level onto that row used to reach the list
     # only when the tab was next opened — a tab away and back.
-    from origenerator.gui.enhance_versions import _LevelRow, _PendingRow
 
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
@@ -10188,7 +10182,6 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
 def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_path):
     # Only the tabs actually showing that generation catch up; a tab looking at
     # another image is not touched by what happened to this one.
-    from origenerator.gui.enhance_versions import _LevelRow
 
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=2), client=client)
@@ -10206,8 +10199,6 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
 
 
 def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):
-    from origenerator.gui.enhance_versions import _LevelRow
-
     client = _reroll_client()
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=client, actions=FakeActions())
@@ -10255,18 +10246,12 @@ def _set_enhance(view, **fields):
 
 
 def _pane_holding(widget):
-    from PyQt6.QtWidgets import QSplitter
-
     while not isinstance(widget.parentWidget(), QSplitter):
         widget = widget.parentWidget()
     return widget
 
 
 def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot, tmp_path):
-    from PyQt6.QtCore import QMargins
-    from PyQt6.QtWidgets import QApplication, QWidget
-    from shared_ui.spacing import MARGIN_STANDARD
-
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.resize(1500, 900)
@@ -10284,8 +10269,6 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
 
 
 def test_a_draggable_divider_parts_the_hud_from_the_enhance_settings(qtbot, tmp_path):
-    from PyQt6.QtWidgets import QSplitter
-
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     divider = _pane_holding(view._enhance.panel).parentWidget()
@@ -10298,8 +10281,6 @@ def test_a_draggable_divider_parts_the_hud_from_the_enhance_settings(qtbot, tmp_
 
 
 def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, tmp_path):
-    from PyQt6.QtWidgets import QSplitter
-
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     divider = _pane_holding(view._scroll).parentWidget()
@@ -10312,8 +10293,6 @@ def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, t
 
 
 def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tmp_path):
-    from PyQt6.QtWidgets import QApplication, QScrollArea
-
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.resize(1500, 1100)
@@ -10329,8 +10308,6 @@ def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tm
 
 def test_squeezed_smaller_than_the_hud_its_section_scrolls_rather_than_spilling(qtbot,
                                                                               tmp_path):
-    from PyQt6.QtWidgets import QApplication, QScrollArea
-
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.resize(1500, 900)
@@ -10490,7 +10467,6 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
                                                                             tmp_path):
     # The level being made appears where the levels are, mirroring the run's
     # frames like every other in-flight card in the app.
-    from origenerator.gui.enhance_versions import _PendingRow
 
     db = _enhanceable_db(tmp_path, count=2)
     view = GalleryView(db, client=_reroll_client())
@@ -11766,7 +11742,6 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
 def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
     # Renaming a folder, writing a prompt: Esc there is how you take it back, and
     # taking it back must not open a slideshow and drive the OSR2.
-    from PyQt6.QtWidgets import QApplication
 
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
@@ -11791,7 +11766,6 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
     # A fullscreen preview or the slideshow is a separate top-level window that uses
     # Esc to close. The gallery's app-wide filter sees Esc first, so it must defer
     # when another window is active rather than swallow Esc to stop the OSR2.
-    from PyQt6.QtWidgets import QApplication
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
@@ -11807,7 +11781,6 @@ def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
 def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # The shared guard under both Esc and Delete: when a separate top-level window
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
-    from PyQt6.QtWidgets import QApplication
     view, _driver, _panel = _osr2_view(qtbot)
     # Which window Qt calls active is ambient in a test process — a fullscreen
     # show another test opened and closed can still hold it — so both sides of
@@ -11888,7 +11861,6 @@ def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
     # The show is a window of ours, and Esc closes it — but on its own that left
     # the loop and the sound running under it, which is the opposite of what
     # the key means. So this one window doesn't take the key away.
-    from PyQt6.QtWidgets import QApplication
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     show = view._shows.showing
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: show))
@@ -11903,7 +11875,6 @@ def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
 def test_esc_over_the_show_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
                                                                  monkeypatch):
     # A dropdown or dialog opened over the show owns Esc, as it does everywhere.
-    from PyQt6.QtWidgets import QApplication
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
     show = view._shows.showing
     popup = QWidget()
@@ -13114,7 +13085,7 @@ def _speak_request(view, qtbot, *utterances):
     which only that request's own answer does.  It used to wait for the words
     "working out" to leave the corner, inside a budget that was exactly the
     note's own flash time -- which told answered from timed out only because
-    a hidden toast happens not to clear its text (bug 44).
+    a hidden notice happens not to clear its text (bug 44).
     """
     for text in utterances:
         view._voice.listener.speak(text)
@@ -13739,7 +13710,6 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # parts a second time and drifting from it.  It wraps what it matches with
     # the side the utterance named, which is how a room with two shows in it
     # says which picture is meant.
-    from origenerator.voice.commands import match_voice_command as match
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
     assert match("go now").command == gallery.GENAU_COMMAND
@@ -13807,12 +13777,10 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     # The one test that puts the pool hop back: everything else runs it inline so a
     # launch is observable in one call. What must hold is that a match taking real
     # time does not hold the UI thread while it takes it.
-    import threading
 
     # The override is off by the marker, not by undoing every monkeypatch the
     # fixtures made -- which took the mic and OSR2 guards with it, so this one
     # test built its view with a real VoiceSteering (bug 43).
-    from origenerator.gui import voice_router as voice_router_module
 
     assert voice_router_module.VoiceSteering.__name__ == "FakeVoiceSteering"
     db = _genau_db(tmp_path)
@@ -14141,7 +14109,6 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
     view._tree.setCurrentItem(_image_workflow(view._tree))  # child folders as tiles
     labels = []
     _menu_labels(monkeypatch, labels)
-    from origenerator.gui.folder_tile import FolderTile
     (tile,) = view._scroll.widget().findChildren(FolderTile)
 
     tile.context_requested.emit(_key(_image_workflow(view._tree).child(0)),

@@ -70,7 +70,7 @@ it keeps the pictures that have been enhanced, each over the whole set the show
 was handed and both at once meaning what answers both
 (:meth:`SlideshowView.toggle_favorites_filter`, :meth:`SlideshowView.toggle_enhanced_mode`).
 They start off, and reset drops them.  What the view has left to say for itself,
-it says in a Fun Time toast across the top (:mod:`origenerator.gui.toast`).
+it says in a Fun Time notice across the top (:mod:`origenerator.gui.notice_overlay`).
 
 The lower strip's queue is floated into the lower-left corner
 (:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
@@ -101,6 +101,7 @@ from origenerator.gui.console import post_console_action, show_device
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
+from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.show_map import SEED_AXIS
@@ -115,7 +116,6 @@ from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
-from origenerator.gui.toast import NOTICE, WARNING, Toast
 from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, ShowState, Slide, in_order
 
@@ -206,11 +206,11 @@ class SlideshowView(QWidget):
         # A note about the item on screen: which of its versions this is, that an
         # enhancement of it is being made, and for a beat whatever a switch or a
         # spoken fix just did — the only way to tell, in a view with no panels,
-        # that a press did anything. It is a Fun Time toast, at the top center
+        # that a press did anything. It is a Fun Time notice, at the top center
         # where Fun Time flashes the same kind of line over a player, because
         # this surface wears the players' own HUD and had no business saying
         # things in a second dialect at the other end of the screen.
-        self._note = Toast(self)
+        self._note = NoticeOverlay(self)
         # What the corner reads while a spoken request pauses the show; empty
         # whenever nothing is being dictated.
         self._request_note = ""

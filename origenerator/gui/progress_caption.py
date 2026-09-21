@@ -2,10 +2,10 @@
 
 Every surface that reports a run in flight — the lower strip's queue, the
 Recents shelf's cards, a folder's re-roll tile — says two things at once: how
-far along it is, and how long that has taken. Those used to be laid out
-separately (a line of text above a bar, or a percentage in a caption with no bar
-at all), which spent two rows on one reading and left each surface free to
-invent its own arrangement.
+far along it is, and how long that has taken. Laid out separately -- a line of
+text above a bar, or a percentage in a caption with no bar at all -- they spend
+two rows on one reading and leave each surface free to invent its own
+arrangement.
 
 Here they are one widget: the numbers sit *on* the bar they measure. The fill is
 the app's flat blue under the writing rather than a wash over it — a

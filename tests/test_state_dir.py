@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from origenerator import config
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 _PROBE = (
@@ -63,6 +65,4 @@ def test_a_branch_session_shares_the_live_installs_library_and_keeps_its_own_win
 
 
 def test_this_run_is_not_writing_into_the_live_state_directory():
-    from origenerator import config
-
     assert config.STATE_DIR != config.PROJECT_DIR / "state"

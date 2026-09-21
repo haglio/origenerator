@@ -192,7 +192,7 @@ def video_duration_seconds(video_path) -> float | None:
     header without spawning a console process, so it costs nothing at import time
     when kept lazy here.
     """
-    import cv2  # heavy; imported lazily so the pure helpers don't pull it in
+    import cv2  # noqa: PLC0415 (heavy; the pure helpers must not pull it in)
 
     cap = cv2.VideoCapture(str(video_path))
     try:

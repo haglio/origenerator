@@ -20,12 +20,14 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
+from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.gui.notice_overlay import ERROR, FAVORITE, WARNING, NoticeOverlay
+from origenerator.gui.notice_overlay import TOP_MARGIN as NOTICE_TOP_MARGIN
+from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
-from origenerator.gui.toast import ERROR, FAVORITE, WARNING, Toast
-from origenerator.gui.toast import TOP_MARGIN as TOAST_TOP_MARGIN
 from origenerator.slideshow import LIVE, Slide, in_order
 from tests.motion_doubles import FakeMotion
 from tests.show_surface_fakes import FakeEngine
@@ -596,8 +598,6 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 
 
 def _around(prompt_id):
-    from origenerator.gui.show_map import MapNeighbors, MapRow
-
     if prompt_id != "id-a":
         return MapNeighbors()
     other_act = Slide("c.png", "image", "id-c")
@@ -837,43 +837,41 @@ def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):
     assert view._note.isHidden()
 
 
-def test_the_enhancing_note_is_a_toast_across_the_top(qtbot):
+def test_the_enhancing_note_is_a_notice_across_the_top(qtbot):
     # Where Fun Time flashes the same kind of line over a player, and in the
     # same shape: this surface wears the players' own HUD, so what it says for
-    # itself is said in the players' own toast rather than in a second dialect
+    # itself is said in the players' own notice rather than in a second dialect
     # at the far end of the screen.
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.resize(800, 600)
     _press(view, Qt.Key.Key_Down)
 
     note = view._note.geometry()
-    assert note.top() == TOAST_TOP_MARGIN
+    assert note.top() == NOTICE_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
 
 
-def test_the_toast_wears_the_color_of_what_it_says(qtbot):
+def test_the_notice_wears_the_color_of_what_it_says(qtbot):
     # Red only for an error, yellow for a warning, green for the favorites, white
-    # for the rest: the colors Fun Time's own toasts read in, since this is the
-    # same toast.
+    # for the rest: the colors Fun Time's own notices read in, since this is
+    # the same overlay.
     host = QWidget()
     qtbot.addWidget(host)
-    toast = Toast(host)
+    notice = NoticeOverlay(host)
 
-    toast.say("a plain line")
-    assert TEXT_PRIMARY.name() in toast.styleSheet()
-    toast.say("nothing to do", kind=WARNING)
-    assert AMBER.name() in toast.styleSheet()
-    toast.say("it broke", kind=ERROR)
-    assert RED.name() in toast.styleSheet()
-    toast.say("starred", kind=FAVORITE)
-    assert GREEN.name() in toast.styleSheet()
+    notice.say("a plain line")
+    assert TEXT_PRIMARY.name() in notice.styleSheet()
+    notice.say("nothing to do", kind=WARNING)
+    assert AMBER.name() in notice.styleSheet()
+    notice.say("it broke", kind=ERROR)
+    assert RED.name() in notice.styleSheet()
+    notice.say("starred", kind=FAVORITE)
+    assert GREEN.name() in notice.styleSheet()
 
 
 # --- the queue, in the corner this view leaves empty -------------------------
 
 def _inflight(**kw):
-    from origenerator.gui.inflight import InFlightItem, RunReading
-
     kw.setdefault("key", "j1")
     kw.setdefault("caption", "Alpha Workflow › a paper kite")
     kw.setdefault("status", "queued")
@@ -2013,8 +2011,6 @@ def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_
 def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
     """The other half of the column: its rows are gone to and looped, where an
     act's row narrows the show instead."""
-    from origenerator.gui.show_map import MapNeighbors, MapRow
-
     a_configuration = Slide("c.png", "image", "id-c")
     around = lambda pid: MapNeighbors(  # noqa: E731
         column=(MapRow(a_configuration, "E629425B", configuration=True),)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+from dataclasses import replace
+from unittest.mock import patch
 
 import pytest
 from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
@@ -14,11 +16,13 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import main_window
 from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
+from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.test_gallery_view import _selected_folder, _shelf
@@ -192,8 +196,6 @@ def forget_prompt_heights():
     here would otherwise be the starting size for every form the rest of the
     suite builds.
     """
-    from origenerator.gui.prompt_field import PROMPT_HEIGHTS
-
     yield PROMPT_HEIGHTS
     PROMPT_HEIGHTS.restore({})
 
@@ -574,7 +576,6 @@ def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
     # The queue holds work back for the sake of somebody watching, and closing the
     # app ends every one of those reasons: ComfyUI outlives it and works through
     # the rest alone.
-    from unittest.mock import patch
 
     win = _window(qtbot, tmp_path)
     with patch.object(type(win._gallery_view._reroll), "flush_to_server") as flush:
@@ -654,7 +655,6 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
     # a file row with its copy and Show-in-Explorer buttons, per level. It has to
     # scroll and wrap rather than widen the window, or displaying any enhanced
     # image would knock the whole app out of a tiling slot.
-    import json
 
     win = _window(qtbot, tmp_path)
     db = win._gallery_view._db
@@ -822,7 +822,6 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
 
 def _fun_time_session(main=(10, 20, 800, 600)):
-    from origenerator.fun_time_mode import FunTimeSession, Rect
     return FunTimeSession(
         main_rect=Rect(*main),
         portrait_rect=Rect(2560, 0, 1440, 1870),
@@ -833,8 +832,6 @@ def _fun_time_session(main=(10, 20, 800, 600)):
 
 
 def _headset_session(tmp_path, main=(10, 20, 200, 100)):
-    from dataclasses import replace
-
     return replace(_fun_time_session(main),
                    frames_file=tmp_path / "frame.bin",
                    input_file=tmp_path / "input.txt")

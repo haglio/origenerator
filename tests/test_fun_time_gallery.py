@@ -8,18 +8,28 @@ from __future__ import annotations
 
 from PIL import Image
 from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QSplitter
+from PyQt6.QtCore import QEvent, QPoint, Qt
+from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
+from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
 from origenerator.fun_time_mode import FunTimeSession, Rect
+from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.toast import WARNING
+from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.show_hud import ShowHud, show_hud_model
+from origenerator.voice.app_commands import AppCommand
+from origenerator.voice.commands import ShelfCommand, SurfaceCommand
+from origenerator.workflows.detail_parts import part_table
 from tests.show_hud_support import hud_button_names
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
+    _FakeAmbientAudio,
     _image,
     _row,
+    _SignalMotion,
 )
 
 
@@ -92,8 +102,6 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     # Space and friends belong to Fun Time's own hotkeys while hosted; nothing
     # here may swallow them, let alone drive the device.
     view = _fun_time_view(qtbot)
-    from PyQt6.QtCore import QEvent
-    from PyQt6.QtGui import QKeyEvent
     view.show()
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J,
                       Qt.KeyboardModifier.NoModifier)
@@ -272,7 +280,6 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     # its arrows land in the main window and the view reads as dead.  The
     # offscreen platform cannot express real activation, so the contract is
     # pinned at the seam: presenting raises and activates the window.
-    from PyQt6.QtWidgets import QWidget
 
     view = _fun_time_view(qtbot)
     stub = QWidget()
@@ -302,7 +309,6 @@ def test_a_preview_double_click_opens_the_show_on_a_region(qtbot, tmp_path):
     Image.new("RGB", (200, 100)).save(wide)
     panel._preview.show_media(str(wide), "image")
 
-    from PyQt6.QtCore import QPoint
     qtbot.mouseDClick(panel._preview, Qt.MouseButton.LeftButton,
                       pos=QPoint(panel._preview.width() // 2,
                                  panel._preview.height() // 2))
@@ -319,8 +325,6 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     own — the same panel from the same shared code: mode pair, transport, and
     the nav map speaking the set as a seed family.  The view's own furnishings
     come off; the map says all of it."""
-    from origenerator.gui.show_hud import ShowHud
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
@@ -410,8 +414,6 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     act, with the picture's own row named as that video's source; the corner
     lit and no loop — the players' map, drawn against this app's library of
     that side's shape."""
-    from origenerator.gui.show_hud import show_hud_model
-
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -440,8 +442,6 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
 
 def test_the_map_re_homes_on_whatever_the_show_moves_to(qtbot, tmp_path, monkeypatch):
-    from origenerator.gui.show_hud import show_hud_model
-
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -505,8 +505,6 @@ def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypa
     """Recents is the players' Latest: the shelf lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
     show's HUD status line says which."""
-    from origenerator.gui.gallery_tree import RECENTS_KEY
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "_current_shelf_key", lambda: RECENTS_KEY)
@@ -522,8 +520,6 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
     """The players' F-mode, meaning on a show what it means on a player:
     narrow to the favorites — the favorited items, the same collection the
     Favorites shelf lists — and widen back on the second press."""
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -602,8 +598,6 @@ def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkey
     region — a show STARTED by voice, with nothing up beforehand and the
     browser left wherever it was.  Latest plays newest-first, and its HUD says
     so, exactly as the shelf's own slideshow button opens it."""
-    from origenerator.voice.commands import ShelfCommand
-
     view = _fun_time_view(qtbot)
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
@@ -630,8 +624,6 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     words — dropping "Unlocked", exactly as a looping satellite's does, since a
     set playing through holds nothing.  The press that ends it puts the show
     back to browsing what it opened with, the slide on screen kept."""
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
-
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -664,8 +656,6 @@ def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
         qtbot, tmp_path, monkeypatch):
     """The expand mark: the row grows past the exact configuration to the
     nearest others of the same model, and that wider row is what loops."""
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
-
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -686,8 +676,6 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     on, so its HUD must read that way: the loop button dark, the map unframed,
     and the line naming the order rather than a loop.  It said "Looping seeds"
     over the base state, which is the one place there is no loop at all."""
-    from origenerator.gui.show_hud import show_hud_model
-
     view = _fun_time_view(qtbot)
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
@@ -745,8 +733,6 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
     on a show it is the same switch, the one its HUD already draws.  Opening
     the shelf as a fresh show would answer a word the HUD has a button for with
     something else entirely."""
-    from origenerator.voice.commands import ShelfCommand
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -765,10 +751,6 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
 def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
     """"landscape fix teeth": hosted, two shows run and NEITHER is the active
     window, so the side word is the only thing that says which picture."""
-    from origenerator.gui.toast import NOTICE
-    from origenerator.voice.commands import SurfaceCommand
-    from origenerator.workflows.detail_parts import part_table
-
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
@@ -863,8 +845,6 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     """The players' reset, on a show: F-mode drops, a held lock releases, and
     the first item comes back on screen — the side's defaults, not a dead
     button drawn for sameness."""
-    from origenerator.gui.show_hud import ShowHud
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -931,7 +911,6 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
     Image.new("RGB", (100, 200)).save(tall)
     Image.new("RGB", (200, 100)).save(wide)
-    from tests.test_gallery_view import _row
     rows = [
         _row("p-1", "sdxl_t2i", {"positive_prompt": "a", "seed": 1},
              "sdxl_t2i_p1.png", thumbnail_path=str(tall)),
@@ -955,8 +934,6 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     and the side goes back to browsing its whole library.  A show started on
     one folder therefore leaves that folder — restarting it would be the one
     thing reset is not."""
-    from origenerator.gui.show_hud import ShowHud
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     tall = tmp_path / "tall.png"
@@ -985,8 +962,6 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
 
 def test_latest_on_a_hosted_shows_panel_plays_its_side_newest_first(
         qtbot, tmp_path, monkeypatch):
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     tall = tmp_path / "tall.png"
@@ -1030,8 +1005,6 @@ def test_reset_stays_local_when_a_show_holds_no_region(qtbot, tmp_path, monkeypa
 
 
 def _a_looping_clip(tmp_path):
-    from tests.test_gallery_view import _row
-
     webp = tmp_path / "loop.webp"
     frames = [Image.new("RGB", (64, 32), shade) for shade in ((10, 10, 10), (220, 220, 220))]
     frames[0].save(webp, save_all=True, append_images=frames[1:], duration=100, loop=0)
@@ -1045,9 +1018,6 @@ def _a_looping_clip(tmp_path):
 
 
 def _moving_pictures(view):
-    from PyQt6.QtGui import QMovie
-    from PyQt6.QtWidgets import QLabel
-
     return [label for label in view.findChildren(QLabel)
             if label.movie() is not None
             and label.movie().state() == QMovie.MovieState.Running]
@@ -1121,10 +1091,6 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
     """In the RFB's upright column a portrait picture stacked over the settings
     pushes every prompt field off the foot, so the two go side by side —
     settings left, picture right, the order they are read in."""
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
-
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
@@ -1140,10 +1106,6 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
 def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
     """A wide picture beside a form gets a column too narrow to show it, and the
     form loses the width its prompt fields need."""
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
-
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
 
@@ -1155,10 +1117,6 @@ def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
 
 
 def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_form(qtbot):
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
-
     panel = GenerateConfigPanel(None, FakeDB([]))
     qtbot.addWidget(panel)
     panel._preview._pixmap = QPixmap(400, 900)
@@ -1171,10 +1129,6 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_for
 
 
 def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the_form(qtbot):
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
-
     panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(panel)
     panel._preview._pixmap = QPixmap(400, 900)
@@ -1188,10 +1142,6 @@ def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.info_pane_tabs import InfoPaneTabs
-
     tabs = InfoPaneTabs(None, FakeDB([]))
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
@@ -1207,10 +1157,6 @@ def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opene
 
 
 def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.info_pane_tabs import InfoPaneTabs
-
     tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
@@ -1249,8 +1195,6 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
 
 
 def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(qtbot):
-    from tests.test_gallery_view import _SignalMotion
-
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)
     qtbot.addWidget(view)
@@ -1267,7 +1211,6 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
     # The takeover can miss -- a window still booting when the room opened, an
     # offer a second instance overwrote -- and a window that kept its switch
     # keeps streaming into the one device the session is driving.
-    from tests.test_gallery_view import _SignalMotion
 
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)
@@ -1283,8 +1226,6 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
 
 
 def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qtbot):
-    from tests.test_gallery_view import _SignalMotion
-
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)
     qtbot.addWidget(view)
@@ -1318,8 +1259,6 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
-    from tests.test_gallery_view import _SignalMotion
-
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)
     qtbot.addWidget(view)
@@ -1333,9 +1272,6 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
 
 
 def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
-    from origenerator.voice.app_commands import AppCommand
-    from tests.test_gallery_view import _FakeAmbientAudio
-
     bed = _FakeAmbientAudio()
     view = GalleryView(FakeDB([]), ambient_audio=bed)
     qtbot.addWidget(view)
@@ -1378,8 +1314,6 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_agai
 
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
-    from tests.test_gallery_view import _FakeAmbientAudio, _SignalMotion
-
     bed, motion = _FakeAmbientAudio(), _SignalMotion()
     view = GalleryView(FakeDB([]), ambient_audio=bed, osr2_motion=motion)
     qtbot.addWidget(view)
@@ -1410,9 +1344,6 @@ def test_a_gallery_taken_into_a_session_opens_its_next_show_on_a_region(qtbot, t
 
 
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):
-    from origenerator.voice.app_commands import AppCommand
-    from tests.test_gallery_view import _SignalMotion
-
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), osr2_motion=motion)
     qtbot.addWidget(view)
@@ -1424,8 +1355,6 @@ def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_se
 
 
 def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions(qtbot, monkeypatch):
-    from origenerator.voice.app_commands import AppCommand
-
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     answers = []
@@ -1442,8 +1371,6 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
 
 def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
         qtbot, monkeypatch):
-    from origenerator.voice.app_commands import AppCommand
-
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     answers = []
@@ -1457,8 +1384,6 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
 
 
 def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):
-    from PyQt6.QtGui import QPixmap
-
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     tab = view._info_tabs.current_config_panel()
@@ -1470,8 +1395,6 @@ def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_
 
 
 def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again(qtbot):
-    from PyQt6.QtGui import QPixmap
-
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     tab = view._info_tabs.current_config_panel()
@@ -1485,10 +1408,6 @@ def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again
 
 def test_standalone_never_stands_them_side_by_side(qtbot):
     """The pane is wide there; stacking is right at any shape."""
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.generate_config_panel import GenerateConfigPanel
-
     panel = GenerateConfigPanel(None, FakeDB([]))
     qtbot.addWidget(panel)
 
@@ -1502,10 +1421,6 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_picture(qtbot):
     """The shape belongs to the tab, so switching to one holding a landscape
     picture stands the panes back up — without waiting for something else to
     nudge the splitter, which is all that used to bring them back."""
-    from PyQt6.QtGui import QPixmap
-
-    from origenerator.gui.info_pane_tabs import InfoPaneTabs
-
     tabs = InfoPaneTabs(None, FakeDB([]), fun_time=_session())
     qtbot.addWidget(tabs)
     portrait_tab = tabs.currentWidget()
@@ -1549,8 +1464,6 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     show has enhanced.  A press lands on the show itself, hosted like standalone
     — it is the show's own narrowing, not the session's — and the status line
     names the cut beside the rest."""
-    from origenerator.gui.show_hud import ShowHud, show_hud_model
-
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})

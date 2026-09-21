@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 
 import pytest
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QMouseEvent
 
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.related_media import RelatedMedia
@@ -108,9 +110,6 @@ def test_a_requested_row_points_at_the_item_it_was_asked_about(related):
 
 
 def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
-    from PyQt6.QtCore import QPoint, Qt
-    from PyQt6.QtGui import QMouseEvent
-
     image = _image_row()
     related = make_related(_video_row())
     related.show_row(image, [image])

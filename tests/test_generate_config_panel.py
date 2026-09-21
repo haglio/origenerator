@@ -1,28 +1,45 @@
 from __future__ import annotations
 
 import json
+import os
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter
 
+import origenerator.workflows.derived_size as ds
 from origenerator import evolver_export, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
+from origenerator.funscript import (
+    funscript_path_for,
+    legacy_funscript_path_for,
+    synthesize_actions,
+    write_funscript,
+)
+from origenerator.gallery.keys import settings_key
 from origenerator.generation_config import ConfigSnapshot
-from origenerator.gui import corner_controls, icons
+from origenerator.gui import corner_controls, icons, osr2_driver
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generate_config_panel as module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
-from origenerator.gui.enhance_versions import RunningEnhancement
+from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.param_form import ParamForm
+from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.derived_size import scale_to_total_pixels
 
 
 @pytest.fixture
@@ -44,10 +61,6 @@ def app_chrome():
     launch has left the sheet on the application; read under the sheet it says
     what the pane does in the app.
     """
-    from PyQt6.QtWidgets import QApplication
-
-    from origenerator.gui.stylesheet import build_stylesheet
-
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -89,8 +102,6 @@ def _is_descendant(widget, ancestor) -> bool:
 def test_the_panel_is_one_column_with_no_side_pane(panel):
     """Still one column — the split between the preview and the settings is a
     drag handle, not a second pane beside the tab."""
-    from PyQt6.QtWidgets import QSplitter
-
     assert panel.findChildren(QSplitter) == [panel._media_split]
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
 
@@ -125,8 +136,6 @@ def test_a_narrow_pane_squeezes_the_fields_instead_of_scrolling_sideways(panel):
     a section header for its whole title and the workflow picker for its
     placeholder, so the pane could not be narrowed without a sideways scroll.
     """
-    from PyQt6.QtWidgets import QApplication
-
     for section in panel._param_form._sections.values():
         section.set_collapsed(False)   # every field on show: the widest the form gets
     panel.show()
@@ -146,8 +155,6 @@ def test_nothing_in_the_form_is_laid_out_past_the_column_it_sits_in(blank_panel)
     Nothing on screen said what had been cut: not an ellipsis, and not the scroll
     bar, which stayed away because the layout's stated minimum still fit.
     """
-    from PyQt6.QtWidgets import QApplication
-
     panel = blank_panel
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     for section in panel._param_form._sections.values():
@@ -186,8 +193,6 @@ def test_the_pane_will_not_be_squeezed_narrower_than_its_settings(app_chrome, bl
     own beside the form's label column -- the row most able to push the floor
     past its cap, where the drag would stop with room still to give.
     """
-    from PyQt6.QtWidgets import QApplication
-
     panel = blank_panel
     blank_floor = panel._contents_floor()
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
@@ -213,8 +218,6 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     The failure this exists for: a row layout squeezed them past their minimum and
     clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
     """
-    from PyQt6.QtWidgets import QApplication
-
     buttons = [*(lane.button for lane in panel._lanes.values()),
                panel._cancel_btn, panel._generate_btn]
     for button in buttons:
@@ -298,7 +301,6 @@ def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
 def test_switching_workflow_detaches_the_old_form_at_once(panel):
     # Changing workflow must remove the previous form from the host immediately, not
     # leave it parented (and painting) under the new form until deleteLater runs.
-    from origenerator.gui.param_form import ParamForm
     old_form = panel._param_form
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
 
@@ -349,10 +351,7 @@ def test_i2v_workflow_form_gets_the_derived_size_deriver(panel):
 def test_i2v_form_shows_the_measured_size_of_a_real_input_image(panel, tmp_path, monkeypatch):
     # End to end: the panel hands the real derived_display_size to the form, which
     # measures the picked image and shows its scaled size in the locked field.
-    from PIL import Image
 
-    import origenerator.workflows.derived_size as ds
-    from origenerator.workflows.derived_size import scale_to_total_pixels
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     Image.new("RGB", (1920, 1080), (128, 128, 128)).save(tmp_path / "wide.png")
@@ -391,7 +390,6 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     # A Cancel shares the Generate button's row so the run a tab launched can be
     # stopped from the tab, not only the folder's tile. It's hidden until the
     # gallery marks the tab generating.
-    from PyQt6.QtWidgets import QPushButton
     assert isinstance(panel._cancel_btn, QPushButton)
     assert _is_descendant(panel._cancel_btn, panel)  # in the tab's own column
     assert panel._cancel_btn.parent() is panel._generate_btn.parent()  # same button row host
@@ -729,7 +727,6 @@ def test_a_config_with_no_result_is_named_by_its_folder(panel):
 
 
 def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
-    from origenerator.gallery.keys import settings_key
     panel._db.rename_folder(settings_key("image", *panel.settings_key()), "Wizards")
 
     assert panel.title() == "Wizards"
@@ -907,7 +904,6 @@ def saved_panel(qtbot, tmp_path):
 
 def _metadata_texts(panel):
     """Every label in the panel's metadata block, minus the wrapping zero-widths."""
-    from PyQt6.QtWidgets import QLabel
     return [lbl.text().replace("\u200b", "")
             for lbl in panel._metadata_block.findChildren(QLabel)]
 
@@ -950,13 +946,11 @@ def _fold_enhancement(db, prompt_id="img1"):
 
 
 def _level_rows(panel):
-    from origenerator.gui.enhance_versions import _LevelRow
     return panel._versions._host.findChildren(_LevelRow)
 
 
 def _row_texts(row):
     """Every label on one level's row, minus the wrapping zero-widths."""
-    from PyQt6.QtWidgets import QLabel
     return [lbl.text().replace("\u200b", "") for lbl in row.findChildren(QLabel)]
 
 
@@ -965,7 +959,6 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_pan
     # already see before the first enhancement makes a second one — not least
     # because the enhance you just launched replaces the list's only other
     # content while it runs.
-    from origenerator.gui.enhance_versions import _AddRow
 
     panel, db = saved_panel
     image = _image_row(db, "img1")
@@ -986,8 +979,6 @@ def test_a_video_has_no_version_strip(saved_panel):
 
 def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     """A video on disk, and the upscale Evolver made of it filed in the library."""
-    import os
-
     output = tmp_path / "out"
     video = output / "video" / f"{prompt_id}.mp4"
     video.parent.mkdir(parents=True)
@@ -1044,7 +1035,6 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     # The file information is per enhancement, so it sits with the level that
     # made it — the same File row a metadata block renders, copy button and all,
     # rather than a pooled block at the top labeled with a level's name.
-    from PyQt6.QtWidgets import QPushButton
 
     panel, db = saved_panel
     image = _enhanced_image_row(db)
@@ -1062,8 +1052,6 @@ def test_each_level_carries_its_own_file_row(saved_panel):
 
 
 def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
-    from origenerator.gui.enhance_versions import _PendingRow
-
     panel, db = saved_panel
     image = _image_row(db, "img1")      # never enhanced: no levels of its own
     panel.show_saved_generation(image, [image])
@@ -1086,7 +1074,6 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     # The pane at the top of the tab is where this app shows what is being made,
     # and an enhancement of the image on display is being made — it used to be
     # the one surface that sat on the old picture while the little row streamed.
-    from origenerator.gui import generate_config_panel as module
 
     panel, db = saved_panel
     output_dir = tmp_path / "out"
@@ -1128,7 +1115,6 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
                                                                           monkeypatch):
     # The levels are versions of one image, not separate generations: picking
     # one is a look, so the row on display, its form and its footer all stay put.
-    from origenerator.gui import generate_config_panel as module
 
     panel, db = saved_panel
     output_dir = tmp_path / "out"
@@ -1203,7 +1189,6 @@ def test_a_deleted_images_version_says_how_long_it_has_been_in_the_trash(saved_p
 
 def _version_texts(panel):
     """Every label in the panel's version list, minus the wrapping zero-widths."""
-    from PyQt6.QtWidgets import QLabel
     return [lbl.text().replace("\u200b", "")
             for lbl in panel._versions.findChildren(QLabel)]
 
@@ -1357,12 +1342,6 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
 def _script_for(video_path, output_dir=None):
     """Write a script for ``video_path`` -- in the scripts folder under
     ``output_dir``, or, with none named, in the old place beside the clip."""
-    from origenerator.funscript import (
-        funscript_path_for,
-        legacy_funscript_path_for,
-        synthesize_actions,
-        write_funscript,
-    )
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
     dest = (legacy_funscript_path_for(video_path) if output_dir is None
             else funscript_path_for(video_path, output_dir=output_dir))
@@ -1388,8 +1367,6 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
     """The drive reads a clip's script wherever it is, which for anything
     generated from here on is the folder, not a file beside the clip."""
-    from origenerator.gui import osr2_driver
-
     panel, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "video" / "vid1.mp4"
@@ -1801,7 +1778,6 @@ def _folder_params(prompt="a cat on a couch"):
 
 
 def _images(tmp_path, count):
-    from PIL import Image
     paths = []
     for n in range(count):
         path = tmp_path / f"folder_{n}.png"
@@ -1861,7 +1837,6 @@ def test_a_request_knows_whether_anything_has_actually_been_rewritten():
 def test_a_request_cannot_be_edited_after_the_tab_opens_on_it():
     # What the tab opened on is how a press tells a rewrite from a re-run; a
     # request that could be edited could quietly agree with whatever was typed.
-    from dataclasses import FrozenInstanceError
 
     with pytest.raises(FrozenInstanceError):
         _request().count = 9
@@ -1883,7 +1858,6 @@ def test_the_press_asks_for_changes_and_counts_them_in_the_hover(requesting):
 
 
 def test_every_prompt_is_marked_against_what_it_says_now(requesting):
-    from origenerator.gui.tracked_prompt import _Tracker
     fields = requesting._param_form.text_fields()
     # Every one of them carries a tracker, each rewriting from its own text --
     # a prompt is not a change to itself, so nothing is marked until one is typed in.
@@ -1987,7 +1961,6 @@ def test_showing_a_generation_ends_the_request(requesting, tmp_path):
 
     requesting.show_saved_generation(row, [])
 
-    from origenerator.gui.tracked_prompt import _Tracker
     assert not any(w.findChildren(_Tracker)
                    for w in requesting._param_form.text_fields())
     assert requesting._generate_btn.text() == "Generate"

@@ -386,9 +386,7 @@ def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
     # The table recorded what each worktree's copied database had bookmarked,
     # for adoption at the next live launch; there are no copies now, so it is
     # dropped on open rather than left as a fossil in every library.
-    import sqlite3
 
-    from origenerator.db import Database
 
     path = tmp_path / "origenerator.db"
     with sqlite3.connect(path) as conn:

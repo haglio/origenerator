@@ -42,6 +42,7 @@ from player_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.level_stepper import LevelStepper
+from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
@@ -53,7 +54,6 @@ from origenerator.gui.show_set import (
 )
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.toast import NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.slideshow import ShowState, Slide
 

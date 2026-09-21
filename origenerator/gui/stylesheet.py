@@ -19,6 +19,7 @@ from shared_ui.colors import (
 )
 
 from origenerator.config import PROJECT_DIR
+from origenerator.gui.spin_arrows import arrow_paths
 
 
 def _h(color) -> str:
@@ -33,8 +34,6 @@ def _spin_arrow_rules() -> str:
     :mod:`origenerator.gui.spin_arrows` renders one. If it can't, this contributes
     nothing and Qt draws its own arrow: uncertain color, but an arrow.
     """
-    from origenerator.gui.spin_arrows import arrow_paths
-
     normal = arrow_paths(TEXT_PRIMARY)
     if normal is None:
         return ""

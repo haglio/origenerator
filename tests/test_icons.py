@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from collections import Counter
+
+from PyQt6.QtCore import QRect, QSize, Qt
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
+from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.icons import glyph_pixmap
+
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
 
 def _style_tab_close_pixmap():
     """The close mark the live style paints on a tab, drawn here independently."""
-    from PyQt6.QtCore import QRect, Qt
-    from PyQt6.QtGui import QPainter, QPixmap
-    from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
-
     style = QApplication.style()
     size = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
     pixmap = QPixmap(size, size)
@@ -34,8 +38,6 @@ def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
 
 
 def test_level_badge_icons_render_for_each_level(qtbot):
-    from PyQt6.QtCore import QSize
-
     # Every badged level maps to a rendered chip: the four folder levels,
     # workflow -> model -> add-on -> source image.
     assert set(icons.LEVEL_LABELS) == {
@@ -89,7 +91,6 @@ def test_an_orientation_mark_is_a_frame_and_not_a_filled_block(qtbot):
     # A frame, like the family's screen and photo marks -- what it stands for is
     # a region a picture goes in. Filled, it would read as a swatch, and the
     # rounded corners that say "screen" would be lost against the heading's word.
-    from shared_ui.colors import TEXT_PRIMARY
 
     image = icons.orientation_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
@@ -108,15 +109,10 @@ def _ink_bounds(pixmap) -> tuple[int, int]:
 
 
 def _corner_image(icon):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-
     return icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()
 
 
 def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
-    from shared_ui.colors import AMBER, GREEN
-
     # The star is green because Fun Time's favorite ★ is (shared_ui's GREEN is
     # the value its HUD paints), so one color means "bookmarked" in both apps —
     # which leaves the enhanced picture's plus this palette's yellow, since the
@@ -140,8 +136,6 @@ def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
 
 
 def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
-    from shared_ui.colors import AMBER
-
     # A hollow plus with the one it already holds as a yellow shadow under it:
     # the middle stays empty like the plain hollow one, and the amber shows out
     # from under it down and to the right.
@@ -158,8 +152,6 @@ def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
 
 
 def test_arming_a_corner_control_changes_its_mark(qtbot):
-    from shared_ui.colors import RED
-
     # Hovering says "this is a button" — the trash can in the red every delete in
     # this app wears, the others in the light gray that only means "armed".
     rest = _corner_image(icons.corner_trash_icon(armed=False))
@@ -173,9 +165,6 @@ def test_arming_a_corner_control_changes_its_mark(qtbot):
 
 
 def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-
     # It is dead because it is a finished statement — this image already holds the
     # version you would be asking for — so Qt's usual fade would read as a fault.
     icon = icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False)
@@ -185,10 +174,6 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 
 
 def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-    from shared_ui.colors import GREEN
-
     # The tree paints a favorited leaf (and the Favorites shelf) with the filled star,
     # so it wears the badge's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
@@ -201,8 +186,6 @@ def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
 
 
 def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
-    from PyQt6.QtCore import QSize
-
     # The i2v hover controls: a video-seed and an image-seed re-roll glyph, each
     # a non-blank pixmap, and visibly distinct so one isn't mistaken for the other.
     video = icons.reroll_seed_icon(MediaType.VIDEO)
@@ -214,9 +197,6 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 
 
 def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
               icons.delete_icon, icons.clock_icon, icons.audio_icon,
               icons.autoloop_icon, icons.slideshow_icon, icons.enhance_icon,
@@ -232,8 +212,6 @@ def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
 
 
 def test_the_bank_glyphs_are_all_different_marks(qtbot):
-    from PyQt6.QtCore import QSize
-
     # Icon-only buttons are only as good as the glyphs telling each other apart,
     # and two of these were near-identical before: undo against auto-generate
     # (both a circular arrow), and undo against the redo it now sits beside.
@@ -259,8 +237,6 @@ def test_the_bank_glyphs_are_all_different_marks(qtbot):
 
 
 def test_undo_and_redo_carry_their_heads_on_opposite_sides(qtbot):
-    from PyQt6.QtCore import QSize
-
     # The pair is one drawing mirrored, and the arrowhead is what the mirror
     # moves: undo's fills the top-left, redo's the top-right. That difference has
     # to be big — the small head this replaced left the two all but identical at
@@ -288,10 +264,6 @@ def _top_corner_ink(pixmap) -> tuple[int, int]:
 
 
 def test_the_bank_colors_its_act_on_this_trio(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-    from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED
-
     # Star green, enhance yellow, delete red — the colors the corner badges wear,
     # so a button and the mark it leaves on a tile are one symbol. And every one
     # of them still dims to the same muted gray when it has nothing to act on, so
@@ -307,8 +279,6 @@ def test_the_bank_colors_its_act_on_this_trio(qtbot):
 
 def _dominant_color(pixmap) -> int:
     """The most common fully-opaque pixel in a rendered glyph — its ink."""
-    from collections import Counter
-
     image = pixmap.toImage()
     counts = Counter(
         image.pixel(x, y)
@@ -319,9 +289,6 @@ def _dominant_color(pixmap) -> int:
 
 
 def test_experiment_icons_render_and_verdicts_differ(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-
     # The Experiments shelf marker draws in both modes like the other shelves'.
     flask = icons.flask_icon()
     size = QSize(24, 24)
@@ -336,11 +303,6 @@ def test_experiment_icons_render_and_verdicts_differ(qtbot):
 
 
 def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QIcon
-    from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
-    from shared_ui.icons import glyph_pixmap
-
     # The reason the glyphs left this module: a drawing kept here is a drawing
     # that can drift from Fun Time's copy of it, and the two apps' microphones
     # had already drifted into different shapes on one screen. So every button's
@@ -370,10 +332,6 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
 
 
 def test_the_tile_hover_controls_wear_shared_marks_too(qtbot):
-    from PyQt6.QtCore import QSize
-    from PyQt6.QtGui import QColor
-    from shared_ui.icons import glyph_pixmap
-
     # The white line art on a thumbnail's hover buttons is the same family mark
     # the toolbar wears, in the white these read in over a picture -- not a
     # second set of drawings kept for the tiles.

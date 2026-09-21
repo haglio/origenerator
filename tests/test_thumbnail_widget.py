@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from io import BytesIO
 
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
@@ -10,6 +11,7 @@ from PyQt6.QtWidgets import QApplication
 from origenerator.gui import corner_controls, drag_thumbnail, icons
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import RunReading
+from origenerator.gui.looping_preview import set_previews_paused
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -425,7 +427,6 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     because a switch per widget is how three of the four kinds of looping
     preview were missed (see origenerator.gui.looping_preview).
     """
-    from origenerator.gui.looping_preview import set_previews_paused
     webp = tmp_path / "loop.webp"
     Image.new("RGB", (40, 30)).save(webp)
     tile = ThumbnailWidget("p1", None, "a clip", movie_path=str(webp))
@@ -456,8 +457,6 @@ def _run(**kw):
 
 
 def _png_bytes(color=(30, 90, 160)):
-    from io import BytesIO
-
     buf = BytesIO()
     Image.new("RGB", (8, 8), color).save(buf, "PNG")
     return buf.getvalue()

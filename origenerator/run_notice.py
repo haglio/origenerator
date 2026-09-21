@@ -11,7 +11,7 @@ Two runs are never announced. A short one was over before anyone could leave,
 so a notice for it interrupts someone about something they just watched. And
 the app's own background work — the idle experiments, the base re-renders
 repairing an enhance — was never waited on by anyone: those run by the dozen
-while the machine is idle, and a night of them would be a night of toasts.
+while the machine is idle, and a night of them would be a night of pop-ups.
 
 Qt-free on purpose, so what gets said can be read by a test with no desktop to
 say it on; the saying is :mod:`origenerator.gui.desktop_notices`.

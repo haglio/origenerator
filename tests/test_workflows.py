@@ -1,10 +1,25 @@
 from __future__ import annotations
 
 import json
+import json as _json
 import re
 
 import pytest
+from PIL import Image
 
+import origenerator.workflows.derived_size as ds
+import origenerator.workflows.detail_parts as detail_module
+import origenerator.workflows.detail_parts as module
+import origenerator.workflows.flux_t2i_upscaled as flux
+import origenerator.workflows.sdxl_pose_transfer as pose
+import origenerator.workflows.sdxl_t2i as t2i
+import origenerator.workflows.wan21_ati_i2v as ati
+import origenerator.workflows.wan21_ati_i2v as ati_module
+import origenerator.workflows.wan_experts as experts
+from origenerator import config
+from origenerator.comfy_graph import dual_sampler_model_files
+from origenerator.gui.param_fields import clamped_number
+from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.workflows import WORKFLOW_REGISTRY, base
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
@@ -13,6 +28,7 @@ from origenerator.workflows.base import (
     ParamDef,
     WorkflowTemplate,
 )
+from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.duration import seconds_for_frames
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.frame_rate import (
@@ -20,7 +36,12 @@ from origenerator.workflows.frame_rate import (
     NATIVE_FPS,
     playback_rate,
 )
+from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
+from origenerator.workflows.model_files import NO_LORA
+from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
+from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
+from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
@@ -74,8 +95,6 @@ def test_wan_video_workflows_expose_lora_pickers(monkeypatch):
     # matching the persisted default — not a hidden param the form silently reset
     # to default. Where the pickers sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
-    import origenerator.workflows.wan_experts as experts
-    from origenerator.workflows.model_files import NO_LORA
 
     options = [NO_LORA, "x_high.safetensors", "y_low.safetensors"]
     monkeypatch.setattr(experts, "list_lora_files", lambda fallback, **terms: options)
@@ -96,8 +115,6 @@ def test_wan_video_workflows_bypass_a_none_lora(monkeypatch):
     # other stage's real LoRA is untouched. Verified both by the payload (how
     # many LoraLoaderModelOnly nodes it has) and by reading the graph back the
     # way the importer does — a bypassed stage resolves to no LoRA at all.
-    from origenerator.comfy_graph import dual_sampler_model_files
-    from origenerator.workflows.model_files import NO_LORA
 
     def lora_count(payload):
         return sum(n["class_type"] == "LoraLoaderModelOnly" for n in payload.values())
@@ -131,7 +148,6 @@ def test_wan_video_workflows_expose_model_pickers(monkeypatch):
     # installed diffusion_models — selectable, not a hidden default the form
     # silently reset. Where the pickers sit is asserted separately, by
     # test_wan_video_workflows_group_all_models_then_all_loras.
-    import origenerator.workflows.wan_experts as experts
 
     installed = {
         "diffusion_models": ["m_high.safetensors", "m_low.safetensors"],
@@ -245,7 +261,7 @@ def test_sdxl_t2i_default_params_has_required_keys():
     assert required.issubset(params.keys())
 
 
-def test_sdxl_t2i_param_definitions_returns_paramdefs():
+def test_every_sdxl_t2i_setting_is_declared_as_a_paramdef():
     wf = SdxlT2iWorkflow()
     defs = wf.param_definitions()
     assert len(defs) > 0
@@ -415,8 +431,6 @@ def test_flux_enhance_resamples_on_the_guided_conditioning():
 # ---- Image Enhance (the standalone form of the tail) ----
 
 def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, monkeypatch):
-    from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
-
     wf = WORKFLOW_REGISTRY["image_enhance"]
     assert wf.__class__ is ImageEnhanceWorkflow
     assert wf.output_type == "image"
@@ -430,7 +444,6 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     # It takes an input image, so — like every input-image workflow — its size
     # derives from it: the source's own dimensions at enhance_scale, no budget.
     assert wf.derives_size_from_input is True
-    import origenerator.workflows.derived_size as ds
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "src.png", (640, 360))
     params = dict(wf.default_params(), input_image="src.png", enhance_scale=2.0)
@@ -501,8 +514,6 @@ def _enhance_payload(installed=_FOUND_DETECTORS, **params):
     Stated rather than read off this machine's ComfyUI: the pass drops any part
     whose model isn't there, so what is installed decides what the graph holds.
     """
-    import origenerator.workflows.detail_parts as module
-
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(module, "list_detector_files", lambda: list(installed))
@@ -702,8 +713,6 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
     # upscale model picked from the installed upscale_models files like every
     # other model picker, and the scale/steps/denoise numerics — not hidden
     # defaults the form would silently reset.
-    import origenerator.workflows.sdxl_pose_transfer as pose
-    import origenerator.workflows.sdxl_t2i as t2i
 
     installed = {"upscale_models": ["4x_crisp.pt", "4x_soft.pth"]}
     picker = lambda category, fallback, **terms: installed.get(category, list(fallback))
@@ -826,7 +835,6 @@ def test_no_workflow_can_build_a_graph_with_a_link_to_a_node_it_lost(enhance, mo
     # ControlNet and 22/23 the depth pair, so this sits clear of both"). ComfyUI
     # answers a collision with a submit rejection at generate time, which is the
     # user's first and only warning.
-    import origenerator.workflows.detail_parts as detail_module
     monkeypatch.setattr(detail_module, "list_detector_files",
                         lambda: list(_FOUND_DETECTORS))
 
@@ -926,8 +934,6 @@ def test_every_input_image_workflow_derives_its_size():
 def test_derived_display_size_measures_the_input_image(tmp_path, monkeypatch):
     # The form reads the derived width/height to show from here: the picked image
     # measured and scaled exactly as the run will size it.
-    import origenerator.workflows.derived_size as ds
-    from origenerator.workflows.derived_size import scale_to_total_pixels
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "wide.png", (1920, 1080))
@@ -1025,7 +1031,6 @@ def test_wan21_ati_i2v_honors_an_unlocked_size_override():
     # An explicit WxH wins over the input image's derived size, and the motion is
     # rescaled into the overridden space — so an unlock overrides derivation even
     # when the (here nonexistent) image would otherwise be measured or fall back.
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), input_image="whatever.png", width=720, height=480)
@@ -1110,7 +1115,7 @@ def test_wan22_i2v_default_params_has_required_keys():
     assert "width" not in params and "height" not in params
 
 
-def test_wan22_i2v_param_definitions_returns_paramdefs():
+def test_every_wan22_i2v_setting_is_declared_as_a_paramdef():
     wf = Wan22I2vWorkflow()
     defs = wf.param_definitions()
     assert len(defs) > 0
@@ -1276,8 +1281,6 @@ def test_wan21_ati_i2v_payload_follows_an_authored_motion_track():
     # fixed 121-point/24fps convention: a 3-point cluster riding the authored
     # sine between motion_ceiling and motion_floor, plus one static point holding
     # the anchor (e.g. a anchor base) in place.
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
-    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     assert wf.__class__ is Wan21AtiI2vWorkflow
@@ -1344,7 +1347,6 @@ def test_wan21_ati_i2v_authors_its_funscript_from_the_same_track():
     # track always spans 5.0s of track time stretched over the clip's real
     # duration) and normalized to travel depth. Each top-of-cycle action must
     # land where the track's y actually crests. No pixel measurement anywhere.
-    import json as _json
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), motion_hz=1.2, frame_count=81, frame_rate=16.0, seed=42)
@@ -1382,7 +1384,6 @@ def test_one_seeds_authored_motion_is_the_same_motion_it_has_always_been():
     # detail: a change to the wobble, the easing or the shaping point would
     # leave every stored script describing a motion its video no longer makes.
     # Pinned exactly, at one seed, so a move or a rewrite has to reproduce it.
-    import json as _json
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     params = dict(wf.default_params(), seed=4242, frame_count=81, motion_hz=1.2,
@@ -1463,9 +1464,6 @@ def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
     # the high-noise LoRA patches the early-step model, the low-noise LoRA the
     # late-step one, both branching off the one UNET. Each slot is optional
     # ("None" omits its loader; that stage runs the base model unmodified).
-    import origenerator.workflows.wan21_ati_i2v as ati_module
-    from origenerator.workflows.model_files import NO_LORA
-    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     options = [NO_LORA, "hand_high.safetensors", "hand_low.safetensors"]
     monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback, **terms: options)
@@ -1536,8 +1534,6 @@ def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
 
 
 def _write_image(path, size):
-    from PIL import Image
-
     Image.new("RGB", size, (128, 128, 128)).save(path)
 
 
@@ -1547,10 +1543,6 @@ def test_wan21_ati_i2v_derives_size_and_rescales_the_motion(tmp_path, monkeypatc
     # motion coordinates — authored in the 480×864 reference frame — are rescaled
     # into that derived space so the track lands in the same relative place
     # regardless of the image's aspect ratio.
-    import origenerator.workflows.derived_size as ds
-    from origenerator.workflows.derived_size import scale_to_total_pixels
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
-    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "square.png", (1024, 1024))
@@ -1584,8 +1576,6 @@ def test_wan21_ati_i2v_falls_back_to_the_reference_size_when_unmeasurable(monkey
     # A missing or unset input image can't be measured, so the size falls back to
     # the 480×864 reference (scale 1.0 → the motion coordinates pass through
     # unchanged) rather than crashing payload build.
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
-    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     wf = Wan21AtiI2vWorkflow()
     for image in ("", "does_not_exist.png"):
@@ -1602,7 +1592,6 @@ def test_wan21_ati_motion_coordinates_are_bounded_by_the_reference_frame():
     # rescaled into the derived size), so their ranges are that frame's bounds —
     # X params to the reference width, Y params to the reference height — not the
     # old catch-all 4096. This keeps the form's meaning honest about the space.
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
 
     wf = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     by_key = {pd.key: pd for pd in wf.param_definitions()}
@@ -1620,11 +1609,7 @@ def test_wan21_ati_i2v_auto_aims_untouched_motion_params(monkeypatch, tmp_path):
     # coordinate switches detection off entirely — the user's numbers win.
     # The funscript is unaffected either way: pos is normalized depth, so the
     # same seed yields the same actions no matter where the track points.
-    import json as _json
 
-    import origenerator.workflows.wan21_ati_i2v as ati
-    from origenerator.workflows.motion_track import REFERENCE_HEIGHT, REFERENCE_WIDTH
-    from origenerator.workflows.wan21_ati_i2v import Wan21AtiI2vWorkflow
 
     aim = {"motion_x": 0.5, "motion_ceiling": 0.25, "motion_floor": 0.5,
            "anchor_x": 0.45, "anchor_y": 0.6}
@@ -1672,8 +1657,6 @@ def test_wan21_ati_i2v_frame_count_avoids_the_resampler_crash():
 # ---- SDXL Pose Transfer (re-skin an image, keeping its pose) ----
 
 def test_sdxl_pose_transfer_is_registered_as_an_image_workflow():
-    from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
-
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     assert wf.__class__ is SdxlPoseTransferWorkflow
     assert wf.name == "sdxl_pose_transfer"
@@ -1692,7 +1675,6 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     # library, not ComfyUI's input dump, so its Structure Image picker opens
     # there. The path is built from the (private) library root, never spelled out
     # in source.
-    from origenerator import config
 
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     pd = next(pd for pd in wf.param_definitions() if pd.key == "input_image")
@@ -1817,8 +1799,6 @@ def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, 
     # The form's locked Dimensions field must show the size this workflow will
     # actually render — the pose image's aspect at the 1 MP SDXL budget, not the
     # video workflows' 0.4 MP.
-    import origenerator.workflows.derived_size as ds
-    from origenerator.workflows.derived_size import scale_to_total_pixels
 
     monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
     _write_image(tmp_path / "tall.png", (1080, 1920))
@@ -2039,7 +2019,6 @@ def test_flux_t2i_upscaled_default_params_has_required_keys():
 def test_flux_t2i_upscaled_exposes_a_gguf_model_picker(monkeypatch):
     # The GGUF diffusion model is a combo drawn from the installed diffusion
     # models, like SDXL's checkpoint picker — the one thing a user varies most.
-    import origenerator.workflows.flux_t2i_upscaled as flux
 
     installed = ["a_flux.gguf", "b_flux.gguf"]
     monkeypatch.setattr(flux, "list_model_files", lambda category, fallback, **terms: installed)
@@ -2192,8 +2171,6 @@ def test_every_registered_workflow_says_what_its_own_graph_reads_as():
 
 @pytest.mark.parametrize("name", sorted(READS_AS))
 def test_a_workflows_own_graph_reads_as_it_always_has(name):
-    from origenerator.importer import _workflow_from_nodes
-
     workflow = WORKFLOW_REGISTRY[name]
     graph = workflow.build_api_payload(dict(workflow.default_params()))
 
@@ -2204,8 +2181,6 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
     """The chain hardcodes workflow names; a rename or a removal on one side
     would leave it writing a name no gallery folder is ever built for, and the
     value is persisted into every row."""
-    from origenerator.importer import _GRAPH_SIGNATURES
-
     assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY)
 
 
@@ -2602,8 +2577,6 @@ def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
     one question, and if they ever disagreed the field would be advertising a
     rate the file isn't written at — so this walks every rate a person could
     type and holds them to the same answer."""
-    from origenerator.gui.param_fields import clamped_number
-
     rate_def = next(pd for pd in WORKFLOW_REGISTRY[name].param_definitions()
                     if pd.key == "frame_rate")
     for typed in range(200):

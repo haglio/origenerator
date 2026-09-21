@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess as sp
 from pathlib import Path
 
 import pytest
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
+import origenerator.importer as imp
 from origenerator.db import Database
 from origenerator.importer import (
     backfill_input_image,
@@ -204,7 +206,6 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
 
 
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
-    import origenerator.importer as imp
     # No _meta titles: prompts must be found structurally via the Wan node's links.
     graph = {
         "1": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},
@@ -227,7 +228,6 @@ def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monke
 
 
 def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monkeypatch):
-    import origenerator.importer as imp
     # An i2v variant differs from its siblings only by LoRA. The LoRA (and base
     # model) live in the two samplers' model chains; extracting them is what lets
     # the gallery nest the import under its model -> LoRA folders.
@@ -261,9 +261,6 @@ def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monk
 
 
 def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):
-    import subprocess as sp
-
-    import origenerator.importer as imp
     graph = {"1": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
     double = json.dumps(json.dumps(graph))  # VHS_VideoCombine double-encodes
     out = json.dumps({"format": {"tags": {"prompt": double}}})
@@ -275,7 +272,6 @@ def test_video_prompt_graph_handles_double_encoded(tmp_path, monkeypatch):
 
 
 def test_video_prompt_graph_empty_without_ffprobe(tmp_path, monkeypatch):
-    import origenerator.importer as imp
     monkeypatch.setattr(imp.shutil, "which", lambda n: None)
     assert imp._video_prompt_graph(tmp_path / "v.mp4") == {}
 
@@ -284,10 +280,6 @@ def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monk
     """Each ffprobe child must be spawned windowless: importing a batch of videos
     calls it once per file, and on Windows an unsuppressed child flashes a console
     window per call. Assert the console-suppressing creationflag is passed."""
-    import subprocess as sp
-
-    import origenerator.importer as imp
-
     captured: dict = {}
 
     def fake_run(*args, **kwargs):
@@ -494,7 +486,6 @@ def test_backfill_regenerates_a_missing_thumbnail(tmp_path):
 
 
 def test_extract_metadata_identifies_flux_t2i_upscaled_from_graph(tmp_path):
-    import origenerator.importer as imp
     # Flux embeds no checkpoint and no Wan node: its UnetLoaderGGUF + DualCLIPLoader
     # + FluxGuidance signature is what names it, and the GGUF model is pulled out
     # so the gallery can split Flux runs by which model made them. The filename
@@ -563,7 +554,6 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
 
 
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
-    import origenerator.importer as imp
     # WAN 2.2 text-to-image embeds no Wan conditioning node and no checkpoint, so
     # its EmptyHunyuanLatentVideo + ImageFromBatch + SaveImage signature is what
     # names it. The filename matches no workflow prefix, proving the graph alone
@@ -593,9 +583,6 @@ def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
 
 
 def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
-    import origenerator.importer as imp
-    from origenerator.workflows import WORKFLOW_REGISTRY
-
     # An enhanced SDXL graph carries two KSamplers. A re-imported output must
     # record the recipe's base pass, not the low-denoise refinement the enhance
     # tail runs over its VAEEncode'd latent — otherwise the import would claim
@@ -650,8 +637,6 @@ _READ_AS = (
 
 @pytest.mark.parametrize("node_types, expected", _READ_AS)
 def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
-    import origenerator.importer as imp
-
     # A filename matching no workflow prefix, so the graph alone decides.
     path = tmp_path / "renamed_00001_.png"
     _make_png_with_metadata(path, _graph_of(*node_types))
@@ -664,8 +649,6 @@ def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
     prefix that was later reused, would otherwise be filed under the wrong
     workflow forever. Workflow names are persisted into every row and named from
     the overlay's recipes, so this is a data defect, not a display one."""
-    import origenerator.importer as imp
-
     path = tmp_path / "sdxl_t2i_00001_.png"
     _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
 
@@ -680,8 +663,6 @@ def test_every_workflows_own_output_re_imports_as_itself(tmp_path, name):
     an SDXL checkpoint -- and the graph read, which overrules the filename,
     filed a re-import of either under sdxl_t2i although the filename had it
     right (bug 70).  The graph overrules only where it can tell the two apart."""
-    import origenerator.importer as imp
-
     workflow = WORKFLOW_REGISTRY[name]
     prefix = workflow.default_params().get("filename_prefix", "").rsplit("/", 1)[-1]
     if not prefix:
@@ -693,8 +674,6 @@ def test_every_workflows_own_output_re_imports_as_itself(tmp_path, name):
 
 
 def test_a_graph_that_names_nothing_leaves_the_filenames_guess_standing(tmp_path):
-    import origenerator.importer as imp
-
     path = tmp_path / "flux_t2i_upscaled_00001_.png"
     _make_png_with_metadata(path, _graph_of("SomeNodeNobodyHasHeardOf"))
 
@@ -702,8 +681,6 @@ def test_a_graph_that_names_nothing_leaves_the_filenames_guess_standing(tmp_path
 
 
 def test_a_file_with_no_embedded_graph_keeps_the_filenames_guess(tmp_path):
-    import origenerator.importer as imp
-
     path = tmp_path / "wan22_t2i_00001_.png"
     Image.new("RGB", (8, 8)).save(path)
 

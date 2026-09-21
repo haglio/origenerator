@@ -24,6 +24,10 @@ converts at the boundary; without it a window asked to sit at the RFB's rect
 would land at ``scale`` of the way across the screen, at ``scale`` of the size.
 """
 
+# ruff: noqa: PLC0415
+# Qt is imported inside the functions that need it: apply_hosted_scale runs
+# before the first PyQt6 import in the whole process, and a top-level import
+# here would be that import.
 from __future__ import annotations
 
 import ctypes

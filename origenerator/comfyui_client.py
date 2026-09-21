@@ -129,7 +129,7 @@ class ComfyUIClient(QThread):
             self._task = None
 
     async def _ws_loop(self):
-        import websockets
+        import websockets  # noqa: PLC0415 (optional: only a live server needs it)
         self._task = asyncio.current_task()
         try:
             while self._running:

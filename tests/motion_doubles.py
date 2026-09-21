@@ -6,6 +6,7 @@ own half-driver to be pressed against.
 """
 from __future__ import annotations
 
+from origenerator.gui.slideshow_pace import MAX_S, MIN_S
 from origenerator.motion_engine import Motion
 
 
@@ -81,6 +82,5 @@ class FakeHost:
         self.calls.append("cull")
 
     def set_dwell_s(self, seconds):
-        from origenerator.gui.slideshow_pace import MAX_S, MIN_S
         self.dwell_s = max(MIN_S, min(MAX_S, seconds))
         self.calls.append(("dwell", self.dwell_s))

@@ -3,18 +3,18 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui import media_overlay
-from origenerator.gui.toast import Toast
+from origenerator.gui.notice_overlay import NoticeOverlay
 
 
-def test_the_toast_restacks_its_own_window_when_it_comes_up(qtbot, monkeypatch):
+def test_the_notice_restacks_its_own_window_when_it_comes_up(qtbot, monkeypatch):
     raised = []
     monkeypatch.setattr(media_overlay, "raise_window_without_activating", raised.append)
     host = QWidget()
     qtbot.addWidget(host)
     host.resize(800, 600)
-    toast = Toast(host)
+    notice = NoticeOverlay(host)
     host.show()
 
-    toast.say("scene one")
+    notice.say("scene one")
 
-    assert raised == [int(toast.winId())]
+    assert raised == [int(notice.winId())]

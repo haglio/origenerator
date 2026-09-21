@@ -59,12 +59,12 @@ def run_off_thread(work, done) -> None:
     ``done`` is called exactly once, with ``None`` when ``work`` raised.
 
     The carrier is held in :data:`_in_flight` until it delivers, which is the
-    whole of what keeps it and its handler alive. It used to rely on being a
-    reference *cycle* instead -- the handler closed over the carrier, and the
-    carrier's own connection held the handler -- and a cycle nothing outside
-    points at is precisely what Python's cyclic collector takes. Collected
-    mid-flight, the handler was freed while the pool thread's emit was still
-    queued; the queued call then arrived at a function object that had been
+    whole of what keeps it and its handler alive. A reference *cycle* is not
+    enough -- the handler closing over the carrier while the carrier's own
+    connection holds the handler is exactly the shape Python's cyclic collector
+    takes when nothing outside points at it. Collected mid-flight, the handler
+    is freed while the pool thread's emit is still queued, and the queued call
+    then arrives at a function object that has been
     freed and its memory reused. That is not an exception. It is an access
     violation inside the interpreter's own frame setup, no traceback, the
     process simply gone -- and once the 1.5 s poll started running two of these

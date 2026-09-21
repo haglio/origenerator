@@ -3,8 +3,8 @@
 Pressing it launches a job and it is done — the strip's queue and the browser
 pane's in-flight cards are where a run in flight is watched, each showing the
 same reading of it (:func:`origenerator.timing.progress_status_label`). The
-button used to fill with that run's progress as well, which put a third,
-differently-worded account of one run on screen and tied the control that starts
+button does not fill with that run's progress: that would put a third,
+differently-worded account of one run on screen and tie the control that starts
 work to the state of work already going.
 
 It stays pressable throughout, since another press queues another job rather

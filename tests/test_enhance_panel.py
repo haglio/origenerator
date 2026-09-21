@@ -7,11 +7,22 @@ already received.
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QDropEvent
-from PyQt6.QtWidgets import QApplication, QLabel
+from PIL import Image
+from PyQt6.QtCore import QMimeData, QPoint, QRect, Qt
+from PyQt6.QtGui import QDropEvent, QPixmap
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+from shared_ui.colors import AMBER, BG_PRIMARY
 from shared_ui.toggle_switch import ToggleSwitch
 
+import origenerator.workflows.detail_parts as parts
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceLevel,
@@ -19,6 +30,8 @@ from origenerator.gallery import (
     default_enhance_params,
 )
 from origenerator.gui import drag_thumbnail
+from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import (
     EnhanceOffer,
@@ -30,6 +43,7 @@ from origenerator.gui.enhance_versions import (
     enhance_level_mime,
     params_from_mime,
 )
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
@@ -39,8 +53,6 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS):
     """A panel built against a stated set of installed detectors — the one thing
     on it that can be missing, and so the one thing a test must not read off
     whatever this machine happens to have in its ComfyUI."""
-    import origenerator.workflows.detail_parts as parts
-
     edits = []
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(parts, "list_detector_files", lambda: list(detectors))
@@ -224,9 +236,6 @@ def test_the_numbers_share_a_line_while_they_fit_and_take_a_line_each_when_not(q
 
 
 def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot):
-    from PyQt6.QtCore import QRect
-    from PyQt6.QtWidgets import QScrollArea
-
     panel, _ = _panel(qtbot)
     _laid_out_at(panel, 600, panel.minimumSizeHint().height())
     (scroll,) = panel.findChildren(QScrollArea)
@@ -239,8 +248,6 @@ def test_squeezed_shorter_than_its_settings_the_panel_scrolls_down_to_them(qtbot
 
 
 def test_squeezed_narrower_than_its_settings_the_panel_scrolls_sideways_to_them(qtbot):
-    from PyQt6.QtWidgets import QScrollArea
-
     panel, _ = _panel(qtbot)
     (scroll,) = panel.findChildren(QScrollArea)
     _laid_out_at(panel, 2000)
@@ -253,8 +260,6 @@ def test_squeezed_narrower_than_its_settings_the_panel_scrolls_sideways_to_them(
 
 
 def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qtbot):
-    from PyQt6.QtWidgets import QScrollArea
-
     panel, _ = _panel(qtbot)
     (scroll,) = panel.findChildren(QScrollArea)
     for width in (2000, 700, panel.minimumSizeHint().width()):
@@ -264,8 +269,6 @@ def test_given_the_height_it_asks_for_the_panel_shows_its_settings_unscrolled(qt
 
 
 def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
-    from PyQt6.QtWidgets import QPushButton, QScrollArea
-
     panel, _ = _panel(qtbot)
     (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
     (scroll,) = panel.findChildren(QScrollArea)
@@ -279,9 +282,6 @@ def test_the_enhance_button_asks_for_an_enhance_from_outside_the_scroll(qtbot):
 
 
 def test_the_enhance_button_is_yellow_with_dark_words_until_it_goes_dark(qtbot):
-    from PyQt6.QtWidgets import QPushButton
-    from shared_ui.colors import AMBER
-
     panel, _ = _panel(qtbot)
     panel.show()
     QApplication.processEvents()
@@ -297,8 +297,6 @@ def test_the_enhance_button_is_yellow_with_dark_words_until_it_goes_dark(qtbot):
 
 
 def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_do(qtbot):
-    from PyQt6.QtWidgets import QPushButton
-
     panel, _ = _panel(qtbot)
     (button,) = [b for b in panel.findChildren(QPushButton) if b.text() == "Enhance"]
 
@@ -322,8 +320,6 @@ def test_the_fields_line_up_down_the_panel_either_way_the_numbers_lie(qtbot):
 
 
 def test_a_number_is_never_squeezed_narrower_than_its_widest_value(qtbot):
-    from origenerator.gui.stylesheet import build_stylesheet
-
     panel, _ = _panel(qtbot)
     panel.setStyleSheet(build_stylesheet() + panel.styleSheet())  # the app's own chrome
     for width in range(panel.minimumSizeHint().width(), 1201, 20):
@@ -398,10 +394,6 @@ def _mean_ink(widget) -> float:
     whatever the widget doesn't paint uninitialized, and a switch that dims by
     going translucent then measures as whatever happened to be under it.
     """
-    from PyQt6.QtGui import QPixmap
-    from PyQt6.QtWidgets import QWidget
-    from shared_ui.colors import BG_PRIMARY
-
     pixmap = QPixmap(widget.size())
     pixmap.fill(BG_PRIMARY)
     widget.render(pixmap, QPoint(), flags=QWidget.RenderFlag.DrawChildren)
@@ -476,7 +468,6 @@ def _labels(widget):
 
 def _facts(row):
     """Every label on one row, its em-dash "file is gone" placeholder dropped."""
-    from PyQt6.QtWidgets import QLabel
     return " / ".join(lbl.text().replace("\u200b", "")
                       for lbl in row.findChildren(QLabel)
                       if lbl.text() and lbl.text() != "—")
@@ -542,8 +533,6 @@ def test_each_level_carries_its_own_file_and_created_rows(qtbot):
 
 
 def test_a_file_row_can_be_copied_and_revealed(qtbot):
-    from PyQt6.QtWidgets import QPushButton
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)))
@@ -582,7 +571,6 @@ def test_clicking_anywhere_on_a_row_picks_it(qtbot):
     # A row is one thing to click. Its picture and its lines of text cover
     # nearly all of it, and a child widget takes the press by default — which
     # left only the margins around them live.
-    from PyQt6.QtWidgets import QLabel
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -599,7 +587,6 @@ def test_the_buttons_on_a_row_still_take_their_own_clicks(qtbot):
     # The pass-through must stop at the copy and Show-in-Explorer buttons: Qt's
     # hit test skips a container marked transparent along with everything inside
     # it, so these are laid into the row's grid rather than into one.
-    from PyQt6.QtWidgets import QPushButton
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -617,7 +604,6 @@ def test_a_rows_text_offers_no_copy_or_select_all_menu(qtbot):
     # text — and Qt gives selectable text its own Copy / Select All menu. Over a
     # version that menu means nothing (the row has a Copy button for the one
     # value worth copying) and it is in the way of the row's own Delete.
-    from PyQt6.QtWidgets import QLabel
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -708,7 +694,6 @@ def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
 def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
     # A right-click on an unpicked row picks it first, so the menu always acts
     # on what it appeared over.
-    from PyQt6.QtWidgets import QMenu
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -733,8 +718,6 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
 
 
 def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMenu
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)))
@@ -760,8 +743,6 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
 
 
 def test_the_menu_says_a_videos_versions_are_not_deleted_from_here(qtbot, monkeypatch):
-    from PyQt6.QtWidgets import QMenu
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), deletable=False)
@@ -821,8 +802,6 @@ def _share_painted(image, color) -> float:
 
 
 def test_the_add_cards_tile_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
-    from shared_ui.colors import AMBER
-
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(1)), add=EnhanceOffer("2x · 20 steps", None))
@@ -892,7 +871,6 @@ def test_a_level_carries_its_settings_as_a_drag_payload():
 
 
 def test_a_foreign_drag_carries_nothing_this_panel_wants():
-    from PyQt6.QtCore import QMimeData
     mime = QMimeData()
     mime.setText("just some text")
     assert params_from_mime(mime) is None
@@ -928,8 +906,6 @@ def level_drags(monkeypatch):
 
 
 def _an_image(path, size=(16, 16)):
-    from PIL import Image
-
     Image.new("RGB", size, (200, 80, 40)).save(path)
     return path
 
@@ -966,7 +942,6 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, level_
 def test_a_big_versions_picture_drags_at_the_shared_size(qtbot, tmp_path, level_drags):
     # An enhancement is an upscale, so the file under a version can be huge; the
     # picture under the cursor is the same thumbnail every other drag trails.
-    from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 
     tile = _LevelRow(_levels(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))
@@ -1026,7 +1001,6 @@ def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
 def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     # "Enhancing" alone says nothing you didn't already know; the numbers are
     # the only thing worth reading off a tile that has no picture yet.
-    from PyQt6.QtWidgets import QLabel
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -1077,7 +1051,6 @@ def test_dropping_a_level_absorbs_its_settings(qtbot):
 def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
     # The pane is one column of collapsible groups; a heading that cannot fold
     # reads as the one thing you are not allowed to put away.
-    from origenerator.gui.collapsible_section import CollapsibleSection
 
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
@@ -1109,8 +1082,6 @@ def test_a_narrow_row_puts_its_facts_under_the_picture(qtbot):
     settings sideways. Stacked, the row asks for the wider of the two rather than
     their sum, and neither has to give.
     """
-    from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
-
     (level,) = _levels(1)[:1]
     row = _LevelRow(level, 0, None)
     host = QWidget()

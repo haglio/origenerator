@@ -9,7 +9,7 @@ the workflows and the tests behave the same whichever is present.
 
 **The read is cached; the parse is not.** Five module scopes across four packages
 call ``load_content``, and twenty-four modules import ``config``, so importing
-the app used to read and parse the same JSON six times over. What is cached is
+the app reaches this file six times over. What is cached is
 the file's text, keyed by the path it came from — so each caller still gets a
 dictionary of its own, and one module editing the overlay it was handed can
 never be every other module's edit of it. ``load_content.cache_clear()`` drops

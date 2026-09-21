@@ -36,7 +36,7 @@ APP_USER_MODEL_ID = "Origenerator"
 
 def _write_string_values(key_path: str, values: dict[str, str]) -> None:
     """Put *values* under *key_path* in HKEY_CURRENT_USER, making the key if new."""
-    import winreg
+    import winreg  # noqa: PLC0415 (raises off Windows)
 
     with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key_path, 0,
                             winreg.KEY_SET_VALUE) as key:

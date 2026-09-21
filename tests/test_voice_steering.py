@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from origenerator.voice.dictation import RequestDictation
 from origenerator.voice.steering import VoiceSteering
 from origenerator.voice.worker import VoiceWorker
 
@@ -176,8 +177,6 @@ def test_stopping_commands_ends_their_execution(qtbot):
 
 
 def _request_steering(says="Request, no hat, over."):
-    from origenerator.voice.dictation import RequestDictation
-
     listener = FakeListener(says)
     worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(
@@ -247,8 +246,6 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
 def _bare_steering(says):
     """Steering wired as the gallery wires it: a dictation, a loose matcher, and
     a strict whole-utterance one that gets its say before a request can open."""
-    from origenerator.voice.dictation import RequestDictation
-
     listener = FakeListener(says)
     worker = VoiceWorker(lambda pos, neg, instr: (f"{pos}, {instr}", neg))
     steering = VoiceSteering(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 
@@ -41,8 +41,6 @@ def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
     """A row of buttons wants its items close and its rows apart.  At the one
     gap this layout used for both, the gallery's button bank wrapped into two
     rows that all but touched."""
-    from PyQt6.QtWidgets import QPushButton, QWidget
-
     host = QWidget()
     qtbot.addWidget(host)
     flow = FlowLayout(host, spacing=4, row_spacing=20)
@@ -59,8 +57,6 @@ def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
 
 
 def test_the_row_gap_defaults_to_the_one_between_buttons(qtbot):
-    from PyQt6.QtWidgets import QWidget
-
     host = QWidget()
     qtbot.addWidget(host)
     assert FlowLayout(host, spacing=7)._row_spacing == 7

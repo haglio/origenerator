@@ -17,6 +17,8 @@ from origenerator.prompt_edit import (
     RAISED,
     REMOVE,
     apply_request,
+    build_match_messages,
+    parse_match,
     parse_request,
 )
 
@@ -232,21 +234,15 @@ def test_the_matcher_is_shown_the_prompts_own_terms_unweighted():
 
 
 def test_a_completion_names_the_chosen_term():
-    from origenerator.prompt_edit import parse_match
-
     assert parse_match({"choices": [{"message": {"content": '{"choice": 1}'}}]}, 3) == 1
 
 
 def test_a_completion_refusing_to_choose_reads_as_no_match():
-    from origenerator.prompt_edit import parse_match
-
     assert parse_match({"choices": [{"message": {"content": '{"choice": -1}'}}]}, 3) is None
     assert parse_match({"choices": [{"message": {"content": 'nope'}}]}, 3) is None
 
 
 def test_the_match_request_offers_the_terms_numbered():
-    from origenerator.prompt_edit import build_match_messages
-
     messages = build_match_messages(["a woman", "silver ear studs"], "earrings", "RULES")
 
     assert messages[0]["content"] == "RULES"

@@ -19,7 +19,7 @@ which is the state a control is in when it has nothing but ordinary text to say
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.colors import BG_SECONDARY, BLUE, BORDER_PANEL, TEXT_PRIMARY
 
@@ -149,7 +149,6 @@ class _TipPopup(QFrame):
         layout.addWidget(self.label)
 
     def offset(self):
-        from PyQt6.QtCore import QPoint
         return QPoint(0, _GAP)
 
     def enterEvent(self, event):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from origenerator.progress import (
@@ -347,7 +349,6 @@ def test_a_snapshot_from_when_the_bar_counted_steps_is_not_resumed():
 
 
 def test_snapshot_is_json_serializable():
-    import json
     tracker = ProgressTracker(20)
     tracker.update(10, 10)
     tracker.update(3, 10)

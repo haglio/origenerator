@@ -56,12 +56,11 @@ from origenerator.gui.folder_tree import (
 )
 from origenerator.gui.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
 
-# The tree used to narrow itself to a query typed above it. It no longer does:
-# a narrowed list of folder names is a poor answer to "where is the one with
-# the two of them on the couch", because a folder's name is a short code and the
-# thing you would actually recognize is the picture. The search now fills the
-# browser pane with matching thumbnails instead (see
-# BrowserPane.show_search_results), and the tree is left alone — so the folder
+# A search does not narrow this tree: a narrowed list of folder names is a poor
+# answer to "where is the one with the two of them on the couch", because a
+# folder's name is a short code and the thing you would actually recognize is
+# the picture. The search fills the browser pane with matching thumbnails
+# instead (see BrowserPane.show_search_results), and the tree is left alone — so the folder
 # you were standing in is still there when the search clears.
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents

@@ -46,8 +46,8 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_tree import (
     TRASH_KEY as _TRASH_KEY,
 )
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
-from origenerator.gui.toast import ERROR, NOTICE, WARNING
 from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (

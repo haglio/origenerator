@@ -1,6 +1,8 @@
 """The app-side twin of the i2v in-graph size derivation."""
 from __future__ import annotations
 
+from PIL import Image
+
 import origenerator.workflows.derived_size as ds
 from origenerator.workflows.derived_size import (
     measure_derived_size,
@@ -11,8 +13,6 @@ from origenerator.workflows.derived_size import (
 
 
 def _write_image(path, size):
-    from PIL import Image
-
     Image.new("RGB", size, (128, 128, 128)).save(path)
 
 

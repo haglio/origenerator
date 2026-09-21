@@ -20,7 +20,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceController,
     Offer,
 )
-from origenerator.gui.toast import ERROR, NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
 

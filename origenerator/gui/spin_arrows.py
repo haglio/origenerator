@@ -28,7 +28,7 @@ _WIDTH, _HEIGHT = 9, 5  # a small triangle, sized to sit in a 16px-wide button
 
 
 def _draw(path: Path, color: tuple, pointing_down: bool) -> None:
-    from PIL import Image
+    from PIL import Image  # noqa: PLC0415 (optional: no Pillow, no drawn arrow)
 
     image = Image.new("RGBA", (_WIDTH, _HEIGHT), (0, 0, 0, 0))
     pixels = image.load()

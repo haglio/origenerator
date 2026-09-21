@@ -16,7 +16,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import pytest
 
+from origenerator.fun_time_mode import PlayerChannel
+from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_host import ShowHost
+from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.show_surface_fakes import FakeEngine
@@ -79,9 +82,6 @@ def pace_only():
 
 @pytest.fixture
 def on_a_player(qtbot, tmp_path):
-    from origenerator.fun_time_mode import PlayerChannel
-    from origenerator.gui.player_show import PlayerShow
-
     show = PlayerShow([("a.png", "image")], side="portrait", channel=PlayerChannel(
         playlist=tmp_path / "portrait.tsv", command_file=tmp_path / "portrait_cmd.txt",
         status_file=tmp_path / "portrait_status.txt",
@@ -144,7 +144,6 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
 def test_a_host_with_no_set_draws_no_hud_map(pace_only):
     # show_hud_model asks rather than probes now, and an empty set is the answer
     # that means "nothing to map" — the same None the hasattr used to return.
-    from origenerator.gui.show_hud import show_hud_model
 
     assert show_hud_model("portrait", pace_only) is None
 

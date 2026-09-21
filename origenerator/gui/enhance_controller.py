@@ -29,7 +29,7 @@ from origenerator.gui.enhance_panel import EnhancePanel
 from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.toast import ERROR, NOTICE, WARNING
+from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import name_parts

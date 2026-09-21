@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 #
 # The order is the restore order and is load-bearing: the tabs before the folder
 # before the generation, each later one needing what the earlier ones put up.
-SESSION_PREFS = (
+SESSION_UI_STATE = (
     ("generate_tabs", GalleryView.capture_config_tabs, GalleryView.restore_config_tabs),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
@@ -154,7 +154,7 @@ class OrigeneratorWindow(QMainWindow):
         ``closeEvent``) overwritten."""
         if self._fun_time is None:
             self._restore_geometry()
-        for key, _getter, setter in SESSION_PREFS:
+        for key, _getter, setter in SESSION_UI_STATE:
             setter(self._gallery_view, self._app_state.get(key))
 
     def _persist_the_session_as_it_changes(self) -> None:
@@ -298,7 +298,7 @@ class OrigeneratorWindow(QMainWindow):
         super().closeEvent(event)
 
     def _persist_session(self) -> None:
-        for key, getter, _setter in SESSION_PREFS:
+        for key, getter, _setter in SESSION_UI_STATE:
             if self._fun_time is not None and key in _SWITCHES_THE_SESSION_OWNS:
                 continue
             self._app_state.set(key, getter(self._gallery_view))

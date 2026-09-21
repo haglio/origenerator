@@ -12,8 +12,8 @@ from PyQt6.QtCore import QRunnable
 from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
 
 from origenerator.gui import voice_router
+from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.gui.toast import ERROR, WARNING
 from tests.show_surface_fakes import FakeEngine
 from tests.test_gallery_view import _requesting_view
 
@@ -64,7 +64,7 @@ def _fade(view):
 
 def _corner(view) -> str:
     """What the corner actually reads.  A note with nothing to say is hidden
-    rather than emptied, and the toast keeps its last line under that — so
+    rather than emptied, and the notice keeps its last line under that — so
     ``text()`` alone would read a blank corner as still saying the old thing."""
     return "" if view._note.isHidden() else view._note.text()
 

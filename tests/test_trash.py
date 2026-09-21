@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import origenerator.trash as trash_mod
 from origenerator.trash import Trash, TrashedBatch
 
 
@@ -79,8 +80,6 @@ def test_store_with_no_files_is_a_harmless_noop(tmp_path):
 
 
 def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
-    import origenerator.trash as trash_mod
-
     src = _file(tmp_path / "out" / "clip.mp4")
     trash = Trash(tmp_path / "trash")
     real_move = trash_mod.shutil.move

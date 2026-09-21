@@ -225,8 +225,8 @@ class RunTiming:
 
         One wording, shared by the lower strip's queue, the shelf's in-flight cards
         and a folder's re-roll tile, so the same run reads the same wherever it is
-        being watched — three surfaces used to each say a different half of it in
-        different words.
+        being watched, rather than three surfaces each saying a different half of
+        it in different words.
 
         ``step`` is what the app is doing right now
         (:func:`origenerator.progress.stage_names`), and it leads because it is the

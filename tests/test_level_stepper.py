@@ -7,6 +7,8 @@ methods; they are one small object now, and this is what it promises.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from origenerator.gui.level_stepper import LevelStepper
@@ -96,7 +98,6 @@ def test_re_arming_replaces_what_there_is_to_step(armed):
 def test_the_keys_and_the_lists_are_taken_as_this_object_s_own(armed):
     # The gallery rebuilds its map on every poll, and the paths arrive as Paths
     # as often as strings; neither may reach back in here afterwards.
-    from pathlib import Path
 
     versions = [("d.png", "image", "Base"), ("d-v2.png", "image", "Level 2")]
     stepper = LevelStepper()

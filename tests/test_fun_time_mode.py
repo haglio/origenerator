@@ -10,12 +10,14 @@ from PIL import Image
 
 from origenerator.fun_time_mode import (
     Rect,
+    a_session_holds_the_device,
     parse_app_args,
     region_for_items,
     region_for_size,
     take_the_takeover,
 )
 from origenerator.slideshow import Slide
+from origenerator.win32 import this_process_creation_time
 from tests.hosted_launch import hosted_launch
 
 
@@ -188,8 +190,8 @@ def test_region_for_items_defaults_to_landscape_when_nothing_measures(tmp_path):
 
 
 def _mp4(path: Path, width: int, height: int) -> Path:
-    import cv2
-    import numpy
+    import cv2  # noqa: PLC0415 (heavy; only this helper writes a real mp4)
+    import numpy  # noqa: PLC0415
 
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 5,
                              (width, height))
@@ -221,9 +223,6 @@ def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
 
 
 def test_a_live_sessions_claim_on_the_device_is_read_off_its_process(tmp_path):
-    from origenerator.fun_time_mode import a_session_holds_the_device
-    from origenerator.win32 import this_process_creation_time
-
     assert not a_session_holds_the_device(tmp_path)
 
     claim = tmp_path / "fun_time_session.txt"

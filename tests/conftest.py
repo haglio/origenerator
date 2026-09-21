@@ -48,7 +48,20 @@ import sys
 
 import pytest
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstallMessageHandler
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
+from pytestqt.qtbot import QtBot
+
+from origenerator import config
+from origenerator.gui import (
+    desktop_notices,
+    motion_panel,
+    osr2_driver,
+    osr2_motion_driver,
+    voice_router,
+)
+from origenerator.gui.combine_controller import CombineController
+from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.looping_preview import set_previews_paused
 
 
 @pytest.fixture(autouse=True)
@@ -69,7 +82,7 @@ def _unscaled_between_tests():
         if os.environ.get("QT_SCALE_FACTOR") != before:
             # A window taken into a session rescales Qt itself, not only the
             # variable, and Qt's factor outlives the test just the same.
-            from origenerator import ui_scale
+            from origenerator import ui_scale  # noqa: PLC0415 (after Qt is up)
             ui_scale.draw_at(1.0)
         if before is None:
             os.environ.pop("QT_SCALE_FACTOR", None)
@@ -135,8 +148,6 @@ class ModelTree:
 @pytest.fixture
 def installed_models(tmp_path, monkeypatch):
     """An empty stand-in models tree, with ``config.COMFYUI_DIR`` pointed at it."""
-    from origenerator import config
-
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     return ModelTree(tmp_path)
 
@@ -238,8 +249,6 @@ class FakeVoiceSteering(QObject):
 @pytest.fixture(autouse=True)
 def _no_real_mic(monkeypatch):
     """Point every voice router's steering at the inert stand-in above."""
-    from origenerator.gui import voice_router
-
     monkeypatch.setattr(voice_router, "VoiceSteering", FakeVoiceSteering)
 
 
@@ -255,8 +264,6 @@ def _never_take_the_real_device(monkeypatch):
     exercises one for its own sake injects its own; this only replaces the
     default, so nothing is left reaching the hardware by accident.
     """
-    from origenerator.gui import motion_panel, osr2_driver, osr2_motion_driver
-
     class _NoDevice:
         def park(self): pass
         def send_position(self, pos, interval_ms): pass
@@ -290,8 +297,6 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
     pointed at a directory of the run's own; the test that covers either
     supplies its own stand-in over these.
     """
-    from origenerator.gui import desktop_notices
-
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
     monkeypatch.setattr(desktop_notices, "register_notification_identity",
                         lambda *_a, **_kw: None)
@@ -310,8 +315,6 @@ def _no_dialog_nobody_can_answer(monkeypatch):
     stops. Every test that means to reach a dialog answers it with a monkeypatch
     of its own, which lands over this one.
     """
-    from PyQt6.QtWidgets import QInputDialog, QMessageBox
-
     def refuse(name):
         def blocked(*_args, **_kwargs):
             raise AssertionError(
@@ -401,8 +404,6 @@ def _widgets_registered_this_test():
     inside one of its paints freed the whole tree under the paint: the Python 3.14
     gate went down that way in the gallery's delete tests.
     """
-    from pytestqt.qtbot import QtBot
-
     held = []
     register = QtBot.addWidget
 
@@ -463,8 +464,6 @@ def _recipe_match_runs_inline(request, monkeypatch):
     """
     if request.node.get_closest_marker("real_thread_hop"):
         return
-    from origenerator.gui.combine_controller import CombineController
-    from origenerator.gui.gallery_view import GalleryView
 
     monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
@@ -483,8 +482,6 @@ def _previews_start_running():
     what would otherwise let a test that pauses hand the next test a gallery of
     still thumbnails it never asked for.
     """
-    from origenerator.gui.looping_preview import set_previews_paused
-
     set_previews_paused(False)
     yield
     set_previews_paused(False)

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QApplication, QPushButton
+from shared_ui.colors import TEXT_SECONDARY
+from shared_ui.icons import CANVAS, glyph_pixmap
 
 from origenerator.gui.copy_button import CopyButton
 
@@ -40,9 +43,6 @@ def test_wears_the_familys_copy_mark(qtbot):
     # Fun Time's log panel has a copy button too, and each app drew its own
     # two-sheets glyph at its own proportions -- the same drift the microphone
     # had. Both now come out of shared_ui, so the mark is one drawing.
-    from PyQt6.QtCore import QSize
-    from shared_ui.colors import TEXT_SECONDARY
-    from shared_ui.icons import CANVAS, glyph_pixmap
 
     btn = CopyButton("x")
     qtbot.addWidget(btn)

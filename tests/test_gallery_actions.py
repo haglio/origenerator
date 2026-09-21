@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from origenerator.db import Database
+from origenerator.gallery import enhance_levels, is_enhanced_row
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.trash import Trash
 
@@ -68,7 +69,7 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     assert not actions.can_undo()
 
 
-def test_undo_of_a_delete_returns_a_restored_prompt_id(tmp_path):
+def test_undoing_a_delete_says_which_generation_came_back(tmp_path):
     # The view uses it to navigate back to the folder the delete emptied.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
@@ -76,13 +77,13 @@ def test_undo_of_a_delete_returns_a_restored_prompt_id(tmp_path):
     assert actions.undo() == "p1"
 
 
-def test_undo_of_a_rename_returns_no_focus(tmp_path):
+def test_undoing_a_rename_moves_the_selection_nowhere(tmp_path):
     actions, _db, _out = _actions(tmp_path)
     actions.rename_folder("media/wf/deadbeef", "My Folder")
     assert actions.undo() is None
 
 
-def test_undo_with_nothing_to_undo_returns_none(tmp_path):
+def test_undo_with_an_empty_stack_does_nothing(tmp_path):
     actions, _db, _out = _actions(tmp_path)
     assert actions.undo() is None
 
@@ -515,7 +516,6 @@ def test_deleting_a_version_keeps_the_generation(tmp_path):
 def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
     # With nothing enhanced left, the bookkeeping goes too — otherwise the one
     # remaining file would read as an enhancement of itself.
-    from origenerator.gallery import enhance_levels, is_enhanced_row
 
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["enhanced.png"])
@@ -530,7 +530,6 @@ def test_deleting_the_last_enhancement_leaves_a_plain_image(tmp_path):
 def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
     # Binning the pre-enhance file to save the space is a fair thing to want;
     # what is left is still an enhancement, and still says what made it.
-    from origenerator.gallery import enhance_levels
 
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_enhance_levels(_enhanced_row(db, output_dir), ["base.png"])

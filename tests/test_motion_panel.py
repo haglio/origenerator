@@ -6,6 +6,8 @@ lookalike), and that each command it posts reaches the right thing here.
 """
 from __future__ import annotations
 
+import random
+
 from player_core import drive_layout, wave_stack
 from player_core.console import (
     OSR2_CONTROL_BUTTONS,
@@ -14,6 +16,8 @@ from player_core.console import (
     OSR2_PARKED,
 )
 from player_core.console_hud import ConsoleHud, ConsolePainter
+from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
+from player_core.learned_model import LearnedModel, Phrase, classify
 from player_core.modes import Osr2State
 from player_core.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -21,6 +25,9 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from origenerator import motion_engine
 from origenerator.gui.console import console_hud, drive_hud
 from origenerator.gui.motion_panel import MotionPanel
+from origenerator.gui.slideshow_pace import MAX_S, MIN_S, PaceOnlyHost, SlideshowPace
+from origenerator.gui.slideshow_view import SlideshowView
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 from tests.motion_doubles import FakeHost, FakeMotion
 
 
@@ -291,8 +298,6 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
 
 
 def test_the_pace_stops_at_its_ends(qtbot):
-    from origenerator.gui.slideshow_pace import MAX_S, MIN_S
-
     panel, _motion, host = _panel(qtbot)
     host.dwell_s = MIN_S
     panel.render_console()
@@ -316,8 +321,6 @@ def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
 
 
 def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
-    from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
-
     motion = FakeMotion()
     assert drive_hud(motion.state, False).driven == DRIVEN_BY_NOTHING
     assert drive_hud(motion.state, True).driven == DRIVEN_BY_ROBOT_HAND
@@ -331,7 +334,6 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     # wire — so without this the console animated a blue wave nobody was riding.
     # Saying "off" is also what greys the readout and holds its trace still: the
     # painter reads who has the device off this one value (player_core).
-    from player_core.drive_readout import DRIVEN_BY_NOTHING
 
     motion = FakeMotion()
     motion.active = True
@@ -384,8 +386,6 @@ def test_the_panel_actually_paints(qtbot):
 def test_the_pace_starts_at_the_slideshows_own_default(qtbot):
     # It read 0s, which is not a pace at all — the console has to open on the
     # number the slideshow actually uses, whether or not one is running.
-    from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
-    from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 
     pace = SlideshowPace()
     assert pace.seconds == DEFAULT_IMAGE_DWELL_MS // 1000
@@ -395,9 +395,6 @@ def test_the_pace_starts_at_the_slideshows_own_default(qtbot):
 
 
 def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtbot):
-    from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
-    from origenerator.gui.slideshow_view import SlideshowView
-
     pace = SlideshowPace()
     panel = MotionPanel(FakeMotion(), host=PaceOnlyHost(pace))
     qtbot.addWidget(panel)
@@ -410,9 +407,6 @@ def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtb
 
 
 def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
-    from origenerator.gui.slideshow_pace import SlideshowPace
-    from origenerator.gui.slideshow_view import SlideshowView
-
     pace = SlideshowPace()
     view = SlideshowView([("a.png", "image", 1), ("b.png", "image", 2)],
                          shuffle=lambda items: None, pace=pace)
@@ -427,7 +421,6 @@ def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
     # meant to be the motion rather than a drawing of it — so the bar is the
     # whole motion's travel and center, and the trace is the sum, not whichever
     # wave happens to be the big one.
-    import random
 
     motion = FakeMotion()
     live = motion.state
@@ -468,9 +461,7 @@ def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):
 def test_the_readout_holds_the_learned_motions_picture_still_between_knots(qtbot):
     # The learned motion is read on knots: a tick later the same heights are
     # drawn, shifted left by the fraction of a knot the clock has moved.
-    import random
 
-    from player_core.learned_model import LearnedModel, Phrase, classify
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
     motion = FakeMotion()

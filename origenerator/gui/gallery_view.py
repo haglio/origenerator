@@ -1602,7 +1602,7 @@ class GalleryView(QWidget):
 
     # --- data loading & live update ---------------------------------------
 
-    def refresh(self, *, only_if_moved: bool = False):
+    def refresh(self, *, only_if_moved: bool = False, new_listing: bool = False):
         """Re-read the library and draw everything off it again.
 
         ``only_if_moved`` draws again only when the rows or their folder meta
@@ -1620,7 +1620,7 @@ class GalleryView(QWidget):
         moved = fingerprint != self._fingerprint
         self._fingerprint = fingerprint
         if moved or not only_if_moved:
-            self._rebuild(rows, meta)
+            self._rebuild(rows, meta, new_listing=new_listing)
         if self._shows.regions_wanted:
             # The tree a rebuild makes is what the base state is read from, and
             # the session's OPEN_SHOWS can land before the first one (its
@@ -1720,12 +1720,17 @@ class GalleryView(QWidget):
         if facts.foreign is not None:
             self._foreign_queue = facts.foreign
 
-    def _rebuild(self, rows, meta):
+    def _rebuild(self, rows, meta, *, new_listing: bool = False):
         self._folder_meta = meta
         self._drawn_version += 1
         expanded = self._tree_view.expanded_keys()
+        standing = self._tree_view.selected_folder_key()
+        place = self._browser.place()
+        if new_listing:
+            self._browser.restart_recents_listing()
+            place = place.from_the_top()
         # Pending restore targets stand in until the user makes a live choice.
-        selected_key = self._tree_view.selected_folder_key() or self._pending_key
+        selected_key = standing or self._pending_key
         # A live multi-selection is a folder the user is composing, so a rebuild
         # (a poll, a completed generation) must not silently collapse it back to
         # one row — the keys are re-picked once the tree is rebuilt.
@@ -1839,6 +1844,8 @@ class GalleryView(QWidget):
         # generation that lands while a query is open joins its results.
         if self._search.query:
             self._search.run()
+        if standing is not None and self._tree_view.selected_folder_key() == standing:
+            self._browser.return_to(place)
         self._update_queue()
         # Re-assert the front tab's Generate-as-progress state against the live jobs.
         # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
@@ -3623,8 +3630,7 @@ class GalleryView(QWidget):
         A full rebuild rather than a re-list, because the ticks decide which
         *folders* exist as well as which items do — the tree, the shelves and the
         search index are all built from the same narrowed set."""
-        self._browser.restart_recents_listing()  # a new filter is a new listing
-        self.refresh()
+        self.refresh(new_listing=True)  # a new filter is a new listing
         # A filter that empties the gallery leaves the tree with no row to
         # select, so the folder-selected signal that normally re-syncs this
         # button never fires — and it went on offering a show of nothing.

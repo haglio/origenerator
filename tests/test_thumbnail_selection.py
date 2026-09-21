@@ -149,3 +149,35 @@ def test_a_tile_is_asked_whether_it_is_picked_rather_than_reading_the_set(picked
 
     assert selection.holds("a") is True
     assert selection.holds("b") is False
+
+
+def _redrawn(selection, *shown):
+    picks = selection.picks()
+    selection.clear()
+    selection.forget_what_was_shown()
+    for prompt_id in shown:
+        selection.note_shown(prompt_id)
+    return picks
+
+
+def test_picking_again_after_a_redraw_picks_only_what_is_still_on_screen(picked):
+    selection = picked("a", "b", "c")
+    selection.apply("a")
+    selection.apply("c", ctrl=True)
+    picks = _redrawn(selection, "fresh", "a", "b")
+
+    selection.pick_again(picks)
+
+    assert selection.picked == {"a"}
+
+
+def test_a_run_after_a_redraw_is_measured_from_the_same_anchor(picked):
+    selection = picked("a", "b", "c")
+    selection.apply("a")
+    picks = _redrawn(selection, "fresh", "a", "b", "c")
+
+    selection.pick_again(picks)
+    selection.apply("c", shift=True)
+
+    assert selection.picked == {"a", "b", "c"}
+

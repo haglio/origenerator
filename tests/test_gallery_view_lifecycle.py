@@ -83,7 +83,7 @@ def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, m
     view = _gallery(qtbot)
     view.refresh()
     drawn = []
-    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: drawn.append(rows))
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta, **_: drawn.append(rows))
 
     view.show()
 
@@ -97,7 +97,7 @@ def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatc
     view = _gallery(qtbot, db)
     view.refresh()
     drawn = []
-    monkeypatch.setattr(view, "_rebuild", lambda rows, meta: drawn.append(rows))
+    monkeypatch.setattr(view, "_rebuild", lambda rows, meta, **_: drawn.append(rows))
     db._rows.append(_image("i2", "scene two", 50, 2))
 
     view.show()

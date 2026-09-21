@@ -606,6 +606,21 @@ def _around(prompt_id):
                         group=(other_act,))
 
 
+def test_a_picture_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):
+    """While a row is playing round, the map is drawn from the row as it was
+    dealt — so the picture just taken away has to leave that row too, or it goes
+    on being drawn and is merely skipped when the row comes round again."""
+    deleted = []
+    view = _view(qtbot, _KEYED,
+                 actions=ShowActions(neighbors=_around, delete=deleted.append))
+    _press(view, Qt.Key.Key_E)                   # play the seed row round: id-a, id-b
+
+    view.cull()                                  # weird the picture on screen
+
+    assert deleted == ["id-a"]
+    assert "id-a" not in [cell.prompt_id for cell in view.hud_map().cells()]
+
+
 def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot):
     """A row holding only the picture on screen cannot be looped, and the press
     still means "this one" — so it locks the picture, the way a satellite's loop

@@ -242,6 +242,19 @@ def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
     assert show_set.end_loop() is False          # nothing left to end
 
 
+def test_a_slide_taken_away_leaves_the_loop_it_was_in():
+    """A running loop is drawn on the map from the pool it was dealt, not from
+    the library — so a picture taken away has to leave that pool too, or the map
+    goes on drawing it beside the ones still there."""
+    show_set, _dealt = _mapped()
+    show_set.start_loop("seed")
+
+    show_set.forget_id("id-1b")
+
+    assert [slide.prompt_id for slide in show_set.loop.pool] == ["id-1", "id-1c"]
+    assert [cell.prompt_id for cell in show_set.map().seeds] == ["id-1c"]
+
+
 def test_a_forward_step_in_a_loop_down_to_one_slide_leaves_the_loop():
     """A cull can leave a loop holding only the slide on screen, and stepping
     round a row of one is that same picture again — so the forward step ends the

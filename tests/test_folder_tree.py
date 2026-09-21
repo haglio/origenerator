@@ -419,3 +419,16 @@ def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
                                          # row's actions however deep it sits
 
 
+def _is_green(color) -> bool:
+    return (color.green() > color.red() + 50
+            and color.green() > color.blue() + 50)
+
+
+def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot, favorite=True)
+    star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+
+    assert any(_is_green(color) for x, color in _row_pixels(tree, leaf)
+               if star.left() <= x <= star.right())
+
+

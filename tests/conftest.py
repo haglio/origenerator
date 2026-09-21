@@ -61,7 +61,7 @@ from origenerator.gui import (
 )
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.looping_preview import set_previews_paused
+from origenerator.gui.looping_preview import set_all_previews_paused
 
 
 @pytest.fixture(autouse=True)
@@ -482,6 +482,6 @@ def _previews_start_running():
     what would otherwise let a test that pauses hand the next test a gallery of
     still thumbnails it never asked for.
     """
-    set_previews_paused(False)
+    set_all_previews_paused(False)
     yield
-    set_previews_paused(False)
+    set_all_previews_paused(False)

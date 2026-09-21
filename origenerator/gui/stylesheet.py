@@ -187,7 +187,7 @@ def build_stylesheet() -> str:
     /* A collapsible param-form section header: a flat, full-width divider row,
        not a raised button. Left-aligned with its fold arrow, and it must not
        flash the primary blue on click the way the base :pressed rule would. */
-    QPushButton#sectionHeader {{
+    QPushButton#foldingSectionHeader {{
         background-color: transparent;
         color: {_h(TEXT_PRIMARY)};
         border-style: solid;
@@ -198,10 +198,10 @@ def build_stylesheet() -> str:
         font-weight: 600;
         padding: 4px 2px;
     }}
-    QPushButton#sectionHeader:hover {{
+    QPushButton#foldingSectionHeader:hover {{
         background-color: {_h(BG_SECONDARY)};
     }}
-    QPushButton#sectionHeader:pressed {{
+    QPushButton#foldingSectionHeader:pressed {{
         background-color: {_h(BG_SECONDARY)};
     }}
     QToolButton {{
@@ -340,7 +340,7 @@ def build_stylesheet() -> str:
        a section rather than as a label belonging to the tiles before it; left
        aligned and transparent so a flat button reads as a heading you can
        click rather than as a button that happens to be wide. */
-    QPushButton#sectionHeading, QLabel#sectionHeading {{
+    QPushButton#tileGroupHeading, QLabel#tileGroupHeading {{
         color: {_h(TEXT_PRIMARY)};
         font-weight: bold;
         background: transparent;
@@ -349,7 +349,7 @@ def build_stylesheet() -> str:
         padding: 6px 0 2px 0;
         text-align: left;
     }}
-    QPushButton#sectionHeading:hover {{
+    QPushButton#tileGroupHeading:hover {{
         color: {_h(BLUE)};
     }}
     /* The picked row in the table of contents, marked by its ground alone.

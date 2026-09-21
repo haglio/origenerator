@@ -346,7 +346,7 @@ def test_omnipause_stops_the_gallerys_own_moving_pictures(qtbot, tmp_path, monke
     through the tabs."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     tiles, tabs = [], []
-    monkeypatch.setattr(gallery_view_module, "set_previews_paused", tiles.append)
+    monkeypatch.setattr(gallery_view_module, "set_all_previews_paused", tiles.append)
     monkeypatch.setattr(view._info_tabs, "set_previews_paused", tabs.append)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")

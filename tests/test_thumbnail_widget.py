@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QApplication
 from origenerator.gui import corner_controls, drag_thumbnail, icons
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.looping_preview import set_previews_paused
+from origenerator.gui.looping_preview import set_all_previews_paused
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
@@ -434,7 +434,7 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     movie = tile._image_label.movie()
     assert movie is not None
 
-    set_previews_paused(True)
+    set_all_previews_paused(True)
     assert movie.state() == QMovie.MovieState.Paused
 
     # And a tile BUILT during the freeze comes up already held: the grid is
@@ -443,7 +443,7 @@ def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):
     qtbot.addWidget(later)
     assert later._image_label.movie().state() == QMovie.MovieState.Paused
 
-    set_previews_paused(False)
+    set_all_previews_paused(False)
     assert movie.state() == QMovie.MovieState.Running
     assert later._image_label.movie().state() == QMovie.MovieState.Running
 

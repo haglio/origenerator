@@ -116,7 +116,7 @@ from origenerator.gui.inflight import (
     stop_loop_tooltip,
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
-from origenerator.gui.looping_preview import set_previews_paused
+from origenerator.gui.looping_preview import set_all_previews_paused
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import ERROR, NOTICE
@@ -3190,7 +3190,7 @@ class GalleryView(QWidget):
         left the thumbnails running with no sign of why.
         """
         self._shows.set_session_paused(paused)
-        set_previews_paused(paused)
+        set_all_previews_paused(paused)
         self._info_tabs.set_previews_paused(paused)
 
     def region_show(self, side: str):

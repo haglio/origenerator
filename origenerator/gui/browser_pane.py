@@ -153,7 +153,7 @@ def _inflight_signature(items) -> tuple:
 
 def _time_heading(text: str) -> QLabel:
     heading = QLabel(text)
-    heading.setObjectName("sectionHeading")
+    heading.setObjectName("tileGroupHeading")
     return heading
 
 
@@ -553,7 +553,7 @@ class BrowserPane(QObject):
         enough that you are aiming at it after a scroll.
         """
         button = QPushButton()
-        button.setObjectName("sectionHeading")
+        button.setObjectName("tileGroupHeading")
         button.setFlat(True)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         # Doubled "&" so Qt renders it literally instead of swallowing it as a

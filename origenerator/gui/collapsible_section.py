@@ -40,7 +40,7 @@ class CollapsibleSection(QWidget):
         # Elides its title rather than propping the whole form open at the
         # title's own width; it also handles the "&" in "Models & Add-ons".
         self._header = ElidingButton()
-        self._header.setObjectName("sectionHeader")
+        self._header.setObjectName("foldingSectionHeader")
         self._header.setFlat(True)
         self._header.setCursor(Qt.CursorShape.PointingHandCursor)
         self._header.clicked.connect(self._toggle)

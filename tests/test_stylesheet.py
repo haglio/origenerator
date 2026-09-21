@@ -78,11 +78,11 @@ def test_stylesheet_styles_collapsible_section_headers():
     # rule says is the point — a header given a border radius is the raised button
     # this exists to prevent, and the selector would still be there.
     qss = build_stylesheet()
-    rule = qss.split("QPushButton#sectionHeader {", 1)[1].split("}", 1)[0]
+    rule = qss.split("QPushButton#foldingSectionHeader {", 1)[1].split("}", 1)[0]
     assert "background-color: transparent" in rule
     assert "border-width: 0 0 1px 0" in rule   # ruled off below, flat everywhere else
     assert "border-radius: 0;" in rule
-    pressed = qss.split("QPushButton#sectionHeader:pressed {", 1)[1].split("}", 1)[0]
+    pressed = qss.split("QPushButton#foldingSectionHeader:pressed {", 1)[1].split("}", 1)[0]
     assert "background-color" in pressed  # and not Qt's own blue flash
 
 
@@ -267,7 +267,7 @@ def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot)
     app.setStyleSheet(build_stylesheet())
     try:
         heading = QLabel("Sat Sep 12, 7:10 PM – 7:40 PM")
-        heading.setObjectName("sectionHeading")
+        heading.setObjectName("tileGroupHeading")
         qtbot.addWidget(heading)
         heading.resize(300, heading.sizeHint().height())
         image = heading.grab().toImage()

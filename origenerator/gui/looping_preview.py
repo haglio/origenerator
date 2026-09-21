@@ -64,7 +64,7 @@ def looping_movie(path: str, size: QSize, parent) -> QMovie:
     return movie
 
 
-def set_previews_paused(paused: bool) -> None:
+def set_all_previews_paused(paused: bool) -> None:
     """Hold (or release) every looping preview in the app, and the ones built
     after this — a hosting session's OmniPause over the moving thumbnails."""
     global _paused

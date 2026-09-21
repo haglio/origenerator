@@ -1062,7 +1062,7 @@ def test_search_matches_a_generation_by_its_lora(qtbot):
 def _section_headers(view):
     """The fold headers of the open search's model + LoRA bands, in shown order."""
     return [w for w in view._scroll.widget().findChildren(QPushButton)
-            if w.objectName() == "sectionHeading"]
+            if w.objectName() == "tileGroupHeading"]
 
 
 def test_the_recipe_sort_bands_the_results_by_model_and_lora(qtbot):

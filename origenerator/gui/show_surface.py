@@ -278,19 +278,14 @@ class ShowSurface(QWidget):
         return int(self._engine.position_ms)
 
     def close_engine(self) -> None:
-        """Let the engine go, before the framebuffer it draws into is taken down."""
+        """Let the engine go, before the window it draws into is taken down."""
         self._tick.stop()
         self._engine.close()
 
     # --- the presses over it -------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
-        """A click on the picture: the show's, which pauses it.
-
-        The engine draws into this widget's own framebuffer rather than into a
-        window of its own, so there is no native child here to swallow the
-        press -- it arrives like any other Qt event.
-        """
+        """A click on the picture: the show's, which pauses it."""
         if self._on_press is not None:
             self._on_press()
         super().mousePressEvent(event)
@@ -352,7 +347,7 @@ def _offer_the_copy_beside_the_checkouts() -> None:
 
 
 class _NotYetOpened:
-    """What stands in for the engine until there is a context to build one on.
+    """What stands in for the engine until there is a window to hand it.
 
     Answers nothing is playing, so the pane reports neither an item that ran
     out nor one that would not open, and remembers what it was told so the

@@ -24,6 +24,36 @@ already uses. The near miss that still counts: taking a real filename and
 changing a character or two — it is still that clip, still that performer. Make
 it up from scratch, don't lightly edit a real one.
 
+## One word per thing, and the two that keep their second
+
+A word the code invents costs every later reader a translation, and four words
+for one thing cost four. So:
+
+- A submitted piece of work is a **job** (`JobQueue`, `GenerationJob`,
+  `job_for`, `held_jobs`), from the press to the saved row. **Re-roll** is kept
+  for the act it names -- a fresh variation of a settings folder, or a fresh
+  seed on one row (`start_reroll`, `reroll_image_seed`, `reroll_video_seed`,
+  `RerollTile`) -- and for nothing else; the class that owns every generation
+  the app makes was called `RerollController` for years, and its own docstring
+  had to say "it also *is* the queue" to undo the name. **Run** is only a
+  chained job pair taken as a whole, which is what `origin` stamps. A
+  **generation** is the saved row.
+- Work started and not finished is **in flight** (`InFlightItem`,
+  `InFlightCard`, `inflight_items`). "Cooking" said the same thing in fifty
+  comments and is gone.
+- On disk a waiting row's status is **pending**; on screen the line calls it
+  **queued**. Both are right and `display_status()` is the one place that says
+  so -- do not restate it in prose, and never change the string on disk.
+- The **folder key** is the value; `gallery.keys.settings_key` builds one from
+  its three parts and `gallery.tree.settings_folder_key` derives one from a
+  row. Those are two questions with one answer, not two names for it. What was
+  a real collision -- `GenerateConfigPanel.settings_key()` returning the *pair*
+  a folder key is built from, one word from its own `settings_folder_key()`
+  returning the key -- is `workflow_and_signature()`.
+- **Settings**, **config** and **recipe** are three things and keep three
+  words: the settings are what the form holds, a `ConfigSnapshot` is one
+  reading of them, and a recipe is the workflow a generation ran on.
+
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
 `app_support`, `player_core`, `shared_ui` and `voice_core` are pinned

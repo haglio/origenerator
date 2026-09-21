@@ -193,7 +193,7 @@ class GenerateConfigPanel(QWidget):
         self._displayed_row: dict | None = None        # a saved generation this tab is showing (footer visible); None when blank
         # (status, frame, settings) of an enhancement running on the displayed
         # image, fed from outside (the gallery owns the jobs); None when nothing
-        # is cooking. Beside it, the app-wide enhance settings the "+ Enhance"
+        # is in flight. Beside it, the app-wide enhance settings the "+ Enhance"
         # card would run at — also the gallery's, pushed in the same way.
         self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
@@ -795,8 +795,9 @@ class GenerateConfigPanel(QWidget):
         return [r for r in self._db.list_generations()
                 if media_type_of_row(r) == MediaType.IMAGE]
 
-    def settings_key(self, image_index: dict | None = None) -> tuple[str, str] | None:
-        """The gallery settings-folder this config maps to: (workflow, signature).
+    def workflow_and_signature(self, image_index: dict | None = None,
+                               ) -> tuple[str, str] | None:
+        """The two parts the gallery builds this config's folder key out of.
 
         The signature is normalized against the workflow's defaults (see
         ``canonical_settings``), so it matches the folder this tab's outputs land
@@ -822,7 +823,7 @@ class GenerateConfigPanel(QWidget):
         generated with these settings yet. A folder is put in the tree by the
         generations in it, so until there are some there is nowhere to go.
         """
-        key = self.settings_key()
+        key = self.workflow_and_signature()
         if key is None or self._recent_matching_row() is None:
             return None
         return config_folder_key(*key)
@@ -916,7 +917,7 @@ class GenerateConfigPanel(QWidget):
         rows = self._db.list_generations()  # newest first
         index = build_image_config_index(
             [r for r in rows if media_type_of_row(r) == MediaType.IMAGE])
-        matching = rows_in_settings(rows, self.settings_key(index), index)
+        matching = rows_in_settings(rows, self.workflow_and_signature(index), index)
         return matching[0] if matching else None
 
     def current_config(self) -> ConfigSnapshot:
@@ -952,7 +953,7 @@ class GenerateConfigPanel(QWidget):
             return self._folder_request.title()
         name = item_label(self._displayed_row)
         if not name:
-            key = self.settings_key()
+            key = self.workflow_and_signature()
             if key is not None:
                 name = config_folder_name(*key, self._db.folder_meta_map())
         return name or "New generation"

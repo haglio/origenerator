@@ -84,11 +84,11 @@ class EnhanceHost(Protocol):
 class EnhanceController:
     """Every standalone enhance: its settings, its launches, and its live runs."""
 
-    def __init__(self, host: EnhanceHost, *, db, reroll, browser, shows,
+    def __init__(self, host: EnhanceHost, *, db, jobs, browser, shows,
                  info_tabs_of):
         self._host = host
         self._db = db
-        self._reroll = reroll
+        self._jobs = jobs
         self._browser = browser
         self._shows = shows
         # The tabs are built by the window's own layout, after this: asked for
@@ -307,7 +307,7 @@ class EnhanceController:
             index if index is not None else self._host.image_config_index(),
         )
         prepared = randomize_seeds(params, workflow.seed_keys())
-        prompt_id = self._reroll.start_prepared(key, workflow, prepared)
+        prompt_id = self._jobs.start_prepared(key, workflow, prepared)
         if prompt_id:
             # Which image the run is of, by id: the params name only the file it
             # reads, and a file name can belong to more than one row. Stamped on
@@ -333,7 +333,7 @@ class EnhanceController:
         All after every run. The gate is Enhance All's own —
         :func:`~origenerator.gallery.enhance.rows_awaiting_enhancement` — so a
         video, an already-enhanced image (inline or folded), and an image whose
-        enhance is still cooking are all passed over. That last part is what
+        enhance is still in flight are all passed over. That last part is what
         stops the loop: the enhance this queues folds back onto the row it came
         from and arrives here already enhanced."""
         if row is None or not self._settings.auto:
@@ -394,7 +394,7 @@ class EnhanceController:
 
     def _launch_spoken(self, row: dict, params: dict, what: str,
                        doing: str) -> tuple[str | None, str, str]:
-        """The tail both spoken enhancements share: refuse one already cooking,
+        """The tail both spoken enhancements share: refuse one already in flight,
         else launch and say so.
 
         A targeted fix and a plain "enhance" differ in what they refuse and in
@@ -423,9 +423,9 @@ class EnhanceController:
 
     # --- the runs in flight, and where each one shows -------------------------
 
-    def _jobs(self) -> list:
+    def _enhances_in_flight(self) -> list:
         """Every standalone enhance in flight, across every folder."""
-        return [job for job in self._reroll.all_jobs
+        return [job for job in self._jobs.all_jobs
                 if job.workflow.name == gallery.ENHANCE_WORKFLOW]
 
     def _target_of(self, job) -> str | None:
@@ -456,12 +456,12 @@ class EnhanceController:
 
         Every live job is searched, not each folder's leading one: a batch of
         enhances goes out whole and its jobs share a settings key, so all but the
-        first would read as not-cooking off the folder-facing view. ``running``
+        first would read as not in flight off the folder-facing view. ``running``
         takes a listing the caller already holds -- the reconcile reads one per
         pass -- and everything else asks for a fresh one, which is what a delete
         cancelling the runs under it needs.
         """
-        for job in (self._jobs() if running is None else running):
+        for job in (self._enhances_in_flight() if running is None else running):
             if self._of_row(job, row):
                 return job
         return None
@@ -500,7 +500,7 @@ class EnhanceController:
     def reconcile(self) -> None:
         """Show the enhancement being made wherever the image it improves is.
 
-        The info pane's version list leads with a live row while one is cooking,
+        The info pane's version list leads with a live row while one is in flight,
         the tab's own preview streams the same frames, and the image's tile in
         the middle column streams them under its "Enhancing…" scrim — the same
         in-flight treatment work gets everywhere else in the app. The jobs are
@@ -512,7 +512,7 @@ class EnhanceController:
         all: a batch of enhances shares one settings key, and a tab showing the
         third image of it must find its own run rather than the first.
         """
-        running = self._jobs()
+        running = self._enhances_in_flight()
         for panel in self._info_tabs_of().config_panels():
             row = panel.displayed_row()
             panel.set_pending_enhancement(
@@ -602,7 +602,7 @@ class EnhanceController:
         selection: the tile menu's Cancel, and the delete about to take those
         images out from under their runs.
         """
-        running = self._jobs()
+        running = self._enhances_in_flight()
         return [job for job in running
                 if any(self._job_for(row, [job]) is not None for row in rows if row)]
 
@@ -621,7 +621,7 @@ class EnhanceController:
         for job in self.jobs_targeting(rows):
             logger.info("Canceling the enhance of %s: its image is being deleted",
                         job.params.get("input_image"))
-            self._reroll.cancel_job(job.prompt_id)
+            self._jobs.cancel_job(job.prompt_id)
 
     def cancel_for(self, rows) -> None:
         """Throw away the enhancements being made of ``rows``, keeping the images.
@@ -641,7 +641,7 @@ class EnhanceController:
         for job in jobs:
             logger.info("Canceling the enhance of %s: asked to, from its tile",
                         job.params.get("input_image"))
-            self._reroll.cancel_job(job.prompt_id)
+            self._jobs.cancel_job(job.prompt_id)
         if jobs:
             self.reconcile()
 

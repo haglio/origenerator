@@ -93,7 +93,7 @@ def build():
              looping=(), image_rows=(), groups=None, cancelled=None, revealed=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
-            reroll=FakeReroll(jobs_by_folder, held, order),
+            jobs=FakeReroll(jobs_by_folder, held, order),
             auto=FakeAuto(looping),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),

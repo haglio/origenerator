@@ -158,7 +158,7 @@ def test_an_unstamped_run_still_folds_by_the_file_it_read(tmp_path):
 
 
 def test_a_stamped_run_is_awaited_by_id_not_by_file(tmp_path):
-    # Enhance All must skip the image whose enhance is cooking — and only that
+    # Enhance All must skip the image whose enhance is in flight — and only that
     # one, even when another row names the same file.
     db = Database(tmp_path / "t.db")
     first = _add_source(db, "first", filename="sdxl_t2i_twin.png")

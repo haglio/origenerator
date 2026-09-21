@@ -455,7 +455,7 @@ def shows(monkeypatch):
         host = host or FakeHost()
         director = ShowDirector(
             host, db=db or FakeDB(), browser=browser or FakeBrowser(),
-            reroll=FakeReroll(), pace=FakePace(), motion=None,
+            jobs=FakeReroll(), pace=FakePace(), motion=None,
             fun_time=fun_time)
         # The playlist is what a show is of; deriving it from files on disk is
         # resolve_preview's own tested job, not this one's.
@@ -481,7 +481,7 @@ def test_opening_a_show_holds_the_videos_back(shows):
 
     director.open([("a.png", "image", "g1", None)])
 
-    assert director._reroll.holds == [True]
+    assert director._jobs.holds == [True]
 
 
 def test_the_last_show_closing_lets_the_videos_go(shows):
@@ -491,7 +491,7 @@ def test_the_last_show_closing_lets_the_videos_go(shows):
     made[0].close()
 
     assert director.showing is None
-    assert director._reroll.holds == [True, False]
+    assert director._jobs.holds == [True, False]
 
 
 def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
@@ -518,7 +518,7 @@ def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):
     made[1].close()
 
     assert director.showing is made[0]
-    assert director._reroll.holds == [True, True]
+    assert director._jobs.holds == [True, True]
 
 
 def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regions(shows):
@@ -688,7 +688,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 def _director():
     return ShowDirector(FakeHost(), db=FakeDB(), browser=FakeBrowser(),
-                        reroll=FakeReroll(), pace=FakePace(), motion=None,
+                        jobs=FakeReroll(), pace=FakePace(), motion=None,
                         fun_time=None)
 
 

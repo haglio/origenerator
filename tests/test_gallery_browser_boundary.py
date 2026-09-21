@@ -76,7 +76,7 @@ def test_the_pane_holds_no_view():
     init = next(n for n in _class_def(PANE, "BrowserPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [
-        "self", "scroll", "db", "reroll", "auto", "tree", "host"]
+        "self", "scroll", "db", "jobs", "auto", "tree", "host"]
 
 
 def test_the_classes_hold_the_splits_sizes_as_equalities():
@@ -136,7 +136,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     opening a folder lands on its first item, which wants the loading half of a
     thumbnail click without the browsing step a click records -- two methods,
     since a click's own name would be a lie on the folder open driving it. The
-    three sites that opened a folder to watch the run cooking in it are one
+    three sites that opened a folder to watch the run in flight in it are one
     method now, so what used to lead them went into it. 267 -> 266: the OSR2
     switch is the only record of whether it is on, so the copy of it kept here
     went with the one method that wrote it, and the pair the session file saves

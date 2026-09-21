@@ -125,13 +125,13 @@ class GenerationJob(QObject):
         self.prompt_id = str(uuid.uuid4())  # our id; also ComfyUI's, and the DB row key
         # Which run this job belongs to. Its own prompt normally — but a chained
         # i2v is two prompts that are one run to whoever asked for it, so the
-        # second stage is given the first's id (see RerollController._launch).
+        # second stage is given the first's id (see JobQueue._launch).
         self.origin = self.prompt_id
         # What the run this job belongs to will produce, which is not always what
         # this prompt outputs: a chained i2v's first stage draws a still, and that
         # still is the opening of a video. The queue places a job by this, so
         # asking for a video never jumps the pictures already waiting (see
-        # RerollController._launch and :mod:`origenerator.queue_line`).
+        # JobQueue._launch and :mod:`origenerator.queue_line`).
         self.run_media_type = self.media_type
         self._output_dir = output_dir
         self._thumb_dir = thumb_dir

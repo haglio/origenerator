@@ -67,13 +67,13 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.inflight_card import InFlightCard
+from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.prompt_find import _CURRENT_BG
 from origenerator.gui.request_worker import RevisionWorker
-from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.show_hud import ShowHud, show_hud_model
@@ -2579,7 +2579,7 @@ def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_pa
 
     _right_click(view, "g0")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
 
 
@@ -3493,7 +3493,7 @@ def test_a_tiles_plus_corner_queues_an_enhance_of_that_image(qtbot, tmp_path):
 
     view._browser._thumb_widgets["g0"]._controls.triggered.emit(corner_controls.ENHANCE)
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
 
 
@@ -3518,7 +3518,7 @@ def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tm
     view._on_thumbnail_clicked("g0")
     plus = view._info_tabs.current_config_panel()._preview._controls.buttons()[2]
     plus.click()
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
@@ -5506,7 +5506,7 @@ def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
 
     _reroll_tile(view).add_requested.emit()
 
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
     assert job.params["checkpoint"] == _SDXL.default_params()["checkpoint"]  # filled in
     assert job.params["seed"] != 1  # re-rolled
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)  # built without error
@@ -5521,8 +5521,8 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
 
     _reroll_tile(view).add_requested.emit()
 
-    assert key in view._reroll_jobs
-    job = view._reroll_jobs[key]
+    assert key in view._live_jobs
+    job = view._live_jobs[key]
     assert job.workflow.name == "sdxl_t2i"
     assert job.params["seed"] != 7  # same settings, fresh seed
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
@@ -5549,7 +5549,7 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
     view._start_reroll(key)
     view._start_reroll(key)
 
-    assert list(view._reroll_jobs) == [key]  # the second press found one running
+    assert list(view._live_jobs) == [key]  # the second press found one running
     client.submit_job.assert_called_once()
 
 
@@ -5601,7 +5601,7 @@ def test_a_folder_offers_a_request_card_beside_its_reroll_tile(qtbot, tmp_path):
 
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
     # The rewrite reproduces the folder seed for seed, so a folder whose only row
-    # is still cooking has no picture to say differently yet.
+    # is still in flight has no picture to say differently yet.
     rows = [_row("run1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1}, "x.png",
                  status="running", output_files=json.dumps([]))]
     view = GalleryView(FakeDB(rows), client=_reroll_client())
@@ -5635,7 +5635,7 @@ def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
 
     _rewritten(view, key)
 
-    jobs = view._reroll.all_jobs
+    jobs = view._jobs.all_jobs
     assert sorted(job.params["seed"] for job in jobs) == [7, 8, 9]
     assert {job.params["positive_prompt"] for job in jobs} == {"a dog on a couch"}
 
@@ -5648,7 +5648,7 @@ def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_
 
     _rewritten(view, key)
 
-    landing = set(view._reroll.jobs_by_folder)
+    landing = set(view._jobs.jobs_by_folder)
     assert len(landing) == 1                 # the seeds don't split it
     assert landing != {key}                  # ...and it isn't the folder it came from
 
@@ -5666,7 +5666,7 @@ def test_each_rewritten_picture_is_linked_to_the_one_it_came_from(qtbot, tmp_pat
 
     records = db.list_requests()
     assert {r["source_prompt_id"] for r in records} == {"pic7", "pic8", "pic9"}
-    assert {r["prompt_id"] for r in records} == {job.prompt_id for job in view._reroll.all_jobs}
+    assert {r["prompt_id"] for r in records} == {job.prompt_id for job in view._jobs.all_jobs}
     one = records[0]
     assert one["old_positive"] == "a cat on a couch"
     assert one["new_positive"] == "a dog on a couch"
@@ -5681,7 +5681,7 @@ def test_a_rewrite_of_a_folder_that_has_gone_launches_nothing(qtbot, tmp_path):
 
     _rewritten(view, "image/sdxl_t2i/nosuchfolder")
 
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
 
 
 
@@ -5713,12 +5713,12 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
 
     _rewritten(view, key)
 
-    queued = [job.prompt_id for job in view._reroll.all_jobs]
+    queued = [job.prompt_id for job in view._jobs.all_jobs]
     # The one in front -- the last asked for, since each picture takes the
     # machine from the one before -- is the folder's live tile; the rest each
     # get their own card.
     assert _reroll_tile(view) is not None
-    in_front = view._reroll.queue_order[0]
+    in_front = view._jobs.queue_order[0]
     assert set(view._browser._inflight_cards) == set(queued) - {in_front}
     assert len(queued) == 3
 
@@ -5737,7 +5737,7 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
 
     _rewritten(view, key)
 
-    made = {job.prompt_id for job in view._reroll.all_jobs}
+    made = {job.prompt_id for job in view._jobs.all_jobs}
     # The gallery lists rows newest first, which is the order they were written in
     # reversed — so this is the order the new folder will draw them in.
     now = [row["seed"] for row in db.list_generations() if row["prompt_id"] in made]
@@ -5757,7 +5757,7 @@ def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
     view._bank.auto.click()  # the header's Auto toggle, switched on
 
     assert view._auto.is_active(key)
-    assert key in view._reroll_jobs          # a first variation is running
+    assert key in view._live_jobs          # a first variation is running
     client.submit_job.assert_called_once()
     assert view._bank.auto.isChecked()
 
@@ -5769,13 +5769,13 @@ def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the variation finishes
 
     assert client.submit_job.call_count == 2   # the next one was launched
     assert view._auto.is_active(key)
-    assert key in view._reroll_jobs            # a fresh variation is running
+    assert key in view._live_jobs            # a fresh variation is running
 
 
 def test_turning_auto_on_in_a_second_folder_ends_the_first_ones_loop(qtbot, tmp_path):
@@ -5817,7 +5817,7 @@ def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     view._toggle_auto(False)
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
@@ -5834,7 +5834,7 @@ def test_auto_stops_when_a_variation_fails(qtbot, tmp_path, monkeypatch):
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     client.job_error.emit(job.prompt_id, "boom")   # ComfyUI rejected it
 
@@ -5849,14 +5849,14 @@ def test_cancelling_a_reroll_keeps_the_auto_loop_and_tries_another_seed(qtbot, t
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    canceled = view._reroll_jobs[key].prompt_id
+    canceled = view._live_jobs[key].prompt_id
 
     view._cancel_reroll(key)  # the live tile's Cancel: "not this seed", not "stop"
 
     assert view._auto.is_active(key)          # the loop is still on
     assert view._bank.auto.isChecked()         # and the toggle still says so
     assert client.submit_job.call_count == 2  # a fresh seed went out at once
-    assert view._reroll_jobs[key].prompt_id != canceled
+    assert view._live_jobs[key].prompt_id != canceled
 
 
 def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_path):
@@ -5867,13 +5867,13 @@ def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    canceled = view._reroll_jobs[key].prompt_id
+    canceled = view._live_jobs[key].prompt_id
 
     view._cancel_job(canceled)
 
     assert view._auto.is_active(key)
     assert client.submit_job.call_count == 2
-    assert view._reroll_jobs[key].prompt_id != canceled
+    assert view._live_jobs[key].prompt_id != canceled
 
 
 def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_path):
@@ -5920,7 +5920,7 @@ def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
     assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Next seed"
 
 
-def test_turning_auto_off_says_cancel_again_with_the_run_still_cooking(qtbot, tmp_path):
+def test_turning_auto_off_says_cancel_again_with_the_run_still_in_flight(qtbot, tmp_path):
     # Auto off leaves the variation in flight (it still lands), and from then on
     # that button really does stop it — so it must stop claiming to be a next seed.
     db = _seeded_db(tmp_path)
@@ -5933,7 +5933,7 @@ def test_turning_auto_off_says_cancel_again_with_the_run_still_cooking(qtbot, tm
 
     view._toggle_auto(False)
 
-    assert key in view._reroll_jobs  # the in-flight variation was left alone
+    assert key in view._live_jobs  # the in-flight variation was left alone
     assert _reroll_tile(view)._cancel.text() == "Cancel"
     assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
     assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Cancel"
@@ -5954,7 +5954,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
     _reroll_tile(view).add_requested.emit()
 
     panel = view._info_tabs.current_config_panel()
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert panel._cancel_btn.isHidden() is False
     assert panel.launched_runs() == [job.origin]
 
@@ -5971,14 +5971,14 @@ def test_auto_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
     _folder_tab(view, db)
 
     view._toggle_auto(True)
-    first = view._reroll_jobs[key]
+    first = view._live_jobs[key]
     assert view._info_tabs.current_config_panel().launched_runs() == [first.origin]
 
     client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)  # the loop moves on
 
     panel = view._info_tabs.current_config_panel()
     assert panel._cancel_btn.isHidden() is False
-    assert panel.launched_runs() == [view._reroll_jobs[key].origin]
+    assert panel.launched_runs() == [view._live_jobs[key].origin]
 
 
 def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
@@ -5996,7 +5996,7 @@ def test_auto_generate_opens_no_tabs(qtbot, tmp_path):
 
     view._toggle_auto(True)
     for _ in range(3):  # three variations land while the user watches
-        client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+        client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
     assert view._info_tabs.count() == 1
     panel = view._info_tabs.current_config_panel()
@@ -6028,7 +6028,7 @@ def test_auto_generate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):
     panel._preview.show_media = MagicMock()
 
     view._toggle_auto(True)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
     client.preview_image.emit(job.prompt_id, b"a frame")   # the run streams
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # ...and lands
 
@@ -6054,8 +6054,8 @@ def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp
     panel = view._info_tabs.current_config_panel()
     panel._preview.show_frame = MagicMock()
 
-    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
-    client.preview_image.emit(view._reroll_jobs[key].prompt_id, b"the next one")
+    client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
+    client.preview_image.emit(view._live_jobs[key].prompt_id, b"the next one")
 
     assert view._selected_reroll_key == key
     panel._preview.show_frame.assert_called_with(b"the next one")
@@ -6072,7 +6072,7 @@ def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
     key = _select_first_leaf(view)
     view._toggle_auto(True)
     _reroll_tile(view).selected.emit()
-    client.job_completed.emit(view._reroll_jobs[key].prompt_id, _REROLL_HISTORY)
+    client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
     view._toggle_auto(False)
     view._cancel_reroll(key)  # and the variation in flight is thrown away
@@ -6093,7 +6093,7 @@ def test_a_tab_on_other_settings_does_not_claim_the_tiles_launch(qtbot, tmp_path
 
     _reroll_tile(view).add_requested.emit()
 
-    assert view._reroll_jobs                       # the run started
+    assert view._live_jobs                       # the run started
     assert panel._cancel_btn.isHidden() is True    # but this tab isn't its home
     assert panel._generating is False
 
@@ -6159,7 +6159,7 @@ def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_pa
     folder = _generate_in_current_tab(view, positive_prompt="a cat", seed=123)
 
     assert folder == orig_folder                    # same settings folder as 'orig'
-    assert folder in view._reroll_jobs              # a re-roll now runs in it
+    assert folder in view._live_jobs              # a re-roll now runs in it
     assert _selected_folder(view) == folder    # and the view jumped there
     assert view._selected_reroll_key == folder      # its live tile drives the info pane
 
@@ -6178,7 +6178,7 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
 
     assert folder not in before                     # a brand-new folder...
     assert view._tree_item_for(folder) is not None  # ...that now has a node (its running row)
-    assert folder in view._reroll_jobs              # the re-roll is in flight
+    assert folder in view._live_jobs              # the re-roll is in flight
     assert _selected_folder(view) == folder    # navigated to at once, mid-generation
 
 
@@ -6228,20 +6228,20 @@ def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):
 
     view._toggle_auto(True)
     assert view._voice.listener.started
-    (launch_key,) = view._reroll_jobs.keys()  # the folder the first generation lands in
+    (launch_key,) = view._live_jobs.keys()  # the folder the first generation lands in
 
     view._voice.listener.say({"positive": "a cat, no hat", "negative": "ugly"})  # rewritten pair
-    client.job_completed.emit(view._reroll_jobs[launch_key].prompt_id, _REROLL_HISTORY)
+    client.job_completed.emit(view._live_jobs[launch_key].prompt_id, _REROLL_HISTORY)
 
     # the loop re-homed to the new-prompt folder, carrying both steered prompts
-    assert launch_key not in view._reroll_jobs
-    (new_key,) = view._reroll_jobs.keys()
+    assert launch_key not in view._live_jobs
+    (new_key,) = view._live_jobs.keys()
     assert new_key != launch_key and view._auto.is_active(new_key)
-    assert view._reroll_jobs[new_key].params["positive_prompt"] == "a cat, no hat"
-    assert view._reroll_jobs[new_key].params["negative_prompt"] == "ugly"
+    assert view._live_jobs[new_key].params["positive_prompt"] == "a cat, no hat"
+    assert view._live_jobs[new_key].params["negative_prompt"] == "ugly"
 
     # completing the re-homed generation makes its folder exist -> the view follows
-    client.job_completed.emit(view._reroll_jobs[new_key].prompt_id, _REROLL_HISTORY)
+    client.job_completed.emit(view._live_jobs[new_key].prompt_id, _REROLL_HISTORY)
     assert _selected_folder(view) == new_key
 
 
@@ -6505,17 +6505,17 @@ def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
 
-    assert view._reroll._videos_held is True
+    assert view._jobs._videos_held is True
 
     view._shows.showing.close()
-    assert view._reroll._videos_held is False  # closing lets the held ones run
+    assert view._jobs._videos_held is False  # closing lets the held ones run
 
 
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     # A folder gets its node the moment a generation starts, so this one has a
     # row and no picture. A button offering a show that opens nothing is worse
     # than no button: it reappears once the first item lands.
-    view = GalleryView(FakeDB([_running_row("cooking", prompt="a cat")]))
+    view = GalleryView(FakeDB([_running_row("in_flight", prompt="a cat")]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -7134,11 +7134,11 @@ def test_reconnect_running_rerolls_rebinds_a_live_job(qtbot, tmp_path):
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
 
-    view.reconnect_running_rerolls()
+    view.reconnect_running_jobs()
 
     key = gallery.settings_folder_key(db.get_generation("rr"))
-    assert key in view._reroll_jobs
-    assert view._reroll_jobs[key].prompt_id == "rr"
+    assert key in view._live_jobs
+    assert view._live_jobs[key].prompt_id == "rr"
     client.submit_job.assert_not_called()  # reconnected, never resubmitted
 
 
@@ -7148,7 +7148,7 @@ def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)
-    view.reconnect_running_rerolls()
+    view.reconnect_running_jobs()
     view.refresh()
     _select_first_leaf(view)
     assert not _reroll_tile(view)._cancel.isHidden()  # the live, cancelable tile
@@ -7158,7 +7158,7 @@ def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
     row = db.get_generation("rr")
     assert row["status"] == "completed"
     assert "a.png" in row["output_files"]
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
@@ -7172,7 +7172,7 @@ def test_starting_a_reroll_records_a_running_row(qtbot, tmp_path):
 
     _reroll_tile(view).add_requested.emit()
 
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
     row = db.get_generation(job.prompt_id)  # keyed by the same id ComfyUI runs it under
     assert row is not None
     assert row["status"] == "running"
@@ -7188,7 +7188,7 @@ def test_reroll_completion_finalizes_the_running_row(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    prompt_id = view._reroll_jobs[key].prompt_id
+    prompt_id = view._live_jobs[key].prompt_id
 
     client.job_completed.emit(prompt_id, _REROLL_HISTORY)
 
@@ -7198,7 +7198,7 @@ def test_reroll_completion_finalizes_the_running_row(qtbot, tmp_path):
     assert new["status"] == "completed"
     assert "a.png" in new["output_files"]
     assert new["seed"] != 7
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
@@ -7208,7 +7208,7 @@ def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    prompt_id = view._reroll_jobs[key].prompt_id
+    prompt_id = view._live_jobs[key].prompt_id
     assert db.get_generation(prompt_id) is not None
 
     _reroll_tile(view).cancel_requested.emit()
@@ -7224,12 +7224,12 @@ def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path, monkeypatch)
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     view._client.job_error.emit(job.prompt_id, "boom")
 
     assert db.get_generation(job.prompt_id)["status"] == "error"
-    assert key not in view._reroll_jobs
+    assert key not in view._live_jobs
 
 
 def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch):
@@ -7245,7 +7245,7 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch)
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     view._client.job_error.emit(job.prompt_id, json.dumps(
         {"node_type": "RIFE VFI",
@@ -7268,14 +7268,14 @@ def test_cancel_from_the_tile_dequeues_and_stops_the_run_by_name(qtbot, tmp_path
     view.refresh()
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    prompt_id = view._reroll_jobs[key].prompt_id
+    prompt_id = view._live_jobs[key].prompt_id
 
     client.node_executing.emit(prompt_id, "5")  # job is now executing
     _reroll_tile(view).cancel_requested.emit()
 
     client.cancel_prompt.assert_called_once_with(prompt_id)
     client.interrupt.assert_called_once_with(prompt_id)
-    assert key not in view._reroll_jobs
+    assert key not in view._live_jobs
     assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + tile
 
 
@@ -7288,7 +7288,7 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
 
     view.refresh()  # a poll-driven rebuild must not drop the running job
 
-    assert key in view._reroll_jobs
+    assert key in view._live_jobs
     assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
 
 
@@ -7299,7 +7299,7 @@ def _running_reroll(view):
     """Start a re-roll and return (key, job) for the freshly launched job."""
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
-    return key, view._reroll_jobs[key]
+    return key, view._live_jobs[key]
 
 
 def test_selecting_a_running_reroll_shows_its_live_preview_in_the_info_pane(qtbot, tmp_path):
@@ -7383,7 +7383,7 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
     view.refresh()
     panel = view._info_tabs.current_config_panel()
     key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
 
@@ -7453,7 +7453,7 @@ def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
     view.refresh()
     panel = view._info_tabs.current_config_panel()
     key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
     panel._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
@@ -7626,7 +7626,7 @@ def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
     # Once ComfyUI is rendering it, the frame is the answer — don't paint over it.
     view, client = _waiting_view(qtbot, tmp_path, backlog=3)
     view._poll()
-    job = list(view._reroll_jobs.values())[0]
+    job = list(view._live_jobs.values())[0]
     client.preview_image.emit(job.prompt_id, _png_bytes())
     _preview_of(view).show_message = MagicMock()
 
@@ -7671,13 +7671,13 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
     view.refresh()
     key = _select_leaf_of(view, "vid")
     _reroll_tile(view).add_requested.emit()  # image stage starts
-    img_job = view._reroll_jobs[key]
+    img_job = view._live_jobs[key]
     _reroll_tile(view).selected.emit()
     image_frame = _png_bytes()
     client.preview_image.emit(img_job.prompt_id, image_frame)
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image done -> video starts
-    assert view._reroll_jobs[key].workflow.name == "wan22_i2v"
+    assert view._live_jobs[key].workflow.name == "wan22_i2v"
 
     view._poll()  # the rebuild the finished image row triggers
 
@@ -7734,21 +7734,21 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     _reroll_tile(view).add_requested.emit()
 
     # Stage 1: the image re-roll runs first, with the source image's settings.
-    img_job = view._reroll_jobs[key]
+    img_job = view._live_jobs[key]
     assert img_job.workflow.name == "sdxl_t2i"
     assert img_job.params["seed"] != 7  # fresh seed
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)
 
     # Stage 2: the video now runs on the just-generated image, its own seeds fresh.
-    vid_job = view._reroll_jobs[key]
+    vid_job = view._live_jobs[key]
     assert vid_job.workflow.name == "wan22_i2v"
     assert vid_job.params["input_image"] == "image/sdxl_new.png [output]"
     assert vid_job.params["noise_seed"] != 9
 
     client.job_completed.emit(vid_job.prompt_id, _VID_REROLL_HISTORY)
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     rows = db.list_generations()
     new_image = next(r for r in rows
                      if r["workflow_name"] == "sdxl_t2i" and r["prompt_id"] != "img")
@@ -7815,12 +7815,12 @@ def test_video_seed_hover_rerolls_only_the_item_video_seed(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_leaf_of(view, "vid")
-    view._reroll.reroll_video_seed = MagicMock()
+    view._jobs.reroll_video_seed = MagicMock()
 
     view._browser._thumb_widgets["vid"]._corner_buttons[0].click()  # "Randomize video seed"
 
-    view._reroll.reroll_video_seed.assert_called_once()
-    _key, row = view._reroll.reroll_video_seed.call_args.args
+    view._jobs.reroll_video_seed.assert_called_once()
+    _key, row = view._jobs.reroll_video_seed.call_args.args
     assert row["prompt_id"] == "vid"
 
 
@@ -7829,12 +7829,12 @@ def test_image_seed_hover_rerolls_only_the_item_image_seed(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_leaf_of(view, "vid")
-    view._reroll.reroll_image_seed = MagicMock()
+    view._jobs.reroll_image_seed = MagicMock()
 
     view._browser._thumb_widgets["vid"]._corner_buttons[1].click()  # "Randomize image seed"
 
-    view._reroll.reroll_image_seed.assert_called_once()
-    _key, row, _image_rows = view._reroll.reroll_image_seed.call_args.args
+    view._jobs.reroll_image_seed.assert_called_once()
+    _key, row, _image_rows = view._jobs.reroll_image_seed.call_args.args
     assert row["prompt_id"] == "vid"
 
 
@@ -7856,8 +7856,8 @@ def test_poll_reconciles_a_reroll_whose_completion_signal_was_missed(qtbot, tmp_
 
     rows = db.list_generations()
     assert len(rows) == 2  # the re-roll persisted without a restart
-    assert view._reroll_jobs == {}
-    assert key not in view._reroll_jobs
+    assert view._live_jobs == {}
+    assert key not in view._live_jobs
 
 
 def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_path):
@@ -7883,7 +7883,7 @@ def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_pat
 
     _reroll_tile(view).add_requested.emit()
 
-    job = view._reroll_jobs[key]
+    job = view._live_jobs[key]
     assert job.workflow.name == "wan22_i2v"          # no image stage
     assert job.params["input_image"] == "outside.png"  # same input, re-used
     client.submit_job.assert_called_once()
@@ -8113,7 +8113,7 @@ def test_recents_shows_a_live_reroll_as_an_inflight_card(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder_key = _key(_image_workflow(view._tree).child(0).child(0))
-    view._reroll._jobs[folder_key] = [_FakeRerollJob(
+    view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running", frame=_png_bytes()
     )]
     _open_recents(view)
@@ -8162,7 +8162,7 @@ def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert labels == [["Cancel"]]
-    assert view._reroll.all_jobs == []      # the run really stopped
+    assert view._jobs.all_jobs == []      # the run really stopped
 
 
 def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
@@ -8177,7 +8177,7 @@ def test_an_auto_looping_folders_card_offers_the_next_seed_and_a_real_stop(
     view.refresh()
     _select_first_leaf(view)
     view._toggle_auto(True)          # the loop launches the first variation
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     view.refresh()
     _open_recents(view)
     labels = _menu_offering(monkeypatch, "browser_pane")
@@ -8197,7 +8197,7 @@ def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     view.refresh()
     _open_recents(view)
     _menu_offering(monkeypatch, "browser_pane", pick="Cancel")
@@ -8205,7 +8205,7 @@ def test_canceling_from_a_looping_folders_card_ends_the_loop_too(
     view._browser._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert not view._auto.is_active(key)     # the loop is off...
-    assert view._reroll.all_jobs == []       # ...and nothing was launched in its place
+    assert view._jobs.all_jobs == []       # ...and nothing was launched in its place
 
 
 def test_a_card_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
@@ -8239,7 +8239,7 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     view._reroll_tile_menu(key, QPoint(0, 0))
 
     assert labels == [["Cancel"]]
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
 
 
 def test_a_looping_folders_live_tile_offers_the_stop_its_button_cannot(
@@ -8257,7 +8257,7 @@ def test_a_looping_folders_live_tile_offers_the_stop_its_button_cannot(
 
     assert labels == [["Next seed", "Cancel and stop auto-generating"]]
     assert not view._auto.is_active(key)
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
 
 
 def _running_in_folder(prompt_id, prompt, steps, seed):
@@ -8296,7 +8296,7 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
 
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
-    assert "run1" in view._browser._inflight_cards           # cooking, and shown as cooking
+    assert "run1" in view._browser._inflight_cards           # in_flight, and shown as in_flight
     assert view.visible_prompt_ids() == ["i1"]      # run1 isn't a static thumbnail
 
 
@@ -8323,13 +8323,13 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder_key = _key(_image_workflow(view._tree).child(0).child(0))
-    view._reroll._jobs[folder_key] = [
+    view._jobs._jobs[folder_key] = [
         _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"})]
     _open_recents(view)
     assert "rr1" in view._browser._inflight_cards
 
     # The re-roll finishes: its row becomes a completed generation, its job drops.
-    view._reroll_jobs.pop(folder_key)
+    view._live_jobs.pop(folder_key)
     db.delete_generation("rr1")
     db.add(_row("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, "rr1.png"))
     view._poll()
@@ -8346,7 +8346,7 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     view.refresh()
     folder_key = _key(_image_workflow(view._tree).child(0).child(0))
     job = _FakeRerollJob("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, frame=None)
-    view._reroll._jobs[folder_key] = [job]
+    view._jobs._jobs[folder_key] = [job]
     _open_recents(view)
     card = view._browser._inflight_cards["rr1"]
 
@@ -8401,7 +8401,7 @@ def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
     ])
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view._reroll._waiting = [_queued_job("second"), _queued_job("first")]
+    view._jobs._waiting = [_queued_job("second"), _queued_job("first")]
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["second", "first"]
@@ -8418,7 +8418,7 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
     ])
     view = GalleryView(db)
     qtbot.addWidget(view)
-    view._reroll._waiting = [_queued_job("known")]
+    view._jobs._waiting = [_queued_job("known")]
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["known", "brand-new"]
@@ -8486,7 +8486,7 @@ def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeyp
                 status="pending", output_files="[]"))
     db.add(_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
                 status="pending", output_files="[]"))
-    with patch.object(RerollController, "reorder") as reorder:
+    with patch.object(JobQueue, "reorder") as reorder:
         view = GalleryView(db)
         qtbot.addWidget(view)
         view.refresh()
@@ -8522,11 +8522,11 @@ def test_dragging_a_queue_row_asks_the_queue_for_that_order(qtbot):
         _row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
              status="pending", output_files="[]"),
     ])
-    with patch.object(RerollController, "reorder") as reorder:
+    with patch.object(JobQueue, "reorder") as reorder:
         view = GalleryView(db)
         qtbot.addWidget(view)
-        view._reroll._on_server = [_queued_job("running-one")]
-        view._reroll._waiting = [_queued_job("w1"), _queued_job("w2")]
+        view._jobs._on_server = [_queued_job("running-one")]
+        view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
         view.refresh()
 
         view._queue.move_row(2, 1)
@@ -8565,7 +8565,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     view.refresh()
     folder_key = _running_folder_key(view)
     began = time.time() - 90.5
-    view._reroll._jobs[folder_key] = [_FakeRerollJob(
+    view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "wan22_i2v", {}, state="running", progress=(10, 20), started_at=began
     )]
 
@@ -8819,7 +8819,7 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     panel = _tab_with_prompts(gv)
     panel._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     panel._on_generate()                          # emits generate_requested -> a re-roll
-    (pid,) = [job.prompt_id for job in gv._reroll_jobs.values()]
+    (pid,) = [job.prompt_id for job in gv._live_jobs.values()]
 
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert pid in gv._browser._inflight_cards
@@ -8844,7 +8844,7 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
 
     folder_key = gallery.settings_folder_key(db.get_generation("done"))
     gv._start_reroll(folder_key)
-    rr_pid = gv._reroll_jobs[folder_key].prompt_id
+    rr_pid = gv._live_jobs[folder_key].prompt_id
 
     gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
     assert rr_pid in gv._browser._inflight_cards
@@ -8868,13 +8868,13 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     view.refresh()
     key = _select_leaf_of(view, "vid")
     _reroll_tile(view).add_requested.emit()
-    img_job = view._reroll_jobs[key]
+    img_job = view._live_jobs[key]
 
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
     assert img_job.prompt_id in view._browser._inflight_cards
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image -> video
-    vid_job = view._reroll_jobs[key]
+    vid_job = view._live_jobs[key]
     assert vid_job.prompt_id != img_job.prompt_id
 
     view._poll()
@@ -8887,7 +8887,7 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
 
 def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     # A re-roll left running in the DB but not tracked by a live job — e.g. a
-    # restart that didn't re-adopt it into _reroll_jobs — must still show as
+    # restart that didn't re-adopt it into _live_jobs — must still show as
     # in-flight. The card reflects the database, the source of truth for what is
     # in flight, not just the jobs this session happens to hold objects for.
     db = _finished_row_db(tmp_path)
@@ -8964,7 +8964,7 @@ def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
 
     view._combine._generate_combination("img", "loop", intent=recipe_match.GENAU)
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.params["frame_count"] == gallery.CYCLE_FRAMES   # the length that closes
     assert job.params["frame_rate"] > wf.default_params()["frame_rate"]  # smoothed
     assert job.params["positive_prompt"] != "alpha"             # asked for one cycle
@@ -9007,7 +9007,7 @@ def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
 
     view._combine._generate_combination("img", "loop")
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.params["frame_count"] == wf.default_params()["frame_count"]
     assert job.params["frame_rate"] == wf.default_params()["frame_rate"]
     assert job.params["positive_prompt"] == "alpha"
@@ -9020,8 +9020,8 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
 
     view._combine._generate_combination("img", "vid")
 
-    assert len(view._reroll_jobs) == 1
-    job = next(iter(view._reroll_jobs.values()))
+    assert len(view._live_jobs) == 1
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
     assert job.params["noise_seed"] == 99  # the video's seed, reused (not randomized)
@@ -9037,7 +9037,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
 
     view._combine._open_combination("img", "vid")
 
-    assert view._reroll_jobs == {}                 # opened for editing, not launched
+    assert view._live_jobs == {}                 # opened for editing, not launched
     view._client.submit_job.assert_not_called()
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
@@ -9071,7 +9071,7 @@ def test_open_category_opens_the_resolved_recipe_without_launching(qtbot, tmp_pa
 
     view._combine._open_category("img", "dancing")  # the combine DB's one clip is a "dance"
 
-    assert view._reroll_jobs == {}                 # opened for editing, not launched
+    assert view._live_jobs == {}                 # opened for editing, not launched
     view._client.submit_job.assert_not_called()
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
@@ -9105,7 +9105,7 @@ def test_combine_open_buttons_are_wired_to_the_view(qtbot, tmp_path):
     view._combine.panel.combine_requested.emit(CombineRequest(
         image_id="img", video_id="vid", edit_first=True))
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"
@@ -9133,7 +9133,7 @@ def test_combine_duplicate_declined_submits_nothing(qtbot, tmp_path, monkeypatch
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._reroll_jobs == {}                    # declined: nothing submitted
+    assert view._live_jobs == {}                    # declined: nothing submitted
     view._client.submit_job.assert_not_called()
 
 
@@ -9149,7 +9149,7 @@ def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeyp
 
     view._combine._generate_combination("img", "vid")
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"  # the video runs on the same dropped frame
     assert job.params["noise_seed"] != 99  # a fresh seed, not the duplicate's
 
@@ -9168,7 +9168,7 @@ def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path,
 
     # The dropped image is re-drawn first — the tracked job is its SDXL re-roll,
     # not the video — so a fresh frame precedes the (seed-kept) video.
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "sdxl_t2i"
     assert json.loads(view._db.get_generation(job.prompt_id)["params_json"])["seed"] != 1
 
@@ -9186,7 +9186,7 @@ def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_pa
 
     view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "sdxl_t2i"
     assert job.params["seed"] != 42            # a fresh seed, not the duplicate's
 
@@ -9202,7 +9202,7 @@ def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_
 
     view._on_generate_requested("sdxl_t2i", {"seed": 999, "positive_prompt": "a novel prompt"})
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.params["seed"] == 999           # launched exactly as asked, unprompted
 
 
@@ -9223,7 +9223,7 @@ def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
 
     panel._on_generate()
 
-    assert view._reroll_jobs                          # a run is in flight
+    assert view._live_jobs                          # a run is in flight
     assert panel._cancel_btn.isHidden() is False      # the tab offers to cancel it
     assert panel._generate_btn.isEnabled() is True
 
@@ -9252,7 +9252,7 @@ def _click_thumbnail(view, row, image_rows):
 def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_path):
     # The reported block: two pictures of one recipe. Generate the first, click the
     # second, and its Generate button was still mid-run — so a second could not be
-    # started at all, and the button claimed the shown image was the one cooking.
+    # started at all, and the button claimed the shown image was the one in_flight.
     db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -9262,7 +9262,7 @@ def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_pat
     first = _click_thumbnail(view, rows["a"], image_rows)
     first.use_random_seed()  # a fresh sample, not a duplicate of what's on screen
     first._on_generate()
-    assert len(view._reroll.all_jobs) == 1
+    assert len(view._jobs.all_jobs) == 1
 
     panel = _click_thumbnail(view, rows["b"], image_rows)
 
@@ -9273,7 +9273,7 @@ def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_pat
     panel.use_random_seed()
     panel._on_generate()
 
-    assert len(view._reroll.all_jobs) == 2  # both queued, as ComfyUI will run them
+    assert len(view._jobs.all_jobs) == 2  # both queued, as ComfyUI will run them
 
 
 def test_another_images_tab_can_still_generate_while_the_first_runs(qtbot, tmp_path):
@@ -9310,12 +9310,12 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     panel = _front_panel(view)
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
     panel._on_generate()
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert panel._cancel_btn.isHidden() is False
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     assert panel._cancel_btn.isHidden() is True
     assert panel._generate_btn.isEnabled() is True
 
@@ -9333,17 +9333,17 @@ def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
     panel.use_random_seed()
     panel._on_generate()
     panel._on_generate()
-    being_made, queued_after = [job.prompt_id for job in view._reroll.all_jobs]
+    being_made, queued_after = [job.prompt_id for job in view._jobs.all_jobs]
 
     panel._cancel_btn.click()
 
-    assert [job.prompt_id for job in view._reroll.all_jobs] == [queued_after]
+    assert [job.prompt_id for job in view._jobs.all_jobs] == [queued_after]
     assert view._db.get_generation(being_made) is None
     assert panel._generating is True  # the one after it is still its run to watch
 
     panel._cancel_btn.click()
 
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
     assert panel._generating is False
 
 
@@ -9358,13 +9358,13 @@ def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
     panel = _click_thumbnail(view, rows["a"], list(rows.values()))
     panel.use_random_seed()
     panel._on_generate()
-    prompt_id = view._reroll.all_jobs[0].prompt_id
+    prompt_id = view._jobs.all_jobs[0].prompt_id
     assert panel._cancel_btn.isHidden() is False
 
     panel = _front_panel(view)
     panel._cancel_btn.click()
 
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
     assert view._db.get_generation(prompt_id) is None
 
 
@@ -9376,11 +9376,11 @@ def test_clicking_the_tabs_cancel_button_stops_its_run(qtbot, tmp_path):
     panel = _front_panel(view)
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
     panel._on_generate()
-    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+    prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     panel._cancel_btn.click()
 
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
     assert view._db.get_generation(prompt_id) is None
 
 
@@ -9393,12 +9393,12 @@ def test_canceling_from_the_front_tab_stops_the_reroll(qtbot, tmp_path):
     panel = _front_panel(view)
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
     panel._on_generate()
-    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+    prompt_id = next(iter(view._live_jobs.values())).prompt_id
     assert view._db.get_generation(prompt_id) is not None
 
     panel.cancel_requested.emit()
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     assert view._db.get_generation(prompt_id) is None
     assert panel._cancel_btn.isHidden() is True
 
@@ -9458,14 +9458,14 @@ def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(q
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
 
     panel._on_generate()                 # duplicate → a fresh seed, no question asked
-    first = next(iter(view._reroll_jobs.values())).params["seed"]
-    key = next(iter(view._reroll_jobs))
+    first = next(iter(view._live_jobs.values())).params["seed"]
+    key = next(iter(view._live_jobs))
     view._cancel_reroll(key)             # cancel the first attempt
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
     panel._on_generate()                 # Generate again
 
-    launched = next(iter(view._reroll_jobs.values())).params["seed"]
+    launched = next(iter(view._live_jobs.values())).params["seed"]
     assert launched not in (42, first)   # another variation, not the pinned seed
 
 
@@ -9477,14 +9477,14 @@ def test_unticking_random_after_a_generate_keeps_the_seed_that_made_it(qtbot, tm
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
     panel._param_form.set_seed_random(True)
     panel._on_generate()
-    (made,) = view._reroll_jobs.values()
+    (made,) = view._live_jobs.values()
     _finish_reroll(view, made)
 
     panel._param_form.set_seed_random(False)
     panel._param_form._widgets["positive_prompt"].setPlainText("a brand new prompt, at dusk")
     panel._on_generate()
 
-    (tweaked,) = view._reroll_jobs.values()
+    (tweaked,) = view._live_jobs.values()
     assert tweaked.params["seed"] == made.params["seed"]
 
 
@@ -9501,7 +9501,7 @@ def test_combine_noop_for_an_unknown_video_workflow(qtbot, tmp_path):
 
     view._combine._generate_combination("img", "vx")  # can't rebuild "mystery"
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     view._client.submit_job.assert_not_called()
 
 
@@ -9514,7 +9514,7 @@ def test_combine_noop_when_the_image_has_no_output_file(qtbot, tmp_path):
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
@@ -9538,7 +9538,7 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
     assert seen["image_scene"] == "a dog"   # the dropped image's own prompt is the scene to match
     assert seen["scened"]                    # candidates enriched with each recipe's start scene
     assert seen["ids"] == ["vid"]            # only the rebuildable i2v video is a candidate (not the image)
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
     assert job.params["noise_seed"] == 99                         # recipe's seed, reused via the combine path
@@ -9562,7 +9562,7 @@ def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tm
     view._combine.generate_category("img", "alpha")
 
     assert called["category"] == "alpha"   # model unavailable → the act's most-used recipe
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
 
@@ -9577,7 +9577,7 @@ def test_category_launches_a_real_recipe_via_the_fallback(qtbot, tmp_path, monke
 
     view._combine.generate_category("img", "dancing")
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"
 
@@ -9610,7 +9610,7 @@ def test_category_prefers_the_overlays_curated_recipe_over_mining(qtbot, tmp_pat
 
     view._combine.generate_category("img", "gamma")
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"     # run on the dropped image
     assert job.params["lora_high"] == "example-act-high.safetensors"  # the curated spec's pin
@@ -9636,11 +9636,11 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
 
     row, = view._queue.rows()
     assert row._note_text == "Starting…"
-    assert view._reroll_jobs == {}    # and nothing has been submitted for it yet
+    assert view._live_jobs == {}    # and nothing has been submitted for it yet
 
     deferred[0]()                     # the launch the row was standing in for
 
-    assert len(view._reroll_jobs) == 1
+    assert len(view._live_jobs) == 1
     assert not any(item.starting for item in view._queue._items)
 
 
@@ -9690,7 +9690,7 @@ def test_the_stand_in_row_goes_when_the_act_has_no_recipe(qtbot, tmp_path, monke
     view._combine._on_generate_category("img", "epsilon", recipe_match.VIDEO)
 
     assert view._queue.rows() == []
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, monkeypatch):
@@ -9709,7 +9709,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
 
 def _launched_row(view):
     """The DB row of the one run the view just launched."""
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     return view._db.get_generation(job.prompt_id)
 
 
@@ -9878,7 +9878,7 @@ def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_recipe_in_pa
     view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
 
     view._combine._generate_combination("img", "vid", intent=recipe_match.GENAU)
-    view._select_reroll(next(iter(view._reroll_jobs)))  # its card on the shelf, clicked
+    view._select_reroll(next(iter(view._live_jobs)))  # its card on the shelf, clicked
 
     assert _front_panel(view)._live_source.recipe_prompt_edited
 
@@ -9954,7 +9954,7 @@ def test_category_noop_and_hints_when_the_act_has_no_video(qtbot, tmp_path, monk
 
     view._combine.generate_category("img", "epsilon")
 
-    assert view._reroll_jobs == {}            # nothing to reuse: launch nothing
+    assert view._live_jobs == {}            # nothing to reuse: launch nothing
     view._client.submit_job.assert_not_called()
     assert shown                              # but tell the user why
 
@@ -10131,7 +10131,7 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     # Both images share one source config, so their enhances share one folder —
     # and both go to ComfyUI, which works through them one at a time with the
     # lower strip showing the line.
-    jobs = view._reroll.all_jobs
+    jobs = view._jobs.all_jobs
     assert len(jobs) == 2
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
     assert all(j.params["input_image"].startswith("image/sdxl_t2i_g") for j in jobs)
@@ -10139,14 +10139,14 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
 
     # The one ComfyUI is rendering is the last asked for: each picture takes
     # the machine from the one before it.
-    running = next(j for j in jobs if j.prompt_id == view._reroll.queue_order[0])
+    running = next(j for j in jobs if j.prompt_id == view._jobs.queue_order[0])
     waiting = next(j for j in jobs if j is not running)
     client.job_completed.emit(running.prompt_id, _ENHANCE_HISTORY)
 
     # The finished one FOLDED into its source — the transient job row is gone, and
     # the source image itself now wears the enhanced file (identity untouched) —
     # while the other goes on.
-    assert [j.prompt_id for j in view._reroll.all_jobs] == [waiting.prompt_id]
+    assert [j.prompt_id for j in view._jobs.all_jobs] == [waiting.prompt_id]
     assert view._db.get_generation(running.prompt_id) is None
     (upgraded,) = [r for r in view._db.list_generations() if r.get("original_files")]
     files = gallery.row_output_files(upgraded)
@@ -10168,7 +10168,7 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     panel = view._info_tabs.current_config_panel()
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1  # the original
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
@@ -10190,7 +10190,7 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     view._on_thumbnail_clicked("g1")
     panel = view._info_tabs.current_config_panel()
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
@@ -10207,7 +10207,7 @@ def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbo
     view._on_thumbnail_clicked("g0")
     first_tab = view._info_tabs.current_config_panel()
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     assert len(first_tab._versions._host.findChildren(_LevelRow)) == 2
     view._info_tabs.pin_current_tab()
@@ -10230,7 +10230,7 @@ def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
 
     view.enhance_items(["g0", "g1"])
 
-    jobs = view._reroll.all_jobs
+    jobs = view._jobs.all_jobs
     assert len(jobs) == 2
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
 
@@ -10337,8 +10337,8 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
 
     button.click()
 
-    assert view._reroll.all_jobs
-    assert {job.workflow.name for job in view._reroll.all_jobs} == {"image_enhance"}
+    assert view._jobs.all_jobs
+    assert {job.workflow.name for job in view._jobs.all_jobs} == {"image_enhance"}
 
 
 def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
@@ -10397,7 +10397,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
 
     view._enhance._enhance_all()
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["enhance_scale"] == 1.5
     assert job.params["enhance_steps"] == 44
     assert job.params["enhance_denoise"] == 0.3
@@ -10414,7 +10414,7 @@ def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_pat
 
     view.enhance_items(["g0"])
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["enhance_steps"] == 51
 
 
@@ -10429,7 +10429,7 @@ def test_auto_enhance_claims_a_newly_generated_image(qtbot, tmp_path):
 
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 27
 
@@ -10442,7 +10442,7 @@ def test_auto_enhance_leaves_a_new_image_alone_with_the_tick_off(qtbot, tmp_path
 
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_path):
@@ -10459,7 +10459,7 @@ def test_a_reroll_never_inherits_the_enhancement_of_what_it_varies(qtbot, tmp_pa
 
     view._start_reroll(key)
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["enhance"] is False
 
 
@@ -10479,7 +10479,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     view.enhance_items(["g0"])
 
     assert panel._versions._host.findChildren(_PendingRow)
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     view._client.preview_image.emit(job.prompt_id, b"a frame")
     status, frame, settings = panel._pending_enhancement
     assert (status, frame) == ("running", b"a frame")
@@ -10515,10 +10515,10 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     # they landed in the one folder, which is why a tab must not read it by key.
     # The second asked for leads: each picture takes the machine from the one
     # before it, which waits after it.
-    follower, leader = view._reroll.all_jobs
+    follower, leader = view._jobs.all_jobs
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
-    assert len(view._reroll.jobs) == 1
+    assert len(view._jobs.jobs) == 1
     # The one after it counts too — and reads as queued, since it isn't rendering.
     assert view._enhance.run_of(db.get_generation("g0")).status == "queued"
 
@@ -10548,7 +10548,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     assert tile._enhancing is not None
     assert view._browser._thumb_widgets["g1"]._enhancing is None
 
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     view._client.preview_image.emit(job.prompt_id, _png_bytes())
     tile = view._browser._thumb_widgets["g0"]
     assert tile._image_label.pixmap() is not None
@@ -10556,7 +10556,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
 
     # The run ending puts the tile's own picture back: those frames were a
     # partial render of a file that never landed.
-    view._reroll._jobs.clear()
+    view._jobs._jobs.clear()
     view._enhance.reconcile()
     assert tile._enhancing is None
 
@@ -10573,14 +10573,14 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     view.refresh()
     _select_first_leaf(view)
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     assert view._browser._thumb_widgets["g0"]._enhancing is not None
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
     view._browser._thumbnail_context_menu("g0", QPoint(0, 0))
 
     assert "Cancel 1 enhancement" in labels[0]
-    assert view._reroll.all_jobs == []                     # the run stopped
+    assert view._jobs.all_jobs == []                     # the run stopped
     assert db.get_generation("g0") is not None             # the image is untouched
     assert view._browser._thumb_widgets["g0"]._enhancing is None  # and the scrim is off
 
@@ -10595,16 +10595,16 @@ def test_canceling_one_enhancement_leaves_the_others_alone(
     view.refresh()
     _select_first_leaf(view)
     view.enhance_items(["g0", "g1"])
-    leader, follower = view._reroll.all_jobs
+    leader, follower = view._jobs.all_jobs
     _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
     view._browser._thumbnail_context_menu("g1", QPoint(0, 0))
 
-    assert view._reroll.all_jobs == [leader]
-    assert follower not in view._reroll.all_jobs
+    assert view._jobs.all_jobs == [leader]
+    assert follower not in view._jobs.all_jobs
 
 
-def test_a_tile_with_nothing_cooking_offers_no_cancel(qtbot, tmp_path, monkeypatch):
+def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeypatch):
     # The entry appears only while there is a run to stop; an image sitting still
     # is offered the four acts it has always had.
     db = _enhanceable_db(tmp_path, count=1)
@@ -10630,7 +10630,7 @@ def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     view.refresh()
 
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     view.refresh()          # the launch's transient row is in the DB now
     _open_recents(view)
 
@@ -10670,7 +10670,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     _select_first_leaf(view)
 
     view.enhance_items(["g0", "g1"])
-    follower, leader = view._reroll.all_jobs  # the second asked for took the machine
+    follower, leader = view._jobs.all_jobs  # the second asked for took the machine
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
@@ -10699,7 +10699,7 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
 
     show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
 
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     assert show._note.text() == "Enhancement queued"
 
     view._client.preview_image.emit(job.prompt_id, _png_bytes())  # ComfyUI began
@@ -10720,13 +10720,13 @@ def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypat
     qtbot.addWidget(view)
     view.refresh()
     view.enhance_items(["g0", "g1"])
-    doomed, kept = view._reroll.all_jobs
+    doomed, kept = view._jobs.all_jobs
 
     view._delete_rows([db.get_generation("g0")])
 
     assert doomed.state == "canceled"                   # off ComfyUI's queue
     assert db.get_generation(doomed.prompt_id) is None  # no transient row left over
-    assert view._reroll.all_jobs == [kept]              # the other image's run goes on
+    assert view._jobs.all_jobs == [kept]              # the other image's run goes on
 
 
 def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
@@ -10750,13 +10750,13 @@ def test_a_re_enhance_is_cancelled_by_deleting_its_image_too(qtbot, monkeypatch,
     qtbot.addWidget(view)
     view.refresh()
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
     assert "sdxl_t2i_g0.png" in job.params["input_image"]  # re-enhanced from the original
 
     view._delete_rows([db.get_generation("g0")])
 
     assert job.state == "canceled"
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
 
 
 def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, monkeypatch,
@@ -10780,12 +10780,12 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     qtbot.addWidget(view)
     view.refresh()
     view.enhance_items(["g0"])
-    (job,) = view._reroll.all_jobs
+    (job,) = view._jobs.all_jobs
 
     view.trash_generation("g0")  # the Experiments shelf's Reject, from a slideshow
 
     assert job.state == "canceled"
-    assert view._reroll.all_jobs == []
+    assert view._jobs.all_jobs == []
 
 
 def _enhanced_in_place(db, pid="g0"):
@@ -10841,10 +10841,10 @@ def test_auto_enhance_stops_after_one_pass_rather_than_looping(qtbot, tmp_path):
     _set_enhance(view, auto=True)
 
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     upgraded = db.get_generation("g0")
     assert gallery.is_enhanced_row(upgraded)
     # One enhancement, one level above the original.
@@ -10862,7 +10862,7 @@ def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_p
     view._combine._generate_combination("img", "vid")
 
     assert view._browser.showing_recents()  # brand-new folder: watch it cook on the shelf
-    prompt_id = next(iter(view._reroll_jobs.values())).prompt_id
+    prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
 
@@ -10912,8 +10912,8 @@ def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
 
     view._combine.panel._generate_btn.click()  # the panel's button, wired to the view
 
-    assert len(view._reroll_jobs) == 1
-    job = next(iter(view._reroll_jobs.values()))
+    assert len(view._live_jobs) == 1
+    job = next(iter(view._live_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
     assert job.params["noise_seed"] == 99
 
@@ -12640,22 +12640,22 @@ def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
 
     panel._versions.enhance_requested.emit()
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
 
 
-def test_locking_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_path):
+def test_locking_a_slide_enhances_it_unless_one_is_already_in_flight(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
     assert view.enhance_from_slideshow("g0") is True
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
 
-    # Asked again while that one is still cooking: nothing new is started.
+    # Asked again while that one is still in flight: nothing new is started.
     assert view.enhance_from_slideshow("g0") is False
 
 
@@ -12676,7 +12676,7 @@ def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path)
     _set_enhance(view, params={"enhance_steps": 41})  # nothing like what made it
 
     assert view.enhance_from_slideshow("g0") is False
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_landed_enhancement_upgrades_that_item_in_the_open_show(
@@ -12769,10 +12769,10 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     show.close()
 
 
-def test_a_generation_still_cooking_stays_out_of_a_slideshow(qtbot):
+def test_a_generation_still_in_flight_stays_out_of_a_slideshow(qtbot):
     # It used to be seeded with no file, and drew "Generating…" as its slide —
     # a blank between pictures. It joins the show when it has something to show.
-    db = FakeDB([_running_row("cooking", prompt="a cat")])
+    db = FakeDB([_running_row("in_flight", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -12869,7 +12869,7 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
 
     assert view._voice.listener.speak_command("Fix her teeth.") is not None
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
     # The show answers where the speaker is looking, then reads Enhancing….
@@ -12884,7 +12884,7 @@ def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
 
     view._voice.listener.speak_command("fix hands and mouth")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
     assert "fixing hands & teeth" in view._shows.showing._note.text()
@@ -12899,7 +12899,7 @@ def test_fix_all_goes_over_every_part_something_can_find(
 
     view._voice.listener.speak_command("fix everything")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
     assert "fixing hands & teeth" in view._shows.showing._note.text()
@@ -12911,7 +12911,7 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
 
     view._voice.listener.speak_command("fix teeth")
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     assert "no teeth detector" in view._shows.showing._note.text()
 
 
@@ -13018,7 +13018,7 @@ def test_a_spoken_fix_with_no_show_up_says_so_rather_than_vanishing(
 
     view._voice.listener.speak_command("fix teeth")
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     assert "picture on screen" in view._voice.status.text()
 
 
@@ -13125,7 +13125,7 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["seed"] == 7
     assert job.params["positive_prompt"] == "a woman, soft light"
     assert job.params["negative_prompt"] == "blurry"
@@ -13137,7 +13137,7 @@ def test_a_request_for_something_absent_goes_to_the_negative_prompt(
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.params["negative_prompt"] == "blurry, hat"
 
 
@@ -13147,7 +13147,7 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     record = view._db.get_request(job.prompt_id)
     assert record["source_prompt_id"] == "orig"
     assert record["heard"] == "Request, no hat, over."
@@ -13166,7 +13166,7 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
     view._shows.showing._advance()  # something else is on screen now
     _speak_request(view, qtbot, "no hat. Over.")
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
 
 
@@ -13177,7 +13177,7 @@ def test_the_requests_shelf_lists_what_was_asked_for_as_ordinary_tiles(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
     view._tree.setCurrentItem(_shelf(view, REQUESTS_KEY))
@@ -13189,7 +13189,7 @@ def test_the_requests_shelf_lists_what_was_asked_for_as_ordinary_tiles(
 def test_a_request_still_generating_shows_as_a_live_card(
         qtbot, tmp_path, monkeypatch):
     # What "did it queue?" is answered by: the same in-flight card the Recents
-    # shelf gives work that is still cooking.
+    # shelf gives work that is still in flight.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
@@ -13217,7 +13217,7 @@ def test_a_request_that_never_hears_over_says_so_and_resumes(
 
     assert not view._shows.showing._playlist.paused
     assert "never heard" in view._shows.showing._note.text()
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_request_naming_nothing_is_answered_not_generated(
@@ -13226,7 +13226,7 @@ def test_a_request_naming_nothing_is_answered_not_generated(
 
     _speak_request(view, qtbot, "Request. Over.")
 
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
     assert "didn't catch" in view._shows.showing._note.text()
 
 
@@ -13239,7 +13239,7 @@ def test_the_words_of_a_request_never_reach_the_fix_matcher(
 
     view._voice.listener.speak("fix teeth")
 
-    assert view._reroll_jobs == {}  # no enhance launched
+    assert view._live_jobs == {}  # no enhance launched
 
 
 def test_a_request_item_links_back_to_what_it_was_asked_about(
@@ -13248,7 +13248,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
     view._on_thumbnail_clicked(job.prompt_id)
@@ -13263,7 +13263,7 @@ def test_a_request_item_marks_its_change_in_the_prompt_field(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
     view._on_thumbnail_clicked(job.prompt_id)
@@ -13351,7 +13351,7 @@ def test_the_genau_lane_runs_a_looping_recipe(qtbot, tmp_path, monkeypatch):
 
     view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     # The act has a long-form video too; the Genau lane can only use the loop.
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_pick.png [output]"
@@ -13383,7 +13383,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video", lambda src, dest: sent.append(src))
 
     view._combine.generate_category("img", "dancing", recipe_match.GENAU)
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
     view._on_reroll_finished("k", "loop")
@@ -13403,7 +13403,7 @@ def test_genau_it_reads_the_act_off_the_image_and_runs_the_loop(qtbot, tmp_path,
     assert prompt_id == "img_act"
     assert "dancing" in message
     assert kind == NOTICE
-    job = next(iter(view._reroll_jobs.values()))
+    job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
     assert job.params["input_image"] == "sdxl_act.png [output]"
     # Spoken, so it hands itself on: whoever said it is not at the keyboard.
@@ -13418,7 +13418,7 @@ def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(qtbot, tmp_p
     assert prompt_id is None
     assert "doesn't say" in message
     assert kind == WARNING
-    assert not view._reroll_jobs  # nothing was launched on a guess
+    assert not view._live_jobs  # nothing was launched on a guess
 
 
 def test_genau_it_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path, monkeypatch):
@@ -13442,7 +13442,7 @@ def test_genau_it_says_so_when_the_act_has_no_loop_behind_it(qtbot, tmp_path, mo
     assert prompt_id is None
     assert "looping" in message
     assert kind == WARNING
-    assert not view._reroll_jobs
+    assert not view._live_jobs
 
 
 def test_genau_it_declines_a_video(qtbot, tmp_path, monkeypatch):
@@ -13467,7 +13467,7 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     # is looking at the picture, not at this pane.
     assert surface.noted[0] == "img_act"
     assert "dancing" in surface.noted[1]
-    assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+    assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
 def _spoken_genau_rows(view):
@@ -13610,7 +13610,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
     # Answered in the show's own corner: the speaker is looking at the picture.
@@ -13636,7 +13636,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_pa
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 this one is enhanced already", WARNING)
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tmp_path):
@@ -13652,7 +13652,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 only a finished image can be enhanced", WARNING)
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path):
@@ -13670,7 +13670,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert surface.noted == (None, "🎤 this one has no file to enhance", WARNING)
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_a_spoken_enhance_with_no_show_up_presses_the_bank_button(qtbot, tmp_path):
@@ -13685,7 +13685,7 @@ def test_a_spoken_enhance_with_no_show_up_presses_the_bank_button(qtbot, tmp_pat
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    (job,) = view._reroll_jobs.values()
+    (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
 
@@ -13701,7 +13701,7 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert view._voice.status.text() == "🎤 Nothing here to enhance"
-    assert view._reroll_jobs == {}
+    assert view._live_jobs == {}
 
 
 def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
@@ -13796,9 +13796,9 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
 
     view._combine.generate_category("img", "dancing", recipe_match.GENAU)
 
-    qtbot.waitUntil(lambda: bool(view._reroll_jobs), timeout=5000)
+    qtbot.waitUntil(lambda: bool(view._live_jobs), timeout=5000)
     assert asked_on["thread"] != threading.main_thread().name
-    assert next(iter(view._reroll_jobs.values())).workflow.name == "wan22_flf2v_loop"
+    assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
 # --- the bare vocabulary: a shelf, a bank button, a word over the show --------
@@ -14127,7 +14127,7 @@ def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
 
     view._browser._thumb_widgets["vid"].corner_action_triggered.emit("vid", "video")
 
-    (job,) = [job for jobs in view._reroll.jobs_by_folder.values() for job in jobs]
+    (job,) = [job for jobs in view._jobs.jobs_by_folder.values() for job in jobs]
     assert job.workflow.name == "wan22_i2v"
 
 
@@ -14138,13 +14138,13 @@ def test_a_queue_items_cancel_drops_that_run(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder_key = _key(_image_workflow(view._tree).child(0).child(0))
-    view._reroll._jobs[folder_key] = [_FakeRerollJob(
+    view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running")]
 
     (item,) = [it for it in view._inflight_items() if it.key == "rr1"]
     item.cancel()
 
-    assert view._reroll.jobs_by_folder.get(folder_key, []) == []
+    assert view._jobs.jobs_by_folder.get(folder_key, []) == []
     assert db.get_generation("rr1") is None
 
 

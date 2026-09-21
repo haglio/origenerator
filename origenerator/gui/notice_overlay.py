@@ -4,7 +4,7 @@ Fun Time flashes its notices — "Clip saved", "No other seeds", "Next seed" —
 the top center of the player they are about, in one shape everywhere: the panel
 gray, a hairline of the text's own color, a bold heading face, rounded corners
 (``fun_time.notice_overlay.NoticeOverlay``). This is that overlay, worn by
-Origenerator's own notices: the request being spoken, the enhancement cooking,
+Origenerator's own notices: the request being spoken, the enhancement in flight,
 which version of a picture is on screen. A plate of its own down at the foot of
 the show would be a second dialect for the same job, said in the same room, on
 a surface that already wears the players' own HUD.

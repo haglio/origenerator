@@ -155,7 +155,7 @@ class ThumbnailWidget(QWidget):
                 button.installEventFilter(self)  # an off-tile exit from a control
         self._sync_controls()
 
-        # While an enhancement of this image is cooking, the tile wears the same
+        # While an enhancement of this image is in flight, the tile wears the same
         # two overlays an in-flight card does, so work in progress reads the same
         # whichever kind of work it is: a scrim naming the stage, and a bar along
         # the picture's foot saying how far along the run is. The scrim dims the

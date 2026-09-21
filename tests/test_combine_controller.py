@@ -273,13 +273,13 @@ def combine(qtbot, monkeypatch):
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
     built = []
 
-    def build(host=None, *, db=None, reroll=None, client=object(), shows=None,
+    def build(host=None, *, db=None, jobs=None, client=object(), shows=None,
               tabs=None):
         host = host or FakeHost()
         parent = QWidget()
         qtbot.addWidget(parent)
         controller = CombineController(
-            host, parent=parent, db=db or FakeDB(), reroll=reroll or FakeReroll(),
+            host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             client=client, info_tabs_of=lambda: tabs or FakeTabs(),
             shows=shows or FakeShows())
         # The wait between a press and a real job is what the stand-in row is
@@ -428,12 +428,12 @@ def test_a_dropped_pair_runs_the_videos_recipe_on_the_picture(combine, monkeypat
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7, "input_image": "one.png"})
-    reroll = FakeReroll()
-    controller, host = combine(db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, host = combine(db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
-    assert [name for _key, name, _params in reroll.prepared] == [VIDEO_WORKFLOW]
+    assert [name for _key, name, _params in jobs.prepared] == [VIDEO_WORKFLOW]
     assert host.revealed == ["folder-of-clip"]
 
 
@@ -446,15 +446,15 @@ def test_a_press_that_would_reproduce_a_run_asks_which_seed(combine, monkeypatch
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda v, i, wf: {"seed": 7})
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: {"seed": 99})
-    reroll = FakeReroll()
+    jobs = FakeReroll()
     controller, host = combine(
         FakeHost(reproduces=True, seed_answer=REROLL_VIDEO),
-        db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
     assert host.asked == [True]  # the dropped picture is itself re-buildable
-    assert reroll.prepared[0][2] == {"seed": 99}
+    assert jobs.prepared[0][2] == {"seed": 99}
 
 
 def test_saying_no_to_that_question_launches_nothing(combine, monkeypatch):
@@ -462,14 +462,14 @@ def test_saying_no_to_that_question_launches_nothing(combine, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    reroll = FakeReroll()
+    jobs = FakeReroll()
     controller, _host = combine(
         FakeHost(reproduces=True, seed_answer=None),
-        db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
-    assert reroll.prepared == []
+    assert jobs.prepared == []
 
 
 def test_re_drawing_the_frame_launches_the_picture_first(combine, monkeypatch):
@@ -477,15 +477,15 @@ def test_re_drawing_the_frame_launches_the_picture_first(combine, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    reroll = FakeReroll()
+    jobs = FakeReroll()
     controller, host = combine(
         FakeHost(reproduces=True, seed_answer=REROLL_IMAGE),
-        db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
-    assert [pid for _key, pid in reroll.from_image] == ["img"]
-    assert reroll.prepared == []
+    assert [pid for _key, pid in jobs.from_image] == ["img"]
+    assert jobs.prepared == []
     assert host.revealed == ["folder-of-clip"]
 
 
@@ -496,24 +496,24 @@ def test_both_seeds_re_rolled_re_draws_the_frame_with_the_new_video_seed(
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: {"seed": 99})
-    reroll = FakeReroll()
+    jobs = FakeReroll()
     controller, _host = combine(
         FakeHost(reproduces=True, seed_answer=REROLL_BOTH),
-        db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
-    assert reroll.from_image != []
+    assert jobs.from_image != []
 
 
 def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
     monkeypatch.delitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, raising=False)
-    reroll = FakeReroll()
-    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
     controller._generate_combination("img", "clip")
 
-    assert reroll.prepared == []
+    assert jobs.prepared == []
 
 
 # --- finding the recipe an act names ----------------------------------------
@@ -530,13 +530,13 @@ def test_a_curated_recipe_outranks_the_mining(combine, monkeypatch):
     mined = []
     monkeypatch.setattr(module.recipe_match, "smart_recipe",
                         lambda *a, **k: mined.append(1))
-    reroll = FakeReroll()
-    controller, host = combine(db=FakeDB([_image("img")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
 
     controller.generate_category("img", "waving")
 
     assert mined == []  # never asked: the overlay had a pinned recipe
-    assert reroll.prepared[0][0] == f"folder-for-{VIDEO_WORKFLOW}-3"
+    assert jobs.prepared[0][0] == f"folder-for-{VIDEO_WORKFLOW}-3"
     assert host.revealed == [f"folder-for-{VIDEO_WORKFLOW}-3"]
 
 
@@ -545,12 +545,12 @@ def test_an_act_with_no_recipe_under_it_says_so_and_launches_nothing(combine,
     monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: None)
     monkeypatch.setattr(module.recipe_match, "smart_recipe", lambda *a, **k: None)
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
-    reroll = FakeReroll()
-    controller, host = combine(db=FakeDB([_image("img")]), reroll=reroll)
+    jobs = FakeReroll()
+    controller, host = combine(db=FakeDB([_image("img")]), jobs=jobs)
 
     controller.generate_category("img", "waving")
 
-    assert reroll.prepared == []
+    assert jobs.prepared == []
     assert host.told == [("No recipe yet",
                           "No past “waving” video to base a recipe on yet — make "
                           "one first, or drop a specific video instead.")]

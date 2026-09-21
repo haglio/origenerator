@@ -116,6 +116,7 @@ from origenerator.gui.inflight import (
     stop_loop_tooltip,
 )
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
+from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.looping_preview import set_all_previews_paused
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
@@ -125,7 +126,6 @@ from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, pane, pane_splitter
 from origenerator.gui.prompt_find import PromptFind
-from origenerator.gui.reroll_controller import RerollController
 from origenerator.gui.reroll_prompt import (
     REROLL_VIDEO,
     offer_reroll,
@@ -389,14 +389,14 @@ class GalleryView(QWidget):
         """
         # The re-roll controller owns the live jobs and their DB lifecycle; the
         # view reacts to its signals with the redraws they call for.
-        self._reroll = RerollController(db, client)
-        self._reroll.changed.connect(self._rerender_current_leaf)
-        self._reroll.changed.connect(self._reconcile_generating)
-        self._reroll.changed.connect(lambda: self._enhance.reconcile())
-        self._reroll.preview.connect(self._on_reroll_preview)
-        self._reroll.finished.connect(self._on_reroll_finished)
-        self._reroll.failed.connect(self._on_reroll_failed)
-        self._reroll.run_ended.connect(self.run_ended)
+        self._jobs = JobQueue(db, client)
+        self._jobs.changed.connect(self._rerender_current_leaf)
+        self._jobs.changed.connect(self._reconcile_generating)
+        self._jobs.changed.connect(lambda: self._enhance.reconcile())
+        self._jobs.preview.connect(self._on_reroll_preview)
+        self._jobs.finished.connect(self._on_reroll_finished)
+        self._jobs.failed.connect(self._on_reroll_failed)
+        self._jobs.run_ended.connect(self.run_ended)
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_auto_reroll)
@@ -467,7 +467,7 @@ class GalleryView(QWidget):
         # into the layout by _build_ui.
         self._scroll = BrowserScrollArea()
         self._browser = BrowserPane(
-            self._scroll, db, self._reroll, self._auto,
+            self._scroll, db, self._jobs, self._auto,
             TreeNavigation(
                 selected_folder_key=self.selected_folder_key,
                 folder_context=self._folder_context,
@@ -524,14 +524,14 @@ class GalleryView(QWidget):
         # current. Built after the browser it reads and before _build_ui,
         # whose slideshow button starts one.
         self._shows = ShowDirector(
-            self, db=db, browser=self._browser, reroll=self._reroll,
+            self, db=db, browser=self._browser, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time)
         # Combine: a video's recipe run again on a dropped picture, and the
         # spoken "genau it" that asks for the same thing out loud
         # (:mod:`origenerator.gui.combine_controller`). It builds its own panel,
         # which _build_ui places under the tree.
         self._combine = CombineController(
-            self, parent=self, db=db, reroll=self._reroll, client=client,
+            self, parent=self, db=db, jobs=self._jobs, client=client,
             info_tabs_of=lambda: self._info_tabs, shows=self._shows)
         # The standalone enhance: its settings panel, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
@@ -539,7 +539,7 @@ class GalleryView(QWidget):
         # (:mod:`origenerator.gui.enhance_controller`). It builds its own panel,
         # which _build_ui seats in the footer.
         self._enhance = EnhanceController(
-            self, db=db, reroll=self._reroll, browser=self._browser,
+            self, db=db, jobs=self._jobs, browser=self._browser,
             shows=self._shows, info_tabs_of=lambda: self._info_tabs)
         # A thumbnail or a preview picked up anywhere lights the slot it fits,
         # so the drop target is obvious from the start of the gesture.
@@ -798,7 +798,7 @@ class GalleryView(QWidget):
         # edge is this column's splitter handle, so a long queue can be dragged
         # open at the cost of the folder listing above it.
         self._queue = GenerationQueue()
-        self._queue.reorder_requested.connect(self._reroll.reorder)
+        self._queue.reorder_requested.connect(self._jobs.reorder)
         self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
         self._arrangement = PaneArrangement(
             toc=toc, browser=browser, info_pane=self._build_info_pane(),
@@ -1342,7 +1342,7 @@ class GalleryView(QWidget):
         outlives it and works through the rest alone; the next launch picks up
         whatever finished. Returns how many jobs went.
         """
-        return self._reroll.flush_to_server()
+        return self._jobs.flush_to_server()
 
     def _launch_base_render(self, workflow, params):
         """The batch's launch adapter: submit one re-render as a normal re-roll
@@ -1350,10 +1350,10 @@ class GalleryView(QWidget):
         can never displace the user's work under a folder they might re-roll.
         Returns its prompt_id, or ``None`` when the launch didn't take."""
         key = f"base_render/{params[BASE_RENDER_TARGET_KEY]}"
-        if not self._reroll.start_prepared(key, workflow, params,
+        if not self._jobs.start_prepared(key, workflow, params,
                                            source=GenerationSource.BASE_RENDER):
             return None
-        return self._reroll.jobs[key].prompt_id
+        return self._jobs.jobs[key].prompt_id
 
     def _on_experiments_toggled(self, _checked: bool):
         self._sync_experiments_bar()
@@ -1381,10 +1381,10 @@ class GalleryView(QWidget):
         proposal in this batch already claimed the folder (the same recipe
         twice explores nothing)."""
         key = self.folder_key_for(proposal.workflow.name, proposal.params)
-        if not self._reroll.start_prepared(key, proposal.workflow, proposal.params,
+        if not self._jobs.start_prepared(key, proposal.workflow, proposal.params,
                                            source=GenerationSource.EXPERIMENT):
             return None
-        return self._reroll.job_for(key).prompt_id
+        return self._jobs.job_for(key).prompt_id
 
     def _on_experiment_verdict(self, prompt_id: str, action_id: str):
         """A review from the Experiments shelf: "keep" admits the result to the
@@ -1448,7 +1448,7 @@ class GalleryView(QWidget):
         """
         for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
-                    if (job := self._reroll.job_for_origin(origin)) is not None]
+                    if (job := self._jobs.job_for_origin(origin)) is not None]
             panel.forget_launched({origin for origin in panel.launched_runs()
                                    if origin not in {o for o, _ in live}})
             job = live[0][1] if live else None  # the oldest still alive: nearest done
@@ -1468,7 +1468,7 @@ class GalleryView(QWidget):
         job's params, so it is the key the job was actually filed under."""
         if job is None:
             return None
-        return next((k for k, jobs in self._reroll.jobs_by_folder.items()
+        return next((k for k, jobs in self._jobs.jobs_by_folder.items()
                      if job in jobs), None)
 
     def _claim_launch(self, key: str):
@@ -1487,8 +1487,8 @@ class GalleryView(QWidget):
         that tab.
         """
         panel = self._info_tabs.current_config_panel()
-        job = self._reroll.newest_job_for(key)
-        if panel is None or job is None or panel.settings_key() is None:
+        job = self._jobs.newest_job_for(key)
+        if panel is None or job is None or panel.workflow_and_signature() is None:
             return
         if self._panel_reroll_key(panel) == key:
             panel.note_launched(job.origin)
@@ -1502,7 +1502,7 @@ class GalleryView(QWidget):
         screen rather than something queued after it.
         """
         for origin in panel.launched_runs():
-            job = self._reroll.job_for_origin(origin)
+            job = self._jobs.job_for_origin(origin)
             if job is not None:
                 self._cancel_job(job.prompt_id)
                 return
@@ -1550,7 +1550,7 @@ class GalleryView(QWidget):
             if panel is not None:
                 panel.use_random_seed()
         launching = self._info_tabs.current_config_panel()
-        prompt_id = self._reroll.start_prepared(key, wf, params)
+        prompt_id = self._jobs.start_prepared(key, wf, params)
         if not prompt_id:
             return  # no client, or the submit failed
         if launching is not None:
@@ -1561,11 +1561,11 @@ class GalleryView(QWidget):
             if category or video_id:
                 self._db.set_recipe_source(prompt_id, category=category,
                                            video_prompt_id=video_id)
-            launching.note_launched(self._reroll.newest_job_for(key).origin)
+            launching.note_launched(self._jobs.newest_job_for(key).origin)
         self._stand_on_the_run_in(key, rebuild=True)
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
-        """Open the folder ``key`` names and land on the run cooking in it,
+        """Open the folder ``key`` names and land on the run in flight there,
         saying whether the tree had a row to open at all.
 
         The ways here are one move — a Generate, a folder's prompt rewrite, a
@@ -1663,7 +1663,7 @@ class GalleryView(QWidget):
         if self._poll_inflight:
             return
         self._poll_inflight = True
-        jobs = self._reroll.all_jobs
+        jobs = self._jobs.all_jobs
         targets = [(job.prompt_id, job.state) for job in jobs]
         client = self._client
         self.off_thread(lambda: _fetch_poll_facts(client, targets),
@@ -1706,7 +1706,7 @@ class GalleryView(QWidget):
                 # No DB change, but the in-flight cards still need each running
                 # re-roll's live frame pushed in — it advances between rebuilds.
                 # Wherever they were drawn: the Recents shelf, or a folder with
-                # a batch of them cooking in it.
+                # a batch of them in flight.
                 self._browser.refresh_inflight(rows=rows, requests=requests)
             # The lower strip is always on screen, so refresh it every tick —
             # its rows' live frames and progress advance between rebuilds. The
@@ -2409,10 +2409,10 @@ class GalleryView(QWidget):
         return _is_reusable_workflow(group.rows[0].get("workflow_name"))
 
     @property
-    def _reroll_jobs(self) -> dict:
+    def _live_jobs(self) -> dict:
         """The live re-roll jobs, keyed by settings-folder key. Owned by the
         controller; surfaced here for the Recents shelf and the info pane."""
-        return self._reroll.jobs
+        return self._jobs.jobs
 
     @property
     def _selected(self) -> dict | None:
@@ -2519,7 +2519,7 @@ class GalleryView(QWidget):
         self._reroll_tile = None
 
     def _reroll_tile_for(self, group) -> RerollTile:
-        job = self._reroll.job_for(group.key)
+        job = self._jobs.job_for(group.key)
         tile = RerollTile(job,
                           auto_generating=self._auto.is_active(group.key),
                           typical_seconds=self.typical_run_seconds(job),
@@ -2652,12 +2652,12 @@ class GalleryView(QWidget):
             # seed to keep rather than silently inheriting the open tab's.
             was = filled_params(row, wf)
             run = {**params, **{k: was[k] for k in seed_keys if k in was}}
-            prompt_id = self._reroll.start_prepared(key, wf, run)
+            prompt_id = self._jobs.start_prepared(key, wf, run)
             if not prompt_id:
                 continue  # the submit failed; the rest of the folder still goes
             launched += 1
             if launching is not None:
-                launching.note_launched(self._reroll.newest_job_for(key).origin)
+                launching.note_launched(self._jobs.newest_job_for(key).origin)
             self._db.record_request(
                 prompt_id=prompt_id, source_prompt_id=row["prompt_id"], heard="",
                 old_positive=was.get("positive_prompt", ""),
@@ -2752,7 +2752,7 @@ class GalleryView(QWidget):
         """
         if self._client is None:
             return False
-        if key in self._reroll_jobs:
+        if key in self._live_jobs:
             return True  # one is already running for this folder
         working = self._auto_working.get(key)
         if working is not None:
@@ -2767,9 +2767,9 @@ class GalleryView(QWidget):
                 self._pending_auto_key = target
                 key, working = target, self._auto_working[target]
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
-            self._reroll.start_prepared(key, working["workflow"], params)
+            self._jobs.start_prepared(key, working["workflow"], params)
         else:
-            self._reroll.start(key, self.group_for_key(key), self._image_rows)
+            self._jobs.start_reroll(key, self.group_for_key(key), self._image_rows)
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         if not from_auto:
             # A no-op if the launch above failed to register. The tile is lit and
@@ -2783,7 +2783,7 @@ class GalleryView(QWidget):
                 # watching the next, and the tab following the folder gets the
                 # new run's frames by that key without being pointed at it again.
                 self._enter_reroll_selection(key)
-        return self._reroll.has(key)
+        return self._jobs.has(key)
 
     def _note_auto_launch(self, key: str):
         """Remember that the loop, not a tab, asked for the run just launched — so
@@ -2793,11 +2793,11 @@ class GalleryView(QWidget):
         runs by, and pruned to what is still in flight as it goes: only a live run
         can still finish, so a cancelled variation leaves nothing.
         """
-        job = self._reroll.newest_job_for(key)
+        job = self._jobs.newest_job_for(key)
         if job is None:
             return  # the launch didn't take
         self._auto_origins = {origin for origin in self._auto_origins
-                              if self._reroll.job_for_origin(origin) is not None}
+                              if self._jobs.job_for_origin(origin) is not None}
         self._auto_origins.add(job.origin)
 
     def _toggle_auto(self, checked: bool):
@@ -2875,7 +2875,7 @@ class GalleryView(QWidget):
         being steered, leave voice with nothing to steer. The mic stays as the
         button has it."""
         self._auto_working.pop(key, None)
-        if key == self._selected_reroll_key and key not in self._reroll_jobs:
+        if key == self._selected_reroll_key and key not in self._live_jobs:
             # The pane was following this loop between variations; there is no next
             # one to wait for now.
             self._clear_reroll_selection()
@@ -3121,9 +3121,9 @@ class GalleryView(QWidget):
         params = {**params, "positive_prompt": revision.positive,
                   "negative_prompt": revision.negative}
         key = self.folder_key_for(row.get("workflow_name") or "", params)
-        if not self._reroll.start_prepared(key, workflow, params):
+        if not self._jobs.start_prepared(key, workflow, params):
             return "🎤 couldn't queue the request — see the log", ERROR
-        job = self._reroll.newest_job_for(key)
+        job = self._jobs.newest_job_for(key)
         logger.info("Request %r on %s: %s", spoken.heard, row.get("prompt_id"),
                     revision.describe())
         self._db.record_request(
@@ -3237,12 +3237,12 @@ class GalleryView(QWidget):
         if row is None:
             return
         key = self.folder_key_of(row)
-        if key in self._reroll_jobs:
+        if key in self._live_jobs:
             return  # this folder already has a re-roll running
         if which == REROLL_VIDEO:
-            self._reroll.reroll_video_seed(key, row)
+            self._jobs.reroll_video_seed(key, row)
         else:
-            self._reroll.reroll_image_seed(key, row, self._image_rows)
+            self._jobs.reroll_image_seed(key, row, self._image_rows)
         self._select_reroll(key)  # a no-op if the launch above failed to register
 
     # --- combine: a video's recipe applied to a dropped image -------------
@@ -3336,7 +3336,7 @@ class GalleryView(QWidget):
         the same thing that puts its in-flight card on one Recents shelf rather
         than the other. With no job to ask, the side being browsed.
         """
-        job = self._reroll.job_for(key)
+        job = self._jobs.job_for(key)
         asked = requested_orientation(job.params) if job is not None else None
         return asked or self.side_in_view()
 
@@ -3380,7 +3380,7 @@ class GalleryView(QWidget):
         tab parked on other settings is left exactly as it was and the run shows
         on its tile until the tile is clicked.
         """
-        job = self._reroll_jobs.get(key)
+        job = self._live_jobs.get(key)
         if job is None:
             return
         self._enter_reroll_selection(key)
@@ -3390,7 +3390,7 @@ class GalleryView(QWidget):
             if not land:
                 return
             front = tabs.current_config_panel()
-            if (front is not None and front.settings_key() is not None
+            if (front is not None and front.workflow_and_signature() is not None
                     and self._panel_reroll_key(front) == key):
                 panel = front
             else:
@@ -3414,7 +3414,7 @@ class GalleryView(QWidget):
         """
         # ``key`` is the folder the job is filed under, so what it is checked
         # against is the folder on screen rather than the row showing it.
-        if (key is None or key not in self._reroll_jobs
+        if (key is None or key not in self._live_jobs
                 or getattr(self.current_group(), "key", None) != key):
             return
         self._enter_reroll_selection(key)
@@ -3432,7 +3432,7 @@ class GalleryView(QWidget):
         """What re-roll ``key`` is waiting on, when another app is holding ComfyUI
         in front of it — a following tab's wait text, in place of a bare 'waiting
         for preview'. Its own folder's queue isn't a wait worth naming."""
-        job = self._reroll_jobs.get(key)
+        job = self._live_jobs.get(key)
         return queue_wait_text(job.foreign_ahead) if job is not None else None
 
     def _refresh_wait_note(self):
@@ -3466,12 +3466,12 @@ class GalleryView(QWidget):
         if self._reroll_tile is not None:
             self._reroll_tile.set_selected(False)
 
-    def reconnect_running_rerolls(self):
+    def reconnect_running_jobs(self):
         """Rebind live jobs to any re-rolls left running by a previous session, so
         each shows live progress and records its completion again. Called once at
         startup; a tab's Generate is itself a re-roll, so every still-running row is
         the re-roll controller's to reconnect."""
-        self._reroll.reconnect_running()
+        self._jobs.reconnect_running()
 
     def _cancel_reroll(self, key: str):
         """The live tile's button: drop the variation it leads with.
@@ -3485,7 +3485,7 @@ class GalleryView(QWidget):
 
     def _drop_reroll(self, key: str):
         """Cancel the re-roll leading a folder and redraw without it."""
-        self._reroll.cancel(key)
+        self._jobs.cancel(key)
         self._after_a_job_left(key)
 
     def _cancel_job(self, prompt_id: str):
@@ -3497,8 +3497,8 @@ class GalleryView(QWidget):
         after the drop, and a no-op while another of the folder's runs is still
         alive (:meth:`_start_reroll`), so the loop never doubles up.
         """
-        key = self._job_folder_key(self._reroll.job_for_prompt(prompt_id))
-        self._reroll.cancel_job(prompt_id)
+        key = self._job_folder_key(self._jobs.job_for_prompt(prompt_id))
+        self._jobs.cancel_job(prompt_id)
         if key is not None:
             self._after_a_job_left(key)
             self._auto.note_canceled(key)
@@ -3520,7 +3520,7 @@ class GalleryView(QWidget):
             self._shows.close_live()
             self._clear_reroll_selection()
             self._selected_row = None
-        if not self._reroll.has(key):
+        if not self._jobs.has(key):
             for panel in self._info_tabs.watchers_of(key):
                 panel.stop_watching()
 
@@ -3645,7 +3645,7 @@ class GalleryView(QWidget):
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # the run ended: the front tab drops its Cancel
-        self._enhance.reconcile()  # nothing is cooking for it now
+        self._enhance.reconcile()  # nothing is in flight for it now
         QMessageBox.warning(self, "Generation failed", format_execution_error(message))
 
     def _rerender_current_leaf(self):
@@ -3815,7 +3815,7 @@ class GalleryView(QWidget):
     def restore_config_tabs(self, state):
         """Reopen the config tabs saved from a previous session — their
         configurations only; any still-running re-roll is reconnected separately by
-        :meth:`reconnect_running_rerolls`."""
+        :meth:`reconnect_running_jobs`."""
         self._info_tabs.restore_state(state)
 
     # --- selection ---------------------------------------------------------
@@ -3871,10 +3871,10 @@ class GalleryView(QWidget):
             enhance_action = menu.addAction(
                 f"Enhance {n} image{'s' if n != 1 else ''}"
             )
-        cooking = self._enhance.jobs_targeting(rows)
+        in_flight = self._enhance.jobs_targeting(rows)
         cancel_action = None
-        if cooking:
-            n = len(cooking)
+        if in_flight:
+            n = len(in_flight)
             cancel_action = menu.addAction(
                 f"Cancel {n} enhancement{'s' if n != 1 else ''}"
             )

@@ -1191,11 +1191,11 @@ def test_build_gallery_tree_nests_experiments_like_any_other_generation():
         _experiment("approved", "up"),
         _experiment("unreviewed", None),
         _experiment("rejected", "down", output_files=None),
-        _experiment("cooking", None, status="running", output_files="[]"),
+        _experiment("in_flight", None, status="running", output_files="[]"),
     ]
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for folder in tree for r in rows_under(folder)}
-    assert surfaced == {"mine", "approved", "unreviewed", "cooking"}
+    assert surfaced == {"mine", "approved", "unreviewed", "in_flight"}
 
 
 def test_unreviewed_experiments_lists_only_finished_unjudged_results():
@@ -1210,7 +1210,7 @@ def test_unreviewed_experiments_lists_only_finished_unjudged_results():
              output_files=json.dumps([{"filename": "b.png"}])),
         _row(prompt_id="failed", source="experiment", status="error",
              experiment_verdict=None, output_files=None),
-        _row(prompt_id="cooking", source="experiment", status="running",
+        _row(prompt_id="in_flight", source="experiment", status="running",
              experiment_verdict=None, output_files="[]"),
     ]
     assert [r["prompt_id"] for r in unreviewed_experiments(rows)] == ["await-1"]

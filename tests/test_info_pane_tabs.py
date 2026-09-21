@@ -942,7 +942,7 @@ def _config_tab(workflow_name, params=None, seed_is_random=True):
 def test_the_run_a_tab_launched_survives_a_restart(tabs, qtbot):
     # A tab's Cancel and progress fill follow the run it started, so which run that
     # was has to come back with the tab — otherwise a restart mid-generation
-    # reopens the tab with an idle button over a job still cooking.
+    # reopens the tab with an idle button over a job still in flight.
     _pick_workflow(tabs.currentWidget()).note_launched("run-77")
 
     fresh = InfoPaneTabs(tabs._client, tabs._db)

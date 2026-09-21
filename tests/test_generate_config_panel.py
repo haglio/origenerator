@@ -714,7 +714,7 @@ def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
 
 def _folder_name(panel):
     """The name the gallery folder this config maps to wears in the tree."""
-    return gallery.config_folder_name(*panel.settings_key(),
+    return gallery.config_folder_name(*panel.workflow_and_signature(),
                                       panel._db.folder_meta_map())
 
 
@@ -727,7 +727,7 @@ def test_a_config_with_no_result_is_named_by_its_folder(panel):
 
 
 def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
-    panel._db.rename_folder(settings_key("image", *panel.settings_key()), "Wizards")
+    panel._db.rename_folder(settings_key("image", *panel.workflow_and_signature()), "Wizards")
 
     assert panel.title() == "Wizards"
 
@@ -819,11 +819,11 @@ def test_estimate_label_when_no_history(qtbot):
 
 # --- settings key -----------------------------------------------------------
 
-def test_settings_key_matches_a_stored_generation_of_the_same_settings(panel):
+def test_the_two_parts_match_a_stored_generation_of_the_same_settings(panel):
     full = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params())
     full["positive_prompt"] = "a cat"
     panel.prefill("sdxl_t2i", full)
-    workflow, signature = panel.settings_key()
+    workflow, signature = panel.workflow_and_signature()
     assert workflow == "sdxl_t2i"
     # The same params at any seed share the signature; a different setting splits it.
     assert signature == gallery.settings_signature("sdxl_t2i", json.dumps({**full, "seed": 999}))

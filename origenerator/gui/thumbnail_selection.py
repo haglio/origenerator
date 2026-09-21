@@ -13,6 +13,14 @@ among its widgets.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Picks:
+    picked: frozenset[str] = frozenset()
+    anchor: str | None = None
+
 
 class ThumbnailSelection:
     """The picked set, the anchor a run is measured from, and the shown order."""
@@ -75,6 +83,13 @@ class ThumbnailSelection:
         """Nothing picked, and no run to extend."""
         self._picked = set()
         self._anchor = None
+
+    def picks(self) -> Picks:
+        return Picks(frozenset(self._picked), self._anchor)
+
+    def pick_again(self, picks: Picks) -> None:
+        self._picked = set(picks.picked) & set(self._shown)
+        self._anchor = picks.anchor
 
     def holds(self, prompt_id: str) -> bool:
         """Whether this tile is one of the picked — what a right-click asks before

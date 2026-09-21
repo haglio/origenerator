@@ -61,6 +61,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
+from origenerator.gui.pane_place import PanePlace, place_of, stand_at
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
@@ -673,12 +674,12 @@ class BrowserPane(QObject):
         The shelf has no end — it lists every generation ever made — so it opens on
         one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
         a shelf already on screen (a landing generation rebuilds the gallery under
-        it) keeps the pages that were open, at the offset they were being read at,
-        rather than snapping the user back up to the newest item.
+        it) keeps the pages that were open, so the place its caller puts back
+        (:meth:`return_to`) is still drawn to stand on, rather than snapping the
+        user back up to the newest item.
         """
         drawn = self._recents_drawn
-        offset = self._scroll_bar().value() if self._recents_flow is not None else 0
-        container, flow = self._new_tile_pane()  # which clears both of those
+        container, flow = self._new_tile_pane()  # which forgets that count
         rows = self._open_shelf_rows(RECENTS_KEY)
         items = self._latest_inflight_items()
         self._inflight_signature = _inflight_signature(items)
@@ -699,7 +700,6 @@ class BrowserPane(QObject):
         self._recents_flow = flow
         self._draw_recents_page(max(_RECENTS_PAGE, drawn))
         self.show_widget(container)
-        self._restore_scroll(offset)  # a no-op at 0: a shelf opened fresh starts on top
 
     def _draw_recents_page(self, count: int):
         """Add up to ``count`` more finished items to the open shelf, picking up
@@ -734,20 +734,6 @@ class BrowserPane(QObject):
         """The browser pane's vertical scroll bar: what the shelf grows off, and
         what a redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
-
-    def _restore_scroll(self, offset: int):
-        """Scroll the freshly drawn shelf back to ``offset``. The new pane hasn't
-        been laid out yet, so the bar may have no range to move within — hence the
-        second attempt once this turn's layout has run."""
-        if not offset:
-            return
-        self._scroll_bar().setValue(offset)
-        if self._scroll_bar().value() != offset:
-            defer(self, lambda: self._reapply_scroll(offset))
-
-    def _reapply_scroll(self, offset: int):
-        if self.showing_recents():  # unless the user has since navigated off it
-            self._scroll_bar().setValue(offset)
 
     def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
         """Build one finished-item tile for a shelf (Recents/Favorites/Experiments):
@@ -844,7 +830,9 @@ class BrowserPane(QObject):
                  else self._visible_inflight_items(rows, requests))
         if (self.showing_recents()
                 and _inflight_signature(items) != self._inflight_signature):
+            place = self.place()
             self._render_recents()
+            self.return_to(place)
             return
         for item in items:
             self._inflight_by_key[item.key] = item  # keep the reveal current
@@ -1349,7 +1337,7 @@ class BrowserPane(QObject):
         self._scroll_to(widget)
         # The pane it was just drawn in hasn't been laid out yet, so that first
         # attempt had no real tile position to aim at — hence a second one once
-        # this turn's layout has run (as :meth:`_restore_scroll` does).
+        # this turn's layout has run (as :meth:`return_to` does).
         defer(self, lambda: self._reapply_reveal(prompt_id, widget))
 
     def _reapply_reveal(self, prompt_id: str, widget):
@@ -1361,6 +1349,17 @@ class BrowserPane(QObject):
 
     def _scroll_to(self, widget):
         self._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
+
+    def place(self) -> PanePlace:
+        return place_of(self._scroll, self._selection, self._thumb_widgets)
+
+    def return_to(self, place: PanePlace) -> None:
+        self._selection.pick_again(place.picks)
+        self._refresh_selection_highlights()
+        drawn = self._scroll.widget()
+        stand_at(self._scroll, self._thumb_widgets, place, drawn)
+        # Again once laid out: a pane drawn this turn has no tile positions yet.
+        defer(self, lambda: stand_at(self._scroll, self._thumb_widgets, place, drawn))
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():

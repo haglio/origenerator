@@ -7333,6 +7333,75 @@ def test_a_show_ended_on_an_unlocked_slide_leaves_the_gallery_alone(qtbot, monke
     assert view._tree.currentItem() is _alls(view._tree)["Latest"]
 
 
+def _laid_out_folder(qtbot, count=60):
+    db = FakeDB([_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.resize(1800, 1300)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    qtbot.wait(1)
+    return view, db
+
+
+def _in_view(view, prompt_id) -> bool:
+    tile = view._browser._thumb_widgets[prompt_id]
+    viewport = view._scroll.viewport()
+    return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
+
+
+def test_the_picture_a_locked_show_ends_on_stays_picked_and_in_view_as_the_library_moves(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view, db = _laid_out_folder(qtbot)
+    far = view.visible_prompt_ids()[-3]
+    view._browser._thumbnail_clicked(far, _NO_MOD)
+    _scroll_bar(view).setValue(0)
+    show = _double_click_show(view, qtbot)
+    show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    show.close()
+    qtbot.wait(1)
+    assert _in_view(view, far)
+
+    db.add(_image("fresh", "a dog", 50, 999))
+    view.refresh()
+    qtbot.wait(1)
+
+    assert view._browser._thumb_widgets[far].is_selected()
+    assert _in_view(view, far)
+
+
+def test_a_picked_picture_holds_its_place_as_new_ones_land_above_it(qtbot):
+    view, db = _laid_out_folder(qtbot)
+    far = view.visible_prompt_ids()[-3]
+    view._browser.reveal_tile(far)
+    qtbot.wait(1)
+    assert _in_view(view, far)
+
+    for n in range(20):
+        db.add(_image(f"n{n}", "a cat", 50, 500 + n))
+    view.refresh()
+    qtbot.wait(1)
+
+    assert view.visible_prompt_ids().index(far) > 20
+    assert _in_view(view, far)
+
+
+def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
+    view, db = _laid_out_folder(qtbot)
+    assert view.selected_prompt_ids() == [view.visible_prompt_ids()[0]]
+
+    for n in range(20):
+        db.add(_image(f"n{n}", "a cat", 50, 500 + n))
+    view.refresh()
+    qtbot.wait(1)
+
+    assert _scroll_bar(view).value() == 0
+    assert _in_view(view, "n19")
+
+
 def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
     # Closing a show is usually a detour, not being done with it — so the next
     # one stands where the last was left rather than at the top of a fresh

@@ -878,6 +878,23 @@ def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_show_alone(show
     assert director._live_shows == [(made[0], "workflow/a")]
 
 
+def test_a_second_set_in_the_one_window_brings_its_own_sides_library_with_it(shows):
+    """Standalone the monitor holds one show, so a second set re-points the
+    window that is there rather than opening another.  The library that window
+    falls back to — and that its order pair hands it — is the side the set it
+    is playing NOW belongs to; kept on the side it was opened on, it would
+    hand over the other shape's pictures."""
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   ALL_LANDSCAPE: [_row("g7")]})
+    director, _host, made = shows(browser=browser)
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    director.open([("b.png", "image", "g2", None)], side=LANDSCAPE)
+
+    assert director.browse_it_all(made[0]) is True
+    assert made[0].reordered == ([("g7.png", "image", "g7", None)], False, set())
+
+
 def test_a_show_asks_this_director_for_the_way_out_of_a_loop(shows):
     director, _host, made = shows()
 

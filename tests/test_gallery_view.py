@@ -13899,10 +13899,10 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert surface.culled == 1
 
     view._voice.listener.speak("lock")
-    assert surface.locked and surface.said == "🎤 holding this one"
+    assert surface.locked and surface.said == "🎤 locked this one"
 
     view._voice.listener.speak("lock")
-    assert surface.said == "🎤 already holding it"  # asked for a state, not a flip
+    assert surface.said == "🎤 already locked"  # asked for a state, not a flip
 
     view._voice.listener.speak("unlock")
     assert not surface.locked and surface.said == "🎤 let go"

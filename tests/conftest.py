@@ -52,10 +52,9 @@ from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
 from pytestqt.qtbot import QtBot
 
 from origenerator import config, osr2_driver, osr2_motion_driver
-from origenerator.gui import desktop_notices, motion_panel, voice_router
+from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.looping_preview import set_all_previews_paused
 
 
 @pytest.fixture(autouse=True)
@@ -471,11 +470,11 @@ def _recipe_match_runs_inline(request, monkeypatch):
 def _previews_start_running():
     """Leave the app-wide preview freeze off between tests.
 
-    The freeze is module state (origenerator.gui.looping_preview), which is
-    exactly what makes it reach a preview built after it was set — and exactly
-    what would otherwise let a test that pauses hand the next test a gallery of
+    The freeze is module state (origenerator.gui.omnipause), which is exactly
+    what makes it reach a preview built after it was set — and exactly what
+    would otherwise let a test that pauses hand the next test a gallery of
     still thumbnails it never asked for.
     """
-    set_all_previews_paused(False)
+    omnipause.freeze(False)
     yield
-    set_all_previews_paused(False)
+    omnipause.freeze(False)

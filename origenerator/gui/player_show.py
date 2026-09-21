@@ -275,8 +275,12 @@ class PlayerShow(QObject):
 
     def show_step(self, delta: int) -> None:
         """Step the player either way.  Moving off a locked slide releases the
-        lock, the way the players' own prev/next cancel a lock."""
+        lock, the way the players' own prev/next cancel a lock — and a loop
+        down to the picture on screen is ended first, so what the player is
+        handed to step into is the set rather than a list of one."""
         self._unlock()
+        if delta > 0:
+            self._set.end_a_loop_of_one()
         self._send(NEXT if delta > 0 else PREV)
 
     def step(self, delta: int) -> None:

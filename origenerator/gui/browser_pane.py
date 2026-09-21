@@ -352,7 +352,7 @@ class BrowserPane(QObject):
                   trash_rows, request_items=()):
         """Take the newly rebuilt gallery model the shelves render from.
 
-        ``starred_groups`` is per side (``{orientation: [groups]}``): a folder is
+        ``favorite_groups`` is per side (``{orientation: [groups]}``): a folder is
         drawn on whichever sides hold rows of that shape, so each Favorites shelf
         collects the copies of the bookmarks its own side has.
         """

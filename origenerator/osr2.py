@@ -38,8 +38,11 @@ PARK_TCODE = PARK_COMMAND
 
 BROKER_HOST = "127.0.0.1"
 TCODE_UDP_PORT = ports.TCODE_UDP
-# Fun Time's state directory, not this app's and not the broker's: all three
-# look for the file below there.
+# Not this app's state directory and not the broker's own checkout: the one
+# directory all three apps meet at, which the broker -- whose files they are --
+# names in its published broker_contract.json. Spelled here as well because this
+# app is told it by nothing, and tests/test_broker_contract.py is what holds the
+# two spellings together.
 SHARED_STATE_DIR = project_dir("fun_time") / "state"
 SERIAL_RX_FILE = SHARED_STATE_DIR / OSR2_SERIAL_RX
 # The broker's own window for the same question (osr2_broker.monitor.MonitorState),

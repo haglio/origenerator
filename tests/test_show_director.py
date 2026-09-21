@@ -1292,6 +1292,21 @@ def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named
         "g1": "Source image", "v1": "alpha"}
 
 
+def test_a_picture_taken_away_leaves_the_map_its_row_draws(shows):
+    """The map is read off the library every time it is drawn, not off a list
+    taken once — so a picture condemned from a show stops being drawn beside its
+    siblings instead of offering a thumbnail of something that is gone."""
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2)]
+    host, db = FakeHost(rows=rows), FakeDB(rows)
+    director, _host, _made = shows(host, db=db)
+    assert [slide.prompt_id for slide in director.neighbors_of("g1", side="portrait").seeds] == ["g2"]
+
+    db.rows.pop("g2")                                    # condemned: the row goes
+    host.rows = [row for row in host.rows if row["prompt_id"] != "g2"]
+
+    assert director.neighbors_of("g1", side="portrait").seeds == ()
+
+
 def test_beyond_the_row_lies_the_nearest_of_the_models_other_configurations(shows):
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2),
             _picture("g3", "a red fox at dawn", seed=7),

@@ -5,8 +5,9 @@ they are the whole file, not any table of it -- ``salvage_if_malformed`` rebuild
 from this text, and ``migrate`` patches every table at once.
 
 tests/test_db_schema.py holds all of it as a snapshot: another app reads this
-file (evolver mounts it read-only and selects seven columns off ``generations``
-by name), and every user's database is migrated in place rather than rebuilt.
+database (mounted read-only, selecting off ``generations`` by name -- what it
+may rely on is :mod:`origenerator.gallery_contract`), and every user's database
+is migrated in place rather than rebuilt.
 """
 from __future__ import annotations
 

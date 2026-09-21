@@ -132,14 +132,18 @@ COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 
 # Evolver (the sibling video-maintenance app) watches this inbox and ingests any
-# finalized video dropped under a per-source subfolder. Mirrors evolver's own
-# INBOX_DIR; we write under our own source name so Evolver can route
-# Origenerator's videos distinctly from other inbox sources.
+# finalized video dropped under a per-source subfolder; we write under our own
+# source name so it can route Origenerator's videos distinctly from other inbox
+# sources, and it files the upscale it makes of each one in the folder below.
+#
+# Both folders are Evolver's, and both were spelled here from reading its
+# source, with nothing comparing the two. It publishes them now, library-relative,
+# in `evolver_contract.json` at the checkout `project_dir("evolver")` resolves, and
+# tests/test_evolver_pipeline_contract.py holds these to that document -- the
+# only place the two can be compared, since neither repo's gate clones the other.
 _EVOLVER_AI_DIR = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
-# Where Evolver files the upscale it makes of each video sent to it. Mirrors
-# evolver's own OUT_UPSCALED_DIR.
 EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 # A Genau clip goes to the same inbox under its own source name. Evolver routes by
 # that name, so the folder is the whole signal: it upscales the clip on its usual

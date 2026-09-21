@@ -492,6 +492,23 @@ def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_s
     assert said[-1] == "Loop off"
 
 
+def test_a_forward_step_in_a_row_down_to_one_picture_hands_the_set_back(qtbot, tmp_path):
+    """A cull can leave the row holding only the picture on screen, and a
+    player stepping round a list of one plays that picture again — so the step
+    ends the loop first, and what it steps into is the set coming back."""
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    show.show_loop("seed")                      # the row: one.png and one-b.png
+    show.show_cull()                            # down to the one picture left
+    _sent(show)
+
+    show.show_step(1)
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["one-b.png", "two.png", "three.png"]
+    assert _sent(show)[-1] == "NEXT"
+    assert show.hud_map().loop == ""
+
+
 def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qtbot, tmp_path):
     """PLAY_FILE jumps to a file in the list and splices in one that is not —
     which is where the pass put the cell too, so no list is handed over."""

@@ -625,6 +625,22 @@ def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot
     assert view._note.text() == "Loop off"
 
 
+def test_the_forward_step_out_of_a_row_down_to_one_picture_ends_the_loop(qtbot):
+    """A cull can leave the row holding only the picture on screen, and a row of
+    one has nowhere to step: the forward step ends the loop and puts up what the
+    set plays next, the way it steps out of a lock."""
+    browsing = [*_KEYED, ("z.png", "image", "id-z")]
+    view = _view(qtbot, browsing, actions=ShowActions(neighbors=_around))
+    _press(view, Qt.Key.Key_E)                   # the seed row is the pass: id-a, id-b
+    view._playlist.drop("id-b")                  # culled down to the picture on screen
+    shown = _put_up(view)
+
+    view.step(1)
+
+    assert view.hud_map().loop == ""
+    assert shown == ["id-b"]
+
+
 def _put_up(view) -> list:
     shown = []
     view.media_changed.connect(lambda: shown.append(view._playlist.current()[2]))

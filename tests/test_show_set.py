@@ -242,6 +242,48 @@ def test_ending_the_loop_goes_back_to_browsing_with_the_slide_kept():
     assert show_set.end_loop() is False          # nothing left to end
 
 
+def test_a_forward_step_in_a_loop_down_to_one_slide_leaves_the_loop():
+    """A cull can leave a loop holding only the slide on screen, and stepping
+    round a row of one is that same picture again — so the forward step ends the
+    loop and lands on what the browse plays next, the way Right leaves a lock."""
+    show_set, dealt = _mapped()
+    show_set.start_loop("seed")
+    show_set.playlist.drop("id-1b")
+    show_set.playlist.drop("id-1c")
+    dealt.clear()
+
+    show_set.step(1)
+
+    assert show_set.loop is None
+    assert show_set.current_prompt_id() == "id-2"
+
+
+def test_a_forward_step_in_a_loop_with_somewhere_to_go_stays_in_the_loop():
+    """The row is what the forward step walks while it still holds another
+    slide; only a row down to the one on screen is the dead end that ends it."""
+    show_set, _dealt = _mapped()
+    show_set.start_loop("seed")
+
+    show_set.step(1)
+
+    assert show_set.loop is not None
+    assert show_set.current_prompt_id() == "id-1b"
+
+
+def test_a_step_back_in_a_loop_down_to_one_slide_leaves_it_looping():
+    """Only the forward step is the way out, as on a player: back is the loop's
+    own step the other way, and what it finds in a row of one is that slide."""
+    show_set, _dealt = _mapped()
+    show_set.start_loop("seed")
+    show_set.playlist.drop("id-1b")
+    show_set.playlist.drop("id-1c")
+
+    show_set.step(-1)
+
+    assert show_set.loop is not None
+    assert show_set.current_prompt_id() == "id-1"
+
+
 def test_the_loop_key_steps_seeds_then_configs_then_off_and_round_again():
     show_set, _dealt = _mapped()
 

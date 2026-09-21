@@ -343,6 +343,23 @@ class ShowSet:
         around = self.neighbors(current.prompt_id)
         return [current, *(around.seeds if axis == SEED_AXIS else around.group)]
 
+    def end_a_loop_of_one(self) -> None:
+        """End a loop left holding only the slide on screen: round a pass that
+        size is that same slide again, which is the lock rather than a loop,
+        and the forward step is what leaves a lock."""
+        if self.loop is not None and len(self.playlist) < 2:
+            self.end_loop()
+
+    def step(self, delta: int) -> None:
+        """Walk the pass one either way — the browse, or the loop's own row —
+        except forward out of a loop of one, which ends it first
+        (:meth:`end_a_loop_of_one`) and steps into the browse instead."""
+        if delta < 0:
+            self.playlist.back()
+            return
+        self.end_a_loop_of_one()
+        self.playlist.advance()
+
     def start_loop(self, axis: str, pool=None) -> bool:
         """Play *pool* — *axis*'s row or column around the slide on screen, by
         default — round and round, in its own order, the slide on screen

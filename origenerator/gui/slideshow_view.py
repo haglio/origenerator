@@ -586,10 +586,7 @@ class SlideshowView(QWidget):
             return  # a run with no folder armed under it: nowhere to step to
         self._playlist.unlock()
         self._live = False  # stepped off a live generation: its frames stop landing
-        if delta > 0:
-            self._playlist.advance()
-        else:
-            self._playlist.back()
+        self._set.step(delta)
         self._show_current()
 
     @property

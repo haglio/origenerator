@@ -45,6 +45,13 @@ QT_FREE = (
     "origenerator.config",
     "origenerator.undo_stack",
     "origenerator.gallery_actions",
+    # Out of the widget package with the rest of the app's machinery, and
+    # needing no Qt once there: the orientation key scheme, the spin-arrow
+    # PNGs, the show's press vocabulary and the console press grammar.
+    "origenerator.orientation",
+    "origenerator.spin_arrows",
+    "origenerator.show_buttons",
+    "origenerator.console_commands",
 )
 
 # The two that legitimately do, at import. `comfyui_client` is one because it is
@@ -85,3 +92,26 @@ def test_the_modules_that_do_need_qt_are_only_these(module):
     """The control. Without it the list above could pass by importing nothing at
     all, and the boundary would be decorative."""
     assert _qt_after_importing(module) is True
+# The app's own machinery, which the widget package used to hold: the session's
+# file channels, the two device drivers, the ambient players, the orientation
+# key scheme, the spin-arrow PNGs and the shared press vocabulary. Held as an
+# equality so a driver cannot drift back in beside the widgets -- the reason
+# each left is that importing a `gui` module dragged device I/O and filesystem
+# IPC with it, and a reader after the app's IPC contract had to know to look
+# inside the widget package to find it.
+OUTSIDE_THE_WIDGETS = (
+    "ambient_audio_players",
+    "console_commands",
+    "fun_time_bridge",
+    "orientation",
+    "osr2_driver",
+    "osr2_motion_driver",
+    "show_buttons",
+    "spin_arrows",
+)
+
+
+@pytest.mark.parametrize("module", OUTSIDE_THE_WIDGETS)
+def test_the_app_own_machinery_is_not_in_the_widget_package(module):
+    assert (REPO_ROOT / "origenerator" / f"{module}.py").exists()
+    assert not (REPO_ROOT / "origenerator" / "gui" / f"{module}.py").exists()

@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from origenerator.gui import orientation
+from origenerator import orientation
 
 
 class _FakeImage:

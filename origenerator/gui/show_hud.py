@@ -5,7 +5,7 @@ it has to be the same panel rather than a strip of Qt buttons gesturing at it.
 This widget draws the real one: the same panel the players composite into
 their video, rendered by the same shared code (``player_core.satellite_hud`` /
 ``_paint``), so a show's HUD and a player's HUD cannot drift apart — the status
-line, the buttons this show declares (:mod:`origenerator.gui.show_buttons`) and
+line, the buttons this show declares (:mod:`origenerator.show_buttons`) and
 the nav map.
 
 Standalone Origenerator wears it too, over its own fullscreen show.  Nothing
@@ -75,9 +75,9 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from origenerator.console_commands import side_press, spelled_for
 from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
-from origenerator.gui.show_buttons import answer, show_rows
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import thumb_of
+from origenerator.show_buttons import answer, show_rows
 from origenerator.ui_scale import (
     to_bitmap_pos,
     to_logical_size,
@@ -113,7 +113,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     *hosted* is whether a Fun Time session is under the show and *own_window*
     whether this app is drawing it in a window of its own; together they decide
     which buttons the panel declares (see
-    :func:`~origenerator.gui.show_buttons.show_rows`) and what reset goes back
+    :func:`~origenerator.show_buttons.show_rows`) and what reset goes back
     to.  Both default to what a region show wants, which is what every reading
     of one wants; :class:`ShowHud` and a show handed to a player pass their own.
 

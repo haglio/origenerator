@@ -51,7 +51,7 @@ BRANCH_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
 DROP_KEY_ROLE = Qt.ItemDataRole.UserRole + 2
 # A row's own key in the tree: its folder's key with the side it is drawn on
 # appended, so the two copies of one folder are tellable apart (see
-# origenerator.gui.orientation). What a folder key alone can't say is which of
+# origenerator.orientation). What a folder key alone can't say is which of
 # them you picked, hovered, or dragged.
 TREE_KEY_ROLE = Qt.ItemDataRole.UserRole + 3
 COUNT_ROLE = Qt.ItemDataRole.UserRole + 4

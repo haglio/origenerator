@@ -66,11 +66,11 @@ from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
 from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.media import MediaType
+from origenerator.osr2_driver import drive_target_for
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamType

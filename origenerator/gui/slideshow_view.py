@@ -102,7 +102,6 @@ from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
-from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
@@ -117,6 +116,7 @@ from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.media import MediaType
+from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import LIVE, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)

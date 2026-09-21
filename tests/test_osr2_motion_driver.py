@@ -8,7 +8,7 @@ from player_core.learned_model import LearnedModel, Phrase, classify
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 
 from origenerator import motion_engine
-from origenerator.gui.osr2_motion_driver import (
+from origenerator.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
     Osr2MotionDriver,

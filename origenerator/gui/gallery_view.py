@@ -29,6 +29,7 @@ from origenerator import (
     recovery,
     timing,
 )
+from origenerator.ambient_audio_players import AmbientAudio
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
 from origenerator.branch_session import is_branch_session
@@ -51,7 +52,6 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls
-from origenerator.gui.ambient_audio import AmbientAudio
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     BrowserPane,
@@ -121,32 +121,7 @@ from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import ERROR, NOTICE
 from origenerator.gui.off_thread import run_off_thread
-from origenerator.gui.orientation import (
-    LANDSCAPE as _LANDSCAPE,
-)
-from origenerator.gui.orientation import (
-    ORIENTATION_LABELS as _ORIENTATION_LABELS,
-)
-from origenerator.gui.orientation import (
-    ORIENTATIONS as _ORIENTATIONS,
-)
-from origenerator.gui.orientation import (
-    base_of as _base_of,
-)
-from origenerator.gui.orientation import (
-    orientation_of as _orientation_of,
-)
-from origenerator.gui.orientation import (
-    oriented_key,
-    requested_orientation,
-    split_rows,
-)
-from origenerator.gui.orientation import (
-    split_key as _split_shelf_key,
-)
 from origenerator.gui.osr2_control import Osr2Control
-from origenerator.gui.osr2_driver import Osr2Driver
-from origenerator.gui.osr2_motion_driver import Osr2MotionDriver
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, pane, pane_splitter
 from origenerator.gui.prompt_find import PromptFind
@@ -169,6 +144,31 @@ from origenerator.gui.toolbar_bank import (
 )
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.media import MediaType
+from origenerator.orientation import (
+    LANDSCAPE as _LANDSCAPE,
+)
+from origenerator.orientation import (
+    ORIENTATION_LABELS as _ORIENTATION_LABELS,
+)
+from origenerator.orientation import (
+    ORIENTATIONS as _ORIENTATIONS,
+)
+from origenerator.orientation import (
+    base_of as _base_of,
+)
+from origenerator.orientation import (
+    orientation_of as _orientation_of,
+)
+from origenerator.orientation import (
+    oriented_key,
+    requested_orientation,
+    split_rows,
+)
+from origenerator.orientation import (
+    split_key as _split_shelf_key,
+)
+from origenerator.osr2_driver import Osr2Driver
+from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.slideshow import in_order
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand

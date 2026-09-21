@@ -14,9 +14,9 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
+from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.desktop_notices import DesktopNotices
-from origenerator.gui.fun_time_bridge import FunTimeBridge
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS

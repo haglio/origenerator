@@ -51,14 +51,8 @@ from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstall
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
 from pytestqt.qtbot import QtBot
 
-from origenerator import config
-from origenerator.gui import (
-    desktop_notices,
-    motion_panel,
-    osr2_driver,
-    osr2_motion_driver,
-    voice_router,
-)
+from origenerator import config, osr2_driver, osr2_motion_driver
+from origenerator.gui import desktop_notices, motion_panel, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.looping_preview import set_all_previews_paused

@@ -361,10 +361,10 @@ class PlayerShow(QObject):
     def _lock_what_the_cull_left(self) -> None:
         """A row worn down to one picture plays that picture over and over,
         which is the lock — so the cull that wore it down ends the loop and
-        tells the player to lock what is left.  No better version is asked
-        for: nobody pressed for one."""
+        tells the player to lock what is left.  The lock is the state and
+        nothing else: none of what a pressed lock also does — the star, the
+        better version, the gallery — happened, because nobody pressed one."""
         self._lock(True)
-        self.favorite()
         self._note("Locked")
 
     def _condemn(self, prompt_id: str) -> None:

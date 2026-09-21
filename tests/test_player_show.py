@@ -16,7 +16,7 @@ from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
-from origenerator.gui.show_map import MapNeighbors
+from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.slideshow import ShowState, Slide, in_order
 
@@ -453,10 +453,10 @@ def _around(prompt_id):
     act down its column, and the rest have nobody."""
     if prompt_id != "id-1":
         return MapNeighbors()
-    other_act = (Slide("one-x.png", "image", "id-1x"),)
+    other_act = Slide("one-x.png", "image", "id-1x")
     return MapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),),
-                        actions=other_act, label="fox", action_labels=("dawn",),
-                        group=other_act)
+                        column=(MapRow(other_act, "dawn"),), label="fox",
+                        group=(other_act,))
 
 
 def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
@@ -538,6 +538,27 @@ def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, t
     assert said == ["Filter: 'source image, alpha' (1)"]
     assert parse_hud(show.channel.hud_file.read_text(encoding="utf-8")).filter_query == (
         "source image, alpha")
+
+
+def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_path):
+    """Half the column is configurations, and their buttons mean what they
+    meant before the acts joined them: go to that configuration and play its
+    seeds round and round, rather than narrowing the show to an act."""
+    said = []
+    a_configuration = Slide("one-x.png", "image", "id-1x")
+    around = lambda pid: MapNeighbors(  # noqa: E731
+        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+        if pid == "id-1" else (),
+        seeds=(Slide("one-y.png", "image", "id-1y"),) if pid == "id-1x" else ())
+    show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=around, acts=_acts),
+                 say=said.append)
+    _sent(show)
+
+    show.show_filter("e629425b")
+
+    assert show.hud_prompt_id == "id-1x"
+    assert show.hud_act_filter == ""            # a jump, not a narrowing
+    assert said == ["Looping seeds: 2"]
 
 
 def test_a_filter_past_the_item_on_screen_sends_the_player_to_what_is_left(qtbot, tmp_path):

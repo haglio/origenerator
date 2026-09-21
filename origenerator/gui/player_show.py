@@ -43,6 +43,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.show_hud import show_hud_model
+from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
     LOOP_IS_A_LOCK,
     LOOP_OFF,
@@ -471,8 +472,18 @@ class PlayerShow(QObject):
             self._note("Widening net failed", kind=WARNING)
 
     def show_filter(self, query: str) -> None:
-        """Narrow to the act(s) *query* names — the button at the head of a
-        map row, and the session's spoken acts."""
+        """The button at the head of a map row, and the session's spoken acts.
+
+        A configuration's row is gone to and its seeds looped, the way it was
+        before the acts joined the column; an act's narrows the show to it.
+        """
+        row = self._set.configuration_row(query)
+        if row is not None:
+            if row is not self._set.playlist.current():
+                self._let_go()
+                self._jump_to(row)
+            self.show_loop(SEED_AXIS)
+            return
         said, narrowed = narrow_to_acts(self._set, query)
         self._note(said, kind=NOTICE if narrowed else WARNING)
 

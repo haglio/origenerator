@@ -398,6 +398,18 @@ class ShowSet:
             return False
         return self.start_loop(SEED_AXIS, [*self.loop_pool(SEED_AXIS), *additions])
 
+    def configuration_row(self, query: str) -> Slide | None:
+        """The slide of the column row *query* names, where that row is a
+        configuration rather than an act — the half of the column whose button
+        jumps to it and loops its seed row.  ``None`` for an act's row, which
+        narrows the show instead, and for a row the map does not draw."""
+        shown = self.map()
+        if shown is None:
+            return None
+        return next((row.slide for row in shown.column
+                     if row.configuration and acts_posted(row.label) == acts_posted(query)),
+                    None)
+
     def slide_for_path(self, path) -> Slide | None:
         """The slide playing *path* — in the pass, or drawn on the map — or ``None``."""
         shown = self.map()
@@ -443,7 +455,8 @@ class ShowSet:
             # act — into that cell's other axis, as if it were the corner.
             current = self.playlist.current()
             around = self.neighbors(current.prompt_id)
-            cells = (current, *(around.seeds if along_the_row else around.actions))
+            cells = (current, *(around.seeds if along_the_row
+                                else (row.slide for row in around.column)))
             at = 0
         return step_in_ring(cells, at, 1 if direction in ("right", "down") else -1)
 

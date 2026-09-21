@@ -103,6 +103,7 @@ from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.osr2_driver import drive_target_for
 from origenerator.gui.position_caption import PositionCaption
+from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
     LOOP_IS_A_LOCK,
     LOOP_OFF,
@@ -775,8 +776,17 @@ class SlideshowView(QWidget):
             self._flash_note(_WIDENING_FAILED, kind=WARNING)
 
     def show_filter(self, query: str) -> None:
-        """Narrow to the act(s) *query* names — the button at the head of a
-        map row, and the session's spoken acts."""
+        """The button at the head of a map row, and the session's spoken acts.
+
+        A configuration's row is gone to and its seeds looped, the way it was
+        before the acts joined the column; an act's narrows the show to it.
+        """
+        row = self._set.configuration_row(query)
+        if row is not None:
+            if row is not self._playlist.current():
+                self._jump_to(row)
+            self.show_loop(SEED_AXIS)
+            return
         said, narrowed = narrow_to_acts(self._set, query)
         self._flash_note(said, kind=NOTICE if narrowed else WARNING)
 

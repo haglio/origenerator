@@ -596,14 +596,14 @@ def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot
 
 
 def _around(prompt_id):
-    from origenerator.gui.show_map import MapNeighbors
+    from origenerator.gui.show_map import MapNeighbors, MapRow
 
     if prompt_id != "id-a":
         return MapNeighbors()
-    other_act = (Slide("c.png", "image", "id-c"),)
+    other_act = Slide("c.png", "image", "id-c")
     return MapNeighbors(seeds=(Slide("b.png", "image", "id-b"),),
-                        actions=other_act, label="fox", action_labels=("dawn",),
-                        group=other_act)
+                        column=(MapRow(other_act, "dawn"),), label="fox",
+                        group=(other_act,))
 
 
 def test_the_loop_key_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
@@ -2008,3 +2008,22 @@ def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_
     assert view._playlist.current()[2] == "e"
     assert view.locked is False
     assert view.hud_order_label == "Latest"
+
+
+def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
+    """The other half of the column: its rows are gone to and looped, where an
+    act's row narrows the show instead."""
+    from origenerator.gui.show_map import MapNeighbors, MapRow
+
+    a_configuration = Slide("c.png", "image", "id-c")
+    around = lambda pid: MapNeighbors(  # noqa: E731
+        column=(MapRow(a_configuration, "E629425B", configuration=True),)
+        if pid == "id-a" else (),
+        seeds=(Slide("d.png", "image", "id-d"),) if pid == "id-c" else ())
+    view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=around, acts=_acts))
+    shown = _put_up(view)
+
+    view.show_filter("e629425b")
+
+    assert shown == ["id-c"]
+    assert (view.hud_act_filter, view.hud_map().loop) == ("", "seed")

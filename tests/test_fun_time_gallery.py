@@ -405,8 +405,9 @@ def _open_the_fox_show(qtbot, view, monkeypatch, rows):
 
 def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, monkeypatch):
     """The slide in the corner; the same configuration under its other seed
-    running right; the video animated from it running down, named for its
-    act, and the picture's own row named as that video's source; the corner
+    running right; its own seed under another configuration running down,
+    named by that folder, and then the video animated from it, named for its
+    act, with the picture's own row named as that video's source; the corner
     lit and no loop — the players' map, drawn against this app's library of
     that side's shape."""
     from origenerator.gui.show_hud import show_hud_model
@@ -420,9 +421,12 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
     assert model.corner.path == "g1.png"
     assert [cell.path for cell in model.seeds] == ["g2.png"]
-    assert [(cell.path, cell.label) for cell in model.actions] == [("v1.png", "alpha")]
+    a_configuration, an_act = model.actions
+    assert (a_configuration.path, an_act.path) == ("g3.png", "v1.png")
+    assert an_act.label == "alpha"
+    assert a_configuration.label and a_configuration.label != "alpha"   # its folder
     assert model.current_action == "Source image"
-    assert (model.seed_count, model.action_count) == (2, 2)
+    assert (model.seed_count, model.action_count) == (2, 3)
     assert model.playing == ("corner", 0) and model.active_loop == ""
     assert model.lock_label == "Unlocked · Shuffle"
     # And the mode pair leads the panel, with this mode lit: the way back to

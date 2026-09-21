@@ -297,3 +297,50 @@ def test_an_enhanced_version_belongs_to_its_run_like_any_other_item():
                     _image("g2", "a red fox", seed=2), _image("g1", "a red fox", seed=1)]
 
     assert _ids(one_per_stretch(newest_first, image_index={})) == ["g4"]
+
+
+# --- the column: this seed's other configurations, then the videos of it ---------
+
+
+def test_the_column_opens_on_the_same_seed_under_other_configurations():
+    """What the column showed before the videos joined it, and still shows
+    first: the same seed drawn under another configuration of the same model."""
+    current = _image("g1", "a red fox in snow", seed=7)
+    tweaked = _image("g2", "a red fox at dawn", seed=7)
+    other_model = _image("g3", "a red fox at dawn", seed=7, checkpoint="model_b.safetensors")
+    reroll = _image("g4", "a red fox in snow", seed=8)
+
+    around = surroundings(current, [current, tweaked, other_model, reroll], image_index={})
+
+    assert _ids(around.configs) == ["g2"]
+
+
+def test_a_configuration_sibling_is_not_also_one_of_the_acts_below_it():
+    """The two halves of the column are told apart by where they sit, so a
+    picture's own re-prompt is a configuration and never an act as well."""
+    picture = _image("i1", "a fox", seed=1)
+    tweaked = _image("i2", "a fox at dawn", seed=1)
+    index = gallery.build_image_config_index([picture, tweaked])
+    runs = _video("v1", "the fox runs", noise_seed=5, frame="i1.png", act="alpha")
+
+    around = surroundings(picture, [picture, tweaked, runs], image_index=index)
+
+    assert _ids(around.configs) == ["i2"]
+    assert [(row["prompt_id"], label) for row, label in around.actions] == [("v1", "alpha")]
+
+
+def test_a_video_has_no_configurations_of_its_own_because_its_seed_is_its_pictures():
+    """Configurations belong to pictures.  A video's own sampler seed says
+    nothing about which picture it is of, so two videos that happen to share
+    one are strangers; what another configuration of this video's picture
+    would be is a video of that picture, which the acts below already are."""
+    picture = _image("i1", "a fox", seed=1)
+    other_picture = _image("i2", "a hare", seed=2)
+    index = gallery.build_image_config_index([picture, other_picture])
+    current = _video("v1", "it runs", noise_seed=5, frame="i1.png", act="alpha")
+    elsewhere = _video("v2", "it runs", noise_seed=5, frame="i2.png", act="alpha")
+
+    around = surroundings(current, [picture, other_picture, current, elsewhere],
+                          image_index=index)
+
+    assert around.configs == ()

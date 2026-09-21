@@ -58,8 +58,8 @@ CONTROL_FACES = {
 _NO_OTHER_VERSION = " (none for this one)"
 
 # What each one is, in this app's words rather than a player's: these act on the
-# generations this app made, so the bin is the toolbar's Delete and the hold is
-# the whole of what holding a slide means here.
+# generations this app made, so the bin is the toolbar's Delete and the lock is
+# the whole of what locking a slide means here.
 CONTROL_TOOLTIPS = {
     "prev": "Previous slide",
     "next": "Next slide",
@@ -133,7 +133,7 @@ def answer(host, action: str, argument: str = "") -> bool:
     if action in ("prev", "next"):
         host.show_step(-1 if action == "prev" else 1)
     elif action == "lock":
-        host.show_toggle_hold()
+        host.show_toggle_lock()
     elif action == "trash":
         host.show_cull()
     elif action == "reset":
@@ -164,8 +164,8 @@ def answer(host, action: str, argument: str = "") -> bool:
     elif action in ("cycle_version", "cycle_version_back"):
         host.show_step_version(-1 if action.endswith("_back") else 1)
     elif action in ("play_video", "lock_video"):
-        # A thumbnail on the map: a click plays it, a double-click holds it.
-        host.show_item(argument, hold=action == "lock_video")
+        # A thumbnail on the map: a click plays it, a double-click locks it.
+        host.show_item(argument, lock=action == "lock_video")
     else:
         return False
     return True

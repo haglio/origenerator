@@ -98,7 +98,7 @@ def test_nothing_is_said_about_an_engine_with_nothing_asked_of_it(qtbot):
     assert said == []
 
 
-def test_a_freeze_reaches_the_engine_and_the_next_slide_arrives_holding(qtbot, tmp_path):
+def test_a_freeze_reaches_the_engine_and_the_next_slide_arrives_frozen(qtbot, tmp_path):
     first, second = (tmp_path / "one.png"), (tmp_path / "two.png")
     for picture in (first, second):
         picture.write_bytes(b"")
@@ -293,7 +293,7 @@ def test_an_engine_that_will_not_open_leaves_the_stand_in(qtbot, monkeypatch, ca
     assert "could not open" in caplog.text
 
 
-def test_the_engine_opens_on_the_slide_and_hold_it_missed(tmp_path):
+def test_the_engine_opens_on_the_slide_and_pace_it_missed(tmp_path):
     waiting = _NotYetOpened()
     waiting.set_muted(True)
     waiting.set_pace(6)

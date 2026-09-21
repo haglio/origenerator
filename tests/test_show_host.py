@@ -27,7 +27,7 @@ from tests.show_surface_fakes import FakeEngine
 # under it takes the protocol's own answers for them.
 TRANSPORT = (
     "locked", "dwell_s", "set_dwell_s",
-    "show_step", "show_toggle_hold", "show_cull",
+    "show_step", "show_toggle_lock", "show_cull",
 )
 THE_SET = (
     "show_reset", "hud_map", "hud_favorites_filter", "hud_order_label",
@@ -130,7 +130,7 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     assert host.show_reset() is None
     assert host.show_order(latest=True) is None
     assert host.toggle_favorites_filter() is None
-    assert host.show_item("anything", hold=True) is None
+    assert host.show_item("anything", lock=True) is None
     assert host.show_loop("seed") is None
     assert host.show_loop_cycle() is None
     assert host.show_more_seeds() is None

@@ -139,9 +139,9 @@ class ShowSet:
         loop plays its row in the row's order.
         """
         current = self.playlist.current()
-        held = current.prompt_id if keep_slide and current is not None else None
+        keep_id = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
-                      if held is not None and item.prompt_id == held), None)
+                      if keep_id is not None and item.prompt_id == keep_id), None)
         paused = self.playlist.paused
         self.playlist = self._deal(items, image_dwell_ms=self.playlist.image_dwell_ms,
                                    start=start, shuffle=shuffle)
@@ -425,8 +425,8 @@ class ShowSet:
         current = self.playlist.current()
         if current is not None and self._same(current, slide):
             return False
-        index = next((index for index, held in enumerate(self.playlist.items)
-                      if self._same(held, slide)), None)
+        index = next((index for index, item in enumerate(self.playlist.items)
+                      if self._same(item, slide)), None)
         if index is not None:
             self.playlist.jump_to(index)
             return True

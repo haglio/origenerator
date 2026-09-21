@@ -14,7 +14,7 @@ wants its regions filled, whether the room is frozen, where the last show left
 off, and which runs the open show has already turned down as slides of their
 own frames.
 
-The spoken words about a show are here too -- close it, hold it, narrow it to
+The spoken words about a show are here too -- close it, lock it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a shelf. They
 are words about a show rather than words about the microphone, and a router that
 carried them would only have to hand every one of them straight back.
@@ -315,8 +315,8 @@ class ShowDirector:
                                 favorite_ids=self._favorite_prompt_ids())}
 
     def open_on_preview(self, media, frame):
-        """A double-click on a tab's preview: open its folder as a slideshow held
-        on the very picture that was clicked.
+        """A double-click on a tab's preview: open its folder as a slideshow
+        standing on the very picture that was clicked.
 
         The pace is nought — nothing moves until an arrow does, or until the
         console's clip-seconds pair is turned up — and the order is the browser's
@@ -409,7 +409,7 @@ class ShowDirector:
                                        levels=levels,
                                        folder_items=folder_items, **kwargs)
         self._slideshow = show
-        already_live = any(held is show for held, _where in self._live_shows)
+        already_live = any(live is show for live, _where in self._live_shows)
         self._live_shows = [entry for entry in self._live_shows if entry[0] is not show]
         self._live_shows.append((show, location))
         if resume is not None:
@@ -437,7 +437,7 @@ class ShowDirector:
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
-            # Three of these are a session's: a lock opens the held item as a
+            # Three of these are a session's: a lock opens the locked item as a
             # generate tab, a reset means the REGION's base state, and a click
             # on the picture asks the room to pause.
             lock=(self._open_generate_tab_for
@@ -827,13 +827,13 @@ class ShowDirector:
         self._host.follow_link(prompt_id)
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
-        """A lock on a hosted show: go to the held item, in the browser and in
+        """A lock on a hosted show: go to the locked item, in the browser and in
         the tabs — the way the RFB answers a lock by opening the video's tab.
 
         The item itself, not one of its siblings.  Asking the pane to reveal a
         config brings forward whichever tab is already on that SETTINGS folder,
         and every seed of one recipe shares that folder — so the tab that came
-        up was a sibling of the held picture rather than the picture, which is
+        up was a sibling of the locked picture rather than the picture, which is
         the "wrong item, a similar one" this used to open.  So the browser is
         navigated to the item itself (its own folder, its own tile picked), and
         that navigation loads the row into a tab the way a click on it would.
@@ -916,8 +916,8 @@ class ShowDirector:
 
     def _side_of(self, show) -> str | None:
         """Which satellite region *show* is holding, if it holds one."""
-        return next((side for side, held in self._region_shows.items()
-                     if held is show), None)
+        return next((side for side, on_that_side in self._region_shows.items()
+                     if on_that_side is show), None)
 
     def reset_region(self, show) -> None:
         """A region's reset: back to the base state, not to the top of whatever
@@ -944,8 +944,8 @@ class ShowDirector:
         show.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
 
     def _repoint(self, show, key: str) -> None:
-        self._live_shows = [(held, key if held is show else where)
-                            for held, where in self._live_shows]
+        self._live_shows = [(live, key if live is show else where)
+                            for live, where in self._live_shows]
 
     def _base_side(self, show) -> str | None:
         if self._fun_time is not None:
@@ -1114,9 +1114,9 @@ class ShowDirector:
     def note_enhancing(self, statuses: dict) -> None:
         """Tell an open show how the enhancements in flight are going.
 
-        A show is where a batch of them gets asked for — every held slide is a
+        A show is where a batch of them gets asked for — every locked slide is a
         run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a hold hears only
+        turn has not come. The show cannot tell on its own: a lock hears only
         that a run started, not where in the line it landed.
         """
         if self._slideshow is None:
@@ -1159,12 +1159,12 @@ class ShowDirector:
             self._host.say(message)
 
     def run_show_command(self, command: ShowCommand, side: str | None):
-        """Get the show going, hold it, or close it — on *side*'s region when
+        """Get the show going, pause it, or close it — on *side*'s region when
         the utterance named one, else on the show that is up.
 
         Pausing is a pace of nought and starting is that pace back at the
         standard number, because a show that never moves on is exactly what a
-        held picture is here — there is no separate paused state to keep.
+        stopped picture is here — there is no separate paused state to keep.
 
         The pace is set through the show when there is one, not only posted to
         the app-wide number: a show sitting at nought while that number already
@@ -1274,7 +1274,7 @@ class ShowDirector:
 
     def run_on_slide(self, command: AppCommand) -> None:
         """A word about the slide filling the screen: step off it either way,
-        take it away, hold it, or bookmark it.
+        take it away, lock it, or bookmark it.
 
         The words are Fun Time's, and so is what they do — "weird" condemns what
         is on screen, a lock holds it — because the two rooms are one room to
@@ -1296,10 +1296,10 @@ class ShowDirector:
             said, kind = (("🎤 favorited", FAVORITE) if show.favorite()
                           else ("🎤 nothing here to favorite", WARNING))
         elif command is AppCommand.LOCK:
-            said, kind = (("🎤 holding this one", NOTICE) if show.set_held(True)
+            said, kind = (("🎤 holding this one", NOTICE) if show.set_locked(True)
                           else ("🎤 already holding it", WARNING))
         else:  # UNLOCK
-            said, kind = (("🎤 let go", NOTICE) if show.set_held(False)
+            said, kind = (("🎤 let go", NOTICE) if show.set_locked(False)
                           else ("🎤 nothing was held", WARNING))
         self.answer(said, kind=kind)
 

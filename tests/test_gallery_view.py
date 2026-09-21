@@ -93,7 +93,7 @@ def _will_move_on(view) -> bool:
     finished clip, so there is no clock of the view's own to ask: what decides
     is the same three things that decided whether one was armed -- the room is
     not frozen, the slide is not locked, and the pace is not nought."""
-    return (not view._paused and not view._playlist.holding()
+    return (not view._paused and not view._playlist.locked_or_paused()
             and bool(view._dwell_s))
 
 
@@ -6849,7 +6849,7 @@ def test_a_show_ended_on_a_locked_slide_lands_on_that_item(qtbot, monkeypatch):
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
 
 
-def test_a_show_ended_on_an_unheld_slide_leaves_the_gallery_alone(qtbot, monkeypatch):
+def test_a_show_ended_on_an_unlocked_slide_leaves_the_gallery_alone(qtbot, monkeypatch):
     # Nothing was held, so nothing was chosen: closing is just leaving, and the
     # shelf the show was started from is still what's on screen.
     _resolve_by_id(monkeypatch)
@@ -6893,7 +6893,7 @@ def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkey
     view._shows.showing.close()
 
 
-def test_a_show_reopened_on_a_held_slide_comes_back_holding_it(qtbot, monkeypatch):
+def test_a_show_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
     # A hold is the user saying this is the one: it lands the gallery in that
     # slide's folder, and the show reopened there is still stopped on it.
     _resolve_by_id(monkeypatch)
@@ -9982,7 +9982,7 @@ class _VoiceSurface:
         self.steps = []     # the transport moves it was asked for, in order
         self.culled = 0
         self.favorited = 0
-        self.held = False
+        self.locked = False
         self.queued = []     # what the poll last fed its corner queue
         self.in_flight = set()
 
@@ -10013,10 +10013,10 @@ class _VoiceSurface:
         self.favorited += 1
         return True
 
-    def set_held(self, held):
-        if held == self.held:
+    def set_locked(self, locked):
+        if locked == self.locked:
             return False
-        self.held = held
+        self.locked = locked
         return True
 
     # The gallery's poll feeds every open show its queue and what is in flight,
@@ -10704,7 +10704,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     assert tiles["g0"]._resting_pixmap is None   # never given the leader's frame
 
 
-def test_a_held_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
+def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
                                                                  monkeypatch):
     # Holding a slide asks for an enhancement, and what it gets first is a place
     # in the line — a show of held slides has several out at once. The corner
@@ -12674,7 +12674,7 @@ def test_the_add_card_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     assert job.params["enhance_steps"] == 29
 
 
-def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_path):
+def test_locking_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -12688,7 +12688,7 @@ def test_holding_a_slide_enhances_it_unless_one_is_already_cooking(qtbot, tmp_pa
     assert view.enhance_from_slideshow("g0") is False
 
 
-def test_holding_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
+def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
     # A hold is made with no view of the Enhance panel, so an image that already
     # carries an enhancement must not be re-derived at whatever the settings happen
     # to say now — however far those settings have moved since. Re-enhancing is
@@ -12735,7 +12735,7 @@ def test_a_landed_enhancement_upgrades_that_item_in_the_open_show(
     view._shows.showing.close()
 
 
-def test_a_slideshow_hold_on_a_video_asks_for_nothing(qtbot, tmp_path):
+def test_a_slideshow_lock_on_a_video_asks_for_nothing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video", "type": "output"}]))
@@ -13135,7 +13135,7 @@ def test_the_tree_carries_a_requests_shelf(qtbot):
     assert "Requests" in _top_level(view._tree)
 
 
-def test_saying_request_holds_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
+def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
@@ -13899,13 +13899,13 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert surface.culled == 1
 
     view._voice.listener.speak("lock")
-    assert surface.held and surface.said == "🎤 holding this one"
+    assert surface.locked and surface.said == "🎤 holding this one"
 
     view._voice.listener.speak("lock")
     assert surface.said == "🎤 already holding it"  # asked for a state, not a flip
 
     view._voice.listener.speak("unlock")
-    assert not surface.held and surface.said == "🎤 let go"
+    assert not surface.locked and surface.said == "🎤 let go"
 
 
 def test_the_transport_words_step_the_show_they_are_said_over(qtbot, tmp_path):
@@ -13975,7 +13975,7 @@ def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
     assert view._voice.status.text() == "🎤 Nothing to undo"
 
 
-def test_holding_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
+def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("lock")

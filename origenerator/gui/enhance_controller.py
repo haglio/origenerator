@@ -349,7 +349,7 @@ class EnhanceController:
         didn't), the line the speaking surface should say, and its kind.
 
         Only an image that has received no enhancement gets one, the same gate a
-        fullscreen hold's Down uses — spoken over a show, this is a gesture made
+        fullscreen lock's Down uses — spoken over a show, this is a gesture made
         with no view of the Enhance panel, and an image already carrying an
         enhancement someone chose must not be re-derived at whatever the settings
         happen to say now. Re-enhancing stays a deliberate act made in front of
@@ -411,11 +411,11 @@ class EnhanceController:
         return row["prompt_id"], f"🎤 {doing}", NOTICE
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """Holding a slide asked for it to be enhanced. Returns whether a run
+        """Locking a slide asked for it to be enhanced. Returns whether a run
         started — the slideshow shows its corner note only if one did.
 
         The same ask as a spoken "enhance" over the same picture, so the same
-        decision makes it (:meth:`enhance_it`); a hold has no corner line to
+        decision makes it (:meth:`enhance_it`); a lock has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
         in the slideshow because it is this side that holds the levels — and a
         video has none to receive."""
@@ -524,9 +524,9 @@ class EnhanceController:
     def tell_the_shows(self) -> None:
         """Tell an open show how the enhancements in flight are going.
 
-        A show is where a batch of them gets asked for — every held slide is a
+        A show is where a batch of them gets asked for — every locked slide is a
         run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a hold hears only
+        turn has not come. The show cannot tell on its own: a lock hears only
         that a run started, not where in the line it landed. Told, its corner
         says whether the version is being made or waiting to be.
 

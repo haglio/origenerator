@@ -691,7 +691,7 @@ class VoiceRouter(QObject):
         """One step of a spoken request — from the mic's dictation, or from the
         hosting session's channel with the region it was said to.
 
-        While it is still being said the show holds and the corner says so;
+        While it is still being said the show pauses and the corner says so;
         finished, it queues a revision of the item it was opened over. The
         target is taken at the opening step and kept, because a request is about
         the picture that prompted it, not whatever is up when the words run out.
@@ -707,11 +707,11 @@ class VoiceRouter(QObject):
             # "Request, no hat, over" is a whole one in a single breath.
             self._request_target = self._target_of(show)
         if spoken.listening:
-            self._hold_for_request(show, spoken)
+            self._pause_for_request(show, spoken)
             return
         target = self._request_target
         self._request_target = None
-        self._hold_for_request(show, spoken)
+        self._pause_for_request(show, spoken)
         if spoken.state != COMPLETED:  # given up on — the terminator never came
             self._answer_request(show, "🎤 request dropped — never heard “over”", spoken)
             return
@@ -724,13 +724,13 @@ class VoiceRouter(QObject):
             return show.voice_target()
         return self._host.selected_generation()
 
-    def _hold_for_request(self, show, spoken) -> None:
-        """Hold (or release) the show while the sentence is being said, and say
+    def _pause_for_request(self, show, spoken) -> None:
+        """Pause (or release) the show while the sentence is being said, and say
         so — in the show's own corner when one is up, since that is where the
         speaker is looking, and in this pane's voice caption otherwise."""
         note = f"🎤 Request: {spoken.text}…" if spoken.listening else ""
         if show is not None:
-            show.hold_for_request(spoken.listening, note)
+            show.pause_for_request(spoken.listening, note)
         elif spoken.listening:
             self._show(note or "🎤 Request…", transient=False)
 

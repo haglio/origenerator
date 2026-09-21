@@ -7,7 +7,7 @@ takes OFF it are written once, here, rather than once per surface.
 
 Nothing is drawn here. :class:`player_core.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
-the pace an unheld slide moves on at, the motion's dials sampled forward, the
+the pace an unlocked slide moves on at, the motion's dials sampled forward, the
 funscript's line where a script has the device, and which of the four control
 states the app's one OSR2 switch is in.
 """
@@ -122,7 +122,7 @@ def console_hud(motion, host, *, device_on: bool = True,
     ``mode`` is genau because that is what this is: a self-generated motion over
     what is on screen, with no Nau playlist under it. The empty
     :class:`ModeHud` is what leaves the status line saying only whether the
-    slide is held — there is no compilation, no browse order and no length
+    slide is locked — there is no compilation, no browse order and no length
     filter here to report.
 
     ``script`` is the funscript driver, when this app has one: while it has the
@@ -171,7 +171,7 @@ class ShowDevice:
     whole console for the surface that has no show under it at all.
     """
 
-    # The pace an unheld slide moves on at -- about the SET, so it rides with
+    # The pace an unlocked slide moves on at -- about the SET, so it rides with
     # the rows that step it rather than with the device.
     rows: tuple
     # And the rows that aim the OSR2, which ride with the device.
@@ -263,7 +263,7 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
     elif action == "quarter_button":
         motion.quarter_offset()
     elif action == "main_lock":
-        host.show_toggle_hold()
+        host.show_toggle_lock()
     elif action == "genau_weird_clip":
         host.show_cull()
     elif action in ("genau_clip_seconds_up", "genau_clip_seconds_down"):

@@ -1087,7 +1087,7 @@ class GalleryView(QWidget):
         generation exactly as a browser thumbnail's do.
         Its ``displayed_changed`` re-aims the global OSR2 drive at the front video
         and re-reads whether the tab still owns a run in flight, a double-click on
-        its preview opens the folder under it as a held slideshow,
+        its preview opens the folder under it as a slideshow standing on it,
         and its Cancel stops the re-roll running in the tab's folder. Called for the
         initial tab and every tab forked afterward."""
         panel.source_activated.connect(self.follow_link)
@@ -1715,7 +1715,7 @@ class GalleryView(QWidget):
             self._update_queue(self._inflight_items(rows=rows, requests=requests))
             # And a show's corner, for the same reason and one more: a run
             # starting is not a change to any row, so nothing else here would
-            # tell the show its held slide went from waiting to being made.
+            # tell the show its locked slide went from waiting to being made.
             self._enhance.tell_the_shows()
             self._refresh_wait_note()
         finally:
@@ -3278,7 +3278,7 @@ class GalleryView(QWidget):
         self._enhance.enhance_items(prompt_ids)
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """A held slide asked to be enhanced; whether a run started."""
+        """A locked slide asked to be enhanced; whether a run started."""
         return self._enhance.enhance_from_slideshow(prompt_id)
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:

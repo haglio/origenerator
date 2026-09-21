@@ -276,7 +276,7 @@ def test_the_transport_and_the_pace_reach_the_slideshow(qtbot):
     for action in ("genau_next_clip", "genau_prev_clip", "main_lock",
                    "genau_weird_clip", "genau_clip_seconds_up"):
         _press(panel, action)
-    assert host.calls == [("step", 1), ("step", -1), "hold", "cull", ("dwell", 5)]
+    assert host.calls == [("step", 1), ("step", -1), "lock", "cull", ("dwell", 5)]
 
 
 def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):

@@ -74,8 +74,8 @@ class FakeHost:
     def show_step(self, delta):
         self.calls.append(("step", delta))
 
-    def show_toggle_hold(self):
-        self.calls.append("hold")
+    def show_toggle_lock(self):
+        self.calls.append("lock")
 
     def show_cull(self):
         self.calls.append("cull")

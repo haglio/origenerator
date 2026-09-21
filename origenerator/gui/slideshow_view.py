@@ -575,8 +575,19 @@ class SlideshowView(QWidget):
         self._playlist.remove_current()
         if self._playlist.is_empty():
             self.close()
-        else:
-            self._show_current()
+            return
+        if self._set.end_a_loop_of_one():
+            self._lock_what_the_cull_left()
+        self._show_current()
+
+    def _lock_what_the_cull_left(self) -> None:
+        """A row worn down to one picture plays that picture over and over,
+        which is the lock — so the cull that wore it down ends the loop and
+        locks what is left, as a satellite's does.  The lock is flipped on
+        rather than asked for, because the cull released it three lines up, and
+        no better version is asked for: nobody pressed for one."""
+        self._flip_lock()
+        self._flash_note("Locked")
 
     def _step(self, delta: int):
         """Manual stepping — an arrow, or the console's transport: moving off a
@@ -760,7 +771,7 @@ class SlideshowView(QWidget):
         means "this one" rather than nothing; and a lock is not a loop, so a
         loop that was running is dropped."""
         self._set.end_loop()
-        self.set_held(True)
+        self.set_locked(True)
         self._flash_note("Locked")
 
     def show_loop_cycle(self) -> None:

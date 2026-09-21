@@ -351,12 +351,13 @@ class ShowSet:
         around = self.neighbors(current.prompt_id)
         return [current, *(around.seeds if axis == SEED_AXIS else around.group)]
 
-    def end_a_loop_of_one(self) -> None:
+    def end_a_loop_of_one(self) -> bool:
         """End a loop left holding only the slide on screen: round a pass that
         size is that same slide again, which is the lock rather than a loop,
-        and the forward step is what leaves a lock."""
-        if self.loop is not None and len(self.playlist) < 2:
-            self.end_loop()
+        and the forward step is what leaves a lock.  ``True`` when one ended."""
+        if self.loop is None or len(self.playlist) > 1:
+            return False
+        return self.end_loop()
 
     def step(self, delta: int) -> None:
         """Walk the pass one either way — the browse, or the loop's own row —

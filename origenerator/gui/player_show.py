@@ -351,10 +351,21 @@ class PlayerShow(QObject):
             # A show culled empty is over, and the side goes back to its base
             # state — which hands the player another list to move on to.
             self.close()
+        elif self._set.end_a_loop_of_one():
+            self._lock_what_the_cull_left()  # its pass change hands the set over
         else:
             self._hand_over()
         if item.prompt_id is not None and self._actions.delete is not None:
             self._condemn(item.prompt_id)
+
+    def _lock_what_the_cull_left(self) -> None:
+        """A row worn down to one picture plays that picture over and over,
+        which is the lock — so the cull that wore it down ends the loop and
+        tells the player to lock what is left.  No better version is asked
+        for: nobody pressed for one."""
+        self._lock(True)
+        self.favorite()
+        self._note("Locked")
 
     def _condemn(self, prompt_id: str) -> None:
         """Delete the generation, saying so where it could not be.
@@ -464,7 +475,7 @@ class PlayerShow(QObject):
         itself, so the press means "this one" rather than nothing; and a lock is
         not a loop, so a loop that was running is dropped."""
         self._set.end_loop()
-        self.set_held(True)
+        self.set_locked(True)
         self._note("Locked")
 
     def show_loop_cycle(self) -> None:

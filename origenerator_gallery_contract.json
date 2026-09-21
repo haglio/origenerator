@@ -1,0 +1,39 @@
+{
+  "database_path": "state/origenerator.db",
+  "table": "generations",
+  "columns": [
+    "prompt_id",
+    "workflow_name",
+    "workflow_version",
+    "positive_prompt",
+    "negative_prompt",
+    "seed",
+    "params_json",
+    "output_files",
+    "created_at"
+  ],
+  "optional_columns": [
+    "provenance",
+    "evolver_exported_at",
+    "evolver_unsent_at",
+    "genau_exported_at",
+    "genau_unsent_at"
+  ],
+  "params_model_keys": [
+    "unet_high",
+    "unet",
+    "checkpoint",
+    "unet_low"
+  ],
+  "params_input_image_key": "input_image",
+  "lanes": {
+    "evolver": {
+      "sent": "evolver_exported_at",
+      "unsent": "evolver_unsent_at"
+    },
+    "genau": {
+      "sent": "genau_exported_at",
+      "unsent": "genau_unsent_at"
+    }
+  }
+}

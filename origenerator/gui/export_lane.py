@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QPushButton
 
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
+from origenerator.gallery_contract import LANES
 
 
 @dataclass(frozen=True)
@@ -29,10 +30,11 @@ class ExportLane:
 
     ``source`` is the sub-folder Evolver reads the destination from, so it is a
     name agreed with another repo and must stay spelled exactly as
-    :mod:`origenerator.config` has it. ``flag`` is the persisted column and
-    ``mark`` stamps it — two halves of one fact, spelled apart, which is why a
-    test pins that every lane's pair agrees. ``unsent_flag`` and ``unmark`` are
-    the same pair for taking the send back. Each names the database method
+    :mod:`origenerator.config` has it. ``source_key`` is this lane's name in
+    :data:`origenerator.gallery_contract.LANES`, which holds the two persisted
+    columns — the send and its withdrawal — because the reader on the other
+    side selects them by name and they are the promise this repo publishes.
+    ``mark`` stamps the first and ``unmark`` the second. Each names the database method
     outright rather than by a string the panel would have to look up: reached by
     name, a stamp nothing else calls reads as dead code and is deleted by the
     next person to run the scan. ``noun`` is what the failure dialog calls the
@@ -41,10 +43,9 @@ class ExportLane:
     """
 
     name: str
+    source_key: str
     source: str
-    flag: str
     mark: Callable[[Database, str], None]
-    unsent_flag: str
     unmark: Callable[[Database, str], None]
     noun: str
     tooltip: str
@@ -54,6 +55,16 @@ class ExportLane:
     # (see :meth:`GenerateConfigPanel._build_ui`). ``None`` on the table's own
     # rows, which describe the lanes rather than any one panel's buttons.
     button: QPushButton | None = None
+
+    @property
+    def flag(self) -> str:
+        """The column a send is stamped on, from the promise this repo publishes."""
+        return LANES[self.source_key]["sent"]
+
+    @property
+    def unsent_flag(self) -> str:
+        """The column a withdrawal is stamped on, from that same promise."""
+        return LANES[self.source_key]["unsent"]
 
     @property
     def send_caption(self) -> str:
@@ -77,9 +88,8 @@ class ExportLane:
         return f"Could not send this {self.noun} to {self.name}:\n\n{error}"
 
 EVOLVER = ExportLane(
-    name="Evolver", source=EVOLVER_SOURCE, flag="evolver_exported_at",
+    name="Evolver", source_key="evolver", source=EVOLVER_SOURCE,
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
-    unsent_flag="evolver_unsent_at",
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
     noun="video",
     tooltip="Copy this video into Evolver's inbox for sorting and upscaling.",
@@ -90,9 +100,8 @@ EVOLVER = ExportLane(
 )
 
 GENAU = ExportLane(
-    name="Genau", source=GENAU_SOURCE, flag="genau_exported_at",
+    name="Genau", source_key="genau", source=GENAU_SOURCE,
     mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
-    unsent_flag="genau_unsent_at",
     unmark=lambda db, prompt_id: db.mark_genau_unsent(prompt_id),
     noun="clip",
     tooltip="Send this clip down the Genau lane: Evolver upscales it on its "

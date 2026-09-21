@@ -4270,7 +4270,7 @@ class GalleryView(QWidget):
             return
         key = self._editing_key
         self._editing_key = None
-        name = item.text(0)  # no ★ prefix to strip — the star is a row icon now
+        name = item.text(0)
         self._actions.rename_folder(key, name.strip() or None)
         self._re_aim()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.

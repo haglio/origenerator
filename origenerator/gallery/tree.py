@@ -671,7 +671,7 @@ def build_gallery_tree(
     :func:`placeable_rows`. Folders are placed by the oldest of their rows,
     newest-made first (the caller orders rows newest-first); neither a new
     generation in a folder nor a star moves it — bookmarks are gathered by
-    :func:`starred_folders` instead. ``folder_meta``
+    :func:`favorite_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 

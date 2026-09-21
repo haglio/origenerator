@@ -262,8 +262,6 @@ class GalleryTree:
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, orientation) -> QTreeWidgetItem:
-        # Favorites state shows as the row's star icon (the delegate reads it from
-        # the group), so the label itself carries no ★ prefix.
         item = QTreeWidgetItem([group.label])
         if gallery.is_renamable(group):
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename

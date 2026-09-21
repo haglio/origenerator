@@ -18,7 +18,7 @@ class FolderMetaStore(Store):
     """The six queries over the `folder_meta` table."""
 
     def folder_meta_map(self) -> dict[str, dict]:
-        """Return ``{folder_key: {"custom_name": str|None, "favorited": bool}}``."""
+        """Return ``{folder_key: {"custom_name": str|None, "starred": bool}}``."""
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT folder_key, custom_name, starred FROM folder_meta"

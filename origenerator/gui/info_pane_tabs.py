@@ -14,9 +14,10 @@ what "close all" means where one tab is always open.
 
 Tabs open the way an IDE opens files, so browsing doesn't pile up a row of them. A single-clicked generation lands in the *preview* tab, drawn in italic:
 the next single click replaces it. A click on a folder's live tile lands the
-same way — the run's own settings on the form, its frames in the preview — unless
-a tab is already that run's, having launched it or been pointed at its folder,
-in which case that tab comes forward instead.
+same way — the run's own settings on the form, its frames in the preview — as
+does the press of the "+" beside it that starts one, unless a tab is already
+that run's, having launched it or been pointed at its folder, in which case that
+tab comes forward instead.
 
 What a tab's preview shows is only ever the tab's own: the generation it was
 opened on, the run it launched or was pointed at (which it follows by folder
@@ -447,6 +448,17 @@ class InfoPaneTabs(QTabWidget):
         """
         self._pin_panel(self.currentWidget())
 
+    def pin_tab(self, panel):
+        """Keep ``panel``, a run of the gallery's own being in flight in it.
+
+        The tile's "+" is pressed outside every tab, so the run it starts is
+        given to the tab standing on that folder or to one opened on it
+        (``GalleryView._claim_launch``, ``GalleryView._select_reroll``). Either
+        way that tab holds the run's Cancel and its filling bar from then on,
+        which a later click replacing the tab would take away mid-run.
+        """
+        self._pin_panel(panel)
+
     def _on_panel_generate(self, panel, workflow_name: str, params: dict):
         """Relay a tab's Generate for the gallery to launch as a re-roll — and
         keep that tab.
@@ -554,15 +566,16 @@ class InfoPaneTabs(QTabWidget):
         A run's result belongs to the tab that asked for it: that tab ends showing
         the finished image/video rather than the live-frame placeholder. Every
         other tab is left alone — including the pane's resting tab, which the
-        gallery's own launches (the folder tile's "+", the auto-generate loop)
-        used to fill with a picture nothing in it had asked for. That left the
-        resting tab no longer blank, so the next clicked generation opened a tab
-        beside it instead of loading into it, and a loop running while the user
-        browsed grew a row of them.
+        auto-generate loop used to fill with a picture nothing in it had asked
+        for. That left the resting tab no longer blank, so the next clicked
+        generation opened a tab beside it instead of loading into it, and a loop
+        running while the user browsed grew a row of them.
 
         A tab claims a gallery-side launch only while it is showing that very
         folder (see ``GalleryView._claim_launch``), so what a loop lands in is a
-        tab already following it, never one parked elsewhere.
+        tab already following it, never one parked elsewhere. The tile's "+" is
+        the one gallery-side launch that opens a tab of its own, somebody having
+        pressed it.
 
         Read *before* the finish is reconciled — a tab lets go of its runs as they
         end (see ``GalleryView._reconcile_generating``).

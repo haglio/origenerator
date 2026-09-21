@@ -1492,7 +1492,7 @@ class GalleryView(QWidget):
             return
         if self._panel_reroll_key(panel) == key:
             panel.note_launched(job.origin)
-            self._info_tabs.pin_current_tab()
+            self._info_tabs.pin_tab(panel)
             self._reconcile_generating()  # the launch's own reconcile ran before this
 
     def _cancel_panel_reroll(self, panel):
@@ -2742,10 +2742,10 @@ class GalleryView(QWidget):
         folder (:meth:`_claim_launch`) — otherwise it would run with no tab
         showing its progress or offering to discard it.
 
-        ``from_auto`` is the loop's launch (:meth:`_start_auto_reroll`), which takes
-        the info pane only where the user already had it on this folder's loop —
-        watching one variation is watching the next. Otherwise the pane keeps
-        whatever the user put there.
+        ``from_auto`` is the loop's launch (:meth:`_start_auto_reroll`), and the one
+        that goes up in no tab of its own: it takes the info pane only where the
+        user already had it on this folder's loop — watching one variation is
+        watching the next — and otherwise leaves there whatever they put there.
 
         Skips a folder already re-rolling (or a missing client) without stealing
         the info pane — the same guard the controller enforces before launching.
@@ -2773,9 +2773,10 @@ class GalleryView(QWidget):
         self._claim_launch(key)  # the tab on this folder shows it, and can discard it
         if not from_auto:
             # A no-op if the launch above failed to register. The tile is lit and
-            # the tab on this folder, if any, follows the run; no other tab is
-            # made to — the press asked for a picture, not to be shown one.
-            self._select_reroll(key, land=False)
+            # the run goes up in a tab — the tab on this folder where there is
+            # one, else one opened on the run, the way a click on a running tile
+            # lands it.
+            self._select_reroll(key)
         else:
             self._note_auto_launch(key)  # its result is the loop's, not a tab's
             if self._selected_reroll_key == key:
@@ -3359,26 +3360,28 @@ class GalleryView(QWidget):
                 or self._stand_on_the_run_in(key, rebuild=True)):
             logger.info("Nothing to reveal for %s: no folder row", key)
 
-    def _select_reroll(self, key: str, *, land: bool = True):
+    def _select_reroll(self, key: str):
         """Make a running re-roll's tile the selected item, and show the run
         full size in the tab it belongs to.
 
         That tab is never simply the one in front: it is a tab already following
         this folder, else the tab that launched the run — a Generate, or a claim
-        on the folder's own launch (:meth:`_claim_launch`). With ``land``, a run
-        no tab is for is landed the way a clicked thumbnail is: in the front tab
-        when its settings are this very folder, else in the pane's preview tab,
-        seeded from the run's own settings
+        on the folder's own launch (:meth:`_claim_launch`). A run no tab is for
+        is landed the way a clicked thumbnail is: in the front tab when its
+        settings are this very folder, else in the pane's preview tab, seeded
+        from the run's own settings
         (:meth:`GenerateConfigPanel.show_running_generation`) so the tab is *for*
         this run — its form is the run's recipe, its bar fills with the run's
         progress, its button discards it, and its preview follows the run's
         frames to the picture they land as
         (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
         tile or on the shelf's card asks for, and the tab comes to the front as a
-        clicked thumbnail's does. The folder tile's "+" passes ``land=False``: a
-        press there is a request to make something, not to be shown it, so a
-        tab parked on other settings is left exactly as it was and the run shows
-        on its tile until the tile is clicked.
+        clicked thumbnail's does.
+
+        The folder tile's "+" lands its run the same way: that press is a press
+        for a picture, and its tile is a thumbnail's worth of one. The tab it
+        lands in is the pane's resting or preview tab, else a new one, so no tab
+        anybody is working in is taken.
         """
         job = self._live_jobs.get(key)
         if job is None:
@@ -3387,8 +3390,6 @@ class GalleryView(QWidget):
         tabs = self._info_tabs
         panel = tabs.panel_watching(key) or tabs.panel_that_launched(job.origin)
         if panel is None:
-            if not land:
-                return
             front = tabs.current_config_panel()
             if (front is not None and front.workflow_and_signature() is not None
                     and self._panel_reroll_key(front) == key):
@@ -3400,6 +3401,7 @@ class GalleryView(QWidget):
                     panel.show_running_generation(row)
             if job.origin not in panel.launched_runs():
                 panel.note_launched(job.origin)  # its Cancel and progress are this run's now
+            tabs.pin_tab(panel)  # ...so a later click opens beside it, not over it
             self._reconcile_generating()
         panel.watch_folder(key, job.last_preview, self._wait_note(key),
                            self._job_made_from(job, self.animated_preview))

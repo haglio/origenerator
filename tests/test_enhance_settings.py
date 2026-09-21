@@ -358,14 +358,14 @@ def test_removing_an_enhancement_leaves_the_others(tmp_path):
     updates = remove_enhance_levels(row, ["image_enhance_00002_.png"])
     after = dict(row, **updates)
     assert [lvl.label for lvl in enhance_levels(after)] == ["Enhance 1", "Original"]
-    # The surviving level keeps its own settings and its own run id — the id
-    # rides with the level it belongs to, so binning the newer enhancement takes
-    # the place on the Recents shelf it had lifted the image to along with it.
+    # The surviving level keeps its own settings, its own run id and its own
+    # finish — they ride with the level they belong to, so binning the newer
+    # enhancement takes the place on the Recents shelf it had lifted the image
+    # to along with it.
     older = json.loads(row["enhance_history"])[1]
-    assert json.loads(after["enhance_history"]) == [
-        {"filename": "image_enhance_00001_.png", "params": {"enhance_scale": 2.0},
-         "run_id": older["run_id"]}
-    ]
+    assert older["filename"] == "image_enhance_00001_.png"
+    assert older["params"] == {"enhance_scale": 2.0}
+    assert json.loads(after["enhance_history"]) == [older]
 
 
 def test_removing_the_last_enhancement_leaves_a_plain_image(tmp_path):

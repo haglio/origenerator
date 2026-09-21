@@ -119,6 +119,18 @@ def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     assert gallery.recent_generations(db.list_generations())[0]["prompt_id"] == "src"
 
 
+def test_fold_records_when_the_run_finished_since_the_row_that_said_so_is_deleted(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png")
+    db.update_generation("e1", completed_at="2026-09-12T19:40:00+00:00")
+
+    fold_enhancement(db, db.get_generation("e1"))
+
+    (level,) = json.loads(db.get_generation("src")["enhance_history"])
+    assert level["finished_at"] == "2026-09-12T19:40:00+00:00"
+
+
 def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
     # Two rows naming one file — ComfyUI's counter reused a number after a
     # delete, or a completion was recorded twice — and an enhance of the second.
@@ -180,7 +192,8 @@ def test_a_stamped_run_moves_its_own_image_up_the_shelf(tmp_path):
     rows = db.list_generations()
     run_id = next(r["id"] for r in rows if r["prompt_id"] == "e1")
 
-    assert gallery.enhancement_recency(rows) == {"second": run_id}
+    lifted = {image: run for image, (_finished, run) in gallery.enhancement_recency(rows).items()}
+    assert lifted == {"second": run_id}
 
 
 def test_a_run_id_this_table_never_issued_comes_off_the_level(tmp_path):

@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import json
 import logging
+from bisect import bisect_left
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from origenerator.gallery.enhance_graph import graph_level_params
@@ -41,6 +43,7 @@ from origenerator.gallery.enhance_settings import (
     describe_enhance_params,
     level_settings,
 )
+from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.output import (
     media_type_of_row,
     output_file_reference,
@@ -394,22 +397,22 @@ def enhance_targets_row(input_image: str | None, row: dict) -> bool:
     return name in {_frame_name(f.get("filename")) for f in row_output_files(row)}
 
 
-def enhancement_recency(rows) -> dict[str, int]:
-    """Each image's newest enhancement, as the id of the run that made it —
-    ``{prompt_id: id}``, for the images that have one.
+def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
+    """Each image's newest enhancement, as when it finished and the id of the
+    run that made it — ``{prompt_id: (finished, id)}`` — for the images that have one.
 
     An enhancement is not an item beside the image but something that happens to
     it, so the shelf that lists what you have lately made has to list the image
     itself, moved: it belongs where its enhancement falls in the library's order,
     not where its own generation does (:func:`~origenerator.gallery.tree.
-    recent_generations`). A run's id is that place, and it is available at both
-    ends of the run — in flight it is the transient enhance row still among
-    ``rows``, and once folded it is the id recorded on the level the run
-    left.
+    recent_generations`). When the run finished and the id it ran under are that
+    place, and both are available at both ends of the run — in flight on the
+    transient enhance row still among ``rows``, and once folded on the level the
+    run left.
 
-    An image enhanced before that id was recorded has none here and keeps its own
-    place, which is the right answer: an enhancement older than the record of it
-    is an enhancement from long ago.
+    An image enhanced before even the id was recorded has no place here and
+    keeps its own, which is the right answer: an enhancement older than the
+    record of it is an enhancement from long ago.
     """
     holders: dict[str, str] = {}
     for row in rows:
@@ -425,11 +428,19 @@ def enhancement_recency(rows) -> dict[str, int]:
             name = _frame_name(stored.get("filename"))
             if name:
                 holders.setdefault(name, row.get("prompt_id"))
-    recency: dict[str, int] = {}
+    recency: dict[str, tuple[datetime, int]] = {}
+    asked = sorted((row["id"], row["created_at"]) for row in rows
+                   if isinstance(row.get("id"), int) and row.get("created_at"))
+    asked_ids = [row_id for row_id, _stamp in asked]
 
-    def note(prompt_id, run_id):
-        if isinstance(run_id, int) and run_id > recency.get(prompt_id, 0):
-            recency[prompt_id] = run_id
+    def asked_around(run_id):
+        next_asked = min(bisect_left(asked_ids, run_id), len(asked) - 1)
+        return asked[next_asked][1] if asked else None
+
+    def note(prompt_id, finished, run_id):
+        if isinstance(run_id, int):
+            recency[prompt_id] = max(recency.get(prompt_id, (BEFORE_EVERY_RECORD, 0)),
+                                     (moment_of(finished or asked_around(run_id)), run_id))
 
     for row in rows:
         if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
@@ -438,10 +449,10 @@ def enhancement_recency(rows) -> dict[str, int]:
                 name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
                 target = holders.get(name) if name else None
             if target is not None and target != row.get("prompt_id"):
-                note(target, row.get("id"))
+                note(target, row.get("completed_at"), row.get("id"))
         for entry in parse_file_list(row.get("enhance_history")):
             if isinstance(entry, dict):
-                note(row.get("prompt_id"), entry.get("run_id"))
+                note(row.get("prompt_id"), entry.get("finished_at"), entry.get("run_id"))
     return recency
 
 

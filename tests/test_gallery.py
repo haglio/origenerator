@@ -1442,11 +1442,18 @@ def test_favorite_folders_is_empty_when_nothing_is_favorite():
     assert favorite_folders(tree) == []
 
 
-def test_recent_generations_keeps_the_callers_newest_first_order():
-    # Rows arrive newest-first (the DB lists by descending id); the shelf keeps
-    # that order and doesn't re-sort.
+def test_recent_generations_keeps_rows_that_do_not_say_when_they_landed_in_the_order_asked():
     rows = [_img("i3", "c", 50, 3), _img("i2", "b", 50, 2), _img("i1", "a", 50, 1)]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
+
+
+def test_recent_generations_lists_a_run_by_when_it_finished_not_when_it_was_asked_for():
+    slow = _img("asked_first", "a cat", 50, 1, id=1, created_at="2026-09-12 19:00:00",
+                completed_at="2026-09-12T19:30:00+00:00")
+    quick = _img("asked_second", "a dog", 50, 2, id=2, created_at="2026-09-12 19:10:00",
+                 completed_at="2026-09-12T19:10:09+00:00")
+    assert [r["prompt_id"] for r in recent_generations([quick, slow])] \
+        == ["asked_first", "asked_second"]
 
 
 def test_recent_generations_lists_imported_files_where_they_arrived():
@@ -1458,6 +1465,15 @@ def test_recent_generations_lists_imported_files_where_they_arrived():
     imported = _row(prompt_id="imp", source="imported", id=2,
                     output_files=json.dumps([{"filename": "imp.png"}]))
     assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["imp", "gen"]
+
+
+def test_recent_generations_lists_a_file_found_on_disk_by_when_it_was_found_however_old_the_file():
+    made = _img("gen", "a cat", 50, 1, id=1, created_at="2026-09-12 19:00:00",
+                completed_at="2026-09-12T19:00:09+00:00")
+    found = _row(prompt_id="imp", source="imported", id=2, created_at="2026-09-12 20:00:00",
+                 completed_at="2026-09-01T08:00:00+00:00",
+                 output_files=json.dumps([{"filename": "imp.png"}]))
+    assert [r["prompt_id"] for r in recent_generations([found, made])] == ["imp", "gen"]
 
 
 def test_recent_generations_leaves_experiments_to_their_own_shelf():
@@ -1568,6 +1584,38 @@ def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 4}])
     rows = _shelf(("i3", 3), ("i2", 2)) + [i1]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
+
+
+def _finished(row, asked, finished):
+    return {**row, "created_at": f"2026-09-12 {asked}", "completed_at": f"2026-09-12T{finished}+00:00"}
+
+
+def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_finished():
+    enhanced, slow, later = (_finished(row, asked, finished) for row, asked, finished in zip(
+        _shelf(("enhanced", 1), ("slow", 2), ("later", 4)),
+        ("19:00:00", "19:05:00", "19:50:00"), ("19:00:09", "19:30:00", "19:50:09")))
+    enhanced["enhance_history"] = json.dumps([{
+        "filename": "image_enhance_e1.png", "params": {}, "run_id": 3,
+        "finished_at": "2026-09-12T19:40:00+00:00"}])
+    assert [r["prompt_id"] for r in recent_generations([later, slow, enhanced])] \
+        == ["later", "enhanced", "slow"]
+
+
+def test_recent_generations_leads_with_an_image_being_enhanced_over_a_run_that_finished_before_it_was_asked():
+    old, slow = (_finished(row, asked, finished) for row, asked, finished in zip(
+        _shelf(("old", 1), ("slow", 2)), ("08:00:00", "19:05:00"), ("08:00:09", "19:30:00")))
+    running = {**_enhance_run("e1", "sdxl_t2i_old.png", 3), "created_at": "2026-09-12 19:45:00"}
+    assert [r["prompt_id"] for r in recent_generations([running, slow, old])] == ["old", "slow"]
+
+
+def test_recent_generations_seats_an_enhancement_folded_before_finishes_were_recorded_under_the_next_thing_asked_for():
+    old, before, after = (_finished(row, asked, finished) for row, asked, finished in zip(
+        _shelf(("old", 1), ("before", 2), ("after", 4)),
+        ("08:00:00", "19:05:00", "19:50:00"), ("08:00:09", "19:05:09", "19:50:09")))
+    old["enhance_history"] = json.dumps(
+        [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
+    assert [r["prompt_id"] for r in recent_generations([after, before, old])] \
+        == ["after", "old", "before"]
 
 
 def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():

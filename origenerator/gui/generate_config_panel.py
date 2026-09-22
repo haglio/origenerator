@@ -128,12 +128,12 @@ class GenerateConfigPanel(QWidget):
     preview is driven from outside: a browsed selection's output, a running
     re-roll's live frames, or this config's newest matching result when idle.
 
-    The info appears only while the tab is displaying a saved generation
-    (:meth:`show_saved_generation`): a File/Created block above the form, and at the
-    foot of the scroll the videos an image was animated into, or a clickable
+    The info appears only while the tab is displaying a saved generation — one
+    clicked (:meth:`show_saved_generation`) or the newest result it put up for
+    its own settings: a File/Created block above the form, and at the foot of
+    the scroll the videos an image was animated into, or a clickable
     source-image tile for a video. Send-to-Evolver and Send-to-Genau (a video), and
-    the Drive-OSR2 toggle key off the displayed row. A blank
-    tab, or one showing a bare autoshow, hides them all.
+    the Drive-OSR2 toggle key off the displayed row. A blank tab hides them all.
 
     What acts on the generation itself does not live in the button bank at all:
     the preview wears the same star / trash / plus corners a gallery thumbnail of
@@ -241,6 +241,7 @@ class GenerateConfigPanel(QWidget):
         # than a flag because the loads nest (restore_config prefills, prefill
         # re-picks the workflow, which re-seeds the carried-over fields).
         self._loading_config = 0
+        self._autoshow_held = False   # see _point_elsewhere
         # One for the generation on display, drawn on each of its file rows:
         # every version of it lives in the same folder.
         self._go_to_folder = QAction("Go to folder", self)
@@ -912,18 +913,24 @@ class GenerateConfigPanel(QWidget):
         scripted video arms the OSR2 drive exactly like a browsed selection — the
         drive follows whatever video is actually on screen, however it got there.
 
-        The footer stays hidden: an autoshow is a peek, not an explicit selection,
-        so it shows the preview alone and never a prior selection's metadata."""
-        self._hide_footer()
+        Its footer comes up with it, as a clicked one's does: it is a real
+        generation, and its file has to be reachable from it — copied, shown in
+        Explorer, gone to in the gallery. With nothing to show, the last
+        selection's footer is taken down rather than left naming a file that is
+        no longer on screen."""
+        if self._autoshow_held:
+            return
         row = self._recent_matching_row()
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
         if preview is not None:
             self._preview.show_media(*preview)
             self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
             self._displayed_row = row
+            self._show_footer(row, self._image_rows(), preview)
         else:
             self._preview.clear()  # nothing generated with these settings yet
             self._displayed_row = None
+            self._hide_footer()
         self._arm_preview_actions()
         self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows
@@ -1091,16 +1098,14 @@ class GenerateConfigPanel(QWidget):
         and, when ``request`` says a spoken request made it, a link back to the
         item it was asked about.
 
-        The form is seeded first so its recent-preview autoshow doesn't override
-        the selection's own output. A workflow the app can't rebuild leaves the
-        form as it was but still shows the preview and info. Whatever the tab
-        was about before — a run it launched or followed, a combination Combine
-        opened here — it lets go of (:meth:`_point_elsewhere`).
+        The form is seeded first, with the newest-result autoshow held back
+        while it is, so nothing but the selection is ever put up. A workflow the
+        app can't rebuild leaves the form as it was but still shows the preview
+        and info. Whatever the tab was about before — a run it launched or
+        followed, a combination Combine opened here — it lets go of
+        (:meth:`_point_elsewhere`).
         """
         self._point_elsewhere(row)
-        # Prefill's autoshow just set _displayed_row to this tab's recent result; the
-        # browsed selection is what's actually on display, so _display_result (below)
-        # overrides it.
         self._display_result(row, image_rows, request)
 
     def show_running_generation(self, row: dict):
@@ -1115,6 +1120,7 @@ class GenerateConfigPanel(QWidget):
         """
         self._point_elsewhere(row)
         self._hide_footer()
+        self._preview.clear()          # whatever was up is not this run's
         self._displayed_row = None     # a running generation isn't a saved one
         self._displayed_config = None  # ...so no settings for a notice to deviate from
         self._emit_title()
@@ -1129,6 +1135,12 @@ class GenerateConfigPanel(QWidget):
         picture just put here. The same goes for a combination Combine opened
         here — the tab is about this row now, and a launch from it is not the
         combination's.
+
+        Both callers put up a picture of their own straight after, so the newest
+        result the seeded settings would show is held back: loading it — its
+        picture, and its versions' pictures under the settings — only for the
+        caller to replace it at once made every click wait on a picture nobody
+        saw.
         """
         self.forget_launched()
         self._forget_watch()
@@ -1136,7 +1148,11 @@ class GenerateConfigPanel(QWidget):
         self._end_folder_request()  # a workflow this app can't rebuild never reaches prefill
         workflow_name = row.get("workflow_name", "")
         if workflow_name in WORKFLOW_REGISTRY:
-            self.prefill(workflow_name, merge_denormalized(row))
+            self._autoshow_held = True
+            try:
+                self.prefill(workflow_name, merge_denormalized(row))
+            finally:
+                self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         """Show a generation this tab's own Generate just produced: swap the live
@@ -1298,7 +1314,7 @@ class GenerateConfigPanel(QWidget):
         self._displayed_row = row
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
-            self._preview.show_media(*preview)  # after any prefill, so it wins over autoshow
+            self._preview.show_media(*preview)
             self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
         else:
             self._preview.clear()
@@ -1327,9 +1343,8 @@ class GenerateConfigPanel(QWidget):
         everything they report moves under the picture too: the bookmark when the
         menu toggles one, what the plus offers whenever a setting moves on the
         Enhance panel. An autoshow arms them as readily as an explicit selection:
-        the footer stays hidden there because an autoshow is a peek rather than a
-        choice, but the picture is a real generation and favoriting it means exactly
-        what favoriting it anywhere means.
+        the picture is a real generation and favoriting it means exactly what
+        favoriting it anywhere means.
 
         ``prompt_id`` names the generation when it is NOT the row this tab holds —
         the picture a followed run landed as (:meth:`show_finished_media`) goes
@@ -1393,8 +1408,8 @@ class GenerateConfigPanel(QWidget):
 
     def _hide_footer(self):
         """Hide every info/action element that belongs only to a saved generation —
-        the state of a blank tab, or one whose preview is a bare autoshow rather than
-        an explicit selection."""
+        the state of a tab with none on display: blank, following a run still
+        being made, or holding a whole folder's rewrite."""
         self._metadata_block.hide()
         self._related.clear()
         self._versions.hide()

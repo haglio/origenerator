@@ -1251,9 +1251,11 @@ def test_showing_a_generation_reveals_its_file_and_created(saved_panel):
     assert "generated" not in texts
 
 
-def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monkeypatch):
-    # An idle autoshow is a peek, not an explicit selection: it must not leave a
-    # prior selection's metadata (a different file's name) stranded on screen.
+def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
+        saved_panel, monkeypatch):
+    # Settings that have generated nothing put up no picture, and the footer of
+    # whatever was on display before it must not be left stranded there — it
+    # names a file that is no longer on screen.
     panel, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     panel.show_saved_generation(image, [image])
@@ -1266,6 +1268,42 @@ def test_autoshowing_a_recent_result_hides_the_metadata_footer(saved_panel, monk
     assert panel._versions.isHidden()
     assert panel._related._source_tile.isHidden()
     assert _lane_button(panel).isHidden()
+
+
+def _wizard_panel(qtbot, tmp_path, monkeypatch):
+    """A tab over one finished picture, filed in the folder ``_wiz_params`` names
+    — its workflow version and all — with its file on disk, so the tab can put
+    it up."""
+    output = tmp_path / "out"
+    (output / "image").mkdir(parents=True)
+    (output / "image" / "sdxl_g1.png").write_bytes(b"png")
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="g1", workflow_name="sdxl_t2i",
+                         workflow_version=_SDXL_VERSION, positive_prompt="a wizard",
+                         params_json=json.dumps(_wiz_params()), workflow_json="{}")
+    db.update_generation("g1", status="completed", output_files=json.dumps(
+        [{"filename": "sdxl_g1.png", "subfolder": "image"}]))
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    panel._preview.show_media = MagicMock()
+    return panel, db
+
+
+def test_a_picture_the_tab_puts_up_itself_carries_its_own_file_row(
+        qtbot, tmp_path, monkeypatch):
+    # The newest result of these settings is a real generation, not a peek: you
+    # reach its file from it exactly as from one you clicked — which is what
+    # opening a configuration by name puts on screen.
+    panel, _db = _wizard_panel(qtbot, tmp_path, monkeypatch)
+
+    panel.prefill("sdxl_t2i", _wiz_params())
+
+    assert panel.displayed_row()["prompt_id"] == "g1"
+    (row,) = _level_rows(panel)
+    assert "image/sdxl_g1.png" in _row_texts(row)
+    names = [b.objectName() for b in row.findChildren(QPushButton)]
+    assert names == ["copyButton", "revealButton", "goToFolderButton"]
 
 
 def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):
@@ -1509,6 +1547,19 @@ def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_pa
     panel.show_saved_generation(video, [])
 
     assert panel._preview.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video")
+
+
+def test_a_click_puts_up_only_the_picture_it_was_on(qtbot, tmp_path, monkeypatch):
+    # Seeding the form from the clicked item used to put up the newest result of
+    # its settings on the way — its picture, and its versions' pictures under the
+    # settings — for the click to replace all of it at once. Nobody saw that one;
+    # every click waited for it.
+    panel, db = _wizard_panel(qtbot, tmp_path, monkeypatch)
+    row = db.get_generation("g1")
+
+    panel.show_saved_generation(row, [row])
+
+    assert panel._preview.show_media.call_count == 1
 
 
 def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):

@@ -18,8 +18,10 @@ it a reader.
 """
 from __future__ import annotations
 
+import io
 import subprocess
 import sys
+import tokenize
 from pathlib import Path
 
 from app_support.dead_code import assert_no_dead_code, assert_whitelist_is_live
@@ -64,3 +66,81 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+# Prose the code has to be kept in step with by hand, and is not kept in step
+# with by hand. This repo measured 0.6331 lines of it per line of code on
+# 2026-09-21 -- against fun_time's 0.3107, which is the same family working the
+# same findings -- and backlog item 70 is the file-by-file work of bringing it
+# down. The ceiling exists so each step is kept: it only ever comes down, and a
+# step that only deletes is refused, because prose you do not write is coverage
+# you owe.
+#
+# 19327 on 2026-09-21, measured on the merged tree, when the ceiling went in with
+# the two longest module preambles already under it: the fullscreen player's 90
+# lines and the info pane's 71 are 30 and 31, which is what took the tree from
+# 19416 to here. What they keep is what a test cannot say -- where the creep into
+# a picture lives, why a run joins a show on its first frame and not before, why
+# a show wears one panel where Fun Time wears two, why the tab row carries no
+# "+" of its own, and that an edit is what a person did rather than what a load
+# did. Every rule cut was already a test named for the claim (161 of them across
+# the two files); each preamble now says so and names the file.
+MAX_PROSE_LINES = 19327
+
+
+def _prose_and_code(path: Path) -> tuple[int, int]:
+    """(prose lines, code lines) in one module.
+
+    A line is prose when its only content is a comment or a docstring, so a
+    trailing `# why` on a real statement costs nothing -- the ratio is about
+    paragraphs, not annotations. The same measure fun_time's own ceiling uses,
+    so the two repos' numbers can be read against each other; publishing it
+    once for the family is item 70's own follow-up.
+    """
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines()
+    kind = ["blank" if not line.strip() else "code" for line in lines]
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, IndentationError):  # pragma: no cover - syntax is CI's job
+        return 0, 0
+
+    def mark(token, *, only_if_alone: bool):
+        for n in range(token.start[0] - 1, token.end[0]):
+            if kind[n] != "code":
+                continue
+            if only_if_alone and lines[n].split("#")[0].strip():
+                continue  # a trailing `# why` on a statement is not prose
+            kind[n] = "prose"
+
+    opens_a_statement = tokenize.INDENT
+    for token in tokens:
+        if token.type == tokenize.COMMENT:
+            mark(token, only_if_alone=True)
+        elif token.type == tokenize.STRING and opens_a_statement in (
+            tokenize.INDENT, tokenize.DEDENT, tokenize.NEWLINE, tokenize.NL,
+        ):
+            mark(token, only_if_alone=False)
+        if token.type not in (tokenize.COMMENT, tokenize.NL):
+            opens_a_statement = token.type
+    return kind.count("prose"), kind.count("code")
+
+
+def test_prose_does_not_outgrow_the_code_it_explains():
+    """A ceiling that can only come down.
+
+    Design that lives in prose has to be kept in step by hand, and is not kept
+    in step by hand. Where a paragraph states a rule, the way to spend it is a
+    name or a test, not another paragraph -- and this fails until one of those
+    is what carries it.
+    """
+    prose = code = 0
+    for target in SCANNED:
+        for path in sorted(target.rglob("*.py")):
+            module_prose, module_code = _prose_and_code(path)
+            prose += module_prose
+            code += module_code
+
+    assert prose <= MAX_PROSE_LINES, (
+        f"{prose} prose lines (ceiling {MAX_PROSE_LINES}), against {code} of code "
+        f"-- {prose / code:.4f} per line. Delete a stale block, or move what it "
+        "says into a name or a test; lower MAX_PROSE_LINES when you do."
+    )

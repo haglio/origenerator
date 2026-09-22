@@ -3,8 +3,8 @@
 Two links, stacked under a config tab's settings form: the item this row was
 built from, and the videos an image was animated into. They are mutually
 exclusive in practice — a video has a start frame and no animations, an image is
-the other way round — and both are hidden whenever the tab is blank or showing a
-bare autoshow rather than a generation someone chose.
+the other way round — and both are hidden whenever the tab has no generation on
+display.
 
 "Built from" is one slot answering three relations, because they are one
 question: a video's start frame, the item a spoken request revised, and — for the
@@ -84,8 +84,7 @@ class RelatedMedia(QWidget):
         self._animated_strip.show_videos(self._animated_items(row))
 
     def clear(self) -> None:
-        """Put both links down — a blank tab, or one showing a bare autoshow
-        rather than a generation someone chose."""
+        """Put both links down — the tab has no generation on display."""
         self._source_tile.clear()
         self._animated_strip.hide()
 

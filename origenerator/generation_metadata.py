@@ -47,6 +47,12 @@ class MetaItem:
     reveal: str | None = None
 
 
+# What the block above the form is called. Named here beside the section it
+# titles, because the block draws that heading for a row whose facts come to
+# nothing — the way to the folder still hangs under it.
+BASIC_TITLE = "Basic"
+
+
 @dataclass
 class MetaSection:
     title: str
@@ -138,7 +144,7 @@ def basic_section(row: dict, upscale: Path | None = None) -> MetaSection | None:
         items.append(MetaItem("Created", str(row.get("created_at", ""))))
     if row.get("provenance"):
         items.append(_version_line(json.loads(row["provenance"])))
-    return MetaSection("Basic", items) if items else None
+    return MetaSection(BASIC_TITLE, items) if items else None
 
 
 def _version_line(block: dict) -> MetaItem:

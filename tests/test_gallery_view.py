@@ -2551,9 +2551,9 @@ def _folder_buttons(view):
             if button.isVisibleTo(panel)]
 
 
-def test_the_file_rows_go_to_folder_takes_a_shelf_item_home_without_a_right_click(qtbot):
+def test_the_go_to_folder_button_takes_a_shelf_item_home_without_a_right_click(qtbot):
     # Pressed and released like a real one, because going there rebuilds the
-    # file rows: the button is destroyed in the middle of its own click.
+    # block it sits in: the button is destroyed in the middle of its own click.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -2569,7 +2569,7 @@ def test_the_file_rows_go_to_folder_takes_a_shelf_item_home_without_a_right_clic
     assert view.selected_prompt_ids() == ["i2"]
 
 
-def test_the_file_rows_carry_no_go_to_folder_inside_the_items_own_folder(qtbot):
+def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
     # Standing in the folder already, there is nowhere for it to take you, and a
     # button that would do nothing is not drawn — the rule its right-click entry
     # has always followed.
@@ -2582,7 +2582,7 @@ def test_the_file_rows_carry_no_go_to_folder_inside_the_items_own_folder(qtbot):
     assert _folder_buttons(view) == []
 
 
-def test_a_deleted_items_file_row_offers_no_way_to_a_folder(qtbot):
+def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
     view = _trash_shelf_view(qtbot, FakeActions())
 
     view._browser._thumb_widgets["d1"].clicked.emit("d1", _NO_MOD)
@@ -2590,9 +2590,9 @@ def test_a_deleted_items_file_row_offers_no_way_to_a_folder(qtbot):
     assert _folder_buttons(view) == []      # it left its folder when its row did
 
 
-def test_a_videos_file_row_offers_the_same_way_to_its_folder(qtbot):
-    # A video's file is listed in the block above the form rather than among
-    # versions it has none of, and that row is a file row like any other.
+def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
+    # A video's block above the settings carries its file, where a picture's
+    # carries none; the way to the folder sits over both the same.
     view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()

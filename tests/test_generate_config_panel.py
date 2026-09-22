@@ -1034,9 +1034,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
 def test_each_level_carries_its_own_file_row(saved_panel):
     # The file information is per enhancement, so it sits with the level that
     # made it — the same File row a metadata block renders, copy button and all,
-    # rather than a pooled block at the top labeled with a level's name. Both
-    # ways to the file stand on it, in the order they are worth reaching for:
-    # the OS folder, then the gallery folder.
+    # rather than a pooled block at the top labeled with a level's name.
 
     panel, db = saved_panel
     image = _enhanced_image_row(db)
@@ -1047,10 +1045,29 @@ def test_each_level_carries_its_own_file_row(saved_panel):
     assert "image/sdxl_img1.png" in _row_texts(rows[1])
     for row in rows:
         names = [b.objectName() for b in row.findChildren(QPushButton)]
-        assert names == ["copyButton", "revealButton", "goToFolderButton"]
+        assert names == ["copyButton", "revealButton"]
         assert "Created" in _row_texts(row)
-    # ...and the block at the top has nothing left to repeat.
-    assert panel._metadata_block.isHidden()
+    # ...and the block at the top has no file of its own to repeat.
+    assert "File" not in _metadata_texts(panel)
+
+
+def test_the_way_to_the_folder_is_one_button_at_the_top(saved_panel):
+    # Every version of a picture is in the same folder, so going there is the
+    # picture's act rather than any one file's: one button, in the block above
+    # the settings, and none among the file rows where Show in Explorer — which
+    # names a different file each time — belongs.
+    panel, db = saved_panel
+    panel.set_folder_check(lambda row: True)
+    image = _enhanced_image_row(db)
+
+    panel.show_saved_generation(image, [image])
+
+    assert not panel._metadata_block.isHidden()
+    assert [b.objectName() for b in panel._metadata_block.findChildren(QPushButton)
+            if b.objectName() != "foldingSectionHeader"] == ["goToFolderButton"]
+    for row in _level_rows(panel):
+        assert "goToFolderButton" not in [b.objectName()
+                                          for b in row.findChildren(QPushButton)]
 
 
 def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
@@ -1303,7 +1320,7 @@ def test_a_picture_the_tab_puts_up_itself_carries_its_own_file_row(
     (row,) = _level_rows(panel)
     assert "image/sdxl_g1.png" in _row_texts(row)
     names = [b.objectName() for b in row.findChildren(QPushButton)]
-    assert names == ["copyButton", "revealButton", "goToFolderButton"]
+    assert names == ["copyButton", "revealButton"]
 
 
 def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):

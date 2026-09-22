@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 import origenerator.gui.metadata_block as mb
@@ -14,7 +15,8 @@ def _row(**overrides):
     """A completed video — the shape whose file this block still carries.
 
     An image's files are versions of it now, each listed with the enhancement
-    level that made it, so an image row renders no block at all."""
+    level that made it, so an image row's block carries only what no version
+    claims: the workflow version, and the way to the folder."""
     row = {
         "status": "completed",
         "source": "generated",
@@ -37,6 +39,24 @@ def block(qtbot):
 def _texts(block):
     """Every label's text, with the on-screen wrapping zero-width spaces removed."""
     return [lbl.text().replace("\u200b", "") for lbl in block.findChildren(QLabel)]
+
+
+def test_the_way_to_the_folder_leads_the_block(qtbot):
+    # One button for the generation, over the lines about its files: each of
+    # those names a file of its own, and every one of them is in that folder.
+    action = QAction("Go to folder")
+    action.setVisible(False)          # nowhere to go until the gallery says so
+    b = MetadataBlock(go_to_folder=action)
+    qtbot.addWidget(b)
+
+    assert b.show_row(_row()) is True             # the file and the date are reason enough
+    button = b.findChild(QPushButton, "goToFolderButton")
+    assert button.parent().layout().indexOf(button) == 0
+    assert not button.isVisibleTo(b)
+
+    action.setVisible(True)
+
+    assert button.isVisibleTo(b)
 
 
 def test_shows_file_and_created(block):

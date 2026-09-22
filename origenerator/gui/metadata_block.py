@@ -8,10 +8,10 @@ field for is a read-only row in the form itself, and an image's files are
 versions, listed with the level that made each. The model lives in
 :mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
-The block is a titled set of ``label: value`` rows; a row gains a
-copy-to-clipboard button when its item declares copyable text (a filename), and
-a file row gains the two ways to where that file is — Show in Explorer, and Go
-to folder for the gallery folder its generation sits in.
+The block is a titled set of ``label: value`` rows, led by the generation's "Go
+to folder"; a row gains a copy-to-clipboard button when its item declares
+copyable text (a filename), and a file row gains a Show in Explorer for the file
+it names.
 """
 from __future__ import annotations
 
@@ -29,7 +29,12 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
 
-from origenerator.generation_metadata import MetaItem, MetaSection, basic_section
+from origenerator.generation_metadata import (
+    BASIC_TITLE,
+    MetaItem,
+    MetaSection,
+    basic_section,
+)
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
@@ -53,21 +58,34 @@ class MetadataBlock(QWidget):
     def __init__(self, parent=None, *, go_to_folder: QAction | None = None):
         super().__init__(parent)
         self._go_to_folder = go_to_folder
+        self._section: MetaSection | None = None
         self._outer = QVBoxLayout(self)
         self._outer.setContentsMargins(0, 0, 0, 0)
         self._container: QWidget | None = None
 
     def show_row(self, row: dict, upscale=None) -> bool:
-        """Render this row's section, reporting whether it had one.
+        """Render this row's section, reporting whether it has anything in it.
 
         An image's files are all versions, listed with the enhancement level
         that made each — and so are a video's once Evolver has made its
-        ``upscale`` — so its block holds only the workflow version, and there
-        is none before one is recorded; a caller shows this block only when
-        there is something in it, rather than leaving a bare gap above the form."""
-        section = basic_section(row, upscale)
-        self._render(section)
-        return section is not None
+        ``upscale`` — so its block holds the workflow version and the way to its
+        folder, and before a version is recorded it holds only the way to the
+        folder; a caller shows this block only when there is something in it,
+        rather than leaving a bare gap above the form."""
+        self._section = basic_section(row, upscale)
+        self._render(self._section)
+        return self.has_content()
+
+    def has_content(self) -> bool:
+        """Whether there is anything in this block to show.
+
+        Asked again whenever the way to the folder comes or goes — walking into
+        the folder a picture is in takes that button away, and for a picture
+        whose files are all listed as its versions the button can be the only
+        thing this block has.
+        """
+        return self._section is not None or (
+            self._go_to_folder is not None and self._go_to_folder.isVisible())
 
     def _render(self, section: MetaSection | None):
         if self._container is not None:
@@ -81,26 +99,35 @@ class MetadataBlock(QWidget):
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        if section is not None:
+        if section is not None or self._go_to_folder is not None:
             layout.addWidget(_build_section(section, self._go_to_folder))
         self._container = container
         self._outer.addWidget(container)
 
 
-def _build_section(section: MetaSection, go_to_folder: QAction | None = None) -> QWidget:
+def _build_section(section: MetaSection | None,
+                   go_to_folder: QAction | None = None) -> QWidget:
     """One titled block, folding like every other section in the pane.
 
     It sits among the form's own sections, so it folds by the same header rather
     than being the one heading in the column that doesn't.
+
+    "Go to folder" leads it, on a line of its own: every file this generation
+    holds is in that one folder, so going there is the generation's act and
+    there is one of it, where Show in Explorer names a different file on each
+    line it sits on.
     """
-    block = CollapsibleSection(section.title)
+    items = section.items if section is not None else []
+    block = CollapsibleSection(section.title if section is not None else BASIC_TITLE)
     rows = QWidget()
     layout = QVBoxLayout(rows)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
-    label_width = label_column_width(section.items)
-    for item in section.items:
-        layout.addWidget(meta_row(item, label_width, go_to_folder))
+    if go_to_folder is not None:
+        layout.addWidget(_folder_button(go_to_folder), 0, Qt.AlignmentFlag.AlignLeft)
+    label_width = label_column_width(items)
+    for item in items:
+        layout.addWidget(meta_row(item, label_width))
     block.content_form().addRow(rows)
     return block
 
@@ -117,11 +144,9 @@ def label_column_width(items: list[MetaItem]) -> int:
     return max(metrics.horizontalAdvance(text) for text in labels) + 12
 
 
-def meta_cells(item: MetaItem, label_width: int = 0,
-               go_to_folder: QAction | None = None) -> tuple:
-    """One item's five cells — ``(label, value, copy, reveal, folder)`` — the
-    last three ``None`` unless the item declares copyable text or a path to
-    reveal, and a path to reveal gets ``go_to_folder`` beside it.
+def meta_cells(item: MetaItem, label_width: int = 0) -> tuple:
+    """One item's four cells — ``(label, value, copy, reveal)`` — the last two
+    ``None`` unless the item declares copyable text or a path to reveal.
 
     Public as cells rather than only as a finished row because the version list
     lays these into a grid of its own: a level's File line carries the same
@@ -134,13 +159,10 @@ def meta_cells(item: MetaItem, label_width: int = 0,
         _value_widget(item),
         CopyButton(item.copy) if item.copy is not None else None,
         _reveal_button(item.reveal) if item.reveal is not None else None,
-        _folder_button(go_to_folder)
-        if item.reveal is not None and go_to_folder is not None else None,
     )
 
 
-def meta_row(item: MetaItem, label_width: int = 0,
-             go_to_folder: QAction | None = None) -> QWidget:
+def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
     """A ``label: value`` row, gaining a copy-to-clipboard button when the item
     declares copyable text. ``label_width`` aligns keys within the section."""
     row = QWidget()
@@ -148,7 +170,7 @@ def meta_row(item: MetaItem, label_width: int = 0,
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(8)
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-    label, value, *buttons = meta_cells(item, label_width, go_to_folder)
+    label, value, *buttons = meta_cells(item, label_width)
     layout.addWidget(label)
     layout.addWidget(value, 1)
     for button in buttons:
@@ -202,9 +224,9 @@ class _ActionButton(ElidingButton):
 
 
 def _folder_button(action: QAction) -> QPushButton:
-    """The "Go to folder" beside Show in Explorer: the same file's home, in the
-    gallery rather than in Explorer. Every file row of one generation shows the
-    same act, which is why they are all built for the one action."""
+    """The generation's "Go to folder": the gallery folder holding the picture
+    these files are of, where Show in Explorer opens the folder on disk holding
+    one of them."""
     return _dressed(_ActionButton(action), "goToFolderButton")
 
 

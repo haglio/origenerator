@@ -246,6 +246,7 @@ class GenerateConfigPanel(QWidget):
         # every version of it lives in the same folder.
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
+        self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
         self._go_to_folder.triggered.connect(self._on_go_to_folder)
         self._can_go_to_folder = None   # the gallery's; see set_folder_check
         self._build_ui()
@@ -429,7 +430,7 @@ class GenerateConfigPanel(QWidget):
         # earlier levels (and the original) are, each captioned with what made
         # it and draggable onto the Enhance subpanel to reuse those settings.
         # Hides itself for an image with only its original, which is most of them.
-        self._versions = EnhanceVersions(go_to_folder=self._go_to_folder)
+        self._versions = EnhanceVersions()
         # What the list is showing, in its order: the positions its rows report
         # are only good against this.
         self._listed_levels = []
@@ -1541,6 +1542,10 @@ class GenerateConfigPanel(QWidget):
         row, can_go = self._displayed_row, self._can_go_to_folder
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
+        if row is not None:
+            # The button can be the only thing in the block above the settings,
+            # so whether that block shows at all moves with it.
+            self._metadata_block.setVisible(self._metadata_block.has_content())
 
     def _on_levels_delete_requested(self, positions: list):
         """Relay a version-list delete by filename, not by position.

@@ -83,7 +83,14 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # "+" of its own, and that an edit is what a person did rather than what a load
 # did. Every rule cut was already a test named for the claim (161 of them across
 # the two files); each preamble now says so and names the file.
-MAX_PROSE_LINES = 19327
+#
+# 19323 when a folder's star stopped redrawing the gallery: the tree's note that
+# the star is drawn from the folder rather than written before its name
+# (test_favoriting_a_folder_persists_without_reordering and
+# test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere), and the
+# pane's that each side's Favorites collects its own side's bookmarks
+# (test_favorites_collects_the_bookmarks_of_its_own_side).
+MAX_PROSE_LINES = 19323
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

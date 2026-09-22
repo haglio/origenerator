@@ -308,7 +308,7 @@ class BrowserPane(QObject):
             FAVORITES_KEY: Shelf(
                 rows=self._combined_favorite_rows,
                 render=lambda: self._show_favorites(
-                    self._favorite_groups.get(self._shelf_orientation, ()),
+                    self._favorite_folders(self._shelf_orientation),
                     filter_rows(gallery.favorite_generations(self._listed_rows),
                                 self._shelf_orientation))),
             EXPERIMENTS_KEY: Shelf(
@@ -334,9 +334,7 @@ class BrowserPane(QObject):
         self._recent_rows: list[dict] = []  # every generated row, newest first
         self._recents_flow = None           # the open shelf's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
-        # Each side's bookmarked folders, keyed by orientation — a Favorites
-        # shelf collects the copies of them its own side holds.
-        self._favorite_groups: dict = {}
+        self._side_trees: dict = {}
         self._listed_rows: list[dict] = []
         self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
         self._trash_rows: list[dict] = []   # held deletions, newest first
@@ -348,16 +346,16 @@ class BrowserPane(QObject):
         # shelf_rows. Every shelf belongs to one side, so on one it is never None.
         self._shelf_orientation: str | None = None
 
-    def set_model(self, recent_rows, favorite_groups, listed_rows, experiment_rows,
+    def set_model(self, recent_rows, side_trees, listed_rows, experiment_rows,
                   trash_rows, request_items=()):
         """Take the newly rebuilt gallery model the shelves render from.
 
-        ``favorite_groups`` is per side (``{orientation: [groups]}``): a folder is
+        ``side_trees`` is per side (``{orientation: [folders]}``): a folder is
         drawn on whichever sides hold rows of that shape, so each Favorites shelf
         collects the copies of the bookmarks its own side has.
         """
         self._recent_rows = recent_rows
-        self._favorite_groups = favorite_groups
+        self._side_trees = side_trees
         self._listed_rows = listed_rows
         self._experiment_rows = experiment_rows
         self._trash_rows = trash_rows
@@ -439,6 +437,11 @@ class BrowserPane(QObject):
         tile.context_requested.connect(self.folder_menu_requested)
         flow.addWidget(tile)
         self._visible_keys.append(group.key)
+
+    def mark_folder_favorite(self, folder_key: str, favorite: bool) -> None:
+        for tile in self._scroll.widget().findChildren(FolderTile):
+            if tile.key == folder_key:
+                tile.set_favorite(favorite)
 
     def show_folder_tiles(self, groups):
         container, flow = self._new_tile_pane()
@@ -1036,12 +1039,15 @@ class BrowserPane(QObject):
 
     # --- the Favorites shelf: every bookmark — items and folders — in one place ---
 
+    def _favorite_folders(self, orientation: str | None) -> list:
+        return gallery.favorite_folders(self._side_trees.get(orientation) or [])
+
     def _combined_favorite_rows(self, orientation: str | None = None) -> list[dict]:
         """Everything one side's Favorites shelf stands for: its favorited items,
         plus the items inside the folders it has bookmarked."""
         return _unique_rows(filter_rows(gallery.favorite_generations(self._listed_rows),
                                         orientation) + [
-            row for group in self._favorite_groups.get(orientation, ())
+            row for group in self._favorite_folders(orientation)
             for row in gallery.rows_under(group)
         ])
 

@@ -250,6 +250,10 @@ def _is_reusable_workflow(workflow_name) -> bool:
     return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
+def _takes_a_favorite(group) -> bool:
+    return group is not None and not isinstance(group, gallery.CustomGroup)
+
+
 def _is_deletable_folder(group) -> bool:
     """Whether a folder may be deleted: anything nested inside a workflow.
 
@@ -500,7 +504,9 @@ class GalleryView(QWidget):
         self._browser.trash_action_triggered.connect(self._on_trash_action)
         self._browser.cancel_requested.connect(self._cancel_job)
         self._browser.selection_changed.connect(self._re_aim)
-        self._fingerprint = None
+        self._fingerprint = (None, None)
+        self._folder_meta: dict = {}
+        self._drawn_version = 0
         self._pending_key: str | None = None  # a folder to open once the tree exists
         self._pending_selection: str | None = None  # a generation to highlight once shown
         # A combine's brand-new folder doesn't exist until its job finishes; hold
@@ -1690,15 +1696,17 @@ class GalleryView(QWidget):
             meta = db.folder_meta_map()
             return rows, meta, db.list_requests(), _fingerprint(rows, meta)
 
-        self.off_thread(read_listing, self._finish_poll_rebuild)
+        read_at = self._drawn_version
+        self.off_thread(read_listing,
+                        lambda listing: self._finish_poll_rebuild(listing, read_at))
 
-    def _finish_poll_rebuild(self, listing):
+    def _finish_poll_rebuild(self, listing, read_at: int):
         """The tick's last hop: fold the freshly read listing into the panes."""
         try:
             if listing is None:  # only if the read itself died
                 return
             rows, meta, requests, fingerprint = listing
-            if fingerprint != self._fingerprint:
+            if fingerprint != self._fingerprint and read_at == self._drawn_version:
                 self._fingerprint = fingerprint
                 self._rebuild(rows, meta)
             else:
@@ -1738,6 +1746,8 @@ class GalleryView(QWidget):
             self._foreign_queue = facts.foreign
 
     def _rebuild(self, rows, meta):
+        self._folder_meta = meta
+        self._drawn_version += 1
         expanded = self._tree_view.expanded_keys()
         # Pending restore targets stand in until the user makes a live choice.
         selected_key = self._tree_view.selected_folder_key() or self._pending_key
@@ -1805,7 +1815,7 @@ class GalleryView(QWidget):
         trees = _side_trees(listed, meta, start_frames)
         self._browser.set_model(
             gallery.recent_generations(listed),
-            {orientation: gallery.favorite_folders(tree) for orientation, tree in trees.items()},
+            trees,
             listed,
             unreviewed,
             held,
@@ -2319,8 +2329,8 @@ class GalleryView(QWidget):
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
             for group in groups:
-                self._db.set_folder_favorite(group.key, True)
-            self.refresh()
+                if not group.favorite:
+                    self._toggle_favorite(group.key)
             return
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
@@ -3922,16 +3932,20 @@ class GalleryView(QWidget):
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0
-        for orientation in _ORIENTATIONS:
-            self._tree_view.set_shelf_count(
-                _FAVORITES_KEY, orientation, _shelf_count(self._browser, _FAVORITES_KEY, orientation))
-        if _base_of(self.selected_folder_key() or "") == _FAVORITES_KEY:
-            self._browser.show_shelf(_FAVORITES_KEY, self.side_in_view())
-        else:
+        if not self._redrew_the_favorites_shelf():
             self._browser.refresh_corners()
         self._info_tabs.reconcile_previews(self._live_ids)
         if ids & self._browser.selected_ids:
             self._re_aim()
+
+    def _redrew_the_favorites_shelf(self) -> bool:
+        for orientation in _ORIENTATIONS:
+            self._tree_view.set_shelf_count(
+                _FAVORITES_KEY, orientation, _shelf_count(self._browser, _FAVORITES_KEY, orientation))
+        if _base_of(self.selected_folder_key() or "") != _FAVORITES_KEY:
+            return False
+        self._browser.show_shelf(_FAVORITES_KEY, self.side_in_view())
+        return True
 
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked.
@@ -4310,8 +4324,19 @@ class GalleryView(QWidget):
         # A star is the folder's, not the row's: both sides draw the same folder,
         # so favoriting it on one is favoriting it.
         group = self.group_for_key(key)
-        self._db.set_folder_favorite(_base_of(key), not bool(group and group.favorite))
-        self.refresh()
+        if not _takes_a_favorite(group):
+            return
+        favorite, key = not group.favorite, group.key
+        self._db.set_folder_favorite(key, favorite)
+        self._tree_view.mark_favorite(key, favorite)
+        self._folder_meta[key] = {**self._folder_meta.get(key, {"custom_name": None}),
+                                  "starred": favorite}
+        self._fingerprint = (self._fingerprint[0],
+                             _folder_meta_fingerprint(self._folder_meta))
+        self._drawn_version += 1
+        if not self._redrew_the_favorites_shelf():
+            self._browser.mark_folder_favorite(key, favorite)
+        self._re_aim()
 
     def _delete_folder_by_key(self, key: str):
         """Delete the folder a hover-row trash click names."""
@@ -4574,14 +4599,20 @@ def _read_foreign_queue(client):
         return ForeignQueue(running=[], pending=[])
 
 
-def _fingerprint(rows, meta) -> int:
-    """A cheap hash of everything the gallery renders, to detect DB changes."""
-    row_sig = tuple(
+def _fingerprint(rows, meta) -> tuple[int, int]:
+    """Cheap hashes of everything the gallery renders, to detect DB changes."""
+    return _rows_fingerprint(rows), _folder_meta_fingerprint(meta)
+
+
+def _rows_fingerprint(rows) -> int:
+    return hash(tuple(
         (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
          r.get("workflow_name"), r.get("params_json"), r.get("output_files"))
         for r in rows
-    )
-    meta_sig = tuple(sorted(
-        (k, v.get("custom_name"), v.get("starred")) for k, v in meta.items()
     ))
-    return hash((row_sig, meta_sig))
+
+
+def _folder_meta_fingerprint(meta) -> int:
+    return hash(tuple(sorted(
+        (k, v.get("custom_name"), v.get("starred")) for k, v in meta.items()
+    )))

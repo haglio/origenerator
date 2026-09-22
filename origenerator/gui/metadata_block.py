@@ -1,17 +1,12 @@
 """Render a generation's read-only metadata as one compact titled block.
 
-Sits in the info-pane tab's footer, under the editable form, and shows only what
-the form can't: the output file, when the run happened, and which workflow
-version made it. Everything else the
-block once carried has a better home — a parameter the workflow lays out no
-field for is a read-only row in the form itself, and an image's files are
-versions, listed with the level that made each. The model lives in
+Sits at the top of the info-pane tab's scroll, above the editable form, and
+shows only what the form and the version list can't: a file no version claims,
+when the run happened, and which workflow version made it. The model lives in
 :mod:`origenerator.generation_metadata`; this does the Qt rendering.
 
 The block is a titled set of ``label: value`` rows, led by the generation's "Go
-to folder"; a row gains a copy-to-clipboard button when its item declares
-copyable text (a filename), and a file row gains a Show in Explorer for the file
-it names.
+to folder" — the one act here that is the row's rather than one file's.
 """
 from __future__ import annotations
 
@@ -66,24 +61,16 @@ class MetadataBlock(QWidget):
     def show_row(self, row: dict, upscale=None) -> bool:
         """Render this row's section, reporting whether it has anything in it.
 
-        An image's files are all versions, listed with the enhancement level
-        that made each — and so are a video's once Evolver has made its
-        ``upscale`` — so its block holds the workflow version and the way to its
-        folder, and before a version is recorded it holds only the way to the
-        folder; a caller shows this block only when there is something in it,
-        rather than leaving a bare gap above the form."""
+        An image's files are all versions, listed with the level that made each
+        — and so are a video's once Evolver has upscaled it — so what is left
+        here can be as little as the way to the folder, or nothing at all."""
         self._section = basic_section(row, upscale)
         self._render(self._section)
         return self.has_content()
 
     def has_content(self) -> bool:
-        """Whether there is anything in this block to show.
-
-        Asked again whenever the way to the folder comes or goes — walking into
-        the folder a picture is in takes that button away, and for a picture
-        whose files are all listed as its versions the button can be the only
-        thing this block has.
-        """
+        """Whether there is anything in this block to show — asked again
+        whenever the way to the folder comes or goes."""
         return self._section is not None or (
             self._go_to_folder is not None and self._go_to_folder.isVisible())
 
@@ -111,11 +98,6 @@ def _build_section(section: MetaSection | None,
 
     It sits among the form's own sections, so it folds by the same header rather
     than being the one heading in the column that doesn't.
-
-    "Go to folder" leads it, on a line of its own: every file this generation
-    holds is in that one folder, so going there is the generation's act and
-    there is one of it, where Show in Explorer names a different file on each
-    line it sits on.
     """
     items = section.items if section is not None else []
     block = CollapsibleSection(section.title if section is not None else BASIC_TITLE)
@@ -180,8 +162,6 @@ def meta_row(item: MetaItem, label_width: int = 0) -> QWidget:
 
 
 def _dressed(btn: QPushButton, name: str) -> QPushButton:
-    """The dress a file row's buttons share with the copy button beside them, so
-    the three read as one row of controls rather than three widgets."""
     btn.setObjectName(name)
     btn.setStyleSheet("padding: 2px 6px;")
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -205,10 +185,8 @@ def _reveal_button(target: str) -> QPushButton:
 
 
 class _ActionButton(ElidingButton):
-    """A button standing for ``action``: pressing it triggers the action, and
-    whether it is there at all, whether it is live and what it says on hover are
-    the action's to move, so every button built for one act answers a change of
-    mind together."""
+    """A button standing for ``action``: it is there, live and worded as the
+    action says, and pressing it triggers the action."""
 
     def __init__(self, action: QAction):
         super().__init__(action.text())
@@ -224,9 +202,6 @@ class _ActionButton(ElidingButton):
 
 
 def _folder_button(action: QAction) -> QPushButton:
-    """The generation's "Go to folder": the gallery folder holding the picture
-    these files are of, where Show in Explorer opens the folder on disk holding
-    one of them."""
     return _dressed(_ActionButton(action), "goToFolderButton")
 
 

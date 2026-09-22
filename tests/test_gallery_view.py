@@ -23,6 +23,7 @@ from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, Qt, QTimer, p
 from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import (
     QApplication,
+    QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
@@ -1463,6 +1464,157 @@ def test_renaming_a_folder_persists_and_relabels_it(qtbot):
 
     assert db.folder_meta_map()[key]["custom_name"] == "Best Models"
     assert _image_workflow(view._tree).text(0) == "Best Models"
+
+
+def _square_texts(view, key) -> list[str]:
+    """The words on the middle pane's square for the folder ``key`` — its name
+    (led by a star once the folder is favorited) and how many items it holds."""
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile.key == key]
+    return [label.text() for label in square.findChildren(QLabel)]
+
+
+def test_favoriting_a_folder_stars_its_square_in_the_pane_beside_it(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(view._tree_item_for(cat).parent())  # both, as squares
+
+    view._toggle_favorite(dog)
+
+    assert "★ " + view.group_for_key(dog).label in _square_texts(view, dog)
+    assert view.group_for_key(cat).label in _square_texts(view, cat)  # and only that one
+
+
+def test_a_folder_the_user_made_takes_no_favorite(qtbot):
+    # A bookmark of a bookmark shelf collects nothing, so its menu offers no
+    # Favorite — and the star its row shows on hover must not leave one either.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+
+    view._toggle_favorite(made)
+
+    assert not view.group_for_key(made).favorite
+
+
+def test_the_favorite_button_offers_to_take_back_the_favorite_it_just_made(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _click_off(view)  # nothing picked inside it, so the button aims at the folder
+
+    view._bank.favorite.click()
+
+    assert view._bank.favorite.toolTip().startswith("Unfavorite folder")
+
+
+def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_shelf(qtbot):
+    view, _cat, dog = _two_leaf_view(qtbot)
+    view._toggle_favorite(dog)
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    assert view._browser._visible_keys == [dog]
+
+    view._toggle_favorite(dog)
+
+    assert view._browser._visible_keys == []
+    assert _shown(_shelf(view, FAVORITES_KEY)) == "Favorites"  # and its count with it
+
+
+def _long_list_view(qtbot):
+    """A view holding more folders than its list can show at once, on screen so
+    the list really scrolls. Returns it with that side's folder rows, top-down."""
+    view = GalleryView(FakeDB([_image(f"i{n}", f"prompt {n}", 50, n) for n in range(30)]))
+    qtbot.addWidget(view)
+    view.resize(700, 500)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    lora = _image_workflow(view._tree).child(0).child(0)
+    for item in (lora.parent().parent(), lora.parent(), lora):
+        item.setExpanded(True)
+    return view, [lora.child(i) for i in range(lora.childCount())]
+
+
+def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
+    # The gallery was read back and redrawn whole for one star — seconds of it on a
+    # real library — and the redraw scrolled the list to the folder that was open,
+    # taking the row just starred out from under the mouse.
+    view, folders = _long_list_view(qtbot)
+    half = _side(view._tree)
+    view._tree.setCurrentItem(folders[0])   # the folder that is open, up at the top
+    half.scrollToItem(folders[-1])          # ...with the list scrolled away from it
+    target, key = folders[-1], _key(folders[-1])
+    scrolled_to = half.verticalScrollBar().value()
+    assert scrolled_to > 0
+
+    view._toggle_favorite(key)
+
+    assert view._tree_item_for(key) is target  # the row itself, not a redrawn one
+    assert target.data(0, _GROUP_ROLE).favorite
+    assert half.verticalScrollBar().value() == scrolled_to
+
+
+def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
+    # Each side draws the folder from a copy of its own, so a star set through
+    # one row has to reach the other side's row too.
+    shapes = {"i1": (1280, 720), "i2": (720, 1280)}
+    view = GalleryView(FakeDB([
+        _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
+                               "width": width, "height": height}, f"sdxl_t2i_{pid}.png")
+        for pid, (width, height) in shapes.items()]))
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _key(_image_workflow(view._tree))
+    rows = [view._tree_item_for(tree_key)
+            for tree_key in view._tree_view.keys_for_folder(key)]
+    assert len(rows) == 2
+
+    view._toggle_favorite(key)
+
+    assert [row.data(0, _GROUP_ROLE).favorite for row in rows] == [True, True]
+
+
+def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
+    # The squares a star marks are the ones on screen now: every pane drawn since
+    # deleted the squares of the one before it.
+    view, cat, dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(view._tree_item_for(cat).parent())  # both, as squares
+    view._tree.setCurrentItem(view._tree_item_for(cat))           # ...then into one
+
+    view._toggle_favorite(dog)
+
+    assert view.group_for_key(dog).favorite
+
+
+def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
+    # The star is on screen and in the database, so the tick that follows a second
+    # later must not read it as somebody else's change and redraw the list — which
+    # is the scroll the star itself no longer causes, arriving late.
+    view, _cat, dog = _two_leaf_view(qtbot)
+    view._toggle_favorite(dog)
+    row = view._tree_item_for(dog)
+
+    view._poll()
+
+    assert view._tree_item_for(dog) is row
+
+
+def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
+                                                                            monkeypatch):
+    # Each tick reads the library on a thread of its own, so a read taken a moment
+    # before a star lands a moment after it. Drawing that read would put the star
+    # back out and jump the list, and put both right again a tick later.
+    view, _cat, dog = _two_leaf_view(qtbot)
+    held = []
+    monkeypatch.setattr(view, "off_thread", lambda work, done: held.append((work(), done)))
+    view._finish_poll([], None)   # the tick's reading, taken first
+
+    view._toggle_favorite(dog)    # the star, made while that reading was out
+    row = view._tree_item_for(dog)
+    (reading, deliver), = held
+    deliver(reading)              # ...and the reading landing after it
+
+    assert view._tree_item_for(dog) is row
+    assert row.data(0, _GROUP_ROLE).favorite
 
 
 def test_favoriting_a_folder_persists_without_reordering(qtbot):
@@ -12238,6 +12390,18 @@ def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):
     view._on_folders_dropped(gallery_view_module._FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
+
+
+def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
+    # The other way of starring from the list, and it must cost the list no more
+    # than the star itself does: no redraw, so no jump under the dragging hand.
+    view, cat, _dog = _two_leaf_view(qtbot)
+    row = view._tree_item_for(cat)
+
+    view._on_folders_dropped(gallery_view_module._FAVORITES_KEY, [cat])
+
+    assert view._tree_item_for(cat) is row
+    assert row.data(0, _GROUP_ROLE).favorite
 
 
 def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):

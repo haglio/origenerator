@@ -145,8 +145,13 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     taking over an open window also asks to fold the panes into its column, and
     the gallery keeps the one `become_hosted` for that. 265 -> 266: the session
     hands that window back when it ends, and `become_standalone` asks the
-    arrangement to unfold them.)"""
+    arrangement to unfold them. 266 -> 267: a folder's star stopped redrawing the
+    whole gallery and is told in place, as an item's always was, so re-counting
+    the Favorites shelf and drawing it again where it is open is one method both
+    of them ask. And the pane 75 -> 77: it marks a folder's square in place, and
+    reads the bookmarked folders off each side's folders when it needs them
+    rather than keeping a list a star would leave stale.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 266
+               for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 75
+               for x in _class_def(PANE, "BrowserPane").body) == 77

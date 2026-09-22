@@ -75,7 +75,8 @@ class FolderTile(QFrame):
         caption_row.setSpacing(4)
         if level is not None:
             caption_row.addWidget(self._level_badge(level), 0, Qt.AlignmentFlag.AlignTop)
-        caption = QLabel(("★ " if favorite else "") + text)
+        self._text = text
+        self._caption = caption = QLabel(self._captioned(favorite))
         caption.setWordWrap(True)
         grid_card.style_caption(caption)  # the grid's shared caption size
         # A settings folder is named by a code, so what it holds — the prompt and
@@ -89,6 +90,16 @@ class FolderTile(QFrame):
         count_label.setStyleSheet("color: #9a9a9a; font-size: 10px;")
         count_label.setFixedHeight(grid_card.COUNT_HEIGHT)
         layout.addWidget(count_label)
+
+    @property
+    def key(self) -> str:
+        return self._key
+
+    def set_favorite(self, favorite: bool) -> None:
+        self._caption.setText(self._captioned(favorite))
+
+    def _captioned(self, favorite: bool) -> str:
+        return ("★ " if favorite else "") + self._text
 
     def _level_badge(self, level) -> QLabel:
         """The lettered recipe-level chip, tooltip'd with the level's full name."""

@@ -302,6 +302,12 @@ class GalleryTree:
         — in side order, empty for one no side is holding right now."""
         return list(self.keys_by_folder.get(folder_key, ()))
 
+    def mark_favorite(self, folder_key: str, favorite: bool) -> None:
+        for key in self.keys_by_folder.get(folder_key, ()):
+            item = self.item_by_key[key]
+            item.data(0, GROUP_ROLE).favorite = favorite
+            item.emitDataChanged()
+
     def shelf_item(self, shelf_key: str, orientation: str) -> QTreeWidgetItem | None:
         """One side's copy of a shelf row."""
         return self.item_by_key.get(oriented_key(shelf_key, orientation))

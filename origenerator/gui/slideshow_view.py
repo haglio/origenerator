@@ -1,92 +1,32 @@
 """The fullscreen player — the one way this app fills the screen with a picture.
 
-It plays a set of generations: a folder's, a shelf's (Recents, Favorites), or the
-one folder a double-clicked picture came from.  The players' own engine shows
-the slides (:class:`~origenerator.gui.show_surface.ShowSurface`) and a
-:class:`~origenerator.slideshow.SlideshowPlaylist` says their order.  A picture
-and a clip move on the same way: the engine holds the picture for the pace and
-ends it as it ends a finished clip, and the show pages on
-(``ShowSurface.media_ended``).  The arrows step, Shift+arrows step the
-versions of the item on screen, Up culls, Down locks the slide
-against the advance (a locked clip replays, and the lock both favorites the slide and
-asks for an enhancement — see :meth:`SlideshowView._lock_current`), Enter leaves
-for the shown item's own folder (``open_requested``), and Escape closes. Ending
-a show on a locked slide leaves for that slide's folder too: locking one is the
-user saying this is the one, so the gallery lands there rather than back where
-it was when the show started.
+It plays a set of generations: a folder's, a shelf's, or the one folder a
+double-clicked picture came from. **A double-click opens this same view at a
+pace of nought**, holding the clicked picture until an arrow moves it, which is
+why there is no second fullscreen viewer with its own keys and its own copy of
+the counter, the neighbor stills and the culling; turning the console's
+clip-seconds pace up off nought sets such a show going.
 
-Closing one doesn't lose your place in it. :meth:`SlideshowView.state` is where
-a show was — the pass, the slide, the lock on it — and :meth:`SlideshowView.resume`
-opens the next one there, so the look at the folder under a picture that closing
-the show is usually for doesn't cost the picture.
+The set is not frozen at the opening: a run joins it on its first frame rather
+than when it lands, because the first iterations are what a show of a filling
+folder is watched for — and not before, a black screen reading "Generating…"
+being nothing to watch.
 
-**Double-clicking a picture opens this same view at a pace of nought** — its
-folder in the browser's own order, starting on the picture that was clicked,
-holding it until an arrow moves it. There used to be a second full-screen
-viewer for that, with its own keys to learn and its own copy of the counter, the
-neighbor stills, the level stepping and the culling; a show that simply never
-moves on is the same thing with nothing to keep in sync. Turning the console's
-clip-seconds pace up off nought is what sets such a show going.
+The creep into a picture while it holds the screen is the *engine's*, not this
+window's, so a show handed to one of a session's players creeps the same way,
+and turning the pace up slows the creep instead of cropping harder.
 
-Anything that moves off a locked slide — a step either way, a cull — releases the
-lock, the way Fun Time's next/prev cancel a satellite's: the lock holds the slide
-it was set on, not wherever the user wanders to.
+One panel, not two. Fun Time splits the device across the main player's console
+and the set across each satellite's HUD, because there they are two players; a
+show is one host doing both, and wearing both panels says the status twice in
+two lines that can disagree, with prev/next/lock/trash drawn on each.
 
-The show puts a stop of its own on the advance: :meth:`SlideshowView.pause_for_request` halts
-advance while a spoken request is being said, since the request is about what is
-on screen and a show that pages on mid-sentence would aim it at the wrong slide.
-It is independent of the lock, so releasing it never unlocks a locked slide.
+Being the deliberate foreground view, it plays sound — the inline preview pane
+stays muted.
 
-The set is not frozen at the opening. It holds only generations there is
-something to look at, and the gallery hands each one over the moment there is
-— which is well before it lands. A run with no frame yet is no slide: a black
-screen reading "Generating…" is nothing to watch. But the first iterations
-coming in are the most exciting thing in a folder that is filling, and they are
-what a show of one is being watched for, so the run joins the set on its first
-frame (:meth:`SlideshowView.note_generating`), keeps the newest one from there,
-and swaps its frames for the file when it lands
-(:meth:`SlideshowView.note_added`). A show of a folder that is auto-generating
-therefore watches the loop work rather than only its results.
-
-It also opens over a generation that's still running: built with no items, it
-shows that generation's streamed low-res frames (:meth:`show_frame`) until the
-pane that opened it hands over the finished file (:meth:`show_landed`), at which
-point it is an ordinary show of that file. So a generation can be watched
-full-screen while it's made, not only once it lands.
-
-A picture does not simply sit there while it holds the screen: the engine creeps
-into it, ending a tenth of the way in by the time the dwell runs out, paced by
-the dwell rather than by a clock of its own -- so turning the pace up slows the
-creep instead of cropping harder.  That is the engine's, not this window's,
-which is why a show handed to one of a session's players creeps the same way.
-
-Every show wears the players' own HUD (:meth:`SlideshowView.adopt_hud`,
-:mod:`origenerator.gui.show_hud`) — hosted on a satellite region and fullscreen
-alike — so its map replaces the view's own position plate and the small stills
-riding either side of the picture (:mod:`origenerator.gui.neighbor_previews`).
-The two switches on that HUD's control band are this show's own narrowing, the
-way F-mode is a player's own: F-mode keeps the favorites and the switch beside
-it keeps the pictures that have been enhanced, each over the whole set the show
-was handed and both at once meaning what answers both
-(:meth:`SlideshowView.toggle_favorites_filter`, :meth:`SlideshowView.toggle_enhanced_mode`).
-They start off, and reset drops them.  What the view has left to say for itself,
-it says in a Fun Time notice across the top (:mod:`origenerator.gui.notice_overlay`).
-
-The lower strip's queue is floated into the lower-left corner
-(:mod:`origenerator.gui.slideshow_queue`) — live frame, progress bar, rows and
-their buttons — since the strip that carries it is under this window, and a show
-is exactly when the line stops moving and when the user keeps adding to it. The
-shared OSR2 motion keys ride along too (Space and friends — see
-:mod:`origenerator.gui.motion_hud`), and what they are doing to the device is on
-that same one panel: :attr:`SlideshowView.hud_device` hands the HUD the pace and
-motion rows, who has the OSR2 and the drive readout, and
-:meth:`SlideshowView.press_console` takes the presses back.  Fun Time splits
-those across two windows — the main player's console for the device, each
-satellite's HUD for the set — because there they are two players; a show is one
-host doing both, and wearing both panels said the status twice, in two lines
-that disagreed, with prev/next/lock/trash drawn on each.  A clip that carries a
-funscript offers itself as an :meth:`osr2_drive_target` instead. Being the
-deliberate foreground view, it plays sound — the inline preview stays muted.
+What every key does, what the lock takes with it, what a filter narrows and
+where a closing show leaves you are `tests/test_slideshow_view.py`'s to state:
+each is a test named for the claim.
 """
 from __future__ import annotations
 

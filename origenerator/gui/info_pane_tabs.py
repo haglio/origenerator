@@ -1,74 +1,35 @@
 """The gallery's info pane as a tabbed workspace of editable generate tabs.
 
-Every tab is the same plain, editable :class:`GenerateConfigPanel` — pick a
-workflow and set params — with no special or permanent tab. The pane always holds
-at least one: closing the last tab opens a fresh blank one in its place, so the
-resting state is a whole generate form waiting on a workflow rather than an empty
-black rectangle. That is why there is no "+" — a tab is always there. A tab's
-right-click menu goes to the gallery folder that tab's settings have been
-generating into — the way across from a tab to the pictures it has made — and
-closes the others, everything to its right, or all of them, listing only what
-that tab can actually do. Tabs drag along the row to reorder. Closing all of
-them is not an empty pane either: the resting tab takes their place, which is
-what "close all" means where one tab is always open.
+Every tab is the same plain :class:`GenerateConfigPanel`, and the pane always
+holds at least one: closing the last opens a fresh blank one in its place, so
+the resting state is a whole generate form waiting on a workflow rather than an
+empty black rectangle — which is why this row carries no "+" of its own.
 
-Tabs open the way an IDE opens files, so browsing doesn't pile up a row of them. A single-clicked generation lands in the *preview* tab, drawn in italic:
-the next single click replaces it. A click on a folder's live tile lands the
-same way — the run's own settings on the form, its frames in the preview — as
-does the press of the "+" beside it that starts one, unless a tab is already
-that run's, having launched it or been pointed at its folder, in which case that
-tab comes forward instead.
+Tabs open the way an IDE opens files, so browsing does not pile up a row of
+them: one tab at a time is the *preview* tab, drawn in italic, and the next
+single click replaces it. A double-click pins it upright, and so does editing
+anything in it, because that is work someone did and the next open must land
+beside it rather than throw it away. A run the user starts from a folder's own
+tile — including the "+" beside it — opens the same way, so it can be watched
+full size, unless a tab is already that run's.
 
-What a tab's preview shows is only ever the tab's own: the generation it was
-opened on, the run it launched or was pointed at (which it follows by folder
-key, frame by frame, to the picture it lands as), or its settings' newest
-result. Nothing here paints "the tab in front" from outside — the gallery's
-selection, a rebuild, a run some other tab is for — which is how a tab used to
-end up showing a picture it was not about.
-
-A double-click on the tab pins it upright, and
-the click after it opens a new preview tab beside it. Editing anything in the tab
-pins it the same way, without the double-click: changing the workflow or any
-field is work someone did in that tab, and the next open must land beside it
-rather than throw it away. Opening a configuration by
-name — a history-strip click, a queue row, the combine panel's "Open in
-generator" — lands the same way, since it is the same "show me this" gesture;
-generating from the tab pins it too.
-
-What counts as an edit is what a person did, never what a load did — an open
+**What counts as an edit is what a person did, never what a load did.** An open
 writes the picker and every field exactly as typing would, so the panel says
-which is which (:attr:`GenerateConfigPanel.user_edited`) rather than the widgets
-being asked.
+which was which (:attr:`GenerateConfigPanel.user_edited`) rather than the
+widgets being asked after the fact.
 
-The pane's blank resting tab is never left sitting beside real work: whatever
-opens next takes it over rather than appearing next to it.
+**What a tab's preview shows is only ever that tab's own** — the generation it
+was opened on, the run it launched or was pointed at, or its settings' newest
+result. Nothing here paints "the tab in front" from outside, which is how a tab
+came to show a picture it was not about.
 
-The resting tab wears the slant too, from the moment the pane opens: nothing has
-been done in it, so the next open takes it over — which is all the italic ever
-means here. Picking a workflow in it takes the slant off, since that is work
-someone did and an open would throw it away.
+A tab's Generate runs nothing here: it emits :attr:`generate_requested` for the
+gallery to launch. The gallery owns every job and reconnects the ones left
+running after a restart, so the tabs carry no job state at all.
 
-Each tab is named after what it is showing, not typed: the item on display, by
-its file, marked with that item's own thumbnail — or, before there is one, the
-folder the config would generate into and the plain image/video mark for what it
-makes. So the row of tabs reads as the things you have open.
-
-This owns every tab's lifecycle — add, close, rename, and session capture/restore
-of each tab's configuration.
-
-A tab's Generate doesn't run a job here; it emits :attr:`generate_requested`, which
-this relays for the gallery to launch as a re-roll of the config's settings folder.
-The gallery owns every in-flight job (a re-roll) and reconnects any left running
-after a restart, so the tabs carry no job state.
-
-Clicking a browser thumbnail loads that generation into a tab (see
-:meth:`load_selection`), where its output shows in the preview, its settings seed
-the editable form, and a footer offers the source-image link / animations /
-Send-to-Evolver for its media type.
-
-Config tabs need a ComfyUIClient to run; without one (a read-only gallery in a
-test) :meth:`open_config` is a no-op — but a tab still shows, its form up for
-inspection with Generate disabled.
+Which tab a click lands in, what each is named, what its menu offers, and what
+happens with no ComfyUI client are `tests/test_info_pane_tabs.py`'s to state:
+each is a test named for the claim.
 """
 from __future__ import annotations
 

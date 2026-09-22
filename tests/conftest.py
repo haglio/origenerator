@@ -14,15 +14,16 @@ left decided what the next one drew.
 """
 from __future__ import annotations
 
-import atexit
 import os
-import shutil
 import tempfile
+from pathlib import Path
+
+from tests.scratch import remove_at_exit
 
 if "ORIGENERATOR_STATE_DIR" not in os.environ:
     _suite_state_dir = tempfile.mkdtemp(prefix="origenerator-suite-")
     os.environ["ORIGENERATOR_STATE_DIR"] = _suite_state_dir
-    atexit.register(shutil.rmtree, _suite_state_dir, True)
+    remove_at_exit(Path(_suite_state_dir))
 
 # Before anything that can pull PyQt6 in: the voice stack's native DLLs
 # (whisper's engine, its VAD, and torch where installed) die with a plain

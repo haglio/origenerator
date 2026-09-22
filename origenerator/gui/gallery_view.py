@@ -3894,7 +3894,9 @@ class GalleryView(QWidget):
         shelf = folder_shelf(base)
         if shelf is None or shelf.shelf != _FAVORITES_KEY:
             return False
+        place = self._browser.place()
         self._browser.show_shelf(shelf.key, orientation)
+        self._browser.return_to(place)
         return True
 
     def _delete_selection(self):

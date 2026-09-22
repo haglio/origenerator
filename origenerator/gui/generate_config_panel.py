@@ -128,10 +128,9 @@ class GenerateConfigPanel(QWidget):
     preview is driven from outside: a browsed selection's output, a running
     re-roll's live frames, or this config's newest matching result when idle.
 
-    The info appears only while the tab is displaying a saved generation — one
-    clicked (:meth:`show_saved_generation`) or the newest result it put up for
-    its own settings: a File/Created block above the form, and at the foot of
-    the scroll the videos an image was animated into, or a clickable
+    The info appears only while the tab is displaying a saved generation, clicked
+    or put up for its settings: a File/Created block above the form, and at the
+    foot of the scroll the videos an image was animated into, or a clickable
     source-image tile for a video. Send-to-Evolver and Send-to-Genau (a video), and
     the Drive-OSR2 toggle key off the displayed row. A blank tab hides them all.
 
@@ -242,8 +241,6 @@ class GenerateConfigPanel(QWidget):
         # re-picks the workflow, which re-seeds the carried-over fields).
         self._loading_config = 0
         self._autoshow_held = False   # see _point_elsewhere
-        # One for the generation on display, drawn on each of its file rows:
-        # every version of it lives in the same folder.
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
         self._go_to_folder.setVisible(False)  # until the gallery says there is a folder
@@ -914,11 +911,8 @@ class GenerateConfigPanel(QWidget):
         scripted video arms the OSR2 drive exactly like a browsed selection — the
         drive follows whatever video is actually on screen, however it got there.
 
-        Its footer comes up with it, as a clicked one's does: it is a real
-        generation, and its file has to be reachable from it — copied, shown in
-        Explorer, gone to in the gallery. With nothing to show, the last
-        selection's footer is taken down rather than left naming a file that is
-        no longer on screen."""
+        Its footer comes up with it, as a clicked one's does; with nothing to
+        show, the last one's comes down rather than name a file no longer up."""
         if self._autoshow_held:
             return
         row = self._recent_matching_row()
@@ -1137,11 +1131,8 @@ class GenerateConfigPanel(QWidget):
         here — the tab is about this row now, and a launch from it is not the
         combination's.
 
-        Both callers put up a picture of their own straight after, so the newest
-        result the seeded settings would show is held back: loading it — its
-        picture, and its versions' pictures under the settings — only for the
-        caller to replace it at once made every click wait on a picture nobody
-        saw.
+        Both callers put up a picture of their own straight after, so the one
+        the seeded settings would show is held back rather than loaded for nothing.
         """
         self.forget_launched()
         self._forget_watch()
@@ -1528,23 +1519,15 @@ class GenerateConfigPanel(QWidget):
             self.go_to_folder_requested.emit(self._displayed_row["prompt_id"])
 
     def set_folder_check(self, can_go) -> None:
-        """How to ask whether the generation on display has a folder to be gone
-        to. The gallery's question to answer, since it knows where it stands."""
         self._can_go_to_folder = can_go
 
     def reread_folder_buttons(self) -> None:
-        """Put a "Go to folder" on the file rows, or take it off.
-
-        Asked again whenever the gallery moves or the generation on display
-        changes: standing in the folder the picture is in, there is nowhere for
-        it to go, and a button that would do nothing is not drawn at all.
-        """
+        """Asked again whenever the gallery moves: in the picture's own folder it
+        would do nothing, and is not there."""
         row, can_go = self._displayed_row, self._can_go_to_folder
         self._go_to_folder.setVisible(
             row is not None and can_go is not None and can_go(row))
         if row is not None:
-            # The button can be the only thing in the block above the settings,
-            # so whether that block shows at all moves with it.
             self._metadata_block.setVisible(self._metadata_block.has_content())
 
     def _on_levels_delete_requested(self, positions: list):

@@ -3894,8 +3894,7 @@ class GalleryView(QWidget):
 
         A deleted one has none — it left its folder when its row did — and neither
         has one whose folder is already the pane you are standing in, where going
-        there would be a click that changes nothing. Both the right-click's entry
-        and the file rows' button are simply absent when this says no.
+        there would be a click that changes nothing.
         """
         if row.get("deleted_at") is not None:
             return False

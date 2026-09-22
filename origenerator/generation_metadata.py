@@ -47,10 +47,7 @@ class MetaItem:
     reveal: str | None = None
 
 
-# What the block above the form is called. Named here beside the section it
-# titles, because the block draws that heading for a row whose facts come to
-# nothing — the way to the folder still hangs under it.
-BASIC_TITLE = "Basic"
+BASIC_TITLE = "Basic"   # the block draws it for a row whose facts come to nothing
 
 
 @dataclass

@@ -7414,6 +7414,27 @@ def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
     assert _in_view(view, "n19")
 
 
+def test_taking_a_favorite_off_the_favorites_shelf_leaves_it_where_it_was(qtbot):
+    view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n) | {"starred": 1}
+                               for n in range(1, 61)]))
+    qtbot.addWidget(view)
+    view.resize(1800, 1300)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    qtbot.wait(1)
+    far = view.visible_prompt_ids()[-3]
+    view._browser.reveal_tile(far)
+    qtbot.wait(1)
+
+    view.set_items_favorite([view.visible_prompt_ids()[0]], False)
+    qtbot.wait(1)
+
+    assert view._browser._thumb_widgets[far].is_selected()
+    assert _in_view(view, far)
+
+
 def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
     # Closing a show is usually a detour, not being done with it — so the next
     # one stands where the last was left rather than at the top of a fresh

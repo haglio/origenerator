@@ -12,6 +12,7 @@ from origenerator import gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import JobQueue, _parse_progress_state
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -418,9 +419,12 @@ def test_progress_tick_persists_the_jobs_progress_to_its_row(qtbot, tmp_path):
     assert state["last_progress"] == list(job.last_progress)
 
 
-def test_progress_persistence_is_throttled(qtbot, tmp_path):
+def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
     # Ticks fire per step (sub-second for images); only the first of a burst is
     # written, so the disk isn't hammered — the value stays recent enough to resume.
+    # The interval is set here rather than waited out: a machine that stalls a
+    # second between two emits would otherwise write the second one and fail.
+    monkeypatch.setattr(job_queue_module, "_PROGRESS_PERSIST_INTERVAL_S", 3600)
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -430,8 +434,12 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path):
 
     client.progress.emit(pid, "s", 5, 10)                       # first tick -> written
     first = db.get_generation(pid)["progress_json"]
-    client.progress.emit(pid, "s", 6, 10)                       # same second -> throttled
+    client.progress.emit(pid, "s", 6, 10)                       # inside the interval -> throttled
     assert db.get_generation(pid)["progress_json"] == first
+
+    monkeypatch.setattr(job_queue_module, "_PROGRESS_PERSIST_INTERVAL_S", 0)
+    client.progress.emit(pid, "s", 7, 10)                       # past it -> written again
+    assert db.get_generation(pid)["progress_json"] != first
 
 
 def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):

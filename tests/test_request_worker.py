@@ -6,6 +6,8 @@ a failure is answered rather than raised.
 """
 from __future__ import annotations
 
+import logging
+
 from PyQt6 import sip
 from PyQt6.QtWidgets import QWidget
 
@@ -35,6 +37,19 @@ def test_a_failure_answers_with_nothing_rather_than_raising(qtbot):
     worker.revise("ctx", "a woman", "", "no hat")
 
     assert seen == [None]
+
+
+def test_a_failure_is_logged_without_the_request_or_either_prompt(qtbot, caplog):
+    def boom(pos, neg, req):
+        raise ValueError(f"cannot read {pos!r} or {neg!r} for {req!r}")
+
+    worker = RevisionWorker(boom)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.gui.request_worker"):
+        worker.revise("ctx", "gamma form, an example lantern", "example flaws to avoid",
+                      "no example lantern")
+
+    assert caplog.messages == ["Could not work out a request (ValueError)"]
 
 
 def test_the_task_runs_one_revision(qtbot):

@@ -41,7 +41,7 @@ class RevisionWorker(QObject):
         try:
             revision = self._apply(positive, negative, request)
         except Exception as exc:
-            logger.warning("Could not work out the request %r: %s", request, exc)
+            logger.warning("Could not work out a request (%s)", type(exc).__name__)
             revision = None
         self.revised.emit(context, revision)
 

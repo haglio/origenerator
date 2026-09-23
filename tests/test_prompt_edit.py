@@ -5,6 +5,10 @@ whatever the library's own prompts say, which never appears in this repo.
 """
 from __future__ import annotations
 
+import json
+import logging
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from origenerator.prompt_edit import (
@@ -20,6 +24,7 @@ from origenerator.prompt_edit import (
     build_match_messages,
     parse_match,
     parse_request,
+    smart_match,
 )
 
 # --- reading the request ----------------------------------------------------
@@ -240,6 +245,38 @@ def test_a_completion_names_the_chosen_term():
 def test_a_completion_refusing_to_choose_reads_as_no_match():
     assert parse_match({"choices": [{"message": {"content": '{"choice": -1}'}}]}, 3) is None
     assert parse_match({"choices": [{"message": {"content": 'nope'}}]}, 3) is None
+
+
+def _model_answering(content):
+    response = MagicMock()
+    response.read.return_value = json.dumps(
+        {"choices": [{"message": {"content": content}}]}).encode()
+    response.__enter__ = lambda self: self
+    response.__exit__ = MagicMock(return_value=False)
+    return patch("urllib.request.urlopen", return_value=response)
+
+
+def test_a_match_is_logged_by_where_the_term_stands_never_by_its_words(caplog):
+    with _model_answering('{"choice": 1}'), \
+            caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
+        chosen = smart_match(["gamma form", "an example lantern", "soft light"], "lamp",
+                             base_url="http://model.invalid", model="m",
+                             system_prompt="RULES")
+
+    assert chosen == 1
+    assert caplog.messages == ["prompt_edit: the request matched index 1 of the prompt's 3 terms"]
+
+
+def test_a_match_that_fails_says_why_and_never_what_was_asked(caplog):
+    with patch("urllib.request.urlopen", side_effect=OSError("model down")), \
+            caplog.at_level(logging.INFO, logger="origenerator.prompt_edit"):
+        chosen = smart_match(["gamma form", "an example lantern"], "lamp",
+                             base_url="http://model.invalid", model="m",
+                             system_prompt="RULES")
+
+    assert chosen is None
+    assert caplog.messages == [
+        "prompt_edit: could not match the request against the prompt's 2 terms (model down)"]
 
 
 def test_the_match_request_offers_the_terms_numbered():

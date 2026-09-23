@@ -13202,6 +13202,20 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
     assert record["new_positive"] == "a woman, soft light"
 
 
+def test_a_queued_request_is_logged_by_the_pictures_it_joins_never_by_its_words(
+        qtbot, tmp_path, monkeypatch, caplog):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch,
+                            prompt="gamma form, an example lantern, soft light")
+
+    with caplog.at_level("INFO"):
+        _speak_request(view, qtbot, "Request, no example lantern, over.")
+
+    (job,) = view._live_jobs.values()
+    assert f"Request on orig: term dropped, queued as {job.prompt_id}" in caplog.messages
+    for private in ("lantern", "soft light", "blurry"):
+        assert private not in caplog.text
+
+
 def test_the_request_lands_on_the_slide_it_was_opened_over(
         qtbot, tmp_path, monkeypatch):
     # The words take seconds; the show holds, but the target is taken when the

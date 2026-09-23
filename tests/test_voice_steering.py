@@ -5,6 +5,7 @@ rewrite) drive the whole flow synchronously, without audio, a model, or a server
 """
 from __future__ import annotations
 
+import logging
 from unittest.mock import Mock
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -88,6 +89,23 @@ def test_a_listener_failure_surfaces(qtbot):
     assert errors and "no mic" in errors[0]
 
 
+def test_what_steers_the_prompt_leaves_its_words_and_both_prompts_off_the_log(
+        qtbot, caplog):
+    steering, listener = _steering(listener=FakeListener("add an example lantern"))
+    prompts = {"positive": "gamma form, an example scene unfolds",
+               "negative": "example flaws to avoid"}
+    steering.start(lambda: dict(prompts), lambda new: prompts.update(new))
+
+    with caplog.at_level(logging.INFO, logger="origenerator.voice"):
+        listener.hear()
+
+    assert prompts["positive"].endswith("add an example lantern")
+    assert caplog.messages == ["Voice: rewriting the prompt with a 4-word instruction",
+                               "Voice: rewrote the prompt pair"]
+    for private in ("lantern", "scene unfolds", "flaws to avoid"):
+        assert private not in caplog.text
+
+
 # --- spoken commands: the same mic, a second use ----------------------------
 
 
@@ -161,6 +179,26 @@ def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypat
     built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"})
 
 
+def test_a_command_is_logged_in_the_words_it_was_heard_in(qtbot, caplog):
+    steering, listener = _command_steering(says="Fix teeth.")
+    steering.start_commands(lambda matched: None)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.voice"):
+        listener.hear()
+
+    assert caplog.messages == ["Voice: 'Fix teeth.' matched 'teeth'"]
+
+
+def test_words_that_miss_every_command_are_logged_while_nothing_steers(qtbot, caplog):
+    steering, listener = _command_steering(says="fix teath")
+    steering.start_commands(lambda matched: None)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.voice"):
+        listener.hear()
+
+    assert caplog.messages == ["Voice: 'fix teath' matched no command"]
+
+
 def test_stopping_commands_ends_their_execution(qtbot):
     steering, listener = _command_steering()
     ran = []
@@ -227,6 +265,19 @@ def test_requests_ride_along_wherever_the_mic_is_open(qtbot):
     listener.hear()
 
     assert spoken and spoken[0].text == "no hat"
+
+
+def test_a_request_is_logged_by_where_it_stands_and_never_by_its_words(qtbot, caplog):
+    steering, listener = _request_steering(says="Request, no example lantern, over.")
+    spoken = []
+    steering.request.connect(spoken.append)
+    steering.start_commands(lambda matched: None)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.voice"):
+        listener.hear()
+
+    assert [request.text for request in spoken] == ["no example lantern"]
+    assert caplog.messages == ["Voice: request completed"]
 
 
 def test_closing_the_mic_drops_a_half_said_request(qtbot):

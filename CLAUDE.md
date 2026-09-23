@@ -275,10 +275,14 @@ from a session, no hardware in view: send
 `../fun_time/state/osr2_serial_tx.txt` (its mtime moves iff UDP → broker →
 serial happened; `broker_heartbeat.txt` is broker liveness); grep each state
 dir's `origenerator.log` for "OSR2 motion engaged" / "streaming" to see whether
-the app ever actually drove; render a widget offscreen and look at the PNG
-(`widget.grab().save(...)` — offscreen has no fonts, so text is tofu there but
-fine live); and check which instance the user is running from the launch lines
-at the top of each state dir's log — the "main app" can be on pre-merge code.
+the app ever actually drove; lay a widget out offscreen and read its geometry
+— `geometry()`, `sizeHint()`, where a child lands (`mapTo(window, QPoint())`)
+once `layout().activate()` has run — never a picture of it, because a grab of
+anything showing a generation is one of his pictures, which no agent looks at
+(Private Content, in the global engineering law), and the private-content
+hook refuses to open a PNG this checkout does not track; and check which
+instance the user is running from the launch lines at the top of each state
+dir's log — the "main app" can be on pre-merge code.
 
 ## Landing — GitHub merge queue, not local ff-merge
 

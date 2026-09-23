@@ -427,9 +427,10 @@ def smart_match(terms: list[str], term: str, *, base_url: str, model: str,
         with urllib.request.urlopen(request, timeout=timeout) as response:
             chosen = parse_match(json.loads(response.read()), len(terms))
     except Exception as exc:  # model down / unparseable: the words stand alone
-        logger.warning("prompt_edit: could not match %r against the prompt (%s)",
-                       term, exc)
+        logger.warning("prompt_edit: could not match the request against the "
+                       "prompt's %d terms (%s)", len(terms), exc)
         return None
     if chosen is not None:
-        logger.info("prompt_edit: %r matched the prompt's %r", term, terms[chosen])
+        logger.info("prompt_edit: the request matched index %d of the prompt's %d terms",
+                    chosen, len(terms))
     return chosen

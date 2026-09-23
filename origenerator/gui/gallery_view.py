@@ -3124,8 +3124,8 @@ class GalleryView(QWidget):
         if not self._jobs.start_prepared(key, workflow, params):
             return "🎤 couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)
-        logger.info("Request %r on %s: %s", spoken.heard, row.get("prompt_id"),
-                    revision.describe())
+        logger.info("Request on %s: term %s, queued as %s", row.get("prompt_id"),
+                    revision.action, job.prompt_id)
         self._db.record_request(
             prompt_id=job.prompt_id, source_prompt_id=row["prompt_id"],
             heard=spoken.heard, term=revision.term, polarity=revision.polarity,

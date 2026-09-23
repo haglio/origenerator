@@ -7,11 +7,7 @@ pool; the worker's signals carry the result back to the UI thread that owns it.
 """
 from __future__ import annotations
 
-import logging
-
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot
-
-logger = logging.getLogger(__name__)
 
 
 class VoiceWorker(QObject):
@@ -40,7 +36,6 @@ class VoiceWorker(QObject):
             if match_command is not None:
                 matched = match_command(instruction)
                 if matched is not None:
-                    logger.info("Voice: command matched %r", matched)
                     self.command.emit(matched)
                     return
             if prompts is None:

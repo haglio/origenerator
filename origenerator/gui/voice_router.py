@@ -466,7 +466,7 @@ class VoiceRouter(QObject):
         app's own vocabulary: the session cannot know which shelves this tree
         has or which detail parts have detectors installed.
 
-        The order is this app's own mic's (``VoiceSteering._interpret``).  A
+        The order is this app's own mic's (``VoiceSteering._meaning``).  A
         whole-utterance word is that command first — "landscape enhanced only"
         turns the show's switch, and left to the looser picture matcher it
         would read as "enhance" with a word after it — so long as no request

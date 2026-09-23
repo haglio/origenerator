@@ -132,7 +132,7 @@ class VoiceSteering(QObject):
 
     def bare_command(self, text: str):
         """The whole-utterance command *text* is, or ``None`` — asked of a
-        transcription the HOSTING session heard, the way :meth:`_interpret`
+        transcription the HOSTING session heard, the way :meth:`_meaning`
         asks it of this app's own mic: first, and only while no request is
         being said.  Without this the session's "enhanced only" reached the
         looser picture matcher, which reads it as "enhance" with a word after
@@ -164,14 +164,27 @@ class VoiceSteering(QObject):
         if self._get_prompts is None and self._execute_command is None:
             return
         prompts = self._get_prompts() if self._get_prompts is not None else None
-        logger.info("Voice: heard %r (positive %r)", text, (prompts or {}).get("positive"))
+        interpret = partial(self._interpret, steering=prompts is not None)
         if self._async:
             QThreadPool.globalInstance().start(
-                ProcessTask(self._worker, text, prompts, self._interpret))
+                ProcessTask(self._worker, text, prompts, interpret))
         else:
-            self._worker.process(text, prompts, self._interpret)
+            self._worker.process(text, prompts, interpret)
 
-    def _interpret(self, text: str):
+    def _interpret(self, text: str, *, steering: bool):
+        meaning = self._meaning(text)
+        if isinstance(meaning, SpokenRequest):
+            logger.info("Voice: request %s", meaning.state.value)
+        elif meaning is not None:
+            logger.info("Voice: %r matched %r", text, meaning)
+        elif steering:
+            logger.info("Voice: rewriting the prompt with a %d-word instruction",
+                        len(text.split()))
+        else:
+            logger.info("Voice: %r matched no command", text)
+        return meaning
+
+    def _meaning(self, text: str):
         """What one transcription meant, or ``None`` to let it steer the prompt.
 
         An utterance that is nothing but a command word is that command, so long
@@ -202,15 +215,13 @@ class VoiceSteering(QObject):
 
     def _on_command(self, matched) -> None:
         if isinstance(matched, SpokenRequest):
-            logger.info("Voice: request %s -> %r", matched.state, matched.text)
             self.request.emit(matched)
             return
-        logger.info("Voice: command -> %r", matched)
         if self._execute_command is not None:
             self._execute_command(matched)
 
     def _on_rewritten(self, new_prompts) -> None:
-        logger.info("Voice: rewrote -> %r", new_prompts)
+        logger.info("Voice: rewrote the prompt pair")
         if self._set_prompts is not None:
             self._set_prompts(new_prompts)
             self.edited.emit(new_prompts.get("positive", ""))

@@ -37,6 +37,8 @@ _PREVIEW_IMAGE_EVENT = 1
 # A preview frame's payload is then a 4-byte image-format tag followed by the
 # encoded image, so the displayable bytes start at offset 8.
 _PREVIEW_IMAGE_OFFSET = 8
+_WHAT_THREW_AND_WHERE = ("node_id", "node_type", "exception_type", "exception_message",
+                         "traceback")
 
 class ComfyUIClient(QThread):
     connected = pyqtSignal()
@@ -210,7 +212,8 @@ class ComfyUIClient(QThread):
         elif msg_type == "execution_error":
             self.job_error.emit(
                 data.get("prompt_id", ""),
-                json.dumps(data),
+                json.dumps({field: data[field] for field in _WHAT_THREW_AND_WHERE
+                            if field in data}),
             )
 
     def _handle_ws_binary(self, raw: bytes):

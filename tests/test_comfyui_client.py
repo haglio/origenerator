@@ -106,6 +106,25 @@ def test_progress_carries_the_node_that_took_the_step(qtbot):
     # as "same pass as before", which is what it was before ids were carried.
     assert seen == [("job1", "24", 3, 50), ("job1", "", 4, 50)]
 
+def test_a_failed_run_arrives_saying_what_threw_and_nothing_its_node_was_given(qtbot):
+    client = ComfyUIClient()
+    seen = []
+    client.job_error.connect(lambda pid, message: seen.append((pid, json.loads(message))))
+
+    client._handle_ws_message(json.dumps({"type": "execution_error", "data": {
+        "prompt_id": "job1", "node_id": "6", "node_type": "CLIPTextEncode",
+        "executed": ["4"], "exception_message": "example failure",
+        "exception_type": "RuntimeError", "traceback": ['  File "nodes.py", line 1'],
+        "current_inputs": {"text": ["gamma form, an example scene unfolds"]},
+        "current_outputs": ["4"],
+    }}))
+
+    assert seen == [("job1", {
+        "node_id": "6", "node_type": "CLIPTextEncode",
+        "exception_message": "example failure", "exception_type": "RuntimeError",
+        "traceback": ['  File "nodes.py", line 1'],
+    })]
+
 def test_reuses_a_supplied_client_id(qtbot):
     # Persisting and reusing this id across launches is how a restart reconnects to a
     # job still running in ComfyUI, which targets that job's live websocket messages

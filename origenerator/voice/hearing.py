@@ -16,7 +16,6 @@ from voice_core.listener import (
     Engines,
     ListenerEvents,
     ListenerSettings,
-    PauseSettings,
 )
 from voice_core.listening import Heard
 from voice_core.listening_thread import ListeningThread
@@ -56,8 +55,7 @@ class Hearing(QObject):
         return CommandListener(
             self._rules,
             ListenerSettings(model_name=config.VOICE_MODEL_NAME,
-                             device_name=config.VOICE_DEVICE_NAME, pauses=PauseSettings(),
-                             speech_hint=request_bias()),
+                             device_name=config.VOICE_DEVICE_NAME, speech_hint=request_bias()),
             ListenerEvents(heard=self._on_heard, speech=self._on_speech),
             self._engines or Engines(second_opinion=WhisperReader(),
                                      take_down=WhisperReader(for_dictation=True)))

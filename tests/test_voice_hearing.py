@@ -36,6 +36,12 @@ class _Recognizer:
     def AcceptWaveform(self, _frame):  # noqa: N802 - vosk's own name
         return False
 
+    def Reset(self):  # noqa: N802 - vosk's own name
+        pass
+
+    def PartialResult(self):  # noqa: N802 - vosk's own name
+        return json.dumps({"partial": ""})
+
     def FinalResult(self):  # noqa: N802 - vosk's own name
         return json.dumps({"alternatives": [
             {"text": reading, "confidence": 1.0} for reading in self._readings]})

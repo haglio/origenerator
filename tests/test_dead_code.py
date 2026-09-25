@@ -104,7 +104,16 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19309 when a show's answers became the table the command file's published
 # lines are built from: what the old chain's notes said is
 # test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells.
-MAX_PROSE_LINES = 19309
+#
+# 19290 when closing the window started asking first: its notes on the close --
+# where the quit shortcut fires, what a close hands ComfyUI and saves, the queue
+# flushed last, no chore able to take the session down -- are
+# test_quit_shortcut_fires_from_anywhere_in_the_app,
+# test_ctrl_alt_q_answered_yes_quits_keeping_the_session,
+# test_closing_hands_comfyui_the_experiments_to_run_while_away (red with the flush
+# first), test_close_event_persists_session and
+# test_a_broken_close_chore_still_leaves_the_session_saved.
+MAX_PROSE_LINES = 19290
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

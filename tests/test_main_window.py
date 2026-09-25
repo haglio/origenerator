@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QSystemTrayIcon
+from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from origenerator import gallery, recipe_match, ui_scale
 from origenerator.app_state import AppState
@@ -28,11 +28,12 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.test_gallery_view import _selected_folder, _shelf
 
 
-def _window(qtbot, tmp_path, app_state=None):
+def _window(qtbot, tmp_path, app_state=None, *, fun_time=None):
     win = OrigeneratorWindow(
         ComfyUIClient(),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
+        fun_time=fun_time,
     )
     qtbot.addWidget(win)
     return win
@@ -46,21 +47,117 @@ def _quit_shortcut(win):
     raise AssertionError("window has no Ctrl+Alt+Q shortcut")
 
 
-def test_ctrl_alt_q_quits_persisting_the_session(qtbot, tmp_path):
-    # The quit shortcut goes through close(), so it saves the session like any close.
+def _close_from_the_title_bar(win):
+    QApplication.sendEvent(win.windowHandle(), QCloseEvent())
+
+
+def _answer_the_close_question(monkeypatch, button):
+    asked = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *args: asked.append(args) or button))
+    return asked
+
+
+def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
+
+
+def test_closing_it_from_its_title_bar_asks_first(qtbot, tmp_path, monkeypatch):
+    asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert len(asked) == 1
+    assert win.isVisible()
+
+
+def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
+    asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _quit_shortcut(win).activated.emit()  # what pressing Ctrl+Alt+Q fires
+
+    assert len(asked) == 1
+    assert win.isVisible()
+
+
+def test_saying_no_hands_comfyui_nothing(qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    with patch.object(type(win._gallery_view._jobs), "flush_to_server") as flush:
+        _close_from_the_title_bar(win)
+
+    flush.assert_not_called()
+
+
+def test_saying_yes_closes_it_and_keeps_the_session(qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    win.show()
+    win._gallery_view.select_generation("xyz")
+
+    _close_from_the_title_bar(win)
+
+    assert not win.isVisible()
+    assert AppState(path).get("gallery_selection") == "xyz"
+
+
+def test_ctrl_alt_q_answered_yes_quits_keeping_the_session(qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
     win._gallery_view.select_generation("xyz")
 
-    _quit_shortcut(win).activated.emit()  # what pressing Ctrl+Alt+Q fires
+    _quit_shortcut(win).activated.emit()
 
     assert AppState(path).get("gallery_selection") == "xyz"
 
 
-def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
-    # Application-scoped, so it triggers regardless of which widget holds focus.
+def test_windows_signing_out_closes_it_without_asking(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    assert _quit_shortcut(win).context() == Qt.ShortcutContext.ApplicationShortcut
+    win.show()
+
+    QApplication.closeAllWindows()  # what Qt does as Windows ends the session
+
+    assert not win.isVisible()
+
+
+def test_a_window_fun_time_launched_closes_when_the_session_ends_without_asking(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert not win.isVisible()
+
+
+def test_ctrl_alt_q_in_a_fun_time_session_quits_without_asking(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    win.show()
+
+    _quit_shortcut(win).activated.emit()
+
+    assert not win.isVisible()
+
+
+def test_a_window_a_session_handed_back_asks_again(qtbot, tmp_path, monkeypatch):
+    asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    _close_from_the_title_bar(win)
+
+    assert len(asked) == 1
 
 
 def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
@@ -840,11 +937,7 @@ def _headset_session(tmp_path, main=(10, 20, 200, 100)):
 def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_path):
     """Its picture is what the room shows, and a parked window has no picture:
     Qt draws nothing for one Windows has unmapped."""
-    win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
-        fun_time=_headset_session(tmp_path),
-    )
-    qtbot.addWidget(win)
+    win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
 
     assert not win.isMinimized()
     assert win.hands_its_window_over is not None
@@ -853,11 +946,7 @@ def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_p
 def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
     """There the window itself is what is seen, so a frame written every tick
     would be work for nobody."""
-    win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
-        fun_time=_fun_time_session(),
-    )
-    qtbot.addWidget(win)
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
 
     assert win.hands_its_window_over is None
 
@@ -879,11 +968,7 @@ def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, t
 
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):
-    win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
-        fun_time=_fun_time_session(),
-    )
-    qtbot.addWidget(win)
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
     assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
     geo = win.geometry()
@@ -898,11 +983,7 @@ def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
     state = AppState(path)
     state.set("window_geometry", "c3RhbmRhbG9uZQ==")
     state.save()
-    win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), state,
-        fun_time=_fun_time_session(),
-    )
-    qtbot.addWidget(win)
+    win = _window(qtbot, tmp_path, state, fun_time=_fun_time_session())
     win.close()
     assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="
 
@@ -915,11 +996,7 @@ def test_a_hosted_window_wires_the_sessions_channels_to_its_own_gallery(qtbot, t
     # session, so it is the one that can wire them without naming anything
     # private, and the bridge is parented to it for lifetime either way.
     session = _fun_time_session()
-    win = OrigeneratorWindow(
-        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
-        fun_time=session,
-    )
-    qtbot.addWidget(win)
+    win = _window(qtbot, tmp_path, fun_time=session)
 
     bridges = win.findChildren(FunTimeBridge)
     assert len(bridges) == 1
@@ -945,6 +1022,8 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
 
     assert said == [("Video ready", "WAN 2.2 Image-to-Video · 4:12",
                      QSystemTrayIcon.MessageIcon.Information)]
+
+
 def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path, caplog):
     # Nothing said either transition, so a log could not tell a window a session
     # had taken from one it had missed -- and those behave differently.

@@ -4439,6 +4439,11 @@ class GalleryView(QWidget):
         self._search.leave()
         self._go_to_generation(prompt_id)
 
+    def go_to_file(self, path: str):
+        prompt_id = gallery.generation_of_file(path, self._db.list_generations())
+        if prompt_id is not None:
+            self.follow_link(prompt_id)
+
     def _go_to_generation(self, prompt_id: str):
         """Go to a generation: open the folder holding it, draw that folder, pick
         the item's own tile in it, and show the item in the info pane.

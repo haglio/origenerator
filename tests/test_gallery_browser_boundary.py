@@ -150,8 +150,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the Favorites shelf and drawing it again where it is open is one method both
     of them ask. And the pane 75 -> 77: it marks a folder's square in place, and
     reads the bookmarked folders off each side's folders when it needs them
-    rather than keeping a list a star would leave stale.)"""
+    rather than keeping a list a star would leave stale. 267 -> 268: a Fun Time
+    session names the clip its Genau has locked on by the clip's file, and
+    landing on the generation that file copies is `go_to_file` -- the gallery's
+    rows and a `follow_link`, which nothing outside it holds both of.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 267
+               for x in _class_def(VIEW, "GalleryView").body) == 268
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

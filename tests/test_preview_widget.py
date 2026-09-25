@@ -11,6 +11,7 @@ from PyQt6.QtGui import QImage, QMouseEvent, QResizeEvent
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PyQt6.QtWidgets import QApplication, QWidget
 
+from origenerator.fun_time_mode import PlayerChannel
 from origenerator.funscript import (
     funscript_path_for,
     legacy_funscript_path_for,
@@ -21,6 +22,7 @@ from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_wid
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.generation_drag import GENERATION_MIME
+from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.preview_widget import PreviewWidget
 
 
@@ -383,17 +385,16 @@ def test_a_report_still_waiting_when_the_next_clip_comes_up_is_not_passed_on(mak
 
 # --- double-click to open the current media fullscreen ----------------------
 
-def _arm(preview, cls=None):
+def _arm(preview):
     """Wire what a double-click here opens, as the gallery does — the pane itself
-    has no idea what folder its generation sits in, so the window is built for it.
-    Returns a list the built windows land in."""
+    has no idea what folder its generation sits in, so the show is built for it.
+    Returns a list the built shows land in."""
     built = []
 
     def make(media, frame):
-        win = (cls or _FakeFullscreen)(media, frame=frame)
-        built.append(win)
-        win.showFullScreen()
-        return win
+        show = _FakeShow(media, frame=frame)
+        built.append(show)
+        return show
 
     preview.set_fullscreen_factory(make)
     return built
@@ -408,7 +409,6 @@ def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path):
     w.mouseDoubleClickEvent(None)
 
     assert built[0].media == (png, "image")
-    assert built[0].isVisible()
     assert w._fullscreen is built[0]  # kept alive here, and fed from here
 
 
@@ -479,17 +479,22 @@ def test_both_presses_of_a_double_click_run_the_press_callback(qtbot):
 
 # --- watching a generation fullscreen while it's still being made -----------
 
-class _FakeFullscreen(QWidget):
-    """Stands in for the slideshow a double-click opens, so a test can see what
-    the pane feeds a show opened over a running generation, without a real media
-    backend."""
+class _FakeShow:
+    """Stands in for the show a double-click opens, which is a window of this
+    app's or one of a session's players -- so nothing of a window is on it."""
 
-    def __init__(self, media, *, frame=None, **kwargs):
-        super().__init__()
+    def __init__(self, media, *, frame=None):
         self.media = media
         self.frames = [frame] if frame is not None else []
         self.landed = None
         self._live = media is None
+        self._showing = True
+
+    def is_showing(self):
+        return self._showing
+
+    def close(self):
+        self._showing = False
 
     def is_live(self):
         return self._live
@@ -500,9 +505,6 @@ class _FakeFullscreen(QWidget):
     def show_landed(self, media):
         self.landed = media
         self._live = False
-
-    def showFullScreen(self):
-        self.show()
 
 
 @pytest.fixture
@@ -597,6 +599,33 @@ def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
     live_preview.show_frame(_png_bytes())  # a later run starts streaming
 
     assert win.frames == [_png_bytes()]  # the view still shows what it landed on
+
+
+def _show_on_a_sessions_player(tmp_path):
+    show = PlayerShow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
+                      channel=PlayerChannel(
+                          playlist=tmp_path / "landscape.tsv",
+                          command_file=tmp_path / "landscape_cmd.txt",
+                          status_file=tmp_path / "landscape_status.txt",
+                          hud_file=tmp_path / "origenerator_landscape_hud.json"))
+    show._timer.stop()
+    return show
+
+
+def test_a_pane_whose_picture_went_to_a_sessions_player_goes_on_taking_runs_and_files(
+        make_preview, tmp_path):
+    show = _show_on_a_sessions_player(tmp_path)
+    preview = make_preview()
+    preview.set_fullscreen_factory(lambda media, frame: show)
+    preview.show_image(_make_png(tmp_path / "a.png"))
+    assert preview.open_fullscreen() is show
+    handed_over = show.channel.command_file.read_text(encoding="utf-8")
+
+    preview.show_frame(_png_bytes())
+    preview.show_image(_make_png(tmp_path / "landed.png"))
+
+    assert not preview._image_label.pixmap().isNull()
+    assert show.channel.command_file.read_text(encoding="utf-8") == handed_over
 
 
 # --- funscript strip: proof a shown video carries a funscript -----------

@@ -12,9 +12,9 @@ import random
 import pytest
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.gui.show_set import ShowSet, narrow_to_the_act_on_screen
+from origenerator.gui.show_set import ShowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import in_order
+from origenerator.slideshow import LIVE, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -153,6 +153,116 @@ def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded
     assert sorted(_pass(show_set)) == sorted(item[2] for item in _TWELVE)
     assert _pass(show_set) != [item[2] for item in _TWELVE]
     assert show_set.order_label == SHUFFLE_LABEL
+
+
+# --- a picture that something is being made of -------------------------------
+
+def test_a_pass_dealt_while_a_picture_of_it_is_being_enhanced_opens_on_it():
+    show_set, _dealt = _set(hud=HudFacts(enhancing={"id-3": "running"}))
+
+    assert _pass(show_set) == ["id-3", "id-1", "id-2"]
+    assert show_set.current_prompt_id() == "id-3"
+
+
+def test_a_picture_whose_enhancement_is_still_waiting_keeps_its_place():
+    show_set, _dealt = _set(hud=HudFacts(enhancing={"id-3": "queued"}))
+
+    assert _pass(show_set) == ["id-1", "id-2", "id-3"]
+
+
+def test_a_pass_opened_on_a_named_slide_stays_on_it_whatever_is_being_made():
+    show_set, _dealt = _set(start=1, hud=HudFacts(enhancing={"id-3": "running"}))
+
+    assert show_set.current_prompt_id() == "id-2"
+
+
+def test_a_new_set_opens_on_the_picture_being_made_in_it():
+    show_set, _dealt = _set()
+    show_set.note_enhancing({"id-2": "running"})
+
+    show_set.reorder(_ITEMS, latest=True)
+
+    assert show_set.current_prompt_id() == "id-2"
+
+
+def test_a_run_still_streaming_its_frames_leads_when_the_show_is_asked_to():
+    show_set, _dealt = _set()
+    show_set.playlist.add(Slide(b"frame", LIVE, "id-run"))
+
+    assert show_set.lead_with_what_is_being_made() is True
+    assert show_set.current_prompt_id() == "id-run"
+
+
+def test_a_locked_slide_is_not_taken_off_the_screen_for_what_is_being_made():
+    show_set, _dealt = _set()
+    show_set.playlist.toggle_lock()
+    show_set.note_enhancing({"id-3": "running"})
+
+    assert show_set.lead_with_what_is_being_made() is False
+    assert show_set.current_prompt_id() == "id-1"
+
+
+def test_a_picture_being_made_holds_the_screen_half_as_long_as_the_pace():
+    show_set, _dealt = _set(hud=HudFacts(enhancing={"id-2": "queued", "id-3": "running"}))
+    plain, waiting, being_made = (Slide.of(item) for item in _ITEMS)
+
+    assert show_set.pace_for(being_made, 5) == 2.5
+    assert show_set.pace_for(waiting, 5) == 5
+    assert show_set.pace_for(plain, 5) == 5
+
+
+_TWO_VERSIONS = [("one_enhanced.png", "image", "Enhance 1"), ("one.png", "image", "Original")]
+
+
+def test_the_note_on_a_picture_filed_once_with_nothing_in_flight_says_nothing():
+    show_set, _dealt = _set()
+
+    assert item_note(show_set, levels=[], level_index=0) == ""
+
+
+def test_the_note_names_the_version_on_screen_and_how_many_there_are():
+    show_set, _dealt = _set()
+
+    assert item_note(show_set, levels=_TWO_VERSIONS, level_index=1) == "Original — 2 of 2"
+
+
+def test_the_note_says_whether_a_better_version_is_being_made_or_waiting():
+    show_set, _dealt = _set()
+
+    show_set.note_enhancing({"id-1": "queued"})
+    assert item_note(show_set, levels=[], level_index=0) == "Enhancement queued"
+    show_set.note_enhancing({"id-1": "running"})
+    assert item_note(show_set, levels=[], level_index=0) == "Enhancing…"
+    assert item_note(show_set, levels=_TWO_VERSIONS, level_index=0) == (
+        "Enhance 1 — 1 of 2 · Enhancing…")
+
+
+def test_an_enhancement_this_show_asked_for_waits_until_the_gallery_says_otherwise():
+    show_set, _dealt = _set()
+
+    show_set.note_enhancement_asked("id-1")
+
+    assert item_note(show_set, levels=[], level_index=0) == "Enhancement queued"
+    show_set.note_enhancing({"id-1": "running"})
+    assert item_note(show_set, levels=[], level_index=0) == "Enhancing…"
+
+
+def test_an_enhancement_that_landed_leaves_nothing_in_flight_to_say():
+    show_set, _dealt = _set()
+    show_set.note_enhancement_asked("id-1")
+    show_set.note_enhancing({"id-1": "running"})
+
+    show_set.note_enhancement_landed("id-1")
+
+    assert item_note(show_set, levels=[], level_index=0) == ""
+
+
+def test_the_note_on_a_run_still_streaming_its_frames_says_it_is_being_generated():
+    show_set, _dealt = _set()
+    show_set.playlist.add(Slide(b"frame", LIVE, "id-run"))
+    show_set.lead_with_what_is_being_made()
+
+    assert item_note(show_set, levels=[], level_index=0) == "Generating…"
 
 
 # --- the map around the slide on screen, and the loops along it -------------

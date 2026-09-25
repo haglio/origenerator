@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -109,6 +110,7 @@ class FakeShow:
         self.pause_raises = False
         self.state_at_close = "where-it-got-to"
         self.played = []
+        self.leads = 0
 
     # what a show is, and what it holds
     def queue(self):
@@ -161,6 +163,9 @@ class FakeShow:
 
     def note_enhancing(self, statuses):
         self.enhancing = dict(statuses)
+
+    def lead_with_what_is_being_made(self):
+        self.leads += 1
 
     def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
@@ -1118,12 +1123,13 @@ def test_the_queue_plate_comes_up_filled_rather_than_blank(shows):
     # The hold on videos is this opening's own doing, so the corner says what is
     # waiting on it rather than going blank for a second and a half.
     host = FakeHost()
-    host.queue = (["a card"], 3)
+    waiting = _being_made("g-waiting", frame=None)
+    host.queue = ([waiting], 3)
     director, _host, made = shows(host)
 
     director.open([("a.png", "image", "g1", None)])
 
-    assert made[0].queue_set == (["a card"], 3)
+    assert made[0].queue_set == ([waiting], 3)
 
 
 def test_the_plate_clear_drops_another_apps_work(shows):
@@ -1467,3 +1473,49 @@ def test_a_show_of_a_folder_still_picks_up_where_the_last_one_stopped(shows):
 
     assert made[0].resumed is director._show_state
 
+
+
+# --- what is being made while a show is up --------------------------------------
+
+def _being_made(key, frame=b"frame"):
+    return SimpleNamespace(key=key, reading=SimpleNamespace(frame=frame))
+
+
+def test_how_the_enhancements_are_going_reaches_every_show_that_is_up(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    director.note_enhancing({"g1": "running"})
+
+    assert [show.enhancing for show in made] == [{"g1": "running"}] * 2
+
+
+def test_a_show_opens_knowing_what_is_being_enhanced(shows):
+    director, _host, made = shows()
+    director.note_enhancing({"g1": "running"})
+
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].hud.enhancing == {"g1": "running"}
+
+
+def test_a_show_opened_with_no_slide_named_leads_with_the_run_being_generated(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    host.queue = ([_being_made("g-run")], 0)
+    director, _host, made = shows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[0].leads == 1
+
+
+def test_a_show_opened_on_a_named_slide_is_led_nowhere_else(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    host.queue = ([_being_made("g-run")], 0)
+    director, _host, made = shows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+
+    director.open([("a.png", "image", "g1", None)], start=0)
+
+    assert (made[0].generating, made[0].leads) == ([], 0)

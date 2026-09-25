@@ -162,8 +162,9 @@ class FakeShow:
     def note_enhanced(self, prompt_id, path, media_type, *, still):
         self.enhanced.append((prompt_id, media_type, still))
 
-    def note_enhancing(self, statuses):
+    def note_enhancing(self, statuses, frames=None):
         self.enhancing = dict(statuses)
+        self.enhancing_frames = dict(frames or {})
 
     def lead_with_what_is_being_made(self):
         self.leads += 1
@@ -1548,3 +1549,13 @@ def test_a_landed_enhancement_hands_every_show_the_pictures_new_versions(
     director.note_enhanced(_row("g1", files=("better.png",)))
 
     assert [show.levels_added for show in made] == [[{"better.png": ["newer", "older"]}]] * 2
+
+
+def test_the_frames_of_the_enhancements_being_made_reach_every_show_that_is_up(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    director.note_enhancing({"g1": "running"}, frames={"g1": b"frame"})
+
+    assert [show.enhancing_frames for show in made] == [{"g1": b"frame"}] * 2

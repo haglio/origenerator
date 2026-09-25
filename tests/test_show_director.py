@@ -111,6 +111,7 @@ class FakeShow:
         self.state_at_close = "where-it-got-to"
         self.played = []
         self.leads = 0
+        self.levels_added = []
 
     # what a show is, and what it holds
     def queue(self):
@@ -166,6 +167,9 @@ class FakeShow:
 
     def lead_with_what_is_being_made(self):
         self.leads += 1
+
+    def add_levels(self, levels):
+        self.levels_added.append(levels)
 
     def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
@@ -1519,3 +1523,19 @@ def test_a_show_opened_on_a_named_slide_is_led_nowhere_else(shows):
     director.open([("a.png", "image", "g1", None)], start=0)
 
     assert (made[0].generating, made[0].leads) == ([], 0)
+
+
+def test_a_landed_enhancement_hands_every_show_the_pictures_new_versions(
+        shows, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "better.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+    director.versions_of = lambda rows: {"better.png": ["newer", "older"]}
+
+    director.note_enhanced(_row("g1", files=("better.png",)))
+
+    assert [show.levels_added for show in made] == [[{"better.png": ["newer", "older"]}]] * 2

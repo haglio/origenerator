@@ -682,7 +682,8 @@ class GalleryView(QWidget):
             # Space reaches the switch rather than the motion, so a motion
             # running with the switch off is one something else started — the
             # stop has always covered that case, and so does the resume.
-            motion=self._osr2_motion.active and not self.osr2_control.isChecked(),
+            motion=(self._osr2_motion is not None and self._osr2_motion.active
+                    and not self.osr2_control.isChecked()),
             auto=self._auto.active_key(),
             audio=self._bank.audio is not None and self._bank.audio.isChecked(),
             show=show is not None,

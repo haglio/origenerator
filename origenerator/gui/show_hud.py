@@ -102,7 +102,8 @@ _THE_SHOWS_OWN = frozenset({
 })
 
 def _cell(slide, label: str = "") -> HudCell:
-    return HudCell(path=str(slide.path), thumb=thumb_of(slide), label=label)
+    return HudCell(path="" if slide.is_live else str(slide.path), thumb=thumb_of(slide),
+                   label=label)
 
 
 def show_hud_model(side: str, host, *, hosted: bool = True,

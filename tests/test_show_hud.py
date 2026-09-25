@@ -165,3 +165,15 @@ class TestTheOnePanelAShowWears:
         hud._deliver("portrait_next")
 
         assert show._playlist.index != before
+
+
+def test_a_picture_still_being_generated_is_drawn_on_the_map_without_its_frame_bytes(qtbot):
+    show = SlideshowView([("scene one.png", "image", "id-one")], engine=FakeEngine(),
+                         shuffle=in_order)
+    qtbot.addWidget(show)
+    show.note_generating("id-run", b"\x89PNG frame bytes")
+    show.step(1)
+
+    corner = show_hud_model("portrait", show).corner
+
+    assert (corner.path, corner.thumb) == ("", "")

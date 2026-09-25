@@ -619,4 +619,4 @@ def looping_note(show_set: ShowSet) -> str:
 def thumb_of(slide: Slide) -> str:
     """The still a map cell draws for *slide*, as the path the panel takes."""
     still = still_for(slide)
-    return str(still) if still else ""
+    return str(still) if still and not slide.is_live else ""

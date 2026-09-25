@@ -1559,3 +1559,54 @@ def test_the_frames_of_the_enhancements_being_made_reach_every_show_that_is_up(s
     director.note_enhancing({"g1": "running"}, frames={"g1": b"frame"})
 
     assert [show.enhancing_frames for show in made] == [{"g1": b"frame"}] * 2
+
+
+def test_a_run_reaches_each_show_whose_own_set_holds_it(shows):
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1"), _row("g-run")],
+                                   "shelf/b": [_row("g2")]})
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[1].generating == []
+
+
+def test_every_show_that_is_up_hears_which_runs_are_still_being_made(shows):
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")], "shelf/b": [_row("g2")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+
+    director.note_in_flight([_being_made("g-run", frame=None)])
+
+    assert [show.in_flight for show in made] == [{"g-run"}, {"g-run"}]
+
+
+def test_a_latest_show_takes_a_new_run_after_the_browser_has_moved_on(shows):
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g1")]}, recents=False)
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
+                  side=LANDSCAPE)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == [("g-run", b"frame")]
+
+
+def test_a_latest_show_turns_down_a_run_asked_for_in_the_other_shape(shows):
+    run = _row("g-run")
+    run["params_json"] = json.dumps({"width": 1024, "height": 768})
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g1")]})
+    director, _host, made = shows(browser=browser, db=FakeDB([run]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
+                  side=PORTRAIT)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == []

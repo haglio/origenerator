@@ -74,6 +74,18 @@ def test_closing_it_from_its_title_bar_asks_first(qtbot, tmp_path, monkeypatch):
     assert win.isVisible()
 
 
+def test_the_question_names_origenerator_in_full_since_its_title_is_cut_short(
+        qtbot, tmp_path, monkeypatch):
+    asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    _parent, _title, text, *_buttons = asked[0]
+    assert text == "Are you sure you want to close Origenerator?"
+
+
 def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
     asked = _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
     win = _window(qtbot, tmp_path)

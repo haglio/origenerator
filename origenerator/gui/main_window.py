@@ -289,7 +289,7 @@ class OrigeneratorWindow(QMainWindow):
         if self._fun_time is not None:
             return True
         return QMessageBox.question(
-            self, "Close Origenerator", "Are you sure?",
+            self, "Close Origenerator", "Are you sure you want to close Origenerator?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         ) == QMessageBox.StandardButton.Yes

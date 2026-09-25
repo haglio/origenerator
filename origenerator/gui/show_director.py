@@ -417,7 +417,7 @@ class ShowDirector:
             # left showing is only a version once they are armed.
             show.resume(resume)
         if kwargs.get("start") is None:
-            self._offer_the_frames(show, self._host.queue_now()[0])
+            self._offer_the_frames(show, location, self._host.queue_now()[0])
             show.lead_with_what_is_being_made()
         if not already_live:
             show.open_requested.connect(self._open_from_slideshow)
@@ -1017,8 +1017,8 @@ class ShowDirector:
                                 enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):
-        """A run streamed a frame: an open show playing its folder takes it in as
-        a slide of that frame, right now, and keeps it current from there.
+        """A run streamed a frame: every open show playing its folder takes it in
+        as a slide of that frame, right now, and keeps it current from there.
 
         Waiting for the file is waiting minutes for the one thing the show is
         being watched for. The first iterations are already worth looking at, so
@@ -1028,17 +1028,19 @@ class ShowDirector:
         asked again on its next frame, since the folder lists a new run a poll
         after it starts.
         """
-        show = self._slideshow
-        if show is None or show.is_live():
-            return  # a show already following one run full-screen is that run's
-        if not show.holds(prompt_id) and not self._would_play(prompt_id):
-            return
-        show.note_generating(prompt_id, frame)
+        for show, location in self._shows_open_to_runs():
+            if show.holds(prompt_id) or self._would_play(prompt_id, location):
+                show.note_generating(prompt_id, frame)
 
-    def _would_play(self, prompt_id: str) -> bool:
-        """Whether the open show would be playing a generation that has no file
-        yet — the question :meth:`note_finished` asks of the rows on screen,
-        asked a few minutes earlier.
+    def _shows_open_to_runs(self) -> list[tuple]:
+        return [(show, location) for show, location in self._live_shows
+                if not show.is_live()]
+
+    def _would_play(self, prompt_id: str, location=None) -> bool:
+        """Whether a show opened at *location* would be playing a generation
+        that has no file yet — the question :meth:`note_finished` asks of its
+        rows, asked a few minutes earlier.  A show opened on a preview has no
+        location, and is asked of the view on screen.
 
         A folder's show answers off those rows as usual: the tree keeps a run in
         flight in the folder its settings put it in, so it is already among them.
@@ -1054,20 +1056,25 @@ class ShowDirector:
         would be the same image twice, one of them worse.
         """
         row = self._db.get_generation(prompt_id)
-        return bool(
-            row is not None
-            and row.get("workflow_name") != gallery.ENHANCE_WORKFLOW
-            and (any(r["prompt_id"] == prompt_id for r in self._host.rows_to_play())
-                 # Recents by its own rule, having no list of its own to consult.
-                 or (self._browser.showing_recents()
-                     and not self._browser.showing_search()
-                     and source_of(row) == GenerationSource.GENERATED
-                     and gallery.media_type_of_row(row) in self._host.media_types()))
-        )
+        if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+            return False
+        rows = self.rows_at(location) if location else self._host.rows_to_play()
+        return (any(r["prompt_id"] == prompt_id for r in rows)
+                or self._recents_would_take(row, location))
+
+    def _recents_would_take(self, row: dict, location) -> bool:
+        base, side = _split_shelf_key(location)
+        playing_recents = (base == _RECENTS_KEY if location
+                           else self._browser.showing_recents()
+                           and not self._browser.showing_search())
+        return bool(playing_recents
+                    and source_of(row) == GenerationSource.GENERATED
+                    and gallery.media_type_of_row(row) in self._host.media_types()
+                    and filter_rows([row], side))
 
     def note_in_flight(self, items):
-        """Tell an open show what is still being made, off the same in-flight list
-        the queue plate in its corner is drawn from.
+        """Tell every open show what is still being made, off the same in-flight
+        list the queue plate in its corner is drawn from.
 
         Two things the frames alone can't say. A run whose frames began before the
         show opened sends no new one for a while — the tail of a run is all decode
@@ -1075,16 +1082,14 @@ class ShowDirector:
         and a run that was cancelled or failed sends nothing ever again, leaving
         the half-rendered frame it got to in the pass forever.
         """
-        show = self._slideshow
-        if show is None or show.is_live():
-            return
-        self._offer_the_frames(show, items)
-        show.note_in_flight({item.key for item in items})
+        for show, location in self._shows_open_to_runs():
+            self._offer_the_frames(show, location, items)
+            show.note_in_flight({item.key for item in items})
 
-    def _offer_the_frames(self, show, items) -> None:
+    def _offer_the_frames(self, show, location, items) -> None:
         for item in items:
-            if item.reading.frame is not None and (show.holds(item.key)
-                                           or self._would_play(item.key)):
+            if item.reading.frame is not None and (
+                    show.holds(item.key) or self._would_play(item.key, location)):
                 show.note_generating(item.key, item.reading.frame)
 
     def note_enhanced(self, row: dict | None):

@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator import osr2 as osr2_device
 from origenerator.gui.console import post_console_action, show_device
+from origenerator.gui.holdable_timer import HoldableTimer
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
@@ -45,9 +46,11 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
 from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import (
+    GENERATING,
     LOOP_IS_A_LOCK,
     LOOP_OFF,
     ShowSet,
+    item_note,
     looping_note,
     narrow_to_acts,
     narrow_to_the_act_on_screen,
@@ -62,18 +65,12 @@ from origenerator.slideshow import LIVE, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
 
-_GENERATING = "Generating…"
 # What the map's chrome says when it does what it says, in the players' own
 # words, and the three ways it can have nothing to do.
 _MORE_SEEDS = "More seeds"
 _WIDENING_FAILED = "Widening net failed"
 _NOTHING_TO_LOOP = "Nothing to loop"
 _NOTHING_THAT_WAY = "Nothing that way"
-# What the corner says about an enhancement of the slide on screen. Which of the
-# two is a fact about the run, not about the ask: locking slide after slide
-# sends out a line of runs, and ComfyUI is making exactly one of them.
-_ENHANCING = "Enhancing…"
-_ENHANCE_QUEUED = "Enhancement queued"
 
 
 class SlideshowView(QWidget):
@@ -93,16 +90,6 @@ class SlideshowView(QWidget):
         # each gesture that lands on the generation rather than on the slide.
         # None of it, for a show standing on its own (see ShowActions).
         self._actions = actions if actions is not None else ShowActions()
-        # Locking a slide is also how you ask for it: Down enhances what is on
-        # screen if it has never been enhanced, so the one you stopped on is the
-        # one that gets the better version — and one that already has a better
-        # version is left alone.
-        self._enhancing: set[str] = set()  # prompt_ids with a run in flight
-        # How each enhancement in flight is actually going, as the gallery
-        # reads it (``prompt_id`` -> "running"/"queued"). Pushed in by
-        # :meth:`note_enhancing`: the show knows what it asked for, and only
-        # the side holding the jobs knows which of them is on the GPU.
-        self._enhance_status: dict[str, str] = {}
         self._motion = motion  # the gallery's app-global motion driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
@@ -144,13 +131,9 @@ class SlideshowView(QWidget):
         # both when the queue stops moving (its videos are held) and when the
         # user keeps adding to it (a locked slide asks for an enhancement).
         self._queue = SlideshowQueue(self)
-        # A note about the item on screen: which of its versions this is, that an
-        # enhancement of it is being made, and for a beat whatever a switch or a
-        # spoken fix just did — the only way to tell, in a view with no panels,
-        # that a press did anything. It is a Fun Time notice, at the top center
-        # where Fun Time flashes the same kind of line over a player, because
-        # this surface wears the players' own HUD and had no business saying
-        # things in a second dialect at the other end of the screen.
+        # For a beat, whatever a switch or a spoken fix just did. It is a Fun
+        # Time notice, at the top center where Fun Time flashes the same kind of
+        # line over a player, because this surface wears the players' own HUD.
         self._note = NoticeOverlay(self)
         # What the corner reads while a spoken request pauses the show; empty
         # whenever nothing is being dictated.
@@ -163,6 +146,8 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
+        self._live_clock = HoldableTimer(self)
+        self._live_clock.timeout.connect(self._on_media_ended)
         self._hud = None
 
         # A pause — the hosting session's OmniPause, or a click on a show with no
@@ -255,7 +240,7 @@ class SlideshowView(QWidget):
             if self._frame is not None:
                 self._pane.show_frame(self._frame)
             else:
-                self._pane.show_message(_GENERATING)  # opened before the first one
+                self._pane.show_message(GENERATING)  # opened before the first one
             self._update_counter()
             self._update_neighbors()
             return
@@ -266,10 +251,10 @@ class SlideshowView(QWidget):
         if slide.is_live:
             # Still being made: what it looks like so far, rather than a file.
             self._pane.show_frame(slide.path)
+            self._start_the_live_clock()
         else:
-            # The pace before the file: the engine reads it as it opens one.
-            self._pane.set_pace(self._dwell_s)
-            self._pane.show_media(slide.path, slide.media_type)
+            self._live_clock.cancel()
+            self._open_on_engine(slide.path, slide.media_type)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
@@ -277,6 +262,20 @@ class SlideshowView(QWidget):
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     # --- the slide's own clock, which is the engine's -----------------------
+
+    def _open_on_engine(self, path, media_type) -> None:
+        # The pace before the file: the engine reads it as it opens one.
+        self._pane.set_pace(self._pace_on_screen())
+        self._pane.show_media(path, media_type)
+
+    def _pace_on_screen(self) -> float:
+        return self._set.pace_for(self._playlist.current(), self._dwell_s)
+
+    def _start_the_live_clock(self) -> None:
+        if self._dwell_s:
+            self._live_clock.run_for(int(self._pace_on_screen() * 1000))
+        else:
+            self._live_clock.cancel()
 
     def _apply_freeze(self) -> None:
         """Hand the engine whatever is holding the show still.
@@ -290,7 +289,9 @@ class SlideshowView(QWidget):
         """
         request_stills_a_picture = (self._playlist.paused
                                     and not self._pane.is_showing_video())
-        self._pane.set_paused(self._paused or request_stills_a_picture)
+        held = self._paused or request_stills_a_picture
+        self._pane.set_paused(held)
+        self._live_clock.hold(held)
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -320,7 +321,6 @@ class SlideshowView(QWidget):
         item — its own axis, because a version is not a neighbor.
         """
         self._levels.arm(levels_by_path)
-        self._refresh_note()
 
     def queue(self) -> SlideshowQueue:
         """The floated queue, for the gallery to wire its reorder and clear to —
@@ -367,8 +367,9 @@ class SlideshowView(QWidget):
         if self._live or not self._playlist.resume(state.order, state.current):
             return False
         self._playlist.set_locked(state.locked)
+        led = self._set.lead_with_what_is_being_made()
         self._show_current()
-        if state.level_index:
+        if state.level_index and not led:
             # A fresh slide sits at its top version, so the remembered index is
             # exactly the number of steps down to the one that was on screen.
             self._step_level(state.level_index)
@@ -552,8 +553,7 @@ class SlideshowView(QWidget):
         if level is None:
             return
         self._live = False
-        self._pane.show_media(*level[:2])
-        self._refresh_note()
+        self._open_on_engine(*level[:2])
         self.media_changed.emit()
 
     # --- opened over a generation still being made --------------------------
@@ -947,7 +947,7 @@ class SlideshowView(QWidget):
         self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
-        self._pane.set_pace(seconds)
+        self._pane.set_pace(self._pace_on_screen())
         if not self._playlist.locked:
             # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.
@@ -1047,7 +1047,7 @@ class SlideshowView(QWidget):
         The gallery decides whether it does — it is the one that knows whether
         this image has already been enhanced, whether its Enhance-on-lock
         switch is on at all, and an enhanced one wants nothing.  ``True`` back
-        means a run started, and the note says so until the finished version
+        means a run started, and the HUD says so until the finished version
         arrives.
         """
         if self._actions.enhance is None:
@@ -1055,11 +1055,10 @@ class SlideshowView(QWidget):
         if self._playlist.current_is_live():
             return  # no file yet to make a better version of; the lock still holds
         prompt_id = self._current_prompt_id()
-        if prompt_id is None or prompt_id in self._enhancing:
+        if prompt_id is None or self._set.enhancement_of(prompt_id):
             return
         if self._actions.enhance(prompt_id):
-            self._enhancing.add(prompt_id)
-            self._refresh_note()
+            self._set.note_enhancement_asked(prompt_id)
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
                       still=None) -> None:
@@ -1073,14 +1072,12 @@ class SlideshowView(QWidget):
         one replaced. What is on screen changes only when the upgraded item is
         what's on it.
         """
-        self._enhancing.discard(prompt_id)
-        self._enhance_status.pop(prompt_id, None)
-        self._set.enhanced_ids.add(prompt_id)  # it carries an enhancement now
+        self._set.note_enhancement_landed(prompt_id)
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._levels.restart()  # its versions are a level deeper now
-                self._pane.show_media(path, media_type)
+                self._open_on_engine(path, media_type)
                 self.media_changed.emit()
             self._update_neighbors()  # it may be the still riding either side
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
@@ -1088,29 +1085,13 @@ class SlideshowView(QWidget):
             # better version is exactly what that pass plays, so in it goes.
             self._update_counter()
             self._update_neighbors()
-        self._refresh_note()
 
     def note_enhancing(self, statuses: dict) -> None:
-        """How every enhancement in flight is going, as the gallery reads it:
-        ``prompt_id`` -> ``"running"`` or ``"queued"``.
+        self._set.note_enhancing(statuses)
 
-        Pushed in whenever it changes rather than asked for, because the show has
-        no way to tell: a lock launches a run and hears only that one started,
-        and a show of locked slides has a line of them out at once with ComfyUI
-        working through it one at a time. Without this the note claimed every one
-        of them was being made the moment it was asked for.
-
-        Carries every run in flight, not only the ones this show asked for —
-        which of them the corner speaks for is :meth:`_refresh_note`'s call, and
-        the ones it doesn't cost a dict entry each.
-        """
-        if statuses == self._enhance_status:
-            return
-        self._enhance_status = dict(statuses)
-        # Not over a flash: a status arriving mid-sentence would wipe the answer
-        # to a spoken command. The flash's own timer refreshes on the way out.
-        if not self._note_timer.isActive():
-            self._refresh_note()
+    def lead_with_what_is_being_made(self) -> None:
+        if self._set.lead_with_what_is_being_made():
+            self._show_current()
 
     def _current_prompt_id(self):
         """The id of the item on screen, or ``None`` — a playlist assembled
@@ -1137,12 +1118,8 @@ class SlideshowView(QWidget):
         return self._current_prompt_id()
 
     def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
-        """Say what a spoken order did and, when it launched a run
-        (``prompt_id``), keep the note on that run once the flash fades — the
-        same note a lock's enhance earns, and it reads the same way: where the
-        run has got to, not merely that one was asked for."""
         if prompt_id is not None:
-            self._enhancing.add(prompt_id)
+            self._set.note_enhancement_asked(prompt_id)
         self.note_voice_command(message, kind=kind)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
@@ -1152,45 +1129,17 @@ class SlideshowView(QWidget):
         self._flash_note(message, ms=2500, kind=kind)
 
     def _refresh_note(self):
-        """Say what there is to say about the item on screen: the request being
-        spoken (which stops the show, so it outranks the rest), the one already
-        said and still being worked out, that this slide is still being made,
-        where the version being made of it has got to, or — failing those —
-        which of its versions this one is.
-
-        Stepping levels is invisible without the last line: two versions of one
-        picture differ by texture, which is exactly what you cannot tell apart
-        from memory. And an early iteration looks exactly like a bad generation,
-        so a slide that is still in flight says so, in the same corner and for the
-        same reason an enhancement in flight does.
-        """
         if self._request_note:
             self._show_note(self._request_note)
-            return
-        if self._working_note:
+        elif self._working_note:
             self._show_note(self._working_note)
-            return
-        if self._playlist.current_is_live():
-            self._show_note(_GENERATING)
-            return
-        prompt_id = self._current_prompt_id()
-        if prompt_id is not None and prompt_id in self._enhancing:
-            # Being made, or still in the line — an ask made minutes ago on a
-            # slide the show has come back around to is usually the latter, and
-            # "Enhancing…" over a run nobody has started yet is simply wrong
-            # about the picture being looked at. A run nothing has been said
-            # about counts as waiting: the ask is what has happened to it so far.
-            self._show_note(_ENHANCING
-                            if self._enhance_status.get(prompt_id) == "running"
-                            else _ENHANCE_QUEUED)
-            return
-        levels = self._levels.levels(base=self._current_base())
-        if len(levels) <= 1:
+        else:
             self._note.hide()
-            return
-        index = self._levels.index
-        label = levels[index][2] if len(levels[index]) > 2 else f"Version {index + 1}"
-        self._show_note(f"{label} — {index + 1} of {len(levels)}")
+
+    @property
+    def hud_item_note(self) -> str:
+        return item_note(self._set, levels=self._levels.levels(base=self._current_base()),
+                         level_index=self._levels.index)
 
     def _show_note(self, text: str, *, kind: str = NOTICE) -> None:
         self._note.say(text, kind=kind)
@@ -1347,6 +1296,7 @@ class SlideshowView(QWidget):
         """
         self._pane.clear()  # release any held file so it can be deleted
         self._pane.close_engine()
+        self._live_clock.cancel()
         landing = self._land_on
         if landing is None and self._playlist.locked:
             landing = self._current_prompt_id()

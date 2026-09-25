@@ -233,6 +233,29 @@ def test_an_item_the_playlist_already_holds_is_not_added_twice():
     assert len(playlist) == 1
 
 
+def test_a_slide_led_with_comes_up_now_and_the_one_it_displaced_next():
+    playlist = _playlist()
+    playlist.advance()
+
+    playlist.lead_with(2)
+
+    assert playlist.current() == Slide("c.png", "image")
+    assert playlist.peek(1) == Slide("b.mp4", "video")
+    assert playlist.peek(2) == Slide("a.png", "image")
+
+
+def test_a_slide_led_with_from_earlier_in_the_pass_still_comes_up_now():
+    playlist = _playlist()
+    playlist.advance()
+    playlist.advance()
+
+    playlist.lead_with(0)
+
+    assert playlist.current() == Slide("a.png", "image")
+    assert playlist.peek(1) == Slide("c.png", "image")
+    assert playlist.peek(2) == Slide("b.mp4", "video")
+
+
 # --- an item that gets enhanced while the show runs -------------------------
 
 def _keyed(**kw):

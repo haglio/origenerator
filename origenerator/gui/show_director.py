@@ -191,6 +191,7 @@ class ShowDirector:
         # frames — another folder's work, an enhancement. Asked once and kept,
         # since every frame of such a run asks again (:meth:`_would_play`).
         self._show_refused: set[str] = set()
+        self._enhance_status: dict[str, str] = {}
 
     def become_hosted(self, session) -> None:
         if self._slideshow is not None:
@@ -400,7 +401,8 @@ class ShowDirector:
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
-                      enhanced_ids=self._enhanced_ids_of(rows))
+                      enhanced_ids=self._enhanced_ids_of(rows),
+                      enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
         levels = self.versions_of(rows)
@@ -420,6 +422,9 @@ class ShowDirector:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
             show.resume(resume)
+        if kwargs.get("start") is None:
+            self._offer_the_frames(show, self._host.queue_now()[0])
+            show.lead_with_what_is_being_made()
         if not already_live:
             show.open_requested.connect(self._open_from_slideshow)
             show.closed.connect(lambda s=show: self._on_closed(s))
@@ -1051,8 +1056,8 @@ class ShowDirector:
         search's hits are a set that was already asked for.
 
         An enhancement is nobody's slide, wherever it is running. It is a better
-        version of a picture the show may already be playing, and it says so in
-        that picture's own corner note — a second slide of it half-rendered
+        version of a picture the show may already be playing, and the HUD says
+        so beside that picture's name — a second slide of it half-rendered
         would be the same image twice, one of them worse.
 
         A no is kept for the life of the show, since it is asked again of every
@@ -1089,11 +1094,14 @@ class ShowDirector:
         show = self._slideshow
         if show is None or show.is_live():
             return
+        self._offer_the_frames(show, items)
+        show.note_in_flight({item.key for item in items})
+
+    def _offer_the_frames(self, show, items) -> None:
         for item in items:
             if item.reading.frame is not None and (show.holds(item.key)
                                            or self._would_play(item.key)):
                 show.note_generating(item.key, item.reading.frame)
-        show.note_in_flight({item.key for item in items})
 
     def note_enhanced(self, row: dict | None):
         """Hand a landed enhancement to every open show, so the item becomes
@@ -1116,16 +1124,9 @@ class ShowDirector:
                                   still=row.get("thumbnail_path"))
 
     def note_enhancing(self, statuses: dict) -> None:
-        """Tell an open show how the enhancements in flight are going.
-
-        A show is where a batch of them gets asked for — every locked slide is a
-        run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a lock hears only
-        that a run started, not where in the line it landed.
-        """
-        if self._slideshow is None:
-            return
-        self._slideshow.note_enhancing(statuses)
+        self._enhance_status = dict(statuses)
+        for surface in self.surfaces():
+            surface.note_enhancing(statuses)
 
     def note_queue(self, items, foreign_total: int) -> None:
         """Redraw the queue plate a show floats in its corner — the same widget

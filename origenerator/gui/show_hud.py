@@ -151,6 +151,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
         # The players' favorite star, over the same collection the Favorites
         # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
+        item_note=host.hud_item_note,
         # The buttons this show answers, in the bands the panel draws them in —
         # which ones depends on what is drawing it.
         rows=(*show_rows(side, locked=locked, favorites_filter=favorites_filter,

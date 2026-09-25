@@ -809,3 +809,156 @@ def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path
 
     assert (model.active_loop, model.filter_query) == ("seed", "fox")
 
+
+
+# --- what is being made of the item on screen ---------------------------------
+
+def _panel(show: PlayerShow):
+    return parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
+
+
+def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.set_levels(_LEVELS)
+
+    assert _panel(show).item_note == "Enhance 2 — 1 of 2"
+
+
+def test_the_panel_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_enhancing({"id-1": "queued"})
+    assert _panel(show).item_note == "Enhancement queued"
+    show.note_enhancing({"id-1": "running"})
+    assert _panel(show).item_note == "Enhancing…"
+
+
+def test_a_lock_that_asks_for_a_better_version_says_so_on_the_panel(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(enhance=lambda pid: True))
+
+    show.show_toggle_lock()
+
+    assert _panel(show).item_note == "Enhancement queued"
+
+
+def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_panel(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhancing({"id-1": "running"})
+
+    show.note_enhanced("id-1", "one_enhanced.png")
+
+    assert _panel(show).item_note == ""
+
+
+def test_a_show_opened_while_an_item_of_it_is_being_enhanced_plays_that_item_first(
+        qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["three.png", "one.png", "two.png"]
+
+
+def test_a_show_picked_back_up_plays_what_is_being_made_before_where_it_left_off(
+        qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))
+    _sent(show)
+
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-2"))
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["three.png", "two.png", "one.png"]
+    assert "PLAY_FILE three.png" in _sent(show)
+
+
+def _clocked_show(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> PlayerShow:
+    show = _show(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
+                 **fields)
+    _says(show, video="one.png")
+    show.tick()
+    _sent(show)
+    return show
+
+
+def test_an_item_being_enhanced_is_moved_on_after_half_the_pace(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    now[0] = 1.9
+    show.tick()
+    assert _sent(show) == []
+    now[0] = 2.1
+    show.tick()
+    assert _sent(show) == ["NEXT"]
+
+
+def test_the_time_a_frozen_player_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    _says(show, video="one.png", paused=True)
+    now[0] = 5.0
+    show.tick()
+    _says(show, video="one.png")
+    now[0] = 6.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_that_the_player_holds_is_not_moved_on(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    _says(show, video="one.png", locked=True)
+    now[0] = 5.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot, tmp_path):
+    now = [0.0]
+    show = _show(qtbot, tmp_path, image_dwell_ms=0, clock=lambda: now[0],
+                 hud=HudFacts(enhancing={"id-1": "running"}))
+    _sent(show)
+
+    _says(show, video="one.png")
+    show.tick()
+    now[0] = 5.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
+        qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    show.pause_for_request(True)
+    now[0] = 5.0
+    show.tick()
+
+    assert "NEXT" not in _sent(show)
+
+
+def test_a_show_told_to_lead_with_what_is_being_made_sends_the_player_there(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.note_enhancing({"id-3": "running"})
+    _sent(show)
+
+    show.lead_with_what_is_being_made()
+
+    assert "PLAY_FILE three.png" in _sent(show)
+
+
+def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now)
+
+    show.note_enhancing({"id-1": "running"})
+    now[0] = 2.5
+    show.tick()
+
+    assert "NEXT" not in _sent(show)

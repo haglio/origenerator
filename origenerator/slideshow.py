@@ -178,6 +178,13 @@ class SlideshowPlaylist:
         self._pos = self._order.index(item_index)
         return True
 
+    def lead_with(self, item_index: int) -> None:
+        at = self._order.index(item_index)
+        del self._order[at]
+        if at < self._pos:
+            self._pos -= 1
+        self._order.insert(self._pos, item_index)
+
     def in_play_order(self) -> list:
         """The items in the order this pass is playing them, rather than the order
         the set was handed over in — so a playlist built from these, in order,

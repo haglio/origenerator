@@ -27,6 +27,16 @@ def test_the_panel_lights_the_order_the_show_is_playing_in(qtbot):
         assert _lit_order(show_hud_model("portrait", show)) == lit, order_label
 
 
+def test_the_panel_carries_what_is_being_made_of_the_item_on_screen(qtbot):
+    show = SlideshowView([("scene one.png", "image", "id-one")], engine=FakeEngine(),
+                         shuffle=in_order)
+    qtbot.addWidget(show)
+
+    show.note_enhancing({"id-one": "running"})
+
+    assert show_hud_model("portrait", show).item_note == "Enhancing…"
+
+
 def test_the_hud_restacks_its_own_window_over_the_media_on_every_beat(qtbot, monkeypatch):
     raised = []
     monkeypatch.setattr(media_overlay, "raise_window_without_activating", raised.append)

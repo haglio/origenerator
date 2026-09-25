@@ -169,7 +169,16 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19155 when a folder of your own saved before folders had a side was given one
 # at startup: the note on the order the bookmark passes run in is
 # test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are.
-MAX_PROSE_LINES = 19155
+#
+# 19098 when what a show says about the picture on screen moved off the notice
+# across the top and onto the HUD after the picture's name: the fullscreen
+# player's paragraphs on what that corner said and when are
+# test_the_hud_says_which_version_is_on_screen,
+# test_a_run_of_an_item_this_show_never_asked_about_is_named_all_the_same and
+# test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer, and the
+# director's on telling only the show in front is
+# test_how_the_enhancements_are_going_reaches_every_show_that_is_up.
+MAX_PROSE_LINES = 19098
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

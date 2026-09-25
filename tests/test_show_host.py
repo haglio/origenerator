@@ -37,7 +37,8 @@ TRANSPORT = (
 )
 THE_SET = (
     "show_reset", "hud_map", "hud_favorites_filter", "hud_order_label",
-    "hud_is_favorite", "toggle_favorites_filter", "show_item", "current_media_path",
+    "hud_is_favorite", "hud_item_note", "toggle_favorites_filter", "show_item",
+    "current_media_path",
     # F-mode said which way, as the lock is: "f mode on" and "f mode off".
     "set_favorites_filter",
     # The map's own chrome and the session's keys over it: the loops along
@@ -126,6 +127,7 @@ def test_a_host_with_no_set_says_it_has_no_set(pace_only):
     assert host.hud_favorites_filter is False
     assert host.hud_order_label == ""
     assert host.hud_is_favorite is False
+    assert host.hud_item_note == ""
     assert host.current_media_path() == ""
 
 

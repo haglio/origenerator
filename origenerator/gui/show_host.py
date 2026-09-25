@@ -152,6 +152,10 @@ class ShowHost(Protocol):
         """Whether the item on screen is favorited — the players' star readout."""
         return False
 
+    @property
+    def hud_item_note(self) -> str:
+        return ""
+
     def toggle_favorites_filter(self) -> None:
         """Narrow the set to the favorites, or widen it back."""
 

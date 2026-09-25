@@ -10381,7 +10381,7 @@ class _VoiceSurface:
     def note_voice_run(self, prompt_id, message, *, kind):
         self.noted = (prompt_id, message, kind)
 
-    def note_enhancing(self, statuses):
+    def note_enhancing(self, statuses, frames=None):
         self.enhancing = statuses
 
     def note_voice_command(self, message, *, kind=NOTICE):

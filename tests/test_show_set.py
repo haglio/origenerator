@@ -719,3 +719,17 @@ def test_a_configuration_rows_button_is_told_from_an_acts_by_the_row_itself():
     assert show_set.configuration_row("e629425b") is a_configuration
     assert show_set.configuration_row("alpha") is None
     assert show_set.configuration_row("nobody") is None
+
+
+def test_the_frame_of_a_picture_being_made_is_its_newest():
+    show_set, _dealt = _set()
+    plain, waiting, enhancing = (Slide.of(item) for item in _ITEMS)
+    live = Slide(b"run-frame", LIVE, "id-run")
+
+    show_set.note_enhancing({"id-2": "queued", "id-3": "running"},
+                            frames={"id-3": b"enhance-frame"})
+
+    assert show_set.frame_being_made_of(enhancing) == b"enhance-frame"
+    assert show_set.frame_being_made_of(waiting) is None
+    assert show_set.frame_being_made_of(plain) is None
+    assert show_set.frame_being_made_of(live) == b"run-frame"

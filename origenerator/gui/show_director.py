@@ -1109,10 +1109,10 @@ class ShowDirector:
                                   still=row.get("thumbnail_path"))
             surface.add_levels(versions)
 
-    def note_enhancing(self, statuses: dict) -> None:
+    def note_enhancing(self, statuses: dict, frames=None) -> None:
         self._enhance_status = dict(statuses)
         for surface in self.surfaces():
-            surface.note_enhancing(statuses)
+            surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
         """Redraw the queue plate a show floats in its corner — the same widget

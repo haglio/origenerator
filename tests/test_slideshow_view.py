@@ -40,10 +40,10 @@ def _png(path):
     return str(path)
 
 
-def _png_bytes():
+def _png_bytes(color=(10, 120, 200)):
     """A streamed in-progress frame: encoded image bytes, no file on disk."""
     buf = BytesIO()
-    Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
+    Image.new("RGB", (32, 24), color).save(buf, "PNG")
     return buf.getvalue()
 
 
@@ -2231,3 +2231,73 @@ def test_a_picture_enhanced_during_the_show_steps_its_versions_without_reopening
 
     assert view._pane._media[0] == a
     assert view.hud_item_note == "Original — 2 of 2"
+
+
+def _frame_on(view) -> QPixmap:
+    return view._pane._frame
+
+
+def _pixmap_of(data: bytes) -> QPixmap:
+    pixmap = QPixmap()
+    pixmap.loadFromData(data)
+    return pixmap
+
+
+def test_a_picture_being_enhanced_shows_the_enhancement_as_it_comes_in(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    frame = _png_bytes()
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": frame})
+
+    assert _frame_on(view).toImage() == _pixmap_of(frame).toImage()
+    assert view._live_clock.isActive()
+
+
+def test_each_new_frame_of_the_enhancement_replaces_the_last(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+    newer = _png_bytes(color=(200, 40, 40))
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": newer})
+
+    assert _frame_on(view).toImage() == _pixmap_of(newer).toImage()
+
+
+def test_the_finished_enhancement_takes_the_place_of_its_frames(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view.note_enhanced("id-a", "a_enhanced.png")
+
+    assert view._pane._media[0] == "a_enhanced.png"
+    assert not view._live_clock.isActive()
+
+
+def test_a_cancelled_enhancement_puts_the_picture_itself_back(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view.note_enhancing({})
+
+    assert view._pane._media[0] == "a.png"
+
+
+def test_a_picture_whose_enhancement_is_waiting_shows_as_itself(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+
+    view.note_enhancing({"id-a": "queued"}, frames={})
+
+    assert view._pane._media[0] == "a.png"
+
+
+def test_a_version_stepped_to_while_the_picture_is_enhanced_stays_up(qtbot, tmp_path):
+    a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")]})
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    _shift(view, Qt.Key.Key_Right)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes(color=(1, 2, 3))})
+
+    assert view._pane._media[0] == a_base

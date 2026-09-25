@@ -69,6 +69,10 @@ class LevelStepper:
         return self._by_path.get(self._base or base) or []
 
     @property
+    def stepping(self) -> bool:
+        return self._base is not None
+
+    @property
     def index(self) -> int:
         """Which of those versions is showing, from the top. Nought is both the
         newest version and an image nobody has stepped, which is why a resumed

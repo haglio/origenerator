@@ -148,6 +148,7 @@ class SlideshowView(QWidget):
         self._note_timer.timeout.connect(self._refresh_note)
         self._live_clock = HoldableTimer(self)
         self._live_clock.timeout.connect(self._on_media_ended)
+        self._frames_on_screen = False
         self._hud = None
 
         # A pause — the hosting session's OmniPause, or a click on a show with no
@@ -248,9 +249,10 @@ class SlideshowView(QWidget):
         if slide is None:
             return
         self._levels.restart()  # a new item, so its own versions from the top
-        if slide.is_live:
-            # Still being made: what it looks like so far, rather than a file.
-            self._pane.show_frame(slide.path)
+        frame = self._set.frame_being_made_of(slide)
+        self._frames_on_screen = frame is not None
+        if self._frames_on_screen:
+            self._pane.show_frame(frame)
             self._start_the_live_clock()
         else:
             self._live_clock.cancel()
@@ -556,6 +558,7 @@ class SlideshowView(QWidget):
         if level is None:
             return
         self._live = False
+        self._frames_on_screen = False
         self._open_on_engine(*level[:2])
         self.media_changed.emit()
 
@@ -1079,9 +1082,7 @@ class SlideshowView(QWidget):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
-                self._levels.restart()  # its versions are a level deeper now
-                self._open_on_engine(path, media_type)
-                self.media_changed.emit()
+                self._show_current()
             self._update_neighbors()  # it may be the still riding either side
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
             # Kept out of an enhanced-only pass until now, being unenhanced; the
@@ -1089,8 +1090,16 @@ class SlideshowView(QWidget):
             self._update_counter()
             self._update_neighbors()
 
-    def note_enhancing(self, statuses: dict) -> None:
-        self._set.note_enhancing(statuses)
+    def note_enhancing(self, statuses: dict, frames=None) -> None:
+        self._set.note_enhancing(statuses, frames)
+        current = self._playlist.current()
+        if current is None or self._live or self._levels.stepping:
+            return
+        frame = self._set.frame_being_made_of(current)
+        if frame is not None and self._frames_on_screen:
+            self._pane.show_frame(frame)
+        elif (frame is not None) != self._frames_on_screen:
+            self._show_current()
 
     def lead_with_what_is_being_made(self) -> None:
         if self._set.lead_with_what_is_being_made():

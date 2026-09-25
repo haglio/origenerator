@@ -536,10 +536,11 @@ class EnhanceController:
         the row says "running" from the moment the job is handed to ComfyUI, and
         the wait on ComfyUI's own queue is exactly the stretch this names.
         """
-        self._shows.note_enhancing({
-            prompt_id: "running" if job.state == "running" else "queued"
-            for prompt_id, job in self._by_prompt.items()
-        })
+        self._shows.note_enhancing(
+            {prompt_id: "running" if job.state == "running" else "queued"
+             for prompt_id, job in self._by_prompt.items()},
+            {prompt_id: job.last_preview for prompt_id, job in self._by_prompt.items()
+             if job.state == "running" and job.last_preview})
 
     def _reconcile_tiles(self, running) -> None:
         """Stream each running enhance onto the tile of the image it is enhancing.

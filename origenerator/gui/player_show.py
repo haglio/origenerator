@@ -677,8 +677,8 @@ class PlayerShow(QObject):
         """Which runs are still being made — about the frames this show does
         not play, so nothing to drop."""
 
-    def note_enhancing(self, statuses: dict) -> None:
-        self._set.note_enhancing(statuses)
+    def note_enhancing(self, statuses: dict, frames=None) -> None:
+        self._set.note_enhancing(statuses, frames)
         self._publish()
 
     def lead_with_what_is_being_made(self) -> None:

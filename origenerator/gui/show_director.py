@@ -11,8 +11,7 @@ The eight pieces of state a show needs are here and only here: the show that is
 up, the shape a show on its own was opened on, every show that is up (hosted,
 two run at once), what each satellite region holds, whether the session still
 wants its regions filled, whether the room is frozen, where the last show left
-off, and which runs the open show has already turned down as slides of their
-own frames.
+off, and how the enhancements in flight are going.
 
 The spoken words about a show are here too -- close it, lock it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a shelf. They
@@ -187,10 +186,6 @@ class ShowDirector:
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
-        # Runs the open show has already turned down as slides of their own
-        # frames — another folder's work, an enhancement. Asked once and kept,
-        # since every frame of such a run asks again (:meth:`_would_play`).
-        self._show_refused: set[str] = set()
         self._enhance_status: dict[str, str] = {}
 
     def become_hosted(self, session) -> None:
@@ -397,7 +392,6 @@ class ShowDirector:
         channel = self._fun_time.player(where) if self._fun_time is not None else None
         if channel is not None and not items:
             return None  # a player is handed files, and a run being made has none yet
-        self._show_refused = set()  # a new show, a new set to be judged against
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
@@ -1030,10 +1024,9 @@ class ShowDirector:
         being watched for. The first iterations are already worth looking at, so
         the run joins on its first frame and swaps for the file when it lands.
 
-        Whether it belongs is asked once per run, either way: a run the show
-        holds answers itself, and one it turned down is remembered as turned down
-        (:attr:`_show_refused`). A frame arrives every second or so, and the
-        question costs a row lookup and a walk of what is on screen.
+        A run the show holds answers for itself, and one it turned down is
+        asked again on its next frame, since the folder lists a new run a poll
+        after it starts.
         """
         show = self._slideshow
         if show is None or show.is_live():
@@ -1059,15 +1052,9 @@ class ShowDirector:
         version of a picture the show may already be playing, and the HUD says
         so beside that picture's name — a second slide of it half-rendered
         would be the same image twice, one of them worse.
-
-        A no is kept for the life of the show, since it is asked again of every
-        frame of a run in some other folder — and the set under a show doesn't
-        move while one is up, the gallery being covered by it.
         """
-        if prompt_id in self._show_refused:
-            return False
         row = self._db.get_generation(prompt_id)
-        plays = bool(
+        return bool(
             row is not None
             and row.get("workflow_name") != gallery.ENHANCE_WORKFLOW
             and (any(r["prompt_id"] == prompt_id for r in self._host.rows_to_play())
@@ -1077,9 +1064,6 @@ class ShowDirector:
                      and source_of(row) == GenerationSource.GENERATED
                      and gallery.media_type_of_row(row) in self._host.media_types()))
         )
-        if not plays:
-            self._show_refused.add(prompt_id)
-        return plays
 
     def note_in_flight(self, items):
         """Tell an open show what is still being made, off the same in-flight list

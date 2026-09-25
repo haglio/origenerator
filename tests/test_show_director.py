@@ -620,9 +620,7 @@ def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     assert made[1].added == []
 
 
-def test_a_run_in_another_folder_is_turned_down_once_and_not_asked_again(shows):
-    # A frame arrives every second or so, and the question costs a row lookup
-    # and a walk of what is on screen.
+def test_a_run_in_another_folder_is_turned_down(shows):
     host = FakeHost(rows=[_row("g1")])
     director, _host, made = shows(host, db=FakeDB([_row("g7")]))
     director.open([("a.png", "image", "g1", None)])
@@ -631,7 +629,18 @@ def test_a_run_in_another_folder_is_turned_down_once_and_not_asked_again(shows):
     director.note_generating("g7", b"frame-two")
 
     assert made[0].generating == []
-    assert director._show_refused == {"g7"}
+
+
+def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(shows):
+    host = FakeHost(rows=[_row("g1")])
+    director, _host, made = shows(host, db=FakeDB([_row("g1"), _row("g7")]))
+    director.open([("a.png", "image", "g1", None)])
+
+    director.note_generating("g7", b"frame-one")
+    host.rows.append(_row("g7"))
+    director.note_generating("g7", b"frame-two")
+
+    assert made[0].generating == [("g7", b"frame-two")]
 
 
 def test_an_enhancement_is_never_a_slide_of_its_own_frames(shows):

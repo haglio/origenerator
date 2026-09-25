@@ -4,7 +4,9 @@ from __future__ import annotations
 import gc
 import threading
 
-from origenerator.gui.off_thread import _in_flight, run_off_thread
+from PyQt6 import sip
+
+from origenerator.gui.off_thread import _in_flight, _Result, _Task, run_off_thread
 
 
 def _wait_for(qtbot, got, ms=5000):
@@ -71,6 +73,13 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot):
 
     _wait_for(qtbot, got)
     assert len(_in_flight) == before
+
+
+def test_an_answer_whose_carrier_the_app_took_on_its_way_out_is_let_go_of(qtbot):
+    result = _Result()
+    sip.delete(result)  # what the interpreter's exit does to every carrier still waiting
+
+    _Task(lambda: "too late", result).run()
 
 
 def test_each_call_carries_its_own_answer(qtbot):

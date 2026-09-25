@@ -7,7 +7,11 @@ pool; the worker's signals carry the result back to the UI thread that owns it.
 """
 from __future__ import annotations
 
+import logging
+
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceWorker(QObject):
@@ -59,4 +63,7 @@ class ProcessTask(QRunnable):
         self._match_command = match_command
 
     def run(self):
-        self._worker.process(self._instruction, self._prompts, self._match_command)
+        try:
+            self._worker.process(self._instruction, self._prompts, self._match_command)
+        except RuntimeError:
+            logger.info("An utterance came back after the app let go of its worker")

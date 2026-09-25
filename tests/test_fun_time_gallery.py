@@ -28,6 +28,8 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
     FakeDB,
     _FakeAmbientAudio,
     _image,
+    _keys_are_the_gallerys,
+    _press_escape,
     _row,
     _SignalMotion,
 )
@@ -231,6 +233,18 @@ def test_both_regions_can_hold_a_show_at_once(qtbot, tmp_path, monkeypatch):
     assert portrait is not landscape
     for show in (portrait, landscape):
         qtbot.addWidget(show)
+
+
+def test_esc_reaching_a_gallery_in_a_session_stops_its_show(qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    _keys_are_the_gallerys(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
+    show = view._shows._region_shows["landscape"]
+    qtbot.addWidget(show)
+
+    assert _press_escape(view) is True
+
+    assert not show.is_showing()
 
 
 def test_a_new_show_replaces_the_regions_current_occupant(qtbot, tmp_path, monkeypatch):

@@ -65,6 +65,11 @@ def _no_crash_log_in_the_checkout(monkeypatch):
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: None)
 
 
+@pytest.fixture(autouse=True)
+def _a_boot_holds_the_library_until_its_process_ends_so_each_test_finds_it_free(monkeypatch):
+    monkeypatch.setattr("origenerator.single_instance.claim_the_library", lambda state_dir: 1)
+
+
 def test_warming_the_voice_runtimes_reaches_for_both_and_survives_any_install(monkeypatch):
     # The warm runs before Qt so ctranslate2/onnxruntime get a clean DLL init
     # (imported after Qt, the first model load is an access violation that
@@ -1024,3 +1029,66 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
             assert main([]) == 0
 
         told.assert_not_called()
+
+
+class TestASecondCopy:
+    @pytest.fixture(autouse=True)
+    def another_copy_holds_the_library(self, monkeypatch):
+        monkeypatch.setattr("origenerator.single_instance.claim_the_library",
+                            lambda state_dir: None)
+
+    def test_it_says_another_copy_is_running_in_a_box_like_the_close_question_and_starts_nothing(
+            self, qapp):
+        told = MagicMock()
+        comfyui = MagicMock()
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "origenerator.app._ensure_comfyui_server": comfyui,
+            "origenerator.gui.main_window.OrigeneratorWindow": window,
+        }):
+            code = main([])
+
+        assert code == 1
+        told.assert_called_once_with(
+            None, "Origenerator", "Another copy of Origenerator is already running.")
+        comfyui.assert_not_called()
+        window.assert_not_called()
+
+    def test_the_copy_fun_time_starts_opens_even_while_another_boots(self, qapp):
+        told = MagicMock()
+        window = MagicMock()
+
+        with _a_faked_boot([], **{
+            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "origenerator.gui.main_window.OrigeneratorWindow": window,
+        }):
+            code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
+
+        assert code == 0
+        told.assert_not_called()
+        window.assert_called_once()
+
+
+def test_the_claim_is_on_the_library_a_preview_shares_with_the_everyday_copy(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "everyday" / "state")
+    claimed = MagicMock(return_value=1)
+    monkeypatch.setattr("origenerator.single_instance.claim_the_library", claimed)
+
+    with _a_faked_boot([]):
+        assert main([]) == 0
+
+    claimed.assert_called_once_with(tmp_path / "everyday" / "state")
+
+
+def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
+        qapp, monkeypatch):
+    claimed = MagicMock(return_value=None)
+    monkeypatch.setattr("origenerator.single_instance.claim_the_library", claimed)
+
+    with _a_faked_boot([]):
+        assert main(["--check-launch"]) == 0
+
+    claimed.assert_not_called()

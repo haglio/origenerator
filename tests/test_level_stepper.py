@@ -105,3 +105,10 @@ def test_the_keys_and_the_lists_are_taken_as_this_object_s_own(armed):
     versions.append(("d-v3.png", "image", "Level 3"))
 
     assert len(stepper.levels(base="d.png")) == 2
+
+
+def test_versions_taken_on_later_join_the_ones_already_armed(armed):
+    armed.add({"b-v2.png": [("b-v2.png", "image", "Level 2"), ("b.png", "image", "Base")]})
+
+    assert armed.levels(base="a.png")[0] == ("a-v3.png", "image", "Level 3")
+    assert armed.step(1, base="b-v2.png") == ("b.png", "image", "Base")

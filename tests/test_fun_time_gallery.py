@@ -268,7 +268,7 @@ def test_a_preview_double_click_lands_its_show_on_the_matching_region(qtbot, tmp
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
 
-    show = view._shows.open_on_preview((str(wide), "image"), None)
+    show = view._shows.open_on_preview((str(wide), "image"), None, None)
 
     qtbot.addWidget(show)
     assert view.region_show("landscape") is show
@@ -283,7 +283,7 @@ def test_a_region_show_is_muted_like_every_satellite(qtbot, tmp_path):
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
 
-    show = view._shows.open_on_preview((str(wide), "image"), None)
+    show = view._shows.open_on_preview((str(wide), "image"), None, None)
 
     qtbot.addWidget(show)
     assert show.audio_muted()

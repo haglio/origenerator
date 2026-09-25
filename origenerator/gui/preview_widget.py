@@ -109,11 +109,7 @@ class PreviewWidget(QWidget):
         # double-click dismisses it.
         self._on_double_click = on_double_click
         self._on_press = on_press
-        # The shown generation's prompt_id when the owner has armed the preview to be
-        # dragged out onto a combine slot (like a gallery thumbnail), else None; a
-        # transient view (a live frame, a message) disarms it. drag_out holds the
-        # left-press point while measuring whether a move is a drag or just a click.
-        self._draggable_id: str | None = None
+        self._generation: str | None = None
         self.drag_out = DragOut()
 
         # The shown generation's prompt_id when the owner has armed the corner
@@ -248,8 +244,8 @@ class PreviewWidget(QWidget):
         # is told so here rather than by whoever built it (see the module).
         omnipause.holds(self)
 
-    def _take_the_pane(self, media, *, stop_player: bool = True,
-                       enhancing: bool = False,
+    def _take_the_pane(self, media, *, generation: str | None = None,
+                       stop_player: bool = True, enhancing: bool = False,
                        live: bool = False, live_frame: bytes | None = None) -> None:
         """Put down everything the pane is holding, ready for new content.
 
@@ -261,11 +257,6 @@ class PreviewWidget(QWidget):
         pane records what it is about to be showing (``media``, or ``None`` for
         anything that is not a file on disk) and hands a fullscreen view opened
         over a running generation the file it landed as.
-
-        The drag follows ``media`` rather than a switch of its own: a view with
-        no file on disk has nothing to drag out, and a view that has one leaves
-        the arming to its owner, since only the owner knows which generation the
-        file belongs to.
 
         The two switches are the deliberate exceptions, one caller each.
         ``stop_player`` — a clip does not stop the player it is about to hand a
@@ -282,22 +273,20 @@ class PreviewWidget(QWidget):
         if not enhancing:
             self.set_notice(None)
             self.set_actions(None)
-        self._media = media
+        self._media, self._generation = media, generation
         self._end_live(media)
         if live:
             self._live, self._live_frame = True, live_frame
-        if media is None:
-            self._draggable_id = None
 
-    def show_media(self, path, media_type: str) -> None:
+    def show_media(self, path, media_type: str, generation: str | None = None) -> None:
         """Display ``path`` as an image or video per ``media_type``."""
         if media_type == MediaType.VIDEO:
-            self.show_video(path)
+            self.show_video(path, generation)
         else:
-            self.show_image(path)
+            self.show_image(path, generation)
 
-    def show_image(self, path) -> None:
-        self._take_the_pane((path, MediaType.IMAGE))
+    def show_image(self, path, generation: str | None = None) -> None:
+        self._take_the_pane((path, MediaType.IMAGE), generation=generation)
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._set_movie(QMovie(str(path)), reader.size())
@@ -310,8 +299,9 @@ class PreviewWidget(QWidget):
         self._rescale()
         self._stack.setCurrentWidget(self._image_label)
 
-    def show_video(self, path) -> None:
-        self._take_the_pane((path, MediaType.VIDEO), stop_player=False)
+    def show_video(self, path, generation: str | None = None) -> None:
+        self._take_the_pane((path, MediaType.VIDEO), generation=generation,
+                            stop_player=False)
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
@@ -462,7 +452,7 @@ class PreviewWidget(QWidget):
             return
         win = self._following_fullscreen()
         if win is not None:
-            win.show_landed(media)
+            win.show_landed(media, self._generation)
 
     def _following_fullscreen(self):
         """The fullscreen show this pane opened over a running generation and is
@@ -636,15 +626,6 @@ class PreviewWidget(QWidget):
         self._place_controls()
         super().resizeEvent(event)
 
-    def set_draggable_id(self, prompt_id: str | None) -> None:
-        """Arm (or disarm) dragging the shown media out as a generation.
-
-        The owner passes the displayed generation's prompt_id so the preview can be
-        dragged onto a combine slot exactly like a gallery thumbnail; ``None`` leaves
-        it undraggable. A transient view (a live frame or a message) disarms itself,
-        so this only ever needs re-arming when a saved generation is shown."""
-        self._draggable_id = prompt_id
-
     def _update_strip(self, video_path) -> None:
         """Aim the funscript strip at ``video_path``'s script, showing it only when
         one exists — so the strip's presence is itself the "this clip has a script"
@@ -673,7 +654,7 @@ class PreviewWidget(QWidget):
         # The media children are transparent to the mouse, so a press over the
         # image or video lands here. Note the origin for a possible drag of the
         # shown generation; a plain click still falls through to the double-click.
-        if self._draggable_id is not None:
+        if self._generation is not None:
             self.drag_out.note_press(event)
         self._run_press(event)
 
@@ -685,9 +666,9 @@ class PreviewWidget(QWidget):
         # Drag the shown generation out to a combine slot, but only once the press
         # has travelled far enough to read as a drag rather than a click — so a
         # plain click still just opens fullscreen on the following double-click.
-        if self._draggable_id is None or not self.drag_out.should_start(event):
+        if self._generation is None or not self.drag_out.should_start(event):
             return
-        self._start_drag(self._draggable_id)
+        self._start_drag(self._generation)
 
     def _start_drag(self, prompt_id: str) -> None:
         """Carry the shown generation out under the shared drag type, so a combine
@@ -743,7 +724,8 @@ class PreviewWidget(QWidget):
             return None
         if self._open_fullscreen_view is None:
             return None
-        self._fullscreen = self._open_fullscreen_view(self._media, self._live_frame)
+        self._fullscreen = self._open_fullscreen_view(self._media, self._live_frame,
+                                                      self._generation)
         return self._fullscreen
 
     def _on_media_status(self, status) -> None:

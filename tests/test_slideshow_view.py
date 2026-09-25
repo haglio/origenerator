@@ -1546,7 +1546,7 @@ def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
     changed = []
     view.media_changed.connect(lambda: changed.append(True))
 
-    view.show_landed((png, "image"))
+    view.show_landed((png, "image"), "done")
 
     assert view._pane._media == (png, "image")
     assert view.is_live() is False
@@ -1556,7 +1556,7 @@ def test_the_landed_file_takes_over_from_the_frames(qtbot, tmp_path):
 def test_frames_are_ignored_once_it_has_landed(qtbot, tmp_path):
     png = _png(tmp_path / "done.png")
     view = _view(qtbot, [])
-    view.show_landed((png, "image"))
+    view.show_landed((png, "image"), "done")
 
     view.show_frame(_png_bytes())  # a later run's frames must not paint over it
 

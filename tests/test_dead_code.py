@@ -127,7 +127,14 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19279 when a clip handed to Evolver began taking its funscript along: what
 # the hand-over's note said of the order it renames its copies in is
 # test_shows_up_only_after_its_clip_so_evolver_never_finds_it_alone.
-MAX_PROSE_LINES = 19279
+#
+# 19262 when the preview began naming its generation with its file, rather than
+# waiting for its owner to arm a drag: the three notes on that arming went with
+# the method, and what they said is test_a_transient_view_disarms_the_drag and
+# test_dragging_the_armed_preview_carries_its_generation; the director's note
+# that a lone picture keeps its row for its versions is
+# test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation.
+MAX_PROSE_LINES = 19262
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

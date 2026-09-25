@@ -4270,7 +4270,7 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
 
     # The loaded tab resolves the selection's output and shows it last (after any
     # settings-folder autoshow the form prefill does).
-    assert _preview_of(view).show_media.call_args.args == (resolved[0], "image")
+    assert _preview_of(view).show_media.call_args.args == (resolved[0], "image", "i1")
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
@@ -7705,6 +7705,31 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     assert win._pane._media == (done, "image")
     assert not win.is_live()
     win.close()
+
+
+def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
+        qtbot, tmp_path, monkeypatch):
+    by_id = lambda row, output_dir: (f"{row['prompt_id']}.png", "image")
+    monkeypatch.setattr(gallery, "resolve_preview", by_id)
+    monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _running_reroll(view)
+    _reroll_tile(view).selected.emit()
+    client.preview_image.emit(job.prompt_id, _png_bytes())
+    show = _preview_of(view).open_fullscreen()
+    qtbot.addWidget(show)
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == \
+        view.visible_prompt_ids()
+    assert show._playlist.current().prompt_id == job.prompt_id
+    qtbot.keyClick(show, Qt.Key.Key_Down)
+    assert view._enhance.run_of(view.row_for(job.prompt_id)) is not None
+    show.close()
 
 
 def test_a_cancelled_generation_closes_the_show_watching_it(qtbot, tmp_path):
@@ -11339,11 +11364,13 @@ def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
     pane as a real show, held at a pace of nought.
 
     ``media`` is what the pane was showing — ``None`` for a generation still
-    running under it, which opens the show over ``frame``. ``target`` stands in
-    for the OSR2 drive target the clip on screen would offer, since these tests
-    carry no real scripted video.
+    running under it, which opens the show over ``frame`` — and the generation
+    it names is the tile these tests clicked, which is what the tab shows.
+    ``target`` stands in for the OSR2 drive target the clip on screen would
+    offer, since these tests carry no real scripted video.
     """
-    show = view._shows.open_on_preview(media, frame)
+    shown = view.selected_prompt_id() if media is not None else None
+    show = view._shows.open_on_preview(media, frame, shown)
     qtbot.addWidget(show)
     if target is not None:
         _aim_show(view, show, target)
@@ -11624,6 +11651,52 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     assert show._playlist.order == list(range(len(order)))  # the browser's order
     assert show._playlist.current()[2] == "i2"  # opened on the shown item
     assert show.dwell_s == 0                    # and holding it
+    show.close()
+
+
+def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
+        qtbot, tmp_path, monkeypatch):
+    by_id = lambda row, output_dir: (f"{row['prompt_id']}.png", "image")
+    monkeypatch.setattr(gallery, "resolve_preview", by_id)
+    monkeypatch.setattr(gcp_module, "resolve_preview", by_id)
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._bank.auto.click()
+    _reroll_tile(view).selected.emit()  # watching the loop in the tab
+    landed = view._live_jobs[key].prompt_id
+    client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
+
+    show = _preview_of(view).open_fullscreen()
+    qtbot.addWidget(show)
+
+    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == \
+        view.visible_prompt_ids()
+    assert show._playlist.current().prompt_id == landed
+    qtbot.keyClick(show, Qt.Key.Key_Down)
+    assert view._enhance.run_of(view.row_for(landed)) is not None
+    show.close()
+
+
+def test_a_double_click_on_a_picture_from_another_folder_opens_that_folder(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    rows = [_image("a1", "a cat", 50, 1), _image("b1", "a dog", 50, 1),
+            _image("b2", "a dog", 50, 2)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["b1"])
+    folder_b = view.visible_prompt_ids()
+    view._tree.setCurrentItem(view._leaf_by_id["a1"])
+
+    show = view._shows.open_on_preview(("b1.png", "image"), None, "b1")
+    qtbot.addWidget(show)
+
+    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == folder_b
+    assert show._playlist.current().prompt_id == "b1"
     show.close()
 
 

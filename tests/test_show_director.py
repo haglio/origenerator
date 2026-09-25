@@ -352,7 +352,6 @@ class FakeHost:
         self.cleared_queue = 0
         self.queue = ([], 0)
         self.visible = [row["prompt_id"] for row in self.rows]
-        self.selected = None
         self.types = {"image", "video"}
 
     def show_location(self):
@@ -381,9 +380,6 @@ class FakeHost:
 
     def visible_prompt_ids(self):
         return list(self.visible)
-
-    def selected_prompt_id(self):
-        return self.selected
 
     def queue_now(self):
         return self.queue
@@ -506,6 +502,20 @@ def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
     assert made == [again]
     assert again.played == [[("b.png", "image", "g2", None)]]
     assert director._live_shows == [(again, "shelf/b")]
+
+
+def test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation(shows):
+    host = FakeHost(rows=[_row("a1"), _row("t1")])
+    host.visible = ["a1"]
+    director, _host, made = shows(host)
+    director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
+                                         for row in rows}
+
+    director.open_on_preview(("t1.png", "image"), None, "t1")
+
+    (show,) = made
+    assert show.items == [("t1.png", "image", "t1", None)]
+    assert show.levels == {"t1.png": ["newer", "older"]}
 
 
 def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):

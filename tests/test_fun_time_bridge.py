@@ -613,13 +613,12 @@ def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
     monkeypatch.setattr(view, "visible_prompt_ids", lambda: [item[2] for item in folder])
     monkeypatch.setattr(view, "row_for", lambda pid: next(
         (_row_of(item) for item in folder if item[2] == pid), None))
-    monkeypatch.setattr(view, "selected_prompt_id", lambda: clicked[2])
     monkeypatch.setattr(view._shows, "items_of", lambda rows: [
         row if isinstance(row, tuple)
         else (row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
         for row in rows])
 
-    view._shows.open_on_preview((clicked[0], "image"), None)
+    view._shows.open_on_preview((clicked[0], "image"), None, clicked[2])
 
     played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
     assert played == [clicked[0], folder[0][0]]
@@ -635,7 +634,7 @@ def test_a_double_click_over_a_run_still_being_made_leaves_the_players_alone(
     view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
 
-    assert view._shows.open_on_preview(None, b"a frame of the run") is None
+    assert view._shows.open_on_preview(None, b"a frame of the run", None) is None
 
     assert (tmp_path / "landscape.tsv").read_text(encoding="utf-8") == playing
     assert _told(tmp_path, "landscape") == []

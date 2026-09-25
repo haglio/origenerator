@@ -105,6 +105,7 @@ from origenerator.gallery.labels import (
 )
 from origenerator.gallery.output import (
     animated_preview_path,
+    generation_of_file,
     is_in_progress,
     media_type_of_row,
     output_disk_files,
@@ -219,6 +220,7 @@ __all__ = [
     "folder_id",
     "folder_key_at_level",
     "folder_level",
+    "generation_of_file",
     "group_level",
     "is_custom_key",
     "is_enhance_product_row",

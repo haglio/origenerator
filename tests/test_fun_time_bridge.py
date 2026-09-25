@@ -17,7 +17,7 @@ from origenerator.gui import omnipause, show_director
 from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.show_buttons import answer
-from tests.test_gallery_view import FakeDB, _enhanced_image, _image
+from tests.test_gallery_view import FakeDB, _enhanced_image, _image, _row
 
 
 def _will_move_on(view) -> bool:
@@ -675,3 +675,32 @@ def test_a_verb_said_to_neither_side_is_dropped_on_the_log(qtbot, tmp_path, capl
     _press(bridge, tmp_path, "sideways_next")
 
     assert "Unknown Fun Time verb dropped: sideways_next" in caplog.text
+
+
+def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(
+        qtbot, tmp_path):
+    """Genau locking, in the session, on a loop this app made: the gallery goes
+    to that loop -- its folder, its tile, its tab -- as a lock on one of this
+    app's own shows takes it there."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("i1", "a cat", 50, 1),
+        _row("v7", "wan22_i2v", {"seed": 7}, "wan22_i2v_00007_.mp4")])
+    view.refresh()
+
+    _press(bridge, tmp_path, r"GO_TO|C:\library\genau\clips\wan22_i2v_00007__topaz.mp4")
+
+    assert view.selected_prompt_ids() == ["v7"]
+
+
+def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, tmp_path):
+    """Genau's folder holds the clips carved by hand as well: one of those is
+    none of this app's to show."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
+        _image("i1", "a cat", 50, 1),
+        _row("v7", "wan22_i2v", {"seed": 7}, "wan22_i2v_00007_.mp4")])
+    view.refresh()
+    view.follow_link("i1")
+
+    _press(bridge, tmp_path, r"GO_TO|C:\library\genau\clips\scene one 0012.mp4")
+
+    assert view.selected_prompt_ids() == ["i1"]

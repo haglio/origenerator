@@ -28,6 +28,7 @@ from origenerator.gallery import (
     folder_id,
     folder_key_at_level,
     folder_level,
+    generation_of_file,
     group_level,
     is_enhanced_row,
     is_renamable,
@@ -1766,6 +1767,20 @@ def test_output_disk_files_omits_files_not_on_disk(tmp_path):
     out.mkdir()
     row = _row(output_files=json.dumps([{"filename": "gone.png", "subfolder": ""}]))
     assert output_disk_files(row, out) == []
+
+
+def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies():
+    # Sent to Genau, a loop is copied under a counter where its name was taken,
+    # upscaled under "_topaz", and counted again where Genau's folder had one.
+    loop = _row(prompt_id="vid-7", workflow_name="wan22_i2v",
+                output_files=json.dumps([{"filename": "wan22_i2v_00007_.mp4",
+                                          "subfolder": "video"}]))
+    neighbor = _row(prompt_id="vid-8", workflow_name="wan22_i2v",
+                    output_files=json.dumps([{"filename": "wan22_i2v_00008_.mp4",
+                                              "subfolder": "video"}]))
+    delivered = "C:/library/videos/genau/clips/wan22_i2v_00007_ (2)_topaz (3).mp4"
+
+    assert generation_of_file(delivered, [neighbor, loop]) == "vid-7"
 
 
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():

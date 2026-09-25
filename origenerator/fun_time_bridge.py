@@ -8,11 +8,11 @@ shows the way it reaches the players:
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
   steps the portrait player — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
   and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
-  switching INTO origenerator mode, which opens playing rather than empty) and
-  ``CLOSE_SHOWS`` clears them again; ``FILTER_ENHANCED`` flips the show's
-  enhanced-only switch, the one its own HUD carries and the session's console
-  carries too; ``QUIT`` closes the app the way its own Ctrl+Alt+Q would, and
-  ``RELEASE`` gives a window the session took over back to standalone.
+  switching INTO origenerator mode) and ``CLOSE_SHOWS`` clears them again;
+  ``FILTER_ENHANCED`` flips the enhanced-only switch a show's HUD and the
+  session's console both carry; ``GO_TO|<file>`` lands the gallery on the
+  generation a file is a copy of; ``QUIT`` closes the app as Ctrl+Alt+Q would,
+  and ``RELEASE`` gives a window the session took over back to standalone.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -118,6 +118,9 @@ class FunTimeBridge(QObject):
         keyword = keyword.upper()  # what it carries keeps its case
         if not marker and keyword in self._session_verbs:
             self._session_verbs[keyword]()
+            return
+        if keyword == "GO_TO" and marker == "|":
+            self._gallery.go_to_file(argument)
             return
         side = side_spoken_to(keyword, _SIDES)
         if side is None:

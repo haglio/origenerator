@@ -1,6 +1,6 @@
 """What a generation actually produced on disk: parsing its recorded output
-files, classifying their media type, and resolving them to previewable or
-deletable paths.
+files, classifying their media type, resolving them to previewable or
+deletable paths, and tracing a copy of one elsewhere back to its generation.
 
 A row's ``output_files`` are the ground truth the gallery shows — the tree holds
 only rows that produced one, a row's media type follows its file rather than its
@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
+from origenerator.evolver_upscales import UPSCALE_SUFFIX
+from origenerator.file_refs import frame_name
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
@@ -105,6 +108,23 @@ def output_file_path(file: dict, output_dir: Path) -> Path:
     if moved:
         return Path(moved)
     return output_dir / (file.get("subfolder") or "") / (file.get("filename") or "")
+
+
+_COPY_COUNTER = re.compile(r" \(\d+\)$")
+
+
+def _stem_before_the_library_renamed_it(stem: str) -> str:
+    while True:
+        earlier = _COPY_COUNTER.sub("", stem).removesuffix(UPSCALE_SUFFIX)
+        if earlier == stem:
+            return stem
+        stem = earlier
+
+
+def generation_of_file(path, rows: list[dict]) -> str | None:
+    stem = _stem_before_the_library_renamed_it(Path(frame_name(str(path))).stem)
+    return next((row["prompt_id"] for row in rows for file in row_output_files(row)
+                 if Path(frame_name(file.get("filename"))).stem == stem), None)
 
 
 def resolve_preview(row: dict, output_dir: Path) -> tuple[Path, str] | None:

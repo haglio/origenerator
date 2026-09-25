@@ -962,3 +962,17 @@ def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qt
     show.tick()
 
     assert "NEXT" not in _sent(show)
+
+
+def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_player(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhanced("id-1", "one_enhanced.png")
+    _says(show, video="one_enhanced.png")
+    show.tick()
+    _sent(show)
+
+    show.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhance 1"),
+                                          ("one.png", "image", "Original")]})
+    show.show_step_version(1)
+
+    assert _sent(show) == ["PLAY_FILE one.png"]

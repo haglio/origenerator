@@ -322,6 +322,9 @@ class SlideshowView(QWidget):
         """
         self._levels.arm(levels_by_path)
 
+    def add_levels(self, levels_by_path: dict) -> None:
+        self._levels.add(levels_by_path)
+
     def queue(self) -> SlideshowQueue:
         """The floated queue, for the gallery to wire its reorder and clear to —
         it is the same widget as the lower strip and asks the same things."""

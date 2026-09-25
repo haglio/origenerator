@@ -1119,9 +1119,11 @@ class ShowDirector:
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
+        versions = self.versions_of([row])
         for surface in self.surfaces():
             surface.note_enhanced(row["prompt_id"], preview[0], preview[1],
                                   still=row.get("thumbnail_path"))
+            surface.add_levels(versions)
 
     def note_enhancing(self, statuses: dict) -> None:
         self._enhance_status = dict(statuses)

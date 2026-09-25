@@ -2217,3 +2217,17 @@ def test_a_show_told_to_lead_with_what_is_being_made_puts_it_on_screen_now(qtbot
 
     assert view._playlist.current()[2] == "id-run"
     assert view._live_clock.isActive()
+
+
+def test_a_picture_enhanced_during_the_show_steps_its_versions_without_reopening(
+        qtbot, tmp_path):
+    a, better, b = (_png(tmp_path / n) for n in ("a.png", "a_enhanced.png", "b.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), (b, "image", "id-b")])
+    view.set_levels({})
+    view.note_enhanced("id-a", better)
+
+    view.add_levels({better: [(better, "image", "Enhance 1"), (a, "image", "Original")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    assert view._pane._media[0] == a
+    assert view.hud_item_note == "Original — 2 of 2"

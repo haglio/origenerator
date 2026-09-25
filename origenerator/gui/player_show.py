@@ -237,6 +237,10 @@ class PlayerShow(QObject):
         self._levels.arm(levels_by_path)
         self._publish()
 
+    def add_levels(self, levels_by_path: dict) -> None:
+        self._levels.add(levels_by_path)
+        self._publish()
+
     @property
     def has_other_versions(self) -> bool:
         """Whether the item on screen was filed more than once — what draws

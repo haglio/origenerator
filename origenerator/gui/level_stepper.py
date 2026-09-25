@@ -35,8 +35,12 @@ class LevelStepper:
         the keys are normalized and the lists copied — nothing here goes on
         pointing at what the caller handed over.
         """
-        self._by_path = {str(key): list(versions)
-                         for key, versions in levels_by_path.items()}
+        self._by_path = {}
+        self.add(levels_by_path)
+
+    def add(self, levels_by_path) -> None:
+        self._by_path.update({str(key): list(versions)
+                              for key, versions in levels_by_path.items()})
 
     def restart(self) -> None:
         """Back to the top version, for a new picture — or for one whose

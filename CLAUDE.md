@@ -213,6 +213,17 @@ launch dies opening a database under a path that doesn't exist. The launcher
 log's `Library: …` line names the path it tried; if a preview will not open,
 diff the two `content.local.json` files before looking anywhere else.
 
+**A preview replaces his everyday Origenerator; it never runs beside it.** One
+copy runs on a library at a time, the way Fun Time runs one session (his call,
+2026-09-25): a copy started while another holds the library -- the everyday one,
+another preview, or the one a Fun Time session opened -- says "Another copy of
+Origenerator is already running." and stops before its splash
+(`origenerator/single_instance.py`). A preview he reports as not opening has
+most likely met a copy already running, which that message names. A copy Fun
+Time opens is the one exception: it opens even while a standalone copy is still
+booting, because refusing there would leave the session's room with no
+Origenerator at all.
+
 A change a Fun Time session reaches gets its hosted half judged too. Make a
 fun_time worktree on fun_time's current `main`, put your Origenerator worktree's
 path in its git-ignored `state/origenerator_dir.txt`, and run

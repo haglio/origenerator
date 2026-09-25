@@ -636,6 +636,7 @@ def main(argv: list[str] | None = None) -> int:
         COMFYUI_OUTPUT_DIR,
         COMFYUI_PORT,
         DB_PATH,
+        LIBRARY_STATE_DIR,
         STATE_DIR,
         THUMB_DIR,
         TRASH_DIR,
@@ -665,6 +666,13 @@ def main(argv: list[str] | None = None) -> int:
         from origenerator.gui.main_window import OrigeneratorWindow  # noqa: F401
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
+
+    from origenerator.single_instance import claim_the_library, say_another_copy_is_running
+    holding_the_library = claim_the_library(LIBRARY_STATE_DIR)
+    if holding_the_library is None and fun_time is None:
+        logger.warning("Another copy of Origenerator is already running; not starting")
+        say_another_copy_is_running()
+        return 1
 
     # From here on this is a real boot, and the one kind of death the log
     # cannot record is the one this catches. Not above the launch check: that

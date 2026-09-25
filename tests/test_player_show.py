@@ -18,10 +18,16 @@ from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.slideshow import ShowState, Slide, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
+
+# A window has a picture of its own to put a run's frames on, a queue floated
+# over it, a sound to mute and a panel it wears; a player has none of them.
+ONLY_A_WINDOW = {"adopt_hud", "audio_muted", "set_audio_muted", "queue",
+                 "set_playlist", "show_frame", "show_landed"}
 
 
 def _channel(tmp_path: Path) -> PlayerChannel:
@@ -68,6 +74,13 @@ def _show_with_the_player_on(qtbot, tmp_path, **status) -> PlayerShow:
     show.tick()
     _sent(show)
     return show
+
+
+def test_a_show_on_a_player_answers_whatever_a_window_show_is_asked_but_a_windows_own():
+    asked = {name for name in vars(SlideshowView)
+             if not name.startswith("_") and not name.endswith("Event")}
+
+    assert asked - set(dir(PlayerShow)) == ONLY_A_WINDOW
 
 
 def test_a_show_hands_the_player_the_pass_it_is_to_play(qtbot, tmp_path):
@@ -315,6 +328,15 @@ def test_a_show_picked_back_up_lands_the_player_where_the_last_one_left_off(
     assert show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-3"))
 
     assert _sent(show)[0] == "PLAY_FILE three.png"
+
+
+def test_the_pass_esc_keeps_is_the_one_the_player_is_on_where_it_stands(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+
+    items, index, dwell_ms = show.playing_now()
+
+    assert [str(item.path) for item in items] == ["one.png", "two.png", "three.png"]
+    assert (index, dwell_ms) == (1, show.dwell_s * 1000)
 
 
 def test_a_show_opened_on_a_slide_lands_the_player_on_it(qtbot, tmp_path):

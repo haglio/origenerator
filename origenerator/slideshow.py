@@ -184,6 +184,13 @@ class SlideshowPlaylist:
         takes up where this one stopped."""
         return [self._items[index] for index in self._order]
 
+    def playing_now(self) -> tuple | None:
+        """This pass as another show could take it up: its items in play order,
+        the place of the one on screen, and how long a slide holds."""
+        if self.is_empty():
+            return None
+        return self.in_play_order(), self._pos, self._image_dwell_ms
+
     def order_ids(self) -> list:
         """The pass in ids rather than in places — how a closing show hands its
         order to the next one, over a set that will have moved on."""

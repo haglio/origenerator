@@ -720,6 +720,9 @@ class PlayerShow(QObject):
         self._hand_over(land=True)
         return True
 
+    def playing_now(self):
+        return self._set.playlist.playing_now()
+
     def is_showing(self) -> bool:
         """Whether this show still holds its side."""
         return self._open

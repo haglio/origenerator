@@ -5,7 +5,9 @@ synchronously without a model or a server.
 """
 from __future__ import annotations
 
-from origenerator.voice.worker import VoiceWorker
+from PyQt6 import sip
+
+from origenerator.voice.worker import ProcessTask, VoiceWorker
 
 _PROMPTS = {"positive": "a cat", "negative": ""}
 
@@ -114,3 +116,10 @@ def test_a_command_needs_no_prompts_at_all(qtbot):
     worker.process("fix teeth", None, _teeth_matcher)
 
     assert commands == ["teeth"]
+
+
+def test_an_utterance_whose_worker_the_app_took_on_its_way_out_is_let_go_of(qtbot):
+    worker = VoiceWorker(lambda pos, neg, instr: (pos, neg))
+    sip.delete(worker)  # what the interpreter's exit does to a worker still answering
+
+    ProcessTask(worker, "make it a dog", _PROMPTS).run()

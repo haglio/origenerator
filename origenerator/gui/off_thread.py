@@ -50,7 +50,10 @@ class _Task(QRunnable):
             # thread would simply be lost.
             logger.warning("Off-thread call failed", exc_info=True)
             value = None
-        self._result.ready.emit(value)
+        try:
+            self._result.ready.emit(value)
+        except RuntimeError:
+            logger.info("An off-thread answer came back after the app let go of it")
 
 
 def run_off_thread(work, done) -> None:

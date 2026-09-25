@@ -112,3 +112,11 @@ def test_versions_taken_on_later_join_the_ones_already_armed(armed):
 
     assert armed.levels(base="a.png")[0] == ("a-v3.png", "image", "Level 3")
     assert armed.step(1, base="b-v2.png") == ("b.png", "image", "Base")
+
+
+def test_a_stepper_is_stepping_from_the_first_step_until_it_restarts(armed):
+    assert not armed.stepping
+    armed.step(1, base="a.png")
+    assert armed.stepping
+    armed.restart()
+    assert not armed.stepping

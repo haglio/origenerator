@@ -92,6 +92,7 @@ class ShowSet:
         self.enhanced_mode = False
         self.act_filter = ""
         self._enhancements_asked: set[str] = set()
+        self._enhance_frames: dict[str, bytes] = {}
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`set_modes`).
         self.all_items = [Slide.of(item) for item in items]
@@ -510,8 +511,16 @@ class ShowSet:
         self.enhanced_ids = set(hud.enhanced_ids or ())
         self.enhance_status = dict(hud.enhancing or {})
 
-    def note_enhancing(self, statuses) -> None:
+    def note_enhancing(self, statuses, frames=None) -> None:
         self.enhance_status = dict(statuses)
+        self._enhance_frames = dict(frames or {})
+
+    def frame_being_made_of(self, slide):
+        if slide.is_live:
+            return slide.path
+        if self.enhancement_of(slide.prompt_id) != ENHANCEMENT_RUNNING:
+            return None
+        return self._enhance_frames.get(slide.prompt_id)
 
     def note_enhancement_asked(self, prompt_id: str) -> None:
         self._enhancements_asked.add(prompt_id)
@@ -519,6 +528,7 @@ class ShowSet:
     def note_enhancement_landed(self, prompt_id: str) -> None:
         self._enhancements_asked.discard(prompt_id)
         self.enhance_status.pop(prompt_id, None)
+        self._enhance_frames.pop(prompt_id, None)
         self.enhanced_ids.add(prompt_id)
 
     def enhancement_of(self, prompt_id) -> str:

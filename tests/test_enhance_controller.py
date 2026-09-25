@@ -131,9 +131,11 @@ class FakeBrowser:
 class FakeShows:
     def __init__(self):
         self.told = None
+        self.frames = None
 
-    def note_enhancing(self, statuses):
+    def note_enhancing(self, statuses, frames=None):
         self.told = dict(statuses)
+        self.frames = dict(frames or {})
 
 
 class FakeConfigPanel:
@@ -509,6 +511,7 @@ def test_the_tile_the_version_list_and_the_show_all_learn_of_a_run(enhance,
     assert tab.pending == ("running", b"frame", "upscale x2")
     assert set(browser.enhancing) == {"i1"}
     assert shows.told == {"i1": "running"}
+    assert shows.frames == {"i1": b"frame"}
 
 
 def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):

@@ -391,8 +391,8 @@ def _arm(preview):
     Returns a list the built shows land in."""
     built = []
 
-    def make(media, frame):
-        show = _FakeShow(media, frame=frame)
+    def make(media, frame, generation):
+        show = _FakeShow(media, frame=frame, generation=generation)
         built.append(show)
         return show
 
@@ -400,15 +400,15 @@ def _arm(preview):
     return built
 
 
-def test_double_click_opens_fullscreen_for_shown_media(make_preview, tmp_path):
+def test_double_click_opens_fullscreen_on_the_shown_generation(make_preview, tmp_path):
     w = make_preview()
     built = _arm(w)
     png = _make_png(tmp_path / "p.png")
-    w.show_image(png)
+    w.show_image(png, "gen1")
 
     w.mouseDoubleClickEvent(None)
 
-    assert built[0].media == (png, "image")
+    assert (built[0].media, built[0].generation) == ((png, "image"), "gen1")
     assert w._fullscreen is built[0]  # kept alive here, and fed from here
 
 
@@ -483,8 +483,9 @@ class _FakeShow:
     """Stands in for the show a double-click opens, which is a window of this
     app's or one of a session's players -- so nothing of a window is on it."""
 
-    def __init__(self, media, *, frame=None):
+    def __init__(self, media, *, frame=None, generation=None):
         self.media = media
+        self.generation = generation
         self.frames = [frame] if frame is not None else []
         self.landed = None
         self._live = media is None
@@ -502,8 +503,8 @@ class _FakeShow:
     def show_frame(self, data):
         self.frames.append(data)
 
-    def show_landed(self, media):
-        self.landed = media
+    def show_landed(self, media, generation):
+        self.landed = (media, generation)
         self._live = False
 
 
@@ -564,9 +565,9 @@ def test_a_blank_before_the_result_still_lands_the_view(live_preview, tmp_path):
 
     live_preview.clear()
     png = _make_png(tmp_path / "done.png")
-    live_preview.show_image(png)
+    live_preview.show_image(png, "done")
 
-    assert win.landed == (png, "image")
+    assert win.landed == ((png, "image"), "done")
 
 
 def test_the_finished_file_takes_over_from_the_frames(live_preview, tmp_path):
@@ -574,9 +575,9 @@ def test_the_finished_file_takes_over_from_the_frames(live_preview, tmp_path):
     win = live_preview.open_fullscreen()
 
     png = _make_png(tmp_path / "done.png")
-    live_preview.show_image(png)  # the run landed: the pane swaps to the saved file
+    live_preview.show_image(png, "done")  # the run landed: the pane swaps to the saved file
 
-    assert win.landed == (png, "image")
+    assert win.landed == ((png, "image"), "done")  # named, so its show knows whose it is
 
 
 def test_a_dismissed_view_stops_being_fed(live_preview, tmp_path):
@@ -616,7 +617,7 @@ def test_a_pane_whose_picture_went_to_a_sessions_player_goes_on_taking_runs_and_
         make_preview, tmp_path):
     show = _show_on_a_sessions_player(tmp_path)
     preview = make_preview()
-    preview.set_fullscreen_factory(lambda media, frame: show)
+    preview.set_fullscreen_factory(lambda media, frame, generation: show)
     preview.show_image(_make_png(tmp_path / "a.png"))
     assert preview.open_fullscreen() is show
     handed_over = show.channel.command_file.read_text(encoding="utf-8")
@@ -802,36 +803,22 @@ def _drag_out(w):
     _move(w, 200, 200)
 
 
-def test_showing_media_alone_does_not_arm_a_drag(make_preview, tmp_path):
-    w = make_preview()
-    w.show_image(_make_png(tmp_path / "p.png"))
-    assert w._draggable_id is None  # the owner must arm it with the shown generation
-
-
-def test_set_draggable_id_arms_the_drag(make_preview, tmp_path):
-    w = make_preview()
-    w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_draggable_id("gen1")
-    assert w._draggable_id == "gen1"
-
-
 @pytest.mark.parametrize("transient", [
     lambda w: w.show_frame(_png_bytes()),      # a live in-progress frame
     lambda w: w.show_message("Waiting…"),      # a transient note
     lambda w: w.clear(),                        # back to the placeholder
     lambda w: w.show_combination(Combination()),   # a pair with nothing made from it yet
 ])
-def test_a_transient_view_disarms_the_drag(make_preview, transient):
+def test_a_transient_view_disarms_the_drag(make_preview, transient, tmp_path):
     w = make_preview()
-    w.set_draggable_id("gen1")
+    w.show_image(_make_png(tmp_path / "p.png"), "gen1")
     transient(w)
-    assert w._draggable_id is None  # nothing saved to drag out of a transient view
+    assert w._generation is None  # nothing saved to drag out of a transient view
 
 
 def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_path, drags):
     w = make_preview()
-    w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_draggable_id("gen1")
+    w.show_image(_make_png(tmp_path / "p.png"), "gen1")
     started, ended = [], []
     w.drag_out.started.connect(started.append)
     w.drag_out.ended.connect(lambda: ended.append(True))
@@ -852,8 +839,7 @@ def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
     w.show()
     w.resize(600, 480)
     qtbot.waitUntil(lambda: w._image_label.width() > THUMBNAIL_MAX)
-    w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_draggable_id("gen1")
+    w.show_image(_make_png(tmp_path / "p.png"), "gen1")
 
     shown = w._image_label.pixmap()
     assert max(shown.width(), shown.height()) > THUMBNAIL_MAX  # the pane fits it big
@@ -867,8 +853,7 @@ def test_a_dragged_still_trails_a_thumbnail_not_the_whole_pane(
 def test_a_dragged_animation_trails_the_frame_it_is_on(make_preview, tmp_path, drags):
     # An animated WebP plays through a QMovie, so the label holds no pixmap.
     w = make_preview()
-    w.show_image(_animated_webp(tmp_path / "a.webp"))
-    w.set_draggable_id("gen1")
+    w.show_image(_animated_webp(tmp_path / "a.webp"), "gen1")
 
     _drag_out(w)
 
@@ -882,8 +867,7 @@ def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drag
     # frame handed to the sink is the only hold on it, and without it a dragged
     # video was the one drag in the app that showed nothing.
     w = make_preview()
-    w.show_video(tmp_path / "clip.mp4")
-    w.set_draggable_id("gen1")
+    w.show_video(tmp_path / "clip.mp4", "gen1")
     frame = QImage(160, 120, QImage.Format.Format_RGB32)
     frame.fill(0x2288FF)
     w._video.videoSink().setVideoFrame(QVideoFrame(frame))
@@ -899,8 +883,7 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
     # Dragged before the first frame arrives there is genuinely nothing to show,
     # and that must not stop the drag.
     w = make_preview()
-    w.show_video(tmp_path / "clip.mp4")
-    w.set_draggable_id("gen1")
+    w.show_video(tmp_path / "clip.mp4", "gen1")
     started = []
     w.drag_out.started.connect(started.append)
 
@@ -913,7 +896,7 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
 
 def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
     w = make_preview()
-    w.show_image(_make_png(tmp_path / "p.png"))  # shown, but never armed
+    w.show_image(_make_png(tmp_path / "p.png"))  # a file no generation owns
     started = []
     w.drag_out.started.connect(started.append)
 
@@ -925,8 +908,7 @@ def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
 
 def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     w = make_preview()
-    w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_draggable_id("gen1")
+    w.show_image(_make_png(tmp_path / "p.png"), "gen1")
 
     _press(w, 0, 0)
     _move(w, 2, 2)  # within the start-drag distance — a click, not a drag
@@ -1242,20 +1224,18 @@ def test_the_corners_follow_the_picture_rather_than_the_pane(make_preview, tmp_p
 # --- putting the pane down before laying new content in it -------------------
 #
 # Every show_* opens by clearing what the pane was holding: the playback, the
-# notice, the corner controls, the media, the live follow and the drag. The set
-# is the same six things each time, so these pin it as one list — including the
-# two deliberate exceptions (a saved file leaves the drag for its owner to arm,
-# a kept notice rides over the frames of the picture it is about) and the one
-# that is a defect, held below.
+# notice, the corner controls, the media, the live follow and the generation.
+# The set is the same six things each time, so these pin it as one list —
+# including the deliberate exception (a kept notice rides over the frames of the
+# picture it is about) and the one that is a defect, held below.
 
 
 def _pane_holding_everything(w, tmp_path):
     """A pane holding a saved generation with every resettable thing set: an
     animated picture, a notice over it, armed corners and an armed drag."""
-    w.show_image(_animated_webp(tmp_path / "held.webp"))
+    w.show_image(_animated_webp(tmp_path / "held.webp"), "held")
     w.set_notice("no longer what these settings would make")
     w.set_actions("held", favorite=True, enhance=None)
-    w.set_draggable_id("held")
     w._player.reset_mock()
     return w
 
@@ -1272,7 +1252,7 @@ def test_showing_an_image_puts_down_all_the_pane_was_holding(make_preview, tmp_p
     assert w._media == (path, "image")
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None                 # the animation it replaced
-    assert w._draggable_id == "held"        # a saved file: the owner re-arms it
+    assert w._generation is None            # the generation of the one it replaced
 
 
 def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_path):
@@ -1287,7 +1267,7 @@ def test_showing_a_video_puts_down_all_the_pane_was_holding(make_preview, tmp_pa
     assert w._media == (path, "video")
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None
-    assert w._draggable_id == "held"        # a saved file: the owner re-arms it
+    assert w._generation is None            # the generation of the one it replaced
 
 
 def test_showing_a_live_frame_puts_down_all_the_pane_was_holding(make_preview,
@@ -1303,7 +1283,7 @@ def test_showing_a_live_frame_puts_down_all_the_pane_was_holding(make_preview,
     assert w._media is None                 # a frame is no file to open fullscreen
     assert (w._live, w._live_frame) == (True, data)
     assert w._movie is None
-    assert w._draggable_id is None          # nor a saved generation to drag out
+    assert w._generation is None            # nor a saved generation to drag out
 
 
 def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
@@ -1318,7 +1298,7 @@ def test_showing_a_combination_puts_down_all_the_pane_was_holding(make_preview,
     assert w._media is None
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None
-    assert w._draggable_id is None
+    assert w._generation is None
 
 
 def test_showing_a_message_puts_down_all_the_pane_was_holding(make_preview,
@@ -1333,7 +1313,7 @@ def test_showing_a_message_puts_down_all_the_pane_was_holding(make_preview,
     assert w._media is None
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None
-    assert w._draggable_id is None
+    assert w._generation is None
 
 
 def test_a_message_marked_live_leaves_the_pane_following_the_run(make_preview,
@@ -1380,7 +1360,7 @@ def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
     assert w._media is None
     assert (w._live, w._live_frame) == (False, None)
     assert w._movie is None
-    assert w._draggable_id is None
+    assert w._generation is None
 
 
 def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,

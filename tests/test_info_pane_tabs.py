@@ -686,7 +686,7 @@ def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):
     panel.stop_watching()
 
     assert panel.watched_key() is None
-    panel._preview.show_media.assert_called_once_with("cat.png", "image")
+    panel._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
@@ -712,7 +712,7 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monke
 
     panel.stop_watching()
 
-    panel._preview.show_media.assert_called_once_with("cat.png", "image")
+    panel._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
@@ -759,7 +759,7 @@ def test_a_landed_picture_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
     panel.show_finished_media(cat)
 
     assert not panel.is_awaiting_frame()
-    panel._preview.show_media.assert_called_once_with("cat.png", "image")
+    panel._preview.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
 def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):

@@ -908,8 +908,7 @@ class GenerateConfigPanel(QWidget):
         row = self._recent_matching_row()
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
         if preview is not None:
-            self._preview.show_media(*preview)
-            self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
+            self._preview.show_media(*preview, row["prompt_id"])
             self._displayed_row = row
         else:
             self._preview.clear()  # nothing generated with these settings yet
@@ -1184,8 +1183,7 @@ class GenerateConfigPanel(QWidget):
         if preview is None:
             return  # nothing to look at; leave the frames rather than blank the pane
         self._live_note = None
-        self._preview.show_media(*preview)
-        self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
+        self._preview.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions(row["prompt_id"])  # …and wears its corners
 
     # --- following a run in flight ------------------------------------------
@@ -1288,8 +1286,7 @@ class GenerateConfigPanel(QWidget):
         self._displayed_row = row
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
-            self._preview.show_media(*preview)  # after any prefill, so it wins over autoshow
-            self._preview.set_draggable_id(row["prompt_id"])  # its preview drags onto combine
+            self._preview.show_media(*preview, row["prompt_id"])  # after any prefill, so it wins over autoshow
         else:
             self._preview.clear()
         self._show_footer(row, image_rows, preview, request)
@@ -1466,8 +1463,7 @@ class GenerateConfigPanel(QWidget):
         if preview is None:
             self._preview.clear()
             return
-        self._preview.show_media(*preview)
-        self._preview.set_draggable_id(row["prompt_id"])
+        self._preview.show_media(*preview, row["prompt_id"])
         self._arm_preview_actions()
         self.refresh_modified_notice()  # the picture is back; so is anything said about it
 
@@ -1577,7 +1573,8 @@ class GenerateConfigPanel(QWidget):
             return
         path = self._level_path(self._listed_levels[position])
         if path.exists():
-            self._preview.show_media(path, media_type_of_row(self._displayed_row))
+            self._preview.show_media(path, media_type_of_row(self._displayed_row),
+                                     self._displayed_row["prompt_id"])
             self._arm_preview_actions()  # still the same generation, still actionable
             self.refresh_modified_notice()  # a version of the same generation, same notice
 

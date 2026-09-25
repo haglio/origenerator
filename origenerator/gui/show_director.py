@@ -66,6 +66,7 @@ from origenerator.orientation import (
 from origenerator.orientation import (
     filter_rows,
     oriented_key,
+    row_orientation,
 )
 from origenerator.orientation import (
     split_key as _split_shelf_key,
@@ -108,9 +109,6 @@ class ShowHost(Protocol):
 
     def visible_prompt_ids(self) -> list[str]:
         """The generations the browser lists, in the order shown."""
-
-    def selected_prompt_id(self) -> str | None:
-        """The generation picked in the pane, or ``None``."""
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here, and how much of ComfyUI's queue is another
@@ -314,9 +312,9 @@ class ShowDirector:
                 "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
                                 favorite_ids=self._favorite_prompt_ids())}
 
-    def open_on_preview(self, media, frame):
-        """A double-click on a tab's preview: open its folder as a slideshow
-        standing on the very picture that was clicked.
+    def open_on_preview(self, media, frame, generation):
+        """A double-click on a tab's preview: open the folder of the generation
+        it shows as a slideshow standing on that generation.
 
         The pace is nought — nothing moves until an arrow does, or until the
         console's clip-seconds pair is turned up — and the order is the browser's
@@ -330,27 +328,27 @@ class ShowDirector:
         that run's latest, and goes on following it until the pane hands over the
         file it lands as.
         """
-        folder_rows = self._folder_rows()
-        folder = self.items_of(folder_rows)
-        selected = self._host.selected_prompt_id()
-        index = next((i for i, item in enumerate(folder) if item[2] == selected), None)
-        items, rows = (folder, folder_rows) if index is not None else ([], [])
+        listed = self._folder_rows()
+        folder_items = None
         if media is None:  # following a run: it has no place among the files yet
-            items, index = [], 0
-        elif not items:  # the shown item isn't in the folder listing: play it alone
-            items, index = [(media[0], media[1], None, None)], 0
-            # Its own row all the same, so the one picture on screen still
-            # knows its other versions -- the listing is what it is missing
-            # from, not the library.
-            rows = [row for row in [self._host.row_for(selected)] if row is not None]
+            items, rows, start, folder_items = [], listed, 0, self.items_of(listed)
+        else:
+            rows = (listed if any(row["prompt_id"] == generation for row in listed)
+                    else self.rows_at(self._location_of(self._host.row_for(generation))))
+            items = self.items_of(rows)
+            start = next((i for i, item in enumerate(items) if item[2] == generation),
+                         None)
+            if start is None:
+                items, start = [(media[0], media[1], generation, None)], 0
+                rows = [row for row in [self._host.row_for(generation)] if row is not None]
         # Neither shuffled nor newest-first, and not a loop: this is one folder
         # in the browser's own order, held on one picture.  Said plainly rather
         # than left at the defaults, because the HUD reads them now — an order
         # slot saying "Shuffle" over a folder listed in its own order would be
         # the panel making something up.
-        return self.open(items, rows=[*rows, *folder_rows], start=index, frame=frame,
+        return self.open(items, rows=rows, start=start, frame=frame,
                          image_dwell_ms=0, shuffle=in_order,
-                         folder_items=folder,
+                         folder_items=folder_items,
                          hud=HudFacts(
                              order_label="",
                              favorite_ids=self._favorite_prompt_ids()))
@@ -359,6 +357,12 @@ class ShowDirector:
         """The rows the browser lists, in its order."""
         rows = (self._host.row_for(pid) for pid in self._host.visible_prompt_ids())
         return [row for row in rows if row is not None]
+
+    def _location_of(self, row: dict | None) -> str | None:
+        if row is None:
+            return None
+        key = gallery.settings_folder_key(row, self._host.image_config_index())
+        return oriented_key(key, row_orientation(row))
 
     def open(self, items, *, rows=(), folder_items=None, location=None,
              side=None, resume=None, **kwargs):

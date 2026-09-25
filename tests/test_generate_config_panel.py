@@ -551,11 +551,12 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
     panel = GenerateConfigPanel(ComfyUIClient(), db)
     qtbot.addWidget(panel)
     shown = []
-    monkeypatch.setattr(panel._preview, "show_media", lambda path, mt: shown.append((path, mt)))
+    monkeypatch.setattr(panel._preview, "show_media",
+                        lambda path, mt, generation: shown.append((path, mt, generation)))
 
     panel.prefill("sdxl_t2i", _wiz_params())
 
-    assert shown[-1] == ("wiz.png", "image")
+    assert shown[-1] == ("wiz.png", "image", "g1")
 
 
 def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
@@ -564,7 +565,7 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
     qtbot.addWidget(panel)
     panel.show_recent_preview()
     assert panel._preview._media is None  # a placeholder, not a resolved file
-    assert panel._preview._draggable_id is None  # nothing shown, nothing to drag
+    assert panel._preview._generation is None  # nothing shown, nothing to drag
 
 
 def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
@@ -576,11 +577,9 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
     monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
     panel = GenerateConfigPanel(ComfyUIClient(), db)
     qtbot.addWidget(panel)
-    monkeypatch.setattr(panel._preview, "show_media", lambda path, mt: None)
-
     panel.prefill("sdxl_t2i", _wiz_params())  # autoshows the folder's newest result
 
-    assert panel._preview._draggable_id == "g1"  # its preview can be dragged onto combine
+    assert panel._preview._generation == "g1"  # its preview can be dragged onto combine
 
 
 # --- config snapshot / prefill / restore ------------------------------------
@@ -1015,7 +1014,7 @@ def test_picking_the_evolved_version_plays_it_in_the_preview(saved_panel, monkey
 
     panel._show_level(0)
 
-    panel._preview.show_media.assert_called_once_with(upscale, "video")
+    panel._preview.show_media.assert_called_once_with(upscale, "video", "vid1")
 
 
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
@@ -1092,7 +1091,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     # ...and when the run ends the pane goes back to the image itself.
     panel.set_pending_enhancement(None)
     panel._preview.show_media.assert_called_once_with(
-        output_dir / "image" / "sdxl_img1.png", "image"
+        output_dir / "image" / "sdxl_img1.png", "image", "img1"
     )
 
 
@@ -1130,7 +1129,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     panel._show_level(1)   # the original
 
     panel._preview.show_media.assert_called_once_with(
-        output_dir / "image" / "sdxl_img1.png", "image"
+        output_dir / "image" / "sdxl_img1.png", "image", "img1"
     )
     assert panel._displayed_row["prompt_id"] == "img1"
 
@@ -1200,7 +1199,7 @@ def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypat
 
     panel.show_saved_generation(image, [image])
 
-    assert panel._preview._draggable_id == "img1"  # drag its preview onto combine
+    assert panel._preview.show_media.call_args.args == ("img1.png", "image", "img1")
 
 
 def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, monkeypatch):
@@ -1210,7 +1209,7 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
 
     panel.show_saved_generation(image, [image])
 
-    assert panel._preview._draggable_id is None  # nothing on screen to drag
+    assert panel._preview._generation is None  # nothing on screen to drag
 
 
 def test_panel_forwards_the_preview_drag_signals(panel):
@@ -1506,7 +1505,8 @@ def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_pa
 
     panel.show_saved_generation(video, [])
 
-    assert panel._preview.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video")
+    assert panel._preview.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video",
+                                                         "vid1")
 
 
 def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):

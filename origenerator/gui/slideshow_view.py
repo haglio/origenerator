@@ -570,13 +570,14 @@ class SlideshowView(QWidget):
             self._frame = data
             self._pane.show_frame(data)
 
-    def show_landed(self, media: tuple) -> None:
-        """The followed generation finished: show the saved file in place of its
-        frames, and become an ordinary show of it."""
+    def show_landed(self, media: tuple, generation: str | None) -> None:
+        """The followed generation finished: its saved file takes the place of
+        its frames, at the head of the folder the show was armed with."""
         if not self._live:
             return
         self._live = False
-        self._set.reseed([media], shuffle=in_order)
+        folder = [slide for slide in self._set.all_items if slide.prompt_id != generation]
+        self._set.reseed([Slide(*media, generation), *folder], shuffle=in_order)
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------

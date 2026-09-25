@@ -90,7 +90,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere), and the
 # pane's that each side's Favorites collects its own side's bookmarks
 # (test_favorites_collects_the_bookmarks_of_its_own_side).
-MAX_PROSE_LINES = 19323
+#
+# 19316 when a tab's preview stopped asking the show it opened a window's
+# question: its two notes on what builds that show, one of them calling it a
+# window, are the factory's one line now, and a pane wired to nothing opening
+# nothing is test_a_pane_with_nothing_wired_opens_nothing.
+MAX_PROSE_LINES = 19316
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

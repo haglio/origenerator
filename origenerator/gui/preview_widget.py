@@ -102,10 +102,7 @@ class PreviewWidget(QWidget):
         self._live = False
         self._live_frame: bytes | None = None
         self._allow_fullscreen = allow_fullscreen  # a slideshow's own preview opts out
-        self._fullscreen: QWidget | None = None    # the open fullscreen window, kept alive here
-        # What builds that window. The gallery sets it, because what a double-click
-        # opens is a slideshow of the folder under this pane — which this pane
-        # knows nothing about. Unset, a double-click opens nothing.
+        self._fullscreen = None  # the show a double-click here opened, kept alive here
         self._open_fullscreen_view = None
         # A double-click that doesn't open fullscreen (this preview opted out, or has
         # nothing to open) runs this instead — the slideshow uses it so a second
@@ -473,7 +470,7 @@ class PreviewWidget(QWidget):
         landed on a file, and so is an ordinary show of it now — follows
         nothing."""
         win = self._fullscreen
-        if win is None or not win.isVisible() or not win.is_live():
+        if win is None or not win.is_showing() or not win.is_live():
             return None
         return win
 
@@ -719,14 +716,9 @@ class PreviewWidget(QWidget):
         return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:
-        """Wire what a double-click here opens: ``make(media, frame)`` returns a
-        shown fullscreen window, or ``None``.
-
-        The gallery supplies it, because the window is a slideshow of the folder
-        this pane's generation sits in and the pane has no idea what that folder
-        holds. Left unset — a bare preview in a test — a double-click opens
-        nothing.
-        """
+        """Wire what a double-click here opens: ``make(media, frame)`` returns the
+        show it put up -- a slideshow of the folder this pane's generation sits
+        in, which only the gallery knows -- or ``None``."""
         self._open_fullscreen_view = make
 
     def mouseDoubleClickEvent(self, event) -> None:

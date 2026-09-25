@@ -5,7 +5,7 @@ import logging
 
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QMainWindow
+from PyQt6.QtWidgets import QMainWindow, QMessageBox
 
 from origenerator import ui_scale
 from origenerator.app_state import AppState
@@ -118,13 +118,9 @@ class OrigeneratorWindow(QMainWindow):
         if fun_time is not None and fun_time.in_a_headset:
             self._hand_the_window_over(fun_time)
 
-        # Ctrl+Alt+Q quits from anywhere in the app: an application-scoped shortcut
-        # fires no matter which widget holds focus. close() runs closeEvent — which
-        # persists the session and geometry — and the app exits on the last window
-        # closing, releasing the OSR2 via aboutToQuit.
         quit_shortcut = QShortcut(QKeySequence("Ctrl+Alt+Q"), self)
         quit_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        quit_shortcut.activated.connect(self.close)
+        quit_shortcut.activated.connect(self._close_if_sure)
 
         self._restore_session()
         self._persist_the_session_as_it_changes()
@@ -272,30 +268,31 @@ class OrigeneratorWindow(QMainWindow):
         self._device_rect = (rect.x, rect.y, rect.width, rect.height)
 
     def closeEvent(self, event):
-        """Hand ComfyUI the background experiments for the coming absence and
-        everything else the queue is still holding, then persist the session (open
-        config tabs, gallery folder/selection) and the window geometry so the next
-        launch reopens as it was."""
+        if event.spontaneous() and not self._sure_to_close():
+            event.ignore()
+            return
         for chore in (self._gallery_view.queue_experiments_for_absence,
                       self._gallery_view.queue_base_renders_for_absence,
-                      # Last, so the batches above go with it: the queue holds
-                      # work back for the sake of somebody watching, and there is
-                      # about to be nobody watching.
                       self._gallery_view.flush_queue_to_server):
-            # Each on its own, and none of them able to take the session down with
-            # it. These are errands for a machine nobody is using; what the user
-            # actually loses if the close breaks is everything below — the open
-            # tabs, the folder they were in, the window's place on its monitor.
-            # A typo in one of these chores ate exactly that, silently, for three
-            # days (a name for the base-render source the gallery package had
-            # never exported), and the app looked fine the whole time because nothing
-            # a closing window raises is ever shown to anyone.
             try:
                 chore()
             except Exception as e:
                 logger.warning("Close-time %s failed: %s", chore.__name__, e)
         self._persist_session()
         super().closeEvent(event)
+
+    def _close_if_sure(self) -> None:
+        if self._sure_to_close():
+            self.close()
+
+    def _sure_to_close(self) -> bool:
+        if self._fun_time is not None:
+            return True
+        return QMessageBox.question(
+            self, "Close Origenerator", "Are you sure?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) == QMessageBox.StandardButton.Yes
 
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:

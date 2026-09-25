@@ -95,7 +95,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # question: its two notes on what builds that show, one of them calling it a
 # window, are the factory's one line now, and a pane wired to nothing opening
 # nothing is test_a_pane_with_nothing_wired_opens_nothing.
-MAX_PROSE_LINES = 19316
+#
+# 19310 when the pass Esc keeps became the playlist's, for a show on a
+# session's player as for a window: what the window's note said is
+# test_esc_again_puts_back_everything_it_took_off and
+# test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder.
+MAX_PROSE_LINES = 19310
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

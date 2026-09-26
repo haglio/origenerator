@@ -607,9 +607,6 @@ def _falls_back(answer=True):
 
 
 def test_a_loop_over_a_set_that_is_one_row_ends_somewhere_else_entirely():
-    """A set that is one row has nothing to browse — the row played whole is
-    the row looping — so ending the loop into it would take the rectangle off
-    the map and leave the very same pictures coming round."""
     show_set, dealt = _set(items=_ROW, neighbors=_row_mates)
     fall_back, asked = _falls_back()
 
@@ -621,8 +618,6 @@ def test_a_loop_over_a_set_that_is_one_row_ends_somewhere_else_entirely():
 
 
 def test_a_loop_with_a_set_under_it_ends_into_that_set_rather_than_falling_back():
-    """Three pictures of which one has a row: the loop was a narrowing of a
-    real browse, and the browse is what it ends into."""
     show_set, dealt = _mapped()
     show_set.start_loop("seed")
     fall_back, asked = _falls_back()
@@ -636,8 +631,6 @@ def test_a_loop_with_a_set_under_it_ends_into_that_set_rather_than_falling_back(
 
 
 def test_a_loop_whose_way_out_has_nothing_to_play_ends_into_the_set_as_ever():
-    """Nowhere to fall back to is no reason to leave the screen blank: the row
-    comes back up and only the rectangle goes."""
     show_set, dealt = _set(items=_ROW, neighbors=_row_mates)
     fall_back, asked = _falls_back(answer=False)
 
@@ -649,8 +642,6 @@ def test_a_loop_whose_way_out_has_nothing_to_play_ends_into_the_set_as_ever():
 
 
 def test_the_loop_key_stepped_off_a_row_falls_back_the_same_way():
-    """The key's off stop is the off button: one press of Home over a folder
-    with no acts to loop leaves the folder."""
     show_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
     fall_back, asked = _falls_back()
 
@@ -660,9 +651,6 @@ def test_the_loop_key_stepped_off_a_row_falls_back_the_same_way():
 
 
 def test_a_set_taken_up_under_the_slide_on_screen_plays_on_from_it():
-    """What a loop falls back to: the picture on screen goes on playing and
-    only what comes after it is the new set, the way a satellite's browse
-    resumes under the clip it was looping."""
     show_set, dealt = _set()
     show_set.playlist.jump_to(1)
     wider = [("two.png", "image", "id-2"), ("nine.png", "image", "id-9")]
@@ -675,8 +663,6 @@ def test_a_set_taken_up_under_the_slide_on_screen_plays_on_from_it():
 
 
 def test_a_set_taken_up_under_the_slide_is_no_row_to_be_dealt_as_a_loop():
-    """A set read as a row would be a loop again — the press that ended one
-    putting it straight back.  Played from the top it is that row as ever."""
     show_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
 
     show_set.reorder(_ROW, latest=True, keep_slide=True)

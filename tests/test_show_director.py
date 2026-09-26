@@ -518,6 +518,20 @@ def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
     assert director._live_shows == [(again, "shelf/b")]
 
 
+def test_a_double_clicked_picture_plays_its_folder_newest_first_and_says_latest(shows):
+    """The gallery lists a folder's newest generation first and this show plays
+    it in that order, which is the order Latest plays — so the panel lights
+    Latest over it rather than leaving both of the order pair dark."""
+    host = FakeHost(rows=[_row("a2"), _row("a1")])
+    host.visible = ["a2", "a1"]
+    director, _host, made = shows(host)
+
+    director.open_on_preview(("a2.png", "image"), None, "a2")
+
+    (show,) = made
+    assert show.hud.order_label == LATEST_LABEL
+
+
 def test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation(shows):
     host = FakeHost(rows=[_row("a1"), _row("t1")])
     host.visible = ["a1"]
@@ -837,10 +851,6 @@ def test_a_show_asks_this_director_for_its_order_hosted_or_not(shows, session):
 
 
 def test_a_loop_ending_on_a_folder_show_hands_it_the_library_it_is_ordered_by(shows):
-    """A show whose whole set is the row it loops has nothing to browse, so
-    the off press leaves that folder for the side's whole library — taken up
-    under the picture already on screen, the way a satellite's browse resumes
-    under the clip it was looping."""
     browser = FakeBrowser(shelves={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
@@ -855,7 +865,6 @@ def test_a_loop_ending_on_a_folder_show_hands_it_the_library_it_is_ordered_by(sh
 
 
 def test_a_show_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(shows):
-    """Whichever of the pair is lit on the panel is the set it falls back to."""
     browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")],
                                    ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser)
@@ -879,11 +888,6 @@ def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_show_alone(show
 
 
 def test_a_second_set_in_the_one_window_brings_its_own_sides_library_with_it(shows):
-    """Standalone the monitor holds one show, so a second set re-points the
-    window that is there rather than opening another.  The library that window
-    falls back to — and that its order pair hands it — is the side the set it
-    is playing NOW belongs to; kept on the side it was opened on, it would
-    hand over the other shape's pictures."""
     browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
                                    ALL_LANDSCAPE: [_row("g7")]})
     director, _host, made = shows(browser=browser)

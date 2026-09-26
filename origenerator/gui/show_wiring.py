@@ -38,12 +38,9 @@ class ShowActions:
     the corner note goes on to say. ``lock`` takes one and is a session's: it
     opens the held item as a generate tab. ``reset`` takes the show itself and
     is a session's too — hosted, "how it started" is the REGION's base state,
-    which only the gallery knows. ``reorder`` takes the show and whether to
-    play its side's whole library newest first; ``browse_all`` takes the show
-    alone and is that same library in the order the show is already in, taken
-    up from the slide on screen — where a loop over a set that is one row ends
-    (:meth:`~origenerator.gui.show_set.ShowSet.end_loop`). Both answer whether
-    there was anything of that shape to play. ``drive_toggle`` takes nothing: Space goes to
+    which only the gallery knows. ``reorder`` takes the show and whether to play
+    its side's library newest first; ``browse_all`` takes the show alone and
+    plays that library in the order it is in. ``drive_toggle`` takes nothing: Space goes to
     the app's one OSR2 switch rather than straight to this show's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
     console's four control buttons read and set.
@@ -81,9 +78,9 @@ class HudFacts:
     """What this show's own HUD says about the set it is playing.
 
     All of it is the players' vocabulary, because the panel is the players'
-    panel: ``order_label`` is how the set is ordered (Recents plays "Latest",
-    everything else "Shuffle", and a folder opened in the browser's own order
-    says nothing at all rather than making one up); ``favorite_ids`` is which of
+    panel: ``order_label`` is how the set is ordered — "Latest" for Recents and
+    for a folder opened on one of its pictures, both of which play newest
+    first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean
     here what they mean on a player.  Whether the show is LOOPING is not a
     fact about the set at all: a loop is one axis of the map played round and

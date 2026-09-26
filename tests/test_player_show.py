@@ -450,8 +450,6 @@ def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot,
 
 
 def test_a_reorder_keeping_the_slide_leaves_the_player_on_the_picture_it_has(qtbot, tmp_path):
-    """The loop's way out: the picture on screen plays to its end and the
-    library is only what comes up after it, so the player is sent nowhere."""
     show = _show(qtbot, tmp_path)
     _sent(show)
 
@@ -1241,8 +1239,6 @@ def _row_only(prompt_id):
 
 def test_taking_the_loop_off_a_folder_on_a_player_asks_for_the_regions_library(
         qtbot, tmp_path):
-    """The set under the loop is the folder, which is the loop — so the off
-    press leaves it for the whole library of that region's shape."""
     said, widened = [], []
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
     show = _show(qtbot, tmp_path, items=folder, say=said.append, actions=ShowActions(

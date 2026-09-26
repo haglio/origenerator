@@ -795,9 +795,6 @@ def _seeds_only(prompt_id):
 
 
 def test_taking_the_loop_off_a_folder_show_asks_the_gallery_for_the_library(qtbot):
-    """A folder show is the row it loops and nothing else, so the off button
-    would put the same pictures straight back.  It leaves the folder instead —
-    the whole library of this show's shape, which the gallery owns."""
     widened = []
     view = _view(qtbot, _KEYED, actions=ShowActions(
         neighbors=_seeds_only, browse_all=lambda show: widened.append(show) or True))
@@ -2097,8 +2094,6 @@ def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_
 
 
 def test_a_reorder_keeping_the_slide_leaves_the_picture_up_and_browses_on(qtbot, tmp_path):
-    """The loop's way out: the picture on screen stays where it is, and the
-    library is what comes after it."""
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"))
     view.step(1)
     shown = _put_up(view)

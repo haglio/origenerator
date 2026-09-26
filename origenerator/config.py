@@ -19,6 +19,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # this module never could.
 STATE_DIR = Path(os.environ.get("ORIGENERATOR_STATE_DIR") or PROJECT_DIR / "state")
 UI_STATE_PATH = STATE_DIR / "ui_state.json"
+FRAMES_BEING_MADE_DIR = STATE_DIR / "frames_being_made"
 # Set by the preview launcher and never by the live one: this run is a worktree's
 # code shown for judging, not the live install (see origenerator.branch_session).
 BRANCH_SESSION_FLAG = "ORIGENERATOR_BRANCH_SESSION"

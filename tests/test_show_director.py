@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -109,6 +110,8 @@ class FakeShow:
         self.pause_raises = False
         self.state_at_close = "where-it-got-to"
         self.played = []
+        self.leads = 0
+        self.levels_added = []
 
     # what a show is, and what it holds
     def queue(self):
@@ -159,8 +162,15 @@ class FakeShow:
     def note_enhanced(self, prompt_id, path, media_type, *, still):
         self.enhanced.append((prompt_id, media_type, still))
 
-    def note_enhancing(self, statuses):
+    def note_enhancing(self, statuses, frames=None):
         self.enhancing = dict(statuses)
+        self.enhancing_frames = dict(frames or {})
+
+    def lead_with_what_is_being_made(self):
+        self.leads += 1
+
+    def add_levels(self, levels):
+        self.levels_added.append(levels)
 
     def note_voice_command(self, message, *, kind=NOTICE):
         self.said.append(message)
@@ -611,9 +621,7 @@ def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     assert made[1].added == []
 
 
-def test_a_run_in_another_folder_is_turned_down_once_and_not_asked_again(shows):
-    # A frame arrives every second or so, and the question costs a row lookup
-    # and a walk of what is on screen.
+def test_a_run_in_another_folder_is_turned_down(shows):
     host = FakeHost(rows=[_row("g1")])
     director, _host, made = shows(host, db=FakeDB([_row("g7")]))
     director.open([("a.png", "image", "g1", None)])
@@ -622,7 +630,18 @@ def test_a_run_in_another_folder_is_turned_down_once_and_not_asked_again(shows):
     director.note_generating("g7", b"frame-two")
 
     assert made[0].generating == []
-    assert director._show_refused == {"g7"}
+
+
+def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(shows):
+    host = FakeHost(rows=[_row("g1")])
+    director, _host, made = shows(host, db=FakeDB([_row("g1"), _row("g7")]))
+    director.open([("a.png", "image", "g1", None)])
+
+    director.note_generating("g7", b"frame-one")
+    host.rows.append(_row("g7"))
+    director.note_generating("g7", b"frame-two")
+
+    assert made[0].generating == [("g7", b"frame-two")]
 
 
 def test_an_enhancement_is_never_a_slide_of_its_own_frames(shows):
@@ -1073,9 +1092,8 @@ def test_a_show_on_a_player_says_its_lines_in_the_gallerys_caption(shows):
     assert made[0].opened_with["say"] == host.say
 
 
-def test_a_show_on_a_player_is_handed_files_and_no_frame(shows):
-    # A player is handed files to play; a run still being made has none yet, so
-    # the frame a double-click landed on stays with the window it was for.
+def test_a_show_on_a_player_takes_runs_from_what_is_in_flight_not_a_double_clicks_frame(
+        shows):
     director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT, frame=b"frame")
@@ -1118,12 +1136,13 @@ def test_the_queue_plate_comes_up_filled_rather_than_blank(shows):
     # The hold on videos is this opening's own doing, so the corner says what is
     # waiting on it rather than going blank for a second and a half.
     host = FakeHost()
-    host.queue = (["a card"], 3)
+    waiting = _being_made("g-waiting", frame=None)
+    host.queue = ([waiting], 3)
     director, _host, made = shows(host)
 
     director.open([("a.png", "image", "g1", None)])
 
-    assert made[0].queue_set == (["a card"], 3)
+    assert made[0].queue_set == ([waiting], 3)
 
 
 def test_the_plate_clear_drops_another_apps_work(shows):
@@ -1467,3 +1486,140 @@ def test_a_show_of_a_folder_still_picks_up_where_the_last_one_stopped(shows):
 
     assert made[0].resumed is director._show_state
 
+
+
+# --- what is being made while a show is up --------------------------------------
+
+def _being_made(key, frame=b"frame"):
+    return SimpleNamespace(key=key, reading=SimpleNamespace(frame=frame))
+
+
+def test_how_the_enhancements_are_going_reaches_every_show_that_is_up(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    director.note_enhancing({"g1": "running"})
+
+    assert [show.enhancing for show in made] == [{"g1": "running"}] * 2
+
+
+def test_a_show_opens_knowing_what_is_being_enhanced(shows):
+    director, _host, made = shows()
+    director.note_enhancing({"g1": "running"})
+
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].hud.enhancing == {"g1": "running"}
+
+
+def test_a_show_opened_with_no_slide_named_leads_with_the_run_being_generated(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    host.queue = ([_being_made("g-run")], 0)
+    director, _host, made = shows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[0].leads == 1
+
+
+def test_a_show_opened_on_a_named_slide_is_led_nowhere_else(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    host.queue = ([_being_made("g-run")], 0)
+    director, _host, made = shows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+
+    director.open([("a.png", "image", "g1", None)], start=0)
+
+    assert (made[0].generating, made[0].leads) == ([], 0)
+
+
+def test_a_landed_enhancement_hands_every_show_the_pictures_new_versions(
+        shows, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "better.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+    director.versions_of = lambda rows: {"better.png": ["newer", "older"]}
+
+    director.note_enhanced(_row("g1", files=("better.png",)))
+
+    assert [show.levels_added for show in made] == [[{"better.png": ["newer", "older"]}]] * 2
+
+
+def test_the_frames_of_the_enhancements_being_made_reach_every_show_that_is_up(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+
+    director.note_enhancing({"g1": "running"}, frames={"g1": b"frame"})
+
+    assert [show.enhancing_frames for show in made] == [{"g1": b"frame"}] * 2
+
+
+def test_a_run_reaches_each_show_whose_own_set_holds_it(shows):
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1"), _row("g-run")],
+                                   "shelf/b": [_row("g2")]})
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[1].generating == []
+
+
+def test_every_show_that_is_up_hears_which_runs_are_still_being_made(shows):
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")], "shelf/b": [_row("g2")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+
+    director.note_in_flight([_being_made("g-run", frame=None)])
+
+    assert [show.in_flight for show in made] == [{"g-run"}, {"g-run"}]
+
+
+def test_a_latest_show_takes_a_new_run_after_the_browser_has_moved_on(shows):
+    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g1")]}, recents=False)
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
+                  side=LANDSCAPE)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == [("g-run", b"frame")]
+
+
+def test_a_latest_show_turns_down_a_run_asked_for_in_the_other_shape(shows):
+    run = _row("g-run")
+    run["params_json"] = json.dumps({"width": 1024, "height": 768})
+    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g1")]})
+    director, _host, made = shows(browser=browser, db=FakeDB([run]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
+                  side=PORTRAIT)
+
+    director.note_generating("g-run", b"frame")
+
+    assert made[0].generating == []
+
+
+def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    director, host, made = shows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(
+        players={PORTRAIT: object(), LANDSCAPE: object()}))
+    host.queue = ([_being_made("g-run")], 0)
+
+    director.open([], folder_items=[("a.png", "image", "g1", None)], start=0,
+                  frame=b"frame")
+
+    assert made[0].items == [("a.png", "image", "g1", None)]
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[0].leads == 1

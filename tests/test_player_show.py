@@ -10,11 +10,13 @@ from pathlib import Path
 
 from player_core.file_channel import consume_command_file
 from player_core.hud_status import LATEST_LABEL
-from player_core.playlist import read_playlist
+from player_core.player_verbs import play_file
+from player_core.playlist import PlaylistItem, read_playlist
 from player_core.satellite_hud import parse_hud
 from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
@@ -23,6 +25,7 @@ from origenerator.slideshow import ShowState, Slide, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
+FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 # A window has a picture of its own to put a run's frames on, a queue floated
 # over it, a sound to mute and a panel it wears; a player has none of them.
@@ -46,7 +49,7 @@ def _show(qtbot, tmp_path, items=_ITEMS, **fields) -> PlayerShow:
     test says when the player is next read rather than racing it.
     """
     show = PlayerShow(items, side="portrait", channel=_channel(tmp_path),
-                      shuffle=in_order, **fields)
+                      frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     show._timer.stop()
     return show
 
@@ -809,3 +812,317 @@ def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path
 
     assert (model.active_loop, model.filter_query) == ("seed", "fox")
 
+
+
+# --- what is being made of the item on screen ---------------------------------
+
+def _panel(show: PlayerShow):
+    return parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
+
+
+def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.set_levels(_LEVELS)
+
+    assert _panel(show).item_note == "Enhance 2 — 1 of 2"
+
+
+def test_the_panel_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_enhancing({"id-1": "queued"})
+    assert _panel(show).item_note == "Enhancement queued"
+    show.note_enhancing({"id-1": "running"})
+    assert _panel(show).item_note == "Enhancing…"
+
+
+def test_a_lock_that_asks_for_a_better_version_says_so_on_the_panel(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, actions=ShowActions(enhance=lambda pid: True))
+
+    show.show_toggle_lock()
+
+    assert _panel(show).item_note == "Enhancement queued"
+
+
+def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_panel(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhancing({"id-1": "running"})
+
+    show.note_enhanced("id-1", "one_enhanced.png")
+
+    assert _panel(show).item_note == ""
+
+
+def test_a_show_opened_while_an_item_of_it_is_being_enhanced_plays_that_item_first(
+        qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["three.png", "one.png", "two.png"]
+
+
+def test_a_show_picked_back_up_plays_what_is_being_made_before_where_it_left_off(
+        qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))
+    _sent(show)
+
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-2"))
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["three.png", "two.png", "one.png"]
+    assert "PLAY_FILE three.png" in _sent(show)
+
+
+def _clocked_show(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> PlayerShow:
+    show = _show(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
+                 **fields)
+    _says(show, video="one.png")
+    show.tick()
+    _sent(show)
+    return show
+
+
+def test_an_item_being_enhanced_is_moved_on_after_half_the_pace(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    now[0] = 1.9
+    show.tick()
+    assert _sent(show) == []
+    now[0] = 2.1
+    show.tick()
+    assert _sent(show) == ["NEXT"]
+
+
+def test_the_time_a_frozen_player_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    _says(show, video="one.png", paused=True)
+    now[0] = 5.0
+    show.tick()
+    _says(show, video="one.png")
+    now[0] = 6.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_that_the_player_holds_is_not_moved_on(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    _says(show, video="one.png", locked=True)
+    now[0] = 5.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_under_a_pace_of_nought_is_held_like_any_other(qtbot, tmp_path):
+    now = [0.0]
+    show = _show(qtbot, tmp_path, image_dwell_ms=0, clock=lambda: now[0],
+                 hud=HudFacts(enhancing={"id-1": "running"}))
+    _sent(show)
+
+    _says(show, video="one.png")
+    show.tick()
+    now[0] = 5.0
+    show.tick()
+
+    assert _sent(show) == []
+
+
+def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
+        qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
+
+    show.pause_for_request(True)
+    now[0] = 5.0
+    show.tick()
+
+    assert "NEXT" not in _sent(show)
+
+
+def test_a_show_told_to_lead_with_what_is_being_made_sends_the_player_there(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+    show.note_enhancing({"id-3": "running"})
+    _sent(show)
+
+    show.lead_with_what_is_being_made()
+
+    assert "PLAY_FILE three.png" in _sent(show)
+
+
+def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qtbot, tmp_path):
+    now = [0.0]
+    show = _clocked_show(qtbot, tmp_path, now)
+
+    show.note_enhancing({"id-1": "running"})
+    now[0] = 2.5
+    show.tick()
+
+    assert "NEXT" not in _sent(show)
+
+
+def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_player(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhanced("id-1", "one_enhanced.png")
+    _says(show, video="one_enhanced.png")
+    show.tick()
+    _sent(show)
+
+    show.add_levels({"one_enhanced.png": [("one_enhanced.png", "image", "Enhance 1"),
+                                          ("one.png", "image", "Original")]})
+    show.show_step_version(1)
+
+    assert _sent(show) == ["PLAY_FILE one.png"]
+
+
+def test_a_run_being_made_joins_the_players_list_on_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_generating("id-run", FRAME)
+
+    played = [item.path for item in read_playlist(show.channel.playlist)]
+    assert [str(path) for path in played[:1] + played[2:]] == ["one.png", "two.png",
+                                                              "three.png"]
+    assert played[1].read_bytes() == FRAME
+    assert "RELOAD_PLAYLIST" in _sent(show)
+
+
+def test_the_player_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    _sent(show)
+
+    show.lead_with_what_is_being_made()
+
+    first_frame = read_playlist(show.channel.playlist)[0].path
+    assert first_frame.read_bytes() == FRAME
+    assert play_file(PlaylistItem(first_frame)) in _sent(show)
+
+
+def _frame_shown(sent: list[str]) -> bytes | None:
+    """What the last SHOW_FRAME among *sent* has the player paint, read off
+    the file it names."""
+    shown = [line.removeprefix("SHOW_FRAME ") for line in sent
+             if line.startswith("SHOW_FRAME ")]
+    return Path(shown[-1]).read_bytes() if shown else None
+
+
+def test_a_player_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbot,
+                                                                          tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+    _sent(show)
+
+    _says(show, video=str(first_frame))
+    show.tick()
+
+    assert show.hud_prompt_id == "id-run"
+    assert _frame_shown(_sent(show)) == FRAME
+
+
+def _show_with_the_player_on_a_run(qtbot, tmp_path) -> PlayerShow:
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    _says(show, video=str(read_playlist(show.channel.playlist)[1].path))
+    show.tick()
+    _sent(show)
+    return show
+
+
+def test_a_newer_frame_of_the_run_on_the_player_goes_to_it_at_once(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+
+    show.note_generating("id-run", FRAME + b" one step further")
+
+    assert _frame_shown(_sent(show)) == FRAME + b" one step further"
+
+
+def test_a_run_that_lands_is_its_file_on_the_player_from_then_on(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+
+    show.note_added("run.png", "image", "id-run")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["run.png", "two.png", "three.png", "one.png"]
+    assert play_file(PlaylistItem(Path("run.png"))) in _sent(show)
+    assert not first_frame.exists()
+
+
+def test_a_run_that_stops_being_made_leaves_the_players_list(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+
+    show.note_in_flight(set())
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["two.png", "three.png", "one.png"]
+    assert play_file(PlaylistItem(Path("two.png"))) in _sent(show)
+    assert not first_frame.exists()
+
+
+def test_a_show_left_with_nothing_once_its_run_stops_is_over(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, items=[("one.png", "image", "id-1")])
+    show.note_generating("id-run", FRAME)
+    show.show_cull()
+
+    show.note_in_flight(set())
+
+    assert show.is_showing() is False
+
+
+def test_a_show_that_closes_takes_its_frames_with_it(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+
+    show.close()
+
+    assert list((tmp_path / "frames").iterdir()) == []
+
+
+def test_a_picture_being_enhanced_on_the_player_shows_the_enhancement_coming_in(
+        qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
+
+    assert _frame_shown(_sent(show)) == FRAME
+
+
+def test_an_enhancement_that_stops_takes_its_frame_off_the_player(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
+    _sent(show)
+
+    show.note_enhancing({}, {})
+
+    assert _sent(show) == ["CLEAR_FRAME"]
+
+
+def test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame(qtbot,
+                                                                          tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    show.show_cull()
+
+    show.note_generating("id-run", FRAME + b" one step further")
+
+    assert not show.holds("id-run")
+    assert list((tmp_path / "frames").iterdir()) == []
+
+
+def test_a_run_that_lands_after_the_player_moved_on_is_the_players_next_item(qtbot,
+                                                                             tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    _says(show, video="two.png")
+    show.tick()
+
+    show.note_added("run.png", "image", "id-run")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played[:2] == ["two.png", "run.png"]

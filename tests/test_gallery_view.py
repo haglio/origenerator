@@ -10381,7 +10381,7 @@ class _VoiceSurface:
     def note_voice_run(self, prompt_id, message, *, kind):
         self.noted = (prompt_id, message, kind)
 
-    def note_enhancing(self, statuses):
+    def note_enhancing(self, statuses, frames=None):
         self.enhancing = statuses
 
     def note_voice_command(self, message, *, kind=NOTICE):
@@ -11074,9 +11074,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
                                                                  monkeypatch):
     # Holding a slide asks for an enhancement, and what it gets first is a place
-    # in the line — a show of held slides has several out at once. The corner
-    # used to read "Enhancing…" from the moment of the ask, over a picture
-    # nothing had started making.
+    # in the line — a show of held slides has several out at once.
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -11091,11 +11089,11 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
 
     (job,) = view._jobs.all_jobs
-    assert show._note.text() == "Enhancement queued"
+    assert show.hud_item_note == "Enhancement queued"
 
     view._client.preview_image.emit(job.prompt_id, _png_bytes())  # ComfyUI began
 
-    assert show._note.text() == "Enhancing…"
+    assert show.hud_item_note == "Enhancing…"
     show.close()
 
 
@@ -13413,8 +13411,8 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
-    # The show answers where the speaker is looking, then reads Enhancing….
     assert "fixing teeth" in view._shows.showing._note.text()
+    assert view._shows.showing.hud_item_note == "Enhancement queued"
 
 
 def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(

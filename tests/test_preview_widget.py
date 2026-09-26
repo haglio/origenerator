@@ -21,6 +21,7 @@ from origenerator.funscript import (
 from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_widget
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.preview_widget import PreviewWidget
@@ -608,7 +609,8 @@ def _show_on_a_sessions_player(tmp_path):
                           playlist=tmp_path / "landscape.tsv",
                           command_file=tmp_path / "landscape_cmd.txt",
                           status_file=tmp_path / "landscape_status.txt",
-                          hud_file=tmp_path / "origenerator_landscape_hud.json"))
+                          hud_file=tmp_path / "origenerator_landscape_hud.json"),
+                      frames=FrameFiles(tmp_path / "frames"))
     show._timer.stop()
     return show
 

@@ -169,7 +169,33 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19155 when a folder of your own saved before folders had a side was given one
 # at startup: the note on the order the bookmark passes run in is
 # test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are.
-MAX_PROSE_LINES = 19155
+#
+# 19098 when what a show says about the picture on screen moved off the notice
+# across the top and onto the HUD after the picture's name: the fullscreen
+# player's paragraphs on what that corner said and when are
+# test_the_hud_says_which_version_is_on_screen,
+# test_a_run_of_an_item_this_show_never_asked_about_is_named_all_the_same and
+# test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer, and the
+# director's on telling only the show in front is
+# test_how_the_enhancements_are_going_reaches_every_show_that_is_up.
+#
+# 19078 when a session's players took in the pictures still being made: the
+# player show's lines on why it could not are gone, and the fullscreen show's
+# on taking a run in once is
+# test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame.
+#
+# 19074 when a run that lands was queued next: the playlist's paragraph on a
+# landed run being the same slide is test_a_live_slide_becomes_the_file_it_lands_as.
+#
+# 19071 when a double-click on a run opened its folder on a player: the
+# director's lines on why a player could take no frame are gone, and what it
+# takes instead is
+# test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it.
+#
+# 19070 when a show's arrivals began coming up in the order they arrived: what
+# the playlist said about putting each one straight after the picture on
+# screen is test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it.
+MAX_PROSE_LINES = 19070
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

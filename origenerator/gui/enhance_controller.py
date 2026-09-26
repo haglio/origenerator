@@ -527,7 +527,7 @@ class EnhanceController:
         A show is where a batch of them gets asked for — every locked slide is a
         run — so it is the surface most likely to be looking at a picture whose
         turn has not come. The show cannot tell on its own: a lock hears only
-        that a run started, not where in the line it landed. Told, its corner
+        that a run started, not where in the line it landed. Told, its HUD
         says whether the version is being made or waiting to be.
 
         Keyed by the mapping the tiles are drawn from, which covers every image
@@ -536,10 +536,11 @@ class EnhanceController:
         the row says "running" from the moment the job is handed to ComfyUI, and
         the wait on ComfyUI's own queue is exactly the stretch this names.
         """
-        self._shows.note_enhancing({
-            prompt_id: "running" if job.state == "running" else "queued"
-            for prompt_id, job in self._by_prompt.items()
-        })
+        self._shows.note_enhancing(
+            {prompt_id: "running" if job.state == "running" else "queued"
+             for prompt_id, job in self._by_prompt.items()},
+            {prompt_id: job.last_preview for prompt_id, job in self._by_prompt.items()
+             if job.state == "running" and job.last_preview})
 
     def _reconcile_tiles(self, running) -> None:
         """Stream each running enhance onto the tile of the image it is enhancing.

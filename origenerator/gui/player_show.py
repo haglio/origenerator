@@ -15,24 +15,26 @@ switches are the same ones a window show keeps
 the way the window does (:class:`~origenerator.gui.show_host.ShowHost`), and
 what is on screen is read back from the player rather than rendered here.
 
-Three things a window show has are the player's to learn next: the frames of a
-generation still being made, the queue plate in the corner, and the lines this
-app flashes over a show — which go to the gallery's own caption instead, where
-the speaker can still see them.
+Two things a window show has are the player's to learn next: the queue plate
+in the corner, and the lines this app flashes over a show — which go to the
+gallery's own caption instead, where the speaker can still see them.
 """
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from player_core.file_channel import append_command, publish_whole
 from player_core.player_verbs import (
+    CLEAR_FRAME,
     LOCK_OFF,
     LOCK_ON,
     NEXT,
     PREV,
     RELOAD_PLAYLIST,
     SET_PACE,
+    SHOW_FRAME,
     TRASH,
     play_file,
 )
@@ -41,6 +43,7 @@ from player_core.satellite_hud import hud_text
 from player_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.show_hud import show_hud_model
@@ -49,6 +52,7 @@ from origenerator.gui.show_set import (
     LOOP_IS_A_LOCK,
     LOOP_OFF,
     ShowSet,
+    item_note,
     looping_note,
     narrow_to_acts,
     narrow_to_the_act_on_screen,
@@ -77,12 +81,19 @@ class PlayerShow(QObject):
     # A different item is on screen.
     media_changed = pyqtSignal()
 
-    def __init__(self, items, *, side: str, channel, actions=None, hud=None,
-                 pace=None, image_dwell_ms=None, start=None, shuffle=None,
-                 say=None, parent=None):
+    def __init__(self, items, *, side: str, channel, frames: FrameFiles, actions=None,
+                 hud=None, pace=None, image_dwell_ms=None, start=None, shuffle=None,
+                 say=None, clock=time.monotonic, parent=None):
         super().__init__(parent)
         self._side = side
         self.channel = channel
+        self._frames = frames
+        self._clock = clock
+        self._last_tick = clock()
+        self._held_s = 0.0
+        self._moves_on_early = False
+        self._request_holds_it = False
+        self._frame_on_player: Path | None = None
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
         self._actions = actions if actions is not None else ShowActions()
@@ -102,9 +113,6 @@ class PlayerShow(QObject):
         self._locked = False
         self._published = ""
         self._levels = LevelStepper()
-        # Locking a slide is also how you ask for it: a lock asks for a better
-        # version of what is on screen, unless the gallery wired none.
-        self._enhancing: set[str] = set()  # prompt_ids with a run in flight
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
             self._showing = self._player_status().video
@@ -138,16 +146,23 @@ class PlayerShow(QObject):
         """Give the player this pass to play, written rotated onto the slide
         this show stands on: a player showing nothing of it opens there, and a
         reload keeps the item a player is on wherever that item survived."""
-        items = [item for item in self._set.playlist.in_play_order() if not item.is_live]
         current = self._set.playlist.current()
-        rotated = _rotated_onto(items, current)
+        rotated = _rotated_onto(self._set.playlist.in_play_order(), current)
         write_playlist(self.channel.playlist,
-                       [_playlist_item(item) for item in rotated])
-        if land and current is not None and str(current.path) != self._showing:
+                       [self._playlist_item(item) for item in rotated])
+        if land and current is not None and self._file_of(current) != self._showing:
             # Before the reload, which then keeps it: after, it would load twice.
-            self._send(play_file(_playlist_item(current)))
+            self._send(play_file(self._playlist_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._send(f"{SET_PACE} {self._dwell_s}")
+
+    def _file_of(self, slide) -> str:
+        if slide.is_live:
+            return str(self._frames.first_of(slide.prompt_id))
+        return str(slide.path)
+
+    def _playlist_item(self, slide) -> PlaylistItem:
+        return PlaylistItem(Path(self._file_of(slide)))
 
     def _send(self, verb: str) -> None:
         if not append_command(self.channel.command_file, verb):
@@ -200,10 +215,38 @@ class PlayerShow(QObject):
         """Read the player's status, follow it, and publish the panel."""
         status = self._player_status()
         self._locked = status.locked
+        now = self._clock()
         if status.video and status.video != self._showing:
             self._showing = status.video
             self._follow(status.video)
+            self._held_s = 0.0
+            current = self._set.playlist.current()
+            self._moves_on_early = current is not None and self._set.being_made(current)
+            self._frame_on_player = None
+            self._show_what_is_being_made()
+        elif not (status.paused or status.locked or self._request_holds_it):
+            self._held_s += now - self._last_tick
+        self._last_tick = now
+        self._move_on_early_from_what_is_being_made()
         self._publish()
+
+    def _show_what_is_being_made(self) -> None:
+        current = self._set.playlist.current()
+        frame = None
+        if current is not None and self._file_of(current) == self._showing:
+            frame = self._set.frame_being_made_of(current)
+        path = None if frame is None else self._frames.write(current.prompt_id, frame)
+        if path == self._frame_on_player:
+            return
+        self._frame_on_player = path
+        self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
+
+    def _move_on_early_from_what_is_being_made(self) -> None:
+        if not (self._moves_on_early and self._dwell_s):
+            return
+        if self._held_s >= self._set.pace_for(self._set.playlist.current(), self._dwell_s):
+            self._moves_on_early = False
+            self._send(NEXT)
 
     def _player_status(self):
         return parse_status(_read_fields(self.channel.status_file))
@@ -216,6 +259,10 @@ class PlayerShow(QObject):
         same map a window show is armed with, from the same gallery.
         """
         self._levels.arm(levels_by_path)
+        self._publish()
+
+    def add_levels(self, levels_by_path: dict) -> None:
+        self._levels.add(levels_by_path)
         self._publish()
 
     @property
@@ -243,7 +290,7 @@ class PlayerShow(QObject):
         """The file the set lists the item on screen under — what its versions
         are keyed by."""
         item = self._set.playlist.current()
-        return "" if item is None else str(item.path)
+        return "" if item is None else self._file_of(item)
 
     def _follow(self, video: str) -> None:
         """Stand the pass on the item the player just moved to.
@@ -253,7 +300,7 @@ class PlayerShow(QObject):
         find out which item that is.
         """
         for index, item in enumerate(self._set.playlist.items):
-            if str(item.path) == video:
+            if self._file_of(item) == video:
                 self._set.playlist.jump_to(index)
                 self._levels.restart()  # a new item, so its own versions from the top
                 self.media_changed.emit()
@@ -348,6 +395,7 @@ class PlayerShow(QObject):
         self._showing = ""
         self._set.forget(item)
         self._set.playlist.remove_current()
+        self._frames.forget(item.prompt_id)
         if self._set.playlist.is_empty():
             # A show culled empty is over, and the side goes back to its base
             # state — which hands the player another list to move on to.
@@ -445,7 +493,7 @@ class PlayerShow(QObject):
         (see :meth:`_pass_changed`).
         """
         self._set.jump_to(slide)
-        self._send(play_file(_playlist_item(slide)))
+        self._send(play_file(self._playlist_item(slide)))
         self._publish()
 
     # --- the map, and the loops along it -----------------------------------
@@ -537,6 +585,11 @@ class PlayerShow(QObject):
         return self._set.is_favorite
 
     @property
+    def hud_item_note(self) -> str:
+        return item_note(self._set, levels=self._levels.levels(base=self._current_base()),
+                         level_index=self._levels.index)
+
+    @property
     def hud_favorites_filter(self) -> bool:
         return self._set.favorites_filter
 
@@ -601,15 +654,17 @@ class PlayerShow(QObject):
             self._set.enhanced_ids.add(prompt_id)
         slide = Slide(path, media_type, prompt_id, still)
         self._set.remember(slide)
-        if self._set.passes(slide) and self._set.playlist.add(slide):
+        if self._set.playlist.replace_live(prompt_id, path, media_type, still):
+            self._hand_over(land=True)
+            self._frames.forget(prompt_id)
+        elif self._set.passes(slide) and self._set.playlist.add(slide):
             self._hand_over()
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
                       still=None) -> None:
         """An enhancement of one of these items landed: the show plays the
         better version from here on, wherever that item sits in the pass."""
-        self._enhancing.discard(prompt_id)
-        self._set.enhanced_ids.add(prompt_id)
+        self._set.note_enhancement_landed(prompt_id)
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
             self._hand_over()
@@ -617,6 +672,7 @@ class PlayerShow(QObject):
             # Kept out of an enhanced-only pass until now, being unenhanced; the
             # better version is exactly what that pass plays, so in it goes.
             self._hand_over()
+        self._publish()
 
     def _enhance_current(self) -> None:
         """Ask the gallery for a better version of the item on screen, if it
@@ -624,10 +680,45 @@ class PlayerShow(QObject):
         if self._actions.enhance is None:
             return
         prompt_id = self._set.current_prompt_id()
-        if prompt_id is None or prompt_id in self._enhancing:
+        if prompt_id is None or self._set.enhancement_of(prompt_id):
             return
         if self._actions.enhance(prompt_id):
-            self._enhancing.add(prompt_id)
+            self._set.note_enhancement_asked(prompt_id)
+            self._publish()
+
+    # --- what is being made ------------------------------------------------
+
+    def note_generating(self, prompt_id: str, frame: bytes) -> None:
+        if self._set.playlist.update_live(prompt_id, frame):
+            self._show_what_is_being_made()
+        elif (self._set.first_offer_of(prompt_id) and self._frames.write(prompt_id, frame)
+              and self._set.join_live(prompt_id, frame)):
+            self._hand_over()
+
+    def note_in_flight(self, prompt_ids) -> None:
+        gone = [prompt_id for prompt_id in self._set.live_ids()
+                if prompt_id not in prompt_ids]
+        if not gone:
+            return
+        for prompt_id in gone:
+            self._set.playlist.drop(prompt_id)
+            self._set.forget_id(prompt_id)
+        if self._set.playlist.is_empty():
+            self.close()
+        else:
+            self._hand_over(land=True)
+        for prompt_id in gone:
+            self._frames.forget(prompt_id)
+
+    def note_enhancing(self, statuses: dict, frames=None) -> None:
+        self._set.note_enhancing(statuses, frames)
+        self._show_what_is_being_made()
+        self._publish()
+
+    def lead_with_what_is_being_made(self) -> None:
+        if self._set.lead_with_what_is_being_made():
+            self._hand_over(land=True)
+            self._publish()
 
     # --- what a player cannot do yet ----------------------------------------
     # Each of these is a window show's, and the last step of this move is what
@@ -635,22 +726,9 @@ class PlayerShow(QObject):
     # a show to everything that drives one.
 
     def is_live(self) -> bool:
-        """Whether this show is following a generation still being made.  Never
-        — a player has no way to be handed a frame yet, so a run joins this set
-        when it lands (:meth:`note_added`) and not before."""
+        """Whether this show is following one generation still being made, alone.
+        Never: a player plays a run among the rest of its set."""
         return False
-
-    def note_generating(self, prompt_id: str, frame: bytes) -> None:
-        """A run streamed a frame.  Nothing to do with it here: a playlist
-        names files, and this one has none yet."""
-
-    def note_in_flight(self, prompt_ids) -> None:
-        """Which runs are still being made — about the frames this show does
-        not play, so nothing to drop."""
-
-    def note_enhancing(self, statuses: dict) -> None:
-        """How the enhancements in flight are going, for a corner this show
-        has not got."""
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """What is in flight, for the queue plate a window floats in its
@@ -675,6 +753,7 @@ class PlayerShow(QObject):
         A request is about what is on screen, and a set that pages on every few
         seconds would hand the words to whatever came up next.
         """
+        self._request_holds_it = paused
         self._send(f"{SET_PACE} {0 if paused else self._dwell_s}")
         if note:
             self._note(note)
@@ -688,7 +767,7 @@ class PlayerShow(QObject):
 
     def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
         if prompt_id is not None:
-            self._enhancing.add(prompt_id)
+            self._set.note_enhancement_asked(prompt_id)
         self._note(message, kind=kind)
 
     def _note(self, message: str, *, kind: str = NOTICE) -> None:
@@ -722,6 +801,7 @@ class PlayerShow(QObject):
         pass.  Returns whether the place carried."""
         if not self._set.playlist.resume(state.order, state.current):
             return False
+        self._set.lead_with_what_is_being_made()
         self._hand_over(land=True)
         return True
 
@@ -744,11 +824,8 @@ class PlayerShow(QObject):
         self._open = False
         self._timer.stop()
         publish_whole(self.channel.hud_file, "")
+        self._frames.forget_all()
         self.closed.emit()
-
-
-def _playlist_item(slide) -> PlaylistItem:
-    return PlaylistItem(Path(str(slide.path)))
 
 
 def _rotated_onto(items: list, current) -> list:

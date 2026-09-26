@@ -11,8 +11,7 @@ The eight pieces of state a show needs are here and only here: the show that is
 up, the shape a show on its own was opened on, every show that is up (hosted,
 two run at once), what each satellite region holds, whether the session still
 wants its regions filled, whether the room is frozen, where the last show left
-off, and which runs the open show has already turned down as slides of their
-own frames.
+off, and how the enhancements in flight are going.
 
 The spoken words about a show are here too -- close it, lock it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a shelf. They
@@ -36,7 +35,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator import gallery
-from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR,
+    EVOLVER_SOURCE,
+    EVOLVER_UPSCALED_DIR,
+    FRAMES_BEING_MADE_DIR,
+)
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
@@ -48,6 +52,7 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery.shelves import folder_shelf
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
@@ -187,10 +192,7 @@ class ShowDirector:
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
-        # Runs the open show has already turned down as slides of their own
-        # frames — another folder's work, an enhancement. Asked once and kept,
-        # since every frame of such a run asks again (:meth:`_would_play`).
-        self._show_refused: set[str] = set()
+        self._enhance_status: dict[str, str] = {}
 
     def become_hosted(self, session) -> None:
         if self._slideshow is not None:
@@ -390,17 +392,19 @@ class ShowDirector:
         # Which side this show belongs to: the one asked for, else the one this
         # set's own shape belongs on.  Standalone it names nothing but the
         # panel's own verbs, since the monitor is the whole screen.
-        where = side or region_for_items(items)
+        where = side or region_for_items(items or folder_items or [])
         # And what that side IS: one of the session's players, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.player(where) if self._fun_time is not None else None
         if channel is not None and not items:
-            return None  # a player is handed files, and a run being made has none yet
-        self._show_refused = set()  # a new show, a new set to be judged against
+            if not folder_items:
+                return None
+            items, kwargs["start"] = folder_items, None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
-                      enhanced_ids=self._enhanced_ids_of(rows))
+                      enhanced_ids=self._enhanced_ids_of(rows),
+                      enhancing=self._enhance_status)
         # And the other axis: the versions of whichever item is on screen, which
         # the shifted step keys and the band's versions button walk.
         levels = self.versions_of(rows)
@@ -420,6 +424,9 @@ class ShowDirector:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
             show.resume(resume)
+        if kwargs.get("start") is None:
+            self._offer_the_frames(show, location, self._host.queue_now()[0])
+            show.lead_with_what_is_being_made()
         if not already_live:
             show.open_requested.connect(self._open_from_slideshow)
             show.closed.connect(lambda s=show: self._on_closed(s))
@@ -462,11 +469,7 @@ class ShowDirector:
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
         """A show on one of the session's players: the set goes to the player
-        and the panel this app publishes goes with it — no window of ours.
-
-        A frame is dropped on the way in: a player is handed files to play, and
-        a generation still being made has none yet.
-        """
+        and the panel this app publishes goes with it — no window of ours."""
         kwargs.pop("frame", None)
         occupant = self.region_show(side)
         if occupant is not None:
@@ -474,6 +477,7 @@ class ShowDirector:
             occupant.set_levels(levels)
             return occupant
         show = PlayerShow(items, side=side, channel=channel,
+                          frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
         show.set_levels(levels)
@@ -1018,29 +1022,30 @@ class ShowDirector:
                                 enhanced=gallery.is_enhanced_row(row))
 
     def note_generating(self, prompt_id: str, frame: bytes):
-        """A run streamed a frame: an open show playing its folder takes it in as
-        a slide of that frame, right now, and keeps it current from there.
+        """A run streamed a frame: every open show playing its folder takes it in
+        as a slide of that frame, right now, and keeps it current from there.
 
         Waiting for the file is waiting minutes for the one thing the show is
         being watched for. The first iterations are already worth looking at, so
         the run joins on its first frame and swaps for the file when it lands.
 
-        Whether it belongs is asked once per run, either way: a run the show
-        holds answers itself, and one it turned down is remembered as turned down
-        (:attr:`_show_refused`). A frame arrives every second or so, and the
-        question costs a row lookup and a walk of what is on screen.
+        A run the show holds answers for itself, and one it turned down is
+        asked again on its next frame, since the folder lists a new run a poll
+        after it starts.
         """
-        show = self._slideshow
-        if show is None or show.is_live():
-            return  # a show already following one run full-screen is that run's
-        if not show.holds(prompt_id) and not self._would_play(prompt_id):
-            return
-        show.note_generating(prompt_id, frame)
+        for show, location in self._shows_open_to_runs():
+            if show.holds(prompt_id) or self._would_play(prompt_id, location):
+                show.note_generating(prompt_id, frame)
 
-    def _would_play(self, prompt_id: str) -> bool:
-        """Whether the open show would be playing a generation that has no file
-        yet — the question :meth:`note_finished` asks of the rows on screen,
-        asked a few minutes earlier.
+    def _shows_open_to_runs(self) -> list[tuple]:
+        return [(show, location) for show, location in self._live_shows
+                if not show.is_live()]
+
+    def _would_play(self, prompt_id: str, location=None) -> bool:
+        """Whether a show opened at *location* would be playing a generation
+        that has no file yet — the question :meth:`note_finished` asks of its
+        rows, asked a few minutes earlier.  A show opened on a preview has no
+        location, and is asked of the view on screen.
 
         A folder's show answers off those rows as usual: the tree keeps a run in
         flight in the folder its settings put it in, so it is already among them.
@@ -1051,34 +1056,30 @@ class ShowDirector:
         search's hits are a set that was already asked for.
 
         An enhancement is nobody's slide, wherever it is running. It is a better
-        version of a picture the show may already be playing, and it says so in
-        that picture's own corner note — a second slide of it half-rendered
+        version of a picture the show may already be playing, and the HUD says
+        so beside that picture's name — a second slide of it half-rendered
         would be the same image twice, one of them worse.
-
-        A no is kept for the life of the show, since it is asked again of every
-        frame of a run in some other folder — and the set under a show doesn't
-        move while one is up, the gallery being covered by it.
         """
-        if prompt_id in self._show_refused:
-            return False
         row = self._db.get_generation(prompt_id)
-        plays = bool(
-            row is not None
-            and row.get("workflow_name") != gallery.ENHANCE_WORKFLOW
-            and (any(r["prompt_id"] == prompt_id for r in self._host.rows_to_play())
-                 # Recents by its own rule, having no list of its own to consult.
-                 or (self._browser.showing_recents()
-                     and not self._browser.showing_search()
-                     and source_of(row) == GenerationSource.GENERATED
-                     and gallery.media_type_of_row(row) in self._host.media_types()))
-        )
-        if not plays:
-            self._show_refused.add(prompt_id)
-        return plays
+        if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+            return False
+        rows = self.rows_at(location) if location else self._host.rows_to_play()
+        return (any(r["prompt_id"] == prompt_id for r in rows)
+                or self._recents_would_take(row, location))
+
+    def _recents_would_take(self, row: dict, location) -> bool:
+        base, side = _split_shelf_key(location)
+        playing_recents = (base == _RECENTS_KEY if location
+                           else self._browser.showing_recents()
+                           and not self._browser.showing_search())
+        return bool(playing_recents
+                    and source_of(row) == GenerationSource.GENERATED
+                    and gallery.media_type_of_row(row) in self._host.media_types()
+                    and filter_rows([row], side))
 
     def note_in_flight(self, items):
-        """Tell an open show what is still being made, off the same in-flight list
-        the queue plate in its corner is drawn from.
+        """Tell every open show what is still being made, off the same in-flight
+        list the queue plate in its corner is drawn from.
 
         Two things the frames alone can't say. A run whose frames began before the
         show opened sends no new one for a while — the tail of a run is all decode
@@ -1086,14 +1087,15 @@ class ShowDirector:
         and a run that was cancelled or failed sends nothing ever again, leaving
         the half-rendered frame it got to in the pass forever.
         """
-        show = self._slideshow
-        if show is None or show.is_live():
-            return
+        for show, location in self._shows_open_to_runs():
+            self._offer_the_frames(show, location, items)
+            show.note_in_flight({item.key for item in items})
+
+    def _offer_the_frames(self, show, location, items) -> None:
         for item in items:
-            if item.reading.frame is not None and (show.holds(item.key)
-                                           or self._would_play(item.key)):
+            if item.reading.frame is not None and (
+                    show.holds(item.key) or self._would_play(item.key, location)):
                 show.note_generating(item.key, item.reading.frame)
-        show.note_in_flight({item.key for item in items})
 
     def note_enhanced(self, row: dict | None):
         """Hand a landed enhancement to every open show, so the item becomes
@@ -1111,21 +1113,16 @@ class ShowDirector:
         preview = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:
             return
+        versions = self.versions_of([row])
         for surface in self.surfaces():
             surface.note_enhanced(row["prompt_id"], preview[0], preview[1],
                                   still=row.get("thumbnail_path"))
+            surface.add_levels(versions)
 
-    def note_enhancing(self, statuses: dict) -> None:
-        """Tell an open show how the enhancements in flight are going.
-
-        A show is where a batch of them gets asked for — every locked slide is a
-        run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a lock hears only
-        that a run started, not where in the line it landed.
-        """
-        if self._slideshow is None:
-            return
-        self._slideshow.note_enhancing(statuses)
+    def note_enhancing(self, statuses: dict, frames=None) -> None:
+        self._enhance_status = dict(statuses)
+        for surface in self.surfaces():
+            surface.note_enhancing(statuses, frames)
 
     def note_queue(self, items, foreign_total: int) -> None:
         """Redraw the queue plate a show floats in its corner — the same widget

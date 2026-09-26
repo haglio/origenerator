@@ -16,7 +16,7 @@ answers opens a different show, or retunes this one with a fresh record.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 
 from player_core.hud_status import SHUFFLE_LABEL
@@ -93,3 +93,4 @@ class HudFacts:
     # that only a show's HUD grows: the same shape as the favorites, over the
     # same set, and followed the same way as enhancements land.
     enhanced_ids: Collection[str] = field(default_factory=frozenset)
+    enhancing: Mapping[str, str] = field(default_factory=dict)

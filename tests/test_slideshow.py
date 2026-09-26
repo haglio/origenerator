@@ -233,6 +233,29 @@ def test_an_item_the_playlist_already_holds_is_not_added_twice():
     assert len(playlist) == 1
 
 
+def test_a_slide_led_with_comes_up_now_and_the_one_it_displaced_next():
+    playlist = _playlist()
+    playlist.advance()
+
+    playlist.lead_with(2)
+
+    assert playlist.current() == Slide("c.png", "image")
+    assert playlist.peek(1) == Slide("b.mp4", "video")
+    assert playlist.peek(2) == Slide("a.png", "image")
+
+
+def test_a_slide_led_with_from_earlier_in_the_pass_still_comes_up_now():
+    playlist = _playlist()
+    playlist.advance()
+    playlist.advance()
+
+    playlist.lead_with(0)
+
+    assert playlist.current() == Slide("a.png", "image")
+    assert playlist.peek(1) == Slide("c.png", "image")
+    assert playlist.peek(2) == Slide("b.mp4", "video")
+
+
 # --- an item that gets enhanced while the show runs -------------------------
 
 def _keyed(**kw):
@@ -398,6 +421,98 @@ def test_a_live_slide_becomes_the_file_it_lands_as():
     assert len(playlist) == 5                        # the same slide, finished
     assert playlist.peek(1) == ("new.mp4", "video", "id-new", "thumb.png")
     assert playlist.live_ids() == []
+
+
+def test_a_run_that_lands_after_the_show_moved_past_it_comes_up_next():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+    for _ in range(3):
+        playlist.advance()
+
+    playlist.replace_live("id-new", "new.png", "image")
+
+    assert playlist.current() == Slide("c.png", "image", "id-c")
+    assert playlist.peek(1) == ("new.png", "image", "id-new", None)
+
+
+def test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.advance()
+    playlist.advance()
+
+    playlist.replace_live("id-first", "first.png", "image")
+    playlist.add((b"frame-1", LIVE, "id-second", None))
+
+    assert playlist.advance()[2] == "id-first"
+    assert playlist.advance()[2] == "id-second"
+    assert playlist.advance()[2] == "id-c"
+
+
+def test_arrivals_keep_their_order_when_a_slide_is_dropped_from_the_set():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+
+    playlist.drop("id-c")
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-e"
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_an_arrival_that_has_been_on_screen_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.advance()
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_a_run_that_lands_while_waiting_its_turn_keeps_its_place_in_line():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.add(("e.png", "image", "id-e"))
+
+    playlist.replace_live("id-first", "first.png", "image")
+
+    assert playlist.advance()[2] == "id-first"
+    assert playlist.advance()[2] == "id-e"
+
+
+def test_an_arrival_jumped_onto_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.jump_to(4)
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_an_arrival_led_with_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.advance()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.lead_with(4)
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_a_waiting_run_the_show_jumped_past_comes_up_next_when_it_lands():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.jump_to(2)
+
+    playlist.replace_live("id-first", "first.png", "image")
+
+    assert playlist.advance()[2] == "id-first"
 
 
 def test_an_item_that_was_never_live_is_not_replaced_as_one():

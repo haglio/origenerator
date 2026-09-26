@@ -10,7 +10,7 @@ for each stored key:
     formula change can re-derive it from a generation under it;
   - **dangles, stored ref still exists** → recompute the key at the stored tier
     and move the bookmark onto it (robust to *any* formula change);
-  - **dangles, no usable identity** → try the legacy settings formulas, which
+  - **dangles, no usable identity** → try the legacy key formulas, which
     recovers bookmarks predating stored identity;
   - **still nothing** → leave it alone. Its generations are gone, and a user's
     star, name or grouping is never dropped.
@@ -46,7 +46,7 @@ class Folders:
 
     #: folder key → ``(level, a prompt_id under it)``, for every folder there is.
     current: dict
-    #: a settings folder's keys under older formulas → its key today.
+    #: a folder's keys under older formulas → its key today.
     legacy_keys: dict
     #: every generation by prompt id, which is what a stored ref resolves to.
     rows_by_id: dict
@@ -163,7 +163,7 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
 
 def _index_current_folders(rows, image_index):
     """Map every current folder key → ``(level, a prompt_id under it)``, plus each
-    settings folder's legacy keys → its current key (for the historical formula
+    folder's legacy keys → its current key (for the historical formula
     changes, so bookmarks made before stored identity can still be recovered)."""
     current: dict = {}
     legacy_keys: dict = {}
@@ -186,6 +186,9 @@ def _index_current_folders(rows, image_index):
                     ):
                         if legacy != group.key:
                             legacy_keys.setdefault(legacy, group.key)
+                if isinstance(group, (gallery.LoraGroup, gallery.SourceImageGroup)):
+                    legacy_keys.setdefault(gallery.legacy_parentless_folder_key(
+                        folder_rows[0], group.level, image_index), group.key)
             walk(gallery.child_groups(group))
 
     walk(gallery.build_gallery_tree(list(rows), {}))
@@ -196,7 +199,7 @@ def _repoint_target(row, folders: Folders):
     """The current key a dangling bookmark should move to, or ``None``.
 
     Prefers recomputing from the bookmark's stored identity — a row under it at its
-    tier, robust to any formula change — and falls back to a legacy settings
+    tier, robust to any formula change — and falls back to a legacy key
     formula for bookmarks that predate stored identity."""
     ref, level = row["ref_prompt_id"], row["level"]
     if ref and level and ref in folders.rows_by_id:

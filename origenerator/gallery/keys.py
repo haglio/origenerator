@@ -3,8 +3,8 @@
 A folder's *key* is what its star, its custom name and its place in a custom
 folder hang off, so it has to be derivable from any row under it and has to stay
 put as the library grows. Every level below the workflow is keyed by a hash of
-the facet it projects — the model, the LoRA, the start frame, the full settings —
-tagged with the media type, the workflow and a letter for the level.
+the facets that place it — its own and those of the folders above it — tagged
+with the media type, the workflow and a letter for the level.
 
 A folder's generic *name* falls out of that key: :func:`folder_id` renders it as
 a short code. The settings leaves used to be named after their prompt, and a

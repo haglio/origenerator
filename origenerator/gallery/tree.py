@@ -132,16 +132,35 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     if level == "model":
         return model_key(media_type, workflow_name, model_signature(workflow_name, params_json))
     if level == "lora":
-        return lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
+        return lora_key(media_type, workflow_name, _lora_place(workflow_name, params_json))
     if level == "source_image":
-        # The tier grows under video folders only, so it always asks which picture.
-        config = _input_image_config(
-            parse_params(params_json).get("input_image"), image_index, identify=True,
-        )
-        return source_image_key(media_type, workflow_name, config)
+        return source_image_key(media_type, workflow_name,
+                                _source_image_place(workflow_name, params_json, image_index))
     if level == "settings":
         return settings_folder_key(row, image_index)
     raise ValueError(f"unknown folder level: {level!r}")
+
+
+def _lora_place(workflow_name: str, params_json: str | None) -> str:
+    return json.dumps([model_signature(workflow_name, params_json),
+                       lora_signature(workflow_name, params_json)])
+
+
+def _source_image_place(workflow_name: str, params_json: str | None,
+                        image_index: dict | None) -> str:
+    picture = _input_image_config(parse_params(params_json).get("input_image"), image_index,
+                                  identify=True)
+    return json.dumps([_lora_place(workflow_name, params_json), picture])
+
+
+def legacy_parentless_folder_key(row: dict, level: str, image_index: dict | None = None) -> str:
+    media_type = media_type_of_row(row)
+    workflow_name = row.get("workflow_name") or "unknown"
+    params_json = row.get("params_json")
+    if level == "lora":
+        return lora_key(media_type, workflow_name, lora_signature(workflow_name, params_json))
+    return source_image_key(media_type, workflow_name, _input_image_config(
+        parse_params(params_json).get("input_image"), image_index, identify=True))
 
 
 def legacy_settings_folder_key(row: dict) -> str:
@@ -547,7 +566,7 @@ def _build_lora_groups(tier: _Tier, rows: list[dict]) -> list[LoraGroup]:
     whether or not the pipeline uses a LoRA."""
     return _grouped_folders(
         tier, rows, cls=LoraGroup,
-        signature=lambda r: lora_signature(tier.workflow_name, r.get("params_json")),
+        signature=lambda r: _lora_place(tier.workflow_name, r.get("params_json")),
         key_for=lambda sig: lora_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: lora_label(tier.workflow_name, params),
         children_for=lambda sub: _build_leaves(tier, sub),
@@ -572,18 +591,11 @@ def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
 
 def _build_source_image_groups(tier: _Tier, rows: list[dict]) -> list[SourceImageGroup]:
     """The source-image folders under one model/LoRA folder: videos split by the
-    picture they animate, each holding its settings leaves.
-
-    Keyed by which picture that is (:func:`_input_image_config`), the same
-    projection of the settings signature that the model and LoRA levels use for
-    theirs — so every settings folder in here explores one frame, and opening any
-    of them shows videos of that one image."""
+    picture they animate, each holding its settings leaves."""
     return _grouped_folders(
         tier, rows, cls=SourceImageGroup,
-        signature=lambda r: _input_image_config(
-            parse_params(r.get("params_json")).get("input_image"), tier.image_index,
-            identify=True,
-        ),
+        signature=lambda r: _source_image_place(tier.workflow_name, r.get("params_json"),
+                                                tier.image_index),
         key_for=lambda sig: source_image_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: _source_image_label(params, tier.image_index),
         children_for=lambda sub: _build_settings_groups(tier, sub),

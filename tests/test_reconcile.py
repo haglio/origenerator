@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from PIL import Image
 
 from origenerator import bookmark_reconcile, gallery
@@ -216,6 +217,32 @@ def test_reconcile_repoints_an_i2v_favorite_across_the_frame_config_change(tmp_p
     meta = db.folder_meta_map()
     assert meta.get(current_key, {}).get("starred") is True  # moved onto the live folder
     assert legacy_key not in meta                             # old key cleared
+    assert summary["repointed"] == 1
+
+
+@pytest.mark.parametrize("level", ["lora", "source_image"])
+def test_reconcile_repoints_a_favorite_made_before_a_folder_was_keyed_by_its_place(
+        tmp_path, level):
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "img", params={"positive_prompt": "a face", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_img.png")
+    video = _add_completed(
+        db, "vid", workflow="wan22_i2v",
+        params={"input_image": "sdxl_t2i_img.png", "seed": 2,
+                "lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors"},
+        filename="wan22_i2v_vid.mp4",
+    )
+    index = gallery.build_image_config_index([db.get_generation("img")])
+    legacy_key = gallery.legacy_parentless_folder_key(video, level, index)
+    current_key = gallery.folder_key_at_level(video, level, index)
+    assert legacy_key != current_key
+    db.set_folder_favorite(legacy_key, True)
+
+    summary = reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()
+    assert meta.get(current_key, {}).get("starred") is True
+    assert legacy_key not in meta
     assert summary["repointed"] == 1
 
 

@@ -30,7 +30,7 @@ PUBLISHED = {
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
     "config_folder_name",
     "config_tab_title", "curated_params", "custom_folder_id",
-    "custom_folder_key", "custom_folder_side", "default_enhance_params", "describe_enhance_params",
+    "custom_folder_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",
     "displayed_levels", "enhance_levels", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",

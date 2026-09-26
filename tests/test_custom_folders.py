@@ -7,7 +7,7 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.sides import PORTRAIT
 from origenerator.gallery_actions import GalleryActions
 from origenerator.trash import Trash
 
@@ -97,25 +97,6 @@ def test_an_empty_custom_folder_still_appears():
     )
     assert gallery.child_groups(folder) == []
     assert gallery.rows_under(folder) == []
-
-
-def test_a_folder_of_your_own_lives_on_the_side_it_was_made_on():
-    trees = {PORTRAIT: _tree([_row("i1", "a cat")]), LANDSCAPE: _tree([_row("i2", "a cat")])}
-    record = {"id": 1, "name": "Later", "items": [], "side": PORTRAIT}
-
-    assert gallery.custom_folder_side(record, trees) == PORTRAIT
-
-
-def test_a_folder_saved_before_folders_had_a_side_lives_where_most_of_its_pictures_are():
-    trees = {PORTRAIT: _tree([_row("i1", "a cat", seed=1), _row("i2", "a cat", seed=2)]),
-             LANDSCAPE: _tree([_row("i3", "a cat", seed=3)])}
-    (cat,) = [group.key for group in gallery.child_groups(_lora_folder(trees[PORTRAIT]))]
-
-    gathering = {"id": 1, "name": "Cats", "items": [cat], "side": None}
-    empty = {"id": 2, "name": "Later", "items": [], "side": None}
-
-    assert gallery.custom_folder_side(gathering, trees) == PORTRAIT
-    assert gallery.custom_folder_side(empty, trees) == LANDSCAPE
 
 
 def test_gathering_a_folder_and_its_parent_counts_each_item_once():

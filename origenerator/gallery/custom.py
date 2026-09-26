@@ -22,8 +22,7 @@ recoverable from the key alone.
 """
 from __future__ import annotations
 
-from origenerator.gallery.groups import CustomGroup, child_groups, rows_under
-from origenerator.gallery.sides import LANDSCAPE
+from origenerator.gallery.groups import CustomGroup, child_groups
 
 CUSTOM_PREFIX = "__custom__/"
 # The throwaway folder a live multi-selection stands up: never saved, so it needs
@@ -71,7 +70,7 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
     """Resolve saved custom folders against ``tree``.
 
     ``records`` are the rows :meth:`Database.list_custom_folders` returns —
-    ``{"id", "name", "items"}`` with ``items`` a list of folder keys in the
+    ``{"id", "name", "side", "items"}`` with ``items`` a list of folder keys in the
     order they were added. Items that don't resolve are skipped (see the module
     docstring); an empty folder still appears, since a folder you have made and
     named but not yet filled is exactly where you are about to drop something.
@@ -85,14 +84,6 @@ def build_custom_folders(tree: list, records) -> list[CustomGroup]:
             folder_id=record["id"],
         ))
     return folders
-
-
-def custom_folder_side(record, trees: dict) -> str:
-    if record.get("side") in trees:
-        return record["side"]
-    held = {side: len(rows_under(build_custom_folders(tree, [record])[0]))
-            for side, tree in trees.items()}
-    return max(sorted(trees, key=lambda side: side != LANDSCAPE), key=held.__getitem__)
 
 
 def selection_group(groups: list) -> CustomGroup:

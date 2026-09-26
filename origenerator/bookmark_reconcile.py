@@ -24,10 +24,13 @@ but the word.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from dataclasses import dataclass
 
 from origenerator import gallery
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
+from origenerator.orientation import row_orientation
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +41,9 @@ _NOTHING = {"refreshed": 0, "repointed": 0, "orphaned": 0}
 class Folders:
     """One reading of the gallery tree, indexed the ways a reconcile needs it.
 
-    Built once and used by both passes. Safe to share because neither writes to
-    `generations` — both write only to the bookmark tables — so the tree the
-    second reconciles against is the tree the first did. tests/test_reconcile.py
+    Built once and used by every pass. Safe to share because none writes to
+    `generations` — each writes only to the bookmark tables — so the tree a
+    later pass reads is the tree the first did. tests/test_reconcile.py
     asserts that, since sharing it is what makes the assumption load-bearing.
     """
 
@@ -52,6 +55,7 @@ class Folders:
     rows_by_id: dict
     #: the image-config index the key formulas need.
     image_index: dict
+    tree: list
 
 
 def index_folders(db) -> Folders:
@@ -60,22 +64,20 @@ def index_folders(db) -> Folders:
     image_index = gallery.build_image_config_index(
         [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == MediaType.IMAGE]
     )
-    current, legacy_keys = _index_current_folders(rows_by_id.values(), image_index)
-    return Folders(current, legacy_keys, rows_by_id, image_index)
+    tree = gallery.build_gallery_tree(list(rows_by_id.values()), {})
+    current, legacy_keys = _index_current_folders(tree, image_index)
+    return Folders(current, legacy_keys, rows_by_id, image_index, tree)
 
 
 def reconcile_bookmarks(db) -> dict:
-    """Both bookmark passes, over one reading of the gallery tree.
-
-    Ordered: the stars and names first, then the folders the user composed by
-    hand. Returns each pass's summary under its own key.
-    """
     if not db.folder_meta_full() and not db.custom_folder_items_full():
-        return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING)}
+        return {"folder_meta": dict(_NOTHING), "custom_folders": dict(_NOTHING),
+                "custom_folder_sides": 0}
     folders = index_folders(db)
     return {
         "folder_meta": reconcile_folder_meta(db, folders),
         "custom_folders": reconcile_custom_folders(db, folders),
+        "custom_folder_sides": stamp_custom_folder_sides(db, folders),
     }
 
 
@@ -135,6 +137,19 @@ def reconcile_custom_folders(db, folders: Folders | None = None) -> dict:
     return summary
 
 
+def stamp_custom_folder_sides(db, folders: Folders | None = None) -> int:
+    unsided = [record for record in db.list_custom_folders() if record["side"] is None]
+    if not unsided:
+        return 0
+    folders = index_folders(db) if folders is None else folders
+    for folder in gallery.build_custom_folders(folders.tree, unsided):
+        shapes = Counter(row_orientation(row) for row in gallery.rows_under(folder))
+        db.set_custom_folder_side(
+            folder.folder_id, PORTRAIT if shapes[PORTRAIT] > shapes[LANDSCAPE] else LANDSCAPE)
+    logger.info("Put %d custom folder(s) on a side", len(unsided))
+    return len(unsided)
+
+
 def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
     """The three-outcome pass both tables get, with the writes handed in.
 
@@ -161,7 +176,7 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
     return summary
 
 
-def _index_current_folders(rows, image_index):
+def _index_current_folders(tree, image_index):
     """Map every current folder key → ``(level, a prompt_id under it)``, plus each
     folder's legacy keys → its current key (for the historical formula
     changes, so bookmarks made before stored identity can still be recovered)."""
@@ -191,7 +206,7 @@ def _index_current_folders(rows, image_index):
                         folder_rows[0], group.level, image_index), group.key)
             walk(gallery.child_groups(group))
 
-    walk(gallery.build_gallery_tree(list(rows), {}))
+    walk(tree)
     return current, legacy_keys
 
 

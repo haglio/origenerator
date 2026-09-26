@@ -10,8 +10,10 @@ from origenerator.bookmark_reconcile import (
     reconcile_bookmarks,
     reconcile_custom_folders,
     reconcile_folder_meta,
+    stamp_custom_folder_sides,
 )
 from origenerator.db import Database
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.inflight import reconcile_in_flight
 
 # sdxl_t2i saves under output node "7".
@@ -416,6 +418,50 @@ def test_reconcile_with_no_custom_folders_is_a_noop(tmp_path):
     assert reconcile_custom_folders(db) == {"refreshed": 0, "repointed": 0, "orphaned": 0}
 
 
+# --- the side a custom folder saved before folders had one is put on ----------
+
+def _shaped(db, pid, width, height):
+    return _add_completed(db, pid, params={"positive_prompt": "a cat", "steps": 30, "seed": 1,
+                                           "width": width, "height": height},
+                          filename=f"sdxl_t2i_{pid}.png")
+
+
+def test_a_folder_saved_before_folders_had_a_side_is_put_where_most_of_what_it_gathers_is(
+        tmp_path):
+    db = Database(tmp_path / "t.db")
+    rows = [_shaped(db, "t1", 100, 200), _shaped(db, "t2", 100, 200), _shaped(db, "w1", 200, 100)]
+    gathering = _folder_holding(db, *{(gallery.settings_folder_key(row), None, None)
+                                      for row in rows})
+    empty = db.create_custom_folder("Later")
+
+    reconcile_bookmarks(db)
+
+    assert {record["id"]: record["side"] for record in db.list_custom_folders()} == {
+        gathering: PORTRAIT, empty: LANDSCAPE}
+
+
+def test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are(tmp_path):
+    db = Database(tmp_path / "t.db")
+    tall = _shaped(db, "t1", 100, 200)
+    assert gallery.legacy_settings_folder_key(tall) != gallery.settings_folder_key(tall)
+    _folder_holding(db, (gallery.legacy_settings_folder_key(tall), None, None))
+
+    reconcile_bookmarks(db)
+
+    assert db.list_custom_folders()[0]["side"] == PORTRAIT
+
+
+def test_a_folder_that_has_a_side_keeps_it_whatever_it_gathers(tmp_path):
+    db = Database(tmp_path / "t.db")
+    tall = _shaped(db, "t1", 100, 200)
+    folder_id = db.create_custom_folder("Mine", side=LANDSCAPE)
+    db.add_custom_folder_items(folder_id, [(gallery.settings_folder_key(tall), None, None)])
+
+    reconcile_bookmarks(db)
+
+    assert db.list_custom_folders()[0]["side"] == LANDSCAPE
+
+
 # --- one reading of the tree, for both passes ---------------------------------
 
 
@@ -433,9 +479,9 @@ def _a_library_with_both_kinds_of_bookmark(tmp_path):
 
 
 def test_reconciling_both_reads_the_gallery_tree_once(tmp_path, monkeypatch):
-    """The two passes ask the same question of the same tree, and building it
+    """The passes ask the same question of the same tree, and building it
     reads every row in the database — so the boot paid for two full builds back
-    to back. One index now serves both."""
+    to back. One index now serves them all."""
     db, _row, _legacy = _a_library_with_both_kinds_of_bookmark(tmp_path)
     builds = []
     build = gallery.build_gallery_tree
@@ -455,7 +501,8 @@ def test_reconciling_both_together_lands_where_reconciling_each_alone_does(tmp_p
 
     together = bookmark_reconcile.reconcile_bookmarks(shared_db)
     apart = {"folder_meta": reconcile_folder_meta(apart_db),
-             "custom_folders": reconcile_custom_folders(apart_db)}
+             "custom_folders": reconcile_custom_folders(apart_db),
+             "custom_folder_sides": stamp_custom_folder_sides(apart_db)}
 
     assert together == apart
     assert shared_db.folder_meta_map() == apart_db.folder_meta_map()
@@ -503,4 +550,5 @@ def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):
 
     assert builds == []
     assert summaries == {"folder_meta": {"refreshed": 0, "repointed": 0, "orphaned": 0},
-                         "custom_folders": {"refreshed": 0, "repointed": 0, "orphaned": 0}}
+                         "custom_folders": {"refreshed": 0, "repointed": 0, "orphaned": 0},
+                         "custom_folder_sides": 0}

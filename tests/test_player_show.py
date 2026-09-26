@@ -15,6 +15,8 @@ from player_core.satellite_hud import parse_hud
 from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
+from origenerator.funscript import funscript_path_for
+from origenerator.gui import player_show
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
@@ -90,6 +92,30 @@ def test_a_show_hands_the_player_the_pass_it_is_to_play(qtbot, tmp_path):
 
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]
+
+
+def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
+    output = tmp_path / "output"
+    monkeypatch.setattr(player_show, "COMFYUI_OUTPUT_DIR", output)
+    scripts = {}
+    for clip in clips:
+        script = funscript_path_for(clip, output_dir=output)
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("{}", encoding="utf-8")
+        scripts[clip] = script
+    return scripts
+
+
+def test_a_clip_is_handed_over_with_the_script_the_player_drives_the_osr2_by(
+        qtbot, tmp_path, monkeypatch):
+    scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+    items = [("one.png", "image", "id-1"), ("clip.mp4", "video", "id-2"),
+             ("bare.mp4", "video", "id-3")]
+
+    show = _show(qtbot, tmp_path, items=items)
+
+    handed = [item.funscript for item in read_playlist(show.channel.playlist)]
+    assert handed == [None, scripts["clip.mp4"], None]
 
 
 def test_the_player_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
@@ -418,6 +444,20 @@ class TestVersions:
         show.show_step_version(1)
 
         assert _sent(show) == ["PLAY_FILE one.png"]
+
+    def test_a_clips_other_copy_is_played_with_its_script(
+            self, qtbot, tmp_path, monkeypatch):
+        scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+        show = _show(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
+        _says(show, video="clip.mp4")
+        show.tick()
+        _sent(show)
+        show.set_levels({"clip.mp4": [("clip_upscaled.mp4", "video", "Upscale"),
+                                      ("clip.mp4", "video", "Original")]})
+
+        show.show_step_version(1)
+
+        assert _sent(show) == [f"PLAY_FILE clip.mp4	{scripts['clip.mp4']}"]
 
     def test_stepping_on_and_back_walks_the_copies_in_order(self, qtbot, tmp_path):
         show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")

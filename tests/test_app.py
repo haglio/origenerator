@@ -543,6 +543,61 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(qapp):
     watch.return_value.withdraw.assert_called_once_with()
 
 
+def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(qapp):
+    events = []
+
+    with _a_faked_boot([], **{
+        "origenerator.fun_time_mode.offer_the_window_while_it_is_built":
+            MagicMock(side_effect=lambda state_dir: events.append(("offered", state_dir))),
+        "origenerator.gui.main_window.OrigeneratorWindow":
+            MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
+    }):
+        assert main([]) == 0
+
+    assert events == [("offered", STATE_DIR), "built"]
+
+
+def test_a_boot_fun_time_launched_offers_its_window_to_nobody(qapp):
+    offered = MagicMock()
+
+    with _a_faked_boot([], **{
+            "origenerator.fun_time_mode.offer_the_window_while_it_is_built": offered}):
+        assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
+
+    offered.assert_not_called()
+
+
+def test_a_boot_fun_time_launched_leaves_what_is_in_front_to_the_session(qapp):
+    window = MagicMock()
+    fronted = MagicMock()
+
+    with _a_faked_boot([], **{
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.app._bring_to_front": fronted,
+    }):
+        assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
+
+    assert window not in [fronting.args[0] for fronting in fronted.call_args_list]
+
+
+def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_brought_forward(
+        qapp):
+    watch = MagicMock()
+    watch.return_value.stands_its_offer.return_value = False
+    window = MagicMock()
+    fronted = MagicMock()
+
+    with _a_faked_boot([], **{
+        "origenerator.gui.fun_time_watch.FunTimeWatch": watch,
+        "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
+        "origenerator.app._bring_to_front": fronted,
+    }):
+        assert main([]) == 0
+
+    window.show.assert_not_called()
+    assert window not in [fronting.args[0] for fronting in fronted.call_args_list]
+
+
 def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
     window = MagicMock()
     watch = MagicMock()

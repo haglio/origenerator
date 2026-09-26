@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 
-from origenerator.fun_time_mode import Rect
+from origenerator.fun_time_mode import Rect, offer_the_window_while_it_is_built
 from origenerator.gui.fun_time_watch import FunTimeWatch
 from origenerator.win32 import this_process_creation_time
 
@@ -43,6 +43,16 @@ def test_a_takeover_for_this_app_hands_it_the_session_and_withdraws_the_offer(qt
     assert len(taken) == 1
     assert (tmp_path / "fun_time_takeover.json").exists()
     del watch
+
+
+def test_a_session_that_asked_while_the_window_was_being_built_takes_it_at_once(tmp_path):
+    taken = []
+    _takeover(tmp_path, pid=os.getpid())
+
+    watch = FunTimeWatch(tmp_path, take_over=taken.append)
+
+    assert [session.main_rect for session in taken] == [Rect(0, 206, 853, 1234)]
+    assert not watch.stands_its_offer()
 
 
 def test_an_app_handed_back_offers_itself_to_the_next_session(qtbot, tmp_path):
@@ -154,6 +164,18 @@ def test_an_offer_simply_missing_is_put_back_without_a_word(qtbot, tmp_path, cap
         offer.unlink()
         qtbot.waitUntil(offer.exists)
 
+    assert caplog.records == []
+    watch.withdraw()
+
+
+def test_the_offer_made_while_starting_becomes_the_plain_one_without_a_word(tmp_path, caplog):
+    offer_the_window_while_it_is_built(tmp_path)
+
+    with caplog.at_level("INFO", logger="origenerator.gui.fun_time_watch"):
+        watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
+
+    assert (tmp_path / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(this_process_creation_time())]
     assert caplog.records == []
     watch.withdraw()
 

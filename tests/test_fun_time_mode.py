@@ -11,6 +11,7 @@ from PIL import Image
 from origenerator.fun_time_mode import (
     Rect,
     a_session_holds_the_device,
+    offer_the_window_while_it_is_built,
     parse_app_args,
     region_for_items,
     region_for_size,
@@ -151,6 +152,13 @@ def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path
 
     assert take_the_takeover(tmp_path, pid=4321) is None
     assert not takeover.exists()
+
+
+def test_a_window_still_being_built_offers_itself_as_starting(tmp_path):
+    offer_the_window_while_it_is_built(tmp_path)
+
+    assert (tmp_path / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(this_process_creation_time()), "starting"]
 
 
 def test_region_for_size_splits_on_aspect():

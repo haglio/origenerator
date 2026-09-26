@@ -19,9 +19,9 @@ from origenerator.fun_time_mode import (
     OFFER_NAME,
     FunTimeSession,
     a_session_holds_the_device,
+    offer_of_this_process,
     take_the_takeover,
 )
-from origenerator.win32 import this_process_creation_time
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,11 @@ class FunTimeWatch(QObject):
 
     def renew(self) -> None:
         self._state_dir.mkdir(parents=True, exist_ok=True)
-        self._stand_the_offer()
-        self._device_claimed(a_session_holds_the_device(self._state_dir))
         self._timer.start()
+        self._answer_the_session()
+
+    def stands_its_offer(self) -> bool:
+        return self._timer.isActive()
 
     def _stand_the_offer(self) -> None:
         """Put the offer back whenever it stops naming this window.
@@ -56,11 +58,13 @@ class FunTimeWatch(QObject):
         overwrites it in the ordinary course of things.
         """
         offer = self._state_dir / OFFER_NAME
-        mine = f"{os.getpid()} {this_process_creation_time()}"
+        mine = offer_of_this_process()
         try:
-            if offer.read_text(encoding="utf-8") == mine:
+            standing = offer.read_text(encoding="utf-8")
+            if standing == mine:
                 return
-            logger.info("The offer to Fun Time named someone else; standing ours again")
+            if standing != offer_of_this_process(starting=True):
+                logger.info("The offer to Fun Time named someone else; standing ours again")
         except FileNotFoundError:
             pass
         except OSError:

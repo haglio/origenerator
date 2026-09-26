@@ -13,7 +13,7 @@ from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gui.gallery_tree import RECENTS_KEY
+from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs

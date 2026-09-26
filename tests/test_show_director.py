@@ -18,8 +18,8 @@ import pytest
 from PyQt6.QtCore import Qt
 
 from origenerator import gallery
+from origenerator.gallery.shelves import FAVORITES_KEY, RECENTS_KEY, FolderShelf
 from origenerator.gui import show_director as module
-from origenerator.gui.gallery_tree import FAVORITES_KEY, RECENTS_KEY
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.show_director import ShowDirector
 from origenerator.orientation import oriented_key
@@ -1375,6 +1375,15 @@ def test_a_show_of_latest_plays_one_of_each_run_of_a_folders_generations(shows):
     assert _played(made[0]) == ["g5", "g3", "g2"]
 
 
+def test_a_show_of_a_folders_latest_plays_one_of_each_run_newest_first(shows):
+    location = oriented_key(FolderShelf(RECENTS_KEY, "workflow/a").key, PORTRAIT)
+    director, _host, made = shows(FakeHost(location=location, rows=_a_sitting()))
+
+    director.start()
+
+    assert _played(made[0]) == ["g5", "g3", "g2"]
+
+
 def test_a_show_of_a_folder_plays_every_one_of_its_seeds(shows):
     rows = _a_sitting()
     director, _host, made = shows(FakeHost(location="workflow/a", rows=rows))
@@ -1417,6 +1426,24 @@ def test_a_show_of_favorites_plays_the_sides_whole_library_with_the_filter_on(sh
     assert _played(made[0]) == ["g1", "g2"]
     assert made[0].hud_favorites_filter is True
     assert director._live_shows == [(made[0], ALL_PORTRAIT)]
+
+
+def _folder_of(rows):
+    return gallery.SettingsGroup("workflow/a", "A", list(rows))
+
+
+def test_a_show_of_a_folders_favorites_plays_that_folder_with_the_filter_on(shows):
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
+    folder = oriented_key("workflow/a", PORTRAIT)
+    favorites = oriented_key(FolderShelf(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
+    director, _host, made = shows(FakeHost(location=favorites, rows=[rows[0]],
+                                           groups={folder: _folder_of(rows)}))
+
+    director.start()
+
+    assert _played(made[0]) == ["g1", "g2"]
+    assert made[0].hud_favorites_filter is True
+    assert director._live_shows == [(made[0], folder)]
 
 
 def test_a_show_of_latest_opens_on_the_newest_rather_than_where_the_last_one_stopped(shows):

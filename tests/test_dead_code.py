@@ -145,7 +145,17 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 19247 when auto-generate's bolt lost its ring: the icon's account of the ring
 # the bolt broke out of went with the ring.
-MAX_PROSE_LINES = 19247
+#
+# 19168 when every folder of folders got the five shelves of its own: the notes on
+# when each shelf row is drawn, where the gallery lands, how a shelf is titled,
+# searched and named to the slideshow, and what a Favorites shelf collects are
+# test_favorite_shelf_is_absent_until_a_folder_exists,
+# test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it,
+# test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands,
+# test_a_folders_latest_lists_what_that_folder_made_under_its_path,
+# test_a_folders_shelf_scopes_the_search_and_names_its_path and
+# test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it.
+MAX_PROSE_LINES = 19168
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

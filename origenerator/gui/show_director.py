@@ -40,13 +40,14 @@ from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSC
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
-from origenerator.generation_state import GenerationSource, source_of
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     RECENTS_KEY as _RECENTS_KEY,
 )
+from origenerator.gallery.shelves import folder_shelf
+from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
@@ -275,16 +276,15 @@ class ShowDirector:
         here."""
         location = self._host.show_location()
         base, orientation = _split_shelf_key(location)
+        shelf = folder_shelf(base)
         side = side or orientation
-        # Favorites is not a set of its own: it is the whole library with the
+        # Favorites is not a set of its own: it is its folder with the
         # favorites switch held down, so the switch can be let go to widen and
-        # the order pair means the library rather than the bookmarks.  It is the
-        # one set whose shape its own items cannot name, since it is the side's
-        # whole library before the switch narrows it.
-        favorites = base == _FAVORITES_KEY
+        # the order pair means the folder rather than the bookmarks.
+        favorites = shelf is not None and shelf.shelf == _FAVORITES_KEY
         if favorites:
             side = side or self._host.side_in_view()
-            location = self.base_location(side)
+            location = oriented_key(shelf.folder, side)
             rows = self.rows_at(location)
         else:
             rows = self._one_per_run_where_the_order_is_newest_first(
@@ -297,7 +297,7 @@ class ShowDirector:
         # set shuffles — and the show's HUD status line says which.  Latest
         # opens on the newest rather than where the last Latest show stopped:
         # the newest is what it is opened for.
-        latest = base == _RECENTS_KEY
+        latest = shelf is not None and shelf.shelf == _RECENTS_KEY
         show = self.open(items, rows=rows, location=location, side=side,
                          resume=None if latest else self._show_state,
                          **self._order(latest))
@@ -647,8 +647,8 @@ class ShowDirector:
         of a configuration at a time; its show plays one of each such run, and
         the map's row reaches the rest.  Every other set is shuffled, where a
         run is not a run of anything."""
-        base, _side = _split_shelf_key(location)
-        if base != _RECENTS_KEY:
+        shelf = folder_shelf(_split_shelf_key(location)[0])
+        if shelf is None or shelf.shelf != _RECENTS_KEY:
             return rows
         return one_per_stretch(rows, image_index=self._host.image_config_index())
 

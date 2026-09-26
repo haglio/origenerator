@@ -17,7 +17,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
 
 from origenerator import gallery
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -160,6 +160,11 @@ def _rows(tree, orientation) -> list[str]:
     return [half.topLevelItem(i).text(0) for i in range(half.topLevelItemCount())]
 
 
+def _under_all(tree, orientation) -> list[str]:
+    all_row = tree._halves[orientation].topLevelItem(0)
+    return [all_row.child(i).text(0) for i in range(all_row.childCount())]
+
+
 def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
@@ -169,8 +174,9 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
 
     # Each half carries the whole table of contents, not a slice of it.
     for orientation in ("portrait", "landscape"):
-        assert _rows(view._tree, orientation) == [
-            "Latest", "Favorites", "Experiments", "Requests", "Trash", "All",
+        assert _rows(view._tree, orientation) == ["All"]
+        assert _under_all(view._tree, orientation)[:5] == [
+            "Latest", "Favorites", "Experiments", "Requests", "Trash",
         ]
 
 
@@ -250,8 +256,9 @@ def test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it(qtbot, tmp_pa
 
     # No folders of that shape yet, so no Favorites and no library — but the
     # shelves a first generation would land on are all there.
-    assert _rows(view._tree, "portrait") == ["Experiments", "Requests", "Trash"]
-    assert "All" in _rows(view._tree, "landscape")
+    assert _rows(view._tree, "portrait") == ["All"]
+    assert _under_all(view._tree, "portrait") == ["Experiments", "Requests", "Trash"]
+    assert "Favorites" in _under_all(view._tree, "landscape")
 
 
 def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):

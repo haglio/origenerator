@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gui.gallery_tree import FAVORITES_KEY
+from origenerator.gallery.shelves import FAVORITES_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,

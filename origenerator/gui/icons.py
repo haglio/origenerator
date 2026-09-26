@@ -49,6 +49,14 @@ from shared_ui.colors import (
 )
 from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
 
+from origenerator.gallery.shelves import (
+    EXPERIMENTS_KEY,
+    FAVORITES_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    SHELF_LABELS,
+    TRASH_KEY,
+)
 from origenerator.gallery.sides import PORTRAIT
 from origenerator.media import MediaType
 
@@ -184,6 +192,17 @@ def clock_icon() -> QIcon:
 def flask_icon() -> QIcon:
     """An Erlenmeyer flask — the Experiments shelf's caret marker."""
     return glyph_icon("flask", size=_SIZE)
+
+
+def shelf_icon(shelf: str) -> QIcon:
+    return {
+        RECENTS_KEY: clock_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
+        EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon, TRASH_KEY: trash_icon,
+    }[shelf]()
+
+
+def shelf_badge(shelf: str) -> tuple[QIcon, str]:
+    return shelf_icon(shelf), SHELF_LABELS[shelf]
 
 
 def custom_folder_icon() -> QIcon:
@@ -503,6 +522,10 @@ def tab_close_icon(widget=None) -> QIcon:
                         widget)
     painter.end()
     return QIcon(pixmap)
+
+
+def level_badge(level: str | None) -> tuple[QIcon, str] | None:
+    return (level_badge_icon(level), LEVEL_LABELS[level]) if level else None
 
 
 @cache

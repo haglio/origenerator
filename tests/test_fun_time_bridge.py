@@ -16,8 +16,8 @@ from player_core.satellite_hud import parse_hud
 from origenerator import fun_time_mode as contract
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
+from origenerator.gallery.shelves import FAVORITES_KEY
 from origenerator.gui import omnipause, show_director
-from origenerator.gui.gallery_tree import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.show_buttons import answer
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image, _row

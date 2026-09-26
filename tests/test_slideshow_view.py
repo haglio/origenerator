@@ -2301,3 +2301,20 @@ def test_a_version_stepped_to_while_the_picture_is_enhanced_stays_up(qtbot, tmp_
     view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes(color=(1, 2, 3))})
 
     assert view._pane._media[0] == a_base
+
+
+def test_a_closing_show_is_off_the_screen_before_its_engine_lets_go(qtbot):
+    seen = {}
+
+    class RecordingEngine(FakeEngine):
+        def close(self) -> None:
+            super().close()
+            seen["show visible"] = view.isVisible()
+
+    view = SlideshowView(_ITEMS, engine=RecordingEngine(), shuffle=in_order)
+    qtbot.addWidget(view)
+    view.show()
+
+    view.close()
+
+    assert seen == {"show visible": False}

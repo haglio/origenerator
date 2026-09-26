@@ -102,10 +102,12 @@ def test_the_show_captions_the_document_names_are_the_ones_a_region_show_wears()
 
 
 def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
+    """Byte for byte what the tracked copy holds, line endings included, so
+    publishing on Windows leaves the checkout clean."""
     written = contract.publish(tmp_path)
 
     assert written == tmp_path / contract.CONTRACT_FILE
-    assert written.read_text(encoding="utf-8") == contract.published_text()
+    assert written.read_bytes() == contract.published_text().encode("utf-8")
 
 
 def test_a_region_rect_is_not_required_of_a_launch():

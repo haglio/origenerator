@@ -126,14 +126,17 @@ This app runs two ways — on its own, and hosted inside a Fun Time session as o
 of the room's managed windows — so anything added here that the session touches
 has a matching half over there, and the two are one piece of work rather than a
 feature and a follow-up. Four shapes it takes: a verb in
-`fun_time_bridge.py` (answered by fun_time's dispatch table and its loop
-branches), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
+`fun_time_bridge.py` (sent by fun_time's dispatch table and its loop branches;
+`fun_time_mode.py` declares every line the command file answers and publishes
+them in `origenerator_contract.json`, which fun_time's
+`tests/test_vr_control_parity.py` holds everything its keys and phrases send
+here to), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
-`windows_bridge_sequencer.py`; that module declares the flags and the window
-captions once and publishes them as `origenerator_contract.json` for the
-session to read, and `tests/test_hosted_launch_contract.py` holds the parser
-and the windows to what it says), and the offer, takeover and session-claim files
+`windows_bridge_startup.py`; that module declares the flags and the window
+captions once and publishes them in the same document for the session to
+read, and `tests/test_hosted_launch_contract.py` holds the parser and the
+windows to what it says), and the offer, takeover and session-claim files
 a standalone window meets a session through (`fun_time_mode.py` here,
 `standalone_origenerator.py` there) — renamed on one side only, every session
 quietly launches a second copy beside the one already open, and the copy it

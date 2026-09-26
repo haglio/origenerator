@@ -100,7 +100,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # session's player as for a window: what the window's note said is
 # test_esc_again_puts_back_everything_it_took_off and
 # test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder.
-MAX_PROSE_LINES = 19310
+#
+# 19309 when a show's answers became the table the command file's published
+# lines are built from: what the old chain's notes said is
+# test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells.
+MAX_PROSE_LINES = 19309
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

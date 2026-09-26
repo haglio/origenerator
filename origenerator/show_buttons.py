@@ -16,9 +16,14 @@ feature is there when it is not.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from player_core.hud_button import FIT_THE_WORD, Button
 from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
 from player_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+
+from origenerator.console_commands import FILTER
 
 # The band, in the order the players put the same controls in.  The tuples are
 # the groups the wider gap opens between.
@@ -110,13 +115,41 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
     return (_mode_row(), band) if mode_row else (band,)
 
 
-# The map's own chrome and the session's own keys, in the players' spelling,
-# each with the axis or the direction it means on a show.
-_LOOPS = {"seed_loop": "seed", "action_loop": "action", "no_loop": ""}
-_NAV = {"nav_left": "left", "nav_right": "right", "nav_up": "up", "nav_down": "down",
-        # The players' spoken "next seed" / "next action": one step along the
-        # row, one step down the column.
-        "cycle_seed": "right", "cycle_action": "down"}
+# What each press asks of a show, by the name its verb carries after the side:
+# the band's buttons, the map's own chrome and the session's own keys, all in
+# the players' spelling.
+_PRESSES: dict[str, Callable[[Any], object]] = {
+    "prev": lambda show: show.show_step(-1),
+    "next": lambda show: show.show_step(1),
+    "lock": lambda show: show.show_toggle_lock(),
+    "trash": lambda show: show.show_cull(),
+    "reset": lambda show: show.show_reset(),
+    "shuffle": lambda show: show.show_order(latest=False),
+    "latest": lambda show: show.show_order(latest=True),
+    "fmode": lambda show: show.toggle_favorites_filter(),
+    "enhanced": lambda show: show.toggle_enhanced_mode(),
+    "seed_loop": lambda show: show.show_loop("seed"),
+    "action_loop": lambda show: show.show_loop("action"),
+    "no_loop": lambda show: show.show_loop(""),
+    "loop": lambda show: show.show_loop_cycle(),
+    "more_seeds": lambda show: show.show_more_seeds(),
+    "no_filter": lambda show: show.clear_modes(),
+    "nav_left": lambda show: show.show_nav("left"),
+    "nav_right": lambda show: show.show_nav("right"),
+    "nav_up": lambda show: show.show_nav("up"),
+    "nav_down": lambda show: show.show_nav("down"),
+    "cycle_seed": lambda show: show.show_nav("right"),
+    "cycle_action": lambda show: show.show_nav("down"),
+    "cycle_version": lambda show: show.show_step_version(1),
+    "cycle_version_back": lambda show: show.show_step_version(-1),
+}
+# The map's thumbnails, whose presses carry the item they were made on.
+_PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
+    "play_video": lambda show, path: show.show_item(path, lock=False),
+    "lock_video": lambda show, path: show.show_item(path, lock=True),
+}
+PRESSES = tuple(_PRESSES)
+PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 
 
 def answer(host, action: str, argument: str = "") -> bool:
@@ -130,42 +163,12 @@ def answer(host, action: str, argument: str = "") -> bool:
     for minimize, which is a window's rather than a show's, and for the
     players' chrome about acts, which a show has no counterpart for.
     """
-    if action in ("prev", "next"):
-        host.show_step(-1 if action == "prev" else 1)
-    elif action == "lock":
-        host.show_toggle_lock()
-    elif action == "trash":
-        host.show_cull()
-    elif action == "reset":
-        host.show_reset()
-    elif action in ("shuffle", "latest"):
-        host.show_order(latest=action == "latest")
-    elif action == "fmode":
-        host.toggle_favorites_filter()
-    elif action == "enhanced":
-        host.toggle_enhanced_mode()
-    elif action in _LOOPS:
-        host.show_loop(_LOOPS[action])
-    elif action == "loop":
-        host.show_loop_cycle()
-    elif action == "more_seeds":
-        host.show_more_seeds()
-    elif action == "filter":
-        # The button at the head of a map row, and the session's spoken
-        # acts: narrow to that act, the way a satellite's does.
+    if action in _PRESSES:
+        _PRESSES[action](host)
+    elif action in _PRESSES_ABOUT_A_FILE:
+        _PRESSES_ABOUT_A_FILE[action](host, argument)
+    elif action == FILTER:
         host.show_filter(argument)
-    elif action == "no_filter":
-        # A press on the row the filter already is.  Said to a show, "no
-        # filter" is the way out of every narrowing, and a hosted panel's
-        # press arrives as those very words -- so the press means that here.
-        host.clear_modes()
-    elif action in _NAV:
-        host.show_nav(_NAV[action])
-    elif action in ("cycle_version", "cycle_version_back"):
-        host.show_step_version(-1 if action.endswith("_back") else 1)
-    elif action in ("play_video", "lock_video"):
-        # A thumbnail on the map: a click plays it, a double-click locks it.
-        host.show_item(argument, lock=action == "lock_video")
     else:
         return False
     return True

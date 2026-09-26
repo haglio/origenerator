@@ -2318,3 +2318,18 @@ def test_a_closing_show_is_off_the_screen_before_its_engine_lets_go(qtbot):
     view.close()
 
     assert seen == {"show visible": False}
+
+
+def test_a_run_the_show_opened_on_comes_back_finished_after_the_picture_on_screen(qtbot):
+    view = _view(qtbot, [("a.png", "image", "id-a"), ("b.png", "image", "id-b")])
+    view.note_generating("id-run", _png_bytes())
+    view.lead_with_what_is_being_made()
+    assert view._playlist.current()[2] == "id-run"
+    view._on_media_ended()
+    moved_on_to = view.current_media_path()
+
+    view.note_added("run.png", "image", "id-run")
+    view._on_media_ended()
+
+    assert moved_on_to == "a.png"
+    assert view.current_media_path() == "run.png"

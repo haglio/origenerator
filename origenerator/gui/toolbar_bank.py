@@ -22,14 +22,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
-from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QToolButton, QWidget
-from shared_ui.spacing import (
-    BUTTON_GAP,
-    BUTTON_GROUP_GAP,
-    BUTTON_ROW_GAP,
-    BUTTON_SIZE,
-)
+from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP
 
 from origenerator.config import AMBIENT_AUDIO_VOICES
 from origenerator.gui import icons
@@ -106,16 +101,9 @@ class BankActs(NamedTuple):
     toggle_mic: Callable[[bool], None]
 
 
-_MARK_INSET = 2
-_MARK = BUTTON_SIZE - 2 * _MARK_INSET
-
-
 def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
-    btn = QToolButton()
-    btn.setObjectName("bankButton")
-    btn.setFixedSize(BUTTON_SIZE, BUTTON_SIZE)
+    btn = fill_square_with_mark(QToolButton())
     btn.setIcon(icon)
-    btn.setIconSize(QSize(_MARK, _MARK))
     btn.setToolTip(tooltip)
     btn.setCheckable(checkable)
     (btn.toggled if checkable else btn.clicked).connect(handler)

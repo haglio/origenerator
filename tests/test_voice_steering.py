@@ -189,14 +189,18 @@ def test_a_command_is_logged_in_the_words_it_was_heard_in(qtbot, caplog):
     assert caplog.messages == ["Voice: 'Fix teeth.' matched 'teeth'"]
 
 
-def test_words_that_miss_every_command_are_logged_while_nothing_steers(qtbot, caplog):
-    steering, listener = _command_steering(says="fix teath")
+def test_words_that_miss_every_command_go_to_the_screen_and_only_their_count_to_the_log(
+        qtbot, caplog):
+    steering, listener = _command_steering(says="put the kettle on")
     steering.start_commands(lambda matched: None)
+    shown = []
+    steering.heard.connect(shown.append)
 
-    with caplog.at_level(logging.INFO, logger="origenerator.voice"):
+    with caplog.at_level(logging.DEBUG):
         listener.hear()
 
-    assert caplog.messages == ["Voice: 'fix teath' matched no command"]
+    assert shown == ["put the kettle on"]
+    assert caplog.messages == ["Voice: a 4-word utterance matched no command"]
 
 
 def test_stopping_commands_ends_their_execution(qtbot):

@@ -181,7 +181,7 @@ class VoiceSteering(QObject):
             logger.info("Voice: rewriting the prompt with a %d-word instruction",
                         len(text.split()))
         else:
-            logger.info("Voice: %r matched no command", text)
+            logger.info("Voice: a %d-word utterance matched no command", len(text.split()))
         return meaning
 
     def _meaning(self, text: str):

@@ -169,7 +169,19 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19155 when a folder of your own saved before folders had a side was given one
 # at startup: the note on the order the bookmark passes run in is
 # test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are.
-MAX_PROSE_LINES = 19155
+#
+# 19126 when a window that stops answering began writing down where it is stuck:
+# the crash log's notes on what it records, that it is appended to and never
+# closed, and that a launch check leaves it alone are
+# test_a_hard_crash_writes_a_python_stack_to_the_state_dir,
+# test_the_crash_log_keeps_what_earlier_runs_left,
+# test_arming_the_crash_log_hands_back_the_log_a_freeze_is_written_to and
+# test_the_launch_check_is_no_launch_in_the_crash_log.
+#
+# 19124 when the launch stopped asking Qt Quick for a render thread: nothing has
+# drawn with Qt Quick since the show moved onto the players' engine, and the
+# module's note on why it asked went with it.
+MAX_PROSE_LINES = 19124
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

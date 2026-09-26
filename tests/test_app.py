@@ -3,7 +3,6 @@ from __future__ import annotations
 import builtins
 import json
 import logging
-import os
 import runpy
 import sqlite3
 import subprocess
@@ -396,7 +395,31 @@ def test_an_unwritable_state_dir_costs_the_log_and_nothing_else(tmp_path):
     # Never the launch: a crash log that cannot be opened is a missing report,
     # not a reason for the app not to come up.
 
-    _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t"))
+    assert _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t")) is None
+
+
+def test_arming_the_crash_log_hands_back_the_log_a_freeze_is_written_to(tmp_path):
+    crash_log = _arm_the_crash_log(tmp_path, logging.getLogger("t"))
+
+    assert Path(crash_log.name) == tmp_path / "origenerator_crash.log"
+    assert not crash_log.closed
+
+
+def test_the_window_is_watched_for_a_freeze_for_as_long_as_it_is_up(qapp, monkeypatch):
+    events = []
+    crash_log = object()
+    monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: crash_log)
+    freeze_watch = MagicMock(side_effect=lambda log: events.append(("watching", log))
+                             or MagicMock(stop=lambda: events.append("stopped")))
+
+    with _a_faked_boot([], **{
+        "origenerator.freeze_watch.FreezeWatch": freeze_watch,
+        "PyQt6.QtWidgets.QApplication.exec": MagicMock(
+            side_effect=lambda: events.append("running") or 0),
+    }):
+        assert main([]) == 0
+
+    assert events == [("watching", crash_log), "running", "stopped"]
 
 
 def test_main_reclaims_unreachable_trash_on_startup(qapp):
@@ -851,15 +874,6 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
 
 
-def test_main_asks_qt_quick_to_draw_on_a_thread_of_its_own(qapp):
-    requested = MagicMock()
-
-    with _a_faked_boot([], **{"origenerator.render_loop.request_threaded_render_loop": requested}):
-        assert main([]) == 0
-
-    requested.assert_called_once_with(os.environ)
-
-
 def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
     """Every pass is best-effort: a library the app cannot finish tidying is
     still a library it must open. Each is guarded on its own, so the one that
@@ -1147,3 +1161,13 @@ def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
         assert main(["--check-launch"]) == 0
 
     claimed.assert_not_called()
+
+
+def test_the_launch_check_is_no_launch_in_the_crash_log(qapp, monkeypatch):
+    armed = MagicMock()
+    monkeypatch.setattr("origenerator.app._arm_the_crash_log", armed)
+
+    with _a_faked_boot([]):
+        assert main(["--check-launch"]) == 0
+
+    armed.assert_not_called()

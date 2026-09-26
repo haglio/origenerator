@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
+from player_core.file_channel import append_command
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
@@ -975,6 +976,15 @@ def _fun_time_session(main=(10, 20, 800, 600)):
     )
 
 
+def _hosted_with_a_channel(tmp_path):
+    """A session on the monitors whose command file is real, so a verb reaches it."""
+    return replace(_fun_time_session(), command_file=tmp_path / "origenerator_cmd.txt")
+
+
+def _say(tmp_path, verb: str) -> None:
+    append_command(tmp_path / "origenerator_cmd.txt", verb)
+
+
 def _headset_session(tmp_path, main=(10, 20, 200, 100)):
     return replace(_fun_time_session(main),
                    frames_file=tmp_path / "frame.bin",
@@ -996,6 +1006,40 @@ def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
 
     assert win.hands_its_window_over is None
+
+
+def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path):
+    """A window hosted on the monitors is kept across a crossing, and the
+    headset session that adopts it has no monitor to put it on: it asks for the
+    picture through the session's own channel instead of launching another."""
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_hosted_with_a_channel(tmp_path),
+    )
+    qtbot.addWidget(win)
+    assert win.hands_its_window_over is None
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert not win.isMinimized()
+
+
+def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tmp_path):
+    """And the desktop session that adopts it back puts it where it always was:
+    parked until the mode switch restores it, and no picture written for nobody."""
+    win = OrigeneratorWindow(
+        ComfyUIClient(), Database(tmp_path / "t.db"), AppState(tmp_path / "ui.json"),
+        fun_time=_hosted_with_a_channel(tmp_path),
+    )
+    qtbot.addWidget(win)
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    _say(tmp_path, "TAKE_BACK")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
+
+    assert win.isMinimized()
 
 
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):

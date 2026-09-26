@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import logging
 import time
+from contextlib import contextmanager
+from dataclasses import dataclass
 
 from player_core.file_channel import consume_command_file
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
-from PyQt6.QtGui import QImage, QMouseEvent, QWheelEvent
+from PyQt6.QtGui import QImage, QMouseEvent, QPainter, QWheelEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.frame_channel import FrameWriter
@@ -45,6 +48,73 @@ _IDLE_LOOK_S = 0.1
 #: pixels written, read and drawn for nothing.
 CAP_PX = 1440
 
+_NO_DRAG_PX = 1 << 20
+
+
+@contextmanager
+def _no_drag_can_start():
+    before = QApplication.startDragDistance()
+    QApplication.setStartDragDistance(_NO_DRAG_PX)
+    try:
+        yield
+    finally:
+        QApplication.setStartDragDistance(before)
+
+
+@dataclass(frozen=True)
+class Patch:
+
+    picture: QImage
+    at: QPoint
+    width: int
+    height: int
+
+
+_OVER_THE_WINDOW = {Qt.WindowType.Dialog: 0, Qt.WindowType.Sheet: 0,
+                    Qt.WindowType.Popup: 1, Qt.WindowType.ToolTip: 2}
+
+
+def opened_over(window: QWidget) -> list[QWidget]:
+    return sorted((top for top in QApplication.topLevelWidgets()
+                   if top is not window and top.isVisible()
+                   and top.windowType() in _OVER_THE_WINDOW),
+                  key=lambda top: _OVER_THE_WINDOW[top.windowType()])
+
+
+def windows_opened_over(window: QWidget, *, scale: float) -> list[Patch]:
+    patches = []
+    for top in opened_over(window):
+        at = window.mapFromGlobal(top.mapToGlobal(QPoint(0, 0)))
+        patches.append(Patch(top.grab().toImage(),
+                             QPoint(round(at.x() * scale), round(at.y() * scale)),
+                             round(top.width() * scale), round(top.height() * scale)))
+    return patches
+
+
+def _held_off(target: QWidget) -> bool:
+    modal = QApplication.activeModalWidget()
+    return modal is not None and modal is not target and not modal.isAncestorOf(target)
+
+
+def painted_over(image: QImage, patches: list[Patch]) -> QImage:
+    if not patches:
+        return image
+    painter = QPainter(image)
+    try:
+        for patch in patches:
+            painter.drawImage(
+                patch.at,
+                patch.picture.scaled(patch.width, patch.height,
+                                     Qt.AspectRatioMode.KeepAspectRatio,
+                                     Qt.TransformationMode.SmoothTransformation))
+    finally:
+        painter.end()
+    return image
+
+
+def pixels_per_coordinate(image: QImage, window) -> float:
+    return image.width() / window.width() if window.width() else 1.0
+
 
 def within_the_cap(image: QImage) -> QImage:
     """*image* itself, or scaled until its longest edge is :data:`CAP_PX`."""
@@ -67,6 +137,7 @@ class HeadsetWindow(QObject):
         self._pointer = QPoint(0, 0)
         self._pressed: QWidget | None = None
         self._sent: bytes | None = None
+        self._published: tuple[int, int] | None = None
         self._looked_at: float | None = None
         self._asked = False
         self._timer = QTimer(self)
@@ -92,9 +163,9 @@ class HeadsetWindow(QObject):
             except ValueError:
                 logger.warning("A headset press with no pixel: %r", line)
                 return
-            self._pointer = QPoint(x, y)
+            self._pointer = self._in_the_window(x, y)
             self._point(kind)
-            self._asked = True
+            self._asked = self._asked or kind != HEADSET_HOVER
         elif kind == HEADSET_RELEASE:
             self._mouse(self._pressed, QMouseEvent.Type.MouseButtonRelease,
                         Qt.MouseButton.NoButton)
@@ -107,9 +178,17 @@ class HeadsetWindow(QObject):
                 logger.warning("A headset scroll of nothing: %r", line)
             self._asked = True
 
+    def _in_the_window(self, x: int, y: int) -> QPoint:
+        if self._published is None:
+            return QPoint(x, y)
+        width, height = self._published
+        return QPoint(round(x * self._window.width() / width),
+                      round(y * self._window.height() / height))
+
     def _point(self, kind: str) -> None:
         if kind == HEADSET_PRESS:
             self._pressed = self._under_the_pointer()
+            self._put_away_what_it_missed(self._pressed)
             self._mouse(self._pressed, QMouseEvent.Type.MouseButtonPress,
                         Qt.MouseButton.LeftButton)
         elif kind == HEADSET_DRAG:
@@ -120,21 +199,35 @@ class HeadsetWindow(QObject):
                         Qt.MouseButton.NoButton)
 
     def _under_the_pointer(self) -> QWidget:
+        at = self._window.mapToGlobal(self._pointer)
+        for top in reversed(opened_over(self._window)):
+            local = top.mapFromGlobal(at)
+            if top.windowType() != Qt.WindowType.ToolTip and top.rect().contains(local):
+                return top.childAt(local) or top
         return self._window.childAt(self._pointer) or self._window
 
+    def _put_away_what_it_missed(self, target: QWidget) -> None:
+        for top in opened_over(self._window):
+            if (top.windowType() == Qt.WindowType.Popup
+                    and top is not target and not top.isAncestorOf(target)):
+                top.close()
+
     def _mouse(self, target: QWidget | None, kind, buttons: Qt.MouseButton) -> None:
-        if target is None:
+        if target is None or sip.isdeleted(target) or _held_off(target):
             return
-        local = QPointF(target.mapFrom(self._window, self._pointer))
-        QApplication.sendEvent(target, QMouseEvent(
-            kind, local, QPointF(self._pointer), Qt.MouseButton.LeftButton, buttons,
-            Qt.KeyboardModifier.NoModifier))
+        at = QPointF(self._window.mapToGlobal(self._pointer))
+        with _no_drag_can_start():
+            QApplication.sendEvent(target, QMouseEvent(
+                kind, target.mapFromGlobal(at), at, Qt.MouseButton.LeftButton, buttons,
+                Qt.KeyboardModifier.NoModifier))
 
     def _scroll(self, delta: int) -> None:
         target = self._under_the_pointer()
+        if _held_off(target):
+            return
+        at = QPointF(self._window.mapToGlobal(self._pointer))
         QApplication.sendEvent(target, QWheelEvent(
-            QPointF(target.mapFrom(self._window, self._pointer)),
-            QPointF(self._pointer), QPoint(0, 0), QPoint(0, delta),
+            target.mapFromGlobal(at), at, QPoint(0, 0), QPoint(0, delta),
             Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
             Qt.ScrollPhase.NoScrollPhase, False))
 
@@ -149,10 +242,12 @@ class HeadsetWindow(QObject):
             return
         self._asked = False
         self._looked_at = now
-        image = within_the_cap(
-            self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888))
+        grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+        image = within_the_cap(painted_over(grabbed, windows_opened_over(
+            self._window, scale=pixels_per_coordinate(grabbed, self._window))))
         pixels = image.constBits().asstring(image.sizeInBytes())
         if pixels == self._sent:
             return
         self._frames.write(0, image.width(), image.height(), pixels)
         self._sent = pixels
+        self._published = (image.width(), image.height())

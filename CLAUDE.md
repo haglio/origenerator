@@ -239,7 +239,11 @@ preview still leaves to the live app is ComfyUI's absence work — background
 experiments and base re-renders, which would outlive it in a queue only the app
 that queued them can cancel (see `origenerator/branch_session.py`). Before
 handing one over, **re-copy the primary's `content.local.json` into the worktree
-root every time**.
+root and its `state/ui_state.json` into the worktree's `state/`, every time**.
+The overlay is how the library is found at all; the window state is what was
+open in the gallery, so without it a preview opens on nothing and reads as a
+dummy -- which is what a Fun Time session handed him on 2026-09-20, and why
+fun_time's `--shortcut` now refuses a hosted checkout that has neither.
 
 Re-copy, not copy-once. The overlay is where `project_roots` lives, and the
 primary's library is found through it — a worktree carrying a copy taken weeks

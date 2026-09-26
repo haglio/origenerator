@@ -63,6 +63,8 @@
     "CLOSE_SHOWS",
     "FILTER_ENHANCED",
     "RELEASE",
+    "TAKE_BACK",
+    "HAND_OVER|{frames}|{input}",
     "GO_TO|{file}",
     "portrait_prev",
     "portrait_next",

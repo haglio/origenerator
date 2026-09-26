@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import logging
+from dataclasses import replace
 
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
@@ -114,7 +115,8 @@ class OrigeneratorWindow(QMainWindow):
             # rather than by the boot, which had to reach through this window
             # for the gallery to hand over. Parented to the window, so it lives
             # exactly as long as the app.
-            FunTimeBridge(fun_time, self._gallery_view, parent=self)
+            self._answer_the_crossings(
+                FunTimeBridge(fun_time, self._gallery_view, parent=self))
         self.hands_its_window_over: HeadsetWindow | None = None
         if fun_time is not None and fun_time.in_a_headset:
             self._hand_the_window_over(fun_time)
@@ -210,6 +212,7 @@ class OrigeneratorWindow(QMainWindow):
         self._wear_the_session(session)
         self._bridge = FunTimeBridge(session, self._gallery_view, parent=self)
         self._bridge.released.connect(self.become_standalone)
+        self._answer_the_crossings(self._bridge)
         if session.in_a_headset:
             self._hand_the_window_over(session)
         else:
@@ -221,6 +224,19 @@ class OrigeneratorWindow(QMainWindow):
         window Windows has unmapped, so a parked one has no picture to hand."""
         self.show()
         self.hands_its_window_over = HeadsetWindow(self, session, parent=self)
+
+    def _answer_the_crossings(self, bridge: FunTimeBridge) -> None:
+        bridge.hand_over_asked.connect(self._handed_to_a_headset)
+        bridge.take_back_asked.connect(self._taken_back_to_the_monitors)
+
+    def _handed_to_a_headset(self, frames_file, input_file) -> None:
+        self._take_the_window_back()
+        self._hand_the_window_over(replace(
+            self._fun_time, frames_file=frames_file, input_file=input_file))
+
+    def _taken_back_to_the_monitors(self) -> None:
+        self._take_the_window_back()
+        self.showMinimized()
 
     def _take_the_window_back(self) -> None:
         if self.hands_its_window_over is not None:

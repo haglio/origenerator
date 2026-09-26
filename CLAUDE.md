@@ -145,7 +145,11 @@ windows to what it says), and the offer, takeover and session-claim files
 a standalone window meets a session through (`fun_time_mode.py` here,
 `standalone_origenerator.py` there) — renamed on one side only, every session
 quietly launches a second copy beside the one already open, and the copy it
-missed goes on driving the OSR2 the session is driving too.
+missed goes on driving the OSR2 the session is driving too. The claim is also
+a matter of where: a preview keeps a `state/` of its own, so it reads the
+claim in the everyday copy's `state/` as well, which is where every session
+writes one; a preview that read only its own went on driving beside Fun Time
+(2026-09-26).
 
 One-sided, none of them fails loudly. The console's enhanced-only switch shipped
 on the shared side with nothing on fun_time's side answering the verb it posts,

@@ -529,7 +529,9 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
     mock_loading.assert_not_called()
 
 
-def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(qapp):
+def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "everyday" / "state")
     window = MagicMock()
     watch = MagicMock()
     with _a_faked_boot([], **{
@@ -539,7 +541,8 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(qapp):
         assert main([]) == 0
 
     watch.assert_called_once_with(STATE_DIR, take_over=window.become_hosted,
-                                  device_claimed=window.the_session_has_the_device)
+                                  device_claimed=window.the_session_has_the_device,
+                                  library_state_dir=tmp_path / "everyday" / "state")
     watch.return_value.withdraw.assert_called_once_with()
 
 

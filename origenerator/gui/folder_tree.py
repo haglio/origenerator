@@ -1,7 +1,7 @@
 """The gallery's folder tree, with per-leaf star/delete actions on the left.
 
-Only a leaf folder (a row with no sub-folders) carries actions, and they sit in
-the empty indentation just left of its label — a star right beside the text and,
+Only a leaf folder (a row with no sub-folders) that collects nothing carries
+actions, and they sit in the empty indentation just left of its label — a star right beside the text and,
 further left, a delete. Because that space is the row's existing indentation, the
 icons appear there on hover without moving the text at all. The star doubles as
 the favorited indicator: filled and always shown for a favorited leaf, an outline
@@ -10,9 +10,9 @@ in place. Clicking an icon emits ``favorite_clicked`` / ``delete_clicked`` with 
 folder's key instead of selecting the row; the tree hit-tests clicks against the
 same rects it paints. Only a left click ever works the caret: a right one just
 picks the row it lands on, so opening a folder's menu never shuts the folder. A
-row carrying a QIcon under ``BRANCH_ICON_ROLE`` (the Favorites and Recents shelves)
-draws that icon in its caret column so its label lines up with the siblings'.
-Which group a row holds is injected, so this stays free of the gallery model.
+row carrying a QIcon under ``BRANCH_ICON_ROLE`` (a shelf, or a folder of your own)
+draws that icon under its folder's own mark. Which group a row holds is injected,
+so this stays free of the gallery model.
 
 A row carrying ``RECENT_ROLE`` is one of the folders lately worked in, and wears
 a dot at the pane's own left edge — the same place on every row, whatever its
@@ -32,7 +32,13 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon
-from PyQt6.QtWidgets import QAbstractItemView, QStyledItemDelegate, QTreeWidget
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QTreeWidget,
+)
 
 from origenerator.gui import icons
 
@@ -91,6 +97,8 @@ class _CountBeforeName(QStyledItemDelegate):
         count = index.data(COUNT_ROLE)
         if count:
             option.text = f"({count}) {option.text}"
+        if isinstance(index.data(BRANCH_ICON_ROLE), QIcon) and index.parent().isValid():
+            option.rect.setLeft(self.parent().name_left_of_marked_row(option.rect))
 
 
 class FolderTree(QTreeWidget):
@@ -140,11 +148,9 @@ class FolderTree(QTreeWidget):
             command = QItemSelectionModel.SelectionFlag.ClearAndSelect
         super().setCurrentItem(item, column, command)
 
-    def _leaf_group(self, index):
-        """The folder a leaf row holds (one with no sub-folders), else None — parent
-        folders and the synthetic shelf get no actions."""
+    def _group_with_actions(self, index):
         group = index.data(self._role) if index.isValid() else None
-        if group is None or self.model().hasChildren(index):
+        if group is None or self.model().hasChildren(index) or index.data(DROP_KEY_ROLE):
             return None
         return group
 
@@ -158,7 +164,7 @@ class FolderTree(QTreeWidget):
         index = self.indexAt(event.pos())
         # The row's key, not the folder's: both sides draw the folder, and only
         # the row under the mouse should light up.
-        hovered = index.data(TREE_KEY_ROLE) if self._leaf_group(index) else None
+        hovered = index.data(TREE_KEY_ROLE) if self._group_with_actions(index) else None
         self._set_hover(hovered)
 
     def leaveEvent(self, event):
@@ -169,7 +175,7 @@ class FolderTree(QTreeWidget):
         super().drawRow(painter, option, index)
         if index.data(RECENT_ROLE):
             self._recent.paint(painter, _mark_rect(self.visualRect(index)))
-        group = self._leaf_group(index)
+        group = self._group_with_actions(index)
         if group is None:
             return
         hovered = index.data(TREE_KEY_ROLE) == self._hover_key
@@ -181,18 +187,33 @@ class FolderTree(QTreeWidget):
             self._delete.paint(painter, delete_rect)
 
     def drawBranches(self, painter, rect, index):
-        """Paint a shelf row's icon (Favorites' star, Recents' clock) in its caret
-        column, so its label aligns with the sibling folders' rather than sitting a
-        chevron-width off. Every other row keeps its normal disclosure control —
-        and a folder's level chip is its row *icon*, drawn to the right of the
-        caret with the label, because the chip is part of the folder's name."""
         icon = index.data(BRANCH_ICON_ROLE)
         if isinstance(icon, QIcon):
-            x = rect.left() + (rect.width() - _ICON) // 2
-            y = rect.top() + (rect.height() - _ICON) // 2
-            icon.paint(painter, QRect(x, y, _ICON, _ICON))
+            icon.paint(painter, self.branch_mark_rect(index))
             return
         super().drawBranches(painter, rect, index)
+
+    def branch_mark_rect(self, index) -> QRect:
+        row = self.visualRect(index)
+        top = row.top() + (row.height() - _ICON) // 2
+        folder_row = row.translated(-self.indentation(), 0)
+        if not index.parent().isValid():
+            return QRect(folder_row.left() + (self.indentation() - _ICON) // 2, top, _ICON, _ICON)
+        mark = self._folder_layout(folder_row, QStyle.SubElement.SE_ItemViewItemDecoration)
+        return QRect(mark.left(), top, _ICON, _ICON)
+
+    def name_left_of_marked_row(self, row: QRect) -> int:
+        return self._folder_layout(row.translated(-self.indentation(), 0),
+                                   QStyle.SubElement.SE_ItemViewItemText).left()
+
+    def _folder_layout(self, folder_row: QRect, element) -> QRect:
+        option = QStyleOptionViewItem()
+        self.initViewItemOption(option)
+        option.rect = folder_row
+        option.features |= (QStyleOptionViewItem.ViewItemFeature.HasDecoration
+                            | QStyleOptionViewItem.ViewItemFeature.HasDisplay)
+        option.decorationSize = self.iconSize()
+        return self.style().subElementRect(element, option, self)
 
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:
@@ -207,7 +228,7 @@ class FolderTree(QTreeWidget):
             QAbstractItemView.mousePressEvent(self, event)
             return
         index = self.indexAt(event.pos())
-        group = self._leaf_group(index)
+        group = self._group_with_actions(index)
         if group is not None:
             star_rect, delete_rect = _action_rects(self.visualRect(index))
             if delete_rect.contains(event.pos()):

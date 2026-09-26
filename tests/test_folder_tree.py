@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
-from PyQt6.QtWidgets import QStyleOptionViewItem, QTreeWidgetItem
+from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 
-from origenerator.gui import folder_tree
+from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gui import folder_tree, icons
 from origenerator.gui.folder_tree import (
+    BRANCH_ICON_ROLE,
     COUNT_ROLE,
     DROP_KEY_ROLE,
     FOLDER_KEYS_MIME,
@@ -431,4 +433,81 @@ def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
     assert any(_is_green(color) for x, color in _row_pixels(tree, leaf)
                if star.left() <= x <= star.right())
 
+
+
+
+def _decoration_left(tree, item) -> int:
+    index = tree.indexFromItem(item)
+    option = QStyleOptionViewItem()
+    tree.initViewItemOption(option)
+    option.rect = tree.visualRect(index)
+    tree.itemDelegate().initStyleOption(option, index)
+    return tree.style().subElementRect(
+        QStyle.SubElement.SE_ItemViewItemDecoration, option, tree).left()
+
+
+def test_a_shelf_rows_mark_stands_under_its_folders_own_mark(qtbot):
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    top = _folder_row("All", "all")
+    folder = _folder_row("Workflow", "wf")
+    folder.setIcon(0, icons.level_badge_icon("workflow"))
+    shelf = QTreeWidgetItem(["Latest"])
+    shelf.setData(0, BRANCH_ICON_ROLE, icons.shelf_icon(RECENTS_KEY))
+    folder.addChild(shelf)
+    top.addChild(folder)
+    tree.addTopLevelItem(top)
+    tree.expandAll()
+    tree.show()
+
+    assert tree.branch_mark_rect(tree.indexFromItem(shelf)).left() == \
+        _decoration_left(tree, folder)
+
+
+def _text_left(tree, item) -> int:
+    index = tree.indexFromItem(item)
+    option = QStyleOptionViewItem()
+    tree.initViewItemOption(option)
+    option.rect = tree.visualRect(index)
+    tree.itemDelegate().initStyleOption(option, index)
+    return tree.style().subElementRect(
+        QStyle.SubElement.SE_ItemViewItemText, option, tree).left()
+
+
+def test_a_shelf_rows_name_starts_where_its_folders_name_starts(qtbot):
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    top = _folder_row("All", "all")
+    folder = _folder_row("Workflow", "wf")
+    folder.setIcon(0, icons.level_badge_icon("workflow"))
+    shelf = QTreeWidgetItem(["Latest"])
+    shelf.setData(0, BRANCH_ICON_ROLE, icons.shelf_icon(RECENTS_KEY))
+    folder.addChild(shelf)
+    top.addChild(folder)
+    tree.addTopLevelItem(top)
+    tree.expandAll()
+    tree.show()
+
+    assert _text_left(tree, shelf) == _text_left(tree, folder)
+
+
+def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
+    tree = FolderTree(_ROLE)
+    qtbot.addWidget(tree)
+    own = _folder_row("Keepers", "__custom__/1")
+    own.setData(0, BRANCH_ICON_ROLE, icons.custom_folder_icon())
+    own.setData(0, DROP_KEY_ROLE, "__custom__/1")
+    tree.addTopLevelItem(own)
+    tree.show()
+    clicked = []
+    tree.favorite_clicked.connect(clicked.append)
+    tree.delete_clicked.connect(clicked.append)
+    star, delete = _action_rects(tree.visualRect(tree.indexFromItem(own)))
+
+    for spot in (star.center(), delete.center()):
+        qtbot.mouseMove(tree.viewport(), spot)
+        qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=spot)
+
+    assert clicked == []
+    assert tree._hover_key is None
 

@@ -547,3 +547,19 @@ def test_a_shelf_square_wears_the_mark_its_row_wears(qtbot):
     (tile,) = scroll.widget().findChildren(FolderTile)
     assert [label for label in tile.findChildren(QLabel)
             if label.toolTip() == "Trash" and not label.pixmap().isNull()]
+
+
+def test_a_folders_shelf_squares_stand_apart_from_its_folders_behind_a_heading_line(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+
+    pane.show_folder_tiles(tree, shelves=[oriented_key(RECENTS_KEY, LANDSCAPE),
+                                          oriented_key(TRASH_KEY, LANDSCAPE)])
+
+    layout = scroll.widget().layout()
+    shown = [layout.itemAt(index).widget() for index in range(layout.count())]
+    assert [widget.objectName() for widget in shown] == [
+        "folderTile", "folderTile", "tileGroupHeading", "folderTile"]
+    assert not shown[2].text().strip()

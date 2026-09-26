@@ -27,8 +27,8 @@ from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
-    BUTTON_ICON,
     BUTTON_ROW_GAP,
+    BUTTON_SIZE,
 )
 
 from origenerator.config import AMBIENT_AUDIO_VOICES
@@ -106,19 +106,16 @@ class BankActs(NamedTuple):
     toggle_mic: Callable[[bool], None]
 
 
-def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
-    """An icon-only button for the bank. A ``checkable`` one is a toggle whose
-    ``handler`` receives its on/off state.
+_MARK_INSET = 2
+_MARK = BUTTON_SIZE - 2 * _MARK_INSET
 
-    The icon is drawn near the button's full height on purpose. At 16px it sat in
-    a 24px button carrying a glyph that used a third of its own canvas — a mark
-    covering about a ninth of the button, which reads as a smudge rather than as
-    a symbol.
-    """
+
+def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
     btn = QToolButton()
-    btn.setObjectName("iconButton")
+    btn.setObjectName("bankButton")
+    btn.setFixedSize(BUTTON_SIZE, BUTTON_SIZE)
     btn.setIcon(icon)
-    btn.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
+    btn.setIconSize(QSize(_MARK, _MARK))
     btn.setToolTip(tooltip)
     btn.setCheckable(checkable)
     (btn.toggled if checkable else btn.clicked).connect(handler)

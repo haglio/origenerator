@@ -19,7 +19,7 @@ from player_core.console import (
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
 from PyQt6.QtWidgets import (
     QApplication,
@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from shared_ui.spacing import MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_SIZE, MARGIN_STANDARD
 
 from origenerator import evolver_export, gallery, motion_engine, recipe_match, search
 from origenerator.branch_session import ENV_FLAG
@@ -3787,17 +3787,13 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
 
 
 def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot):
-    # In a narrow pane a horizontal bank squeezes every button until the glyphs
-    # are a row of smudges. Wrapped, a button is always the size it asks for and
-    # the bank just gets taller.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view.show()
     host = view._bank
-    wanted = view._bank.back.sizeHint()
 
-    host.setFixedWidth(wanted.width() * 3)  # far narrower than the whole bank
+    host.setFixedWidth(BUTTON_SIZE * 3)  # far narrower than the whole bank
     host.updateGeometry()
     qtbot.wait(10)
 
@@ -3805,10 +3801,10 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
              if not b.isHidden()]
     assert len(shown) > 3                       # more buttons than fit on one row
     for button in shown:
-        assert button.width() == button.sizeHint().width()  # none of them squeezed
+        assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE)  # none of them squeezed
     rows = {button.y() for button in shown}
     assert len(rows) > 1                        # so they went onto further rows
-    assert host.heightForWidth(host.width()) >= wanted.height() * len(rows)
+    assert host.heightForWidth(host.width()) >= BUTTON_SIZE * len(rows)
 
 
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):

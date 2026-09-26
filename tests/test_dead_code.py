@@ -138,7 +138,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19261 when a discarded seed's relaunch moved ahead of the folder's redraw: the
 # helper that wrapped the drop and the redraw went, and what its line said is
 # test_a_tab_watching_the_loop_follows_it_onto_the_next_seed.
-MAX_PROSE_LINES = 19261
+#
+# 19254 when the button bank's marks grew to fill their buttons: the bank
+# button's note that its icon was drawn near the button's full height, which it
+# never was, is test_every_mark_on_the_bank_spans_more_than_half_its_button.
+MAX_PROSE_LINES = 19254
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

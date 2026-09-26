@@ -1,7 +1,7 @@
 """How big this app draws, and why its hosted half draws smaller.
 
-Standalone, Origenerator owns a whole monitor and draws at the shared family's
-ordinary size: a ``BUTTON_SIZE`` square with a ``BUTTON_ICON`` mark in it.
+Standalone, Origenerator owns a whole monitor and draws its buttons at the
+shared family's ordinary ``BUTTON_SIZE``.
 
 Hosted by a Fun Time session it does not.  It occupies the Random Favs
 Browser's upright rect, inches from that session's satellite HUDs, which draw

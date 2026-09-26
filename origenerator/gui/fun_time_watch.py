@@ -31,9 +31,11 @@ _POLL_MS = 250
 class FunTimeWatch(QObject):
     def __init__(self, state_dir: Path, *, take_over: Callable[[FunTimeSession], None],
                  device_claimed: Callable[[bool], None] | None = None,
+                 library_state_dir: Path | None = None,
                  parent: QObject | None = None):
         super().__init__(parent)
         self._state_dir = state_dir
+        self._claims_read_in = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over
         self._device_claimed = device_claimed or (lambda held: None)
         self._timer = QTimer(self)
@@ -73,7 +75,7 @@ class FunTimeWatch(QObject):
 
     def _answer_the_session(self) -> None:
         self._stand_the_offer()
-        self._device_claimed(a_session_holds_the_device(self._state_dir))
+        self._device_claimed(any(map(a_session_holds_the_device, self._claims_read_in)))
         session = take_the_takeover(self._state_dir, pid=os.getpid())
         if session is None:
             return

@@ -514,11 +514,12 @@ def _build_window(client, db, app_state, fun_time):
     return window
 
 
-def _watch_for_fun_time(window, state_dir):
+def _watch_for_fun_time(window, state_dir, library_state_dir):
     from origenerator.gui.fun_time_watch import FunTimeWatch
 
     watch = FunTimeWatch(state_dir, take_over=window.become_hosted,
-                         device_claimed=window.the_session_has_the_device)
+                         device_claimed=window.the_session_has_the_device,
+                         library_state_dir=library_state_dir)
     window.handed_back.connect(watch.renew)
     return watch
 
@@ -722,7 +723,8 @@ def main(argv: list[str] | None = None) -> int:
 
     status("Building the interface...")
     window = _build_window(client, db, app_state, fun_time)
-    watch = None if fun_time is not None else _watch_for_fun_time(window, STATE_DIR)
+    watch = None if fun_time is not None else _watch_for_fun_time(
+        window, STATE_DIR, LIBRARY_STATE_DIR)
     still_offered = watch is not None and watch.stands_its_offer()
     if still_offered:
         window.show()

@@ -12596,6 +12596,28 @@ def test_a_folder_of_your_own_is_drawn_only_on_the_side_it_was_made_on(qtbot):
     assert "Keepers" not in _top_level(view._tree, LANDSCAPE)
 
 
+def test_a_folder_saved_before_folders_had_a_side_stays_put_when_the_ticks_hide_what_it_holds(
+        qtbot):
+    tall_video = _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
+                                          "width": 100, "height": 200}, "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([tall_video]))
+    qtbot.addWidget(view)
+    folder_id = view._db.create_custom_folder("Keepers")
+    view._db.add_custom_folder_items(
+        folder_id, [(gallery.settings_folder_key(tall_video), None, None)])
+    view.refresh()
+
+    def sides_showing_it():
+        return [side for side in (PORTRAIT, LANDSCAPE)
+                if "Keepers" in _top_level(view._tree, side)]
+
+    before = sides_showing_it()
+
+    view._video_cb.setChecked(False)
+
+    assert sides_showing_it() == before
+
+
 def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])

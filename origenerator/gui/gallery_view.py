@@ -4477,7 +4477,7 @@ def _side_trees(rows, meta, start_frames) -> dict[str, list]:
 def _custom_folders_by_side(trees, records) -> dict[str, list]:
     return {side: gallery.build_custom_folders(
                 tree, [record for record in records
-                       if gallery.custom_folder_side(record, trees) == side])
+                       if (record["side"] or _LANDSCAPE) == side])
             for side, tree in trees.items()}
 
 

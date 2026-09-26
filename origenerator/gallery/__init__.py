@@ -43,7 +43,6 @@ from origenerator.gallery.custom import (
     build_custom_folders,
     custom_folder_id,
     custom_folder_key,
-    custom_folder_side,
     is_custom_key,
     selection_group,
 )
@@ -201,7 +200,6 @@ __all__ = [
     "curated_params",
     "custom_folder_id",
     "custom_folder_key",
-    "custom_folder_side",
     "cycle_shaped",
     "default_enhance_params",
     "describe_enhance_params",

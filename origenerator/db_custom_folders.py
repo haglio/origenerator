@@ -15,7 +15,7 @@ from origenerator.db_connection import Store
 
 
 class CustomFolderStore(Store):
-    """The nine queries over `custom_folders` and `custom_folder_items`."""
+    """The queries over `custom_folders` and `custom_folder_items`."""
 
     def create_custom_folder(self, name: str, folder_id: int | None = None,
                              side: str | None = None) -> int:
@@ -33,6 +33,11 @@ class CustomFolderStore(Store):
         with self._connect() as conn:
             conn.execute("UPDATE custom_folders SET name = ? WHERE id = ?",
                          (name, folder_id))
+
+    def set_custom_folder_side(self, folder_id: int, side: str):
+        with self._connect() as conn:
+            conn.execute("UPDATE custom_folders SET side = ? WHERE id = ?",
+                         (side, folder_id))
 
     def delete_custom_folder(self, folder_id: int):
         """Drop a custom folder and everything it holds. The gathered folders and
@@ -75,7 +80,7 @@ class CustomFolderStore(Store):
             )
 
     def list_custom_folders(self) -> list[dict]:
-        """Every custom folder as ``{"id", "name", "items": [folder_key, ...]}``,
+        """Every custom folder as ``{"id", "name", "side", "items": [folder_key, ...]}``,
         oldest first, each item list in the order it was built up."""
         with self._connect() as conn:
             folders = [

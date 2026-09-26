@@ -165,7 +165,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19159 when each folder of your own came to live on one side: the note that
 # every side is built from the rows the media ticks keep is
 # test_unticking_videos_empties_both_halves_of_their_folders.
-MAX_PROSE_LINES = 19159
+#
+# 19155 when a folder of your own saved before folders had a side was given one
+# at startup: the note on the order the bookmark passes run in is
+# test_a_folder_saved_before_folders_had_a_side_is_put_where_its_moved_items_are.
+MAX_PROSE_LINES = 19155
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

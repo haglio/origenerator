@@ -190,6 +190,9 @@ class Database:
     def rename_custom_folder(self, folder_id: int, name: str):
         return self.custom_folders.rename_custom_folder(folder_id, name)
 
+    def set_custom_folder_side(self, folder_id: int, side: str):
+        return self.custom_folders.set_custom_folder_side(folder_id, side)
+
     def delete_custom_folder(self, folder_id: int):
         return self.custom_folders.delete_custom_folder(folder_id)
 

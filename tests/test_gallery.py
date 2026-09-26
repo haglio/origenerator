@@ -1032,6 +1032,44 @@ def test_folder_key_at_level_recomputes_each_tiers_key_from_a_row_under_it():
         assert folder_key_at_level(rows[0], group_level(g)) == g.key
 
 
+def _animated(prompt_id, lora, frame_file):
+    return _row(
+        prompt_id=prompt_id,
+        workflow_name="wan22_i2v",
+        params_json=json.dumps({
+            "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
+            "lora_high": f"{lora}_high.safetensors", "lora_low": f"{lora}_low.safetensors",
+            "steps": 20, "seed": 1, "input_image": frame_file,
+        }),
+        output_files=json.dumps([{"filename": f"wan22_i2v_{prompt_id}.mp4"}]),
+    )
+
+
+def test_two_folders_of_one_name_in_two_places_have_two_keys():
+    face = _img("face", "a face", 30, 1)
+    rows = [
+        _img_model("i1", "a cat", "alpha.safetensors", 50, 1),
+        _img_model("i2", "a cat", "beta.safetensors", 50, 1),
+        face,
+        _animated("va", "styleA", "sdxl_t2i_face.png"),
+        _animated("vb", "styleB", "sdxl_t2i_face.png"),
+    ]
+    index = build_image_config_index([face])
+    folders = []
+
+    def walk(groups):
+        for group in groups:
+            folders.append(group)
+            walk(child_groups(group))
+
+    walk(build_gallery_tree(rows, image_index=index))
+
+    assert len({folder.key for folder in folders}) == len(folders)
+    for folder in folders:
+        for row in rows_under(folder):
+            assert folder_key_at_level(row, group_level(folder), index) == folder.key
+
+
 def test_legacy_settings_key_differs_from_the_current_normalized_key():
     # canonical_settings changed the settings hash, so the legacy formula yields a
     # different key for the same row — exactly why a star set before the change no

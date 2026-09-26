@@ -41,7 +41,7 @@ PUBLISHED = {
     "is_custom_key", "is_enhance_product_row", "is_enhanceable_row",
     "is_enhanced_row", "is_image_conditioned", "is_in_progress",
     "is_renamable", "item_label", "job_kind_label",
-    "legacy_preenhance_settings_folder_keys",
+    "legacy_parentless_folder_key", "legacy_preenhance_settings_folder_keys",
     "legacy_preframe_settings_folder_key",
     "legacy_preversion_settings_folder_key", "legacy_settings_folder_key",
     "level_matching_params", "level_matching_settings", "lora_label",

@@ -490,7 +490,8 @@ class VoiceRouter(QObject):
             return True
         matched = match_voice_command(text)
         if matched is None:
-            logger.info("Voice (from the session): %r matched no command", text)
+            logger.info("Voice (from the session): a %d-word utterance matched no command",
+                        len(text.split()))
             return False
         self.on_command(matched)
         return True

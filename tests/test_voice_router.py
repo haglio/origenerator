@@ -10,6 +10,8 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
+import logging
+
 import pytest
 from PyQt6.QtWidgets import QWidget
 
@@ -443,6 +445,19 @@ def test_what_was_heard_reaches_the_caption_and_the_shows_corner(router):
     assert len(shows.said) == 1
 
 
+def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(router, caplog):
+    voice, _host, shows = router(shows=FakeShows(showing=FakeShow()))
+    voice.sync()
+
+    with caplog.at_level(logging.DEBUG):
+        voice.listener.heard.emit("put the kettle on")
+
+    assert voice.status.text() == "🎤 heard: “put the kettle on”"
+    assert shows.said == ["🎤 heard: “put the kettle on”"]
+    assert voice._flash_timer.isActive()
+    assert caplog.messages == []
+
+
 def test_a_transcription_with_no_letters_in_it_says_nothing(router):
     voice, _host, shows = router()
 
@@ -824,7 +839,11 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
     assert voice.status.text() == "🎤 Request: no hat…"
 
 
-def test_words_that_match_nothing_here_are_handed_back_as_not_ours(router):
+def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(
+        router, caplog):
     voice, _host, _shows = router()
 
-    assert voice.run_spoken_command("put the kettle on") is False
+    with caplog.at_level(logging.DEBUG):
+        assert voice.run_spoken_command("put the kettle on") is False
+
+    assert caplog.messages == ["Voice (from the session): a 4-word utterance matched no command"]

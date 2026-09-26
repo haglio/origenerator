@@ -1868,6 +1868,20 @@ def test_output_disk_files_includes_a_video_metadata_sidecar(tmp_path):
     assert output_disk_files(row, out) == [mp4, sidecar]
 
 
+def test_deleting_a_video_takes_its_soundless_copy_and_that_copys_picture_along(tmp_path):
+    out = tmp_path / "output"
+    (out / "video").mkdir(parents=True)
+    sounded = out / "video" / "flf2v_loop_1-audio.mp4"
+    soundless = out / "video" / "flf2v_loop_1.mp4"
+    picture = out / "video" / "flf2v_loop_1.png"
+    for file in (sounded, soundless, picture):
+        file.write_bytes(b"v")
+    row = _row(output_files=json.dumps([
+        {"filename": "flf2v_loop_1-audio.mp4", "subfolder": "video"},
+        {"filename": "flf2v_loop_1.mp4", "subfolder": "video", "role": "silent"}]))
+    assert output_disk_files(row, out) == [sounded, soundless, picture]
+
+
 def test_output_disk_files_omits_files_not_on_disk(tmp_path):
     out = tmp_path / "output"
     out.mkdir()

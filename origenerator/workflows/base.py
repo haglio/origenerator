@@ -847,7 +847,9 @@ class WorkflowTemplate(ABC):
         """Find this workflow's saved files in a ComfyUI /history response.
 
         The output node lists them under ``output_key`` — ``images`` for
-        SaveImage and native SaveVideo, ``gifs`` for VHS_VideoCombine.
+        SaveImage and native SaveVideo, ``gifs`` for VHS_VideoCombine, which
+        names only the ``-audio`` file it muxed and leaves the soundless one
+        it wrote first beside it unlisted.
 
         When the run also saved its pre-enhance render (:meth:`base_save_node`),
         those files follow, each tagged ``role: "original"``. The order is the
@@ -857,6 +859,7 @@ class WorkflowTemplate(ABC):
         """
         outputs = history_data.get("outputs", {})
         files = list(outputs.get(self.output_node_id, {}).get(self.output_key, []))
+        files += soundless_copies_of(files)
         if self.base_output_node_id is None:
             return files
         base = outputs.get(self.base_output_node_id, {}).get(self.output_key, [])
@@ -883,3 +886,15 @@ class WorkflowTemplate(ABC):
                 },
             },
         }
+
+
+def soundless_copies_of(saved: list[dict]) -> list[dict]:
+    copies = []
+    for saved_file in saved:
+        stem, dot, ext = (saved_file.get("filename") or "").rpartition(".")
+        if dot and stem.endswith("-audio"):
+            copies.append({"filename": f"{stem.removesuffix('-audio')}.{ext}",
+                           "subfolder": saved_file.get("subfolder", ""),
+                           "type": saved_file.get("type", "output"),
+                           "role": "silent"})
+    return copies

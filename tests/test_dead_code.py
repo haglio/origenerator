@@ -204,7 +204,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # puts its offer back whenever the offer stops naming it is
 # test_an_offer_deleted_under_an_open_window_is_put_back and
 # test_an_offer_another_instance_overwrote_is_taken_back.
-MAX_PROSE_LINES = 18945
+#
+# 18941 when a video's soundless copy began staying with its video instead of
+# being found as an item of its own: the sidecar fold's note on what it
+# repoints and what it drops is
+# test_merge_repoints_image_sidecar_to_video_and_drops_video_row.
+MAX_PROSE_LINES = 18941
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

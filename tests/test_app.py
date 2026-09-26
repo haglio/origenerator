@@ -863,6 +863,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
+    ("origenerator.importer", "merge_soundless_copy_rows"),
     ("origenerator.importer", "backfill_unknown_workflows"),
     ("origenerator.importer", "backfill_model_and_lora_params"),
     ("origenerator.importer", "backfill_input_image"),

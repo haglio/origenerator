@@ -248,6 +248,12 @@ def _merge_video_sidecars(library: Library):
     return merge_video_sidecar_rows(library.db)
 
 
+def _merge_soundless_copies(library: Library):
+    from origenerator.importer import merge_soundless_copy_rows
+
+    return merge_soundless_copy_rows(library.db)
+
+
 def _backfill_workflow_labels(library: Library):
     """Relabel any imports that predate filename-based workflow inference."""
     from origenerator.importer import backfill_unknown_workflows
@@ -358,6 +364,9 @@ MAINTENANCE = (
     BootPass("Tidying up video previews...", _merge_video_sidecars,
              counted="Consolidated %d video sidecar previews",
              failure="Sidecar consolidation failed: %s"),
+    BootPass(None, _merge_soundless_copies,
+             counted="Folded %d soundless copies into the videos they came from",
+             failure="Folding soundless copies failed: %s"),
     BootPass("Updating workflow labels...", _backfill_workflow_labels,
              counted="Relabeled %d previously-unknown imports",
              failure="Workflow backfill failed: %s"),

@@ -472,6 +472,24 @@ def test_import_standalone_video_without_sidecar_still_imports(tmp_path):
     assert files[0]["filename"] == "wan22_i2v_00001_.mp4"
 
 
+def test_a_finished_videos_soundless_copy_and_picture_are_not_found_as_a_new_item(tmp_path):
+    output_dir = tmp_path / "output"
+    (output_dir / "video").mkdir(parents=True)
+    _make_png_with_metadata(output_dir / "video" / "flf2v_loop_00001.png", {"2": {}})
+    (output_dir / "video" / "flf2v_loop_00001.mp4").write_bytes(b"")
+    (output_dir / "video" / "flf2v_loop_00001-audio.mp4").write_bytes(b"")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(prompt_id="made-here", workflow_name="wan22_flf2v_loop",
+                         workflow_version="v009", params_json="{}", workflow_json="{}")
+    db.update_generation("made-here", status="completed", output_files=json.dumps(
+        WORKFLOW_REGISTRY["wan22_flf2v_loop"].extract_output_info({"outputs": {"16": {"gifs": [
+            {"filename": "flf2v_loop_00001-audio.mp4", "subfolder": "video", "type": "output",
+             "workflow": "flf2v_loop_00001.png"}]}}})))
+
+    assert import_comfyui_output(output_dir, db, tmp_path / "thumbs") == 0
+    assert len(db.list_generations()) == 1
+
+
 def _completed(db, prompt_id, filename, subfolder, **fields):
     db.insert_generation(
         prompt_id=prompt_id, workflow_name=fields.get("workflow_name", "wan22_flf2v_loop"),
@@ -511,6 +529,72 @@ def test_merge_leaves_standalone_rows_untouched(tmp_path):
     assert merge_video_sidecar_rows(db) == 0
     assert db.get_generation("solo-img") is not None
     assert db.get_generation("solo-vid") is not None
+
+
+def _made_here(db, prompt_id, filename, subfolder="video", starred=False):
+    db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+                         workflow_version="v009", params_json="{}", workflow_json="{}")
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
+    if starred:
+        db.set_generation_favorite(prompt_id, True)
+
+
+def test_merge_folds_a_found_soundless_copy_into_the_video_the_app_made(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+
+    assert imp.merge_soundless_copy_rows(db) == 1
+    assert db.get_generation("copy") is None
+    files = json.loads(db.get_generation("sounded")["output_files"])
+    assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
+    assert files[1]["role"] == "silent"
+
+
+def test_a_folded_copys_favorite_goes_to_its_video(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.set_generation_favorite("copy", True)
+
+    imp.merge_soundless_copy_rows(db)
+
+    assert db.get_generation("sounded")["starred"] == 1
+
+
+def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_recipe(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    _made_here(db, "combined", "flf2v_loop_00002-audio.mp4")
+    db.set_recipe_source("combined", category="alpha", video_prompt_id="copy")
+
+    imp.merge_soundless_copy_rows(db)
+
+    combined = db.get_generation("combined")
+    assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "sounded")
+
+
+def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_item(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _completed(db, "found-sounded", "old_clip_00001-audio.mp4", "video")
+    _completed(db, "found-copy", "old_clip_00001.mp4", "video")
+    _completed(db, "lone", "wan22_i2v_00001_.mp4", "video", workflow_name="wan22_i2v")
+
+    assert imp.merge_soundless_copy_rows(db) == 0
+    assert {r["prompt_id"] for r in db.list_generations()} == {"found-sounded", "found-copy", "lone"}
+
+
+def test_folding_again_finds_nothing_and_lists_the_copy_once(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    imp.merge_soundless_copy_rows(db)
+
+    assert imp.merge_soundless_copy_rows(db) == 0
+    files = json.loads(db.get_generation("sounded")["output_files"])
+    assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
 
 
 def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):

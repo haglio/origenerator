@@ -179,11 +179,20 @@ class SlideshowPlaylist:
         return True
 
     def lead_with(self, item_index: int) -> None:
+        self._take_out_of_the_pass(item_index)
+        self._order.insert(self._pos, item_index)
+
+    def _queue_next(self, item_index: int) -> None:
+        if self._order[self._pos] == item_index:
+            return
+        self._take_out_of_the_pass(item_index)
+        self._order.insert(self._pos + 1, item_index)
+
+    def _take_out_of_the_pass(self, item_index: int) -> None:
         at = self._order.index(item_index)
         del self._order[at]
         if at < self._pos:
             self._pos -= 1
-        self._order.insert(self._pos, item_index)
 
     def in_play_order(self) -> list:
         """The items in the order this pass is playing them, rather than the order
@@ -308,16 +317,14 @@ class SlideshowPlaylist:
 
     def replace_live(self, prompt_id, path, media_type, still=None) -> bool:
         """Swap the frames of a slide still being made for the file it landed as.
-        Returns whether such a slide was here.
-
-        The same item, finished — not a second one. Without this the show would
-        hold both the frames it watched arrive and the file they became, and play
-        the stale pair of them every pass.
-        """
-        if not any(self._items[index].is_live
-                   for index in self._made_by(prompt_id)):
+        Returns whether such a slide was here."""
+        live = [index for index in self._made_by(prompt_id) if self._items[index].is_live]
+        if not live:
             return False
-        return self.replace_item(prompt_id, path, media_type, still)
+        self.replace_item(prompt_id, path, media_type, still)
+        for index in live:
+            self._queue_next(index)
+        return True
 
     def remove_current(self):
         """Drop the current item; the item that followed it becomes current."""

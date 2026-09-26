@@ -1114,3 +1114,15 @@ def test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame(qtbot
 
     assert not show.holds("id-run")
     assert list((tmp_path / "frames").iterdir()) == []
+
+
+def test_a_run_that_lands_after_the_player_moved_on_is_the_players_next_item(qtbot,
+                                                                             tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    _says(show, video="two.png")
+    show.tick()
+
+    show.note_added("run.png", "image", "id-run")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played[:2] == ["two.png", "run.png"]

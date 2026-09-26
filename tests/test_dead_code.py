@@ -183,7 +183,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # player show's lines on why it could not are gone, and the fullscreen show's
 # on taking a run in once is
 # test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame.
-MAX_PROSE_LINES = 19078
+#
+# 19074 when a run that lands was queued next: the playlist's paragraph on a
+# landed run being the same slide is test_a_live_slide_becomes_the_file_it_lands_as.
+MAX_PROSE_LINES = 19074
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -2,7 +2,7 @@
 
 Mirrors what :class:`player_core.render_player.MpvRenderPlayer` offers a host
 that owns the window: a file to open, the pace a picture holds for, the freeze,
-the sound, the creep into a still, and the two things a host has to ask about
+the sound, a still's move, and the two things a host has to ask about
 what happened -- whether the item ran out and whether anything opened at all.
 """
 from __future__ import annotations

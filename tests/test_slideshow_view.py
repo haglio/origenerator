@@ -1231,9 +1231,9 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
 
 
 # --- the dwell a picture keeps the screen for, and what stops the clock ------
-# The creep into a still is the engine's own (player_core.still_push), paced by
-# the dwell it was given, so the show's part is the dwell it hands over and the
-# freeze it hands with it.
+# A still's move is the engine's own (player_core.ken_burns), paced by the dwell
+# it was given, so the show's part is the dwell it hands over and the freeze it
+# hands with it.
 
 
 def _engine(view):
@@ -1269,7 +1269,7 @@ def test_locking_a_slide_leaves_it_where_it_is(qtbot):
 
 
 def test_a_new_pace_reaches_a_locked_slide_without_opening_it_again(qtbot):
-    # Not back out to the top of the move: a locked slide keeps where its creep
+    # Not back out to the top of the move: a locked slide keeps where its move
     # had got to, and the pace changes only how fast the rest of it goes.
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
     _press(view, Qt.Key.Key_Down)

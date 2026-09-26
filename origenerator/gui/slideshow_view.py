@@ -12,9 +12,9 @@ than when it lands, because the first iterations are what a show of a filling
 folder is watched for — and not before, a black screen reading "Generating…"
 being nothing to watch.
 
-The creep into a picture while it holds the screen is the *engine's*, not this
-window's, so a show handed to one of a session's players creeps the same way,
-and turning the pace up slows the creep instead of cropping harder.
+A picture's move while it holds the screen is the *engine's*, not this
+window's, so a show handed to one of a session's players moves the same way,
+and turning the pace up slows the move instead of cropping harder.
 
 One panel, not two. Fun Time splits the device across the main player's console
 and the set across each satellite's HUD, because there they are two players; a
@@ -284,7 +284,7 @@ class SlideshowView(QWidget):
         The room's freeze stops everything.  A spoken request stops the show
         moving on rather than stopping the clip: it is about what is on screen,
         and a clip that stopped mid-sentence would be answering a question
-        nobody asked.  A picture under one holds where the creep had got to,
+        nobody asked.  A picture under one holds where its move had got to,
         since the alternative is its dwell running out and starting over under
         the speaker.
         """

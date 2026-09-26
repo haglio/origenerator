@@ -113,7 +113,17 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_closing_hands_comfyui_the_experiments_to_run_while_away (red with the flush
 # first), test_close_event_persists_session and
 # test_a_broken_close_chore_still_leaves_the_session_saved.
-MAX_PROSE_LINES = 19290
+#
+# 19287 when a standalone launch began offering its window to Fun Time while it
+# is still being built: the note on why a hosted launch never asks for the
+# foreground is test_a_boot_fun_time_launched_leaves_what_is_in_front_to_the_session.
+#
+# 19281 when a standalone window stopped being shown before Fun Time could ask for
+# it: the window builder's notes on showing, parking and the headset are
+# test_main_in_fun_time_mode_parks_the_window_and_threads_the_session,
+# test_a_boot_hosted_in_the_headset_is_not_parked and
+# test_main_shows_loading_screen_during_boot_and_closes_it_after_window.
+MAX_PROSE_LINES = 19281
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

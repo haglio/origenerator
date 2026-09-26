@@ -219,10 +219,13 @@ copy runs on a library at a time, the way Fun Time runs one session (his call,
 another preview, or the one a Fun Time session opened -- says "Another copy of
 Origenerator is already running." and stops before its splash
 (`origenerator/single_instance.py`). A preview he reports as not opening has
-most likely met a copy already running, which that message names. A copy Fun
-Time opens is the one exception: it opens even while a standalone copy is still
-booting, because refusing there would leave the session's room with no
-Origenerator at all.
+most likely met a copy already running, which that message names. A standalone
+copy offers itself to Fun Time the moment it has the library, marked as still
+starting until its window is up, so a session opened during its splash takes it
+over and waits for it rather than starting a second (`fun_time_offer.txt`, read
+by fun_time's `standalone_origenerator.py`). A copy Fun Time opens itself never
+refuses, since refusing would leave the session's room with no Origenerator at
+all; it is only ever opened when no copy has offered itself.
 
 A change a Fun Time session reaches gets its hosted half judged too. Make a
 fun_time worktree on fun_time's current `main`, put your Origenerator worktree's

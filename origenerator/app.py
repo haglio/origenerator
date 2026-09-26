@@ -506,20 +506,21 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
 
 
 def _build_window(client, db, app_state, fun_time):
-    """The main window: shown, parked for a session on the monitors, or shown for
-    one in the headset, which has no monitor to park it on."""
     from origenerator.gui.main_window import OrigeneratorWindow
 
     window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
-    if fun_time is None:
-        window.show()
-    elif not fun_time.in_a_headset:
-        # Parked until the session's own mode switch restores it: the session
-        # may be in player mode, where popping over the RFB would be wrong.
-        # A room in the headset shows this window's PICTURE instead, and the
-        # window shows itself for it (OrigeneratorWindow).
+    if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
+
+
+def _watch_for_fun_time(window, state_dir):
+    from origenerator.gui.fun_time_watch import FunTimeWatch
+
+    watch = FunTimeWatch(state_dir, take_over=window.become_hosted,
+                         device_claimed=window.the_session_has_the_device)
+    window.handed_back.connect(watch.renew)
+    return watch
 
 
 def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
@@ -673,6 +674,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.warning("Another copy of Origenerator is already running; not starting")
         say_another_copy_is_running()
         return 1
+    if fun_time is None:
+        from origenerator.fun_time_mode import offer_the_window_while_it_is_built
+        offer_the_window_while_it_is_built(STATE_DIR)
 
     # From here on this is a real boot, and the one kind of death the log
     # cannot record is the one this catches. Not above the launch check: that
@@ -718,6 +722,10 @@ def main(argv: list[str] | None = None) -> int:
 
     status("Building the interface...")
     window = _build_window(client, db, app_state, fun_time)
+    watch = None if fun_time is not None else _watch_for_fun_time(window, STATE_DIR)
+    still_offered = watch is not None and watch.stands_its_offer()
+    if still_offered:
+        window.show()
 
     if loading is not None:
         loading.close()
@@ -726,16 +734,8 @@ def main(argv: list[str] | None = None) -> int:
         # in the Z-order, and unpumped that lands *after* the request below and
         # undoes it.
         app.processEvents()
-    watch = None
-    if fun_time is None:
-        # Hosted, the session decides what is in front — this window is parked
-        # until the satellites switch to origenerator mode, and asking for the
-        # foreground here would pull it over the room mid-boot.
+    if still_offered:
         _bring_to_front(window)
-        from origenerator.gui.fun_time_watch import FunTimeWatch
-        watch = FunTimeWatch(STATE_DIR, take_over=window.become_hosted,
-                             device_claimed=window.the_session_has_the_device)
-        window.handed_back.connect(watch.renew)
 
     exit_code = app.exec()
     if watch is not None:

@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,7 +33,7 @@ from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
 from origenerator.show_buttons import PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.slideshow import Slide
-from origenerator.win32 import process_creation_time
+from origenerator.win32 import process_creation_time, this_process_creation_time
 
 logger = logging.getLogger(__name__)
 
@@ -452,6 +453,17 @@ def parse_app_args(argv: list[str]) -> AppArgs:
 OFFER_NAME = "fun_time_offer.txt"
 TAKEOVER_NAME = "fun_time_takeover.json"
 SESSION_NAME = "fun_time_session.txt"
+OFFER_STILL_STARTING = "starting"
+
+
+def offer_of_this_process(*, starting: bool = False) -> str:
+    offer = f"{os.getpid()} {this_process_creation_time()}"
+    return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
+
+
+def offer_the_window_while_it_is_built(state_dir: Path) -> None:
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / OFFER_NAME).write_text(offer_of_this_process(starting=True), encoding="utf-8")
 
 
 def a_session_holds_the_device(state_dir: Path) -> bool:

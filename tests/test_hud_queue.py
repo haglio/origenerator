@@ -1,7 +1,9 @@
 """The generation queue as a block of the one panel a show wears."""
 from __future__ import annotations
 
+import numpy as np
 from PIL import Image
+from shared_ui.palette import RED
 
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading
@@ -79,3 +81,21 @@ def test_a_row_is_a_way_into_the_folder_its_job_will_land_in():
     _image, targets = _painted(section)
 
     assert "queue_open|j1" in _posted(targets)
+
+
+def _reds(image) -> int:
+    """How many pixels of the block are within a hair of the panel's red."""
+    pixels = np.asarray(image).reshape(-1, 4).astype(int)
+    near = np.all(np.abs(pixels[:, :3] - np.array(RED[:3])) < 24, axis=1)
+    return int(np.count_nonzero(near & (pixels[:, 3] > 0)))
+
+
+def test_the_word_that_throws_a_job_away_is_drawn_in_the_panel_own_ink():
+    """The strip under the window draws Cancel in the panel's ordinary gray,
+    and the panel's own copy of that queue reads the same: red here is the
+    color the players keep for a live recording."""
+    section = queue_section([_item("j1", cancel=lambda: None)], 0)
+
+    image, _targets = _painted(section)
+
+    assert _reds(image) == 0

@@ -315,7 +315,7 @@ class QueueSection:
                 word = _word_width(line.discard)
                 rect = (cursor, row, word, CTRL_BTN)
                 button = Button(f"{CANCEL}|{line.key}", line.discard,
-                                line.discard_tooltip, width=word, danger=True)
+                                line.discard_tooltip, width=word)
                 draw_button(image, draw, rect, button, hovered=_on(rect, pointer),
                             glyph_font=_glyphs(), word_font=_tiny())
                 targets.append((rect, button))

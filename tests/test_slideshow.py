@@ -435,6 +435,86 @@ def test_a_run_that_lands_after_the_show_moved_past_it_comes_up_next():
     assert playlist.peek(1) == ("new.png", "image", "id-new", None)
 
 
+def test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.advance()
+    playlist.advance()
+
+    playlist.replace_live("id-first", "first.png", "image")
+    playlist.add((b"frame-1", LIVE, "id-second", None))
+
+    assert playlist.advance()[2] == "id-first"
+    assert playlist.advance()[2] == "id-second"
+    assert playlist.advance()[2] == "id-c"
+
+
+def test_arrivals_keep_their_order_when_a_slide_is_dropped_from_the_set():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+
+    playlist.drop("id-c")
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-e"
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_an_arrival_that_has_been_on_screen_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.advance()
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_a_run_that_lands_while_waiting_its_turn_keeps_its_place_in_line():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.add(("e.png", "image", "id-e"))
+
+    playlist.replace_live("id-first", "first.png", "image")
+
+    assert playlist.advance()[2] == "id-first"
+    assert playlist.advance()[2] == "id-e"
+
+
+def test_an_arrival_jumped_onto_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.jump_to(4)
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_an_arrival_led_with_no_longer_waits_ahead_of_new_ones():
+    playlist = _four()
+    playlist.advance()
+    playlist.add(("e.png", "image", "id-e"))
+    playlist.lead_with(4)
+    playlist.back()
+
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+
+    assert playlist.advance()[2] == "id-new"
+
+
+def test_a_waiting_run_the_show_jumped_past_comes_up_next_when_it_lands():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-first", None))
+    playlist.jump_to(2)
+
+    playlist.replace_live("id-first", "first.png", "image")
+
+    assert playlist.advance()[2] == "id-first"
+
+
 def test_an_item_that_was_never_live_is_not_replaced_as_one():
     playlist = _four()
     assert playlist.replace_live("id-a", "other.png", "image") is False

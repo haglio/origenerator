@@ -104,6 +104,10 @@ class ShowState:
     level_index: int = 0
 
 
+def _without(indices: list, removed: int) -> list:
+    return [i - 1 if i > removed else i for i in indices if i != removed]
+
+
 def in_order(order: list) -> None:
     """A shuffle that doesn't: play the set in the order it was handed over.
 
@@ -128,6 +132,7 @@ class SlideshowPlaylist:
         self._locked = False
         self._paused = False
         self._image_dwell_ms = image_dwell_ms
+        self._waiting: list[int] = []
 
     def is_empty(self) -> bool:
         return not self._items
@@ -176,17 +181,29 @@ class SlideshowPlaylist:
         if not 0 <= item_index < len(self._items):
             return False
         self._pos = self._order.index(item_index)
+        self._seen_on_screen()
         return True
 
     def lead_with(self, item_index: int) -> None:
         self._take_out_of_the_pass(item_index)
         self._order.insert(self._pos, item_index)
+        self._seen_on_screen()
 
-    def _queue_next(self, item_index: int) -> None:
-        if self._order[self._pos] == item_index:
+    def _line_up(self, item_index: int) -> None:
+        if self._order[self._pos] == item_index or item_index in self._waiting_ahead():
             return
         self._take_out_of_the_pass(item_index)
-        self._order.insert(self._pos + 1, item_index)
+        places = map(self._order.index, self._waiting_ahead())
+        self._order.insert(max(places, default=self._pos) + 1, item_index)
+        self._waiting.append(item_index)
+
+    def _waiting_ahead(self) -> list[int]:
+        self._waiting = [i for i in self._waiting if self._order.index(i) > self._pos]
+        return self._waiting
+
+    def _seen_on_screen(self) -> None:
+        if self._order[self._pos] in self._waiting:
+            self._waiting.remove(self._order[self._pos])
 
     def _take_out_of_the_pass(self, item_index: int) -> None:
         at = self._order.index(item_index)
@@ -262,6 +279,7 @@ class SlideshowPlaylist:
             if self._pos >= len(self._items):
                 self._shuffle(self._order)  # a new random order each pass
                 self._pos = 0
+            self._seen_on_screen()
         return self.current()
 
     def back(self):
@@ -271,19 +289,19 @@ class SlideshowPlaylist:
         return self.current()
 
     def add(self, item) -> bool:
-        """Take in an item that has landed since the show opened, and queue it to
-        come up next. Returns whether it was new here.
+        """Take in an item that has landed since the show opened, and line it up
+        after the other arrivals still waiting their turn. Returns whether it was
+        new here.
 
-        Next rather than at the end of the pass: this is how a generation made
-        while the show runs reaches the screen, and watching a folder fill is
-        watching for the new one — parked after a hundred others it would be an
-        hour away. The rest of the pass then carries on where it left off.
+        Watching a folder fill is watching for the new one — parked after a
+        hundred others it would be an hour away.
         """
         slide = Slide.of(item)
         if self.holds(slide.prompt_id):
             return False
         self._items.append(slide)
-        self._order.insert(self._pos + 1, len(self._items) - 1)
+        self._order.append(len(self._items) - 1)
+        self._line_up(len(self._items) - 1)
         return True
 
     def holds(self, prompt_id) -> bool:
@@ -323,7 +341,7 @@ class SlideshowPlaylist:
             return False
         self.replace_item(prompt_id, path, media_type, still)
         for index in live:
-            self._queue_next(index)
+            self._line_up(index)
         return True
 
     def remove_current(self):
@@ -350,7 +368,8 @@ class SlideshowPlaylist:
         removed from under it, and on the same item otherwise."""
         at = self._order.index(index)
         del self._items[index]
-        self._order = [i - 1 if i > index else i for i in self._order if i != index]
+        self._order = _without(self._order, index)
+        self._waiting = _without(self._waiting, index)
         if at < self._pos:
             self._pos -= 1  # the pass got shorter in front of where we are
         if not self._order or self._pos >= len(self._order):

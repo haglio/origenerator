@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 import pytest
 
 from origenerator.fun_time_mode import PlayerChannel
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_host import ShowHost
 from origenerator.gui.show_hud import show_hud_model
@@ -93,7 +94,8 @@ def on_a_player(qtbot, tmp_path):
     show = PlayerShow([("a.png", "image")], side="portrait", channel=PlayerChannel(
         playlist=tmp_path / "portrait.tsv", command_file=tmp_path / "portrait_cmd.txt",
         status_file=tmp_path / "portrait_status.txt",
-        hud_file=tmp_path / "origenerator_portrait_hud.json"))
+        hud_file=tmp_path / "origenerator_portrait_hud.json"),
+        frames=FrameFiles(tmp_path / "frames"))
     show._timer.stop()
     return show
 

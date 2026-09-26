@@ -2850,7 +2850,7 @@ def test_the_go_to_folder_button_takes_a_shelf_item_home_without_a_right_click(q
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)
     (button,) = _folder_buttons(view)
     button.show()   # an unshown button has no rect for a press to land in
@@ -2888,7 +2888,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["v1"].clicked.emit("v1", _NO_MOD)
 
     (button,) = _folder_buttons(view)
@@ -2904,7 +2904,7 @@ def test_hiding_a_kind_takes_away_the_folder_its_go_to_folder_pointed_at(qtbot):
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
     assert _folder_buttons(view)
 
@@ -2920,7 +2920,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     assert _folder_buttons(view) == []
 
-    view._tree.setCurrentItem(_top_level(view._tree)["Latest"])   # the tab stays on i1
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])   # the tab stays on i1
 
     (button,) = _folder_buttons(view)
     assert button.toolTip() == "Go to the folder this item is in"

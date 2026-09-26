@@ -713,8 +713,10 @@ def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_pat
     assert document["command_case_blind"]
 
     for template in document["command_lines"]:
-        line = template.format(file=r"C:\library\scene one.png", row="alpha",
-                               words="favorites", corner="lower_right", on="1")
+        line = template.format(
+            file=r"C:\library\scene one.png", row="alpha", words="favorites",
+            corner="lower_right", on="1",
+            frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
         for spelled in (line.lower(), line.upper()):
             _told_on_a_fresh_bridge(tmp_path, spelled)
 

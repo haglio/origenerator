@@ -92,7 +92,9 @@ OPEN_SHOWS = "OPEN_SHOWS"
 CLOSE_SHOWS = "CLOSE_SHOWS"
 FILTER_ENHANCED = "FILTER_ENHANCED"
 RELEASE = "RELEASE"
-SESSION_VERBS = (OPEN_SHOWS, CLOSE_SHOWS, FILTER_ENHANCED, RELEASE)
+HAND_OVER = "HAND_OVER"
+TAKE_BACK = "TAKE_BACK"
+SESSION_VERBS = (OPEN_SHOWS, CLOSE_SHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
 GO_TO = "GO_TO"
 SAY = "say"
 
@@ -169,6 +171,7 @@ def command_lines() -> tuple[str, ...]:
     the line carries there."""
     return (
         *SESSION_VERBS,
+        f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
         *(line for side in SIDES for line in _lines_said_to(side)),
     )

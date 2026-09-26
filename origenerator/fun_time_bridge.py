@@ -26,6 +26,7 @@ shows the way it reaches the players:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from player_core.file_channel import (
     append_command,
@@ -40,10 +41,12 @@ from origenerator.fun_time_mode import (
     CLOSE_SHOWS,
     FILTER_ENHANCED,
     GO_TO,
+    HAND_OVER,
     OPEN_SHOWS,
     RELEASE,
     SAY,
     SIDES,
+    TAKE_BACK,
     FunTimeSession,
 )
 from origenerator.show_buttons import PANEL_PLACES, answer
@@ -72,6 +75,8 @@ class FunTimeBridge(QObject):
     """Polls the session's channels and routes them onto the gallery's shows."""
 
     released = pyqtSignal()
+    hand_over_asked = pyqtSignal(Path, Path)  # the frames file, the input file
+    take_back_asked = pyqtSignal()
 
     def __init__(self, session: FunTimeSession, gallery, parent=None):
         super().__init__(parent)
@@ -88,6 +93,7 @@ class FunTimeBridge(QObject):
             CLOSE_SHOWS: lambda: self._gallery.close_the_shows(),
             FILTER_ENHANCED: self._filter_enhanced,
             RELEASE: self._release,
+            TAKE_BACK: self.take_back_asked.emit,
         }
         self._released = False
         self._timer = QTimer(self)
@@ -124,6 +130,10 @@ class FunTimeBridge(QObject):
             return
         keyword, marker, argument = _split_argument(line)
         keyword = keyword.upper()  # what it carries keeps its case
+        if keyword == HAND_OVER and marker == "|":
+            frames, _, taken = argument.partition("|")
+            self.hand_over_asked.emit(Path(frames), Path(taken))
+            return
         if not marker and keyword in self._session_verbs:
             self._session_verbs[keyword]()
             return

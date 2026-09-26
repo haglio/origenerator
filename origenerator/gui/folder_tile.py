@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.gui import grid_card, icons, palette
+from origenerator.gui import grid_card, palette
 
 # The collage's four cells fill the card's picture area, a gap apart.
 _CELL_GAP = 2
@@ -35,7 +35,7 @@ class FolderTile(QFrame):
     _BADGE = 16  # on-tile size of the recipe-level chip
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
-                 context="", level=None, detail="", parent=None):
+                 context="", badge=None, detail="", parent=None):
         super().__init__(parent)
         self._key = key
         self.setObjectName("folderTile")
@@ -67,14 +67,11 @@ class FolderTile(QFrame):
             crumb.setToolTip(context)
             layout.addWidget(crumb)
 
-        # The name, led by its recipe-level chip when the folder has one (the same
-        # badge the tree shows), so a Favorites-shelf tile is placeable even out of
-        # its parent's context.
         caption_row = QHBoxLayout()
         caption_row.setContentsMargins(0, 0, 0, 0)
         caption_row.setSpacing(4)
-        if level is not None:
-            caption_row.addWidget(self._level_badge(level), 0, Qt.AlignmentFlag.AlignTop)
+        if badge is not None:
+            caption_row.addWidget(self._badge(*badge), 0, Qt.AlignmentFlag.AlignTop)
         self._text = text
         self._caption = caption = QLabel(self._captioned(favorite))
         caption.setWordWrap(True)
@@ -101,12 +98,11 @@ class FolderTile(QFrame):
     def _captioned(self, favorite: bool) -> str:
         return ("★ " if favorite else "") + self._text
 
-    def _level_badge(self, level) -> QLabel:
-        """The lettered recipe-level chip, tooltip'd with the level's full name."""
+    def _badge(self, icon, name: str) -> QLabel:
         badge = QLabel()
         badge.setFixedSize(self._BADGE, self._BADGE)
-        badge.setPixmap(icons.level_badge_icon(level).pixmap(QSize(self._BADGE, self._BADGE)))
-        badge.setToolTip(icons.LEVEL_LABELS[level])
+        badge.setPixmap(icon.pixmap(QSize(self._BADGE, self._BADGE)))
+        badge.setToolTip(name)
         return badge
 
     @staticmethod

@@ -156,8 +156,14 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     rows and a `follow_link`, which nothing outside it holds both of. 268 -> 267:
     a discarded seed's relaunch comes before the folder's redraw, so the tab
     following the loop keeps following it, and the drop and the redraw that
-    `_drop_reroll` wrapped for its one caller are that caller's own lines.)"""
+    `_drop_reroll` wrapped for its one caller are that caller's own lines. And the
+    pane 77 -> 83: every folder of folders has its own five shelves, so a shelf's
+    rows are asked for a folder as well as a side -- a side's placement of its
+    rows, a folder's share of a list, the open shelf's rows, a folder's own cards
+    in flight, its starred pictures, the counts every folder's shelves wear and
+    the square each of them shows among the folder's own are seven methods, and
+    the lister of Latest's rows they replace went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 77
+               for x in _class_def(PANE, "BrowserPane").body) == 83

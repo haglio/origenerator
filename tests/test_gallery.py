@@ -60,6 +60,7 @@ from origenerator.gallery import (
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
+from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
@@ -1068,6 +1069,25 @@ def test_two_folders_of_one_name_in_two_places_have_two_keys():
     for folder in folders:
         for row in rows_under(folder):
             assert folder_key_at_level(row, group_level(folder), index) == folder.key
+
+
+def test_a_rows_folder_chain_is_the_path_the_tree_files_it_under():
+    face = _img("face", "a face", 30, 1)
+    rows = [face, _img_model("i1", "a cat", "alpha.safetensors", 50, 1),
+            _animated("va", "styleA", "sdxl_t2i_face.png")]
+    index = build_image_config_index([face])
+    paths = {}
+
+    def walk(group, above):
+        path = (*above, group.key)
+        for row in getattr(group, "rows", ()):
+            paths[row["prompt_id"]] = path
+        for child in child_groups(group):
+            walk(child, path)
+
+    walk(all_group(build_gallery_tree(rows, image_index=index)), ())
+
+    assert {row["prompt_id"]: folder_chain(row, index) for row in rows} == paths
 
 
 def test_legacy_settings_key_differs_from_the_current_normalized_key():

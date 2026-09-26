@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gallery.voice_commands import GENAU_COMMAND
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
     TRASH_KEY,
 )
+from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.voice.commands import (
     ShelfCommand,
     ShowControl,

@@ -2,12 +2,9 @@
 
 The pane is two trees, one per shape, each under a standing label and each
 scrolling on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`).
-Each carries the whole table of contents: the Recents, Favorites, Experiments,
-Requests and Trash shelves, the folders the user composed, and the All row over
-the workflow → model → LoRA → [source image] → settings hierarchy — all
-built from that shape's rows alone. Standing anywhere means standing on one
-shape, so a slideshow started there has one region to go to (see
-:mod:`origenerator.orientation`).
+Each carries the whole table of contents, built from that shape's rows alone.
+Standing anywhere means standing on one shape, so a slideshow started there has
+one region to go to (see :mod:`origenerator.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
@@ -20,11 +17,11 @@ Pure rendering and lookups over the pane the GalleryView owns and lays out; it
 has no database or refresh concerns — folder rename/star/delete live in the
 view, which rebuilds both halves through :meth:`populate`.
 
-The folders the user composed by hand ride between the shelves and the media
-roots, rendered flat like a shelf: a custom folder's items can sit anywhere in
-the hierarchy, so nesting them under it would draw the same folder twice and put
-two rows in ``item_by_key`` for one key. Its contents show as tiles in the browser
-pane instead, exactly as the Favorites shelf shows its bookmarked folders.
+The folders the user composed by hand are drawn flat: a custom folder's items
+can sit anywhere in the hierarchy, so nesting them under it would draw the same
+folder twice and put two rows in ``item_by_key`` for one key. Its contents show
+as tiles in the browser pane instead, exactly as a Favorites shelf shows its
+bookmarked folders.
 """
 from __future__ import annotations
 
@@ -36,15 +33,14 @@ from PyQt6.QtWidgets import QTreeWidgetItem
 from origenerator import gallery
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
-    EXPERIMENTS_LABEL,
     FAVORITES_KEY,
-    FAVORITES_LABEL,
     RECENTS_KEY,
-    RECENTS_LABEL,
     REQUESTS_KEY,
-    REQUESTS_LABEL,
+    SHELF_LABELS,
+    SHELVES,
     TRASH_KEY,
-    TRASH_LABEL,
+    FolderShelf,
+    folder_shelf,
 )
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import (
@@ -54,7 +50,7 @@ from origenerator.gui.folder_tree import (
     RECENT_ROLE,
     TREE_KEY_ROLE,
 )
-from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriented_key
+from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriented_key, split_key
 
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
@@ -65,21 +61,30 @@ from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriente
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole  # the gallery group a tree node represents
 
+_SHELF_TIPS = {
+    RECENTS_KEY: "Recently generated",
+    FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
+    EXPERIMENTS_KEY: "Background experiments awaiting your review",
+    REQUESTS_KEY: "What you asked for out loud — “Request … over”",
+    TRASH_KEY: "Deleted items — restorable here until you delete them for good",
+}
+
+
+def _shown_shelves(side) -> list[str]:
+    return [shelf for shelf in SHELVES
+            if (shelf != RECENTS_KEY or side.show_recents)
+            and (shelf != FAVORITES_KEY or side.tree_model)]
+
 
 @dataclass
 class SideModel:
-    """One side of the tree: everything the Portrait (or Landscape) root draws.
-
-    Each count is that side's own — the Experiments row under Portrait says how
-    many portrait experiments are waiting, because a number covering both sides
-    would send you to a shelf that then showed you nothing.
-    """
+    """One side of the tree: everything the Portrait (or Landscape) root draws."""
 
     orientation: str
     tree_model: list                       # this shape's media roots
     custom_folders: list = field(default_factory=list)
     show_recents: bool = False             # anything at all to list yet
-    shelf_counts: dict[str, int] = field(default_factory=dict)  # by shelf key
+    shelf_counts: dict[str, int] = field(default_factory=dict)
 
 
 def _row_tip(group) -> str:
@@ -146,56 +151,21 @@ class GalleryTree:
         somewhere its first generation can appear. Its label says so even while
         the rows under it are only empty shelves.
         """
-        self._add_shelves(root, side)
         for custom in side.custom_folders:
             self._add_custom_folder(root, custom, side.orientation)
-        # One row over that side's folders, standing for its library
-        # entire. It is what the search means by "everywhere": the tree
-        # selection scopes a query, so without a row above that side's folders
-        # there is nowhere to stand that doesn't already narrow it by half.
-        if side.tree_model:
-            self._add_node(gallery.all_group(side.tree_model, folder_meta),
-                           root, side.orientation)
+        self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
 
-    def _add_shelves(self, side_item, side) -> None:
-        """The synthetic shelves leading a side: Recents (in-flight work plus
-        recently finished items) whenever there is anything to show — so a first
-        generation is visible while it runs, before any folder exists — then
-        Favorites (favorited folders and items) once folders do, then Experiments,
-        Requests and Trash, all three always present: the first hosts the
-        background experimenter's review queue, the second is where everything
-        you asked for out loud lands, and the third is where every delete goes —
-        and a bin you can only find once you have something to recover is no use.
-        Each draws its marker in the caret column so its label lines up with the
-        folders below."""
-        if side.show_recents:
-            self._add_shelf(side_item, RECENTS_LABEL, RECENTS_KEY, side,
-                            icons.clock_icon(), "Recently generated")
-        if side.tree_model:
-            favorite = self._add_shelf(
-                side_item, FAVORITES_LABEL, FAVORITES_KEY, side,
-                icons.star_icon(filled=True),
-                "Your favorite folders and items — drop a folder here to add it"
-            )
-            # Favoriting is what the shelf does with a dropped folder, so it
-            # collects. A star is the folder's own, not this side's, so the drop
-            # key is the shelf's plain key.
-            favorite.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
-        self._add_shelf(
-            side_item, EXPERIMENTS_LABEL,
-            EXPERIMENTS_KEY, side, icons.flask_icon(),
-            "Background experiments awaiting your review"
-        )
-        self._add_shelf(
-            side_item, REQUESTS_LABEL,
-            REQUESTS_KEY, side, icons.mic_icon(),
-            "What you asked for out loud — “Request … over”"
-        )
-        self._add_shelf(
-            side_item, TRASH_LABEL,
-            TRASH_KEY, side, icons.trash_icon(),
-            "Deleted items — restorable here until you delete them for good"
-        )
+    def _add_shelves(self, folder_item, side, folder_key: str) -> None:
+        for shelf in _shown_shelves(side):
+            key = FolderShelf(shelf, folder_key).key
+            item = QTreeWidgetItem([SHELF_LABELS[shelf]])
+            item.setData(0, COUNT_ROLE, side.shelf_counts.get(key, 0))
+            item.setData(0, BRANCH_ICON_ROLE, icons.shelf_icon(shelf))
+            item.setToolTip(0, _SHELF_TIPS[shelf])
+            if shelf == FAVORITES_KEY:
+                item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
+            self._register(item, oriented_key(key, side.orientation), folder_item,
+                           folder_key=key)
 
     def _register(self, item, key: str, parent_item,
                   folder_key: str | None = None) -> QTreeWidgetItem:
@@ -232,18 +202,6 @@ class GalleryTree:
         for key in self.keys_by_folder.get(gallery.ALL_KEY, ()):
             self.item_by_key[key].setExpanded(True)
 
-    def _add_shelf(self, side_item, label, key, side, icon,
-                   tooltip) -> QTreeWidgetItem:
-        """Add a synthetic shelf row (Recents/Favorites/…) leading a side, its
-        marker drawn in the caret column so its label aligns with the media
-        folders below."""
-        item = QTreeWidgetItem([label])
-        item.setData(0, COUNT_ROLE, side.shelf_counts.get(key, 0))
-        item.setData(0, BRANCH_ICON_ROLE, icon)  # marker in the caret column
-        item.setToolTip(0, tooltip)
-        return self._register(item, oriented_key(key, side.orientation), side_item,
-                              folder_key=key)
-
     def _add_custom_folder(self, side_item, group, orientation) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a shelf-shaped row carrying
         its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
@@ -261,7 +219,7 @@ class GalleryTree:
         return self._register(item, oriented_key(group.key, orientation), side_item,
                               folder_key=group.key)
 
-    def _add_node(self, group, parent_item, orientation) -> QTreeWidgetItem:
+    def _add_node(self, group, parent_item, side) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])
         if gallery.is_renamable(group):
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
@@ -288,14 +246,21 @@ class GalleryTree:
             # prompt and the settings that set it apart from its siblings are
             # read — the row itself stays one short line.
             item.setToolTip(0, _row_tip(group))
-        self._register(item, oriented_key(group.key, orientation), parent_item,
+        self._register(item, oriented_key(group.key, side.orientation), parent_item,
                        folder_key=group.key)
+        if not isinstance(group, gallery.SettingsGroup):
+            self._add_shelves(item, side, group.key)
         for child in gallery.child_groups(group):
-            self._add_node(child, item, orientation)
+            self._add_node(child, item, side)
         if isinstance(group, gallery.SettingsGroup):
             for row in group.rows:
                 self.leaf_by_id[row["prompt_id"]] = item
         return item
+
+    def shelves_in(self, item) -> list[str]:
+        children = (item.child(i) for i in range(item.childCount()))
+        return [child.data(0, TREE_KEY_ROLE) for child in children
+                if child.data(0, GROUP_ROLE) is None]
 
     def keys_for_folder(self, folder_key: str) -> list[str]:
         """The tree keys drawing ``folder_key`` — a folder's own key or a shelf's
@@ -312,23 +277,18 @@ class GalleryTree:
         """One side's copy of a shelf row."""
         return self.item_by_key.get(oriented_key(shelf_key, orientation))
 
-    def set_shelf_count(self, shelf_key: str, orientation: str, count: int) -> None:
-        item = self.shelf_item(shelf_key, orientation)
-        if item is not None:
-            blocked = self._tree.blockSignals(True)
-            item.setData(0, COUNT_ROLE, count)
-            self._tree.blockSignals(blocked)
+    def set_shelf_counts(self, orientation: str, counts: dict[str, int]) -> None:
+        blocked = self._tree.blockSignals(True)
+        for key, item in self.item_by_key.items():
+            base, side = split_key(key)
+            if side == orientation and folder_shelf(base) is not None:
+                item.setData(0, COUNT_ROLE, counts.get(base, 0))
+        self._tree.blockSignals(blocked)
 
     def default_item(self) -> QTreeWidgetItem | None:
-        """The folder to land on with no saved target: the first side's All row —
-        the whole of the shape the tree opens on — falling back to a side that
-        has one, and then to a Latest shelf, so a first generation stays visible
-        while it runs with no folders around it yet."""
-        for base in (gallery.ALL_KEY, RECENTS_KEY):
-            keys = self.keys_by_folder.get(base)
-            if keys:
-                return self.item_by_key[keys[0]]
-        return None
+        alls = [self.item_by_key[key] for key in self.keys_by_folder.get(gallery.ALL_KEY, ())]
+        holding = [item for item in alls if gallery.child_groups(item.data(0, GROUP_ROLE))]
+        return next(iter(holding or alls), None)
 
     def expanded_keys(self) -> set[str]:
         return {key for key, item in self.item_by_key.items() if item.isExpanded()}

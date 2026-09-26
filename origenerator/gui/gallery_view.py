@@ -44,6 +44,19 @@ from origenerator.db import Database
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.fun_time_mode import FunTimeSession
+from origenerator.gallery.shelves import (
+    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
+)
+from origenerator.gallery.shelves import (
+    FAVORITES_KEY as _FAVORITES_KEY,
+)
+from origenerator.gallery.shelves import (
+    RECENTS_KEY as _RECENTS_KEY,
+)
+from origenerator.gallery.shelves import (
+    REQUESTS_KEY as _REQUESTS_KEY,
+)
+from origenerator.gallery.shelves import SHELF_LABELS, FolderShelf, folder_shelf
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
@@ -71,37 +84,7 @@ from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.gallery_navigation import NavigationController
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_LABEL as _EXPERIMENTS_LABEL,
-)
-from origenerator.gui.gallery_tree import (
-    FAVORITES_KEY as _FAVORITES_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    FAVORITES_LABEL as _FAVORITES_LABEL,
-)
-from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
-)
-from origenerator.gui.gallery_tree import (
-    RECENTS_KEY as _RECENTS_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    RECENTS_LABEL as _RECENTS_LABEL,
-)
-from origenerator.gui.gallery_tree import (
-    REQUESTS_KEY as _REQUESTS_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    REQUESTS_LABEL as _REQUESTS_LABEL,
-)
-from origenerator.gui.gallery_tree import (
-    TRASH_KEY as _TRASH_KEY,
-)
-from origenerator.gui.gallery_tree import (
-    TRASH_LABEL as _TRASH_LABEL,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
@@ -147,9 +130,6 @@ from origenerator.orientation import (
     LANDSCAPE as _LANDSCAPE,
 )
 from origenerator.orientation import (
-    ORIENTATION_LABELS as _ORIENTATION_LABELS,
-)
-from origenerator.orientation import (
     ORIENTATIONS as _ORIENTATIONS,
 )
 from origenerator.orientation import (
@@ -192,18 +172,6 @@ _SEARCH_DELAY_MS = 300
 # large fraction of any library through sheer stemming, so an as-you-type search
 # would answer the first keystroke of every query with most of the gallery.
 _SEARCH_MIN_CHARS = 3
-# The synthetic shelves, as back/forward history locations: each is a place the
-# user can be standing, so a visit to one is recorded and restored by key rather
-# than by the generation that happened to be picked there.
-_SHELF_KEYS = (_RECENTS_KEY, _FAVORITES_KEY, _EXPERIMENTS_KEY, _REQUESTS_KEY,
-               _TRASH_KEY)
-# Their plain names — what the search field and header call a shelf it is
-# searching.
-_SHELF_LABELS = {
-    _RECENTS_KEY: _RECENTS_LABEL, _FAVORITES_KEY: _FAVORITES_LABEL,
-    _EXPERIMENTS_KEY: _EXPERIMENTS_LABEL, _REQUESTS_KEY: _REQUESTS_LABEL,
-    _TRASH_KEY: _TRASH_LABEL,
-}
 
 
 class _Running(NamedTuple):
@@ -1821,6 +1789,7 @@ class GalleryView(QWidget):
             unreviewed,
             held,
             requested,
+            image_index=start_frames,
         )
         self._tree_view.populate(
             self._build_sides(trees), expanded, folder_meta=meta,
@@ -1894,8 +1863,7 @@ class GalleryView(QWidget):
             # Recents keeps a side up with no folders yet, so a first-ever
             # generation of that shape is visible while it runs.
             show_recents=bool(tree) or orientation in inflight,
-            shelf_counts={key: _shelf_count(self._browser, key, orientation)
-                          for key in _SHELF_KEYS if key != _RECENTS_KEY},
+            shelf_counts=self._browser.shelf_counts(orientation),
         ) for orientation, tree in trees.items()]
 
     def _reselect_generation(self, prompt_id: str | None):
@@ -2068,21 +2036,13 @@ class GalleryView(QWidget):
         entire, since every other folder narrows the answer before the query does.
 
         ``path`` is the row's breadcrumb — what the field, the header and the
-        empty-result message all name the scope by. A shelf is a single row with
-        no branch above it, so its path is just its own name.
+        empty-result message all name the scope by.
         """
         item = self._tree.currentItem()
-        shelf = self._current_shelf_key()
-        if shelf is not None:
-            base, orientation = _split_shelf_key(shelf)
-            name = _SHELF_LABELS[base]
-            if orientation:
-                # The same path shape a folder's breadcrumb has, since a shelf is
-                # one side's now: which half of the library is being searched has
-                # to read the same way wherever you are standing.
-                name = f"{_ORIENTATION_LABELS[orientation]}  ›  {name}"
+        if self._current_shelf_key() is not None:
             rows = self._browser.selected_shelf_rows() or []
-            return _SearchScope(name, {row["prompt_id"] for row in rows})
+            return _SearchScope(self._tree_view.breadcrumb(item),
+                                {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
             # Nothing selected, or the caret resting on a side's header row: the
@@ -2119,11 +2079,9 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim()
-        # The experimenter's switch belongs to the Experiments shelf alone, and
-        # which shelf is showing is read off the key rather than off an item
-        # identity — there are two of every row now, one per side.
         base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
-        self._experiments_bar.setVisible(base == _EXPERIMENTS_KEY)
+        shelf = folder_shelf(base)
+        self._experiments_bar.setVisible(shelf is not None and shelf.shelf == _EXPERIMENTS_KEY)
         if current is None:
             self._title.set_display("")
             self._title.setToolTip("")
@@ -2131,8 +2089,8 @@ class GalleryView(QWidget):
             self._browser.show_empty()
             self._re_aim()
             return
-        if base in _SHELF_KEYS:
-            self._open_shelf(base, orientation)
+        if shelf is not None:
+            self._open_shelf(shelf, orientation, current)
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -2146,7 +2104,7 @@ class GalleryView(QWidget):
         # is read by hovering the path, as it is by hovering the row itself.
         self._title.setToolTip(gallery.folder_detail(group) if group else "")
         self._update_folder_average(group)
-        self._show_group_contents(group)
+        self._show_group_contents(group, current)
         landed = self._land_on_the_first_item()
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
@@ -2179,42 +2137,29 @@ class GalleryView(QWidget):
         self._browser.apply_selection(first, Qt.KeyboardModifier.NoModifier)
         return first
 
-    def _open_shelf(self, base: str, orientation: str | None):
-        """Show one side's copy of a shelf: dress the header, clear the info
-        pane (a shelf opens showing nothing until an item is picked), have the
-        browser render it, and record the visit so Back can return to it."""
-        if base == _EXPERIMENTS_KEY:
-            self._sync_experiments_bar()  # what the switch's position means
-        self._title.set_display(self._shelf_title(base, orientation))
-        self._avg_label.setText("")   # no shelf has an average to state
+    def _open_shelf(self, shelf: FolderShelf, orientation: str | None, item):
+        if shelf.shelf == _EXPERIMENTS_KEY:
+            self._sync_experiments_bar()
+        self._title.set_display(self._shelf_title(shelf, item))
+        self._avg_label.setText("")
         self._clear_metadata()
-        self._browser.show_shelf(base, orientation)
-        if base == _REQUESTS_KEY:
+        self._browser.show_shelf(shelf.key, orientation)
+        if shelf.shelf == _REQUESTS_KEY:
             self._re_aim()
         self._navigation.record()
 
-    @staticmethod
-    def _shelf_title(base: str, orientation: str | None) -> str:
-        """A shelf's header: its side, then its name — the path shape a folder's
-        breadcrumb has, since a shelf belongs to one side like everything else.
-        Favorites keeps the star its tree row wears."""
-        label = _SHELF_LABELS[base]
-        if base == _FAVORITES_KEY:
-            label = "★ " + label
-        if orientation is None:
-            return label
-        return f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
+    def _shelf_title(self, shelf: FolderShelf, item) -> str:
+        star = "★ " if shelf.shelf == _FAVORITES_KEY else ""
+        return f"{self._tree_view.breadcrumb(item.parent())}  ›  {star}{item.text(0)}"
 
-    def _show_group_contents(self, group):
-        """Fill the browser pane with what a folder holds: its generations
-        (a settings leaf), the folders it gathers (one the user composed), or its
-        sub-folders (every other tier)."""
+    def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)
         elif isinstance(group, gallery.CustomGroup):
             self._browser.show_custom_folder(group)
         else:
-            self._browser.show_folder_tiles(gallery.child_groups(group))
+            self._browser.show_folder_tiles(gallery.child_groups(group),
+                                            shelves=self._tree_view.shelves_in(item))
 
     def _go_to_folder(self, key: str):
         """Go to a folder: select its tree row, which draws it.
@@ -2918,7 +2863,7 @@ class GalleryView(QWidget):
 
     def shelf_label(self, key: str) -> str:
         """A shelf's plain name, for a spoken word to be answered in."""
-        return _SHELF_LABELS[key]
+        return SHELF_LABELS[key]
 
     def stand_in_shelf(self, key: str, side: str | None) -> bool:
         """Select a shelf's row, exactly as clicking it does, and say whether the
@@ -2960,13 +2905,9 @@ class GalleryView(QWidget):
         """What the slideshow button would play, named for its tooltip."""
         if self._showing_search():
             return "these results"
-        base, orientation = _split_shelf_key(self._current_shelf_key())
-        label = _SHELF_LABELS.get(base, "this folder")
-        if orientation and base in _SHELF_LABELS:
-            # The side leads, as it does in the shelf's own header and in a
-            # folder's breadcrumb — one wording for where you are standing.
-            label = f"{_ORIENTATION_LABELS[orientation]}  ›  {label}"
-        return label
+        if self._current_shelf_key() is not None:
+            return self._tree_view.breadcrumb(self._tree.currentItem())
+        return "this folder"
 
     # --- standalone enhance: the bank button, the selection action, the queue ---
 
@@ -3937,11 +3878,12 @@ class GalleryView(QWidget):
 
     def _redrew_the_favorites_shelf(self) -> bool:
         for orientation in _ORIENTATIONS:
-            self._tree_view.set_shelf_count(
-                _FAVORITES_KEY, orientation, _shelf_count(self._browser, _FAVORITES_KEY, orientation))
-        if _base_of(self.selected_folder_key() or "") != _FAVORITES_KEY:
+            self._tree_view.set_shelf_counts(orientation, self._browser.shelf_counts(orientation))
+        base, orientation = _split_shelf_key(self.selected_folder_key())
+        shelf = folder_shelf(base)
+        if shelf is None or shelf.shelf != _FAVORITES_KEY:
             return False
-        self._browser.show_shelf(_FAVORITES_KEY, self.side_in_view())
+        self._browser.show_shelf(shelf.key, orientation)
         return True
 
     def _delete_selection(self):
@@ -4499,11 +4441,8 @@ class GalleryView(QWidget):
     # --- back/forward navigation ------------------------------------------
 
     def _current_shelf_key(self) -> str | None:
-        """The key of the shelf on screen — one side's Latest, Favorites,
-        Experiments, Requests or Trash — or ``None`` off them."""
         key = self.selected_folder_key()
-        base, _orientation = _split_shelf_key(key)
-        return key if base in _SHELF_KEYS else None
+        return key if folder_shelf(_base_of(key)) is not None else None
 
 
 
@@ -4532,10 +4471,6 @@ def _side_trees(rows, meta, start_frames) -> dict[str, list]:
     return {orientation: gallery.build_gallery_tree(dealt[orientation], meta,
                                                     image_index=start_frames)
             for orientation in _ORIENTATIONS}
-
-
-def _shelf_count(pane, key: str, orientation: str) -> int:
-    return len(pane.rows_for_shelf(oriented_key(key, orientation)))
 
 
 def _group_workflow(group) -> str | None:

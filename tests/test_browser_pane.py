@@ -19,6 +19,14 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery
+from origenerator.gallery.shelves import (
+    EXPERIMENTS_KEY,
+    FAVORITES_KEY,
+    RECENTS_KEY,
+    REQUESTS_KEY,
+    TRASH_KEY,
+    FolderShelf,
+)
 from origenerator.gui.browser_pane import (
     BrowserPane,
     BrowserScrollArea,
@@ -26,14 +34,10 @@ from origenerator.gui.browser_pane import (
     PaneHost,
     TreeNavigation,
 )
-from origenerator.gui.gallery_tree import (
-    EXPERIMENTS_KEY,
-    RECENTS_KEY,
-    REQUESTS_KEY,
-    TRASH_KEY,
-)
+from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
+from origenerator.orientation import LANDSCAPE, oriented_key
 
 _NO_MOD = Qt.KeyboardModifier.NoModifier
 _CTRL = Qt.KeyboardModifier.ControlModifier
@@ -382,3 +386,164 @@ def test_the_empty_trash_hint_promises_no_expiry(qtbot):
 
     assert "as long as you leave them" in hint
     assert "day" not in hint   # no window to count, so no number to state
+
+
+def _made_with(prompt_id, checkpoint, prompt="scene one", starred=0):
+    row = _row(prompt_id, 1)
+    row["params_json"] = json.dumps({"positive_prompt": prompt, "seed": 1,
+                                     "checkpoint": checkpoint})
+    row["starred"] = starred
+    return row
+
+
+def _models(tree):
+    (workflow,) = tree
+    return {model.label: model for model in gallery.child_groups(workflow)}
+
+
+def test_a_folders_latest_lists_only_what_that_folder_holds(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+
+    pane.show_shelf(FolderShelf(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["a1"]
+
+
+def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
+    kept = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
+    deleted = [_made_with("a2", "alpha.safetensors"), _made_with("b2", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(kept)
+    pane, _scroll = _pane(qtbot, kept)
+    pane.set_model(kept, {LANDSCAPE: tree}, kept, [], deleted)
+    trash = FolderShelf(TRASH_KEY, _models(tree)["alpha"].key).key
+
+    pane.show_shelf(trash, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["a2"]
+    assert [row["prompt_id"] for row in pane.rows_for_shelf(oriented_key(trash, LANDSCAPE))]         == ["a2"]
+
+
+def _in_flight(prompt_id, checkpoint):
+    return {**_made_with(prompt_id, checkpoint), "status": "running", "output_files": None}
+
+
+def _card(prompt_id):
+    return InFlightItem(key=prompt_id, caption="scene one", media_type="image",
+                        reading=RunReading(status="running"), reveal=lambda: None)
+
+
+def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot, monkeypatch):
+    rows = [_made_with("a1", "alpha.safetensors"), _in_flight("a2", "alpha.safetensors"),
+            _made_with("b1", "beta.safetensors"), _in_flight("b2", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows[::2], {LANDSCAPE: tree}, rows, [], [])
+    monkeypatch.setattr(pane, "inflight_items",
+                        lambda rows=None, requests=None: [_card("a2"), _card("b2")])
+
+    pane.show_shelf(FolderShelf(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+
+    assert list(pane._inflight_cards) == ["a2"]
+
+
+def test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors", starred=1),
+            _made_with("a2", "alpha.safetensors", prompt="scene two"),
+            _made_with("b1", "beta.safetensors", starred=1)]
+    tree = gallery.build_gallery_tree(rows)
+    alpha = _models(tree)["alpha"]
+    (lora,) = gallery.child_groups(alpha)
+    (scene_two,) = [leaf for leaf in gallery.child_groups(lora) if leaf.rows[0]["prompt_id"] == "a2"]
+    scene_two.favorite = True
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    favorites = FolderShelf(FAVORITES_KEY, alpha.key).key
+
+    pane.show_shelf(favorites, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["a1"]
+    assert pane._visible_keys == [scene_two.key]
+    assert sorted(row["prompt_id"] for row in
+                  pane.rows_for_shelf(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+
+
+def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
+    kept = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
+    tried = [_made_with("a2", "alpha.safetensors"), _made_with("b2", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(kept + tried)
+    pane, _scroll = _pane(qtbot, kept + tried)
+    pane.set_model(kept, {LANDSCAPE: tree}, kept + tried, tried, [])
+
+    pane.show_shelf(FolderShelf(EXPERIMENTS_KEY, _models(tree)["beta"].key).key, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["b2"]
+
+
+def test_a_folders_requests_are_the_ones_that_landed_in_it(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [],
+                   request_items=[{"row": row} for row in rows])
+
+    pane.show_shelf(FolderShelf(REQUESTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+
+    assert pane.visible_prompt_ids() == ["a1"]
+
+
+def _failed(prompt_id, checkpoint, prompt):
+    return {**_made_with(prompt_id, checkpoint, prompt=prompt), "status": "error",
+            "output_files": None}
+
+
+def _folders_of_folders(tree):
+    found = [gallery.ALL_KEY]
+
+    def walk(groups):
+        for group in groups:
+            if gallery.child_groups(group):
+                found.append(group.key)
+                walk(gallery.child_groups(group))
+
+    walk(tree)
+    return found
+
+
+def test_each_folders_shelf_counts_what_that_shelf_lists(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors", starred=1),
+            _made_with("a2", "alpha.safetensors", prompt="scene two"),
+            _made_with("b1", "beta.safetensors"),
+            _made_with("b2", "beta.safetensors", prompt="scene two")]
+    listed = [*rows, _failed("b3", "beta.safetensors", "scene two")]
+    tree = gallery.build_gallery_tree(rows)
+    (lora,) = gallery.child_groups(_models(tree)["beta"])
+    for leaf in gallery.child_groups(lora):
+        leaf.favorite = leaf.rows[0]["prompt_id"] == "b2"
+    deleted = [_made_with("a4", "alpha.safetensors"), _made_with("b4", "beta.safetensors")]
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted,
+                   request_items=[{"row": rows[2]}, {"row": listed[4]}])
+
+    counts = pane.shelf_counts(LANDSCAPE)
+
+    assert counts[FolderShelf(TRASH_KEY, _models(tree)["alpha"].key).key] == 1
+    for folder in _folders_of_folders(tree):
+        for shelf in (FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY):
+            key = FolderShelf(shelf, folder).key
+            listing = pane.rows_for_shelf(oriented_key(key, LANDSCAPE))
+            assert counts.get(key, 0) == len(listing), key
+
+
+def test_a_shelf_square_wears_the_mark_its_row_wears(qtbot):
+    rows = [_made_with("a1", "alpha.safetensors")]
+    pane, scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+
+    pane.show_folder_tiles([], shelves=[oriented_key(TRASH_KEY, LANDSCAPE)])
+
+    (tile,) = scroll.widget().findChildren(FolderTile)
+    assert [label for label in tile.findChildren(QLabel)
+            if label.toolTip() == "Trash" and not label.pixmap().isNull()]

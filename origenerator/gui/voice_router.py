@@ -30,22 +30,22 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
-from origenerator.generation_config import filled_params
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     REQUESTS_KEY as _REQUESTS_KEY,
 )
-from origenerator.gui.gallery_tree import (
+from origenerator.gallery.shelves import (
     TRASH_KEY as _TRASH_KEY,
 )
+from origenerator.generation_config import filled_params
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
 from origenerator.prompt_edit import apply_request
@@ -555,9 +555,9 @@ class VoiceRouter(QObject):
         move is what the show leaves you standing in — so the answer says which
         shelf rather than refusing a command whose whole effect is out of sight.
 
-        Every shelf has two rows now, one per side, so the utterance's own side
-        picks which; unsided, the host takes the tree's own answer for the
-        folder — the same row a click would have landed on.
+        The name is All's copy of the shelf, on the utterance's own side;
+        unsided, the host takes the tree's own answer for the folder — the same
+        row a click would have landed on.
         """
         key = _SHELVES[command]
         label = self._host.shelf_label(key)

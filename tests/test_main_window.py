@@ -18,9 +18,9 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
+from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import main_window
-from origenerator.gui.gallery_tree import RECENTS_KEY
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.run_notice import RunOutcome

@@ -141,6 +141,19 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     raise ValueError(f"unknown folder level: {level!r}")
 
 
+def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
+    workflow_name = row.get("workflow_name") or "unknown"
+    levels = ("workflow", "model", "lora",
+              *(("source_image",) if _grows_source_images(media_type_of_row(row), workflow_name)
+                else ()),
+              "settings")
+    return (ALL_KEY, *(folder_key_at_level(row, level, image_index) for level in levels))
+
+
+def _grows_source_images(media_type: str, workflow_name: str) -> bool:
+    return media_type == MediaType.VIDEO and is_image_conditioned(workflow_name)
+
+
 def _lora_place(workflow_name: str, params_json: str | None) -> str:
     return json.dumps([model_signature(workflow_name, params_json),
                        lora_signature(workflow_name, params_json)])
@@ -584,7 +597,7 @@ def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
     which lands in that workflow's image folder and animates nothing, so it is
     grouped like any other image.
     """
-    if tier.media_type == MediaType.VIDEO and is_image_conditioned(tier.workflow_name):
+    if _grows_source_images(tier.media_type, tier.workflow_name):
         return _build_source_image_groups(tier, rows)
     return _build_settings_groups(tier, rows)
 

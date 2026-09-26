@@ -1110,6 +1110,18 @@ def test_wan22_extract_output_info():
     assert files[0]["filename"] == "flf2v_loop_00001.mp4"
 
 
+def test_wan22_extract_output_info_lists_the_soundless_copy_beside_the_sounded_file():
+    wf = Wan22Flf2vLoopWorkflow()
+    history = {"outputs": {"16": {"gifs": [
+        {"filename": "flf2v_loop_00001-audio.mp4", "subfolder": "video", "type": "output",
+         "workflow": "flf2v_loop_00001.png"},
+    ]}}}
+    files = wf.extract_output_info(history)
+    assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
+    assert files[1] == {"filename": "flf2v_loop_00001.mp4", "subfolder": "video",
+                        "type": "output", "role": "silent"}
+
+
 # ---- WAN 2.2 I2V (dual-noise image-to-video) ----
 
 def test_wan22_i2v_default_params_has_required_keys():

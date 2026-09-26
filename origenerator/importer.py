@@ -28,6 +28,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import soundless_copies_of
 
 logger = logging.getLogger(__name__)
 
@@ -137,13 +138,6 @@ def _output_entry(path: Path, output_dir: Path) -> dict:
 
 
 def merge_video_sidecar_rows(db: Database) -> int:
-    """Consolidate already-imported image sidecars with the video they preview.
-
-    Older imports created a separate gallery row for the metadata PNG that
-    VHS_VideoCombine saves beside each video. This repoints each such image row
-    at its sibling video — so it plays, keeping the prompt/seed it carries — and
-    deletes the now-redundant bare video row. Returns the number consolidated.
-    """
     rows = db.list_generations()
     video_by_key: dict[tuple[str, str], dict] = {}
     for row in rows:
@@ -168,6 +162,42 @@ def merge_video_sidecar_rows(db: Database) -> int:
 
 def _sidecar_key(file_entry: dict) -> tuple[str, str]:
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
+
+
+def merge_soundless_copy_rows(db: Database) -> int:
+    rows = db.list_generations()
+    video_by_copy_key: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        files = row_output_files(row)
+        if row.get("source") != GenerationSource.IMPORTED and files:
+            for copy in soundless_copies_of(files[:1]):
+                video_by_copy_key[_sidecar_key(copy)] = row
+
+    merged = 0
+    for row in rows:
+        files = row_output_files(row)
+        if row.get("source") != GenerationSource.IMPORTED or len(files) != 1:
+            continue
+        video = video_by_copy_key.get(_sidecar_key(files[0]))
+        if video is None:
+            continue
+        _fold_soundless_copy(db, row, video, rows)
+        merged += 1
+    return merged
+
+
+def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -> None:
+    listed = row_output_files(video)
+    listed_names = {f.get("filename") for f in listed}
+    unlisted = [c for c in soundless_copies_of(listed[:1]) if c["filename"] not in listed_names]
+    db.update_generation(video["prompt_id"], output_files=json.dumps(listed + unlisted))
+    if copy.get("starred") and not video.get("starred"):
+        db.set_generation_favorite(video["prompt_id"], True)
+    for combined in rows:
+        if combined.get("recipe_video_id") == copy["prompt_id"]:
+            db.set_recipe_source(combined["prompt_id"], category=combined.get("recipe_category"),
+                                 video_prompt_id=video["prompt_id"])
+    db.delete_generation(copy["prompt_id"])
 
 
 def backfill_shared_thumbnails(db: Database, output_dir: Path, thumb_dir: Path) -> int:

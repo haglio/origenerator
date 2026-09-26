@@ -90,9 +90,6 @@ def _unscaled_between_tests():
 # fixture); setdefault lets a developer override it to watch a test on a real
 # display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-# Qt Quick has no graphics backend under the offscreen platform but its software one.
-os.environ.setdefault("QT_QUICK_BACKEND", "software")
-os.environ.setdefault("QSG_RENDER_LOOP", "threaded")
 
 
 # One recognizable tensor name per architecture, matching the signatures in

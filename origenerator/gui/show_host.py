@@ -9,16 +9,16 @@ re-discovering the interface by guessing at attribute names — and the three di
 not agree: the console called five of the names with no guard at all while the
 other two guarded every one, so nothing in the repo said which was right.
 
-There are exactly two hosts, and this says what each owes.
-:class:`~origenerator.gui.slideshow_view.SlideshowView` has a set and answers
-all of it. :class:`~origenerator.gui.slideshow_pace.PaceOnlyHost` is the main
-window's console with no show under it — a pace to set and nothing to step —
-so it inherits this and takes the answers below for the half it has no set for.
-Those answers are exactly what the probes' defaults used to be, in one place
-rather than sixteen.
+There are three hosts, and this says what each owes.
+:class:`~origenerator.gui.slideshow_view.SlideshowView` and
+:class:`~origenerator.gui.player_show.PlayerShow` have a set and answer all of
+it. :class:`~origenerator.gui.slideshow_pace.PaceOnlyHost` is the main window's
+console with no show under it — a pace to set and nothing to step — so it
+inherits this and takes the answers below for the half it has no set for, which
+are what the probes' defaults used to be.
 
 A caller therefore asks; it does not check first. ``tests/test_show_host.py``
-holds that per driver module at zero, and holds both hosts to every attribute.
+holds that per driver module at zero, and holds every host to every attribute.
 """
 
 from __future__ import annotations
@@ -59,6 +59,8 @@ class ShowHost(Protocol):
         """Lock what is on screen, or let it go."""
         ...
 
+    def set_locked(self, locked: bool) -> bool: ...
+
     def show_cull(self) -> None:
         """Take what is on screen away and move on."""
         ...
@@ -85,6 +87,8 @@ class ShowHost(Protocol):
     def show_filter(self, query: str) -> None:
         """Narrow the set to the act(s) *query* names, as the button at the
         head of a map row posts them."""
+
+    def show_filter_to_the_act_on_screen(self) -> None: ...
 
     def clear_modes(self) -> bool:
         """Every narrowing off at once — the favorites, the enhanced ones and
@@ -150,6 +154,9 @@ class ShowHost(Protocol):
 
     def toggle_favorites_filter(self) -> None:
         """Narrow the set to the favorites, or widen it back."""
+
+    def set_favorites_filter(self, on: bool) -> bool:
+        return False
 
     @property
     def hud_enhanced_mode(self) -> bool:

@@ -52,6 +52,8 @@ from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
 LOOP_OFF = "off"
 LOOP_IS_A_LOCK = "lock"
 
+NO_ACT_ON_SCREEN = "No act for this one"
+
 
 class ShowSet:
     """Everything a show has been handed, the pass dealt from what the
@@ -502,6 +504,9 @@ class ShowSet:
         item = self.playlist.current()
         return item.prompt_id if item is not None else None
 
+    def act_on_screen(self) -> str:
+        return self._named_for(self.current_prompt_id())
+
     @property
     def is_favorite(self) -> bool:
         """Whether the item on screen is one of the favorites — the star the
@@ -531,6 +536,13 @@ def narrow_to_acts(show_set: ShowSet, posted: str) -> tuple[str, bool]:
         return f"Filter: no matches for '{acts}'", False
     summary = f"'{acts}'" if acts else "cleared"
     return f"Filter: {summary} ({len(show_set.playlist)})", True
+
+
+def narrow_to_the_act_on_screen(show_set: ShowSet) -> tuple[str, bool]:
+    act = show_set.act_on_screen()
+    if not act:
+        return NO_ACT_ON_SCREEN, False
+    return narrow_to_acts(show_set, act)
 
 
 def looping_note(show_set: ShowSet) -> str:

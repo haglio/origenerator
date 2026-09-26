@@ -31,16 +31,23 @@ from tests.show_surface_fakes import FakeEngine
 TRANSPORT = (
     "locked", "dwell_s", "set_dwell_s",
     "show_step", "show_toggle_lock", "show_cull",
+    # The lock said which way rather than flipped: a session's spoken "lock"
+    # and "unlock".
+    "set_locked",
 )
 THE_SET = (
     "show_reset", "hud_map", "hud_favorites_filter", "hud_order_label",
     "hud_is_favorite", "toggle_favorites_filter", "show_item", "current_media_path",
+    # F-mode said which way, as the lock is: "f mode on" and "f mode off".
+    "set_favorites_filter",
     # The map's own chrome and the session's keys over it: the loops along
     # its two axes, the loop key that steps them, the expand mark, and a step
     # to a neighboring cell.
     "show_loop", "show_loop_cycle", "show_more_seeds", "show_nav",
     # The act filter: the button at the head of each map row, and what lights it.
     "show_filter", "hud_act_filter", "clear_modes",
+    # And the same filter set from the item on screen: a session's "filter".
+    "show_filter_to_the_act_on_screen",
     # The enhanced-only switch beside F-mode: declared here because three
     # drivers reach for it — the HUD's button, the session console's, and the
     # spoken word — and it was the last of the switches still being probed for.
@@ -130,12 +137,14 @@ def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
     assert host.show_reset() is None
     assert host.show_order(latest=True) is None
     assert host.toggle_favorites_filter() is None
+    assert host.set_favorites_filter(True) is False
     assert host.show_item("anything", lock=True) is None
     assert host.show_loop("seed") is None
     assert host.show_loop_cycle() is None
     assert host.show_more_seeds() is None
     assert host.show_nav("right") is None
     assert host.show_filter("fox") is None
+    assert host.show_filter_to_the_act_on_screen() is None
     assert host.hud_enhanced_mode is False
     assert host.toggle_enhanced_mode() is False
     assert host.set_enhanced_mode(True) is False

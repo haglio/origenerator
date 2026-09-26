@@ -728,6 +728,23 @@ def test_an_act_nothing_here_shows_says_so_and_moves_nothing(qtbot):
     assert view._note.text() == "Filter: no matches for 'gamma'"
 
 
+def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
+
+    view.show_filter_to_the_act_on_screen()
+
+    assert (view.hud_act_filter, view.pass_size()) == ("source image, alpha", 1)
+    assert view._note.text() == "Filter: 'source image, alpha' (1)"
+
+
+def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot):
+    view = _view(qtbot, _KEYED)
+
+    view.show_filter_to_the_act_on_screen()
+
+    assert (view.hud_act_filter, view._note.text()) == ("", "No act for this one")
+
+
 def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(acts=_acts))
     view.show_filter("beta")

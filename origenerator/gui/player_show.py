@@ -51,6 +51,7 @@ from origenerator.gui.show_set import (
     ShowSet,
     looping_note,
     narrow_to_acts,
+    narrow_to_the_act_on_screen,
 )
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -510,6 +511,10 @@ class PlayerShow(QObject):
             self.show_loop(SEED_AXIS)
             return
         said, narrowed = narrow_to_acts(self._set, query)
+        self._note(said, kind=NOTICE if narrowed else WARNING)
+
+    def show_filter_to_the_act_on_screen(self) -> None:
+        said, narrowed = narrow_to_the_act_on_screen(self._set)
         self._note(said, kind=NOTICE if narrowed else WARNING)
 
     def show_nav(self, direction: str) -> None:

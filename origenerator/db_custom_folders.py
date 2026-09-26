@@ -17,19 +17,17 @@ from origenerator.db_connection import Store
 class CustomFolderStore(Store):
     """The nine queries over `custom_folders` and `custom_folder_items`."""
 
-    def create_custom_folder(self, name: str, folder_id: int | None = None) -> int:
+    def create_custom_folder(self, name: str, folder_id: int | None = None,
+                             side: str | None = None) -> int:
         """Make an empty custom folder and return its id.
 
         ``folder_id`` re-creates one at the id it had, so an undone removal comes
         back under the very key the session was saved with (see
         :meth:`GalleryActions.delete_custom_folder`)."""
         with self._connect() as conn:
-            if folder_id is None:
-                cur = conn.execute("INSERT INTO custom_folders (name) VALUES (?)", (name,))
-                return int(cur.lastrowid)
-            conn.execute("INSERT INTO custom_folders (id, name) VALUES (?, ?)",
-                         (folder_id, name))
-            return int(folder_id)
+            cur = conn.execute("INSERT INTO custom_folders (id, name, side) VALUES (?, ?, ?)",
+                               (folder_id, name, side))
+            return int(cur.lastrowid)
 
     def rename_custom_folder(self, folder_id: int, name: str):
         with self._connect() as conn:
@@ -81,9 +79,9 @@ class CustomFolderStore(Store):
         oldest first, each item list in the order it was built up."""
         with self._connect() as conn:
             folders = [
-                {"id": r["id"], "name": r["name"], "items": []}
+                {"id": r["id"], "name": r["name"], "side": r["side"], "items": []}
                 for r in conn.execute(
-                    "SELECT id, name FROM custom_folders ORDER BY id"
+                    "SELECT id, name, side FROM custom_folders ORDER BY id"
                 )
             ]
             by_id = {f["id"]: f for f in folders}

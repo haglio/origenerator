@@ -161,7 +161,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # shelf's mark, and on which rows wear a star and a delete, are
 # test_a_shelf_rows_mark_stands_under_its_folders_own_mark and
 # test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark.
-MAX_PROSE_LINES = 19161
+#
+# 19159 when each folder of your own came to live on one side: the note that
+# every side is built from the rows the media ticks keep is
+# test_unticking_videos_empties_both_halves_of_their_folders.
+MAX_PROSE_LINES = 19159
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

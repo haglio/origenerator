@@ -83,6 +83,7 @@ from origenerator.motion_engine import Motion
 from origenerator.orientation import (
     LANDSCAPE,
     ORIENTATION_LABELS,
+    PORTRAIT,
     base_of,
     oriented_key,
 )
@@ -301,11 +302,11 @@ class FakeDB:
 
     # --- custom folders (the groupings the user composes) ------------------
 
-    def create_custom_folder(self, name, folder_id=None):
+    def create_custom_folder(self, name, folder_id=None, side=None):
         if folder_id is None:
             folder_id = self._next_custom
         self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "items": {}}
+        self._custom[folder_id] = {"name": name, "side": side, "items": {}}
         return folder_id
 
     def rename_custom_folder(self, folder_id, name):
@@ -322,7 +323,7 @@ class FakeDB:
         self._custom[folder_id]["items"].pop(folder_key, None)
 
     def list_custom_folders(self):
-        return [{"id": fid, "name": f["name"], "items": list(f["items"])}
+        return [{"id": fid, "name": f["name"], "side": f["side"], "items": list(f["items"])}
                 for fid, f in sorted(self._custom.items())]
 
     def custom_folder_items_full(self):
@@ -1784,7 +1785,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
         "origenerator.gui.gallery_view.QMenu.exec",
         lambda menu, *a: next(act for act in menu.actions() if act.text() == "Favorite"),
     )
-    view._on_tree_context_menu(images, caret)
+    view._on_tree_context_menu(images, caret, LANDSCAPE)
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert _image_workflow(view._tree).isExpanded()
@@ -3040,6 +3041,21 @@ def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
     view._video_cb.setChecked(False)   # both off: no folders at all
 
     assert not _workflow_rows(view._tree)
+
+
+def test_unticking_videos_empties_both_halves_of_their_folders(qtbot):
+    rows = [_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
+                                     "width": 100, "height": 200}, "wan22_i2v_00001_.mp4"),
+            _row("v2", "wan22_i2v", {"positive_prompt": "dance", "seed": 6,
+                                     "width": 200, "height": 100}, "wan22_i2v_00002_.mp4")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert all(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
+
+    view._video_cb.setChecked(False)
+
+    assert not any(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
 
 
 def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
@@ -12570,6 +12586,16 @@ def _make_folder(view, name, keys):
     return folder_id
 
 
+def test_a_folder_of_your_own_is_drawn_only_on_the_side_it_was_made_on(qtbot):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    view._db.create_custom_folder("Keepers", side=PORTRAIT)
+
+    view.refresh()
+
+    assert "Keepers" in _top_level(view._tree, PORTRAIT)
+    assert "Keepers" not in _top_level(view._tree, LANDSCAPE)
+
+
 def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
@@ -12721,11 +12747,11 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
 # by nothing at all: swapping the custom folder's Rename and Remove arms so that
 # "Rename…" deletes the folder used to pass all 657 tests.
 
-def _tree_menu(view, key=None):
+def _tree_menu(view, key=None, side=LANDSCAPE):
     """Raise a tree row's context menu the way the tree's own signal does, or the
-    empty-space menu below the last row when no key is given."""
+    empty-space menu below the last row of ``side`` when no key is given."""
     view._on_tree_context_menu(
-        view._tree_item_for(key) if key is not None else None, QPoint(0, 0)
+        view._tree_item_for(key) if key is not None else None, QPoint(0, 0), side
     )
 
 
@@ -12801,6 +12827,30 @@ def test_a_folders_menu_lists_the_folders_of_your_own_it_could_join(qtbot, monke
 
     (record,) = view._db.list_custom_folders()
     assert record["items"] == [cat, dog]
+
+
+def test_a_folders_menu_offers_only_the_folders_of_your_own_on_its_side(qtbot, monkeypatch):
+    view, _cat, dog = _two_leaf_view(qtbot)
+    view._db.create_custom_folder("Tall ones", side=PORTRAIT)
+    view.refresh()
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _tree_menu(view, dog)
+
+    assert "Add to folder" not in labels
+
+
+def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browsed(
+        qtbot, monkeypatch):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _make_folder(view, "Keepers", [cat])
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    view._folder_context_menu(dog, QPoint(0, 0))
+
+    assert "Add to folder" in labels
 
 
 def test_a_folder_already_in_a_folder_of_your_own_is_not_offered_it_again(
@@ -12882,6 +12932,40 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
     (record,) = view._db.list_custom_folders()
     assert record["name"] == "Keepers" and record["items"] == []
     assert _top_level(view._tree)["Keepers"] is view._tree.currentItem()
+
+
+def _tall(prompt_id, prompt):
+    return _row(prompt_id, "sdxl_t2i", {"positive_prompt": prompt, "steps": 50, "seed": 1,
+                                        "width": 100, "height": 200},
+                f"sdxl_t2i_{prompt_id}.png")
+
+
+def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch):
+    rows = [_tall("t1", "a cat"), _tall("t2", "a dog")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _pick(view, *(oriented_key(gallery.settings_folder_key(row), PORTRAIT) for row in rows))
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Keepers", True)))
+
+    view._group_selection()
+
+    (record,) = view._db.list_custom_folders()
+    assert record["side"] == PORTRAIT
+
+
+def test_a_folder_started_below_the_last_row_belongs_to_that_half(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    _answer_menu(monkeypatch, "New folder…")
+    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+                        staticmethod(lambda *a, **kw: ("Keepers", True)))
+
+    _tree_menu(view, side=PORTRAIT)
+
+    (record,) = view._db.list_custom_folders()
+    assert record["side"] == PORTRAIT
+    assert _top_level(view._tree, PORTRAIT)["Keepers"] is view._tree.currentItem()
 
 
 def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkeypatch):

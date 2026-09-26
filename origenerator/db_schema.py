@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS folder_meta (
 CREATE TABLE IF NOT EXISTS custom_folders (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    side       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS custom_folder_items (
@@ -218,6 +219,9 @@ ADDED_COLUMNS = {
     "folder_meta": {
         "level": "TEXT",
         "ref_prompt_id": "TEXT",
+    },
+    "custom_folders": {
+        "side": "TEXT",
     },
 }
 

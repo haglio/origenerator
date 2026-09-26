@@ -7,6 +7,7 @@ import pytest
 
 from origenerator import gallery
 from origenerator.db import Database
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery_actions import GalleryActions
 from origenerator.trash import Trash
 
@@ -98,6 +99,25 @@ def test_an_empty_custom_folder_still_appears():
     assert gallery.rows_under(folder) == []
 
 
+def test_a_folder_of_your_own_lives_on_the_side_it_was_made_on():
+    trees = {PORTRAIT: _tree([_row("i1", "a cat")]), LANDSCAPE: _tree([_row("i2", "a cat")])}
+    record = {"id": 1, "name": "Later", "items": [], "side": PORTRAIT}
+
+    assert gallery.custom_folder_side(record, trees) == PORTRAIT
+
+
+def test_a_folder_saved_before_folders_had_a_side_lives_where_most_of_its_pictures_are():
+    trees = {PORTRAIT: _tree([_row("i1", "a cat", seed=1), _row("i2", "a cat", seed=2)]),
+             LANDSCAPE: _tree([_row("i3", "a cat", seed=3)])}
+    (cat,) = [group.key for group in gallery.child_groups(_lora_folder(trees[PORTRAIT]))]
+
+    gathering = {"id": 1, "name": "Cats", "items": [cat], "side": None}
+    empty = {"id": 2, "name": "Later", "items": [], "side": None}
+
+    assert gallery.custom_folder_side(gathering, trees) == PORTRAIT
+    assert gallery.custom_folder_side(empty, trees) == LANDSCAPE
+
+
 def test_gathering_a_folder_and_its_parent_counts_each_item_once():
     # Otherwise the slideshow would play the overlap twice and the tile would
     # claim more items than the folder holds.
@@ -130,6 +150,15 @@ def _db_with_folder(tmp_path, name="Favorites", items=(("image", "media", "i1"),
     return db, folder_id
 
 
+def test_a_saved_folder_keeps_the_side_it_was_made_on(tmp_path):
+    db = Database(tmp_path / "t.db")
+
+    folder_id = db.create_custom_folder("Mine", side=PORTRAIT)
+
+    assert db.list_custom_folders() == [
+        {"id": folder_id, "name": "Mine", "side": PORTRAIT, "items": []}]
+
+
 def test_a_saved_folder_lists_its_items_in_the_order_they_were_added(tmp_path):
     db = Database(tmp_path / "t.db")
     folder_id = db.create_custom_folder("Favorites")
@@ -138,7 +167,7 @@ def test_a_saved_folder_lists_its_items_in_the_order_they_were_added(tmp_path):
                                              ("c", "settings", "p3")])
 
     (record,) = db.list_custom_folders()
-    assert record == {"id": folder_id, "name": "Favorites", "items": ["b", "a", "c"]}
+    assert record["items"] == ["b", "a", "c"]
 
 
 def test_re_adding_an_item_keeps_its_place_rather_than_duplicating_it(tmp_path):
@@ -200,7 +229,7 @@ def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
     # At the same id, so a session saved while it was open still finds it.
     db, actions = _actions(tmp_path)
     folder_id = actions.custom_folders.create(
-        "Favorites", [("a", "settings", "p1"), ("b", "settings", "p2")]
+        "Favorites", [("a", "settings", "p1"), ("b", "settings", "p2")], PORTRAIT
     )
 
     actions.custom_folders.delete(folder_id)
@@ -208,7 +237,7 @@ def test_undoing_a_removal_brings_the_folder_back_whole(tmp_path):
     actions.undo()
 
     assert db.list_custom_folders() == [
-        {"id": folder_id, "name": "Favorites", "items": ["a", "b"]}
+        {"id": folder_id, "name": "Favorites", "side": PORTRAIT, "items": ["a", "b"]}
     ]
 
 
@@ -253,12 +282,13 @@ def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
     # A saved session points at a custom folder by id, so a create that is undone
     # and redone has to resolve to the same key rather than a fresh one.
     db, actions = _actions(tmp_path)
-    folder_id = actions.custom_folders.create("Mine", [("image/sdxl_t2i", "model", None)])
+    folder_id = actions.custom_folders.create("Mine", [("image/sdxl_t2i", "model", None)],
+                                              PORTRAIT)
     actions.undo()
     assert db.list_custom_folders() == []
 
     actions.redo()
 
     ((record,),) = (db.list_custom_folders(),)
-    assert record["id"] == folder_id
+    assert record["id"] == folder_id and record["side"] == PORTRAIT
     assert record["name"] == "Mine" and record["items"] == ["image/sdxl_t2i"]

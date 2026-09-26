@@ -372,23 +372,24 @@ class CustomFolderActions:
         self._db = db
         self._history = history
 
-    def create(self, name: str, items: list[tuple]) -> int:
+    def create(self, name: str, items: list[tuple], side: str | None = None) -> int:
         """Make a custom folder holding ``items`` — ``(folder_key, level,
         ref_prompt_id)`` triples — and return its id. Undo removes it again."""
-        folder_id = self._db.create_custom_folder(name)
+        folder_id = self._db.create_custom_folder(name, side=side)
         self._db.add_custom_folder_items(folder_id, items)
-        self._record_creation(name, folder_id, items)
+        self._record_creation(name, folder_id, items, side)
         return folder_id
 
-    def _record_creation(self, name: str, folder_id: int, items: list[tuple]) -> None:
+    def _record_creation(self, name: str, folder_id: int, items: list[tuple],
+                         side: str | None) -> None:
         """File a just-made custom folder as one undoable step, and say how to
         make it again. The redo re-creates it at the id it had rather than
         letting the database allocate a new one, so the key a saved session
         points at still resolves after undo-then-redo."""
         def redo() -> None:
-            self._db.create_custom_folder(name, folder_id)
+            self._db.create_custom_folder(name, folder_id, side)
             self._db.add_custom_folder_items(folder_id, items)
-            self._record_creation(name, folder_id, items)
+            self._record_creation(name, folder_id, items, side)
 
         self._history.push(UndoEntry(
             f"Create folder “{name}”",
@@ -445,11 +446,11 @@ class CustomFolderActions:
         # query happened to return.
         order = {key: i for i, key in enumerate(record["items"])}
         items.sort(key=lambda m: order[m[0]])
-        name = record["name"]
+        name, side = record["name"], record["side"]
         self._db.delete_custom_folder(folder_id)
 
         def undo() -> str | None:
-            self._db.create_custom_folder(name, folder_id)
+            self._db.create_custom_folder(name, folder_id, side)
             self._db.add_custom_folder_items(folder_id, items)
             return None
 

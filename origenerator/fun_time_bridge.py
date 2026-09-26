@@ -11,8 +11,9 @@ shows the way it reaches the players:
   switching INTO origenerator mode) and ``CLOSE_SHOWS`` clears them again;
   ``FILTER_ENHANCED`` flips the enhanced-only switch a show's HUD and the
   session's console both carry; ``GO_TO|<file>`` lands the gallery on the
-  generation a file is a copy of; ``QUIT`` closes the app as Ctrl+Alt+Q would,
-  and ``RELEASE`` gives a window the session took over back to standalone.
+  generation a file is a copy of, and ``RELEASE`` gives a window the session
+  took over back to standalone.  Every line it answers is declared in
+  :mod:`origenerator.fun_time_mode`, which publishes them for the session.
 * The paused flag freezes the shows the way it freezes the players, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
@@ -35,13 +36,21 @@ from player_core.file_channel import (
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.console_commands import side_press, side_spoken_to
-from origenerator.fun_time_mode import FunTimeSession
+from origenerator.fun_time_mode import (
+    CLOSE_SHOWS,
+    FILTER_ENHANCED,
+    GO_TO,
+    OPEN_SHOWS,
+    RELEASE,
+    SAY,
+    SIDES,
+    FunTimeSession,
+)
 from origenerator.show_buttons import answer
 
 logger = logging.getLogger(__name__)
 
 _POLL_MS = 150
-_SIDES = ("portrait", "landscape")
 
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
@@ -72,14 +81,13 @@ class FunTimeBridge(QObject):
         self._published = False
         # The verbs about the session's shows as a whole, rather than one side's.
         self._session_verbs = {
-            "OPEN_SHOWS": lambda: self._gallery.fill_the_regions(),
+            OPEN_SHOWS: lambda: self._gallery.fill_the_regions(),
             # Through the gallery, not show by show: it has to stop WANTING the
             # regions first, or each close it makes here is answered by the
             # base state opening again underneath it.
-            "CLOSE_SHOWS": lambda: self._gallery.close_the_shows(),
-            "FILTER_ENHANCED": self._filter_enhanced,
-            "QUIT": lambda: self._gallery.window().close(),
-            "RELEASE": self._release,
+            CLOSE_SHOWS: lambda: self._gallery.close_the_shows(),
+            FILTER_ENHANCED: self._filter_enhanced,
+            RELEASE: self._release,
         }
         self._released = False
         self._timer = QTimer(self)
@@ -119,23 +127,22 @@ class FunTimeBridge(QObject):
         if not marker and keyword in self._session_verbs:
             self._session_verbs[keyword]()
             return
-        if keyword == "GO_TO" and marker == "|":
+        if keyword == GO_TO and marker == "|":
             self._gallery.go_to_file(argument)
             return
-        side = side_spoken_to(keyword, _SIDES)
+        side = side_spoken_to(keyword, SIDES)
         if side is None:
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
         action, argument = side_press(side, keyword.lower(), argument)
-        action = action.upper()
-        if action == "SAY" and marker == ":":
+        if action == SAY and marker == ":":
             # The session owns the microphone for the whole room, so a spoken
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
             # which is the only place that knows its shelves and its parts.
             self._gallery.run_spoken_command(f"{side} {argument}")
             return
-        self._apply_side(side, action.lower(), argument, line)
+        self._apply_side(side, action, argument, line)
 
     def _release(self) -> None:
         self._released = True
@@ -151,7 +158,7 @@ class FunTimeBridge(QObject):
         region whose set has nothing enhanced in it refuses the narrowing — and
         one lit switch cannot say that a room is half narrowed.
         """
-        shows = [show for show in map(self._gallery.region_show, _SIDES)
+        shows = [show for show in map(self._gallery.region_show, SIDES)
                  if show is not None]
         enhanced_only = not any(show.hud_enhanced_mode for show in shows)
         for show in shows:

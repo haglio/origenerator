@@ -28,7 +28,9 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from origenerator.console_commands import spelled_filter, spelled_for
 from origenerator.media import MediaType
+from origenerator.show_buttons import PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.slideshow import Slide
 from origenerator.win32 import process_creation_time
 
@@ -36,14 +38,14 @@ logger = logging.getLogger(__name__)
 
 # --- the declared launch contract ------------------------------------------
 #
-# Everything a host must know to start this app inside a session and then find
-# the windows it opens.  Declared once here, published as CONTRACT_FILE at the
-# checkout root for a host that cannot import this package, and used below to
-# BUILD the parser -- so the flags a host writes, the flags this app reads and
-# the document a host checks itself against are all one thing.  They were three
-# hand-kept copies with nothing comparing them, which is how a flag renamed on
-# one side could become a window that never appeared on the other (audit
-# cross/boundaries/cross/017).
+# Everything a host must know to start this app inside a session, find the
+# windows it opens and drive it.  Declared once here, published as
+# CONTRACT_FILE at the checkout root for a host that cannot import this
+# package, and used below to BUILD the parser -- so the flags a host writes,
+# the flags this app reads and the document a host checks itself against are
+# all one thing.  They were three hand-kept copies with nothing comparing them,
+# which is how a flag renamed on one side could become a window that never
+# appeared on the other (audit cross/boundaries/cross/017).
 
 #: The module a host runs.
 MODULE = "origenerator"
@@ -84,6 +86,14 @@ HEADSET_HOVER = "hover"
 HEADSET_SCROLL = "scroll"
 HEADSET_WORDS = (HEADSET_PRESS, HEADSET_RELEASE, HEADSET_DRAG, HEADSET_HOVER,
                  HEADSET_SCROLL)
+
+OPEN_SHOWS = "OPEN_SHOWS"
+CLOSE_SHOWS = "CLOSE_SHOWS"
+FILTER_ENHANCED = "FILTER_ENHANCED"
+RELEASE = "RELEASE"
+SESSION_VERBS = (OPEN_SHOWS, CLOSE_SHOWS, FILTER_ENHANCED, RELEASE)
+GO_TO = "GO_TO"
+SAY = "say"
 
 #: Whose taskbar button this window joins.
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
@@ -153,6 +163,25 @@ def headset_flags() -> tuple[str, ...]:
     return tuple(f"--{name}" for name in HEADSET_FILES)
 
 
+def command_lines() -> tuple[str, ...]:
+    """Every line the command file answers, a name in braces standing for what
+    the line carries there."""
+    return (
+        *SESSION_VERBS,
+        f"{GO_TO}|{{file}}",
+        *(line for side in SIDES for line in _lines_said_to(side)),
+    )
+
+
+def _lines_said_to(side: str) -> tuple[str, ...]:
+    return (
+        *(spelled_for(side, press) for press in PRESSES),
+        *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
+        spelled_filter(side, "{row}"),
+        f"{spelled_for(side, SAY)}:{{words}}",
+    )
+
+
 def declaration() -> dict:
     """The published document, as a host reads it."""
     return {
@@ -165,6 +194,8 @@ def declaration() -> dict:
         "player_flags": {side: list(player_flags(side)) for side in SIDES},
         "headset_flags": list(headset_flags()),
         "headset_words": list(HEADSET_WORDS),
+        "command_case_blind": True,
+        "command_lines": list(command_lines()),
     }
 
 
@@ -179,7 +210,7 @@ def contract_path(root: Path | None = None) -> Path:
 def publish(root: Path | None = None) -> Path:
     """Write the document out, in the shape the tracked copy holds."""
     path = contract_path(root)
-    path.write_text(published_text(), encoding="utf-8")
+    path.write_text(published_text(), encoding="utf-8", newline="\n")
     return path
 
 

@@ -6,11 +6,14 @@ session's hotkeys reach the region shows and its choreography can see them.
 """
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from PIL import Image
 from player_core.file_channel import consume_command_file
 from player_core.playlist import read_playlist
 from player_core.satellite_hud import parse_hud
 
+from origenerator import fun_time_mode as contract
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
 from origenerator.gui import omnipause, show_director
@@ -675,6 +678,30 @@ def test_a_verb_said_to_neither_side_is_dropped_on_the_log(qtbot, tmp_path, capl
     _press(bridge, tmp_path, "sideways_next")
 
     assert "Unknown Fun Time verb dropped: sideways_next" in caplog.text
+
+
+def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
+    """*line* on the command file of a bridge over a gallery that has every
+    answer, so a line dropped is dropped by the bridge itself."""
+    session = _session(tmp_path)
+    bridge = FunTimeBridge(session, MagicMock())
+    session.command_file.write_text(f"{line}\n", encoding="utf-8")
+    bridge._tick()
+
+
+def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_path, caplog):
+    """A host sends what the document names, so a named line dropped here is a
+    key that does nothing in the session -- in whichever case the host spells
+    it, which the document leaves to the host."""
+    document = contract.declaration()
+    assert document["command_case_blind"]
+
+    for template in document["command_lines"]:
+        line = template.format(file=r"C:\library\scene one.png", row="alpha", words="favorites")
+        for spelled in (line.lower(), line.upper()):
+            _told_on_a_fresh_bridge(tmp_path, spelled)
+
+    assert "dropped" not in caplog.text
 
 
 def test_a_clip_the_session_names_lands_the_gallery_on_the_generation_it_copies(

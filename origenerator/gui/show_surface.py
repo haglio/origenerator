@@ -5,9 +5,9 @@ QMovie, a Qt video widget (:mod:`origenerator.gui.preview_widget`).  The show
 does not: it hands the file to the same engine Fun Time's players run on
 (:class:`player_core.render_player.MpvRenderPlayer`), which decodes on the GPU,
 holds a picture for the pace and ends it the way it ends a finished video, and
-creeps slowly into a still while it holds the screen.  So a show looks and
+moves slowly over a still while it holds the screen.  So a show looks and
 behaves the same whether it is this window or one of a session's players
-showing the slides, and there is one copy of each of those behaviours rather
+showing the slides, and there is one copy of each of those behaviors rather
 than two.
 
 The engine draws into a window the caller owns -- that is how Genau runs it
@@ -49,8 +49,8 @@ from origenerator.media import MediaType
 logger = logging.getLogger(__name__)
 
 # How often the engine is asked where it has got to: whether the item ran out,
-# whether anything opened, how big the picture is, and the next step of the
-# creep into a still.  Sixty times a second, which is the creep's rate: the
+# whether anything opened, how big the picture is, and the next step of a
+# still's move.  Sixty times a second, which is the move's rate: the
 # engine paints its own window, so drawing is not on this clock.
 _TICK_MS = 16
 
@@ -175,7 +175,7 @@ class ShowSurface(QWidget):
         """How long a picture holds the screen, nought holding it indefinitely.
 
         The engine's own, so it ends a picture the way it ends a finished
-        video, and paces the creep into a still by it.
+        video, and paces a still's move by it.
         """
         self._engine.set_pace(seconds)
 
@@ -301,7 +301,7 @@ class ShowSurface(QWidget):
         return super().eventFilter(watched, event)
 
     def _follow_the_engine(self) -> None:
-        """Carry the creep on, and pass on whatever the engine has to report."""
+        """Carry a still's move on, and pass on whatever the engine has to report."""
         self._engine.push_still()
         dims = self._engine.video_dims
         if dims != self._dims:

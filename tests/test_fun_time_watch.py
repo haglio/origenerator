@@ -93,6 +93,21 @@ def test_a_session_starting_beside_an_open_window_takes_the_device_from_it(qtbot
     watch.withdraw()
 
 
+def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_everyday_copy(
+        qtbot, tmp_path):
+    preview, everyday = tmp_path / "preview", tmp_path / "everyday"
+    preview.mkdir()
+    everyday.mkdir()
+    said = []
+    watch = FunTimeWatch(preview, take_over=lambda session: None,
+                         device_claimed=said.append, library_state_dir=everyday)
+
+    _claim(everyday, pid=os.getpid())
+    qtbot.waitUntil(lambda: said[-1] is True)
+
+    watch.withdraw()
+
+
 def test_a_claim_left_by_a_session_that_died_holds_nothing(qtbot, tmp_path):
     said = []
     _claim(tmp_path, pid=os.getpid(), created_at=this_process_creation_time() - 1)

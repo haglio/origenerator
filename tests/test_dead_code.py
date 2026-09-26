@@ -134,7 +134,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_dragging_the_armed_preview_carries_its_generation; the director's note
 # that a lone picture keeps its row for its versions is
 # test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation.
-MAX_PROSE_LINES = 19262
+#
+# 19261 when a discarded seed's relaunch moved ahead of the folder's redraw: the
+# helper that wrapped the drop and the redraw went, and what its line said is
+# test_a_tab_watching_the_loop_follows_it_onto_the_next_seed.
+MAX_PROSE_LINES = 19261
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

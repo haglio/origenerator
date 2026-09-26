@@ -153,8 +153,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     rather than keeping a list a star would leave stale. 267 -> 268: a Fun Time
     session names the clip its Genau has locked on by the clip's file, and
     landing on the generation that file copies is `go_to_file` -- the gallery's
-    rows and a `follow_link`, which nothing outside it holds both of.)"""
+    rows and a `follow_link`, which nothing outside it holds both of. 268 -> 267:
+    a discarded seed's relaunch comes before the folder's redraw, so the tab
+    following the loop keeps following it, and the drop and the redraw that
+    `_drop_reroll` wrapped for its one caller are that caller's own lines.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 268
+               for x in _class_def(VIEW, "GalleryView").body) == 267
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 77

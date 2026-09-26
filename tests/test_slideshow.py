@@ -423,6 +423,18 @@ def test_a_live_slide_becomes_the_file_it_lands_as():
     assert playlist.live_ids() == []
 
 
+def test_a_run_that_lands_after_the_show_moved_past_it_comes_up_next():
+    playlist = _four()
+    playlist.add((b"frame-1", LIVE, "id-new", None))
+    for _ in range(3):
+        playlist.advance()
+
+    playlist.replace_live("id-new", "new.png", "image")
+
+    assert playlist.current() == Slide("c.png", "image", "id-c")
+    assert playlist.peek(1) == ("new.png", "image", "id-new", None)
+
+
 def test_an_item_that_was_never_live_is_not_replaced_as_one():
     playlist = _four()
     assert playlist.replace_live("id-a", "other.png", "image") is False

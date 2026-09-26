@@ -1317,6 +1317,7 @@ class SlideshowView(QWidget):
         slide nobody locked (Escape, a double-click, the spoken "close", the last
         item culled), it hands nothing over and leaves the gallery alone.
         """
+        self.hide()
         self._pane.clear()  # release any held file so it can be deleted
         self._pane.close_engine()
         self._live_clock.cancel()

@@ -1,4 +1,4 @@
-"""Copy a video into the Evolver pipeline's inbox.
+"""Copy a video, and its funscript, into the Evolver pipeline's inbox.
 
 Evolver is a sibling app that watches ``0_inbox/<source>/`` and ingests any
 *finalized* video it finds there. This module is the Origenerator side of that
@@ -34,8 +34,8 @@ class EvolverInbox:
 
     inbox_dir: Path
 
-    def hand_over(self, video: Path, source: str) -> Path:
-        """Copy *video* into the folder Evolver routes *source* by.
+    def hand_over(self, video: Path, source: str, *, funscript: Path | None = None) -> Path:
+        """Copy *video*, with its *funscript*, into the folder Evolver routes *source* by.
 
         A lane with no folder is refused rather than dropped in the inbox root,
         where Evolver -- which routes by folder and nothing else -- would read it
@@ -43,7 +43,7 @@ class EvolverInbox:
         """
         if not source:
             raise ValueError("that lane has no folder to send to")
-        return export_video(video, Path(self.inbox_dir) / source)
+        return export_video(video, Path(self.inbox_dir) / source, funscript=funscript)
 
 
 def default_inbox() -> EvolverInbox:
@@ -51,20 +51,26 @@ def default_inbox() -> EvolverInbox:
     return EvolverInbox(EVOLVER_INBOX_DIR)
 
 
-def export_video(src: Path, dest_dir: Path) -> Path:
-    """Copy ``src`` into ``dest_dir`` and return the final destination path.
+def export_video(src: Path, dest_dir: Path, *, funscript: Path | None = None) -> Path:
+    """Copy ``src``, with *funscript* under its name, into ``dest_dir``; where it landed.
 
-    The copy lands under a :data:`PARTIAL_MARKER` name and is renamed into place
-    only once complete. Evolver skips any file whose name carries that marker, so
-    it never ingests a half-written video; the rename is atomic within the dir.
+    Each copy wears :data:`PARTIAL_MARKER`, which Evolver skips, until all are complete.
     """
-    src = Path(src)
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
-    final = _unique_path(dest_dir / src.name)
-    partial = partial_name(final)
-    shutil.copy2(src, partial)
-    os.replace(partial, final)
+    final = _unique_path(dest_dir / Path(src).name)
+    copies = [(Path(src), final)]
+    if funscript is not None:
+        copies.append((Path(funscript), final.with_suffix(FUNSCRIPT_SUFFIX)))
+    try:
+        for source, destination in copies:
+            shutil.copy2(source, partial_name(destination))
+    except BaseException:
+        for _, destination in copies:
+            partial_name(destination).unlink(missing_ok=True)
+        raise
+    for _, destination in copies:
+        os.replace(partial_name(destination), destination)
     return final
 
 
@@ -80,16 +86,20 @@ def partial_name(final: Path) -> Path:
     return final.with_name(f"{final.stem}{PARTIAL_MARKER}{final.suffix.lstrip('.')}")
 
 
+FUNSCRIPT_SUFFIX = ".funscript"
+
+
 def _unique_path(path: Path) -> Path:
     """``path`` if free, else the same name with a `` (2)``, ``(3)``… suffix.
 
-    Keeps an export from overwriting a video already waiting in the inbox.
+    Keeps an export from overwriting a video, or its funscript, waiting in the inbox.
     """
-    if not path.exists():
-        return path
+    def taken(candidate: Path) -> bool:
+        return candidate.exists() or candidate.with_suffix(FUNSCRIPT_SUFFIX).exists()
+
     n = 2
-    while True:
+    candidate = path
+    while taken(candidate):
         candidate = path.with_name(f"{path.stem} ({n}){path.suffix}")
-        if not candidate.exists():
-            return candidate
         n += 1
+    return candidate

@@ -769,7 +769,7 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
     monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
     sent = []
     monkeypatch.setattr(module.evolver_export, "export_video",
-                        lambda path, destination: sent.append(path.name))
+                        lambda path, destination, funscript=None: sent.append(path.name))
     db = FakeDB()
     controller, _host = combine(db=db)
 
@@ -800,7 +800,7 @@ def test_the_clip_lands_in_the_inbox_this_controller_was_handed(combine, monkeyp
 def test_a_clip_already_handed_on_is_not_sent_twice(combine, monkeypatch, tmp_path):
     sent = []
     monkeypatch.setattr(module.evolver_export, "export_video",
-                        lambda path, destination: sent.append(path))
+                        lambda path, destination, funscript=None: sent.append(path))
     controller, _host = combine()
 
     controller.send_to_genau_if_requested(
@@ -817,7 +817,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
     (output / "clip.mp4").write_bytes(b"pixels")
     monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output)
 
-    def boom(path, destination):
+    def boom(path, destination, funscript=None):
         raise OSError("the inbox is not there")
 
     monkeypatch.setattr(module.evolver_export, "export_video", boom)

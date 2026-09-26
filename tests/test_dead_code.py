@@ -123,7 +123,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_main_in_fun_time_mode_parks_the_window_and_threads_the_session,
 # test_a_boot_hosted_in_the_headset_is_not_parked and
 # test_main_shows_loading_screen_during_boot_and_closes_it_after_window.
-MAX_PROSE_LINES = 19281
+#
+# 19279 when a clip handed to Evolver began taking its funscript along: what
+# the hand-over's note said of the order it renames its copies in is
+# test_shows_up_only_after_its_clip_so_evolver_never_finds_it_alone.
+MAX_PROSE_LINES = 19279
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

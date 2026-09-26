@@ -478,6 +478,8 @@ class BrowserPane(QObject):
         container, flow = self._new_tile_pane()
         for key in shelves:
             self._add_shelf_tile(flow, key)
+        if shelves and groups:
+            flow.add_full_row(_time_heading(" "))
         for group in groups:
             self._add_folder_tile(flow, group, favorite=group.favorite)
         self.show_widget(container)

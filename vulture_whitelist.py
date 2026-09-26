@@ -26,6 +26,10 @@ _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:204
 _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_wheel.py:97, origenerator/gui/no_wheel.py:102
 
+# --- Qt style options -- written here, read by the C++ style laying the option out ---
+_.features  # noqa  # origenerator/gui/folder_tree.py:213
+_.decorationSize  # noqa  # origenerator/gui/folder_tree.py:215
+
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 

@@ -155,7 +155,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_folders_latest_lists_what_that_folder_made_under_its_path,
 # test_a_folders_shelf_scopes_the_search_and_names_its_path and
 # test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it.
-MAX_PROSE_LINES = 19168
+#
+# 19161 when a shelf row's mark moved under its folder's own mark and a folder of
+# your own lost the star it could not use: the list's note on where it draws a
+# shelf's mark, and on which rows wear a star and a delete, are
+# test_a_shelf_rows_mark_stands_under_its_folders_own_mark and
+# test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark.
+MAX_PROSE_LINES = 19161
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

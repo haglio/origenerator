@@ -44,7 +44,7 @@ from origenerator.gui.show_map import (
     step_in_ring,
 )
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
 
 # What the loop key answers: the axis it started looping, that it ended the
 # loop, or — with nothing on either axis to loop — that the press is the lock
@@ -93,6 +93,7 @@ class ShowSet:
         self.act_filter = ""
         self._enhancements_asked: set[str] = set()
         self._enhance_frames: dict[str, bytes] = {}
+        self._runs_offered: set[str] = set()
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`set_modes`).
         self.all_items = [Slide.of(item) for item in items]
@@ -323,6 +324,16 @@ class ShowSet:
         """Every run the whole set holds as frames rather than as a file — in
         the pass or kept out of it by a switch."""
         return [kept.prompt_id for kept in self.all_items if kept.is_live]
+
+    def first_offer_of(self, prompt_id: str) -> bool:
+        first = prompt_id not in self._runs_offered
+        self._runs_offered.add(prompt_id)
+        return first
+
+    def join_live(self, prompt_id: str, frame: bytes) -> bool:
+        live = Slide(frame, LIVE, prompt_id)
+        self.remember(live)
+        return self.passes(live) and self.playlist.add(live)
 
     def upgrade(self, prompt_id, path, media_type, still):
         """Point the whole set's entry for *prompt_id* at a better version of

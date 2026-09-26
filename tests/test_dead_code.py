@@ -178,7 +178,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer, and the
 # director's on telling only the show in front is
 # test_how_the_enhancements_are_going_reaches_every_show_that_is_up.
-MAX_PROSE_LINES = 19098
+#
+# 19078 when a session's players took in the pictures still being made: the
+# player show's lines on why it could not are gone, and the fullscreen show's
+# on taking a run in once is
+# test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame.
+MAX_PROSE_LINES = 19078
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

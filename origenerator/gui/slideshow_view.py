@@ -61,7 +61,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_queue import SlideshowQueue
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
-from origenerator.slideshow import LIVE, ShowState, Slide, in_order
+from origenerator.slideshow import ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
 
@@ -186,10 +186,6 @@ class SlideshowView(QWidget):
         # Following a generation still in flight: no items of its own, so the pane
         # that opened this feeds the frames and hands over the file that lands.
         self._live = not items
-        # Every run this show has already taken in as a slide of its own frames.
-        # A run is offered once: one culled off the show would otherwise be put
-        # straight back by its next frame, which is the opposite of what Up says.
-        self._seen_live: set[str] = set()
         self._frame = frame  # the frame the double-click landed on, if any
         # The item to hand the gallery on the way out, once there is one: Enter
         # names it outright, and a lock names it by being the slide the show
@@ -435,15 +431,7 @@ class SlideshowView(QWidget):
             else:
                 self._update_neighbors()  # it may be the still riding either side
             return
-        if prompt_id in self._seen_live:
-            return
-        self._seen_live.add(prompt_id)
-        live = Slide(frame, LIVE, prompt_id)
-        self._set.remember(live)
-        # A run still being made is neither a favorite nor enhanced, so a
-        # narrowed show leaves its frames out of the pass and takes them in
-        # when the switch comes off, the way it takes in anything else it has.
-        if self._set.passes(live) and self._playlist.add(live):
+        if self._set.first_offer_of(prompt_id) and self._set.join_live(prompt_id, frame):
             self._update_counter()
             self._update_neighbors()
 

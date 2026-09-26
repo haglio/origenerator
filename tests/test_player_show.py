@@ -10,11 +10,13 @@ from pathlib import Path
 
 from player_core.file_channel import consume_command_file
 from player_core.hud_status import LATEST_LABEL
-from player_core.playlist import read_playlist
+from player_core.player_verbs import play_file
+from player_core.playlist import PlaylistItem, read_playlist
 from player_core.satellite_hud import parse_hud
 from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
@@ -23,6 +25,7 @@ from origenerator.slideshow import ShowState, Slide, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
+FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 # A window has a picture of its own to put a run's frames on, a queue floated
 # over it, a sound to mute and a panel it wears; a player has none of them.
@@ -46,7 +49,7 @@ def _show(qtbot, tmp_path, items=_ITEMS, **fields) -> PlayerShow:
     test says when the player is next read rather than racing it.
     """
     show = PlayerShow(items, side="portrait", channel=_channel(tmp_path),
-                      shuffle=in_order, **fields)
+                      frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     show._timer.stop()
     return show
 
@@ -976,3 +979,138 @@ def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_player(qtb
     show.show_step_version(1)
 
     assert _sent(show) == ["PLAY_FILE one.png"]
+
+
+def test_a_run_being_made_joins_the_players_list_on_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_generating("id-run", FRAME)
+
+    played = [item.path for item in read_playlist(show.channel.playlist)]
+    assert [str(path) for path in played[:1] + played[2:]] == ["one.png", "two.png",
+                                                              "three.png"]
+    assert played[1].read_bytes() == FRAME
+    assert "RELOAD_PLAYLIST" in _sent(show)
+
+
+def test_the_player_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    _sent(show)
+
+    show.lead_with_what_is_being_made()
+
+    first_frame = read_playlist(show.channel.playlist)[0].path
+    assert first_frame.read_bytes() == FRAME
+    assert play_file(PlaylistItem(first_frame)) in _sent(show)
+
+
+def _frame_shown(sent: list[str]) -> bytes | None:
+    """What the last SHOW_FRAME among *sent* has the player paint, read off
+    the file it names."""
+    shown = [line.removeprefix("SHOW_FRAME ") for line in sent
+             if line.startswith("SHOW_FRAME ")]
+    return Path(shown[-1]).read_bytes() if shown else None
+
+
+def test_a_player_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbot,
+                                                                          tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+    _sent(show)
+
+    _says(show, video=str(first_frame))
+    show.tick()
+
+    assert show.hud_prompt_id == "id-run"
+    assert _frame_shown(_sent(show)) == FRAME
+
+
+def _show_with_the_player_on_a_run(qtbot, tmp_path) -> PlayerShow:
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_generating("id-run", FRAME)
+    _says(show, video=str(read_playlist(show.channel.playlist)[1].path))
+    show.tick()
+    _sent(show)
+    return show
+
+
+def test_a_newer_frame_of_the_run_on_the_player_goes_to_it_at_once(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+
+    show.note_generating("id-run", FRAME + b" one step further")
+
+    assert _frame_shown(_sent(show)) == FRAME + b" one step further"
+
+
+def test_a_run_that_lands_is_its_file_on_the_player_from_then_on(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+
+    show.note_added("run.png", "image", "id-run")
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["run.png", "two.png", "three.png", "one.png"]
+    assert play_file(PlaylistItem(Path("run.png"))) in _sent(show)
+    assert not first_frame.exists()
+
+
+def test_a_run_that_stops_being_made_leaves_the_players_list(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    first_frame = read_playlist(show.channel.playlist)[1].path
+
+    show.note_in_flight(set())
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["two.png", "three.png", "one.png"]
+    assert play_file(PlaylistItem(Path("two.png"))) in _sent(show)
+    assert not first_frame.exists()
+
+
+def test_a_show_left_with_nothing_once_its_run_stops_is_over(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, items=[("one.png", "image", "id-1")])
+    show.note_generating("id-run", FRAME)
+    show.show_cull()
+
+    show.note_in_flight(set())
+
+    assert show.is_showing() is False
+
+
+def test_a_show_that_closes_takes_its_frames_with_it(qtbot, tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+
+    show.close()
+
+    assert list((tmp_path / "frames").iterdir()) == []
+
+
+def test_a_picture_being_enhanced_on_the_player_shows_the_enhancement_coming_in(
+        qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
+
+    assert _frame_shown(_sent(show)) == FRAME
+
+
+def test_an_enhancement_that_stops_takes_its_frame_off_the_player(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
+    _sent(show)
+
+    show.note_enhancing({}, {})
+
+    assert _sent(show) == ["CLEAR_FRAME"]
+
+
+def test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame(qtbot,
+                                                                          tmp_path):
+    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    show.show_cull()
+
+    show.note_generating("id-run", FRAME + b" one step further")
+
+    assert not show.holds("id-run")
+    assert list((tmp_path / "frames").iterdir()) == []

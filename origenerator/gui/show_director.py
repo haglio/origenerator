@@ -35,7 +35,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator import gallery
-from origenerator.config import COMFYUI_OUTPUT_DIR, EVOLVER_SOURCE, EVOLVER_UPSCALED_DIR
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR,
+    EVOLVER_SOURCE,
+    EVOLVER_UPSCALED_DIR,
+    FRAMES_BEING_MADE_DIR,
+)
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
@@ -47,6 +52,7 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery.shelves import folder_shelf
 from origenerator.generation_state import GenerationSource, source_of
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_hud import ShowHud
@@ -473,6 +479,7 @@ class ShowDirector:
             occupant.set_levels(levels)
             return occupant
         show = PlayerShow(items, side=side, channel=channel,
+                          frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
         show.set_levels(levels)

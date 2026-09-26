@@ -10,8 +10,12 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtCore import QPoint, QRect, QSize
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolButton
+from shared_ui.spacing import BUTTON_SIZE
 
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
     BankActs,
@@ -202,3 +206,49 @@ def test_a_switch_hands_its_handler_the_state_it_landed_in(bank):
     made.audio.setChecked(False)
 
     assert heard == [True, False]
+
+
+def _every_button_showing_as_the_app_styles_it(bank) -> ToolbarBank:
+    made = bank()
+    made.setStyleSheet(build_stylesheet())
+    made.apply(_state())
+    made.show()
+    made.layout().activate()
+    return made
+
+
+def _where_the_mark_lands(button: QToolButton) -> QRect:
+    worn = button.grab().toImage()
+    icon = button.icon()
+    button.setIcon(QIcon())
+    bare = button.grab().toImage()
+    button.setIcon(icon)
+    inked = [(x, y) for y in range(worn.height()) for x in range(worn.width())
+             if worn.pixel(x, y) != bare.pixel(x, y)]
+    xs, ys = [x for x, _ in inked], [y for _, y in inked]
+    return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
+
+
+def test_every_button_on_the_bank_is_the_familys_ordinary_square(bank):
+    made = _every_button_showing_as_the_app_styles_it(bank)
+
+    for button in made.findChildren(QToolButton):
+        assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE), button.toolTip()
+
+
+def test_every_mark_on_the_bank_spans_more_than_half_its_button(bank):
+    made = _every_button_showing_as_the_app_styles_it(bank)
+
+    for button in made.findChildren(QToolButton):
+        mark = _where_the_mark_lands(button)
+        assert max(mark.width(), mark.height()) > button.height() / 2, button.toolTip()
+
+
+def test_every_mark_on_the_bank_keeps_two_pixels_clear_of_its_border(bank):
+    made = _every_button_showing_as_the_app_styles_it(bank)
+    border, clear = 1, 2
+
+    for button in made.findChildren(QToolButton):
+        room = button.rect().adjusted(border + clear, border + clear,
+                                      -(border + clear), -(border + clear))
+        assert room.contains(_where_the_mark_lands(button)), button.toolTip()

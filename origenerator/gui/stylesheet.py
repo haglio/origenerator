@@ -232,6 +232,9 @@ def build_stylesheet() -> str:
     QToolButton#iconButton {{
         padding: 4px;
     }}
+    QToolButton#bankButton {{
+        padding: 0px;
+    }}
     /* The derived-size padlock: a compact toggle floating between the width and
        height rows. It lights blue while unlocked (the fields are overridable). */
     QToolButton#dimensionUnlock {{

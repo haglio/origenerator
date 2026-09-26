@@ -255,7 +255,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # director's lines on why a player could take no frame are gone, and what it
 # takes instead is
 # test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it.
-MAX_PROSE_LINES = 18769
+#
+# 18768 when a show's arrivals began coming up in the order they arrived: what
+# the playlist said about putting each one straight after the picture on
+# screen is test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it.
+MAX_PROSE_LINES = 18768
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

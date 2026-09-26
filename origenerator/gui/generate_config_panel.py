@@ -29,6 +29,7 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
+from origenerator.funscript import funscript_of
 from origenerator.gallery import (
     EnhanceSettings,
     build_image_config_index,
@@ -1663,8 +1664,10 @@ class GenerateConfigPanel(QWidget):
         path = self._displayed_video_path()
         if path is None:
             return
+        funscript = (funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR)
+                     if lane.hands_over_funscript else None)
         try:
-            self._inbox.hand_over(path, lane.source)
+            self._inbox.hand_over(path, lane.source, funscript=funscript)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
             QMessageBox.warning(self._preview, lane.failure_title,

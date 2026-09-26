@@ -2048,9 +2048,33 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
 
     # The same inbox Evolver watches, under the name that says where the result
     # belongs — the destination is the whole of what makes a lane a lane.
-    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source)
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
+                                   funscript=None)
     assert panel._displayed_row[lane.flag]
     assert button.text() == f"Delete from {lane.name}"
+
+
+@pytest.mark.parametrize(("lane", "brings_its_funscript"),
+                         [(export_lane_module.EVOLVER, True),
+                          (export_lane_module.GENAU, False)],
+                         ids=lambda value: getattr(value, "name", value))
+def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alone(
+        saved_panel, monkeypatch, lane, brings_its_funscript):
+    panel, db = saved_panel
+    video_path = Path("C:/out/vid1.mp4")
+    funscript = Path("C:/out/funscript/vid1.funscript")
+    monkeypatch.setattr(gcp_module, "resolve_preview",
+                        lambda row, out: (video_path, "video"))
+    monkeypatch.setattr(gcp_module, "funscript_of",
+                        lambda video, output_dir: funscript if video == video_path else None)
+    export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
+    monkeypatch.setattr(evolver_export, "export_video", export)
+
+    panel.show_saved_generation(_video_row(db, "vid1"), [])
+    panel._on_send(panel._lanes[lane.name])
+
+    export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
+                                   funscript=funscript if brings_its_funscript else None)
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -2073,6 +2097,29 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
     panel._on_send(panel._lanes[lane.name])
 
     assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"
+
+
+def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
+        qtbot, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    clip = output / "video" / "vid1.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"pixels")
+    write_funscript(funscript_path_for(clip, output_dir=output), [{"at": 0, "pos": 0}])
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (clip, "video"))
+    db = Database(tmp_path / "t.db")
+    inbox = tmp_path / "0_inbox"
+    panel = GenerateConfigPanel(ComfyUIClient(), db,
+                                inbox=evolver_export.EvolverInbox(inbox))
+    qtbot.addWidget(panel)
+    panel._preview.show_media = MagicMock()
+
+    panel.show_saved_generation(_video_row(db, "vid1"), [])
+    panel._on_send(panel._lanes[export_lane_module.EVOLVER.name])
+
+    lane = inbox / export_lane_module.EVOLVER.source
+    assert sorted(path.name for path in lane.iterdir()) == ["vid1.funscript", "vid1.mp4"]
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

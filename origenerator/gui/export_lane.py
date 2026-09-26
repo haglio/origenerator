@@ -51,6 +51,7 @@ class ExportLane:
     tooltip: str
     delete_tooltip: str
     withdrawn_tooltip: str
+    hands_over_funscript: bool
     # The button this lane wears, filled in per panel when the bank is built
     # (see :meth:`GenerateConfigPanel._build_ui`). ``None`` on the table's own
     # rows, which describe the lanes rather than any one panel's buttons.
@@ -97,6 +98,7 @@ EVOLVER = ExportLane(
                    "now. It goes on Evolver's next run.",
     withdrawn_tooltip="An earlier copy of this video is down for deletion in "
                       "Evolver. Sending puts a fresh one in its inbox.",
+    hands_over_funscript=True,
 )
 
 GENAU = ExportLane(
@@ -110,6 +112,7 @@ GENAU = ExportLane(
                    "does it on its next run.",
     withdrawn_tooltip="An earlier copy of this clip is down for deletion in "
                       "Genau's folder. Sending starts a fresh one down the lane.",
+    hands_over_funscript=False,
 )
 
 # In the order they sit in the button bank. Named above as well, because the

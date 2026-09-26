@@ -13605,7 +13605,8 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
     sent = []
-    monkeypatch.setattr(evolver_export, "export_video", lambda src, dest: sent.append(src))
+    monkeypatch.setattr(evolver_export, "export_video",
+                        lambda src, dest, funscript=None: sent.append(src))
 
     view._combine.generate_category("img", "dancing", recipe_match.GENAU)
     job = next(iter(view._live_jobs.values()))
@@ -13956,7 +13957,8 @@ def test_a_spoken_genau_it_hands_its_finished_clip_on(qtbot, tmp_path, monkeypat
                         lambda row, out: (clip, "video"))
     sent = []
     monkeypatch.setattr(combine_controller.evolver_export, "export_video",
-                        lambda src, dest: sent.append((src, dest)) or dest / src.name)
+                        lambda src, dest, funscript=None:
+                        sent.append((src, dest)) or dest / src.name)
 
     view._on_reroll_finished("k", "loop")
 
@@ -13972,7 +13974,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
     sent = []
     monkeypatch.setattr(combine_controller.evolver_export, "export_video",
-                        lambda src, dest: sent.append(src))
+                        lambda src, dest, funscript=None: sent.append(src))
 
     view._on_reroll_finished("k", "loop")
 
@@ -13987,7 +13989,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
 
-    def boom(src, dest):
+    def boom(src, dest, funscript=None):
         raise OSError("the inbox is not there")
 
     monkeypatch.setattr(combine_controller.evolver_export, "export_video", boom)

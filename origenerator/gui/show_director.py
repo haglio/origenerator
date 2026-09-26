@@ -324,11 +324,8 @@ class ShowDirector:
         it shows as a slideshow standing on that generation.
 
         The pace is nought — nothing moves until an arrow does, or until the
-        console's clip-seconds pair is turned up — and the order is the browser's
-        rather than a shuffle, because this is the folder you were already looking
-        at rather than a set to be played. That is the whole of what used to be a
-        second fullscreen viewer: the arrows, the counter, the neighbor stills,
-        Up and Down, are the show's own.
+        console's clip-seconds pair is turned up — and the set is the folder as
+        the gallery lists it, newest first, which is the order Latest plays.
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
         is still running under it — in which case the show opens over ``frame``,
@@ -348,16 +345,11 @@ class ShowDirector:
             if start is None:
                 items, start = [(media[0], media[1], generation, None)], 0
                 rows = [row for row in [self._host.row_for(generation)] if row is not None]
-        # Neither shuffled nor newest-first, and not a loop: this is one folder
-        # in the browser's own order, held on one picture.  Said plainly rather
-        # than left at the defaults, because the HUD reads them now — an order
-        # slot saying "Shuffle" over a folder listed in its own order would be
-        # the panel making something up.
         return self.open(items, rows=rows, start=start, frame=frame,
                          image_dwell_ms=0, shuffle=in_order,
                          folder_items=folder_items,
                          hud=HudFacts(
-                             order_label="",
+                             order_label=LATEST_LABEL,
                              favorite_ids=self._favorite_prompt_ids()))
 
     def _folder_rows(self) -> list[dict]:
@@ -508,11 +500,6 @@ class ShowDirector:
         """
         view = self._window_up() if self._fun_time is None else None
         if self._fun_time is None:
-            # Which side that one window is playing now -- what its order pair
-            # hands it, and the library a loop over it falls back to, are that
-            # side's.  Taken on every set rather than at the opening, because a
-            # re-pointed window holding the side it was opened on would hand
-            # over the other shape's pictures.
             self._standalone_side = side
         built = view is None
         if built:
@@ -1008,27 +995,12 @@ class ShowDirector:
         show.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
 
     def browse_it_all(self, show) -> bool:
-        """Hand *show* the whole library of its shape, taken up from the slide
-        on screen — the way out of a loop over a set that has nothing under it.
-
-        A show opened on one folder is that folder's seed row played round, so
-        the loop and the set are the same pictures and ending one into the
-        other would leave them coming round exactly as before
-        (:meth:`~origenerator.gui.show_set.ShowSet.end_loop`).  The library is
-        what lies outside it, in the order the show's own panel says it is in:
-        the pair's lit button names the very set it falls back to, and a show
-        wearing neither — a folder opened in the browser's own order — falls
-        back to the shuffle, which is what a side plays with nothing asked of
-        it.  Says whether there was anything of that shape to play.
-        """
+        """The way out of a loop over a set that is one seed row: this show's
+        shape of the library, in the order its panel says, from the slide up."""
         return self._play_the_library(
             show, latest=show.hud_order_label == LATEST_LABEL, keep_slide=True)
 
     def _play_the_library(self, show, *, latest: bool, keep_slide: bool) -> bool:
-        """Point *show* at its side's whole library, newest first or shuffled,
-        and say whether there was anything there to play.  *keep_slide* leaves
-        the picture on screen playing, only what comes after it being the new
-        set; without it the set starts over at the top."""
         side = self._base_side(show)
         key = oriented_key(_RECENTS_KEY, side) if latest else self.base_location(side)
         rows = self.rows_at(key)

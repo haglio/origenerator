@@ -710,9 +710,6 @@ class SlideshowView(QWidget):
         self._flash_note("Locked")
 
     def _browse_it_all(self) -> bool:
-        """Take up the whole library of this show's shape, in the order the
-        panel says it is in — where a loop ends when the set under it was one
-        seed row, and nothing at all where the gallery wired no library."""
         if self._actions.browse_all is None:
             return False
         return bool(self._actions.browse_all(self))

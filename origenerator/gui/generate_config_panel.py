@@ -904,28 +904,20 @@ class GenerateConfigPanel(QWidget):
         return bool(size and size[1] > size[0])
 
     def show_recent_preview(self):
-        """Fill the preview with the newest saved generation matching this tab's
-        settings, or the empty 'select a generation' placeholder when nothing has
-        been generated with them yet.
-
-        The shown generation becomes ``_displayed_row``, so an idle autoshow of a
-        scripted video arms the OSR2 drive exactly like a browsed selection — the
-        drive follows whatever video is actually on screen, however it got there.
-
-        Its footer comes up with it, as a clicked one's does; with nothing to
-        show, the last one's comes down rather than name a file no longer up."""
+        """Put up the newest saved generation matching this tab's settings, through
+        the same tail a clicked one goes through (:meth:`_display_result`), else the
+        'select a generation' placeholder. The form is all an autoshow leaves alone:
+        these settings chose the row, so seeding them from it would overwrite what
+        the user typed."""
         if self._autoshow_held:
             return
         row = self._recent_matching_row()
-        preview = resolve_preview(row, COMFYUI_OUTPUT_DIR) if row is not None else None
-        if preview is not None:
-            self._preview.show_media(*preview, row["prompt_id"])
-            self._displayed_row = row
-            self._show_footer(row, self._image_rows(), preview)
-        else:
-            self._preview.clear()  # nothing generated with these settings yet
-            self._displayed_row = None
-            self._hide_footer()
+        if row is not None and resolve_preview(row, COMFYUI_OUTPUT_DIR) is not None:
+            self._display_result(row, self._image_rows())
+            return
+        self._preview.clear()  # nothing generated with these settings yet
+        self._displayed_row = None
+        self._hide_footer()
         self._arm_preview_actions()
         self._note_displayed_config()
         self._emit_title()  # the tab is named after what it shows

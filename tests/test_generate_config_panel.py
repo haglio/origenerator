@@ -582,6 +582,24 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
     assert panel._preview._generation == "g1"  # its preview can be dragged onto combine
 
 
+def test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
+        qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
+        positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
+    )
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    panel = GenerateConfigPanel(ComfyUIClient(), db)
+    qtbot.addWidget(panel)
+    announced = []
+    panel.displayed_changed.connect(lambda: announced.append(panel.displayed_row()))
+
+    panel.prefill("sdxl_t2i", _wiz_params())
+
+    assert [row["prompt_id"] for row in announced if row][-1:] == ["g1"]
+
+
 # --- config snapshot / prefill / restore ------------------------------------
 
 def test_current_config_does_not_randomize_and_reports_random_flag(panel):

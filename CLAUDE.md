@@ -59,12 +59,17 @@ for one thing cost four. So:
 `app_support`, `player_core`, `shared_ui` and `voice_core` are pinned
 dependencies installed into `.venv` — never the checkouts beside this one.
 Both launchers run that venv and nothing else, and a Fun Time session starts
-this app through it too. To try an unlanded change of one of them here,
-install its checkout over the pin (`pip install -e ../player_core
---config-settings editable_mode=compat`), and reinstall this repo afterwards
-to put the pin back; moving a pin is this repo's own commit, with its own
-suite to answer for it. Never reinstall `.venv` while Origenerator or a Fun
-Time session may be running.
+this app through it too. That venv is also every other agent's test runner,
+so a branch never installs into it: to run a sibling version the venv does not
+hold — an unlanded change, or a pin the branch moves — put a checkout of it
+first on `PYTHONPATH` for the suite, and give the preview a launcher of its own
+in the worktree's git-ignored `state/` that sets the same `PYTHONPATH`. A
+player_core checkout used that way needs `vendor/libmpv-2.dll` copied in from
+the primary player_core's `vendor/`. Moving a pin is this repo's own commit,
+with its own suite to answer for it, and a new shared_ui release reaches this
+app only beside a player_core release that names the same one: pip refuses an
+install that asks for two tags of one sibling. Never reinstall `.venv` while
+Origenerator or a Fun Time session may be running.
 
 ## A model picker offers only what its graph can run
 

@@ -142,7 +142,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19254 when the button bank's marks grew to fill their buttons: the bank
 # button's note that its icon was drawn near the button's full height, which it
 # never was, is test_every_mark_on_the_bank_spans_more_than_half_its_button.
-MAX_PROSE_LINES = 19254
+#
+# 19247 when auto-generate's bolt lost its ring: the icon's account of the ring
+# the bolt broke out of went with the ring.
+MAX_PROSE_LINES = 19247
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -117,15 +117,7 @@ def redo_icon() -> QIcon:
 
 
 def autoloop_icon() -> QIcon:
-    """A lightning bolt bursting out of a ring — auto-generate: re-roll this
-    folder, and keep re-rolling it.
-
-    The ring is the "keep going" and the bolt is the "by itself". It sits three
-    buttons from undo, which is a ring too, so the bolt has to be what the eye
-    lands on: it is a solid where undo and redo are open arcs, and it breaks out
-    of its ring at both ends where theirs merely stops short of an arrowhead.
-    """
-    return glyph_icon("bolt_ring", size=_SIZE)
+    return glyph_icon("bolt", size=_SIZE)
 
 
 def slideshow_icon() -> QIcon:

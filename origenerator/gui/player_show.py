@@ -41,6 +41,8 @@ from player_core.satellite_hud import hud_text
 from player_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from origenerator.config import COMFYUI_OUTPUT_DIR
+from origenerator.funscript import funscript_of
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.show_hud import show_hud_model
@@ -142,10 +144,10 @@ class PlayerShow(QObject):
         current = self._set.playlist.current()
         rotated = _rotated_onto(items, current)
         write_playlist(self.channel.playlist,
-                       [_playlist_item(item) for item in rotated])
+                       [_slide_item(item) for item in rotated])
         if land and current is not None and str(current.path) != self._showing:
             # Before the reload, which then keeps it: after, it would load twice.
-            self._send(play_file(_playlist_item(current)))
+            self._send(play_file(_slide_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._send(f"{SET_PACE} {self._dwell_s}")
 
@@ -237,7 +239,8 @@ class PlayerShow(QObject):
         level = self._levels.step(delta, base=self._current_base())
         if level is None:
             return
-        self._send(play_file(PlaylistItem(Path(str(level[0])))))
+        path, media_type, _label = level
+        self._send(play_file(_playlist_item(path, media_type)))
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
@@ -445,7 +448,7 @@ class PlayerShow(QObject):
         (see :meth:`_pass_changed`).
         """
         self._set.jump_to(slide)
-        self._send(play_file(_playlist_item(slide)))
+        self._send(play_file(_slide_item(slide)))
         self._publish()
 
     # --- the map, and the loops along it -----------------------------------
@@ -747,8 +750,15 @@ class PlayerShow(QObject):
         self.closed.emit()
 
 
-def _playlist_item(slide) -> PlaylistItem:
-    return PlaylistItem(Path(str(slide.path)))
+def _playlist_item(path, media_type) -> PlaylistItem:
+    path = Path(str(path))
+    if media_type != MediaType.VIDEO:
+        return PlaylistItem(path)
+    return PlaylistItem(path, funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR))
+
+
+def _slide_item(slide) -> PlaylistItem:
+    return _playlist_item(slide.path, slide.media_type)
 
 
 def _rotated_onto(items: list, current) -> list:

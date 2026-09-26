@@ -89,8 +89,8 @@ class SplitFolderTree(QWidget):
     signals, and the methods the gallery view calls on a tree — so its callers
     need not know which half a row is in.  The one deliberate difference is the
     context menu: a right-click arrives as :attr:`context_menu_requested` with
-    the row and a screen position, since the pane's coordinates are no longer
-    any one tree's.
+    the row, a screen position and the half it landed in, since the pane's
+    coordinates are no longer any one tree's and empty space has no row to ask.
     """
 
     currentItemChanged = pyqtSignal(object, object)
@@ -100,7 +100,7 @@ class SplitFolderTree(QWidget):
     favorite_clicked = pyqtSignal(object)      # folder key
     delete_clicked = pyqtSignal(object)    # folder key
     folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped tree keys
-    context_menu_requested = pyqtSignal(object, object)  # row under the cursor (or None), global pos
+    context_menu_requested = pyqtSignal(object, object, str)
 
     def __init__(self, group_role, parent=None):
         super().__init__(parent)
@@ -142,7 +142,7 @@ class SplitFolderTree(QWidget):
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         tree.setMinimumHeight(_MIN_HALF_HEIGHT)
         tree.customContextMenuRequested.connect(
-            lambda pos, t=tree: self._on_context_menu(t, pos))
+            lambda pos, t=tree, o=orientation: self._on_context_menu(t, pos, o))
         tree.currentItemChanged.connect(
             lambda current, previous, o=orientation: self._on_current(o, current, previous))
         tree.itemSelectionChanged.connect(self.itemSelectionChanged)
@@ -198,8 +198,9 @@ class SplitFolderTree(QWidget):
         finally:
             tree.blockSignals(blocked)
 
-    def _on_context_menu(self, tree, pos) -> None:
-        self.context_menu_requested.emit(tree.itemAt(pos), tree.viewport().mapToGlobal(pos))
+    def _on_context_menu(self, tree, pos, orientation: str) -> None:
+        self.context_menu_requested.emit(tree.itemAt(pos), tree.viewport().mapToGlobal(pos),
+                                         orientation)
 
     # --- the surface the gallery view calls on a tree ------------------------
 

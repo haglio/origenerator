@@ -183,8 +183,9 @@ class Database:
 
     # --- custom folders (see origenerator.db_custom_folders) ----------------
 
-    def create_custom_folder(self, name: str, folder_id: int | None = None) -> int:
-        return self.custom_folders.create_custom_folder(name, folder_id)
+    def create_custom_folder(self, name: str, folder_id: int | None = None,
+                             side: str | None = None) -> int:
+        return self.custom_folders.create_custom_folder(name, folder_id, side)
 
     def rename_custom_folder(self, folder_id: int, name: str):
         return self.custom_folders.rename_custom_folder(folder_id, name)

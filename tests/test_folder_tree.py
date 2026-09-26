@@ -511,3 +511,25 @@ def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
     assert clicked == []
     assert tree._hover_key is None
 
+
+def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
+    tree, shelf, a, _b = _collecting_tree(qtbot)
+    other_half = FolderTree(_ROLE)
+    qtbot.addWidget(other_half)
+    mime = QMimeData()
+    mime.setData(FOLDER_KEYS_MIME, a.data(0, TREE_KEY_ROLE).encode("utf-8"))
+    dropped = []
+    tree.folders_dropped.connect(lambda target, keys: dropped.append(keys))
+    pos = QPointF(tree.visualRect(tree.indexFromItem(shelf)).center())
+    move = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
+                          Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    drop = QDropEvent(pos, Qt.DropAction.CopyAction, mime,
+                      Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    for event in (move, drop):
+        event.source = lambda: other_half
+
+    tree.dragMoveEvent(move)
+    tree.dropEvent(drop)
+
+    assert not move.isAccepted()
+    assert dropped == []

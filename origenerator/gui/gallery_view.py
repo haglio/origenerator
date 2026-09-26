@@ -486,6 +486,7 @@ class GalleryView(QWidget):
         # picked). Both are CustomGroups, so the pane, breadcrumb, and slideshow
         # treat them exactly as they treat a derived folder.
         self._custom_folders: list = []
+        self._custom_folders_by_side: dict[str, list] = {}
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         # What the trail allows right now, as it last told us: the bank is written
@@ -1758,9 +1759,11 @@ class GalleryView(QWidget):
         self._held_rows = recovery.bin_items(self._bin_records())
         held = gallery.rows_of_media_types(self._held_rows, media_types)
         self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_folders = gallery.build_custom_folders(
-            tree_model, self._db.list_custom_folders()
-        )
+        trees = _side_trees(listed, meta, start_frames)
+        self._custom_folders_by_side = _custom_folders_by_side(
+            trees, self._db.list_custom_folders())
+        self._custom_folders = [folder for folders in self._custom_folders_by_side.values()
+                                for folder in folders]
         # Re-index for the search field while the rows are in hand: tokenizing every
         # prompt belongs to the rebuild, so a keystroke costs only lookups. Rows
         # already indexed keep their words and take the fresh row object, since a
@@ -1779,9 +1782,6 @@ class GalleryView(QWidget):
         self._search.index.update(listed + held, gallery.named_folders_by_row(
             tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
-        # Every side is built from the rows the media filter keeps, so switching
-        # videos off empties both halves of them rather than one.
-        trees = _side_trees(listed, meta, start_frames)
         self._browser.set_model(
             gallery.recent_generations(listed),
             trees,
@@ -1854,12 +1854,11 @@ class GalleryView(QWidget):
         whose counts are its own — a number covering both sides would send you
         to a shelf that then showed you nothing.
         """
-        custom_records = self._db.list_custom_folders()
         inflight = self._browser.inflight_orientations()
         return [SideModel(
             orientation=orientation,
             tree_model=tree,
-            custom_folders=gallery.build_custom_folders(tree, custom_records),
+            custom_folders=self._custom_folders_by_side[orientation],
             # Recents keeps a side up with no folders yet, so a first-ever
             # generation of that shape is visible while it runs.
             show_recents=bool(tree) or orientation in inflight,
@@ -2247,7 +2246,7 @@ class GalleryView(QWidget):
         if not ok or not name.strip():
             return
         folder_id = self._actions.custom_folders.create(
-            name.strip(), [self._item_identity(f) for f in folders]
+            name.strip(), [self._item_identity(f) for f in folders], self.side_in_view()
         )
         self._open_custom_folder(folder_id)
 
@@ -2286,12 +2285,13 @@ class GalleryView(QWidget):
         )
         self._open_custom_folder(folder_id)
 
-    def _new_custom_folder(self):
+    def _new_custom_folder(self, side: str):
         """Make an empty folder of the user's own — the tree's right-click action,
         for when the folders to fill it with are easier dragged in than picked."""
         name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
         if ok and name.strip():
-            self._open_custom_folder(self._actions.custom_folders.create(name.strip(), []))
+            self._open_custom_folder(
+                self._actions.custom_folders.create(name.strip(), [], side))
 
     def _remove_custom_folder(self, group):
         """Delete a folder the user made. Only the grouping goes — its gathered
@@ -4093,9 +4093,9 @@ class GalleryView(QWidget):
 
     # --- rename & star -----------------------------------------------------
 
-    def _on_tree_context_menu(self, item, global_pos: QPoint):
+    def _on_tree_context_menu(self, item, global_pos: QPoint, side: str):
         if item is None:
-            self._empty_tree_context_menu(global_pos)
+            self._empty_tree_context_menu(global_pos, side)
             return
         # Right-clicking inside a multi-selection offers what to do with the whole
         # set; right-clicking outside it is about the one row under the cursor.
@@ -4111,13 +4111,13 @@ class GalleryView(QWidget):
             # on the other side is a different row with its own menu.
             self._folder_context_menu(item.data(0, _TREE_KEY_ROLE), global_pos)
 
-    def _empty_tree_context_menu(self, global_pos: QPoint):
+    def _empty_tree_context_menu(self, global_pos: QPoint, side: str):
         """Below the last row there is no folder to act on, so the only thing on
         offer is starting a new folder of your own."""
         menu = QMenu(self)
         new_action = menu.addAction("New folder…")
         if menu.exec(global_pos) == new_action:
-            self._new_custom_folder()
+            self._new_custom_folder(side)
 
     def _selection_context_menu(self, global_pos: QPoint):
         """The picked folders as a set: save them as a folder of your own."""
@@ -4169,7 +4169,8 @@ class GalleryView(QWidget):
         to what a drag onto its row does, for when dragging is awkward (a long tree,
         a folder scrolled out of sight). Returns ``{action: custom folder key}``,
         empty when there are no folders of the user's own yet."""
-        targets = [f for f in self._custom_folders
+        side = _orientation_of(key) or self.side_in_view()
+        targets = [f for f in self._custom_folders_by_side.get(side, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
@@ -4471,6 +4472,13 @@ def _side_trees(rows, meta, start_frames) -> dict[str, list]:
     return {orientation: gallery.build_gallery_tree(dealt[orientation], meta,
                                                     image_index=start_frames)
             for orientation in _ORIENTATIONS}
+
+
+def _custom_folders_by_side(trees, records) -> dict[str, list]:
+    return {side: gallery.build_custom_folders(
+                tree, [record for record in records
+                       if gallery.custom_folder_side(record, trees) == side])
+            for side, tree in trees.items()}
 
 
 def _group_workflow(group) -> str | None:

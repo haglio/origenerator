@@ -283,6 +283,9 @@ class FolderTree(QTreeWidget):
         return key if isinstance(key, str) else None
 
     def _dragged_keys(self, event) -> list[str]:
+        source = event.source()
+        if isinstance(source, FolderTree) and source is not self:
+            return []
         data = event.mimeData().data(FOLDER_KEYS_MIME)
         if data.isEmpty():
             return []

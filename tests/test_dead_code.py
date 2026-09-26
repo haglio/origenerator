@@ -181,7 +181,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19124 when the launch stopped asking Qt Quick for a render thread: nothing has
 # drawn with Qt Quick since the show moved onto the players' engine, and the
 # module's note on why it asked went with it.
-MAX_PROSE_LINES = 19124
+#
+# 19121 when a picture the tab puts up itself started going through the very tail
+# a clicked one takes: the note that it arms the drive like a browsed selection is
+# test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one.
+MAX_PROSE_LINES = 19121
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

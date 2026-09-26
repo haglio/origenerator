@@ -186,7 +186,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 19074 when a run that lands was queued next: the playlist's paragraph on a
 # landed run being the same slide is test_a_live_slide_becomes_the_file_it_lands_as.
-MAX_PROSE_LINES = 19074
+#
+# 19071 when a double-click on a run opened its folder on a player: the
+# director's lines on why a player could take no frame are gone, and what it
+# takes instead is
+# test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it.
+MAX_PROSE_LINES = 19071
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

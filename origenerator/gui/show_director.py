@@ -392,12 +392,14 @@ class ShowDirector:
         # Which side this show belongs to: the one asked for, else the one this
         # set's own shape belongs on.  Standalone it names nothing but the
         # panel's own verbs, since the monitor is the whole screen.
-        where = side or region_for_items(items)
+        where = side or region_for_items(items or folder_items or [])
         # And what that side IS: one of the session's players, where the session
         # handed them over, or a window of this app's over the region.
         channel = self._fun_time.player(where) if self._fun_time is not None else None
         if channel is not None and not items:
-            return None  # a player is handed files, and a run being made has none yet
+            if not folder_items:
+                return None
+            items, kwargs["start"] = folder_items, None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
@@ -467,11 +469,7 @@ class ShowDirector:
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
         """A show on one of the session's players: the set goes to the player
-        and the panel this app publishes goes with it — no window of ours.
-
-        A frame is dropped on the way in: a player is handed files to play, and
-        a generation still being made has none yet.
-        """
+        and the panel this app publishes goes with it — no window of ours."""
         kwargs.pop("frame", None)
         occupant = self.region_show(side)
         if occupant is not None:

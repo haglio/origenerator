@@ -1092,9 +1092,8 @@ def test_a_show_on_a_player_says_its_lines_in_the_gallerys_caption(shows):
     assert made[0].opened_with["say"] == host.say
 
 
-def test_a_show_on_a_player_is_handed_files_and_no_frame(shows):
-    # A player is handed files to play; a run still being made has none yet, so
-    # the frame a double-click landed on stays with the window it was for.
+def test_a_show_on_a_player_takes_runs_from_what_is_in_flight_not_a_double_clicks_frame(
+        shows):
     director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT, frame=b"frame")
@@ -1610,3 +1609,17 @@ def test_a_latest_show_turns_down_a_run_asked_for_in_the_other_shape(shows):
     director.note_generating("g-run", b"frame")
 
     assert made[0].generating == []
+
+
+def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it(shows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    director, host, made = shows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(
+        players={PORTRAIT: object(), LANDSCAPE: object()}))
+    host.queue = ([_being_made("g-run")], 0)
+
+    director.open([], folder_items=[("a.png", "image", "g1", None)], start=0,
+                  frame=b"frame")
+
+    assert made[0].items == [("a.png", "image", "g1", None)]
+    assert made[0].generating == [("g-run", b"frame")]
+    assert made[0].leads == 1

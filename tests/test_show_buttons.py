@@ -107,6 +107,12 @@ class _Host:
     def show_toggle_lock(self):
         self.calls.append("lock")
 
+    def set_locked(self, locked):
+        self.calls.append(("locked", locked))
+
+    def set_favorites_filter(self, on):
+        self.calls.append(("favorites filter", on))
+
     def show_cull(self):
         self.calls.append("cull")
 
@@ -140,11 +146,37 @@ class _Host:
     def show_filter(self, query):
         self.calls.append(("filter", query))
 
+    def show_filter_to_the_act_on_screen(self):
+        self.calls.append("filter to the act on screen")
+
     def show_step_version(self, delta):
         self.calls.append(("version", delta))
 
     def clear_modes(self):
         self.calls.append("every narrowing off")
+
+
+def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
+    """A session's spoken "lock", "unlock", "f mode on" and "f mode off" name
+    the state wanted, and a flip would hand the other one to a speaker who
+    cannot see which way the switch stands."""
+    host = _Host()
+
+    for action in ("lock_on", "lock_off", "fmode_on", "fmode_off"):
+        assert answer(host, action), action
+
+    assert host.calls == [("locked", True), ("locked", False),
+                          ("favorites filter", True), ("favorites filter", False)]
+
+
+def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
+    """The players' "filter" with no act named, as a satellite takes it: the
+    act read off what is showing."""
+    host = _Host()
+
+    assert answer(host, "lock_action")
+
+    assert host.calls == ["filter to the act on screen"]
 
 
 def test_the_versions_button_is_dim_where_the_item_has_only_itself():

@@ -86,4 +86,7 @@ class PaceOnlyHost(ShowHost):
 
     def show_toggle_lock(self) -> None: ...
 
+    def set_locked(self, locked: bool) -> bool:
+        return False
+
     def show_cull(self) -> None: ...

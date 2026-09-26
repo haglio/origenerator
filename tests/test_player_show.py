@@ -588,6 +588,26 @@ def test_a_rows_button_narrows_the_show_to_that_act_and_hands_the_player_what_is
     assert said == ["Filter: 'alpha' (2)"]
 
 
+def test_filter_said_of_its_side_narrows_to_what_the_item_on_screen_is_named_for(
+        qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)
+
+    show.show_filter_to_the_act_on_screen()
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert (played, said) == (["one.png"], ["Filter: 'source image, alpha' (1)"])
+
+
+def test_filter_said_over_an_item_named_for_no_act_says_so(qtbot, tmp_path):
+    said = []
+    show = _show(qtbot, tmp_path, say=said.append)
+
+    show.show_filter_to_the_act_on_screen()
+
+    assert said == ["No act for this one"]
+
+
 def test_a_row_naming_two_acts_is_posted_with_its_spaces_as_underscores(qtbot, tmp_path):
     said = []
     show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)

@@ -12,7 +12,7 @@ import random
 import pytest
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.gui.show_set import ShowSet
+from origenerator.gui.show_set import ShowSet, narrow_to_the_act_on_screen
 from origenerator.gui.show_wiring import HudFacts
 from origenerator.slideshow import in_order
 
@@ -548,6 +548,27 @@ def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
     assert show_set.set_act_filter("source image, alpha") is True
 
     assert _ids(show_set.playlist.items) == ["id-1"]
+
+
+def test_filtering_to_the_act_on_screen_narrows_to_what_its_row_is_named_for():
+    """A session's spoken "filter", said of a side: the act read off the item
+    on screen rather than spoken, the way its map row's button would post it."""
+    show_set, _dealt = _filterable()
+    show_set.playlist.jump_to(2)
+
+    assert narrow_to_the_act_on_screen(show_set) == ("Filter: 'alpha' (2)", True)
+    assert _ids(show_set.playlist.items) == ["id-1", "id-3"]
+
+
+def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
+    """Rather than lifting the filter, which is what nothing posted to a row's
+    button means."""
+    show_set, _dealt = _set(acts=lambda ids: dict.fromkeys(ids, ""))
+
+    said, narrowed = narrow_to_the_act_on_screen(show_set)
+
+    assert (said, narrowed) == ("No act for this one", False)
+    assert (show_set.act_filter, len(show_set.playlist)) == ("", 3)
 
 
 def test_a_reset_drops_the_act_filter_with_the_other_switches():

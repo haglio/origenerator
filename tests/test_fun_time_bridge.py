@@ -109,6 +109,22 @@ def test_lock_verb_locks_the_slide(qtbot, tmp_path, monkeypatch):
     assert show.locked
 
 
+def test_the_spoken_lock_and_unlock_each_leave_the_slide_the_way_they_name(
+        qtbot, tmp_path, monkeypatch):
+    """Said twice, "portrait lock" stays locked where the key's flip would let
+    go: the session sends the words as the state they ask for."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    held = []
+
+    for line in ("portrait_lock_on", "portrait_lock_on", "portrait_lock_off",
+                 "portrait_lock_off"):
+        _press(bridge, tmp_path, line)
+        held.append(show.locked)
+
+    assert held == [True, True, False, False]
+
+
 def test_reset_verb_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
     """The reset on the shared control band, spoken to a show: the lock
     releases and the top of the set comes back."""

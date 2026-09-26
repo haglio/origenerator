@@ -6036,6 +6036,23 @@ def test_cancelling_an_auto_folders_job_by_name_keeps_the_loop_going(qtbot, tmp_
     assert view._live_jobs[key].prompt_id != canceled
 
 
+def test_a_tab_watching_the_loop_follows_it_onto_the_next_seed(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_auto(True)
+    _reroll_tile(view).selected.emit()
+    panel = view._info_tabs.current_config_panel()
+
+    panel._cancel_btn.click()
+    client.preview_image.emit(view._live_jobs[key].prompt_id, _png_bytes())
+
+    assert panel.watched_key() == key
+    assert panel._preview._live_frame == _png_bytes()
+
+
 def test_only_the_auto_toggle_ends_the_loop_not_a_string_of_cancels(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)

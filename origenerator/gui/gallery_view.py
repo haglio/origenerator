@@ -3486,12 +3486,8 @@ class GalleryView(QWidget):
         discards the run, only the Auto toggle stops the loop. Told *after* the
         drop, so the relaunch doesn't see the job it is replacing and no-op.
         """
-        self._drop_reroll(key)
-        self._auto.note_canceled(key)
-
-    def _drop_reroll(self, key: str):
-        """Cancel the re-roll leading a folder and redraw without it."""
         self._jobs.cancel(key)
+        self._auto.note_canceled(key)
         self._after_a_job_left(key)
 
     def _cancel_job(self, prompt_id: str):
@@ -3506,8 +3502,8 @@ class GalleryView(QWidget):
         key = self._job_folder_key(self._jobs.job_for_prompt(prompt_id))
         self._jobs.cancel_job(prompt_id)
         if key is not None:
-            self._after_a_job_left(key)
             self._auto.note_canceled(key)
+            self._after_a_job_left(key)
 
     def _after_a_job_left(self, key: str):
         """Redraw the folder a run has just been taken out of."""

@@ -46,6 +46,7 @@ import json
 import os
 import struct
 import sys
+import winsound
 
 import pytest
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstallMessageHandler
@@ -291,6 +292,13 @@ def _never_name_this_app_to_the_real_windows(monkeypatch, tmp_path_factory):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("appdata")))
     monkeypatch.setattr(desktop_notices, "register_notification_identity",
                         lambda *_a, **_kw: None)
+
+
+@pytest.fixture(autouse=True)
+def alert_sounds(monkeypatch):
+    sounded = []
+    monkeypatch.setattr(winsound, "MessageBeep", sounded.append)
+    return sounded
 
 
 @pytest.fixture(autouse=True)

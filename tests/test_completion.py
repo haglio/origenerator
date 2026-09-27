@@ -126,8 +126,9 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
 
     ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
     out = tmp_path / "out"
-    (out / "video").mkdir(parents=True)
-    (out / "video" / "wan21_ati_i2v_00001_.mp4").write_bytes(b"v")
+    video = out / "video" / "wan21_ati_i2v_00001_.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
     metronome = []
     monkeypatch.setattr(
         "origenerator.completion.synthesize_funscript",
@@ -135,11 +136,10 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
     )
     params = dict(ati.default_params(), motion_hz=1.5)
     extract_completion(
-        ati, _video_history("15", "images", "wan21_ati_i2v_00001_.mp4"),
+        ati, _video_history("15", "images", video.name),
         out, tmp_path / "thumbs", "n1", params=params,
     )
-    written = read_actions(out / "funscript" / "wan21_ati_i2v_00001_.funscript")
-    assert written == ati.authored_actions(params)
+    assert read_actions(funscript_of(video, output_dir=out)) == ati.authored_actions(params)
     assert metronome == []
 
 

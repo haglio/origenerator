@@ -1,9 +1,9 @@
 """One-shot: synthesize a funscript for every already-generated video without one.
 
 New videos get a funscript at completion (see ``completion.py``); this sweeps the
-videos that predate that. It's GPU-free (the script is authored from each clip's
-duration, not measured) and idempotent — a video that already has a sidecar is
-left untouched — so it's safe to re-run.
+videos that predate that. It's GPU-free (the script is authored from each video's
+duration, not measured) and idempotent — a video that already has a script of its
+own is left untouched — so it's safe to re-run.
 
     python -m origenerator.funscript_backfill
 """
@@ -11,11 +11,12 @@ left untouched — so it's safe to re-run.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from pathlib import Path
 
 from origenerator import config
 from origenerator.db import Database
-from origenerator.funscript import ensure_funscript, funscript_of
+from origenerator.funscript import funscript_of, funscript_path_for, synthesize_funscript
 from origenerator.gallery import media_type_of_row, resolve_preview
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -24,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
-             ensure=ensure_funscript, resolve=resolve_preview) -> dict:
+             write=synthesize_funscript, resolve=resolve_preview) -> dict:
     """Script every video generation that has none. Returns a counts summary.
 
-    ``ensure``/``resolve`` are injectable so the sweep logic can be tested without
-    real videos. The loop flag for each row comes from its workflow, so loop clips
+    ``write``/``resolve`` are injectable so the sweep logic can be tested without
+    real videos. The loop flag for each row comes from its workflow, so loop videos
     get a seamlessly-tiling script.
 
     ``output_dir`` and ``hz`` resolve from config when the caller names neither.
@@ -40,6 +41,7 @@ def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
     output_dir = config.COMFYUI_OUTPUT_DIR if output_dir is None else output_dir
     hz = config.MOTION_DEFAULT_HZ if hz is None else hz
     result = {"written": 0, "skipped": 0, "missing": 0, "failed": 0}
+    videos = []
     for row in db.list_generations():
         if media_type_of_row(row) != MediaType.VIDEO:
             continue
@@ -47,18 +49,29 @@ def backfill(db, output_dir: Path | None = None, *, hz: float | None = None,
         if preview is None or preview[1] != MediaType.VIDEO:
             result["missing"] += 1
             continue
-        path = preview[0]
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        existed = funscript_of(path, output_dir=output_dir) is not None
-        dest = ensure(path, loop=bool(workflow and workflow.looping), hz=hz,
-                      output_dir=output_dir)
-        if dest is None:
-            result["failed"] += 1
-        elif existed:
+        videos.append((preview[0], WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")))
+    shared_stems = _stems_more_than_one_video_has(path for path, _ in videos)
+    for path, workflow in videos:
+        if _script_of(path, output_dir, shared_stems) is not None:
             result["skipped"] += 1
+        elif write(path, loop=bool(workflow and workflow.looping), hz=hz,
+                   output_dir=output_dir) is None:
+            result["failed"] += 1
         else:
             result["written"] += 1
     return result
+
+
+def _stems_more_than_one_video_has(videos) -> set[str]:
+    stems = Counter(video.stem for video in set(videos))
+    return {stem for stem, count in stems.items() if count > 1}
+
+
+def _script_of(video: Path, output_dir, shared_stems) -> Path | None:
+    if video.stem not in shared_stems:
+        return funscript_of(video, output_dir=output_dir)
+    own = funscript_path_for(video, output_dir=output_dir)
+    return own if own.is_file() else None
 
 
 def main() -> int:

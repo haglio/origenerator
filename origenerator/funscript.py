@@ -6,17 +6,13 @@ in this family that reads or writes one and lives in
 :mod:`app_support.funscript`. Origenerator's videos carry no explicit
 motion track — the diffusion model's motion lives only in the pixels — so rather than
 measuring the finished video, this authors a motion *with* it from what the generation
-already knows: the clip's duration, and whether it loops. The result is a rhythm, not a
+already knows: the video's duration, and whether it loops. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
 measured (FunGen) or authored (ATI) source touches nothing else.
 
-The scripts have a folder of their own -- ``<output dir>/funscript`` -- rather
-than sitting beside the clips they belong to. ComfyUI's output folder is sorted
-by kind, and a script is a kind; a name is what ties one to its video. So the two
-questions a caller has are separate functions: :func:`funscript_path_for` says
-where a script GOES, and :func:`funscript_of` says where the one this video HAS
-actually IS -- the folder, or, for every script written before the folder
-existed, still beside the clip.
+The scripts have a folder of their own -- ``<output dir>/funscript`` -- laid out
+like the output folder around it, each script named for its video's whole
+filename, so no two videos share one.
 """
 
 from __future__ import annotations
@@ -27,6 +23,7 @@ from pathlib import Path
 from app_support.funscript import document, write
 
 from origenerator.evolver_upscales import original_stem
+from origenerator.media import VIDEO_EXTS
 
 logger = logging.getLogger(__name__)
 
@@ -39,52 +36,54 @@ CREATOR = "origenerator"
 
 
 def funscript_path_for(video_path, *, output_dir) -> Path:
-    """Where this video's script goes: ``<output_dir>/funscript/<stem>.funscript``.
-
-    ``output_dir`` is keyword-only and has no default. The folder cannot be
-    worked out from the video's own path -- a video sits at whatever depth under
-    the output dir its workflow's prefix puts it -- and a signature default would
-    be read at import, from a constant itself built by reading the content
-    overlay, pinning every caller to wherever this module was first told to look.
-    """
-    name = Path(video_path).with_suffix(".funscript").name
-    return Path(output_dir) / FUNSCRIPT_SUBFOLDER / name
+    """``output_dir`` has no default: one read at import would pin every caller
+    to wherever the content overlay pointed then."""
+    video = Path(video_path)
+    return (Path(output_dir) / FUNSCRIPT_SUBFOLDER / _folder_within(video.parent, output_dir)
+            / f"{video.name}.funscript")
 
 
-def legacy_funscript_path_for(video_path) -> Path:
-    """Where this video's script sat before the scripts had a folder: beside it.
+def _folder_within(folder: Path, output_dir) -> Path:
+    try:
+        return folder.relative_to(output_dir)
+    except ValueError:
+        return Path()
 
-    Hundreds were written that way and are still there, so every read tries here
-    too. Nothing writes here any more.
-    """
+
+def _filed_under(stem: str, output_dir) -> Path:
+    return Path(output_dir) / FUNSCRIPT_SUBFOLDER / f"{stem}.funscript"
+
+
+def _beside(video_path) -> Path:
     return Path(video_path).with_suffix(".funscript")
 
 
 def funscript_of(video_path, *, output_dir) -> Path | None:
-    """The script this video HAS -- the folder first, then the old place beside
-    it -- or ``None`` when it has none. An upscale Evolver made of a video has
-    that video's."""
+    """The script this video HAS, or ``None`` when it has none. An upscale
+    Evolver made of a video has that video's."""
     original = original_stem(video_path)
     if original is not None:
         return _script_of_upscaled(original, output_dir)
-    dest = funscript_path_for(video_path, output_dir=output_dir)
-    if dest.is_file():
-        return dest
-    beside = legacy_funscript_path_for(video_path)
-    return beside if beside.is_file() else None
+    return _first_file([funscript_path_for(video_path, output_dir=output_dir),
+                        _filed_under(Path(video_path).stem, output_dir),
+                        _beside(video_path)])
+
+
+def _first_file(paths) -> Path | None:
+    return next((path for path in paths if path.is_file()), None)
 
 
 def _script_of_upscaled(stem: str, output_dir) -> Path | None:
     """The upscale's own path does not say which output folder the video it was
-    made from was saved in, so an old script beside that video is looked for in
-    each of them."""
-    filed = funscript_path_for(f"{stem}.mp4", output_dir=output_dir)
-    if filed.is_file():
-        return filed
+    made from was saved in, so that video's script is looked for as if it were
+    in each of them."""
     output = Path(output_dir)
-    folders = output.iterdir() if output.is_dir() else ()
-    return next((beside for folder in folders
-                 if (beside := folder / filed.name).is_file()), None)
+    videos = [folder / f"{stem}{suffix}"
+              for folder in (output.iterdir() if output.is_dir() else ())
+              for suffix in sorted(VIDEO_EXTS)]
+    return _first_file([*(funscript_path_for(video, output_dir=output) for video in videos),
+                        _filed_under(stem, output),
+                        *(_beside(video) for video in videos)])
 
 
 def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:
@@ -205,15 +204,6 @@ def video_duration_seconds(video_path) -> float | None:
     if fps and fps > 0 and frames and frames > 0:
         return frames / fps
     return None
-
-
-def ensure_funscript(video_path, *, loop: bool, hz: float, output_dir,
-                     duration_provider=video_duration_seconds) -> Path | None:
-    existing = funscript_of(video_path, output_dir=output_dir)
-    if existing is not None:
-        return existing
-    return synthesize_funscript(video_path, loop=loop, hz=hz, output_dir=output_dir,
-                                duration_provider=duration_provider)
 
 
 def synthesize_funscript(video_path, *, loop: bool, hz: float, output_dir,

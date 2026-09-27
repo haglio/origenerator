@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.funscript import (
     funscript_path_for,
-    legacy_funscript_path_for,
     synthesize_actions,
     write_funscript,
 )
@@ -30,7 +29,7 @@ def _scripted_video(tmp_path, name="clip.mp4"):
     """A temp video with its script in the old place, beside it -- where every
     script written before the scripts had a folder of their own still sits."""
     vid = tmp_path / name
-    write_funscript(legacy_funscript_path_for(vid),
+    write_funscript(vid.with_suffix(".funscript"),
                     synthesize_actions(2.0, hz=1.0, loop=False))
     return vid
 
@@ -651,8 +650,8 @@ def test_scripted_video_shows_its_heatmap_strip(qtbot, tmp_path):
 
 
 def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeypatch):
-    """Where new scripts go: a folder under the output dir, keyed by the clip's
-    name rather than by sitting next to it."""
+    """Where new scripts go: a folder under the output dir, laid out like the
+    output folder, rather than next to the video."""
     monkeypatch.setattr(preview_widget, "COMFYUI_OUTPUT_DIR", tmp_path)
     vid = tmp_path / "video" / "filed.mp4"
     vid.parent.mkdir()

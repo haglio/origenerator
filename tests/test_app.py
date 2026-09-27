@@ -21,11 +21,13 @@ from shared_ui.colors import BLUE
 from origenerator import config, content, gallery
 from origenerator.app import (
     MAINTENANCE,
+    Library,
     _arm_the_crash_log,
     _bring_to_front,
     _configure_logging,
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
+    _merge_soundless_copies,
     _warm_voice_runtimes,
     main,
     resolve_comfyui_client_id,
@@ -34,6 +36,8 @@ from origenerator.app_state import AppState
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database
+from origenerator.evolver_export import EvolverInbox
+from origenerator.gui.export_lane import GENAU
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
 from tests.media_files import write_mp4_with_a_comment_tag
@@ -957,6 +961,31 @@ def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qap
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
     reclaim.assert_called_once()
+
+
+def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(tmp_path):
+    output = tmp_path / "output"
+    (output / "video").mkdir(parents=True)
+    (output / "video" / "flf2v_loop_00001-audio.mp4").write_bytes(b"with its sound")
+    (output / "video" / "flf2v_loop_00001.mp4").write_bytes(b"without")
+    db = Database(tmp_path / "t.db")
+    for prompt_id, filename, source in (("video", "flf2v_loop_00001-audio.mp4", "generated"),
+                                        ("copy", "flf2v_loop_00001.mp4", "imported")):
+        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+                             workflow_version="v009", params_json="{}", workflow_json="{}",
+                             source=source)
+        db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+            [{"filename": filename, "subfolder": "video", "type": "output"}]))
+    db.mark_genau_exported("copy")
+    inbox = tmp_path / "0_inbox"
+    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+                      log_dir=tmp_path / "logs", inbox=EvolverInbox(inbox))
+
+    assert _merge_soundless_copies(library) == 1
+
+    landed = inbox / GENAU.source / "flf2v_loop_00001-audio.mp4"
+    assert landed.read_bytes() == b"with its sound"
+    assert db.get_generation("video")["genau_exported_at"]
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():

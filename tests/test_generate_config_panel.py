@@ -2283,7 +2283,7 @@ def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alo
     funscript = Path("C:/out/funscript/vid1.funscript")
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda row, out: (video_path, "video"))
-    monkeypatch.setattr(gcp_module, "funscript_of",
+    monkeypatch.setattr(export_lane_module, "funscript_of",
                         lambda video, output_dir: funscript if video == video_path else None)
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)

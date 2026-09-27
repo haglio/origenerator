@@ -674,12 +674,12 @@ class CombineController(QObject):
         if preview is None or preview[1] != MediaType.VIDEO:
             return
         try:
-            self._inbox.hand_over(preview[0], GENAU_LANE.source)
+            GENAU_LANE.send(preview[0], row["prompt_id"], db=self._db,
+                            inbox=self._inbox, output_dir=COMFYUI_OUTPUT_DIR)
         except Exception as e:
             logger.warning("Automatic send to Genau failed for %s: %s",
                            row.get("prompt_id"), e)
             return
-        self._db.mark_genau_exported(row["prompt_id"])
         logger.info("genau: sent %s down the Genau lane", preview[0].name)
 
     def _already_genaud(self, row: dict) -> bool:

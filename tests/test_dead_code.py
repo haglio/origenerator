@@ -209,7 +209,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # being found as an item of its own: the sidecar fold's note on what it
 # repoints and what it drops is
 # test_merge_repoints_image_sidecar_to_video_and_drops_video_row.
-MAX_PROSE_LINES = 18941
+#
+# 18930 when a found soundless copy's sends began following it onto its video:
+# the maintenance record's account of its fields went as it gained the inbox,
+# and the send button's note that it re-reads the row before it redraws is
+# test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send.
+MAX_PROSE_LINES = 18930
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

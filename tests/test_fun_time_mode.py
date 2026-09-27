@@ -162,6 +162,16 @@ def test_a_window_still_being_built_offers_itself_as_starting(tmp_path):
         str(os.getpid()), str(this_process_creation_time()), "starting"]
 
 
+def test_a_preview_still_being_built_offers_itself_in_the_everyday_copy_s_state_too(tmp_path):
+    preview, everyday = tmp_path / "preview", tmp_path / "everyday"
+
+    offer_the_window_while_it_is_built(preview, everyday)
+
+    for state_dir in (preview, everyday):
+        assert (state_dir / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
+            str(os.getpid()), str(this_process_creation_time()), "starting"]
+
+
 def test_region_for_size_splits_on_aspect():
     assert region_for_size(1920, 1080) == "landscape"
     assert region_for_size(720, 1280) == "portrait"

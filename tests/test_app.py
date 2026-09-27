@@ -609,18 +609,21 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
     watch.return_value.withdraw.assert_called_once_with()
 
 
-def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(qapp):
+def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(
+        qapp, monkeypatch, tmp_path):
+    everyday = tmp_path / "everyday" / "state"
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", everyday)
     events = []
 
     with _a_faked_boot([], **{
         "origenerator.fun_time_mode.offer_the_window_while_it_is_built":
-            MagicMock(side_effect=lambda state_dir: events.append(("offered", state_dir))),
+            MagicMock(side_effect=lambda *state_dirs: events.append(("offered", state_dirs))),
         "origenerator.gui.main_window.OrigeneratorWindow":
             MagicMock(side_effect=lambda *a, **k: events.append("built") or MagicMock()),
     }):
         assert main([]) == 0
 
-    assert events == [("offered", STATE_DIR), "built"]
+    assert events == [("offered", (STATE_DIR, everyday)), "built"]
 
 
 def test_a_boot_fun_time_launched_offers_its_window_to_nobody(qapp):

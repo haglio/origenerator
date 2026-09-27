@@ -198,7 +198,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # were asked for: the sort's note that rows saying nothing of when they landed
 # keep the order they came in is
 # test_recent_generations_keeps_rows_that_do_not_say_when_they_landed_in_the_order_asked.
-MAX_PROSE_LINES = 19107
+#
+# 18945 when the standalone window began offering itself where every Fun Time
+# session looks, taken down to what the tree measured: the watch's note that it
+# puts its offer back whenever the offer stops naming it is
+# test_an_offer_deleted_under_an_open_window_is_put_back and
+# test_an_offer_another_instance_overwrote_is_taken_back.
+MAX_PROSE_LINES = 18945
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

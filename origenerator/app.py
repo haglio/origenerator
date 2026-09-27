@@ -670,7 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if fun_time is None:
         from origenerator.fun_time_mode import offer_the_window_while_it_is_built
-        offer_the_window_while_it_is_built(STATE_DIR)
+        offer_the_window_while_it_is_built(STATE_DIR, LIBRARY_STATE_DIR)
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 

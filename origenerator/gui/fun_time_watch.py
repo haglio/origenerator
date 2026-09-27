@@ -34,8 +34,7 @@ class FunTimeWatch(QObject):
                  library_state_dir: Path | None = None,
                  parent: QObject | None = None):
         super().__init__(parent)
-        self._state_dir = state_dir
-        self._claims_read_in = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
+        self._state_dirs = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over
         self._device_claimed = device_claimed or (lambda held: None)
         self._timer = QTimer(self)
@@ -44,7 +43,8 @@ class FunTimeWatch(QObject):
         self.renew()
 
     def renew(self) -> None:
-        self._state_dir.mkdir(parents=True, exist_ok=True)
+        for state_dir in self._state_dirs:
+            state_dir.mkdir(parents=True, exist_ok=True)
         self._timer.start()
         self._answer_the_session()
 
@@ -52,14 +52,10 @@ class FunTimeWatch(QObject):
         return self._timer.isActive()
 
     def _stand_the_offer(self) -> None:
-        """Put the offer back whenever it stops naming this window.
+        for state_dir in self._state_dirs:
+            self._stand_the_offer_in(state_dir / OFFER_NAME)
 
-        Written once, it is one deletion away from a window no session can find
-        -- and a session that cannot find it launches a second copy beside it
-        and leaves this one on the device.  A second instance of this app
-        overwrites it in the ordinary course of things.
-        """
-        offer = self._state_dir / OFFER_NAME
+    def _stand_the_offer_in(self, offer: Path) -> None:
         mine = offer_of_this_process()
         try:
             standing = offer.read_text(encoding="utf-8")
@@ -75,8 +71,9 @@ class FunTimeWatch(QObject):
 
     def _answer_the_session(self) -> None:
         self._stand_the_offer()
-        self._device_claimed(any(map(a_session_holds_the_device, self._claims_read_in)))
-        session = take_the_takeover(self._state_dir, pid=os.getpid())
+        self._device_claimed(any(map(a_session_holds_the_device, self._state_dirs)))
+        session = next(filter(None, (take_the_takeover(state_dir, pid=os.getpid())
+                                     for state_dir in self._state_dirs)), None)
         if session is None:
             return
         logger.info("A Fun Time session asked for this window")
@@ -85,4 +82,5 @@ class FunTimeWatch(QObject):
 
     def withdraw(self) -> None:
         self._timer.stop()
-        (self._state_dir / OFFER_NAME).unlink(missing_ok=True)
+        for state_dir in self._state_dirs:
+            (state_dir / OFFER_NAME).unlink(missing_ok=True)

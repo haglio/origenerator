@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import winsound
 from dataclasses import replace
 from unittest.mock import patch
 
@@ -26,6 +27,7 @@ from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.test_gallery_view import _selected_folder, _shelf
+from tests.test_hard_to_miss import _faded_backgrounds
 
 
 def _window(qtbot, tmp_path, app_state=None, *, fun_time=None):
@@ -84,6 +86,30 @@ def test_the_question_names_origenerator_in_full_since_its_title_is_cut_short(
 
     _parent, _title, text, *_buttons = asked[0]
     assert text == "Are you sure you want to close Origenerator?"
+
+
+def test_the_close_question_sounds_the_alert(qtbot, tmp_path, monkeypatch, alert_sounds):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert alert_sounds == [winsound.MB_ICONEXCLAMATION]
+
+
+def test_the_window_behind_the_close_question_fades_out(qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    qtbot.waitExposed(win)
+    faded_while_asked = []
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(
+        lambda *_args: faded_while_asked.extend(_faded_backgrounds(win))
+        or QMessageBox.StandardButton.No))
+
+    _close_from_the_title_bar(win)
+
+    assert [faded.geometry() for faded in faded_while_asked] == [win.geometry()]
 
 
 def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
@@ -149,6 +175,15 @@ def test_a_window_fun_time_launched_closes_when_the_session_ends_without_asking(
     _close_from_the_title_bar(win)
 
     assert not win.isVisible()
+
+
+def test_a_fun_time_session_ending_makes_no_sound(qtbot, tmp_path, alert_sounds):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert alert_sounds == []
 
 
 def test_ctrl_alt_q_in_a_fun_time_session_quits_without_asking(qtbot, tmp_path):

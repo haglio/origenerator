@@ -18,6 +18,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.win32 import place_window_in_device_pixels
@@ -288,11 +289,12 @@ class OrigeneratorWindow(QMainWindow):
     def _sure_to_close(self) -> bool:
         if self._fun_time is not None:
             return True
-        return QMessageBox.question(
-            self, "Close Origenerator", "Are you sure you want to close Origenerator?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        ) == QMessageBox.StandardButton.Yes
+        with hard_to_miss(self):
+            return QMessageBox.question(
+                self, "Close Origenerator", "Are you sure you want to close Origenerator?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            ) == QMessageBox.StandardButton.Yes
 
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:

@@ -74,7 +74,9 @@ hold — an unlanded change, or a pin the branch moves — put a checkout of it
 first on `PYTHONPATH` for the suite, and give the preview a launcher of its own
 in the worktree's git-ignored `state/` that sets the same `PYTHONPATH`. A
 player_core checkout used that way needs `vendor/libmpv-2.dll` copied in from
-the primary player_core's `vendor/`. Moving a pin is this repo's own commit,
+the primary player_core's `vendor/`, and is one you made: another session's
+goes when that session is done with it, and a suite that lost one partway on
+2026-09-27 failed on `No module named 'player_core.mpv_player'`. Moving a pin is this repo's own commit,
 with its own suite to answer for it, and a new shared_ui release reaches this
 app only beside a player_core release that names the same one: pip refuses an
 install that asks for two tags of one sibling. Never reinstall `.venv` while

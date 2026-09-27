@@ -24,6 +24,7 @@ from origenerator.comfy_graph import (
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
+from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
@@ -164,7 +165,7 @@ def _sidecar_key(file_entry: dict) -> tuple[str, str]:
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
 
 
-def merge_soundless_copy_rows(db: Database) -> int:
+def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
     rows = db.list_generations()
     video_by_copy_key: dict[tuple[str, str], dict] = {}
     for row in rows:
@@ -181,9 +182,23 @@ def merge_soundless_copy_rows(db: Database) -> int:
         video = video_by_copy_key.get(_sidecar_key(files[0]))
         if video is None:
             continue
+        try:
+            for lane in _lanes_its_video_is_owed(row, video):
+                send_down(video, lane)
+        except Exception:
+            logger.warning("Could not send %s where its soundless copy had gone; "
+                           "the copy waits for the next launch",
+                           video["prompt_id"], exc_info=True)
+            continue
         _fold_soundless_copy(db, row, video, rows)
         merged += 1
     return merged
+
+
+def _lanes_its_video_is_owed(copy: dict, video: dict) -> list[str]:
+    return [lane for lane, stamps in LANES.items()
+            if copy.get(stamps["sent"])
+            and not video.get(stamps["sent"]) and not video.get(stamps["unsent"])]
 
 
 def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -> None:

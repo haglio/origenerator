@@ -178,18 +178,12 @@ def _warm_voice_runtimes() -> None:
 
 @dataclass(frozen=True)
 class Library:
-    """What the maintenance passes below work on.
-
-    The live database and the ComfyUI client, plus the three folders they read
-    and write. One record rather than four more parameters on every pass: they
-    all draw from the same set, and a pass that needs none of it still has to be
-    callable the same way as the one that needs all of it.
-    """
     db: object
     client: object
     output_dir: Path
     thumb_dir: Path
     log_dir: Path
+    inbox: object
 
 
 @dataclass(frozen=True)
@@ -249,9 +243,21 @@ def _merge_video_sidecars(library: Library):
 
 
 def _merge_soundless_copies(library: Library):
+    from origenerator.gallery import resolve_preview
+    from origenerator.gui.export_lane import EXPORT_LANES
     from origenerator.importer import merge_soundless_copy_rows
+    from origenerator.media import MediaType
 
-    return merge_soundless_copy_rows(library.db)
+    lanes = {lane.source_key: lane for lane in EXPORT_LANES}
+
+    def send_down(video: dict, lane_key: str) -> None:
+        shown = resolve_preview(video, library.output_dir)
+        if shown is None or shown[1] != MediaType.VIDEO:
+            raise FileNotFoundError(f"{video['prompt_id']} has no video on disk")
+        lanes[lane_key].send(shown[0], video["prompt_id"], db=library.db,
+                             inbox=library.inbox, output_dir=library.output_dir)
+
+    return merge_soundless_copy_rows(library.db, send_down=send_down)
 
 
 def _backfill_workflow_labels(library: Library):
@@ -710,9 +716,10 @@ def main(argv: list[str] | None = None) -> int:
         client_id=resolve_comfyui_client_id(app_state),
     )
 
+    from origenerator.evolver_export import default_inbox
     _run_maintenance(
         Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
-                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR),
+                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
         MAINTENANCE, status, logger,
     )
 

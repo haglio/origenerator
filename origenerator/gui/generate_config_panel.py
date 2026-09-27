@@ -29,7 +29,6 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
-from origenerator.funscript import funscript_of
 from origenerator.gallery import (
     EnhanceSettings,
     build_image_config_index,
@@ -1718,16 +1717,15 @@ class GenerateConfigPanel(QWidget):
         path = self._displayed_video_path()
         if path is None:
             return
-        funscript = (funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR)
-                     if lane.hands_over_funscript else None)
         try:
-            self._inbox.hand_over(path, lane.source, funscript=funscript)
+            lane.send(path, self._displayed_row["prompt_id"], db=self._db,
+                      inbox=self._inbox, output_dir=COMFYUI_OUTPUT_DIR)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
             QMessageBox.warning(self._preview, lane.failure_title,
                                 lane.failure_body(e))
             return
-        self._record_lane_state(lane, lane.mark)
+        self._redraw_lane(lane)
 
     def _on_unsend(self, lane):
         """Take the send back: the app it went to deletes every copy it holds.
@@ -1740,17 +1738,11 @@ class GenerateConfigPanel(QWidget):
         """
         if not self._displayed_row or not self._displayed_row.get(lane.flag):
             return
-        self._record_lane_state(lane, lane.unmark)
+        lane.unmark(self._db, self._displayed_row["prompt_id"])
+        self._redraw_lane(lane)
 
-    def _record_lane_state(self, lane, write):
-        """Persist a lane's new state for the displayed row, then redraw its button.
-
-        The button is drawn from the row, so the row is re-read first: writing and
-        then trusting the value written is how a button comes to disagree with
-        what a restart would show.
-        """
+    def _redraw_lane(self, lane):
         prompt_id = self._displayed_row["prompt_id"]
-        write(self._db, prompt_id)
         self._set_displayed_row(self._db.get_generation(prompt_id) or self._displayed_row)
         path = self._displayed_video_path()
         self._update_export_button(lane, None if path is None else (path, MediaType.VIDEO))

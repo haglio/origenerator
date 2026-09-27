@@ -540,12 +540,16 @@ def _made_here(db, prompt_id, filename, subfolder="video", starred=False):
         db.set_generation_favorite(prompt_id, True)
 
 
+def _nothing_to_send(video, lane):
+    raise AssertionError(f"{video['prompt_id']} was sent down the {lane} lane")
+
+
 def test_merge_folds_a_found_soundless_copy_into_the_video_the_app_made(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
 
-    assert imp.merge_soundless_copy_rows(db) == 1
+    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 1
     assert db.get_generation("copy") is None
     files = json.loads(db.get_generation("sounded")["output_files"])
     assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
@@ -558,7 +562,7 @@ def test_a_folded_copys_favorite_goes_to_its_video(tmp_path):
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
     db.set_generation_favorite("copy", True)
 
-    imp.merge_soundless_copy_rows(db)
+    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
     assert db.get_generation("sounded")["starred"] == 1
 
@@ -570,7 +574,7 @@ def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_recipe(tmp
     _made_here(db, "combined", "flf2v_loop_00002-audio.mp4")
     db.set_recipe_source("combined", category="alpha", video_prompt_id="copy")
 
-    imp.merge_soundless_copy_rows(db)
+    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
     combined = db.get_generation("combined")
     assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "sounded")
@@ -582,7 +586,7 @@ def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_it
     _completed(db, "found-copy", "old_clip_00001.mp4", "video")
     _completed(db, "lone", "wan22_i2v_00001_.mp4", "video", workflow_name="wan22_i2v")
 
-    assert imp.merge_soundless_copy_rows(db) == 0
+    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 0
     assert {r["prompt_id"] for r in db.list_generations()} == {"found-sounded", "found-copy", "lone"}
 
 
@@ -590,11 +594,71 @@ def test_folding_again_finds_nothing_and_lists_the_copy_once(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
-    imp.merge_soundless_copy_rows(db)
+    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
 
-    assert imp.merge_soundless_copy_rows(db) == 0
+    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 0
     files = json.loads(db.get_generation("sounded")["output_files"])
     assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
+
+
+def test_a_copy_sent_down_a_lane_its_video_never_went_down_sends_the_video_there(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.mark_genau_exported("copy")
+    sent = []
+
+    imp.merge_soundless_copy_rows(
+        db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
+
+    assert sent == [("sounded", "genau")]
+    assert db.get_generation("copy") is None
+
+
+def test_a_copy_sent_down_a_lane_its_video_already_went_down_sends_nothing(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.mark_evolver_exported("copy")
+    db.mark_evolver_exported("sounded")
+    sent = []
+
+    imp.merge_soundless_copy_rows(
+        db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
+
+    assert sent == []
+    assert db.get_generation("copy") is None
+
+
+def test_a_video_taken_back_from_a_lane_is_not_sent_there_for_its_copy(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.mark_genau_exported("copy")
+    db.mark_genau_exported("sounded")
+    db.mark_genau_unsent("sounded")
+    sent = []
+
+    imp.merge_soundless_copy_rows(
+        db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
+
+    assert sent == []
+
+
+def test_a_copy_whose_video_could_not_be_sent_waits_for_the_next_launch(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    _made_here(db, "sounded-2", "flf2v_loop_00002-audio.mp4")
+    _completed(db, "copy-2", "flf2v_loop_00002.mp4", "video")
+    db.mark_genau_exported("copy")
+
+    def unreachable(video, lane):
+        raise OSError("inbox unreachable")
+
+    assert imp.merge_soundless_copy_rows(db, send_down=unreachable) == 1
+    assert db.get_generation("copy")["genau_exported_at"]
+    assert db.get_generation("copy-2") is None
 
 
 def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):

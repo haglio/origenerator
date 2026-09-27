@@ -173,15 +173,15 @@ class VoiceSteering(QObject):
 
     def _interpret(self, text: str, *, steering: bool):
         meaning = self._meaning(text)
+        length = len(text.split())
         if isinstance(meaning, SpokenRequest):
             logger.info("Voice: request %s", meaning.state.value)
         elif meaning is not None:
-            logger.info("Voice: %r matched %r", text, meaning)
+            logger.info("Voice: a %d-word utterance matched %r", length, meaning)
         elif steering:
-            logger.info("Voice: rewriting the prompt with a %d-word instruction",
-                        len(text.split()))
+            logger.info("Voice: rewriting the prompt with a %d-word instruction", length)
         else:
-            logger.info("Voice: a %d-word utterance matched no command", len(text.split()))
+            logger.info("Voice: a %d-word utterance matched no command", length)
         return meaning
 
     def _meaning(self, text: str):

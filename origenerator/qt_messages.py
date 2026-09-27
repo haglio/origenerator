@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
+from PyQt6.QtCore import QLoggingCategory, QtMsgType, qInstallMessageHandler
+
+_FFMPEG_FORMAT_DUMP_CATEGORY = "qt.multimedia.ffmpeg.mediadataholder"
 
 _LEVELS = {
     QtMsgType.QtDebugMsg: logging.DEBUG,
@@ -72,3 +74,7 @@ def log_qt_message(kind, _context, message: str) -> None:
 
 def install_qt_message_logging():
     return qInstallMessageHandler(log_qt_message)
+
+
+def silence_the_ffmpeg_format_dump() -> None:
+    QLoggingCategory.setFilterRules(f"{_FFMPEG_FORMAT_DUMP_CATEGORY}.info=false")

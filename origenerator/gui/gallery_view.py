@@ -3138,6 +3138,12 @@ class GalleryView(QWidget):
         self._shows.set_session_paused(paused)
         omnipause.freeze(paused)
 
+    def hud_place(self, side: str) -> tuple:
+        return self._shows.hud_place(side)
+
+    def place_a_panel(self, side: str, action: str, argument: str) -> None:
+        self._shows.place_a_panel(side, action, argument)
+
     def region_show(self, side: str):
         """The show occupying satellite region *side*, or None. The hosting
         session's bridge asks this window for it."""

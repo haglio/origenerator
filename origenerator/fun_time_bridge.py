@@ -46,7 +46,7 @@ from origenerator.fun_time_mode import (
     SIDES,
     FunTimeSession,
 )
-from origenerator.show_buttons import answer
+from origenerator.show_buttons import PANEL_PLACES, answer
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,9 @@ class FunTimeBridge(QObject):
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
         action, argument = side_press(side, keyword.lower(), argument)
+        if action in PANEL_PLACES:
+            self._gallery.place_a_panel(side, action, argument)
+            return
         if action == SAY and marker == ":":
             # The session owns the microphone for the whole room, so a spoken
             # command about one of these regions is heard THERE and sent here

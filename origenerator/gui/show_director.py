@@ -31,7 +31,9 @@ from dataclasses import replace
 from functools import partial
 from typing import Protocol
 
+from player_core.hud_placement import HudCorner
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from player_core.modes import read_mode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -72,6 +74,7 @@ from origenerator.orientation import (
 from origenerator.orientation import (
     split_key as _split_shelf_key,
 )
+from origenerator.show_buttons import PANEL_CORNER
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
@@ -165,6 +168,8 @@ class ShowDirector:
         # nought). One slot, because it is one view.
         self._slideshow = None
         self._standalone_side: str | None = None
+        self._hud_corners: dict[str, HudCorner] = {}
+        self._hud_minimized: dict[str, bool] = {}
         # Every show currently up, each with the shelf/folder key it opened
         # from: what a landing generation is offered to, so a show keeps up
         # with an auto-generating folder however far the browser has moved on.
@@ -457,6 +462,7 @@ class ShowDirector:
             neighbors=partial(self.neighbors_of, side=side),
             widen=partial(self.beyond_the_row_of, side=side),
             acts=partial(self.acts_of, side=side),
+            move_hud=partial(self.move_the_hud, side=side),
         )
 
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
@@ -711,6 +717,31 @@ class ShowDirector:
             view.set_paused(True)
         self._wear_the_hud(view, side)
 
+    def hud_place(self, side: str) -> tuple[HudCorner, bool]:
+        return (self._hud_corners.get(side, HudCorner.UPPER_LEFT),
+                self._hud_minimized.get(side, False))
+
+    def place_a_panel(self, side: str, action: str, argument: str) -> None:
+        corner, minimized = self.hud_place(side)
+        if action == PANEL_CORNER:
+            self._hud_corners[side] = read_mode(HudCorner, argument, corner)
+        else:
+            self._hud_minimized[side] = argument == "1"
+        self._tell_the_show_wearing_it(side)
+
+    def move_the_hud(self, direction: str, *, side: str) -> None:
+        self._hud_corners[side] = self.hud_place(side)[0].toward(direction)
+        self._tell_the_show_wearing_it(side)
+
+    def collapse_the_hud(self, minimized: bool, *, side: str) -> None:
+        self._hud_minimized[side] = minimized
+        self._tell_the_show_wearing_it(side)
+
+    def _tell_the_show_wearing_it(self, side: str) -> None:
+        for surface in self.surfaces():
+            if getattr(surface, "hud_side", "") == side:
+                surface.set_hud_place(*self.hud_place(side))
+
     def _wear_the_hud(self, view, side: str) -> None:
         """Put the players' own HUD on *view* — the same panel, rendered by the
         same shared code: the status line, this side's transport, and the nav
@@ -725,9 +756,12 @@ class ShowDirector:
         """
         # The view is handed the panel itself rather than only told one is on:
         # a motion key redraws the device rows riding on it.
+        corner, minimized = self.hud_place(side)
         view.adopt_hud(ShowHud(view, side=side,
                                dashboard_cmd_file=self._session_channel,
-                               label_for=self._item_label))
+                               label_for=self._item_label,
+                               corner=corner, minimized=minimized,
+                               collapse=partial(self.collapse_the_hud, side=side)))
 
     @property
     def _session_channel(self):

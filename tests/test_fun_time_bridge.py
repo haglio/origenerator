@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 from PIL import Image
 from player_core.file_channel import consume_command_file
+from player_core.hud_placement import HudCorner
 from player_core.playlist import read_playlist
 from player_core.satellite_hud import parse_hud
 
@@ -712,7 +713,8 @@ def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_pat
     assert document["command_case_blind"]
 
     for template in document["command_lines"]:
-        line = template.format(file=r"C:\library\scene one.png", row="alpha", words="favorites")
+        line = template.format(file=r"C:\library\scene one.png", row="alpha",
+                               words="favorites", corner="lower_right", on="1")
         for spelled in (line.lower(), line.upper()):
             _told_on_a_fresh_bridge(tmp_path, spelled)
 
@@ -746,3 +748,24 @@ def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, 
     _press(bridge, tmp_path, r"GO_TO|C:\library\genau\clips\scene one 0012.mp4")
 
     assert view.selected_prompt_ids() == ["i1"]
+
+
+def test_the_session_says_where_each_sides_panel_sits(qtbot, tmp_path):
+    """The keys that move a panel are the room's, so the session keeps the
+    answer and tells this app; a show opened into that region later wears it."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+
+    view._fun_time.command_file.write_text(
+        "portrait_hud_corner|lower_right\nportrait_hud_minimized|1\n", encoding="utf-8")
+    bridge._drain_commands()
+
+    assert view.hud_place("portrait") == (HudCorner.LOWER_RIGHT, True)
+    assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
+
+
+def test_the_contract_names_the_panel_lines_the_session_writes():
+    lines = contract.command_lines()
+
+    for side in ("portrait", "landscape"):
+        assert f"{side}_hud_corner|{{corner}}" in lines
+        assert f"{side}_hud_minimized|{{on}}" in lines

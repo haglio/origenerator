@@ -54,8 +54,10 @@ where it can never reach the blacked player underneath.
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 from player_core.file_channel import append_command
+from player_core.hud_placement import HudCorner, hud_origin
 from player_core.hud_status import looping_label, status_line
 from player_core.modes import Osr2State
 from player_core.satellite_hud import (
@@ -100,6 +102,8 @@ _THE_SHOWS_OWN = frozenset({
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
     "cycle_action",
 })
+
+_COLLAPSES = {"hud_minimize": True, "hud_restore": False}
 
 def _cell(slide, label: str = "") -> HudCell:
     return HudCell(path=str(slide.path), thumb=thumb_of(slide), label=label)
@@ -186,7 +190,8 @@ class ShowHud(QLabel):
     """One show's HUD: model from the host, bitmap from the shared renderer."""
 
     def __init__(self, host: QWidget, *, side: str, dashboard_cmd_file,
-                 label_for=None):
+                 label_for=None, corner: HudCorner = HudCorner.UPPER_LEFT,
+                 minimized: bool = False, collapse=None):
         super().__init__(host)
         self._host = host
         self._side = side
@@ -198,6 +203,9 @@ class ShowHud(QLabel):
         # The session's command channel, or ``None`` standalone — which is also
         # how this HUD knows which of the two it is on (see :meth:`_deliver`).
         self._dashboard_cmd_file = dashboard_cmd_file
+        self._corner = corner
+        self._minimized = minimized
+        self._collapse = collapse
         self._renderer = HudRenderer(side)
         self._clicks = HudClicks(side)
         self._targets: HudTargets | None = None
@@ -208,12 +216,7 @@ class ShowHud(QLabel):
         self.setMouseTracking(True)  # hover tooltips render into the bitmap
         # Its map is clicked and hovered, so the mouse stops here.
         float_over_media(self, click_through=False)
-        # The players' own inset, in DEVICE pixels: this panel swaps in and out
-        # with the player's HUD under it, so the two have to sit on the same
-        # corner or the swap reads as a jump.  move() takes logical pixels, and
-        # left unconverted the scale pulled this one 4px in from the corner
-        # against the player's 12.
-        self.move(to_logical_size(MARGIN), to_logical_size(MARGIN))
+        self._place()
         self._timer = QTimer(self)
         self._timer.setInterval(_REFRESH_MS)
         self._timer.timeout.connect(self._tick)
@@ -221,12 +224,33 @@ class ShowHud(QLabel):
         self._tick()
         self.show()
 
+    @property
+    def side(self) -> str:
+        return self._side
+
+    def set_hud_place(self, corner: HudCorner, minimized: bool) -> None:
+        if (corner, minimized) == (self._corner, self._minimized):
+            return
+        self._corner, self._minimized = corner, minimized
+        self._tick()
+        self._place()
+
+    def _place(self) -> None:
+        margin = to_logical_size(MARGIN)
+        size = self.size()
+        self.move(*hud_origin(self._corner, panel=(size.width(), size.height()),
+                              window=(self._host.width(), self._host.height()),
+                              margin=margin))
+
     # --- model in, pixels out ---------------------------------------------
 
     def _tick(self) -> None:
         model = show_hud_model(self._side, self._host,
                                hosted=self._dashboard_cmd_file is not None,
                                device=self._host.hud_device)
+        if model is not None:
+            model = replace(model, hud_corner=self._corner,
+                            hud_minimized=self._minimized)
         # The loop and filter buttons toggle off what they read as lit, so the
         # clicks mirror the show's loop the way a player's mirror its published
         # panel.
@@ -297,6 +321,7 @@ class ShowHud(QLabel):
         pixmap = unscaled_pixmap(QPixmap.fromImage(image))
         self.setPixmap(pixmap)
         self.resize(pixmap.deviceIndependentSize().toSize())
+        self._place()
         raise_over_media(self)
         if self.isHidden():
             self.show()
@@ -353,6 +378,9 @@ class ShowHud(QLabel):
             return
         verb, _, path = command.partition("|")
         action, path = side_press(self._side, verb, path)
+        if action in _COLLAPSES:
+            self._collapse_here_or_out_there(command, _COLLAPSES[action])
+            return
         if action in _THE_SHOWS_OWN:
             # The two filters, reset, the loops, the expand mark and the map's
             # own clicks mean on a show what they mean on a player, and the
@@ -371,6 +399,13 @@ class ShowHud(QLabel):
                      for verb in ("prev", "next", "lock", "trash")))
         if command in allowed:
             append_command(self._dashboard_cmd_file, command)
+
+    def _collapse_here_or_out_there(self, command: str, minimized: bool) -> None:
+        if self._dashboard_cmd_file is not None:
+            append_command(self._dashboard_cmd_file, command)
+            return
+        if self._collapse is not None:
+            self._collapse(minimized)
 
     def _act_here(self, action: str) -> None:
         """A press with no session under it: the show answers it itself.

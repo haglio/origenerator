@@ -164,8 +164,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery
-    put before one went.)"""
+    put before one went. 266 -> 268: the room's keys move this app's panels too, so
+    where each side's show wears its panel is answered here and set from the
+    session's line -- the corner and whether it is collapsed read back together,
+    because a show wears them together.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 266
+               for x in _class_def(VIEW, "GalleryView").body) == 268
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 83

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from player_core.hud_placement import HudCorner
+from player_core.satellite_hud import MARGIN
+
 from origenerator.gui import media_overlay
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
@@ -7,6 +10,7 @@ from origenerator.gui.show_hud import ShowHud, show_hud_model
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.slideshow import in_order
+from origenerator.ui_scale import to_logical_size
 from tests.motion_doubles import FakeMotion
 from tests.show_surface_fakes import FakeEngine
 
@@ -155,3 +159,62 @@ class TestTheOnePanelAShowWears:
         hud._deliver("portrait_next")
 
         assert show._playlist.index != before
+
+
+class TestWhereTheShowsPanelSits:
+    """The room moves this panel round the corners of the show, and collapses it
+    to a square with a plus on it."""
+
+    @staticmethod
+    def _show(qtbot):
+        show = SlideshowView([("scene one.png", "image")], engine=FakeEngine(),
+                             shuffle=in_order)
+        qtbot.addWidget(show)
+        show.resize(900, 600)
+        show.show()
+        return show
+
+    def test_the_panel_moves_to_the_corner_it_is_given(self, qtbot):
+        show = self._show(qtbot)
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+        show.adopt_hud(hud)
+
+        hud.set_hud_place(HudCorner.LOWER_RIGHT, False)
+
+        margin = to_logical_size(MARGIN)
+        assert hud.pos().x() == show.width() - margin - hud.width()
+        assert hud.pos().y() == show.height() - margin - hud.height()
+
+    def test_a_collapsed_panel_is_the_plus_button_alone(self, qtbot):
+        show = self._show(qtbot)
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+        show.adopt_hud(hud)
+        wide = hud.width()
+
+        hud.set_hud_place(HudCorner.UPPER_LEFT, True)
+
+        assert hud.width() < wide
+        assert [button.command for _rect, button in hud._targets.buttons] == [
+            "portrait_hud_restore"]
+
+    def test_a_standalone_press_on_the_minus_collapses_it_here(self, qtbot):
+        show = self._show(qtbot)
+        collapsed: list[bool] = []
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None,
+                      collapse=collapsed.append)
+        show.adopt_hud(hud)
+
+        hud._deliver("portrait_hud_minimize")
+
+        assert collapsed == [True]
+
+    def test_a_hosted_press_on_the_minus_goes_out_on_the_sessions_channel(
+            self, qtbot, tmp_path):
+        show = self._show(qtbot)
+        channel = tmp_path / "dashboard_cmd.txt"
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=channel)
+        show.adopt_hud(hud)
+
+        hud._deliver("portrait_hud_minimize")
+
+        assert channel.read_text(encoding="utf-8").split() == ["portrait_hud_minimize"]

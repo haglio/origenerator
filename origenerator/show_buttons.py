@@ -153,6 +153,10 @@ _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
     "play_video": lambda show, path: show.show_item(path, lock=False),
     "lock_video": lambda show, path: show.show_item(path, lock=True),
 }
+PANEL_CORNER = "hud_corner"
+PANEL_MINIMIZED = "hud_minimized"
+PANEL_PLACES: dict[str, str] = {PANEL_CORNER: "{corner}", PANEL_MINIMIZED: "{on}"}
+
 PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 

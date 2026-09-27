@@ -20,6 +20,7 @@ from origenerator.fun_time_mode import (
 from origenerator.slideshow import Slide
 from origenerator.win32 import this_process_creation_time
 from tests.hosted_launch import hosted_launch
+from tests.media_files import write_mp4
 
 
 def _png(path: Path, width: int, height: int) -> Path:
@@ -197,24 +198,12 @@ def test_region_for_items_defaults_to_landscape_when_nothing_measures(tmp_path):
     assert region_for_items([(str(tmp_path / "gone.mp4"), "video", "a", None)]) == "landscape"
 
 
-def _mp4(path: Path, width: int, height: int) -> Path:
-    import cv2  # noqa: PLC0415 (heavy; only this helper writes a real mp4)
-    import numpy  # noqa: PLC0415
-
-    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 5,
-                             (width, height))
-    for _ in range(3):
-        writer.write(numpy.zeros((height, width, 3), dtype=numpy.uint8))
-    writer.release()
-    return path
-
-
 def test_videos_without_stills_are_probed_rather_than_defaulted(tmp_path):
     # A folder of videos whose rows carry no thumbnails measured as nothing at
     # all, and "nothing" fell to landscape — which is how a portrait slideshow
     # once landed on the landscape region.  With no stills to vote, the first
     # video's own frame answers.
-    clip = _mp4(tmp_path / "tall.mp4", 64, 128)
+    clip = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
     items = [(str(clip), "video", "a", None), (str(clip), "video", "b", None)]
     assert region_for_items(items) == "portrait"
 

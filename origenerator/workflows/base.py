@@ -7,6 +7,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import measure_derived_size, override_size
 from origenerator.workflows.detail_parts import detail_fix_passes
@@ -896,5 +897,5 @@ def soundless_copies_of(saved: list[dict]) -> list[dict]:
             copies.append({"filename": f"{stem.removesuffix('-audio')}.{ext}",
                            "subfolder": saved_file.get("subfolder", ""),
                            "type": saved_file.get("type", "output"),
-                           "role": "silent"})
+                           "role": SILENT_COPY_ROLE})
     return copies

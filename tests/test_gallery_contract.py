@@ -18,6 +18,7 @@ from pathlib import Path
 from origenerator import db_schema
 from origenerator import gallery_contract as contract
 from origenerator.gui.export_lane import EXPORT_LANES
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -53,3 +54,10 @@ def test_every_lane_the_document_names_stamps_the_columns_it_promises():
                for lane in EXPORT_LANES}
 
     assert stamped == _document()["lanes"]
+
+
+def test_a_videos_soundless_copy_is_listed_under_the_role_the_document_promises():
+    finished = WORKFLOW_REGISTRY["wan22_flf2v_loop"].extract_output_info({"outputs": {"16": {
+        "gifs": [{"filename": "clip_00001-audio.mp4", "subfolder": "video", "type": "output"}]}}})
+
+    assert finished[1]["role"] == _document()["silent_copy_role"]

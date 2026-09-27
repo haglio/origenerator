@@ -64,6 +64,7 @@ class ShowActions:
     drive_toggle: Callable[[], None] | None = None
     osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None
+    move_hud: Callable[[str], None] | None = None
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
     acts: Callable[[list], dict] | None = None

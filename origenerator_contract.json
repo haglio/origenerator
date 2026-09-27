@@ -94,6 +94,8 @@
     "portrait_cycle_version_back",
     "portrait_play_video|{file}",
     "portrait_lock_video|{file}",
+    "portrait_hud_corner|{corner}",
+    "portrait_hud_minimized|{on}",
     "filter_portrait_{row}",
     "portrait_say:{words}",
     "landscape_prev",
@@ -126,6 +128,8 @@
     "landscape_cycle_version_back",
     "landscape_play_video|{file}",
     "landscape_lock_video|{file}",
+    "landscape_hud_corner|{corner}",
+    "landscape_hud_minimized|{on}",
     "filter_landscape_{row}",
     "landscape_say:{words}"
   ]

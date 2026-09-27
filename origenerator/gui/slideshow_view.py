@@ -76,6 +76,14 @@ _ENHANCING = "Enhancing…"
 _ENHANCE_QUEUED = "Enhancement queued"
 
 
+_PANEL_MOVES = {
+    Qt.Key.Key_Left: "left",
+    Qt.Key.Key_Right: "right",
+    Qt.Key.Key_Up: "up",
+    Qt.Key.Key_Down: "down",
+}
+
+
 class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
@@ -1237,6 +1245,19 @@ class SlideshowView(QWidget):
 
     # --- the neighboring items ---------------------------------------------
 
+    @property
+    def hud_side(self) -> str:
+        return "" if self._hud is None else self._hud.side
+
+    def set_hud_place(self, corner, minimized: bool) -> None:
+        if self._hud is not None:
+            self._hud.set_hud_place(corner, minimized)
+
+    def _move_the_panel(self, key) -> None:
+        direction = _PANEL_MOVES.get(key)
+        if direction is not None and self._actions.move_hud is not None:
+            self._actions.move_hud(direction)
+
     def adopt_hud(self, hud=None):
         """The players' HUD went on this show: its map now says where in the
         set this is and what is around it, so the view's own furnishings — the
@@ -1302,7 +1323,9 @@ class SlideshowView(QWidget):
     def keyPressEvent(self, event):
         key = event.key()
         shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-        if key == Qt.Key.Key_Escape:
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self._move_the_panel(key)
+        elif key == Qt.Key.Key_Escape:
             self.close()
         elif key == Qt.Key.Key_Left:
             self._step_level(-1) if shifted else self._step(-1)

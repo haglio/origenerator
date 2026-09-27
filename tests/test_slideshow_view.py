@@ -2101,3 +2101,35 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
 
     assert shown == ["id-c"]
     assert (view.hud_act_filter, view.hud_map().loop) == ("", "seed")
+
+
+class TestMovingTheShowsPanel:
+    """Ctrl and the arrow keys move this show's panel round the corners, the same
+    keys a Fun Time session gives the player this show covers."""
+
+    @staticmethod
+    def _show(qtbot, moves):
+        show = SlideshowView([("scene one.png", "image")], engine=FakeEngine(),
+                             shuffle=in_order,
+                             actions=ShowActions(move_hud=moves.append))
+        qtbot.addWidget(show)
+        return show
+
+    def test_each_ctrl_arrow_asks_for_that_direction(self, qtbot):
+        moves: list[str] = []
+        show = self._show(qtbot, moves)
+
+        for key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+            show.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, key,
+                                         Qt.KeyboardModifier.ControlModifier))
+
+        assert moves == ["left", "right", "up", "down"]
+
+    def test_an_arrow_with_no_ctrl_asks_for_no_move(self, qtbot):
+        moves: list[str] = []
+        show = self._show(qtbot, moves)
+
+        show.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right,
+                                     Qt.KeyboardModifier.NoModifier))
+
+        assert moves == []

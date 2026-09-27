@@ -188,8 +188,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 19109 when a finished video's script began replacing the one its name already
 # had: completion's note that an existing script is left alone went, ensure_funscript's
-# notes on what it leaves and skips are test_ensure_funscript_skips_when_the_script_exists,
-# test_ensure_funscript_writes_no_second_copy_of_an_older_one and
+# notes on what it leaves and skips are test_backfill_is_idempotent,
+# test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_filed and
 # test_a_video_of_unknown_length_gets_no_funscript, and that a script which cannot be
 # written never strands the video is
 # test_a_script_that_cannot_be_written_never_strands_a_finished_video.
@@ -214,7 +214,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the maintenance record's account of its fields went as it gained the inbox,
 # and the send button's note that it re-reads the row before it redraws is
 # test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send.
-MAX_PROSE_LINES = 18930
+#
+# 18916 when each video's script got a place of its own: the module's account
+# of a name tying a script to its video went, and the note that every read
+# still tries beside the video is test_a_script_written_before_the_folder_existed_is_still_found
+# and test_a_videos_own_script_is_found_before_those_older_versions_filed.
+MAX_PROSE_LINES = 18916
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -137,13 +137,17 @@ name.
 ## A video's filename is not the video
 
 ComfyUI numbers a video from the files already in its output folder, so
-deleting the newest video gives its filename to the next one, and a funscript
-is tied to its video by that name alone. Completion writes each finished
-video's script over whatever its name had, but anything else that carries a
-script to a video by name -- a sweep, a copy into Evolver's library -- first
-checks that the two are the same length. A one-off copy of this folder's
-scripts into the library on 2026-09-26 did not, and a video from April on the
-Satellites was given the script of a June video that had since taken its name.
+deleting the newest video gives its filename to the next one, and two videos
+can share a name: in two folders, or in one folder as an mp4 and a webm. So a
+script is filed where its video is, under the video's whole filename
+(`funscript_path_for`), and moves with the video when the app follows a move;
+completion writes each finished video's script over whatever was filed there.
+Older scripts are filed by the name without its type, or beside the video, and
+anything that carries one of those to a video by name -- a copy into Evolver's
+library, say -- first checks that the two are the same length. A one-off copy
+of this folder's scripts into the library on 2026-09-26 did not, and a video
+from April on the Satellites was given the script of a June video that had
+since taken its name.
 
 ## A feature the session can reach is half a feature until Fun Time answers it
 

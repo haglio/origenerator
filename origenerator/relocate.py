@@ -32,10 +32,14 @@ is skipped: its file is in the trash, which is not the output tree.
 from __future__ import annotations
 
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 
+from origenerator.funscript import funscript_path_for
 from origenerator.gallery.output import parse_file_list
+
+logger = logging.getLogger(__name__)
 
 #: The row columns holding a list of output-file records. ``enhance_history``
 #: is not among them: it names its files by name alone, so a move cannot
@@ -60,7 +64,7 @@ def _by_name(output_dir: Path) -> dict[str, set[str]]:
     return index
 
 
-def _followed(files: list, index: dict[str, set[str]]) -> int:
+def _followed(files: list, index: dict[str, set[str]], output_dir: Path) -> int:
     """Repoint each record in *files* whose file has moved; how many, in place."""
     moved = 0
     for record in files:
@@ -68,11 +72,25 @@ def _followed(files: list, index: dict[str, set[str]]) -> int:
             continue
         name = record.get("filename") or ""
         holders = index.get(name, set())
-        if len(holders) != 1 or (record.get("subfolder") or "") in holders:
+        was = record.get("subfolder") or ""
+        if len(holders) != 1 or was in holders:
             continue
         record["subfolder"] = next(iter(holders))
+        _move_script(output_dir / was / name, output_dir / record["subfolder"] / name,
+                     output_dir)
         moved += 1
     return moved
+
+
+def _move_script(was: Path, now: Path, output_dir: Path) -> None:
+    script = funscript_path_for(was, output_dir=output_dir)
+    destination = funscript_path_for(now, output_dir=output_dir)
+    if script.is_file() and not destination.exists():
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            script.rename(destination)
+        except OSError as e:
+            logger.warning("A moved video's script stayed at %s: %s", script, e)
 
 
 def relocate_moved_outputs(db, output_dir) -> int:
@@ -91,7 +109,7 @@ def relocate_moved_outputs(db, output_dir) -> int:
         updates = {}
         for column in FILE_LISTS:
             files = parse_file_list(row.get(column))
-            followed = _followed(files, index) if files else 0
+            followed = _followed(files, index, output_dir) if files else 0
             if followed:
                 updates[column] = json.dumps(files)
                 moved += followed

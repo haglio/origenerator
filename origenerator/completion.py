@@ -59,7 +59,7 @@ def _first_output_file(files, output_dir: Path) -> Path | None:
 
 def _write_video_funscript(workflow, files, output_dir: Path, params: dict | None):
     """ComfyUI gives a deleted video's filename to the next video it saves, and
-    the deleted one's script is still filed under that name, so the finished
+    the deleted one's script is still where the new one's goes, so the finished
     video's own script is written over it."""
     if workflow.output_type != MediaType.VIDEO:
         return

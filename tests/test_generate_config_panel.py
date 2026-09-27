@@ -19,7 +19,6 @@ from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database
 from origenerator.funscript import (
     funscript_path_for,
-    legacy_funscript_path_for,
     synthesize_actions,
     write_funscript,
 )
@@ -1486,7 +1485,7 @@ def _script_for(video_path, output_dir=None):
     """Write a script for ``video_path`` -- in the scripts folder under
     ``output_dir``, or, with none named, in the old place beside the clip."""
     actions = synthesize_actions(2.0, hz=1.0, loop=False)
-    dest = (legacy_funscript_path_for(video_path) if output_dir is None
+    dest = (video_path.with_suffix(".funscript") if output_dir is None
             else funscript_path_for(video_path, output_dir=output_dir))
     write_funscript(dest, actions)
     return actions

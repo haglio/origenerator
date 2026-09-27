@@ -76,6 +76,8 @@ LANES = {
     "genau": {"sent": "genau_exported_at", "unsent": "genau_unsent_at"},
 }
 
+SILENT_COPY_ROLE = "silent"
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -89,6 +91,7 @@ def declaration() -> dict:
         "params_model_keys": list(PARAMS_MODEL_KEYS),
         "params_input_image_key": PARAMS_INPUT_IMAGE_KEY,
         "lanes": {lane: dict(stamps) for lane, stamps in LANES.items()},
+        "silent_copy_role": SILENT_COPY_ROLE,
     }
 
 

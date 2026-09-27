@@ -35,5 +35,6 @@
       "sent": "genau_exported_at",
       "unsent": "genau_unsent_at"
     }
-  }
+  },
+  "silent_copy_role": "silent"
 }

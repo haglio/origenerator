@@ -2,8 +2,7 @@
 
 The whole act used to be reachable only by building the app's central widget:
 which recipe a picked act resolves to, what a stand-in row does while the model
-thinks, which seed a press re-rolls rather than reproduce a run, and what a
-spoken "genau it" refuses. Here the host is a handful of recorded calls and the
+thinks, and what a spoken "genau it" refuses. Here the host is a handful of recorded calls and the
 recipe match answers inline.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
@@ -22,7 +21,6 @@ from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineControlle
 from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.export_lane import GENAU
 from origenerator.gui.notice_overlay import NOTICE, WARNING
-from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 
 IMAGE_WORKFLOW = "sdxl_t2i"
 VIDEO_WORKFLOW = "wan22_i2v"
@@ -121,16 +119,11 @@ class FakeWorkflow:
 class FakeReroll:
     def __init__(self, launches="new-run"):
         self.prepared = []
-        self.from_image = []
         self.launches = launches
 
     def start_prepared(self, key, workflow, params):
         self.prepared.append((key, workflow.name, dict(params)))
         return self.launches
-
-    def start_reroll_from_image(self, key, image_row, image_workflow, workflow, params):
-        self.from_image.append((key, image_row["prompt_id"]))
-        return True
 
 
 class FakeDB:
@@ -190,14 +183,11 @@ class FakeConfigPanel:
 class FakeHost:
     """A gallery reduced to what a combine asks of one."""
 
-    def __init__(self, *, rows=(), reproduces=False, seed_answer=None):
+    def __init__(self, *, rows=()):
         self.rows = list(rows)
-        self.reproduces = reproduces
-        self.seed_answer = seed_answer
         self.queue_redraws = 0
         self.revealed = []
         self.told = []
-        self.asked = []
         self.off_thread_calls = []
 
     def image_rows(self):
@@ -212,9 +202,6 @@ class FakeHost:
     def folder_key_for(self, workflow_name, params, workflow_version=None):
         return f"folder-for-{workflow_name}-{workflow_version}"
 
-    def would_reproduce_a_completed_run(self, workflow, params):
-        return self.reproduces
-
     def off_thread(self, work, done):
         self.off_thread_calls.append((work, done))
         done(work())
@@ -227,10 +214,6 @@ class FakeHost:
 
     def follow_link(self, prompt_id):
         pass
-
-    def ask_which_seed(self, workflow, *, can_reroll_image):
-        self.asked.append(can_reroll_image)
-        return self.seed_answer
 
     def tell(self, title, message):
         self.told.append((title, message))
@@ -436,75 +419,6 @@ def test_a_dropped_pair_runs_the_videos_recipe_on_the_picture(combine, monkeypat
 
     assert [name for _key, name, _params in jobs.prepared] == [VIDEO_WORKFLOW]
     assert host.revealed == ["folder-of-clip"]
-
-
-def test_a_press_that_would_reproduce_a_run_asks_which_seed(combine, monkeypatch):
-    # A pinned seed can re-create a byte-identical past generation, and spending
-    # a slot on that is the one thing the ask exists to prevent.
-    workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "combined_params",
-                        lambda v, i, wf: {"seed": 7})
-    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: {"seed": 99})
-    jobs = FakeReroll()
-    controller, host = combine(
-        FakeHost(reproduces=True, seed_answer=REROLL_VIDEO),
-        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
-
-    controller._generate_combination("img", "clip")
-
-    assert host.asked == [True]  # the dropped picture is itself re-buildable
-    assert jobs.prepared[0][2] == {"seed": 99}
-
-
-def test_saying_no_to_that_question_launches_nothing(combine, monkeypatch):
-    workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    jobs = FakeReroll()
-    controller, _host = combine(
-        FakeHost(reproduces=True, seed_answer=None),
-        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
-
-    controller._generate_combination("img", "clip")
-
-    assert jobs.prepared == []
-
-
-def test_re_drawing_the_frame_launches_the_picture_first(combine, monkeypatch):
-    workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    jobs = FakeReroll()
-    controller, host = combine(
-        FakeHost(reproduces=True, seed_answer=REROLL_IMAGE),
-        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
-
-    controller._generate_combination("img", "clip")
-
-    assert [pid for _key, pid in jobs.from_image] == ["img"]
-    assert jobs.prepared == []
-    assert host.revealed == ["folder-of-clip"]
-
-
-def test_both_seeds_re_rolled_re_draws_the_frame_with_the_new_video_seed(
-        combine, monkeypatch):
-    workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: {"seed": 99})
-    jobs = FakeReroll()
-    controller, _host = combine(
-        FakeHost(reproduces=True, seed_answer=REROLL_BOTH),
-        db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
-
-    controller._generate_combination("img", "clip")
-
-    assert jobs.from_image != []
 
 
 def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):

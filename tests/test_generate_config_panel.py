@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter
 
 import origenerator.workflows.derived_size as ds
@@ -25,6 +25,7 @@ from origenerator.funscript import (
 )
 from origenerator.gallery.keys import settings_key
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
@@ -327,7 +328,7 @@ def test_switching_workflow_carries_over_the_users_edits(panel):
 
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
 
-    values = panel._param_form.get_values_static()
+    values = panel._param_form.get_values()
     assert values["positive_prompt"] == "slow beta"
     assert values["input_image"] == "start.png"
     assert values["audio_prompt"] == "wet rhythm"
@@ -437,6 +438,43 @@ def test_cancel_button_click_emits_cancel_requested(panel):
     assert got == [True]
 
 
+def test_a_tabs_seed_drops_down_every_seed_the_library_used_newest_first(panel):
+    for prompt_id, seed in (("older", 10), ("newer", 20)):
+        panel._db.insert_generation(
+            prompt_id=prompt_id, workflow_name="sdxl_t2i",
+            workflow_version=WORKFLOW_REGISTRY["sdxl_t2i"].version, seed=seed,
+            params_json=json.dumps({"seed": seed}), workflow_json="{}")
+        panel._db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+            [{"filename": f"{prompt_id}.png", "subfolder": "image"}]))
+    field = panel._param_form._widgets["seed"]
+
+    field.showPopup()
+
+    assert [field.itemText(row) for row in range(field.count())] == ["20", "10"]
+    field.hidePopup()
+
+
+def test_a_seed_drawn_by_ticking_random_heads_the_dropdown(panel):
+    panel._param_form.set_values({"seed": 5})
+    panel._param_form._randomize_checks["seed"].click()
+    drawn = panel._param_form.get_values()["seed"]
+    field = panel._param_form._widgets["seed"]
+
+    field.showPopup()
+
+    assert field.itemText(0) == str(drawn)
+    field.hidePopup()
+
+
+def test_a_drawn_seed_is_kept_at_the_size_the_tab_would_make(panel):
+    panel._param_form.set_values({"seed": 5, "width": 832, "height": 1216})
+
+    panel._param_form._randomize_checks["seed"].click()
+
+    record = panel._db.list_seed_uses()[0]
+    assert (record["width"], record["height"]) == (832, 1216)
+
+
 def test_use_random_seed_switches_the_seed_to_random(panel):
     # After the user accepts "use a random seed", the choice sticks on the tab: the
     # seed switches to Random, so a later Generate draws a fresh seed rather than
@@ -467,17 +505,17 @@ def test_generate_emits_generate_requested_with_workflow_and_params(panel):
     assert panel._db.list_generations() == []       # the panel submits nothing itself
 
 
-def test_generate_randomizes_a_random_seed_before_emitting(panel):
-    # A Random seed is re-rolled by the form's get_values, so the params carried to
-    # the gallery already hold a concrete fresh seed (never the literal field text).
-    panel._param_form.set_values({"positive_prompt": "a cat"})  # leaves Random checked
+def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(panel):
+    shown = panel._param_form.get_values()["seed"]
     assert panel._param_form.seed_is_random() is True
     requested = []
     panel.generate_requested.connect(lambda wf, params: requested.append(params))
 
     panel._on_generate()
 
-    assert isinstance(requested[0]["seed"], int)  # a real seed, drawn for this run
+    assert requested[0]["seed"] == shown
+    assert panel._param_form.get_values()["seed"] != shown
+    assert panel._param_form.seed_is_random() is True
 
 
 def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
@@ -618,50 +656,81 @@ def test_current_config_does_not_randomize_and_reports_random_flag(panel):
 def test_prefill_selects_workflow_and_sets_values(panel):
     panel.prefill("wan22_i2v", {"positive_prompt": "a fox"})
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
-def test_prefilling_a_video_shows_its_seeds_without_pinning_them(panel):
-    # Prefilling a still pins its seed; prefilling a clip does not. The seeds that
-    # made it fill their fields — there to read and one click from being locked —
-    # while Random stays ticked, so the next Generate is another sample of the
-    # motion rather than this clip's seed riding every later edit of the tab.
+def test_prefilling_a_clip_keeps_random_and_shows_a_fresh_take_of_its_seeds(panel):
+    # Prefilling a still pins its seed; prefilling a clip does not, so the next
+    # Generate is another take of the motion rather than this clip's again --
+    # and the fields show the seeds that take will use.
     panel.prefill("wan22_i2v", {"noise_seed": 11, "audio_seed": 33})
 
+    shown = panel._param_form.get_values()
     assert panel.current_config().seed_is_random is True
-    static = panel._param_form.get_values_static()
-    assert (static["noise_seed"], static["audio_seed"]) == (11, 33)
-    drawn = panel._param_form.get_values()
-    assert drawn["noise_seed"] != 11
+    assert shown["noise_seed"] != 11 and shown["audio_seed"] != 33
 
 
-def test_a_videos_seed_is_lockable_after_the_prefill_that_left_it_random(panel):
-    # The other half of the deal: the clip's own seed is still what a lock locks.
-    panel.prefill("wan22_i2v", {"noise_seed": 22})
+def _clip_row(db, prompt_id="clip1", **seeds):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "dance", **seeds}), workflow_json="{}")
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
+    return db.get_generation(prompt_id)
 
-    panel._param_form.set_seed_random(False)
+
+def test_unticking_random_on_a_clip_on_display_puts_its_own_seed_back(saved_panel):
+    panel, db = saved_panel
+    panel.show_saved_generation(_clip_row(db, noise_seed=22), [])
+
+    panel._param_form._randomize_checks["noise_seed"].click()
 
     assert panel._param_form.get_values()["noise_seed"] == 22
 
 
-def test_a_video_seed_does_not_pin_itself_by_riding_a_workflow_switch(panel):
-    # Switching workflows carries the edited fields across, and a seed loaded from
-    # a clip is one of them — it must land on the new form as unpinned as it left
-    # the old one, or the lineage picks its pin back up on the way through.
-    panel.prefill("wan22_i2v", {"noise_seed": 22})
+def test_a_tab_showing_a_still_wears_its_picture_in_the_seed_field(saved_panel, tmp_path):
+    panel, db = saved_panel
+    thumbnail = tmp_path / "made.png"
+    red = QPixmap(40, 40)
+    red.fill(QColor("red"))
+    red.save(str(thumbnail))
+    _image_row(db, "img1")
+    db.update_generation("img1", thumbnail_path=str(thumbnail))
 
-    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_flf2v_loop"))
+    panel.show_saved_generation(db.get_generation("img1"), [])
 
-    assert panel._param_form.get_values_static()["noise_seed"] == 22
+    picture = panel._param_form._widgets["seed"]._picture.pixmap().toImage()
+    assert picture.pixelColor(picture.width() // 2, picture.height() // 2) == QColor("red")
+
+
+def test_a_random_seed_stays_random_across_a_workflow_switch(panel):
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "flux_t2i_upscaled"))
+
     assert panel._param_form.seed_is_random() is True
+
+
+def test_a_pinned_seed_stays_pinned_across_a_switch_to_a_clip_workflow(panel):
+    panel.prefill("sdxl_t2i", {"seed": 99})
+
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan21_ati_i2v"))
+
+    assert panel._param_form.get_values()["seed"] == 99
+    assert "seed" not in panel._param_form.random_seed_keys()
 
 
 def test_restore_config_reapplies_workflow_params_and_random_seed(panel):
     snap = ConfigSnapshot("wan22_i2v", {"positive_prompt": "a fox"}, seed_is_random=True)
     panel.restore_config(snap)
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert panel._param_form.get_values()["positive_prompt"] == "a fox"
     # A tab that was on Random comes back random, not frozen on a stale seed.
+    assert panel._param_form.seed_is_random() is True
+
+
+def test_a_random_tab_comes_back_showing_the_seed_it_showed(panel):
+    panel.restore_config(ConfigSnapshot("wan22_i2v", {"noise_seed": 77}, seed_is_random=True))
+
+    assert panel._param_form.get_values()["noise_seed"] == 77
     assert panel._param_form.seed_is_random() is True
 
 
@@ -1519,7 +1588,7 @@ def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch
     panel.show_saved_generation(video, [])
 
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "dance"
+    assert panel._param_form.get_values()["positive_prompt"] == "dance"
 
 
 def test_completed_result_shows_output_and_footer_and_keeps_the_edit_in_flight(saved_panel):
@@ -1534,7 +1603,7 @@ def test_completed_result_shows_output_and_footer_and_keeps_the_edit_in_flight(s
 
     panel.show_completed_result(image, [image])
 
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
+    assert panel._param_form.get_values()["positive_prompt"] == "a wizard mid-edit"
     assert panel._displayed_row is image     # the finished output is on display
     assert not panel._versions.isHidden()    # with its footer
 
@@ -1542,7 +1611,7 @@ def test_completed_result_shows_output_and_footer_and_keeps_the_edit_in_flight(s
 def test_a_seed_pinned_while_the_run_was_in_flight_stays_pinned_when_it_lands(saved_panel):
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat", filename="sdxl_img1.png")
-    panel._param_form._widgets["seed"].setText("99")
+    panel._param_form._widgets["seed"].setEditText("99")
     panel._param_form.set_seed_random(False)
 
     panel.show_completed_result(image, [image])
@@ -1559,13 +1628,13 @@ def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved
     db.update_generation("u1", status="completed",
                          output_files=json.dumps([{"filename": "u1.mp4", "subfolder": "video"}]))
     row = db.get_generation("u1")
-    before = panel._param_form.get_values_static()
+    before = panel._param_form.get_values()
     monkeypatch.setattr(gcp_module, "resolve_preview",
                         lambda r, out: (Path("C:/out/u1.mp4"), "video"))
 
     panel.show_saved_generation(row, [])
 
-    assert panel._param_form.get_values_static() == before  # form left as-is
+    assert panel._param_form.get_values() == before  # form left as-is
     assert not _lane_button(panel).isHidden()               # footer still applies
     assert panel._displayed_row is row
 
@@ -1685,6 +1754,19 @@ def test_putting_the_setting_back_clears_the_mark(saved_panel):
     assert _notice(panel) == ""
 
 
+def test_a_finished_run_arrives_marked_while_random_is_ticked(saved_panel):
+    # The field already shows the next run's seed, so what just finished is not
+    # what Generate would make now.
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+
+    panel.show_completed_result(image, [image])
+
+    assert panel._param_form.seed_is_random() is True
+    assert panel._param_form.get_values()["seed"] != image["seed"]
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
 def test_re_rolling_the_seed_marks_it_too(saved_panel):
     # Same prompt, but the run would draw a different seed — so the picture on
     # screen is not what Generate would make either.
@@ -1705,6 +1787,14 @@ def test_a_tab_with_nothing_on_display_is_never_marked(panel):
     assert _notice(panel) == ""
 
 
+def _resting_on(panel, image, monkeypatch, tmp_path):
+    ipath = tmp_path / "sdxl_img1.png"
+    ipath.write_bytes(b"p")
+    monkeypatch.setattr(panel, "_recent_matching_row", lambda: image)
+    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (ipath, "image"))
+    panel.show_recent_preview()
+
+
 def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
     saved_panel, monkeypatch, tmp_path
 ):
@@ -1712,15 +1802,21 @@ def test_the_idle_autoshow_is_marked_once_the_form_moves_off_it(
     # matching the moment the settings do.
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
-    ipath = tmp_path / "sdxl_img1.png"
-    ipath.write_bytes(b"p")
-    monkeypatch.setattr(panel, "_recent_matching_row", lambda: image)
-    monkeypatch.setattr(gcp_module, "resolve_preview", lambda row, out: (ipath, "image"))
+    panel._param_form.set_values({"seed": image["seed"]})
 
-    panel.show_recent_preview()
+    _resting_on(panel, image, monkeypatch, tmp_path)
     assert panel._displayed_row is not None and _notice(panel) == ""
 
     _set_prompt(panel, "a dog")
+
+    assert _notice(panel) == "(not yet generated with modifications)"
+
+
+def test_the_idle_autoshow_is_marked_while_random_is_ticked(saved_panel, monkeypatch, tmp_path):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+
+    _resting_on(panel, image, monkeypatch, tmp_path)
 
     assert _notice(panel) == "(not yet generated with modifications)"
 
@@ -1836,6 +1932,40 @@ def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(panel, qtb
 
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
     assert "already been generated" in panel._generate_btn.toolTip()  # and why
+
+
+def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(saved_panel,
+                                                                           qtbot):
+    # A video saved before its workflow gained its later settings matches no saved
+    # row key for key, yet a tab showing it with both seeds put back makes that
+    # video: the button says what a press will do, as it does for an image.
+    panel, db = saved_panel
+    panel.show_saved_generation(_clip_row(db, noise_seed=22, audio_seed=33), [])
+
+    for key in ("noise_seed", "audio_seed"):
+        panel._param_form._randomize_checks[key].click()
+
+    assert _notice(panel) == ""
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+
+
+def test_a_tab_on_an_imported_pictures_own_settings_says_generate_will_draw_a_random_seed(
+        saved_panel, qtbot):
+    # Wherever the item on display came from, the darkening gone means these are
+    # the settings it was made with, and the button says so the same way.
+    panel, db = saved_panel
+    params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a cat",
+                  seed=1)
+    db.insert_generation(prompt_id="imp", workflow_name="sdxl_t2i", workflow_version="v002",
+                         positive_prompt="a cat", seed=1, params_json=json.dumps(params),
+                         workflow_json="{}", source=GenerationSource.IMPORTED)
+    db.update_generation("imp", status="completed", output_files=json.dumps(
+        [{"filename": "imp.png", "subfolder": "image"}]))
+
+    panel.show_saved_generation(db.get_generation("imp"), [])
+
+    assert _notice(panel) == ""
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
 
 
 def test_editing_the_settings_takes_the_random_seed_caption_back_off(panel, qtbot):

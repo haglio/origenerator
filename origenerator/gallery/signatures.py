@@ -42,6 +42,9 @@ INSTANCE_KEYS = frozenset({"seed", "noise_seed", "audio_seed", "input_image"})
 # setting can't silently start splitting folders by it.
 ENHANCE_KEYS = frozenset({"enhance", "enhance_scale", "enhance_steps", "enhance_denoise"})
 
+GENERATION_SEED_KEYS = ("noise_seed", "seed")
+
+
 def parse_params(params_json: str | None) -> dict:
     """Parse a row's ``params_json`` into a dict, tolerating bad data."""
     if not params_json:
@@ -51,6 +54,20 @@ def parse_params(params_json: str | None) -> dict:
     except (json.JSONDecodeError, TypeError):
         return {}
     return params if isinstance(params, dict) else {}
+
+
+def generation_seed(row: dict) -> str | None:
+    """The seed *row*'s sampler ran with, or ``None`` for a row that has none.
+
+    Off the params first: a video's sampler seed is ``noise_seed``, which the
+    row's ``seed`` column never carries — that column only mirrors a ``seed``
+    param — so the column is the fallback rather than the answer.
+    """
+    params = parse_params(row.get("params_json"))
+    for key in GENERATION_SEED_KEYS:
+        if params.get(key) not in (None, ""):
+            return str(params[key])
+    return None if row.get("seed") is None else str(row["seed"])
 
 
 def settings_only(params: dict) -> dict:

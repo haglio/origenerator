@@ -49,6 +49,8 @@ _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch
 
 # --- style-option fields written for Qt's painter to read, never read back here ---
 _.textVisible  # noqa  # origenerator/gui/progress_caption.py:127, the QStyleOptionProgressBar handed to drawControl
+_.features  # noqa  # origenerator/gui/seed_combo.py:32, the QStyleOptionViewItem the item delegate paints from
+_.decorationSize  # noqa  # origenerator/gui/seed_combo.py:33, the same option
 
 # --- reachable from nothing yet ---
 _.to_logical_rect  # noqa  # origenerator/ui_scale.py:91, added in 23ee359 for the hosted app with only its tests calling it; the caller it waits for is that work's to land, not this landing's to decide

@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -264,6 +265,10 @@ class WorkflowTemplate(ABC):
         A workflow with two seeds (e.g. dual-noise video) reports both, in form
         order. Derived from ``param_definitions`` so it stays in sync with the UI.
         """
+        return self._seed_keys
+
+    @cached_property
+    def _seed_keys(self) -> tuple[str, ...]:
         return tuple(pd.key for pd in self.param_definitions() if pd.type == ParamType.SEED)
 
     def pins_reused_seed(self) -> bool:

@@ -28,6 +28,7 @@ from origenerator.db_generations import GenerationStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_salvage import salvage_if_malformed
 from origenerator.db_schema import SCHEMA, create
+from origenerator.db_seed_uses import SeedUseStore
 from origenerator.generation_state import GenerationSource
 
 
@@ -44,6 +45,7 @@ class Database:
         self.generations = GenerationStore(file)
         self.deletions = DeletionStore(file)
         self.requests = RequestStore(file)
+        self.seed_uses = SeedUseStore(file)
         self.folder_meta = FolderMetaStore(file)
         self.custom_folders = CustomFolderStore(file)
 
@@ -122,6 +124,19 @@ class Database:
 
     def list_generations(self) -> list[dict]:
         return self.generations.list_generations()
+
+    def seed_history_rows(self) -> list[dict]:
+        return self.generations.seed_history_rows()
+
+    def record_seed_use(self, *, kind: str, seed_key: str, seed: int,
+                        width: int | None = None, height: int | None = None,
+                        thumbnail_path: str | None = None) -> None:
+        return self.seed_uses.record_seed_use(
+            kind=kind, seed_key=seed_key, seed=seed, width=width, height=height,
+            thumbnail_path=thumbnail_path)
+
+    def list_seed_uses(self) -> list[dict]:
+        return self.seed_uses.list_seed_uses()
 
     # --- the recovery bin (see origenerator.db_deletions) --------------------
 

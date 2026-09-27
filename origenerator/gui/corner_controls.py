@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import QPushButton, QWidget
 
 from origenerator import gallery
 from origenerator.gui import icons
-from origenerator.gui.media_overlay import float_over_media
 
 STAR = "star"
 TRASH = "trash"
@@ -89,15 +88,10 @@ class _CornerButton(QPushButton):
     going light gray — so the icon is swapped on the crossing instead.
     """
 
-    def __init__(self, host: QWidget, render, *, native: bool = False):
+    def __init__(self, host: QWidget, render):
         super().__init__(host)
         self._render = render  # (armed) -> QIcon
         self._armed = False
-        if native:
-            # Only where a video can turn up: a native window per button is real
-            # cost, and a wall of thumbnails would pay it dozens of times over.
-            # A button is pressed, so the mouse stops here.
-            float_over_media(self, click_through=False)
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
         self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
         self.setStyleSheet(CHIP_CSS)
@@ -134,19 +128,19 @@ class CornerControls(QObject):
 
     triggered = pyqtSignal(str)  # STAR / TRASH / ENHANCE
 
-    def __init__(self, host: QWidget, *, native: bool = False):
+    def __init__(self, host: QWidget):
         super().__init__(host)
         self._available = False   # is there a saved generation here to act on?
         self._favorite = False
         self._enhance: str | None = None
         self._star = _CornerButton(
             host, lambda armed: icons.corner_star_icon(favorite=self._favorite,
-                                                       armed=armed), native=native)
+                                                       armed=armed))
         self._trash = _CornerButton(host, lambda armed: icons.corner_trash_icon(
-            armed=armed), native=native)
+            armed=armed))
         self._enhance_button = _CornerButton(
             host, lambda armed: icons.corner_enhance_icon(
-                self._enhance or icons.ENHANCE_OPEN, armed=armed), native=native)
+                self._enhance or icons.ENHANCE_OPEN, armed=armed))
         self._star.clicked.connect(lambda: self.triggered.emit(STAR))
         self._trash.clicked.connect(lambda: self.triggered.emit(TRASH))
         self._enhance_button.clicked.connect(lambda: self.triggered.emit(ENHANCE))

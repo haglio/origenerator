@@ -31,17 +31,17 @@ folder with room in it rather than as a picture that failed to load; a start
 frame leaves the rest of the block empty, having nothing to say about how many
 pictures there might have been.
 
-Every scaled cell is cached by (file, size, gray) for the life of the session —
-the strip re-renders on every poll, and a start frame is a full-size render off
-disk. That fitting and that cache are :func:`fitted_cell`, which is public
-because the pair drawn by
-:func:`~origenerator.gui.combination_view.combination_pixmap` is the same
-picture at the same size on the same poll, and a second cache of it would be a
-second full-size decode a second.
+Every scaled cell is cached by (file, size, gray) — the strip re-renders on
+every poll, and a start frame is a full-size render off disk. That fitting and
+that cache are :func:`fitted_cell`, which is public because the pair drawn by
+:func:`~origenerator.gui.combination_view.combination_pixmap` and the seed
+dropdown's pictures are the same kind of cell, and a second cache of it would
+be a second full-size decode a second.
 """
 from __future__ import annotations
 
 import os
+from collections import OrderedDict
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPixmap
@@ -65,13 +65,8 @@ def block_width(cell: int) -> int:
     return FOLDER_CELLS * cell + (FOLDER_CELLS - 1) * _GAP
 
 
-# (file, side, gray, written) -> the cell-sized pixmap, or None for a file that
-# wouldn't load. Unbounded on purpose: an entry is a few kilobytes, and the set
-# of files in flight over one session is small — where the cost being avoided
-# is decoding a multi-megabyte render on the UI thread every poll. The file's
-# write time is part of the key, so a render redone in place is read again
-# rather than drawn from the old pixels until the app restarts.
-_CELLS: dict[tuple[str, int, bool, int | None], QPixmap | None] = {}
+_CELLS: OrderedDict[tuple[str, int, bool, int | None], QPixmap | None] = OrderedDict()
+_MOST_CELLS = 1024
 
 
 def _written(path) -> int | None:
@@ -95,10 +90,14 @@ def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
     if not path:
         return None
     key = (str(path), side, gray, _written(path))
-    if key not in _CELLS:
+    if key in _CELLS:
+        _CELLS.move_to_end(key)
+    else:
         fitted = _fit_in_square(QPixmap(str(path)), side)
         _CELLS[key] = (grayscale_pixmap(fitted)
                        if gray and fitted is not None else fitted)
+        if len(_CELLS) > _MOST_CELLS:
+            _CELLS.popitem(last=False)
     return _CELLS[key]
 
 

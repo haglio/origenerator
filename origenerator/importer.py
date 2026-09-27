@@ -20,6 +20,7 @@ from origenerator.comfy_graph import (
     follow,
     graph_model_params,
     input_image_name,
+    sound_params,
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
@@ -259,10 +260,34 @@ def backfill_model_and_lora_params(db: Database) -> int:
     row is missing so a row that already carries them (or whose graph has none)
     is left untouched. Returns how many rows were filled. Idempotent.
     """
+    return _fill_missing_params_from_graph(db, graph_model_params)
+
+
+def backfill_sound_params(db: Database) -> int:
+    return _fill_missing_params_from_graph(db, sound_params)
+
+
+def backfill_imported_video_seeds(db: Database) -> int:
+    updated = 0
+    for row in db.list_generations():
+        params = parse_params(row.get("params_json"))
+        if row.get("source") != GenerationSource.IMPORTED or "noise_seed" not in params:
+            continue
+        graph = _as_graph(row.get("workflow_json") or "")
+        seed = _sampler_settings(graph)[0] if graph else None
+        if seed is None or params["noise_seed"] == seed:
+            continue
+        params["noise_seed"] = seed
+        db.set_params_json(row["prompt_id"], json.dumps(params))
+        updated += 1
+    return updated
+
+
+def _fill_missing_params_from_graph(db: Database, read) -> int:
     updated = 0
     for row in db.list_generations():
         graph = _as_graph(row.get("workflow_json") or "")
-        found = graph_model_params(graph) if graph else {}
+        found = read(graph) if graph else {}
         params = parse_params(row.get("params_json"))
         missing = {k: v for k, v in found.items() if k not in params}
         if not missing:
@@ -433,6 +458,8 @@ def _sampler_settings(graph: dict) -> tuple[int | None, dict]:
                     seed is None or inputs.get("add_noise") == "enable"):
                 seed = noise_seed
             params.update(_scalars(inputs))
+    if seed is not None and "noise_seed" in params:
+        params["noise_seed"] = seed
     return seed, params
 
 
@@ -553,6 +580,7 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     # WAN dual-noise high/low UNET + LoRA), so the gallery can nest the import
     # by model the same way it does a run generated here.
     params.update(graph_model_params(graph))
+    params.update(sound_params(graph))
 
     positive, negative = _prompt_texts(graph)
     result.update(

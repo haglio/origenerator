@@ -33,9 +33,11 @@ from origenerator.gui.generation_job import (
     JobState,
     insert_generation_row,
     mark_generation_completed,
+    record_unfinished_run,
 )
 from origenerator.media import MediaType
 from origenerator.run_notice import RunOutcome
+from origenerator.seed_history import SeedUseKind
 from origenerator.timing import elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -243,9 +245,9 @@ class JobQueue(QObject):
         """Launch a job with already-built ``params`` under folder ``key``.
 
         Unlike :meth:`start`, the caller owns the params — no defaults are filled
-        and no seed is re-rolled. This is the gallery's image+video combine (which
-        reuses the recipe video's exact seed) and the background experimenter,
-        which tags its rows with ``source="experiment"``. Returns the launched
+        and no seed is re-rolled. This is the gallery's image+video combine and
+        the background experimenter, which tags its rows with
+        ``source="experiment"``. Returns the launched
         run's prompt id — truthy exactly where this used to return ``True``, so a
         caller that only asks "did it go?" reads the same, while one acting on the
         row it just made can name it. ``None`` when there's no client, an
@@ -256,28 +258,6 @@ class JobQueue(QObject):
             return None
         job = self._launch(key, workflow, params, self._on_finished, source=source)
         return job.prompt_id if job is not None and self.has(key) else None
-
-    def start_reroll_from_image(self, key: str, image_row: dict, image_workflow,
-                                video_workflow, video_params: dict) -> bool:
-        """Re-roll a fresh start frame from ``image_row`` (a new image seed), then
-        run ``video_workflow`` with the already-built ``video_params`` on it.
-
-        The gallery combine's image-seed and both-seed choices: the frame to re-roll
-        is the dropped image itself, so — unlike :meth:`reroll_image_seed` — the
-        image row is handed in directly rather than looked up from a video's input.
-        The caller owns ``video_params`` (already seed-kept or re-rolled to taste).
-        Returns ``True`` once the chained job is tracked; ``False`` with no client.
-        """
-        if self._client is None or not self._launchable(key):
-            return False
-        self._launch(
-            key, image_workflow, prepared_params(image_row, image_workflow),
-            lambda k, job, files, thumb, dur: self._on_image_finished(
-                k, job, files, thumb, dur, video_workflow, video_params
-            ),
-            run_media_type=video_workflow.output_type,  # a frame opening a video
-        )
-        return self.has(key)
 
     def start_reroll(self, key: str, group, image_rows: list[dict]):
         """Launch a fresh variation of the settings folder ``key`` names — both
@@ -746,6 +726,7 @@ class JobQueue(QObject):
                 if job.prompt_id == prompt_id:
                     self._drop(key, job)
                     job.cancel()
+                    record_unfinished_run(self._db, job, SeedUseKind.CANCELED)
                     self._db.delete_generation(prompt_id)  # drop the abandoned row
                     self._pump()  # the machine is free: start whatever is next
                     return
@@ -774,6 +755,7 @@ class JobQueue(QObject):
     def _on_failed(self, key, job, message):
         self._drop(key, job)
         self._pump()  # the machine is free: start whatever is next
+        record_unfinished_run(self._db, job, SeedUseKind.FAILED)
         self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
                                    error_message=message)
         logger.warning("Re-roll failed for %s: %s", key, message)

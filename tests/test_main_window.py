@@ -182,7 +182,7 @@ def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
     assert tabs.count() == 1  # taken over, not opened beside
     panel = tabs.currentWidget()
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "hi"
+    assert panel._param_form.get_values()["positive_prompt"] == "hi"
 
 
 def test_restores_config_tabs_from_app_state(qtbot, tmp_path):

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
-from PyQt6.QtGui import QImage, QMouseEvent, QResizeEvent
+from PyQt6.QtGui import QColor, QImage, QMouseEvent, QResizeEvent
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -870,7 +870,7 @@ def test_a_dragged_video_trails_the_frame_on_screen(make_preview, tmp_path, drag
     w.show_video(tmp_path / "clip.mp4", "gen1")
     frame = QImage(160, 120, QImage.Format.Format_RGB32)
     frame.fill(0x2288FF)
-    w._video.videoSink().setVideoFrame(QVideoFrame(frame))
+    w._video.video_sink().setVideoFrame(QVideoFrame(frame))
 
     _drag_out(w)
 
@@ -917,6 +917,40 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
 
 
 # --- the notice: this picture isn't what the settings beside it would make ---
+
+def _video_frame(color: str) -> QVideoFrame:
+    picture = QImage(64, 36, QImage.Format.Format_RGB32)
+    picture.fill(QColor(color))
+    return QVideoFrame(picture)
+
+
+def _middle_of_the_media(w) -> QColor:
+    shot = w._media_host.grab().toImage()
+    return shot.pixelColor(shot.width() // 2, shot.height() // 2)
+
+
+def test_a_playing_video_is_drawn_in_the_preview_itself(make_preview, tmp_path):
+    w = make_preview()
+    w.resize(320, 240)
+    w.show_video(tmp_path / "clip.mp4")
+
+    w._video.video_sink().setVideoFrame(_video_frame("red"))
+
+    assert _middle_of_the_media(w) == QColor("red")
+
+
+def test_the_notice_darkens_a_playing_video_as_it_does_a_still(make_preview, tmp_path):
+    w = make_preview()
+    w.resize(320, 240)
+    w.show_video(tmp_path / "clip.mp4")
+    w._video.video_sink().setVideoFrame(_video_frame("red"))
+
+    w.set_notice("(not yet generated with modifications)")
+
+    darkened = _middle_of_the_media(w)
+    assert 0 < darkened.red() < 200
+    assert darkened.green() == darkened.blue() == 0
+
 
 def test_a_preview_starts_with_no_notice(make_preview):
     w = make_preview()

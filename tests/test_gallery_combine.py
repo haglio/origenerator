@@ -33,16 +33,16 @@ def _image_row(files):
     }
 
 
-def test_combined_params_swaps_input_image_and_keeps_video_seeds():
-    video = _video_row(seed=3, noise_seed=9, positive_prompt="a cat", steps=20)
+def test_a_combination_runs_the_recipe_on_the_dropped_picture_with_fresh_seeds():
+    video = _video_row(noise_seed=0, audio_seed=0, positive_prompt="a cat", steps=20)
     image = _image_row([{"filename": "sdxl_new.png", "subfolder": ""}])
 
     params = gallery.combined_params(video, image, _I2V)
 
     assert params["input_image"] == "sdxl_new.png [output]"
-    assert params["seed"] == 3
-    assert params["noise_seed"] == 9
     assert params["positive_prompt"] == "a cat"
+    assert params["steps"] == 20
+    assert params["noise_seed"] != 0 and params["audio_seed"] != 0
 
 
 def test_combined_params_fills_missing_params_from_workflow_defaults():
@@ -52,8 +52,7 @@ def test_combined_params_fills_missing_params_from_workflow_defaults():
 
     params = gallery.combined_params(video, image, _I2V)
 
-    assert params["steps"] == _I2V.default_params()["steps"]  # filled from defaults
-    assert params["seed"] == 3 and params["noise_seed"] == 9   # seeds still preserved
+    assert params["steps"] == _I2V.default_params()["steps"]
 
 
 def test_a_picture_with_no_file_on_disk_cannot_be_combined():
@@ -112,6 +111,9 @@ def test_combined_params_keeps_width_and_height_for_a_manual_size_workflow():
             return {"input_image": "", "width": 512, "height": 512}
 
         def enhance_keys(self):
+            return ()
+
+        def seed_keys(self):
             return ()
 
     video = _video_row(width=720, height=928)

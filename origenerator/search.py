@@ -402,7 +402,7 @@ def content_stems(row: dict) -> frozenset[str]:
 
 def _build_entry(row: dict) -> _Entry:
     params = gallery.parse_params(row.get("params_json"))
-    seeds = {str(params.get(key)) for key in ("seed", "noise_seed")
+    seeds = {str(params.get(key)) for key in gallery.GENERATION_SEED_KEYS
              if params.get(key) is not None}
     if row.get("seed") is not None:
         seeds.add(str(row["seed"]))

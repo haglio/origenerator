@@ -9,11 +9,11 @@ from PyQt6.QtGui import QColor, QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import corner_controls, drag_thumbnail, icons, omnipause
+from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.palette import SELECTED_FILL
-from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType

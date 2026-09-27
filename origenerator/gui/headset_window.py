@@ -14,12 +14,10 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
 
 from player_core.file_channel import consume_command_file
 from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
-from PyQt6.QtGui import QImage, QMouseEvent, QPainter, QWheelEvent
-from PyQt6.QtMultimediaWidgets import QVideoWidget
+from PyQt6.QtGui import QImage, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.frame_channel import FrameWriter
@@ -46,55 +44,6 @@ _IDLE_LOOK_S = 0.1
 #: bigger is scaled into it -- more pixels than the screen in the room has are
 #: pixels written, read and drawn for nothing.
 CAP_PX = 1440
-
-
-@dataclass(frozen=True)
-class Patch:
-    """A picture the grab could not reach, and where it belongs in the window."""
-
-    picture: QImage
-    at: QPoint
-    width: int
-    height: int
-
-
-def pictures_the_grab_missed(window, videos) -> list[Patch]:
-    """Every visible video surface's own last frame, placed in *window*.
-
-    A video plays on the media player's surface rather than through the paint
-    pass, so a grab of the window comes back blank where it is: the last
-    frame the surface handed its sink is the only picture of it there is (the
-    same handle ``preview_widget`` drags one by).
-    """
-    patches = []
-    for video in videos:
-        if not video.isVisible():
-            continue
-        sink = video.videoSink()
-        frame = sink.videoFrame() if sink is not None else None
-        if frame is None or not frame.isValid():
-            continue
-        size = video.size()
-        patches.append(Patch(frame.toImage(), video.mapTo(window, QPoint(0, 0)),
-                             size.width(), size.height()))
-    return patches
-
-
-def painted_over(image: QImage, patches: list[Patch]) -> QImage:
-    """*image* with each patch drawn where it belongs, scaled to its widget."""
-    if not patches:
-        return image
-    painter = QPainter(image)
-    try:
-        for patch in patches:
-            painter.drawImage(
-                patch.at,
-                patch.picture.scaled(patch.width, patch.height,
-                                     Qt.AspectRatioMode.KeepAspectRatio,
-                                     Qt.TransformationMode.SmoothTransformation))
-    finally:
-        painter.end()
-    return image
 
 
 def within_the_cap(image: QImage) -> QImage:
@@ -200,11 +149,8 @@ class HeadsetWindow(QObject):
             return
         self._asked = False
         self._looked_at = now
-        image = within_the_cap(painted_over(
-            self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888),
-            pictures_the_grab_missed(
-                self._window, self._window.findChildren(QVideoWidget)),
-        ))
+        image = within_the_cap(
+            self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888))
         pixels = image.constBits().asstring(image.sizeInBytes())
         if pixels == self._sent:
             return

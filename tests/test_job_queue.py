@@ -4,8 +4,11 @@ from __future__ import annotations
 import json
 import threading
 import time
+from io import BytesIO
+from pathlib import Path
 from unittest.mock import MagicMock
 
+from PIL import Image
 from PyQt6.QtCore import QTimer
 
 from origenerator import gallery
@@ -262,42 +265,18 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     assert video_params["noise_seed"] != 11                             # video seed re-rolled too
 
 
-# --- combine's image re-roll: a fresh frame from the dropped image ------------
-
-def test_start_reroll_from_image_regenerates_the_frame_then_runs_the_given_video(qtbot, tmp_path):
-    client = _client()
-    db = Database(tmp_path / "test.db")
-    queue = JobQueue(db, client)
-    image = _image_row(seed=100)
-    image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
-    video_params = _params(input_image="frame_001.png [output]", noise_seed=11, seed=22)
-
-    started = queue.start_reroll_from_image("k", image, image_wf, _I2V, video_params)
-
-    # The dropped image is re-rolled first (its own seed fresh)...
-    assert started is True
-    client.submit_job.assert_called_once()
-    assert _launched_params(db, _IMAGE_WF)["seed"] != 100
-    # ...then the given video runs on the new frame, its seed used verbatim.
-    image_job = queue.job_for("k")
-    image_job.finished.emit(
-        [{"filename": "newframe.png", "subfolder": "", "type": "output"}], None, 1.0
-    )
-    vparams = _launched_params(db, "wan22_i2v")
-    assert vparams["input_image"] == "newframe.png [output]"
-    assert vparams["noise_seed"] == 11 and vparams["seed"] == 22
-
-
 def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
     # A chained image→video re-roll stacks like any other user launch now.
     client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    image_wf = WORKFLOW_REGISTRY[_IMAGE_WF]
-    queue.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    image = _image_row()
+    db.restore_generation(image)
+    group = gallery.SettingsGroup("k", "settings", [_video_row()])
+    queue.start_reroll("k", group, [image])
 
-    again = queue.start_reroll_from_image("k", _image_row(), image_wf, _I2V, _params())
+    queue.start_reroll("k", group, [image])
 
-    assert again is True
     assert len(queue.all_jobs) == 2
     client.submit_job.assert_called_once()  # the second waits its turn in the line
 
@@ -526,6 +505,50 @@ def test_a_cancelled_job_starts_the_next_one_rather_than_stalling(qtbot, tmp_pat
     assert client.submit_job.call_args_list[-1].args[1] == second.prompt_id
 
 
+def _frame_png() -> bytes:
+    frame = BytesIO()
+    Image.new("RGB", (40, 80), "red").save(frame, "PNG")
+    return frame.getvalue()
+
+
+def test_a_canceled_run_keeps_its_seeds_beside_the_last_frame_it_streamed(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    job = _launch_video(queue, "k1", noise_seed=11, audio_seed=33)
+    client.preview_image.emit(job.prompt_id, _frame_png())
+
+    queue.cancel_job(job.prompt_id)
+
+    kept = db.list_seed_uses()
+    assert {(r["kind"], r["seed_key"], r["seed"]) for r in kept} == {
+        ("canceled", "noise_seed", 11), ("canceled", "audio_seed", 33)}
+    assert all(Path(r["thumbnail_path"]).is_file() for r in kept)
+
+
+def test_a_run_that_fails_keeps_its_seeds_too(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    job = _launch_video(queue, "k1", noise_seed=11, audio_seed=33)
+
+    job.failed.emit("out of memory")
+
+    assert {(r["kind"], r["seed"]) for r in db.list_seed_uses()} == {
+        ("failed", 11), ("failed", 33)}
+
+
+def test_an_experiment_stopped_for_the_person_keeps_no_seeds(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("k1", _I2V, _params(noise_seed=11), source=GenerationSource.EXPERIMENT)
+
+    queue.cancel_job(queue.newest_job_for("k1").prompt_id)
+
+    assert db.list_seed_uses() == []
+
+
 def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
     # A queue stalled on a job ComfyUI won't take would strand everything after
     # it; the refused job fails and the line carries on.
@@ -542,25 +565,10 @@ def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
     assert list(statuses.values()) == ["error"]
 
 
-def test_a_combines_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
+def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
     # A chained i2v draws its start frame first, but a video is what was asked
     # for: placed as the image that prompt makes, it would take the front of the
     # line and put minutes of GPU ahead of every picture already queued.
-    queue = JobQueue(Database(tmp_path / "test.db"), _client())
-    first = _launch_image(queue, "i0")
-    second = _launch_image(queue, "i1")  # takes the machine; the first waits
-
-    queue.start_reroll_from_image(
-        "k", _image_row(), WORKFLOW_REGISTRY[_IMAGE_WF], _I2V, _params()
-    )
-
-    frame = queue.newest_job_for("k")
-    assert queue.queue_order == [second.prompt_id, first.prompt_id, frame.prompt_id]
-
-
-def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
-    # The same for the whole-folder re-roll, which regenerates the frame before
-    # running the video on it.
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())
     image = _image_row(seed=100)
@@ -1004,10 +1012,11 @@ def test_a_videos_start_frame_being_drawn_is_set_aside_with_the_videos(qtbot, tm
     # The prompt on the GPU is a still, but the run it opens is a video, and it
     # rejoins the line as one: after the picture, ahead of the videos waiting.
     client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.start_reroll_from_image(
-        "k", _image_row(), WORKFLOW_REGISTRY[_IMAGE_WF], _I2V, _params()
-    )
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    image = _image_row()
+    db.restore_generation(image)
+    queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
     frame = queue.newest_job_for("k")
     waiting = _launch_video(queue, "v", seed=1)
     _rendering(client, frame)

@@ -187,6 +187,17 @@ CREATE TABLE IF NOT EXISTS deletions (
     batch_json TEXT NOT NULL,
     deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS seed_uses (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind           TEXT    NOT NULL,
+    seed_key       TEXT    NOT NULL,
+    seed           INTEGER NOT NULL,
+    width          INTEGER,
+    height         INTEGER,
+    thumbnail_path TEXT,
+    created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 # Columns added to a table after it first shipped, and how the DDL above

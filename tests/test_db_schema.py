@@ -103,6 +103,16 @@ SCHEMA = {
         ("new_negative", "TEXT", 0, None, 0),
         ("created_at", "TEXT", 1, "datetime('now')", 0),
     ),
+    "seed_uses": (
+        ("id", "INTEGER", 0, None, 1),
+        ("kind", "TEXT", 1, None, 0),
+        ("seed_key", "TEXT", 1, None, 0),
+        ("seed", "INTEGER", 1, None, 0),
+        ("width", "INTEGER", 0, None, 0),
+        ("height", "INTEGER", 0, None, 0),
+        ("thumbnail_path", "TEXT", 0, None, 0),
+        ("created_at", "TEXT", 1, "datetime('now')", 0),
+    ),
 }
 
 # The indexes db.py declares by hand. sqlite's own `sqlite_autoindex_*` are not
@@ -230,6 +240,9 @@ FIRST_SHIPPED = {
     "requests": {
         "prompt_id", "source_prompt_id", "heard", "term", "polarity", "action",
         "old_positive", "old_negative", "new_positive", "new_negative",
+        "created_at"},
+    "seed_uses": {
+        "id", "kind", "seed_key", "seed", "width", "height", "thumbnail_path",
         "created_at"},
 }
 

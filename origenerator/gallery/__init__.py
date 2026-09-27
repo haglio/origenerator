@@ -118,6 +118,8 @@ from origenerator.gallery.output import (
     rows_of_media_types,
 )
 from origenerator.gallery.signatures import (
+    GENERATION_SEED_KEYS,
+    generation_seed,
     is_image_conditioned,
     lora_signature,
     model_signature,
@@ -176,6 +178,7 @@ __all__ = [
     "ENHANCE_SETTING_KEYS",
     "ENHANCE_WORKFLOW",
     "GENAU_COMMAND",
+    "GENERATION_SEED_KEYS",
     "MATCH_SOURCE_MODEL",
     "SELECTION_KEY",
     "AllGroup",
@@ -223,6 +226,7 @@ __all__ = [
     "folder_key_at_level",
     "folder_level",
     "generation_of_file",
+    "generation_seed",
     "group_level",
     "is_custom_key",
     "is_enhance_product_row",

@@ -823,6 +823,8 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "backfill_unknown_workflows"),
     ("origenerator.importer", "backfill_model_and_lora_params"),
     ("origenerator.importer", "backfill_input_image"),
+    ("origenerator.importer", "backfill_sound_params"),
+    ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),
     ("origenerator.gallery", "disown_foreign_runs"),
     ("origenerator.importer", "backfill_shared_thumbnails"),

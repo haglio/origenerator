@@ -34,8 +34,7 @@ from origenerator.config import (
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
 )
-from origenerator.generation_config import randomize_seeds
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
 from origenerator.gui.deferred import defer
@@ -43,18 +42,12 @@ from origenerator.gui.export_lane import GENAU as GENAU_LANE
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.notice_overlay import NOTICE, WARNING
-from origenerator.gui.reroll_prompt import REROLL_BOTH, REROLL_IMAGE, REROLL_VIDEO
 from origenerator.media import MediaType
 from origenerator.prompts import VIDEO_SCENE_MATCH_SYSTEM_PROMPT
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-# What a spoken "genau it" says when the picture already has its clip, or has one
-# on the way. Said rather than run, and said the same way wherever it is reached
-# from: the corner of the surface being spoken to, never a dialog -- that
-# question thrown over the picture someone is talking to is the one thing that
-# must never appear.
 ALREADY_GENAUD = "🎤 already Genau'd"
 
 
@@ -75,9 +68,6 @@ class CombineHost(Protocol):
                        workflow_version: str | None = None) -> str:
         """The same key, for a caller holding a config rather than a row."""
 
-    def would_reproduce_a_completed_run(self, workflow, params: dict) -> bool:
-        """Whether launching this would re-create a byte-identical past run."""
-
     def off_thread(self, work, done) -> None:
         """Run one slow call away from the UI and hand its result back here —
         asking the model which recipe fits is seconds of network wait."""
@@ -91,10 +81,6 @@ class CombineHost(Protocol):
 
     def follow_link(self, prompt_id: str) -> None:
         """Go to a generation a slot is holding."""
-
-    def ask_which_seed(self, workflow, *, can_reroll_image: bool) -> str | None:
-        """Ask which seed to re-roll rather than reproduce a past run, returning
-        ``None`` when the answer is to do nothing."""
 
     def tell(self, title: str, message: str) -> None:
         """Say something that needs acknowledging, where nobody is watching a
@@ -364,8 +350,8 @@ class CombineController(QObject):
     def _combined_params(self, image_id: str, video_id: str,
                          intent: str = recipe_match.VIDEO, category: str = ""):
         """The ``(workflow, params, video_row, image_row)`` for re-running
-        ``video_id``'s recipe on ``image_id`` — the video's workflow, settings and
-        seed with only the input image swapped to the dropped one.
+        ``video_id``'s recipe on ``image_id`` — the video's workflow and settings,
+        fresh seeds, and the dropped picture as the input image.
 
         Under ``GENAU`` the recipe is then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
@@ -438,87 +424,21 @@ class CombineController(QObject):
                               intent: str = recipe_match.VIDEO) -> None:
         """Generate a new video from a dropped image + a dropped video's recipe.
 
-        Reuses the video's workflow, settings and seed, swapping only the input
-        image to the dropped one, and lands the result in the folder for that
-        (image × settings) combination. A pinned seed can reproduce an identical
-        past run, so a *pressed* combine warns first via the shared "already
-        generated" dialog — which, when the dropped image is itself a re-buildable
-        generation, offers a fresh video seed (same frame), a fresh image seed
-        (re-draw the dropped image), or both. A no-op if either row is gone, the
-        video isn't a rebuildable image-conditioned recipe, the image has no
-        output file, or that folder is already generating.
-
-        The lane reaches here now: it chose which recipe ``video_id`` names, and
-        it also re-cuts that recipe to the length one cycle fits in (see
-        :meth:`_combined_params`), which is the one thing a mined clip cannot
-        carry — it was made before anyone knew Genau needed it. ``send``
-        is the one thing that still rides along — a spoken "genau it" wants its
-        clip handed on the moment it exists, and wants no dialog at all: it is
-        answered in the show's corner and nothing runs, so the re-roll answers
-        (and the frame re-draw under them) belong to the pressed path alone.
-        ``category`` names the act the dropdown was set to, when one was picked.
-        The frame re-draw is the one answer it does not reach: that launches the
-        frame first and the clip second, under an id this never sees, so such a
-        clip's row goes without the recipe mark the queue reads.
+        ``send`` hands the clip to Genau the moment it exists, as a spoken
+        "genau it" asks. ``category`` names the act the dropdown was set to, when
+        one was picked.
         """
         built = self._combined_params(image_id, video_id, intent, category)
         if built is None:
             return
-        workflow, params, video_row, image_row = built
-        # The frame is re-buildable independently of the video seed, so the key —
-        # which groups by the image's config, not its filename — is the same one
-        # whether we re-roll the seed, the frame, or both. The prospective row is
-        # stamped with the CURRENT workflow version (what the launched run will
-        # record), not the recipe video's stored one: the settings key folds the
-        # version in, and keying by an old recipe's version would park the reveal
-        # on a folder the finished row never joins.
-        key = self._host.folder_key_of(
-            {**dict(video_row), "params_json": json.dumps(params),
-             "workflow_version": workflow.version})
-        if self._host.would_reproduce_a_completed_run(workflow, params):
-            if send:
-                # Spoken. The dialog below asks which of two seeds to re-roll,
-                # and that question thrown over the fullscreen picture someone
-                # is talking to is the one thing that must never appear — so the
-                # spoken path gives the same answer the up-front guard gives and
-                # stops. This is the case that guard can't see: the identical run
-                # was made by hand, not said.
-                self._say_already_genaud()
-                return
-            image_workflow = WORKFLOW_REGISTRY.get(image_row.get("workflow_name") or "")
-            can_reroll_image = (
-                image_workflow is not None
-                and source_of(image_row) == GenerationSource.GENERATED
-            )
-            choice = self._host.ask_which_seed(
-                workflow, can_reroll_image=can_reroll_image)
-            if choice is None:
-                return  # let the user pick a different pair rather than duplicate
-            if choice in (REROLL_VIDEO, REROLL_BOTH):
-                params = randomize_seeds(params, workflow.seed_keys())
-            if choice in (REROLL_IMAGE, REROLL_BOTH):
-                # Re-draw the dropped image (a new frame) and run the video on it,
-                # carrying whatever video seed we settled on just above.
-                if self._jobs.start_reroll_from_image(
-                    key, image_row, image_workflow, workflow, params
-                ):
-                    self._host.reveal_launch(key)
-                return
+        workflow, params, video_row, _image_row = built
+        key = self._host.folder_key_of(_the_row_this_run_will_make(video_row, params, workflow))
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             self._db.set_recipe_source(prompt_id, category=category,
                                        video_prompt_id=video_id)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
-
-    def _say_already_genaud(self) -> None:
-        """Say this picture has its clip already, where the speaker is looking.
-
-        Only ever reached from a spoken command, which only runs with a show up
-        — and where :meth:`_say_no_recipe` falls back to a dialog, this one has
-        nothing to fall back to: a modal is precisely what it exists to avoid.
-        """
-        self._shows.note_voice_run(None, ALREADY_GENAUD, kind=WARNING)
 
     # --- finding the recipe an act names --------------------------------------
 
@@ -633,7 +553,7 @@ class CombineController(QObject):
                           send: bool) -> bool:
         """Launch ``category``'s curated ``intent`` recipe on the dropped image;
         ``False`` when the act has no usable curated entry, so the caller falls back
-        to mining. No reproduce warning: the seeds are fresh every launch."""
+        to mining."""
         built = self._curated_combination(image_id, category, intent)
         if built is None:
             return False
@@ -828,3 +748,8 @@ class CombineController(QObject):
         logger.info("genau it: image=%s -> category=%s", image_id, category)
         self.generate_category(image_id, category, recipe_match.GENAU, send=True)
         return image_id, f"🎤 animating as a “{category}” loop", NOTICE
+
+
+def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:
+    return {**dict(video_row), "params_json": json.dumps(params),
+            "workflow_version": workflow.version}

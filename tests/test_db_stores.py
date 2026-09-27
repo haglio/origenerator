@@ -29,6 +29,7 @@ from origenerator.db_folder_meta import FolderMetaStore
 from origenerator.db_generations import GenerationStore
 from origenerator.db_requests import RequestStore
 from origenerator.db_schema import GENERATION_COLUMNS
+from origenerator.db_seed_uses import SeedUseStore
 
 # The attribute each store hangs off `Database` under, and a read that proves it
 # is talking to its own table.
@@ -38,6 +39,7 @@ STORES = {
     "requests": (RequestStore, lambda s: s.list_requests()),
     "folder_meta": (FolderMetaStore, lambda s: s.folder_meta_full()),
     "custom_folders": (CustomFolderStore, lambda s: s.list_custom_folders()),
+    "seed_uses": (SeedUseStore, lambda s: s.list_seed_uses()),
 }
 
 

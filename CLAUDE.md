@@ -125,6 +125,17 @@ prompts do mean the act by it — those prompts nearly always say so another way
 too, which is what the act's other keywords are for, and a row has only one
 name.
 
+## A video's filename is not the video
+
+ComfyUI numbers a video from the files already in its output folder, so
+deleting the newest video gives its filename to the next one, and a funscript
+is tied to its video by that name alone. Completion writes each finished
+video's script over whatever its name had, but anything else that carries a
+script to a video by name -- a sweep, a copy into Evolver's library -- first
+checks that the two are the same length. A one-off copy of this folder's
+scripts into the library on 2026-09-26 did not, and a video from April on the
+Satellites was given the script of a June video that had since taken its name.
+
 ## A feature the session can reach is half a feature until Fun Time answers it
 
 This app runs two ways — on its own, and hosted inside a Fun Time session as one

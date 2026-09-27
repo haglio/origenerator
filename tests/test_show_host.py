@@ -61,6 +61,11 @@ THE_SET = (
     # The queue block at that panel's foot: what is in flight, the order a row
     # dragged down it asks for, and the Clear that drops another app's work.
     "hud_queue", "requeue", "clear_foreign_queue",
+    # The row at that panel's foot — the track, the time and the volume the
+    # players lay along the lower edge of their video: what it shows, the
+    # funscript coloring it, and what a press on each part of it asks for.
+    "hud_scrubber", "hud_funscript", "scrub_to", "set_volume",
+    "audio_muted", "set_audio_muted",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so

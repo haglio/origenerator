@@ -1,6 +1,7 @@
 """The show's own pane: what it asks the players' engine for."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -223,7 +224,24 @@ def test_the_picture_is_measured_where_it_is_actually_drawn(qtbot, tmp_path):
     rect = surface.media_rect()
 
     assert rect.width() == 400 and rect.height() == 600
-    assert rect.center() == surface._media_host.geometry().center()
+    assert rect.center() == surface.rect().center()
+
+
+def test_a_scripted_video_gets_the_whole_pane_with_nothing_along_its_foot(
+        qtbot, tmp_path):
+    """The funscript's colors are the track's fill on the panel now, so the
+    pane keeps no room for a strip of them under the video."""
+    video = tmp_path / "made-up.mp4"
+    video.write_bytes(b"")
+    (tmp_path / "made-up.funscript").write_text(
+        '{"actions": [{"at": 0, "pos": 0}, {"at": 900, "pos": 100}]}', encoding="utf-8")
+    surface, engine = _surface(qtbot)
+    surface.resize(800, 600)
+    surface.layout().activate()
+    surface.show_media(str(video), MediaType.VIDEO)
+    engine.video_dims = (800, 600)
+
+    assert surface.media_rect() == surface.rect()
 
 
 def test_a_pane_with_nothing_measurable_on_it_is_measured_whole(qtbot):
@@ -231,7 +249,7 @@ def test_a_pane_with_nothing_measurable_on_it_is_measured_whole(qtbot):
     surface.resize(800, 600)
     surface.layout().activate()
 
-    assert surface.media_rect() == surface._media_host.geometry()
+    assert surface.media_rect() == surface.rect()
 
 
 def test_a_picture_of_a_new_size_is_said_once(qtbot, tmp_path):
@@ -446,3 +464,20 @@ def test_no_copy_beside_the_checkouts_leaves_the_path_alone(monkeypatch, tmp_pat
     show_surface._offer_the_copy_beside_the_checkouts()
 
     assert os.environ["PATH"] == r"C:\somewhere\else"
+
+
+def test_a_scripted_video_fills_the_pane_with_nothing_drawn_under_it(qtbot, tmp_path):
+    # The motion is on the panel the show wears, so nothing takes a slice off it.
+    video = tmp_path / "made-up.mp4"
+    video.write_bytes(b"")
+    video.with_suffix(".funscript").write_text(
+        json.dumps({"actions": [{"at": at, "pos": 100 * (index % 2)}
+                                for index, at in enumerate(range(0, 4_001, 250))]}),
+        encoding="utf-8")
+    surface, _engine = _surface(qtbot)
+    surface.resize(800, 600)
+
+    surface.show_media(str(video), MediaType.VIDEO)
+    surface.layout().activate()
+
+    assert surface._media_host.geometry() == surface.rect()

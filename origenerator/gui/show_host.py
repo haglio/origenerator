@@ -198,6 +198,30 @@ class ShowHost(Protocol):
         line to report, which draws no block."""
         return [], 0
 
+    @property
+    def hud_scrubber(self):
+        """The clip's row for the panel to draw (`player_core.hud_row.RowHud`)
+        — None on a picture, and None where the media is somebody else's."""
+        return None
+
+    @property
+    def hud_funscript(self) -> list[dict]:
+        """The script the video on screen has, whose colors fill that track."""
+        return []
+
+    def scrub_to(self, ms: float) -> None:
+        """Run the video on screen to *ms* — a press along that track."""
+
+    def set_volume(self, level: int) -> None:
+        """How loud this show plays — the chip beside that track."""
+
+    def audio_muted(self) -> bool:
+        """Whether this show is silenced — the speaker on that chip."""
+        return False
+
+    def set_audio_muted(self, muted: bool) -> None:
+        """Silence this show, or let it be heard."""
+
     def requeue(self, keys) -> None:
         """Re-line the queue in this order — a row dragged down the block."""
 

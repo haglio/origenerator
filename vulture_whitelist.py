@@ -24,7 +24,6 @@ _.takeAt  # noqa  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
-_.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_wheel.py:97, origenerator/gui/no_wheel.py:102
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219

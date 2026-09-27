@@ -33,6 +33,7 @@ import threading
 import time
 from pathlib import Path
 
+from app_support.funscript import read_actions
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
@@ -43,7 +44,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import FRAMES_BEING_MADE_DIR, project_dir
+from origenerator.config import (
+    COMFYUI_OUTPUT_DIR,
+    FRAMES_BEING_MADE_DIR,
+    project_dir,
+)
+from origenerator.funscript import funscript_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.media import MediaType
 
@@ -80,6 +86,7 @@ class ShowSurface(QWidget):
         self._media: tuple | None = None
         self._opened: Path | None = None
         self._paused = False
+        self._actions: list[dict] = []
         self._dims: tuple[int, int] = (0, 0)
         # What was said about the item on screen already: the engine goes on
         # reporting an item that ran out for as long as it holds the last
@@ -169,6 +176,8 @@ class ShowSurface(QWidget):
         self._dims = (0, 0)
         self._engine.load(path)
         self._engine.set_paused(self._paused)
+        self._read_the_funscript(
+            str(path) if media and media[1] == MediaType.VIDEO else None)
 
     def current_media_path(self) -> str:
         return str(self._media[0]) if self._media else ""
@@ -215,6 +224,7 @@ class ShowSurface(QWidget):
         self._said = False
         self._picture.clear()
         self._picture.setText("")
+        self._actions = []
         self._stack.setCurrentWidget(self._picture)
 
     def set_paused(self, paused: bool) -> None:
@@ -286,6 +296,20 @@ class ShowSurface(QWidget):
                 self._engine.push_still()
         except Exception:
             logger.exception("A show's picture stopped moving")
+    def funscript_actions(self) -> list[dict]:
+        return self._actions
+
+    def set_volume(self, level: int) -> None:
+        self._engine.set_volume(level)
+
+    def scrub_to(self, ms: float) -> None:
+        self._engine.seek_ms(ms)
+
+    def duration(self) -> float:
+        return float(self._engine.duration_ms)
+
+    def frame_rate(self) -> float:
+        return float(self._engine.frame_rate)
 
     def close_engine(self) -> None:
         """Let the engine go, before the window it draws into is taken down."""
@@ -323,6 +347,11 @@ class ShowSurface(QWidget):
             self._said = True
             self.media_ended.emit()
 
+    def _read_the_funscript(self, video_path) -> None:
+        self._actions = (
+            read_actions(funscript_of(video_path, output_dir=COMFYUI_OUTPUT_DIR))
+            if video_path else [])
+
 
 def _offer_the_copy_beside_the_checkouts() -> None:
     """Put the copy of the engine's file that sits beside the checkouts first.
@@ -358,12 +387,15 @@ class _NotYetOpened:
     idle = False
     video_dims = (0, 0)
     position_ms = 0.0
+    duration_ms = 0.0
+    frame_rate = 0.0
 
     def __init__(self) -> None:
         self.file: Path | None = None
         self.pace: float | None = None
         self.paused: bool | None = None
         self.muted: bool | None = None
+        self.volume: int | None = None
 
     def load(self, path: Path) -> None:
         self.file = path
@@ -380,6 +412,15 @@ class _NotYetOpened:
     def set_muted(self, muted: bool) -> None:
         self.muted = muted
 
+    def set_volume(self, level: int) -> None:
+        self.volume = level
+
+    def seek_ms(self, ms: float) -> None:
+        """Nothing is playing yet, so there is nowhere to run it to."""
+
+    def push_still(self) -> None:
+        pass
+
     def stop(self) -> None:
         self.file = None
 
@@ -388,6 +429,8 @@ class _NotYetOpened:
 
     def replay(self, engine) -> None:
         engine.set_muted(bool(self.muted))
+        if self.volume is not None:
+            engine.set_volume(self.volume)
         if self.pace is not None:
             engine.set_pace(self.pace)
         if self.file is not None:

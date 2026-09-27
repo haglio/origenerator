@@ -758,6 +758,30 @@ class PlayerShow(QObject):
         """And so this show has none to report."""
         return [], 0
 
+    @property
+    def hud_scrubber(self):
+        """And no row of its own: the clip is the player's to run, so the
+        track, the time and the chip are the player's too."""
+        return None
+
+    @property
+    def hud_funscript(self) -> list[dict]:
+        """Nor a script to color a track this show does not draw."""
+        return []
+
+    def scrub_to(self, ms: float) -> None:
+        """Nor a track to press along."""
+
+    def set_volume(self, level: int) -> None:
+        """Nor a chip: a session sets its players' levels itself."""
+
+    def audio_muted(self) -> bool:
+        """Nor a speaker on one."""
+        return False
+
+    def set_audio_muted(self, muted: bool) -> None:
+        """Nor a mute of its own to answer."""
+
     def requeue(self, keys) -> None:
         """Nor a row of one to drag anywhere."""
 

@@ -31,13 +31,11 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
 FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
-# A window has a picture of its own to put a run's frames on, a queue floated
-# over it, a sound to mute and a panel it wears -- which it is told where to
-# wear; a player has none of them, and the session draws its panel wherever its
-# own keys have put it.
-ONLY_A_WINDOW = {"adopt_hud", "audio_muted", "hud_side", "queue",
-                 "set_audio_muted", "set_hud_place", "set_playlist", "show_frame",
-                 "show_landed"}
+# A window has a picture of its own to put a run's frames on and a panel it
+# wears -- which it is told where to wear; a player has neither, and the
+# session draws its panel wherever its own keys have put it.
+ONLY_A_WINDOW = {"adopt_hud", "hud_side", "set_hud_place", "set_playlist",
+                 "show_frame", "show_landed"}
 
 
 def _channel(tmp_path: Path) -> PlayerChannel:

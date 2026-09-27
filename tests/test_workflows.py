@@ -219,6 +219,17 @@ def test_workflows_expose_their_seed_param_keys():
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "audio_seed")
 
 
+def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
+    builds = []
+    real = Wan22I2vWorkflow.param_definitions
+    monkeypatch.setattr(Wan22I2vWorkflow, "param_definitions",
+                        lambda self: builds.append(self) or real(self))
+    workflow = Wan22I2vWorkflow()
+
+    assert workflow.seed_keys() == workflow.seed_keys() == ("noise_seed", "audio_seed")
+    assert len(builds) == 1
+
+
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # Reusing a still's settings pins its seed: the composition is the point of
     # editing one. Reusing a clip's does not — a pinned video seed would ride

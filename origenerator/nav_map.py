@@ -32,20 +32,6 @@ WIDEN_ADDITIONS = 6
 SOURCE_IMAGE = "Source image"
 
 
-def generation_seed(row: dict) -> str | None:
-    """The seed *row*'s sampler ran with, or ``None`` for a row that has none.
-
-    Off the params first: a video's sampler seed is ``noise_seed``, which the
-    row's ``seed`` column never carries — that column only mirrors a ``seed``
-    param — so the column is the fallback rather than the answer.
-    """
-    params = gallery.parse_params(row.get("params_json"))
-    for key in ("seed", "noise_seed"):
-        if params.get(key) not in (None, ""):
-            return str(params[key])
-    return None if row.get("seed") is None else str(row["seed"])
-
-
 def _others(current: dict, rows) -> list[dict]:
     """The rows of *current*'s workflow other than itself — the only ones that
     can share a settings folder or a model with it, and a filter that costs a
@@ -71,14 +57,14 @@ def config_family(current: dict, rows, *, image_index) -> list[dict]:
     where the same sampler draws from the same latent: a seed that collides
     across models is a coincidence, and one across workflows is not even that.
     """
-    seed = generation_seed(current)
+    seed = gallery.generation_seed(current)
     if seed is None:
         return [current]
     model = gallery.folder_key_at_level(current, "model", image_index)
     settings = gallery.settings_folder_key(current, image_index)
     return [current, *(
         row for row in _others(current, rows)
-        if generation_seed(row) == seed
+        if gallery.generation_seed(row) == seed
         and gallery.folder_key_at_level(row, "model", image_index) == model
         and gallery.settings_folder_key(row, image_index) != settings
     )]

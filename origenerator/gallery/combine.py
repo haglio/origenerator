@@ -4,9 +4,9 @@ The gallery already holds both halves of an image-to-video: a video row carries 
 full recipe (workflow + settings + seed), and any image row's output file can seed
 an i2v. This readies a recipe to re-run on a *different* image — the one input a
 user picks — without touching a Generate tab. The recipe is either a past video's
-(:func:`combined_params`, seed deliberately kept so the motion reproduces) or the
-overlay's hand-tuned spec for an act (:func:`curated_params`, seeds re-rolled —
-there is no past run to reproduce). Qt-free so it stays unit-testable.
+(:func:`combined_params`) or the overlay's hand-tuned spec for an act
+(:func:`curated_params`), and either one runs with fresh seeds. Qt-free so it
+stays unit-testable.
 """
 from __future__ import annotations
 
@@ -56,13 +56,9 @@ _CYCLE_WORDS: dict = _CONTENT.get("genau_stroke_prompts") or {}
 
 
 def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
-    """The video's recipe readied to re-run on a new input image, seed kept.
+    """The video's recipe readied to run on a new input image, with fresh seeds.
 
-    ``video_row``'s stored params (anything sparse filled from ``workflow``'s
-    defaults, exactly as :func:`generation_config.filled_params` — the seed is
-    kept, not re-rolled), with ``input_image`` replaced by a ``LoadImage``-
-    resolvable reference to ``image_row``'s output file. ``None`` when the image
-    produced no file to reference.
+    ``None`` when the image produced no file to reference.
 
     A size-deriving workflow's stored ``width``/``height`` are dropped on the way
     through: they size the recipe's OWN frame, and swapping the frame is the one
@@ -76,11 +72,8 @@ def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
     image. Dropped, the size re-derives from the dropped image and the new video
     keeps its proportions.
     """
-    ref = output_file_reference(row_output_files(image_row))
-    if ref is None:
-        return None
-    params = {**filled_params(video_row, workflow), "input_image": ref}
-    if workflow.derives_size_from_input:
+    params = _run_on(image_row, filled_params(video_row, workflow), workflow)
+    if params is not None and workflow.derives_size_from_input:
         for key in _SIZE_KEYS:
             params.pop(key, None)
     return params
@@ -103,19 +96,17 @@ def _words(prompt):
 
 
 def curated_params(spec: dict, image_row: dict, workflow) -> dict | None:
-    """The overlay's hand-tuned act recipe readied to run on ``image_row``'s frame.
-
-    ``spec["params"]`` over ``workflow``'s defaults, every seed re-rolled (a
-    curated recipe has no exemplar run whose motion a kept seed would reproduce,
-    and a pinned one would render the identical video for the same image every
-    time), with ``input_image`` pointed at ``image_row``'s output file. ``None``
-    when the image produced no file to reference.
+    """The overlay's hand-tuned act recipe readied to run on ``image_row``'s
+    frame, with fresh seeds. ``None`` when the image produced no file to reference.
     """
+    params = {**workflow.default_params(), **renamed_params(spec.get("params") or {})}
+    return _run_on(image_row, params, workflow)
+
+
+def _run_on(image_row: dict, params: dict, workflow) -> dict | None:
     ref = output_file_reference(row_output_files(image_row))
     if ref is None:
         return None
-    params = dict(workflow.default_params())
-    params.update(renamed_params(spec.get("params") or {}))
     return {**randomize_seeds(params, workflow.seed_keys()), "input_image": ref}
 
 

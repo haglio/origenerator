@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from io import BytesIO
 from unittest.mock import MagicMock
 
 from PIL import Image
 
 from origenerator import thumbnail
-from origenerator.thumbnail import generate_animated_thumbnail, generate_thumbnail
+from origenerator.thumbnail import (
+    frame_thumbnail,
+    generate_animated_thumbnail,
+    generate_thumbnail,
+)
 
 
 def test_generate_thumbnail_from_image(tmp_path):
@@ -79,3 +84,19 @@ def test_animated_thumbnail_is_cached_and_not_regenerated(tmp_path, monkeypatch)
 def test_animated_thumbnail_is_none_when_no_frames_read(tmp_path, monkeypatch):
     monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: [])
     assert generate_animated_thumbnail(tmp_path / "v.mp4", tmp_path / "thumbs", name="v") is None
+
+
+def test_a_streamed_frame_is_kept_as_a_thumbnail(tmp_path):
+    frame = BytesIO()
+    Image.new("RGB", (600, 300), "red").save(frame, "PNG")
+
+    kept = frame_thumbnail(frame.getvalue(), tmp_path, name="run1_canceled")
+
+    with Image.open(kept) as saved:
+        assert max(saved.size) <= 256
+        assert saved.size[0] > saved.size[1]
+
+
+def test_a_frame_that_will_not_decode_keeps_no_thumbnail(tmp_path):
+    assert frame_thumbnail(b"not a picture", tmp_path, name="run1_canceled") is None
+    assert list(tmp_path.iterdir()) == []

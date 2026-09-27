@@ -32,7 +32,6 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QImageReader, QMovie, QPixmap
 from PyQt6.QtMultimedia import QAudioOutput, QMediaMetaData, QMediaPlayer
-from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -55,7 +54,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.gui.generation_drag import generation_mime
-from origenerator.gui.media_overlay import float_over_media
+from origenerator.gui.video_surface import VideoSurface
 from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
@@ -162,10 +161,10 @@ class PreviewWidget(QWidget):
         self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._image_label)
 
-        self._video = QVideoWidget()
+        self._video = VideoSurface()
         self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._player.setAudioOutput(self._audio)
-        self._player.setVideoOutput(self._video)
+        self._player.setVideoOutput(self._video.video_sink())
         # Infinite for the info-pane preview (an immediate moving thumbnail); a
         # slideshow plays each clip once and advances when it ends.
         self._player.setLoops(
@@ -198,12 +197,6 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
-        # The notice's two pieces, over the media host so they cover the picture
-        # and leave the funscript strip below it clear. Two, because a video
-        # surface is a native window that a plain sibling cannot paint over: the
-        # dim is an ordinary sibling, so it blends into a still or an animation
-        # and simply stays under a clip, while the message itself is native and
-        # rides over either. Both hidden until set_notice says otherwise.
         self._notice_dim = QLabel(media_host)
         self._notice_dim.setStyleSheet(_NOTICE_DIM)
         self._notice_dim.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -211,16 +204,10 @@ class PreviewWidget(QWidget):
         self._notice = QLabel(media_host)
         self._notice.setStyleSheet(_NOTICE_PLATE)
         self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        float_over_media(self._notice)
+        self._notice.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._notice.hide()
 
-        # The same three corner controls a gallery thumbnail of this generation
-        # wears, in the same three corners, so the acts are where they were learned
-        # whichever surface the picture is on. Native, because a video plays on a
-        # surface an ordinary sibling cannot paint over — the notice above it is
-        # native for the very same reason. They stay hidden until the owner arms
-        # them (:meth:`set_actions`): a live frame or a message is no row to act on.
-        self._controls = CornerControls(self, native=True)
+        self._controls = CornerControls(self)
         self._controls.triggered.connect(self._on_control)
 
         # Opt-in funscript heatmap along the lower edge (the info-pane and fullscreen
@@ -424,14 +411,8 @@ class PreviewWidget(QWidget):
         self._notice.move(_NOTICE_MARGIN, _NOTICE_MARGIN)
 
     def _raise_notice(self) -> None:
-        """Put a showing notice back on top of the media — over a video surface,
-        which is a native window a plain sibling cannot paint over, and over a
-        picture that has just landed under it: a stacked layout raises the widget
-        it switches to above every sibling it has.
-
-        A no-op when no notice is up, so anything putting a new view in the pane
-        can call it without asking first.
-        """
+        """A stacked layout raises the widget it switches to above every sibling
+        it has, the notice included."""
         if self._notice.isHidden():
             return
         self._notice_dim.raise_()
@@ -680,20 +661,9 @@ class PreviewWidget(QWidget):
         )
 
     def _drag_picture(self) -> QPixmap:
-        """The thumbnail that trails the cursor while this pane's media is dragged.
-
-        Everything the pane can show has a picture, but not in the same place: a
-        still is the label's pixmap, an animated image is the frame its movie is
-        on, and a video is on the player's own surface with no pixmap anywhere —
-        the last frame it handed its sink is the only handle on it. Reaching
-        only for the label's pixmap is why a dragged video used to trail nothing.
-        """
         if self.is_showing_video():
-            sink = self._video.videoSink()
-            frame = sink.videoFrame() if sink is not None else None
-            if frame is None or not frame.isValid():
-                return QPixmap()
-            return fit_thumbnail(QPixmap.fromImage(frame.toImage()))
+            picture = self._video.picture()
+            return QPixmap() if picture.isNull() else fit_thumbnail(QPixmap.fromImage(picture))
         return label_thumbnail(self._image_label)
 
     def set_fullscreen_factory(self, make) -> None:

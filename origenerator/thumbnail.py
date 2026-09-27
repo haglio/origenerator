@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
@@ -19,17 +20,27 @@ def generate_thumbnail(
     ``ComfyUI_00001_.png`` beside ``video/ComfyUI_00001_.mp4`` — would otherwise
     collapse onto one thumbnail, leaving one row showing the other's frame.
     """
-    thumb_dir.mkdir(parents=True, exist_ok=True)
-    dest = thumb_dir / f"{name}.jpg"
-
     if output_type == MediaType.VIDEO:
         img = _first_frame_from_video(source_path)
     else:
         img = Image.open(source_path)
+    return _saved_thumbnail(img, thumb_dir, name)
 
+
+def frame_thumbnail(frame: bytes, thumb_dir: Path, *, name: str) -> Path | None:
+    try:
+        img = Image.open(BytesIO(frame))
+        img.load()
+    except (OSError, ValueError):
+        return None
+    return _saved_thumbnail(img, thumb_dir, name)
+
+
+def _saved_thumbnail(img: Image.Image, thumb_dir: Path, name: str) -> Path:
+    thumb_dir.mkdir(parents=True, exist_ok=True)
+    dest = thumb_dir / f"{name}.jpg"
     img.thumbnail((_THUMB_MAX, _THUMB_MAX))
-    img = img.convert("RGB")
-    img.save(dest, "JPEG", quality=85)
+    img.convert("RGB").save(dest, "JPEG", quality=85)
     return dest
 
 

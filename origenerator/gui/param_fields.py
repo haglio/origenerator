@@ -15,6 +15,8 @@ from origenerator.gui import diff_text
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.seed_combo import SeedComboBox
+from origenerator.seed_history import SeedHistory
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
 
@@ -59,23 +61,30 @@ class _Line(FieldKind):
         widget.setText(str(value))
 
 
-class _Seed(_Line):
+class _Seed(FieldKind):
     copyable = True
     randomizable = True
 
+    def __init__(self, history: SeedHistory | None = None):
+        self._history = history or (lambda key: [])
+
     def make(self, pd):
-        widget = super().make(pd)
-        widget.setPlaceholderText("64-bit integer seed")
+        widget = SeedComboBox(lambda: self._history(pd.key))
+        widget.lineEdit().setPlaceholderText("64-bit integer seed")
+        widget.setEditText(str(pd.default))
         return widget
+
+    def change_signal(self, widget):
+        return widget.editTextChanged
 
     def read(self, pd, widget):
         try:
-            return int(widget.text())
+            return int(widget.currentText())
         except ValueError:
             return 0
 
     def write(self, pd, widget, value):
-        widget.setText(str(int(value)))
+        widget.setEditText(str(int(value)))
 
 
 class _ImagePath(_Line):
@@ -214,7 +223,6 @@ class _Choice(FieldKind):
 _KINDS: dict[ParamType, FieldKind] = {
     ParamType.BOOL: _Tick(),
     ParamType.STR: _Line(),
-    ParamType.SEED: _Seed(),
     ParamType.INT: _WholeSpinner(),
     ParamType.FLOAT: _DecimalSpinner(),
     ParamType.COMBO: _Choice(),
@@ -225,11 +233,13 @@ _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
 
-def field_kind(pd: ParamDef, heights=None) -> FieldKind:
+def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = None) -> FieldKind:
     """The kind of field ``pd`` is edited in. ``heights`` is the set a prompt's
     dragged height is filed in, which is the form's to supply."""
     if pd.type == ParamType.STR and pd.multiline:
         return _Prompt(heights) if heights is not None else _PROMPT
+    if pd.type == ParamType.SEED:
+        return _Seed(seed_history)
     if pd.type in (ParamType.INT, ParamType.FLOAT) and pd.options:
         return _PRESETS
     return _KINDS[pd.type]

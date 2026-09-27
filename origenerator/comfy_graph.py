@@ -104,6 +104,24 @@ def graph_model_params(graph: dict) -> dict:
     return params
 
 
+_SOUND_INPUTS = {
+    "HunyuanFoleySampler": {"seed": "audio_seed", "prompt": "audio_prompt",
+                            "negative_prompt": "audio_negative_prompt"},
+    "HunyuanModelLoader": {"model_name": "foley_model"},
+    "HunyuanDependenciesLoader": {"vae_name": "foley_vae", "synchformer_name": "foley_synchformer"},
+}
+
+
+def sound_params(graph: dict) -> dict:
+    params: dict = {}
+    for node in graph.values():
+        for input_name, key in _SOUND_INPUTS.get(node.get("class_type", ""), {}).items():
+            value = node.get("inputs", {}).get(input_name)
+            if isinstance(value, (int, str)) and not isinstance(value, bool):
+                params[key] = value
+    return params
+
+
 def input_image_name(graph: dict) -> str | None:
     """The image filename an image-to-video graph loads, or ``None``.
 

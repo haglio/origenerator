@@ -11,9 +11,11 @@ from PIL.PngImagePlugin import PngInfo
 import origenerator.importer as imp
 from origenerator.db import Database
 from origenerator.importer import (
+    backfill_imported_video_seeds,
     backfill_input_image,
     backfill_model_and_lora_params,
     backfill_shared_thumbnails,
+    backfill_sound_params,
     backfill_unknown_workflows,
     import_comfyui_output,
     merge_video_sidecar_rows,
@@ -134,6 +136,55 @@ def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
     assert backfill_model_and_lora_params(db) == 0
 
 
+def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a fox", "noise_seed": 1}),
+        workflow_json=json.dumps(_SOUND_STAGE), source="imported",
+    )
+    db.insert_generation(
+        prompt_id="made", workflow_name="wan22_i2v", workflow_version="v002",
+        params_json=json.dumps({**_SOUND_PARAMS, "audio_seed": 9}),
+        workflow_json=json.dumps(_SOUND_STAGE),
+    )
+
+    updated = backfill_sound_params(db)
+
+    assert updated == 1
+    old = json.loads(db.get_generation("old")["params_json"])
+    assert {key: old[key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
+    assert old["positive_prompt"] == "a fox"
+    assert json.loads(db.get_generation("made")["params_json"])["audio_seed"] == 9
+    assert backfill_sound_params(db) == 0
+
+
+def test_backfill_gives_an_imported_video_back_the_seed_that_added_its_noise(tmp_path):
+    db = Database(tmp_path / "test.db")
+    graph = {
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 555, "add_noise": "enable"}},
+        "16": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 0, "add_noise": "disable"}},
+    }
+    db.insert_generation(
+        prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
+        params_json=json.dumps({"seed": 555, "noise_seed": 0}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+    db.insert_generation(
+        prompt_id="made", workflow_name="wan22_flf2v_loop", workflow_version="v009",
+        params_json=json.dumps({"seed": 0, "noise_seed": 777}), workflow_json=json.dumps(graph),
+    )
+
+    updated = backfill_imported_video_seeds(db)
+
+    assert updated == 1
+    assert json.loads(db.get_generation("old")["params_json"])["noise_seed"] == 555
+    assert json.loads(db.get_generation("made")["params_json"])["noise_seed"] == 777
+    assert backfill_imported_video_seeds(db) == 0
+
+
 def test_backfill_fills_input_image_from_stored_graph(tmp_path):
     db = Database(tmp_path / "test.db")
     # An early video import: the graph is on the row (LoadImage names the source
@@ -225,6 +276,54 @@ def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monke
     assert meta["params"]["width"] == 768
     assert meta["params"]["frame_count"] == 81
     assert meta["workflow_name"] == "wan22_i2v"
+
+
+_SOUND_STAGE = {
+    "20": {"class_type": "HunyuanModelLoader",
+           "inputs": {"model_name": "foley_model.safetensors", "precision": "bf16"}},
+    "21": {"class_type": "HunyuanDependenciesLoader",
+           "inputs": {"vae_name": "foley_vae.safetensors",
+                      "synchformer_name": "sync.safetensors"}},
+    "22": {"class_type": "HunyuanFoleySampler",
+           "inputs": {"hunyuan_model": ["20", 0], "hunyuan_deps": ["21", 0],
+                      "prompt": "footsteps on gravel", "negative_prompt": "music",
+                      "seed": 4242, "cfg_scale": 4.5, "steps": 50}},
+}
+
+_SOUND_PARAMS = {
+    "audio_seed": 4242, "audio_prompt": "footsteps on gravel",
+    "audio_negative_prompt": "music", "foley_model": "foley_model.safetensors",
+    "foley_vae": "foley_vae.safetensors", "foley_synchformer": "sync.safetensors",
+}
+
+
+def test_extract_metadata_keeps_the_seed_that_added_noise_as_the_videos_seed(tmp_path,
+                                                                            monkeypatch):
+    graph = {
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 555, "add_noise": "enable"}},
+        "16": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 0, "add_noise": "disable"}},
+    }
+    monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
+
+    meta = imp._extract_metadata(tmp_path / "flf2v_loop_00001_.mp4", ".mp4")
+
+    assert meta["params"]["noise_seed"] == 555
+
+
+def test_extract_metadata_reads_a_videos_sound_settings(tmp_path, monkeypatch):
+    graph = {
+        "15": {"class_type": "KSamplerAdvanced",
+               "inputs": {"noise_seed": 7, "add_noise": "enable", "steps": 8}},
+        **_SOUND_STAGE,
+    }
+    monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
+
+    meta = imp._extract_metadata(tmp_path / "wan22_i2v_00001_.mp4", ".mp4")
+
+    assert {key: meta["params"][key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
+    assert meta["params"]["steps"] == 8  # the sound's own steps are not the video's
 
 
 def test_extract_metadata_reads_high_low_unet_and_lora_from_graph(tmp_path, monkeypatch):

@@ -55,6 +55,7 @@ from origenerator.gallery.shelves import (
     TRASH_KEY,
 )
 from origenerator.gallery_actions import GalleryActions
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_config_panel as gcp_module
@@ -75,7 +76,6 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.prompt_find import _CURRENT_BG
 from origenerator.gui.request_worker import RevisionWorker
-from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.show_hud import ShowHud, show_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
@@ -214,9 +214,16 @@ class FakeDB:
         self._next_custom = 1
         self._deletions = {}    # prompt_id -> the held-deletion record, newest last
         self._requests = {}     # prompt_id -> its spoken-request record, newest last
+        self._seed_uses = []    # newest first
 
     def list_generations(self):
         return list(self._rows)
+
+    def record_seed_use(self, **use):
+        self._seed_uses.insert(0, use)
+
+    def list_seed_uses(self):
+        return list(self._seed_uses)
 
     def get_generation(self, prompt_id):
         return self._by_id.get(prompt_id)
@@ -4641,7 +4648,7 @@ def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
 
     view._on_thumbnail_clicked("g1")
 
-    values = _current_form(view).get_values_static()
+    values = _current_form(view).get_values()
     assert values["positive_prompt"] == "a wizard"
     assert values["seed"] == 123
 
@@ -4664,7 +4671,7 @@ def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
 
     view.refresh()  # the rebuild a poll makes, re-selecting the same generation
 
-    assert _current_form(view).get_values_static()["positive_prompt"] == "my edit"
+    assert _current_form(view).get_values()["positive_prompt"] == "my edit"
 
 
 def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, tmp_path):
@@ -4685,13 +4692,13 @@ def test_selecting_an_unregistered_thumbnail_leaves_the_reused_tab_alone(qtbot, 
     view.refresh()
     view._on_thumbnail_clicked("reg")
     reg_panel = view._info_tabs.current_config_panel()
-    reg_before = reg_panel._param_form.get_values_static()
+    reg_before = reg_panel._param_form.get_values()
 
     view._on_thumbnail_clicked("unreg")  # a different folder → a fresh tab
 
     # The rebuildable tab keeps its form; the new tab (unregistered) left its own
     # form as-is but now displays the imported row.
-    assert reg_panel._param_form.get_values_static() == reg_before
+    assert reg_panel._param_form.get_values() == reg_before
     assert view._info_tabs.current_config_panel()._displayed_row["prompt_id"] == "unreg"
 
 
@@ -4900,7 +4907,7 @@ def test_clicking_a_thumbnail_seeds_the_tab_with_its_parameters(qtbot, tmp_path)
 
     panel = view._info_tabs.current_config_panel()
     assert panel._workflow_combo.currentData() == "sdxl_t2i"
-    values = panel._param_form.get_values_static()
+    values = panel._param_form.get_values()
     assert (values["steps"], values["positive_prompt"], values["negative_prompt"],
             values["seed"]) == (20, "a cat", "blurry", 7)
 
@@ -7912,7 +7919,7 @@ def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)  # the re-roll finishes
 
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
+    assert panel._param_form.get_values()["positive_prompt"] == "a wizard mid-edit"
 
 
 def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
@@ -8548,6 +8555,8 @@ class _FakeRerollJob:
         self.started_at = started_at        # when ComfyUI began it; None while queued
         self.params = params
         self.workflow = WORKFLOW_REGISTRY[workflow_name]
+        self.source = GenerationSource.GENERATED
+        self.thumb_dir = THUMB_DIR
 
     def reconcile_with(self, history):
         pass  # the poll applies /history on every tracked re-roll; nothing here
@@ -9494,7 +9503,7 @@ def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
     assert job.params["positive_prompt"] == "alpha"
 
 
-def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_path):
+def test_combine_submits_the_recipe_on_the_dropped_picture_with_a_fresh_seed(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -9505,7 +9514,7 @@ def test_combine_submits_with_reused_seed_and_swapped_input_image(qtbot, tmp_pat
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
-    assert job.params["noise_seed"] == 99  # the video's seed, reused (not randomized)
+    assert job.params["noise_seed"] != 99
     view._client.submit_job.assert_called_once()
 
 
@@ -9523,7 +9532,7 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     config = view._info_tabs.current_config_panel().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"  # the dropped image
-    assert config.params["noise_seed"] == 99                         # the video's seed, carried in
+    assert config.seed_is_random                                     # a new take of the motion
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):
@@ -9602,68 +9611,27 @@ def _insert_completed_video(db, prompt_id, params, filename):
                          output_files=json.dumps([{"filename": filename, "subfolder": ""}]))
 
 
-def test_combine_duplicate_declined_submits_nothing(qtbot, tmp_path, monkeypatch):
+def test_combining_a_pair_already_made_makes_another_video(qtbot, tmp_path):
     db = _combine_db(tmp_path)
-    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
-    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")  # this exact run exists
+    made = {**json.loads(db.get_generation("vid")["params_json"]),
+            "input_image": "sdxl_pick.png [output]"}
+    _insert_completed_video(db, "made", made, "wan22_i2v_made.mp4")
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: None)
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._live_jobs == {}                    # declined: nothing submitted
-    view._client.submit_job.assert_not_called()
+    (job,) = view._live_jobs.values()
+    assert job.workflow.name == "wan22_i2v"
+    assert job.params["noise_seed"] != made["noise_seed"]
 
 
-def test_combine_duplicate_accepted_randomizes_the_seed(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)
-    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
-    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: REROLL_VIDEO)
-
-    view._combine._generate_combination("img", "vid")
-
-    job = next(iter(view._live_jobs.values()))
-    assert job.workflow.name == "wan22_i2v"  # the video runs on the same dropped frame
-    assert job.params["noise_seed"] != 99  # a fresh seed, not the duplicate's
-
-
-def test_combine_duplicate_image_seed_redraws_the_dropped_image(qtbot, tmp_path, monkeypatch):
-    db = _combine_db(tmp_path)
-    combined = gallery.combined_params(db.get_generation("vid"), db.get_generation("img"), _WAN_I2V)
-    _insert_completed_video(db, "dup", combined, "wan22_i2v_dup.mp4")  # this exact run exists
-    view = GalleryView(db, client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda parent, wf, *, can_reroll_image=False: REROLL_IMAGE)
-
-    view._combine._generate_combination("img", "vid")
-
-    # The dropped image is re-drawn first — the tracked job is its SDXL re-roll,
-    # not the video — so a fresh frame precedes the (seed-kept) video.
-    job = next(iter(view._live_jobs.values()))
-    assert job.workflow.name == "sdxl_t2i"
-    assert json.loads(view._db.get_generation(job.prompt_id)["params_json"])["seed"] != 1
-
-
-def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_path, monkeypatch):
-    # A pinned seed that would reproduce a past run used to stop the press for a
-    # dialog. The button now says "Generate with Random seed" before it's pressed
-    # (see the panel's caption), so the press just draws one — nothing to ask.
+def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_path):
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda *a, **k: pytest.fail("the button already said so"))
 
     view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
 
@@ -9672,14 +9640,37 @@ def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_pa
     assert job.params["seed"] != 42            # a fresh seed, not the duplicate's
 
 
-def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_path, monkeypatch):
-    # A config that hasn't been generated before must launch with no dialog at all.
+def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbot, tmp_path):
+    # Saved before its workflow gained its later settings, this video matches no
+    # saved row key for key; the tab showing it on its own seeds still says
+    # "Generate with Random seed", and the press keeps that promise.
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(
+        prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
+        params_json=json.dumps({"positive_prompt": "dance", "input_image": "frame.png",
+                                "noise_seed": 22, "audio_seed": 33}),
+        workflow_json="{}")
+    db.update_generation("vid", status="completed", output_files=json.dumps(
+        [{"filename": "vid.mp4", "subfolder": "video"}]))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = _front_panel(view)
+    panel._preview.show_media = MagicMock()
+    panel.show_saved_generation(db.get_generation("vid"), [])
+    panel._param_form.set_seed_random(False)
+
+    panel._on_generate()
+
+    job = next(iter(view._live_jobs.values()))
+    assert job.params["noise_seed"] != 22
+
+
+def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_path):
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda *a, **k: pytest.fail("no dialog for a novel config"))
 
     view._on_generate_requested("sdxl_t2i", {"seed": 999, "positive_prompt": "a novel prompt"})
 
@@ -10022,7 +10013,6 @@ def test_category_uses_the_scene_matched_recipe(qtbot, tmp_path, monkeypatch):
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_i2v"
     assert job.params["input_image"] == "sdxl_pick.png [output]"  # recipe run on the dropped image
-    assert job.params["noise_seed"] == 99                         # recipe's seed, reused via the combine path
 
 
 def test_category_falls_back_to_most_used_when_scene_match_unavailable(qtbot, tmp_path, monkeypatch):
@@ -11396,7 +11386,7 @@ def test_combine_panel_generate_button_launches_the_job(qtbot, tmp_path):
     assert len(view._live_jobs) == 1
     job = next(iter(view._live_jobs.values()))
     assert job.params["input_image"] == "sdxl_pick.png [output]"
-    assert job.params["noise_seed"] == 99
+    assert job.params["noise_seed"] != 99
 
 
 def _combine_view(qtbot, tmp_path):
@@ -14207,28 +14197,6 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
     assert len(_spoken_genau_rows(view)) == 2
-
-
-def test_a_spoken_genau_never_opens_the_which_seed_dialog(qtbot, tmp_path, monkeypatch):
-    # A modal thrown over the fullscreen picture someone is talking to is the one
-    # thing that must never appear. This is the case the up-front guard cannot
-    # see: the identical combination was made by hand, not said.
-    view = _genau_view(qtbot, tmp_path, monkeypatch)
-    asked = []
-    monkeypatch.setattr(gallery_view_module, "offer_reroll",
-                        lambda *a, **k: asked.append(a) or None)
-    monkeypatch.setattr(view, "would_reproduce_a_completed_run", lambda *a: True)
-    surface = _VoiceSurface("img_act")
-    notes = []
-    surface.note_voice_run = (lambda prompt_id, message, *, kind:
-                              notes.append((prompt_id, message, kind)))
-    view._shows._slideshow = surface
-
-    view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
-
-    assert asked == []
-    assert (None, combine_controller.ALREADY_GENAUD, WARNING) in notes
-    assert _spoken_genau_rows(view) == []
 
 
 def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(

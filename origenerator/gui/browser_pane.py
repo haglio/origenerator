@@ -61,11 +61,13 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
-from origenerator.gui.reroll_prompt import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
 from origenerator.orientation import filter_rows, split_key
+
+REROLL_VIDEO = "video"
+REROLL_IMAGE = "image"
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview

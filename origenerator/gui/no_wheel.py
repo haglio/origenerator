@@ -28,12 +28,10 @@ from PyQt6.QtWidgets import (
     QStylePainter,
 )
 
-# What the combo asks for in place of its longest item: enough to read the head of
-# a value, narrow enough that a form full of pickers still fits a slim pane.
-_MIN_CONTENTS_CHARS = 8
-
 
 class NoWheelComboBox(QComboBox):
+    floor_chars = 8
+
     def __init__(self, parent=None):
         super().__init__(parent)
         # A plain combo declares itself unshrinkable (QSizePolicy::Minimum), so a
@@ -50,7 +48,7 @@ class NoWheelComboBox(QComboBox):
         event.ignore()  # let the form scroll; don't change the selection
 
     def minimumSizeHint(self):
-        """_MIN_CONTENTS_CHARS wide, whatever the items or the placeholder say.
+        """:attr:`floor_chars` wide, whatever the items or the placeholder say.
 
         Qt's own minimum is the longest item, and it also widens to hold the
         placeholder text — keeping that width after a choice is made, so a picker
@@ -62,13 +60,13 @@ class NoWheelComboBox(QComboBox):
         return hint
 
     def _floor_width(self) -> int:
-        """How wide this combo is holding only _MIN_CONTENTS_CHARS — the same sum
+        """How wide this combo is holding only :attr:`floor_chars` — the same sum
         (frame, arrow, padding, text) Qt makes for a full-length value, so the
         floor tracks the font and the stylesheet rather than guessing at them."""
         opt = QStyleOptionComboBox()
         self.initStyleOption(opt)
         fm = self.fontMetrics()
-        text = QSize(fm.horizontalAdvance("X") * _MIN_CONTENTS_CHARS, fm.height())
+        text = QSize(fm.horizontalAdvance("X") * self.floor_chars, fm.height())
         return self.style().sizeFromContents(
             QStyle.ContentsType.CT_ComboBox, opt, text, self
         ).width()

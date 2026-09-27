@@ -67,6 +67,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_controls, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
+    REROLL_VIDEO,
     BrowserPane,
     BrowserScrollArea,
     LeadTiles,
@@ -108,10 +109,6 @@ from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import FootSplitter, pane, pane_splitter
 from origenerator.gui.prompt_find import PromptFind
-from origenerator.gui.reroll_prompt import (
-    REROLL_VIDEO,
-    offer_reroll,
-)
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
 from origenerator.gui.show_director import ShowDirector
@@ -1488,9 +1485,8 @@ class GalleryView(QWidget):
         """True when launching ``workflow`` with ``params`` would re-create a
         byte-identical past generation — the cue to re-roll rather than waste a slot.
 
-        Callers pass params whose seed is already concrete (the form randomizes a
-        Random seed before emitting; a combine reads the stored one), so the seed
-        is taken as pinned here; a genuinely random seed would simply never match.
+        The form sends the seed its field shows, so the seed is taken as pinned
+        here; a freshly drawn seed would simply never match.
         """
         return would_reproduce_a_completed_run(
             self._db.list_generations(), workflow, params)
@@ -1521,12 +1517,12 @@ class GalleryView(QWidget):
         # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
         # so this is what it said it would do, not a question worth stopping for.
         # The tab keeps the Random seed, so its form goes on saying the same thing.
-        if self.would_reproduce_a_completed_run(wf, params):
-            params = randomize_seeds(params, wf.seed_keys())
-            panel = self._info_tabs.current_config_panel()
-            if panel is not None:
-                panel.use_random_seed()
         launching = self._info_tabs.current_config_panel()
+        if (self.would_reproduce_a_completed_run(wf, params)
+                or (launching is not None and launching.generate_would_remake_what_it_shows())):
+            params = randomize_seeds(params, wf.seed_keys())
+            if launching is not None:
+                launching.use_random_seed()
         prompt_id = self._jobs.start_prepared(key, wf, params)
         if not prompt_id:
             return  # no client, or the submit failed
@@ -3245,10 +3241,6 @@ class GalleryView(QWidget):
     def queue_changed(self) -> None:
         """Redraw the line — a stand-in row went on it or came off it."""
         self._update_queue()
-
-    def ask_which_seed(self, workflow, *, can_reroll_image: bool) -> str | None:
-        """Ask which seed to re-roll rather than reproduce a past run."""
-        return offer_reroll(self, workflow, can_reroll_image=can_reroll_image)
 
     def tell(self, title: str, message: str) -> None:
         """Say something that needs acknowledging, in a dialog over this window."""

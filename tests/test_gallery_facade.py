@@ -22,7 +22,8 @@ _PACKAGE = ROOT / "origenerator" / "gallery"
 PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
-    "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "LoraGroup",
+    "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "GENERATION_SEED_KEYS",
+    "LoraGroup",
     "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_path",
@@ -37,7 +38,7 @@ PUBLISHED = {
     "enhancement_recency", "find_source_image_id", "fix_params_for",
     "fold_completed_enhancements", "fold_enhancement", "folder_detail",
     "folder_id", "folder_key_at_level", "folder_level", "generation_of_file",
-    "group_level",
+    "generation_seed", "group_level",
     "is_custom_key", "is_enhance_product_row", "is_enhanceable_row",
     "is_enhanced_row", "is_image_conditioned", "is_in_progress",
     "is_renamable", "item_label", "job_kind_label",

@@ -300,7 +300,7 @@ def test_open_config_takes_over_the_blank_resting_tab(tabs):
     panel = tabs.currentWidget()
     assert panel is resting
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
 def test_open_config_adds_and_prefills_a_tab_beside_a_used_one(tabs):
@@ -311,7 +311,7 @@ def test_open_config_adds_and_prefills_a_tab_beside_a_used_one(tabs):
     assert tabs.count() == 2
     panel = tabs.currentWidget()
     assert panel._workflow_combo.currentData() == "wan22_i2v"
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert panel._param_form.get_values()["positive_prompt"] == "a fox"
 
 
 def test_tab_text_is_the_folder_a_config_would_land_in(tabs):
@@ -351,7 +351,7 @@ def test_load_selection_reuses_the_blank_current_tab(tabs):
     assert tabs.count() == before  # the blank first tab was reused, not forked
     panel = tabs.current_config_panel()
     assert panel._displayed_row is row
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard"
+    assert panel._param_form.get_values()["positive_prompt"] == "a wizard"
 
 
 def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
@@ -522,7 +522,7 @@ def test_open_config_keeps_a_pinned_tab_and_opens_beside_it(tabs):
     opened = tabs.open_config("wan22_i2v", {"positive_prompt": "a heron"})
 
     assert opened is not kept
-    assert kept._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert kept._param_form.get_values()["positive_prompt"] == "a fox"
     assert tabs._preview_panel is opened
 
 
@@ -560,7 +560,7 @@ def test_an_edited_tab_on_another_folder_is_left_alone(tabs):
 
     tabs.load_selection(dog, [cat, dog])
 
-    assert pinned._param_form.get_values_static()["positive_prompt"] == "a re-roll of the cat"
+    assert pinned._param_form.get_values()["positive_prompt"] == "a re-roll of the cat"
 
 
 def test_current_config_panel_is_the_front_tab(tabs):
@@ -739,7 +739,7 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
 
     panel.show_running_generation(running)
 
-    assert panel._param_form.get_values_static()["positive_prompt"] == "cat"
+    assert panel._param_form.get_values()["positive_prompt"] == "cat"
     assert panel.displayed_row() is None
     assert panel._metadata_block.isHidden()
     panel._preview.clear.assert_called()
@@ -774,7 +774,7 @@ def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
 
     tabs.panel_that_launched("g1").show_completed_result(row, [row])
 
-    assert panel._param_form.get_values_static()["positive_prompt"] == "a wizard mid-edit"
+    assert panel._param_form.get_values()["positive_prompt"] == "a wizard mid-edit"
     assert panel._displayed_row is row  # the finished result is on display
 
 
@@ -851,7 +851,7 @@ def test_an_edited_tab_is_not_replaced_by_the_next_click(tabs):
 
     assert tabs.count() == 2                      # the next click opened beside it
     assert tabs.current_config_panel() is not edited
-    assert edited._param_form.get_values_static()["positive_prompt"] == "a cat wearing a hat"
+    assert edited._param_form.get_values()["positive_prompt"] == "a cat wearing a hat"
 
 
 def test_changing_the_workflow_takes_the_italic_off(tabs):
@@ -979,7 +979,7 @@ def test_generate_requested_surfaces_from_the_initial_tab(tabs):
 
     panel._on_generate()
 
-    assert requested == [("sdxl_t2i", panel._param_form.get_values_static())]
+    assert requested == [("sdxl_t2i", panel._param_form.get_values())]
 
 
 def test_generate_requested_surfaces_from_a_forked_tab(tabs):
@@ -1004,9 +1004,9 @@ def test_restore_state_rebuilds_config_tabs(tabs):
     panels = tabs.config_panels()
     assert len(panels) == 2  # every prior tab was replaced
     assert panels[0]._workflow_combo.currentData() == "wan22_i2v"
-    assert panels[0]._param_form.get_values_static()["positive_prompt"] == "a fox"
+    assert panels[0]._param_form.get_values()["positive_prompt"] == "a fox"
     assert panels[1]._workflow_combo.currentData() == "sdxl_t2i"
-    assert panels[1]._param_form.get_values_static()["seed"] == 99
+    assert panels[1]._param_form.get_values()["seed"] == 99
     assert tabs.currentIndex() == 1
 
 
@@ -1114,7 +1114,7 @@ def test_capture_restore_round_trips_config(tabs, qtbot):
 
     panels = fresh.config_panels()
     assert [p._workflow_combo.currentData() for p in panels] == ["sdxl_t2i", "wan22_i2v"]
-    assert panels[1]._param_form.get_values_static()["seed"] == 7
+    assert panels[1]._param_form.get_values()["seed"] == 7
     # A tab is named by what it shows, so its name comes back with its config.
     assert fresh.tabText(fresh.indexOf(panels[1])) == panels[1].title()
     assert fresh.currentIndex() == captured["current"]

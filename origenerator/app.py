@@ -272,6 +272,18 @@ def _backfill_input_images(library: Library):
     return backfill_input_image(library.db)
 
 
+def _backfill_sound_settings(library: Library):
+    from origenerator.importer import backfill_sound_params
+
+    return backfill_sound_params(library.db)
+
+
+def _backfill_imported_video_seeds(library: Library):
+    from origenerator.importer import backfill_imported_video_seeds
+
+    return backfill_imported_video_seeds(library.db)
+
+
 def _fold_enhancements(library: Library):
     """A standalone enhance is an upgrade of an existing image, not its own
     generation: fold every finished one onto its source. After the scan, because
@@ -355,6 +367,12 @@ MAINTENANCE = (
     BootPass("Linking videos to their source images...", _backfill_input_images,
              counted="Backfilled source image for %d video imports",
              failure="Input-image backfill failed: %s"),
+    BootPass(None, _backfill_sound_settings,
+             counted="Backfilled sound settings for %d video imports",
+             failure="Sound-settings backfill failed: %s"),
+    BootPass(None, _backfill_imported_video_seeds,
+             counted="Put back the seed of %d video imports",
+             failure="Video-import seed repair failed: %s"),
     BootPass("Folding enhancements into their images...", _fold_enhancements,
              failure="Enhancement fold failed: %s"),
     BootPass(None, _disown_foreign_runs,

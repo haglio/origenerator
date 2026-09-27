@@ -21,10 +21,9 @@ _SEED_MAX = (1 << 63) - 1
 class ConfigSnapshot:
     """A generate panel's live settings, captured for comparison.
 
-    ``params`` is read without randomizing the seed; ``seed_is_random`` records
-    whether the seed's "Random" tick is checked (in which case the panel can
-    never match a concrete past generation), so a reopened tab comes back the way
-    it was left.
+    ``seed_is_random`` records whether the seed's "Random" tick is checked (in
+    which case the panel can never match a concrete past generation), so a
+    reopened tab comes back the way it was left.
     """
 
     workflow_name: str
@@ -151,17 +150,19 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
     if snapshot.seed_is_random:
         return None
     for row in rows:
-        if row.get("status") != GenerationStatus.COMPLETED:
-            continue
-        if not _recorded_an_output(row):
-            continue
-        if source_of(row) != GenerationSource.GENERATED:
+        if not reproducible(row):
             continue
         if row.get("workflow_name", "") != snapshot.workflow_name:
             continue
         if _params_identical(snapshot.params, merge_denormalized(row)):
             return row
     return None
+
+
+def reproducible(row: dict) -> bool:
+    return (row.get("status") == GenerationStatus.COMPLETED
+            and _recorded_an_output(row)
+            and source_of(row) == GenerationSource.GENERATED)
 
 
 def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
@@ -215,12 +216,13 @@ def filled_params(row: dict, workflow) -> dict:
     """
     defaults = workflow.default_params()
     params = merge_denormalized(row)
+    never_recorded = [key for key in workflow.seed_keys() if key not in params]
     for key, value in defaults.items():
         params.setdefault(key, value)
     for key in workflow.enhance_keys():
         if key in defaults:
             params[key] = defaults[key]
-    return params
+    return randomize_seeds(params, never_recorded)
 
 
 def prepared_params(row: dict, workflow) -> dict:

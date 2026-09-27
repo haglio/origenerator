@@ -71,6 +71,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
+from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamType
@@ -545,7 +546,8 @@ class GenerateConfigPanel(QWidget):
             self._install_form(ParamForm(wf.param_definitions(), size_deriver=deriver,
                                          hidden_keys=wf.enhance_keys(),
                                          pins_reused_seed=wf.pins_reused_seed(),
-                                         heights=self._heights))
+                                         heights=self._heights,
+                                         seed_history=self._seed_history))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {
@@ -554,6 +556,7 @@ class GenerateConfigPanel(QWidget):
             }
             if carried:
                 self._param_form.set_values(carried)
+                self._param_form.put_seeds(carried, is_random=False)
         else:
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
@@ -572,9 +575,10 @@ class GenerateConfigPanel(QWidget):
         if self._param_form is None or prior is None:
             return {}
         defaults = prior.default_params()
+        drawn = self._param_form.random_seed_keys()
         return {
-            k: v for k, v in self._param_form.get_values_static().items()
-            if k not in defaults or v != defaults[k]
+            k: v for k, v in self._param_form.get_values().items()
+            if k not in drawn and (k not in defaults or v != defaults[k])
         }
 
     def _detach_form(self):
@@ -613,6 +617,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self._mark_recipe_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
+        self._param_form.seed_drawn.connect(self._record_drawn_seed)
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
         # deletion), so an open find can let go of its fields before they die.
@@ -664,10 +669,11 @@ class GenerateConfigPanel(QWidget):
         config = self.current_config()
         duplicate = (
             wf is not None and self._can_generate()
-            and would_reproduce_a_completed_run(
-                self._db.list_generations(), wf, config.params,
-                seed_is_random=config.seed_is_random,
-            )
+            and (self.generate_would_remake_what_it_shows()
+                 or would_reproduce_a_completed_run(
+                     self._db.list_generations(), wf, config.params,
+                     seed_is_random=config.seed_is_random,
+                 ))
         )
         self._generate_btn.set_caption(
             _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
@@ -677,8 +683,8 @@ class GenerateConfigPanel(QWidget):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
 
         A Generate is conceptually a gallery re-roll: it emits the form's workflow
-        and values (a Random seed already re-rolled by :meth:`ParamForm.get_values`)
-        as :attr:`generate_requested`, and the gallery launches the job in that
+        and values, the seeds as the fields show them, as :attr:`generate_requested`,
+        and the gallery launches the job in that
         folder and navigates there. Pressing it again while a run of this tab's is
         still in flight asks for another one — ComfyUI works through a queue — so
         the panel keeps only the form-level guard that an image workflow has its
@@ -709,6 +715,7 @@ class GenerateConfigPanel(QWidget):
             self.changes_requested.emit(self._folder_request.folder_key, key, params)
             return
         self.generate_requested.emit(key, params)
+        self._param_form.roll_random_seeds()
 
     def set_recipe_source(self, category: str, video_prompt_id: str | None) -> None:
         """Remember that these settings came out of Combine — the act off its
@@ -730,7 +737,7 @@ class GenerateConfigPanel(QWidget):
         workflow = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData())
         return (self._recipe_row is not None and workflow is not None
                 and self._param_form is not None
-                and prompts_differ_from(self._param_form.get_values_static(),
+                and prompts_differ_from(self._param_form.get_values(),
                                         self._recipe_row, workflow))
 
     def _forget_recipe_source(self) -> None:
@@ -807,6 +814,20 @@ class GenerateConfigPanel(QWidget):
             with self._loading():  # the gallery ticked this, not the user
                 self._param_form.set_seed_random(True)
 
+    def _set_displayed_row(self, row: dict | None) -> None:
+        self._displayed_row = row
+        if self._param_form is not None:
+            self._param_form.show_item(merge_denormalized(row) if row is not None else {},
+                                       (row or {}).get("thumbnail_path"))
+
+    def _seed_history(self, key: str) -> list[SeedUse]:
+        return seed_history(self._db.seed_history_rows(), key, self._db.list_seed_uses())
+
+    def _record_drawn_seed(self, key: str, seed: int) -> None:
+        width, height = self._param_form.output_size() or (None, None)
+        self._db.record_seed_use(kind=SeedUseKind.DRAWN, seed_key=key, seed=seed,
+                                 width=width, height=height)
+
     def _image_rows(self):
         return [r for r in self._db.list_generations()
                 if media_type_of_row(r) == MediaType.IMAGE]
@@ -824,7 +845,7 @@ class GenerateConfigPanel(QWidget):
         wf = WORKFLOW_REGISTRY.get(key)
         if wf is None or self._param_form is None:
             return None
-        params = self._param_form.get_values_static()
+        params = self._param_form.get_values()
         if image_index is None:
             image_index = build_image_config_index(self._image_rows())
         return key, settings_signature(key, json.dumps(params), image_index)
@@ -916,7 +937,7 @@ class GenerateConfigPanel(QWidget):
             self._display_result(row, self._image_rows())
             return
         self._preview.clear()  # nothing generated with these settings yet
-        self._displayed_row = None
+        self._set_displayed_row(None)
         self._hide_footer()
         self._arm_preview_actions()
         self._note_displayed_config()
@@ -931,12 +952,11 @@ class GenerateConfigPanel(QWidget):
         return matching[0] if matching else None
 
     def current_config(self) -> ConfigSnapshot:
-        """Snapshot the live settings for comparison (without randomizing the seed)."""
         if self._param_form is None:
             return ConfigSnapshot(self._workflow_combo.currentData(), {}, False)
         return ConfigSnapshot(
             self._workflow_combo.currentData(),
-            self._param_form.get_values_static(),
+            self._param_form.get_values(),
             self._param_form.seed_is_random(),
         )
 
@@ -1027,6 +1047,7 @@ class GenerateConfigPanel(QWidget):
             self.prefill(snapshot.workflow_name, snapshot.params)
             if self._param_form:
                 self._param_form.set_seed_random(snapshot.seed_is_random)
+                self._param_form.put_seeds(snapshot.params, is_random=snapshot.seed_is_random)
 
     # --- rewriting a whole folder's prompt ------------------------------------
 
@@ -1053,7 +1074,7 @@ class GenerateConfigPanel(QWidget):
             opened_on=self.current_config(),
         )
         self._hide_footer()
-        self._displayed_row = None     # a folder, not a generation on display
+        self._set_displayed_row(None)  # a folder, not a generation on display
         self._displayed_config = None  # ...so no settings for a notice to deviate from
         self._preview.show_folder(pictures)
         self._reflow_for_the_media()
@@ -1108,7 +1129,7 @@ class GenerateConfigPanel(QWidget):
         self._point_elsewhere(row)
         self._hide_footer()
         self._preview.clear()          # whatever was up is not this run's
-        self._displayed_row = None     # a running generation isn't a saved one
+        self._set_displayed_row(None)  # a running generation isn't a saved one
         self._displayed_config = None  # ...so no settings for a notice to deviate from
         self._emit_title()
 
@@ -1154,9 +1175,6 @@ class GenerateConfigPanel(QWidget):
         """
         if self._folder_request is not None:
             return
-        if self._param_form is not None:
-            with self._loading():
-                self._param_form.fill_random_seeds(merge_denormalized(row))
         self._display_result(row, image_rows)
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
@@ -1294,7 +1312,7 @@ class GenerateConfigPanel(QWidget):
         untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
         arriving = (self._displayed_row is None
                     or self._displayed_row.get("prompt_id") != row.get("prompt_id"))
-        self._displayed_row = row
+        self._set_displayed_row(row)
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is not None:
             self._preview.show_media(*preview, row["prompt_id"])  # after any prefill, so it wins over autoshow
@@ -1366,9 +1384,17 @@ class GenerateConfigPanel(QWidget):
         on display leaves the mark alone (see :meth:`_display_result`).
         """
         self._displayed_config = (
-            self.current_config() if self._displayed_row is not None else None
+            self._item_config() if self._displayed_row is not None else None
         )
         self.refresh_modified_notice()
+
+    def _item_config(self) -> ConfigSnapshot:
+        current = self.current_config()
+        if self._param_form is None:
+            return current
+        return ConfigSnapshot(current.workflow_name,
+                              {**current.params, **self._param_form.item_seeds()},
+                              seed_is_random=False)
 
     def refresh_modified_notice(self):
         """Mark the preview when the form no longer describes the picture on it.
@@ -1385,8 +1411,12 @@ class GenerateConfigPanel(QWidget):
         notice — so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
-                    and not configs_match(self._displayed_config, self.current_config()))
+                    and not self.generate_would_remake_what_it_shows())
         self._preview.set_notice(_MODIFIED_NOTICE if modified else None)
+
+    def generate_would_remake_what_it_shows(self) -> bool:
+        return (self._displayed_config is not None
+                and configs_match(self._displayed_config, self.current_config()))
 
     def _hide_footer(self):
         """Hide every info/action element that belongs only to a saved generation —
@@ -1721,7 +1751,7 @@ class GenerateConfigPanel(QWidget):
         """
         prompt_id = self._displayed_row["prompt_id"]
         write(self._db, prompt_id)
-        self._displayed_row = self._db.get_generation(prompt_id) or self._displayed_row
+        self._set_displayed_row(self._db.get_generation(prompt_id) or self._displayed_row)
         path = self._displayed_video_path()
         self._update_export_button(lane, None if path is None else (path, MediaType.VIDEO))
 

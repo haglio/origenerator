@@ -28,6 +28,7 @@ from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
+from origenerator.seed_history import SeedHistory
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -102,11 +103,13 @@ class ParamForm(QWidget):
     ``pins_reused_seed`` is the workflow's answer to
     :meth:`~origenerator.workflows.base.WorkflowTemplate.pins_reused_seed`:
     whether a seed written in by :meth:`set_values` also clears its Random tick.
-    False (video) writes the value but leaves the tick ticked, so the settings of
-    a clip loaded into a tab don't quietly pin every later run to its seed.
+    False (video) leaves the tick ticked and a fresh seed in the field, so the
+    settings of a clip loaded into a tab don't quietly pin every later run to its
+    seed.
     """
 
     changed = pyqtSignal()          # any field's value changed
+    seed_drawn = pyqtSignal(str, object)
 
     def __init__(
         self,
@@ -117,15 +120,15 @@ class ParamForm(QWidget):
         hidden_keys: tuple[str, ...] = (),
         pins_reused_seed: bool = True,
         heights=None,
+        seed_history: SeedHistory | None = None,
     ):
         super().__init__(parent)
         # Where a dragged prompt height is filed: the window's own set, handed
         # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
-        # Whether a written-in seed is pinned as well as shown (see the class
-        # docstring). Defaults to pinning: that is what reusing a still's
-        # settings means, and it is the answer a form built without a workflow
-        # under it (a test's bare field list) should get.
+        self._seed_history = seed_history
+        self._item_seeds: dict[str, int] = {}
+        self._item_thumbnail: str | None = None
         self._pins_reused_seed = pins_reused_seed
         # Params carried but never shown, pinned at the definitions' own defaults
         # — a loaded config never moves them (see the class docstring).
@@ -183,13 +186,17 @@ class ParamForm(QWidget):
             self._scenes.changed.connect(self.changed)
         self._build(self._param_defs)
         self._wire_rows_shown_while()
+        for pd in self._seed_defs():
+            self._draw(pd)
+        self.changed.connect(self._describe_seed_fields)
+        self._describe_seed_fields()
 
     def _wire_rows_shown_while(self):
         self.changed.connect(self._refresh_rows_shown_while)
         self._refresh_rows_shown_while()
 
     def _refresh_rows_shown_while(self):
-        values = {pd.key: self._read_field(pd, randomize_seed=False) for pd in self._param_defs}
+        values = {pd.key: self._read_field(pd) for pd in self._param_defs}
         for row, shows in _SHOWN_WHILE.items():
             if row not in self._widgets:
                 continue
@@ -230,7 +237,7 @@ class ParamForm(QWidget):
                 if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
-            field_kind(pd, self._heights).change_signal(widget).connect(self.changed)
+            self._kind(pd).change_signal(widget).connect(self.changed)
             if isinstance(widget, PresetComboBox):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
@@ -311,16 +318,18 @@ class ParamForm(QWidget):
 
     def _make_extras(self, pd: ParamDef) -> list[QWidget]:
         # Copy leads so it reads [field] [copy] [Random]/[Browse].
-        kind = field_kind(pd, self._heights)
+        kind = self._kind(pd)
         extras: list[QWidget] = []
         if kind.copyable:
-            copy = CopyButton(lambda key=pd.key: self._field_text(key))
+            copy = CopyButton(lambda pd=pd: str(self._read_field(pd)))
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
         if kind.randomizable:
             cb = TickControl("Random")
             cb.setChecked(True)
             cb.toggled.connect(self.changed)
+            cb.clicked.connect(lambda checked, pd=pd: self._on_random_clicked(pd, checked))
+            self._widgets[pd.key].activated.connect(lambda _row, cb=cb: cb.setChecked(False))
             self._randomize_checks[pd.key] = cb
             extras.append(cb)
         if kind.browse_filter:
@@ -333,17 +342,6 @@ class ParamForm(QWidget):
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
         return extras
-
-    def _field_text(self, key: str) -> str:
-        """The field's current on-screen text, for its copy button — a live read
-        at click time, so a just-typed prompt or seed is what lands on the
-        clipboard."""
-        w = self._widgets[key]
-        if w is self._scenes:
-            return w.story(key)
-        if isinstance(w, QPlainTextEdit):
-            return diff_text.live_text(w)
-        return w.text()
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:
         """Mark a prompt field with the change a spoken request made to it —
@@ -599,7 +597,7 @@ class ParamForm(QWidget):
         A no-op while unlocked, so it never clobbers a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():
             return
-        size = self._size_deriver(self.get_values_static())
+        size = self._size_deriver(self.get_values())
         for key, value in zip(("width", "height"), size or (0, 0)):
             spinner = self._widgets[key]
             blocked = spinner.blockSignals(True)  # a display refresh isn't a user edit
@@ -643,7 +641,7 @@ class ParamForm(QWidget):
             self,
             f"Select {pd.label}",
             self._initial_browse_path(self._widgets[key].text().strip(), pd.browse_dir),
-            field_kind(pd, self._heights).browse_filter,
+            self._kind(pd).browse_filter,
         )
         if path:
             self._widgets[key].setText(path)
@@ -667,44 +665,86 @@ class ParamForm(QWidget):
             return str(home)
         return str(COMFYUI_INPUT_DIR)
 
+    def _kind(self, pd: ParamDef):
+        return field_kind(pd, self._heights, self._seed_history)
+
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:
             return self._scenes
-        return field_kind(pd, self._heights).make(pd)
+        return self._kind(pd).make(pd)
 
     def get_values(self) -> dict:
-        """Read current values; a seed with its Random tick checked is randomized."""
-        return self._collect(randomize_seed=True)
-
-    def get_values_static(self) -> dict:
-        """Read current values without randomizing; a seed is read from its field.
-
-        Used to snapshot a panel's settings for comparison, where a fresh random
-        seed each call would make equality checks meaningless.
-        """
-        return self._collect(randomize_seed=False)
+        return self._collect()
 
     def seed_is_random(self) -> bool:
         """True if any seed param's Random tick is checked."""
         return any(cb.isChecked() for cb in self._randomize_checks.values())
 
     def set_seed_random(self, is_random: bool):
-        """Set every seed's Random tick, e.g. when restoring a saved tab.
+        for pd in self._seed_defs():
+            tick = self._randomize_checks[pd.key]
+            if tick.isChecked() != is_random:
+                tick.setChecked(is_random)
+                self._follow_random(pd, is_random)
 
-        ``set_values`` unchecks Random on a form that pins reused seeds; this
-        lets a caller put the tick back the way the user had it.
-        """
-        for cb in self._randomize_checks.values():
-            cb.setChecked(is_random)
+    def put_seeds(self, params: dict, *, is_random: bool) -> None:
+        for pd in self._seed_defs():
+            if pd.key in params:
+                self._randomize_checks[pd.key].setChecked(is_random)
+                self._kind(pd).write(pd, self._widgets[pd.key], params[pd.key])
 
-    def fill_random_seeds(self, params: dict):
-        for key, cb in self._randomize_checks.items():
-            if cb.isChecked() and key in params:
-                self._widgets[key].setText(str(int(params[key])))
+    def item_seeds(self) -> dict[str, int]:
+        return dict(self._item_seeds)
 
-    def _read_field(self, pd: ParamDef, randomize_seed: bool):
-        """One field's current value. A seed with its Random tick checked is
-        re-rolled when ``randomize_seed``; otherwise it's read from the field."""
+    def output_size(self) -> tuple[int, int] | None:
+        if self._size_deriver is not None:
+            width, height = self._widgets["width"].value(), self._widgets["height"].value()
+        else:
+            values = self.get_values()
+            width, height = values.get("width"), values.get("height")
+        return (int(width), int(height)) if width and height else None
+
+    def random_seed_keys(self) -> set[str]:
+        return {key for key, tick in self._randomize_checks.items() if tick.isChecked()}
+
+    def _seed_defs(self) -> list[ParamDef]:
+        return [pd for pd in self._param_defs if pd.key in self._randomize_checks]
+
+    def show_item(self, params: dict, thumbnail: str | None = None) -> None:
+        self._item_seeds = {pd.key: int(params[pd.key]) for pd in self._seed_defs()
+                            if params.get(pd.key) not in (None, "")}
+        self._item_thumbnail = thumbnail
+        self._describe_seed_fields()
+
+    def _describe_seed_fields(self) -> None:
+        size = self.output_size()
+        for pd in self._seed_defs():
+            self._widgets[pd.key].describe(self._item_seeds.get(pd.key), self._item_thumbnail,
+                                           size)
+
+    def roll_random_seeds(self) -> None:
+        for pd in self._seed_defs():
+            if self._randomize_checks[pd.key].isChecked():
+                self.seed_drawn.emit(pd.key, self._draw(pd))
+
+    def _on_random_clicked(self, pd: ParamDef, checked: bool) -> None:
+        drawn = self._follow_random(pd, checked)
+        if drawn is not None:
+            self.seed_drawn.emit(pd.key, drawn)
+
+    def _follow_random(self, pd: ParamDef, is_random: bool) -> int | None:
+        if is_random:
+            return self._draw(pd)
+        if pd.key in self._item_seeds:
+            self._kind(pd).write(pd, self._widgets[pd.key], self._item_seeds[pd.key])
+        return None
+
+    def _draw(self, pd: ParamDef) -> int:
+        seed = random.randint(0, _SEED_MAX)
+        self._kind(pd).write(pd, self._widgets[pd.key], seed)
+        return seed
+
+    def _read_field(self, pd: ParamDef):
         w = self._widgets[pd.key]
         if w is self._scenes:
             if pd.key == "scene_frames":
@@ -714,16 +754,9 @@ class ParamForm(QWidget):
             if pd.key == "frame_count":
                 return w.total_frames()
             return w.story(pd.key)
-        tick = self._randomize_checks.get(pd.key)
-        if randomize_seed and tick is not None and tick.isChecked():
-            return random.randint(0, _SEED_MAX)
-        return field_kind(pd, self._heights).read(pd, w)
+        return self._kind(pd).read(pd, w)
 
     def _write_field(self, pd: ParamDef, value) -> None:
-        """Apply one value to its widget. A seed's value always fills its field;
-        whether that also pins it (clearing its Random tick) is
-        ``pins_reused_seed`` — reusing a still's settings reproduces its exact
-        seed, reusing a clip's shows the seed and goes on drawing fresh ones."""
         w = self._widgets[pd.key]
         if w is self._scenes:
             if pd.key == "scene_frames":
@@ -733,16 +766,16 @@ class ParamForm(QWidget):
             elif pd.key != "frame_count":
                 w.set_story(pd.key, value)
             return
-        field_kind(pd, self._heights).write(pd, w, value)
+        self._kind(pd).write(pd, w, value)
         tick = self._randomize_checks.get(pd.key)
         if tick is not None and self._pins_reused_seed:
             tick.setChecked(False)
 
     def _settle(self, pd: ParamDef) -> None:
         """Show a field the value it will emit, once an edit of it has ended."""
-        self._write_field(pd, self._read_field(pd, randomize_seed=False))
+        self._write_field(pd, self._read_field(pd))
 
-    def _collect(self, randomize_seed: bool) -> dict:
+    def _collect(self) -> dict:
         # Start from the params this form carries without showing — the extras it
         # has no field for, then the deliberately hidden ones (both disjoint from
         # the widget keys) — then lay the live field values on top, then any
@@ -751,7 +784,7 @@ class ParamForm(QWidget):
         result = dict(self._passthrough)
         result.update(self._hidden)
         for pd in self._param_defs:
-            result[pd.key] = self._read_field(pd, randomize_seed)
+            result[pd.key] = self._read_field(pd)
         result.update(self._override_dimensions())
         return result
 
@@ -773,6 +806,9 @@ class ParamForm(QWidget):
         for pd in sorted(self._param_defs, key=lambda d: d.key != "positive_prompt"):
             if pd.key in params:
                 self._write_field(pd, params[pd.key])
+        for pd in self._seed_defs():
+            if pd.key in params and self._randomize_checks[pd.key].isChecked():
+                self._draw(pd)
         # The derived width/height aren't declared params, so apply them here:
         # a saved override unlocks and shows, its absence re-locks onto the size
         # the just-applied input image derives.

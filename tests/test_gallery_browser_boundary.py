@@ -162,8 +162,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     rows, a folder's share of a list, the open shelf's rows, a folder's own cards
     in flight, its starred pictures, the counts every folder's shelves wear and
     the square each of them shows among the folder's own are seven methods, and
-    the lister of Latest's rows they replace went.)"""
+    the lister of Latest's rows they replace went. 267 -> 266: a combination
+    draws fresh seeds, so it never repeats a run and the question the gallery
+    put before one went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 267
+               for x in _class_def(VIEW, "GalleryView").body) == 266
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 83

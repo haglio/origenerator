@@ -2,94 +2,58 @@
 from __future__ import annotations
 
 import struct
+from unittest.mock import MagicMock
 
-from PyQt6.QtCore import QPoint, QSize
-from PyQt6.QtGui import QImage
+from PyQt6.QtCore import QPoint
+from PyQt6.QtGui import QColor, QImage
+from PyQt6.QtMultimedia import QVideoFrame
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.fun_time_mode import parse_app_args
 from origenerator.gui.headset_window import (
     CAP_PX,
     HeadsetWindow,
-    pictures_the_grab_missed,
     within_the_cap,
 )
+from origenerator.gui.preview_widget import PreviewWidget
 from tests.hosted_launch import hosted_launch
 
 
-class _Frame:
-    def __init__(self, *, valid: bool = True) -> None:
-        self._valid = valid
-
-    def isValid(self) -> bool:  # noqa: N802 -- Qt's own spelling
-        return self._valid
-
-    def toImage(self) -> QImage:  # noqa: N802 -- Qt's own spelling
-        return QImage(2, 2, QImage.Format.Format_RGBA8888)
+def _hosted(tmp_path):
+    return parse_app_args(hosted_launch(headset=True, **{
+        "--frames-file": str(tmp_path / "frame.bin"),
+        "--input-file": str(tmp_path / "input.txt"),
+        "--width": "200",
+        "--height": "100",
+    })).fun_time
 
 
-class _Sink:
-    def __init__(self, frame: _Frame | None) -> None:
-        self._frame = frame
-
-    def videoFrame(self) -> _Frame | None:  # noqa: N802 -- Qt's own spelling
-        return self._frame
-
-
-class _Video:
-    """A video surface, shaped the way the publisher asks one about itself.
-
-    A fake rather than a real ``QVideoWidget``: what is being tested is which
-    surfaces are asked for their last frame and where it is placed, and a real
-    one would need a window, a media player and a decode to answer.
-    """
-
-    def __init__(self, *, sink: _Sink | None, visible: bool = True,
-                 at: QPoint | None = None, size: QSize | None = None) -> None:
-        self._sink = sink
-        self._visible = visible
-        self._at = at if at is not None else QPoint(10, 20)
-        self._size = size if size is not None else QSize(40, 30)
-
-    def isVisible(self) -> bool:  # noqa: N802 -- Qt's own spelling
-        return self._visible
-
-    def videoSink(self) -> _Sink | None:  # noqa: N802 -- Qt's own spelling
-        return self._sink
-
-    def mapTo(self, _window, _origin) -> QPoint:  # noqa: N802 -- Qt's own spelling
-        return self._at
-
-    def size(self) -> QSize:
-        return self._size
+def _published_color(tmp_path, at: QPoint) -> QColor:
+    published = (tmp_path / "frame.bin").read_bytes()
+    _sequence, _token, width, _height = struct.unpack("<QIII", published[:20])
+    pixel = 20 + (at.y() * width + at.x()) * 4
+    red, green, blue = published[pixel:pixel + 3]
+    return QColor(red, green, blue)
 
 
-class TestThePictureAGrabCannotReach:
-    """A video plays on the media player's own surface, so the paint pass a grab
-    leaves it blank.  The last frame that surface handed its sink
-    is the only picture of it there is, which is how one is dragged too."""
+def test_the_frame_a_preview_is_playing_is_in_the_picture_the_room_gets(tmp_path, qtbot):
+    preview = PreviewWidget(player=MagicMock())
+    qtbot.addWidget(preview)
+    preview.resize(200, 100)
+    preview.show()
+    preview.show_video(tmp_path / "clip.mp4")
+    red = QImage(64, 36, QImage.Format.Format_RGB32)
+    red.fill(QColor("red"))
+    preview._video.video_sink().setVideoFrame(QVideoFrame(red))
 
-    def test_a_playing_surface_is_placed_where_it_sits_in_the_window(self):
-        playing = _Video(sink=_Sink(_Frame()), at=QPoint(7, 9), size=QSize(50, 40))
+    headset = HeadsetWindow(preview, _hosted(tmp_path))
+    try:
+        headset.publish(now=1.0)
+    finally:
+        headset.close()
 
-        (patch,) = pictures_the_grab_missed(None, [playing])
-
-        assert (patch.at, patch.width, patch.height) == (QPoint(7, 9), 50, 40)
-
-    def test_a_surface_nobody_can_see_is_left_out(self):
-        hidden = _Video(sink=_Sink(_Frame()), visible=False)
-
-        assert pictures_the_grab_missed(None, [hidden]) == []
-
-    def test_a_surface_with_no_frame_yet_is_left_out(self):
-        """A pane whose video has decoded nothing has no picture to hand over,
-        and blank is a truer answer than the frame before it."""
-        assert pictures_the_grab_missed(None, [_Video(sink=_Sink(None))]) == []
-        assert pictures_the_grab_missed(
-            None, [_Video(sink=_Sink(_Frame(valid=False)))]) == []
-
-    def test_a_pane_with_no_sink_at_all_is_left_out(self):
-        assert pictures_the_grab_missed(None, [_Video(sink=None)]) == []
+    middle = preview._video.mapTo(preview, preview._video.rect().center())
+    assert _published_color(tmp_path, middle) == QColor("red")
 
 
 class TestHowBigAPublishedPictureMayBe:
@@ -115,14 +79,6 @@ class TestTheRoomsPressesReachTheWindow:
     """The room's pointer lands on a pixel of the published picture, and this
     window has to feel it where a mouse on that pixel would have landed."""
 
-    def _hosted(self, tmp_path):
-        return parse_app_args(hosted_launch(headset=True, **{
-            "--frames-file": str(tmp_path / "frame.bin"),
-            "--input-file": str(tmp_path / "input.txt"),
-            "--width": "200",
-            "--height": "100",
-        })).fun_time
-
     def _window(self, qtbot) -> QWidget:
         window = QWidget()
         qtbot.addWidget(window)
@@ -138,7 +94,7 @@ class TestTheRoomsPressesReachTheWindow:
         window.findChild(QLabel, "target").mousePressEvent = (
             lambda event: pressed.append(
                 f"{event.position().x():.0f},{event.position().y():.0f}"))
-        headset = HeadsetWindow(window, self._hosted(tmp_path))
+        headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset._heard("press 25 35")
         finally:
@@ -150,7 +106,7 @@ class TestTheRoomsPressesReachTheWindow:
         """The room writes the pixel with the word; a line short of one is a
         line to say something about, not to aim at the last place it knew."""
         window = self._window(qtbot)
-        headset = HeadsetWindow(window, self._hosted(tmp_path))
+        headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset._heard("press")
             headset._heard("press 4")
@@ -170,7 +126,7 @@ class TestTheRoomsPressesReachTheWindow:
 
         window = self._window(qtbot)
         window.show()
-        headset = HeadsetWindow(window, self._hosted(tmp_path))
+        headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset.publish(now=1.0)
             first = published()

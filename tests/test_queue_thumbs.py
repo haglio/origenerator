@@ -203,6 +203,25 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
     assert again is not None  # answered from the cache, not re-fitted to nothing
 
 
+def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
+        qapp, tmp_path, monkeypatch):
+    # The seed dropdown draws a cell for every seed it is scrolled past, which
+    # over a session can be the whole library.
+    monkeypatch.setattr(queue_thumbs, "_MOST_CELLS", 2)
+    queue_thumbs._CELLS.clear()
+    a, b, c = (_picture(tmp_path / f"{name}.png", (255, 0, 0)) for name in "abc")
+    for path in (a, b, a, c):
+        fitted_cell(path, CELL)
+
+    reads = []
+    monkeypatch.setattr(queue_thumbs, "_fit_in_square",
+                        lambda *args: reads.append(args[0]) or None)
+    for path in (a, c, b):
+        fitted_cell(path, CELL)
+
+    assert len(reads) == 1  # only b, drawn longest ago, had to be read again
+
+
 def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
     # A start frame enhanced in place, or a thumbnail written again, is the
     # same path with new pixels; the cache keyed by path alone kept drawing

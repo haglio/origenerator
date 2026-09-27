@@ -53,6 +53,15 @@ for one thing cost four. So:
 - **Settings**, **config** and **recipe** are three things and keep three
   words: the settings are what the form holds, a `ConfigSnapshot` is one
   reading of them, and a recipe is the workflow a generation ran on.
+- **The code's word is the one the app shows.** What the gallery shows as a
+  video is a video in the code, an image is an image, and either one is an
+  item. "Clip", said consistently all through the source, is a word the
+  screen never shows: an agent who learned it here asked him about "a clip
+  opened in a tab", and he had to ask what a clip was (2026-09-26). The
+  audit's vocabulary pass above made each thing one word and never held the
+  words against the screen, which is how "clip" passed it. Names that belong
+  to something else keep theirs: CLIP the text model and its ComfyUI nodes,
+  the clipboard, and Genau's clips, which is what Genau calls them.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 

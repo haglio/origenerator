@@ -21,6 +21,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
@@ -29,6 +30,8 @@ from origenerator.completion import extract_completion
 from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_OUTPUT_DIR, SPEECH_PYTHON, THUMB_DIR
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.progress import ProgressTracker, stage_names
+from origenerator.seed_history import SeedUseKind, output_size
+from origenerator.thumbnail import frame_thumbnail
 
 
 class JobState(StrEnum):
@@ -83,6 +86,20 @@ def insert_generation_row(db, job):
         source=job.source,
         provenance=json.dumps(provenance.at_launch(job.workflow)),
     )
+
+
+def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
+    if job.source != GenerationSource.GENERATED:
+        return
+    frame = job.last_preview
+    thumbnail = (frame_thumbnail(frame, job.thumb_dir, name=f"{job.prompt_id}_{kind}")
+                 if frame else None)
+    width, height = output_size(job.workflow.name, job.params) or (None, None)
+    for key in job.workflow.seed_keys():
+        if job.params.get(key) is not None:
+            db.record_seed_use(kind=kind, seed_key=key, seed=int(job.params[key]),
+                               width=width, height=height,
+                               thumbnail_path=str(thumbnail) if thumbnail else None)
 
 
 def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
@@ -215,6 +232,10 @@ class GenerationJob(QObject):
     @property
     def last_preview(self) -> bytes | None:
         return self._last_preview
+
+    @property
+    def thumb_dir(self) -> Path:
+        return self._thumb_dir
 
     @property
     def started_at(self) -> float | None:

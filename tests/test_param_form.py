@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QFormLayout, QLabel, QPushButton, QWidget
-from shared_ui.colors import TEXT_MUTED, TEXT_PRIMARY
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, Qt
+from PyQt6.QtGui import QColor, QImage, QPainter
+from PyQt6.QtWidgets import (
+    QAbstractSlider,
+    QApplication,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QStyle,
+    QStyleOptionViewItem,
+    QWidget,
+)
+from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
-from origenerator.gui import param_sections
+from origenerator.gui import param_sections, seed_combo
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
@@ -17,6 +27,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.seed_history import SeedUse
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
@@ -87,7 +98,7 @@ def test_bool_param_renders_a_tick_control_and_round_trips(qtbot):
     changes = []
     form.changed.connect(lambda: changes.append(1))
     form.set_values({"enhance": False})
-    assert form.get_values_static()["enhance"] is False
+    assert form.get_values()["enhance"] is False
     assert changes  # unticking announced itself like any edit
 
     form.set_values({"enhance": True})
@@ -175,42 +186,31 @@ def test_a_written_seed_pins_itself_by_default(qtbot):
     assert form.get_values()["seed"] == 12345
 
 
-def test_a_form_that_does_not_pin_shows_a_written_seed_and_keeps_drawing(qtbot):
-    # The clip's deal: the seed that made it fills the field (there to read, to
-    # copy, and to lock with one click) but Random stays ticked, so the next
-    # press draws a fresh one instead of re-running that clip's motion.
+def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loaded_one(
+        qtbot):
+    # The clip's deal: Random stays ticked, so the next press is another take of
+    # the motion rather than this clip's again, and the field shows that take's seed.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
     qtbot.addWidget(form)
 
     form.set_values({"seed": 12345})
 
-    assert form._widgets["seed"].text() == "12345"
+    shown = form.get_values()["seed"]
     assert form.seed_is_random() is True
-    assert form.get_values_static()["seed"] == 12345   # a snapshot reads the field
-    assert form.get_values()["seed"] != 12345          # a launch draws its own
+    assert shown != 12345
+    assert form.get_values()["seed"] == shown
 
 
-def test_a_form_that_does_not_pin_still_locks_when_random_is_unticked(qtbot):
+def test_a_form_that_does_not_pin_locks_the_items_own_seed_when_random_is_unticked(qtbot):
     # "Of course there will be cases when you want the seed locked" — one click.
     form = ParamForm([ParamDef("seed", "Seed", "seed", 0)], pins_reused_seed=False)
     qtbot.addWidget(form)
     form.set_values({"seed": 12345})
+    form.show_item({"seed": 12345})
 
-    form.set_seed_random(False)
+    _clicked_random(form)
 
     assert form.get_values()["seed"] == 12345
-
-
-def test_filling_random_seeds_leaves_a_seed_the_params_do_not_carry(qtbot):
-    form = ParamForm([ParamDef("noise_seed", "Noise seed", "seed", 0),
-                      ParamDef("seed", "Seed", "seed", 0)])
-    qtbot.addWidget(form)
-    form._widgets["noise_seed"].setText("31")
-
-    form.fill_random_seeds({"seed": 12345})
-
-    values = form.get_values_static()
-    assert (values["noise_seed"], values["seed"]) == (31, 12345)
 
 
 def test_a_setting_with_no_field_is_kept_for_the_rerun_but_never_shown(qtbot):
@@ -220,7 +220,7 @@ def test_a_setting_with_no_field_is_kept_for_the_rerun_but_never_shown(qtbot):
 
     labels = {lbl.text() for lbl in form.findChildren(QLabel)}
     assert "vae" not in labels and "example.vae.safetensors" not in labels
-    assert form.get_values_static()["vae"] == "example.vae.safetensors"
+    assert form.get_values()["vae"] == "example.vae.safetensors"
 
 
 def _field_cell_of(form, key):
@@ -246,6 +246,453 @@ def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
     copy_i = cell.indexOf(form._copy_buttons["seed"])
     random_i = cell.indexOf(form._randomize_checks["seed"])
     assert 0 <= copy_i < random_i
+
+
+# --- the seed dropdown: every seed used, newest first ----------------------
+
+def _seed_form(qtbot, history, **kwargs):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)],
+                     seed_history=lambda key: history, **kwargs)
+    qtbot.addWidget(form)
+    return form, form._widgets["seed"]
+
+
+def test_a_seed_drops_down_the_seeds_used_most_recent_first(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)])
+
+    field.showPopup()
+
+    assert [field.itemText(row) for row in range(field.count())] == ["30", "20"]
+    field.hidePopup()
+
+
+def test_a_seed_used_several_times_in_a_row_is_listed_once_for_the_stretch(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None),
+                                     SeedUse(5, None)])
+
+    field.showPopup()
+
+    assert [field.itemText(row) for row in range(field.count())] == ["5", "6", "5"]
+    field.hidePopup()
+
+
+def _square(tmp_path, color):
+    path = tmp_path / f"made-{color}.png"
+    picture = QImage(40, 40, QImage.Format.Format_RGB32)
+    picture.fill(QColor(color))
+    picture.save(str(path))
+    return str(path)
+
+
+def _red_square(tmp_path):
+    return _square(tmp_path, "red")
+
+
+def _painted_row(field, row, *, under_the_mouse=False):
+    view, index = field.view(), field.model().index(row, 0)
+    size = view.visualRect(index).size()
+    canvas = QImage(size, QImage.Format.Format_ARGB32)
+    canvas.fill(QColor("black"))
+    option = QStyleOptionViewItem()
+    option.initFrom(view)
+    option.rect = QRect(QPoint(0, 0), size)
+    option.widget = view
+    option.displayAlignment = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+    option.decorationAlignment = Qt.AlignmentFlag.AlignCenter
+    if under_the_mouse:
+        option.state |= QStyle.StateFlag.State_Selected
+    painter = QPainter(canvas)
+    field.itemDelegate().paint(painter, option, index)
+    painter.end()
+    return canvas
+
+
+def test_each_seed_in_the_dropdown_wears_a_picture_of_what_it_made(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    field.showPopup()
+
+    row = _painted_row(field, 0)
+
+    assert row.height() > 2 * field.fontMetrics().height()
+    assert row.pixelColor(row.height() // 2, row.height() // 2) == QColor("red")
+    field.hidePopup()
+
+
+def test_a_stretch_is_one_row_wearing_each_of_its_pictures_newest_on_top(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(5, _square(tmp_path, "red")),
+                                     SeedUse(5, _square(tmp_path, "blue")),
+                                     SeedUse(6, None)])
+    field.showPopup()
+
+    stretch, single = _painted_row(field, 0), _painted_row(field, 1)
+
+    pitch = single.height()
+    assert stretch.height() == 2 * pitch
+    assert stretch.pixelColor(pitch // 2, pitch // 2) == QColor("red")
+    assert stretch.pixelColor(pitch // 2, pitch + pitch // 2) == QColor("blue")
+    field.hidePopup()
+
+
+def _lettering_in(row: QImage, *, right_of: int) -> list[QPoint]:
+    return [QPoint(x, y) for y in range(row.height()) for x in range(right_of, row.width())
+            if row.pixelColor(x, y).lightness() > 180]
+
+
+def test_a_stretch_is_braced_between_its_pictures_and_its_seed(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(6, None)])
+    field.showPopup()
+
+    stretch = _painted_row(field, 0, under_the_mouse=True)
+    single = _painted_row(field, 1, under_the_mouse=True)
+
+    pitch = single.height()
+    seed_starts_at = min(point.x() for point in _lettering_in(single, right_of=pitch))
+    assert any(point.x() < seed_starts_at for point in _lettering_in(stretch, right_of=pitch))
+    field.hidePopup()
+
+
+def test_a_stretch_prints_its_seed_once_beside_the_middle_of_its_pictures(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(5, None), SeedUse(5, None), SeedUse(5, None),
+                                     SeedUse(6, None)])
+    field.showPopup()
+
+    stretch = _painted_row(field, 0, under_the_mouse=True)
+    single = _painted_row(field, 1, under_the_mouse=True)
+
+    seed_starts_at = min(point.x() for point in _lettering_in(single, right_of=single.height()))
+    seed = [point.y() for point in _lettering_in(stretch, right_of=seed_starts_at)]
+    assert max(seed) - min(seed) < single.height()
+    assert abs((max(seed) + min(seed)) / 2 - stretch.height() / 2) <= 3
+    field.hidePopup()
+
+
+def test_a_picture_in_the_dropdown_is_set_in_from_the_edges_of_its_row(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    field.showPopup()
+
+    row = _painted_row(field, 0)
+
+    middle = row.height() // 2
+    assert row.pixelColor(0, middle) != QColor("red")
+    assert row.pixelColor(middle, 0) != QColor("red")
+    assert row.pixelColor(middle, row.height() - 1) != QColor("red")
+    field.hidePopup()
+
+
+def test_a_picture_keeps_its_own_colors_on_the_row_under_the_mouse(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path))])
+    field.showPopup()
+
+    row = _painted_row(field, 0, under_the_mouse=True)
+
+    assert row.pixelColor(row.height() // 2, row.height() // 2) == QColor("red")
+    field.hidePopup()
+
+
+@pytest.mark.parametrize("size, beside, within", [
+    ((400, 800), lambda middle, edge: (edge, middle), lambda middle, edge: (middle, edge + 4)),
+    ((800, 400), lambda middle, edge: (middle, edge), lambda middle, edge: (edge + 4, middle)),
+])
+def test_a_seed_nothing_was_made_with_shows_a_blank_of_the_shape_it_would_make(
+        qtbot, size, beside, within):
+    form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
+    field.showPopup()
+
+    row = _painted_row(field, 0)
+
+    middle, edge = row.height() // 2, 5
+    assert row.pixelColor(*beside(middle, edge)) == QColor("black")
+    assert row.pixelColor(*within(middle, edge)) != QColor("black")
+    field.hidePopup()
+
+
+def _bounds_of(picture: QImage, color: str, *, left_of: int) -> QRect:
+    wanted = QColor(color)
+    xs, ys = [], []
+    for y in range(picture.height()):
+        for x in range(min(left_of, picture.width())):
+            if picture.pixelColor(x, y) == wanted:
+                xs.append(x)
+                ys.append(y)
+    return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
+
+
+@pytest.mark.parametrize("size", [(800, 400), (400, 800), (512, 512)])
+def test_the_question_mark_on_a_blank_nearly_fills_it(qtbot, size):
+    form, field = _seed_form(qtbot, [SeedUse(30, None, size)])
+    field.showPopup()
+
+    row = _painted_row(field, 0)
+
+    mark = _bounds_of(row, TEXT_MUTED, left_of=row.height())
+    blank = _bounds_of(row, BORDER_DEFAULT, left_of=row.height()).united(mark)
+    assert max(mark.width() / blank.width(), mark.height() / blank.height()) >= 0.75
+    field.hidePopup()
+
+
+def test_the_dropdown_opens_wide_enough_for_a_whole_seed_beside_its_picture(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(20, None), SeedUse((1 << 63) - 1, None)])
+    form.resize(160, 400)
+    form.show()
+
+    field.showPopup()
+
+    view = field.view()
+    option = QStyleOptionViewItem()
+    widest = field.itemDelegate().sizeHint(option, field.model().index(1, 0))
+    assert view.viewport().width() >= widest.width()
+    field.hidePopup()
+
+
+def test_opening_the_dropdown_is_no_edit_of_the_seed_in_the_field(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)])
+    form.set_values({"seed": 12345})
+    edits = []
+    form.changed.connect(lambda: edits.append(field.currentText()))
+
+    field.showPopup()
+
+    assert form.get_values()["seed"] == 12345
+    assert edits == []
+    field.hidePopup()
+
+
+@pytest.mark.parametrize("pins_reused_seed", [True, False])
+def test_picking_a_seed_from_the_dropdown_puts_it_in_the_field_and_pins_it(
+        qtbot, pins_reused_seed):
+    form, field = _seed_form(qtbot, [SeedUse(30, None), SeedUse(20, None)],
+                             pins_reused_seed=pins_reused_seed)
+    field.showPopup()
+    view = field.view()
+
+    qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=view.visualRect(field.model().index(1, 0)).center())
+
+    assert form.seed_is_random() is False
+    assert form.get_values()["seed"] == 20
+
+
+def test_a_typed_seed_is_never_finished_off_as_a_longer_one_from_the_dropdown(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(1234, None)])
+    form.show()
+    field.showPopup()
+    field.hidePopup()
+    form.activateWindow()
+    field.lineEdit().setFocus()
+    qtbot.waitUntil(field.lineEdit().hasFocus)
+    field.lineEdit().clear()
+
+    qtbot.keyClicks(field.lineEdit(), "12")
+
+    assert form.get_values()["seed"] == 12
+
+
+def _middle_of(pixmap):
+    image = pixmap.toImage()
+    return image.pixelColor(image.width() // 2, image.height() // 2)
+
+
+def test_the_closed_seed_shows_the_picture_of_the_item_its_seed_came_from(qtbot, tmp_path):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 42})
+
+    form.show_item({"seed": 42}, _red_square(tmp_path))
+
+    assert _middle_of(form._widgets["seed"]._picture.pixmap()) == QColor("red")
+
+
+def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0),
+                      ParamDef("width", "Width", "int", 400, max_val=4096),
+                      ParamDef("height", "Height", "int", 800, max_val=4096)])
+    qtbot.addWidget(form)
+
+    picture = form._widgets["seed"]._picture.pixmap().toImage()
+
+    assert picture.pixelColor(0, picture.height() // 2).alpha() == 0
+    assert picture.pixelColor(picture.width() // 2, 1).alpha() > 0
+
+
+def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path)), SeedUse(20, None)])
+    field.showPopup()
+    view = field.view()
+
+    qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=view.visualRect(field.model().index(0, 0)).center())
+
+    assert _middle_of(field._picture.pixmap()) == QColor("red")
+
+
+def test_picking_anywhere_on_a_stretch_takes_its_seed_with_its_newest_picture(qtbot, tmp_path):
+    form, field = _seed_form(qtbot, [SeedUse(30, _square(tmp_path, "red")),
+                                     SeedUse(30, _square(tmp_path, "blue")),
+                                     SeedUse(20, None)])
+    field.showPopup()
+    view = field.view()
+    stretch = view.visualRect(field.model().index(0, 0))
+
+    qtbot.mouseClick(view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=QPoint(stretch.center().x(), stretch.bottomLeft().y() - 4))
+
+    assert field.currentText() == "30"
+    assert _middle_of(field._picture.pixmap()) == QColor("red")
+
+
+def test_the_closed_seeds_picture_stands_the_fields_height_and_clear_of_its_number(qtbot):
+    form, field = _seed_form(qtbot, [])
+    form.setFont(make_font(FONT_UI, SIZE_HEADING))
+    form.resize(430, 300)
+    form.show()
+    QApplication.processEvents()
+
+    picture = field._picture.geometry()
+    number = field.lineEdit().geometry()
+
+    assert picture.height() >= field.height() - 8
+    assert number.x() + field.lineEdit().textMargins().left() >= picture.right()
+
+
+class _HeightWhenShown(QObject):
+    def __init__(self, popup):
+        super().__init__(popup)
+        self.height = None
+        popup.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Show and self.height is None:
+            self.height = watched.height()
+        return False
+
+
+def _opened_height(qtbot, history) -> int:
+    form, field = _seed_form(qtbot, history)
+    form.show()
+    shown = _HeightWhenShown(field.view().parentWidget())
+    field.showPopup()
+    field.hidePopup()
+    return shown.height
+
+
+def test_a_stretch_leaves_the_dropdown_the_height_it_always_opens_at(qtbot):
+    singles = [SeedUse(seed, None) for seed in range(20)]
+
+    with_a_stretch = _opened_height(qtbot, [SeedUse(99, None)] * 30 + singles)
+
+    assert with_a_stretch == _opened_height(qtbot, singles)
+
+
+def test_a_dropdown_opening_upward_still_meets_its_field(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(99, None)] * 30 + [SeedUse(1, None)])
+    form.show()
+    screen = QApplication.primaryScreen().availableGeometry()
+    form.move(form.x(), screen.bottomLeft().y() - form.frameGeometry().height() + 1)
+
+    field.showPopup()
+
+    popup = field.view().parentWidget().geometry()
+    assert 0 <= field.mapToGlobal(QPoint(0, 0)).y() - popup.bottomLeft().y() <= 2
+    field.hidePopup()
+
+
+def test_a_stretch_too_tall_for_one_row_carries_on_in_the_next(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(5, None)] * 3000 + [SeedUse(6, None)])
+    form.show()
+    field.showPopup()
+    view, model = field.view(), field.model()
+
+    pitch = view.visualRect(model.index(field.count() - 1, 0)).height()
+    stretch_rows = range(field.count() - 1)
+    assert {field.itemText(row) for row in stretch_rows} == {"5"}
+    assert sum(len(field.itemData(row, seed_combo._USES_ROLE)) for row in stretch_rows) == 3000
+    assert all(view.visualRect(model.index(row, 0)).height()
+               == pitch * len(field.itemData(row, seed_combo._USES_ROLE)) for row in stretch_rows)
+    field.hidePopup()
+
+
+def test_a_stretch_taller_than_the_list_scrolls_a_little_at_a_time(qtbot):
+    form, field = _seed_form(qtbot, [SeedUse(5, None)] * 30 + [SeedUse(6, None)])
+    form.show()
+    field.showPopup()
+    view = field.view()
+
+    view.verticalScrollBar().triggerAction(QAbstractSlider.SliderAction.SliderSingleStepAdd)
+
+    stretch = view.visualRect(field.model().index(0, 0))
+    assert stretch.top() < 0 < stretch.bottomLeft().y()
+    field.hidePopup()
+
+
+@pytest.mark.parametrize("seed_of", [lambda n: n, lambda n: 5])
+def test_a_long_history_reads_pictures_only_for_the_seeds_on_screen(qtbot, monkeypatch,
+                                                                     seed_of):
+    read = []
+    monkeypatch.setattr(seed_combo, "fitted_cell", lambda path, side: read.append(path))
+    history = [SeedUse(seed_of(n), f"thumbs/{n}.jpg") for n in range(3000)]
+    form, field = _seed_form(qtbot, history)
+    form.show()
+
+    field.showPopup()
+    qtbot.waitUntil(lambda: bool(read))
+    QApplication.processEvents()
+
+    assert 0 < len(set(read)) <= 2 * field.maxVisibleItems()
+    field.hidePopup()
+
+
+# --- the Random tick: the seed the field shows is the seed Generate uses ----
+
+def _clicked_random(form, key="seed"):
+    form._randomize_checks[key].click()
+
+
+def test_ticking_random_puts_a_fresh_seed_in_the_field_and_says_so(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 42})
+    drawn = []
+    form.seed_drawn.connect(lambda key, seed: drawn.append((key, seed)))
+
+    _clicked_random(form)
+
+    assert form.seed_is_random() is True
+    assert drawn == [("seed", form.get_values()["seed"])]
+    assert drawn[0][1] != 42
+
+
+def test_unticking_random_puts_back_the_seed_of_the_item_on_display(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.show_item({"seed": 42})
+
+    _clicked_random(form)
+
+    assert form.seed_is_random() is False
+    assert form.get_values()["seed"] == 42
+
+
+def test_turning_random_on_from_outside_draws_and_off_puts_the_items_seed_back(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0)])
+    qtbot.addWidget(form)
+    form.set_values({"seed": 42})
+    form.show_item({"seed": 42})
+
+    form.set_seed_random(True)
+    drawn = form.get_values()["seed"]
+    form.set_seed_random(False)
+
+    assert drawn != 42
+    assert form.get_values()["seed"] == 42
+
+
+def test_a_form_sized_from_its_input_says_what_size_it_would_make(qtbot):
+    form = ParamForm([ParamDef("input_image", "Input Image", "image", ""),
+                      ParamDef("noise_seed", "Seed", "seed", 0)],
+                     size_deriver=lambda values: (464, 912))
+    qtbot.addWidget(form)
+
+    assert form.output_size() == (464, 912)
 
 
 def _row_label(form, key):
@@ -560,7 +1007,7 @@ def test_every_kind_of_setting_reads_back_as_the_recipe_stores_it(qtbot, pd, wri
 
     form.set_values({pd.key: written})
 
-    value = form.get_values_static()[pd.key]
+    value = form.get_values()[pd.key]
     assert value == read_back
     assert type(value) is type(read_back)
 
@@ -585,7 +1032,7 @@ def test_set_values_preserves_params_without_a_field(qtbot, sample_defs):
     qtbot.addWidget(form)
     form.set_values({"steps": 30, "vae_name": "custom.safetensors"})
     assert form.get_values()["vae_name"] == "custom.safetensors"
-    assert form.get_values_static()["vae_name"] == "custom.safetensors"
+    assert form.get_values()["vae_name"] == "custom.safetensors"
     assert form.get_values()["steps"] == 30  # real fields still applied
 
 
@@ -622,11 +1069,15 @@ def test_combo_default_absent_from_options_is_still_selected(qtbot):
     assert form.get_values()["lora"] == "default.safetensors"
 
 
-def test_get_values_static_does_not_randomize_seed(qtbot):
+def test_a_fresh_form_shows_the_seed_its_first_generate_will_use(qtbot):
     form = ParamForm([ParamDef("seed", "Seed", "seed", 12345)])
     qtbot.addWidget(form)
-    # Random tick defaults to checked; the static read must ignore it.
-    assert form.get_values_static()["seed"] == 12345
+
+    shown = form.get_values()["seed"]
+
+    assert form.seed_is_random() is True
+    assert shown != 12345
+    assert form.get_values()["seed"] == shown
 
 
 def test_param_form_emits_changed_on_edit(qtbot):
@@ -892,11 +1343,11 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
-    assert form.get_values_static()["enhance"] is False
+    assert form.get_values()["enhance"] is False
 
     form.set_values(dict(wf.default_params(), enhance=True, enhance_steps=44))
 
-    values = form.get_values_static()
+    values = form.get_values()
     assert values["enhance"] is False
     assert values["enhance_steps"] == wf.default_params()["enhance_steps"]
     # And it is still emitted, so the payload always has a value to build from.
@@ -937,7 +1388,7 @@ def test_a_numeric_param_with_presets_is_an_editable_dropdown_that_emits_the_num
 
     form.set_values({"frame_rate": 60})
     assert combo.currentText() == "60 fps"
-    assert form.get_values_static()["frame_rate"] == 60.0
+    assert form.get_values()["frame_rate"] == 60.0
 
 
 def test_a_typed_number_past_the_range_is_clamped_and_shown_clamped_once_the_edit_ends(qtbot):
@@ -1005,7 +1456,7 @@ def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtb
 
     form.set_values({"frame_count": 21})
     assert duration.currentText() == "1.3 s"
-    assert form.get_values_static()["frame_count"] == 21
+    assert form.get_values()["frame_count"] == 21
 
 
 def test_the_frames_a_duration_asks_for_dont_move_when_the_frame_rate_does(qtbot):
@@ -1029,7 +1480,7 @@ def test_a_loaded_frame_count_is_shown_as_the_seconds_it_really_runs(qtbot):
     form.set_values({"frame_count": 121, "frame_rate": 24.0})
     assert form._widgets["frame_count"].currentText() == "7.6 s"
     assert form._widgets["frame_rate"].currentText() == "32 fps"
-    assert form.get_values_static()["frame_count"] == 121
+    assert form.get_values()["frame_count"] == 121
 
 
 def test_a_duration_the_model_cannot_render_settles_to_what_it_can_once_the_edit_ends(qtbot):
@@ -1134,7 +1585,7 @@ def test_a_stored_story_fills_one_field_per_scene(qtbot):
     assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["x", "y", "z"]
     assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["10 s", "5 s", "10 s"]
     assert [field.toPlainText() for field in editor.fields("scene_lines")] == ["hi", "", "bye"]
-    assert form.get_values_static() == stored
+    assert form.get_values() == stored
 
 
 def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbot):
@@ -1145,7 +1596,7 @@ def test_a_recipe_from_before_scenes_loads_as_one_scene_of_the_clips_length(qtbo
     assert [field.toPlainText() for field in editor.fields("positive_prompt")] == ["one shot"]
     assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"]
     assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
-    values = form.get_values_static()
+    values = form.get_values()
     assert (values["scene_frames"], values["frame_count"]) == ([121], 121)
     assert values["negative_prompt"] == "blurry"
 
@@ -1187,7 +1638,7 @@ def test_a_story_has_no_length_row_and_still_records_the_scenes_total(qtbot):
     assert form.get_values()["frame_count"] == 241          # 161 + 80 frames
 
 
-def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
+def test_scene_prompts_are_text_fields_for_find_and_read_back_as_one_story(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
@@ -1198,8 +1649,8 @@ def test_scene_prompts_are_text_fields_for_find_and_copy(qtbot):
     assert editor.fields("positive_prompt")[0] in form.text_fields()
     assert editor.fields("positive_prompt")[1] in form.text_fields()
     assert editor.fields("negative_prompt")[1] in form.text_fields()
-    assert form._field_text("positive_prompt") == "a\n---\nb"
-    assert form._field_text("negative_prompt") == "\n---\nn"
+    assert form.get_values()["positive_prompt"] == "a\n---\nb"
+    assert form.get_values()["negative_prompt"] == "\n---\nn"
 
 
 def test_each_box_on_a_card_says_what_it_is(qtbot):
@@ -1334,7 +1785,7 @@ def test_a_recipe_whose_lone_scene_disagrees_with_the_clip_follows_the_clip(qtbo
     form.set_values({"positive_prompt": "x", "frame_count": 121, "scene_frames": [81]})
     editor = form._widgets["scene_frames"]
     assert [combo.currentText() for combo in [scene.length for scene in editor._scenes]] == ["7.6 s"]
-    assert form.get_values_static()["frame_count"] == 121
+    assert form.get_values()["frame_count"] == 121
 
 
 # --- the voice her lines are spoken in -----------------------------------------

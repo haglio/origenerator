@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import json
 import logging
+import os
 import runpy
 import sqlite3
 import subprocess
@@ -35,8 +36,10 @@ from origenerator.config import STATE_DIR
 from origenerator.db import Database
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
+from tests.media_files import write_mp4_with_a_comment_tag
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_path):
@@ -52,6 +55,43 @@ def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_p
     _configure_logging(tmp_path)
 
     assert installed == [True]
+
+
+def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
+    """The launcher keeps the app's stdout and stderr in its log, and Qt's player
+    had FFmpeg print a readout of every video it opened there, each of its tags
+    included -- a generated video's embedded prompt among them. Run in a child,
+    since FFmpeg writes to the process's own stderr."""
+    tag = "an invented sentence standing in for a prompt"
+    video = write_mp4_with_a_comment_tag(tmp_path / "scene one.mp4", tag)
+    state = tmp_path / "state"
+    child = textwrap.dedent(f"""
+        import sys
+        from pathlib import Path
+        from PyQt6.QtCore import QTimer, QUrl
+        from PyQt6.QtMultimedia import QMediaPlayer
+        from PyQt6.QtWidgets import QApplication
+        from origenerator.app import _configure_logging
+        app = QApplication(sys.argv[:1])
+        _configure_logging(Path({str(state)!r}))
+        player = QMediaPlayer()
+        opened = (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.InvalidMedia)
+        player.mediaStatusChanged.connect(lambda status: status in opened and app.quit())
+        player.setSource(QUrl.fromLocalFile({str(video)!r}))
+        QTimer.singleShot(60_000, app.quit)
+        app.exec()
+        print("finished with", player.mediaStatus().name, flush=True)
+    """)
+    rules_of_its_own = {"QT_LOGGING_RULES", "QT_LOGGING_CONF", "QT_FFMPEG_DEBUG"}
+    env = {k: v for k, v in os.environ.items() if k not in rules_of_its_own} | {
+        "QT_QPA_PLATFORM": "offscreen", "QT_MEDIA_BACKEND": "ffmpeg"}
+    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, env=env, timeout=120,
+                         capture_output=True, encoding="utf-8", errors="replace",
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert "finished with LoadedMedia" in ran.stdout, ran.stdout + ran.stderr
+    written = ran.stdout + ran.stderr + (state / "origenerator.log").read_text(encoding="utf-8")
+    assert tag not in written
 
 
 @pytest.fixture(autouse=True)

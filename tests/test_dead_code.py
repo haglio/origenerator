@@ -185,7 +185,15 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19121 when a picture the tab puts up itself started going through the very tail
 # a clicked one takes: the note that it arms the drive like a browsed selection is
 # test_a_picture_the_tab_puts_up_itself_is_announced_like_a_clicked_one.
-MAX_PROSE_LINES = 19121
+#
+# 19109 when a finished video's script began replacing the one its name already
+# had: completion's note that an existing script is left alone went, ensure_funscript's
+# notes on what it leaves and skips are test_ensure_funscript_skips_when_the_script_exists,
+# test_ensure_funscript_writes_no_second_copy_of_an_older_one and
+# test_a_video_of_unknown_length_gets_no_funscript, and that a script which cannot be
+# written never strands the video is
+# test_a_script_that_cannot_be_written_never_strands_a_finished_video.
+MAX_PROSE_LINES = 19109
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

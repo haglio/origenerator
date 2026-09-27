@@ -209,19 +209,15 @@ def video_duration_seconds(video_path) -> float | None:
 
 def ensure_funscript(video_path, *, loop: bool, hz: float, output_dir,
                      duration_provider=video_duration_seconds) -> Path | None:
-    """Write ``video_path``'s script into the scripts folder if it has none.
-
-    Idempotent: a script it already has is left untouched (and not even probed),
-    wherever that is -- including the old place beside the clip, which is what
-    keeps this from writing a second copy of every script predating the folder.
-    Best-effort — a video whose duration can't be read is skipped with a log line
-    rather than raising, so it never strands a completing generation.
-    """
-    video_path = Path(video_path)
     existing = funscript_of(video_path, output_dir=output_dir)
     if existing is not None:
         return existing
-    dest = funscript_path_for(video_path, output_dir=output_dir)
+    return synthesize_funscript(video_path, loop=loop, hz=hz, output_dir=output_dir,
+                                duration_provider=duration_provider)
+
+
+def synthesize_funscript(video_path, *, loop: bool, hz: float, output_dir,
+                         duration_provider=video_duration_seconds) -> Path | None:
     duration = duration_provider(video_path)
     if not duration or duration <= 0:
         logger.warning("No readable duration for %s; skipping funscript", video_path)
@@ -229,5 +225,6 @@ def ensure_funscript(video_path, *, loop: bool, hz: float, output_dir,
     actions = synthesize_actions(duration, hz=hz, loop=loop)
     if not actions:
         return None
+    dest = funscript_path_for(video_path, output_dir=output_dir)
     write_funscript(dest, actions, duration_seconds=round(duration))
     return dest

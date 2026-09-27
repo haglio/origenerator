@@ -7,6 +7,7 @@ from PIL import Image
 
 from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
+from origenerator.funscript import funscript_of, synthesize_actions, video_duration_seconds
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -71,7 +72,7 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
     (out / "video" / "wan22_i2v_00001_.mp4").write_bytes(b"v")
     calls = []
     monkeypatch.setattr(
-        "origenerator.completion.ensure_funscript",
+        "origenerator.completion.synthesize_funscript",
         lambda video_path, *, loop, hz, output_dir: calls.append(
             (Path(video_path), loop, hz, Path(output_dir))),
     )
@@ -86,13 +87,40 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
         (out / "video" / "wan22_i2v_00001_.mp4", False, MOTION_DEFAULT_HZ, out)]
 
 
+def _mp4(path: Path, seconds: float) -> Path:
+    import cv2  # noqa: PLC0415 (heavy; only a test that needs a real length writes one)
+    import numpy  # noqa: PLC0415
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 16, (16, 16))
+    for _ in range(round(seconds * 16)):
+        writer.write(numpy.zeros((16, 16, 3), dtype=numpy.uint8))
+    writer.release()
+    return path
+
+
+def test_a_video_given_a_deleted_videos_name_is_scripted_for_its_own_length(tmp_path):
+    out = tmp_path / "out"
+    video = out / "video" / "wan22_i2v_00001_.mp4"
+    history = _video_history("19", "images", video.name)
+    _mp4(video, seconds=15.0)
+    extract_completion(I2V, history, out, tmp_path / "thumbs", "deleted")
+    video.unlink()
+
+    _mp4(video, seconds=5.0)
+    extract_completion(I2V, history, out, tmp_path / "thumbs", "namesake")
+
+    assert read_actions(funscript_of(video, output_dir=out)) == synthesize_actions(
+        video_duration_seconds(video), hz=MOTION_DEFAULT_HZ, loop=I2V.looping)
+
+
 def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypatch):
     out = tmp_path / "out"
     (out / "video").mkdir(parents=True)
     (out / "video" / "flf2v_loop_00001.mp4").write_bytes(b"v")
     calls = []
     monkeypatch.setattr(
-        "origenerator.completion.ensure_funscript",
+        "origenerator.completion.synthesize_funscript",
         lambda video_path, *, loop, hz, output_dir: calls.append(loop),
     )
     extract_completion(
@@ -113,7 +141,7 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
     (out / "video" / "wan21_ati_i2v_00001_.mp4").write_bytes(b"v")
     metronome = []
     monkeypatch.setattr(
-        "origenerator.completion.ensure_funscript",
+        "origenerator.completion.synthesize_funscript",
         lambda *a, **k: metronome.append((a, k)),
     )
     params = dict(ati.default_params(), motion_hz=1.5)
@@ -126,12 +154,43 @@ def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_pat
     assert metronome == []
 
 
+def test_a_track_authored_video_given_a_deleted_videos_name_is_scripted_with_its_own_motion(
+        tmp_path):
+    ati = WORKFLOW_REGISTRY["wan21_ati_i2v"]
+    out = tmp_path / "out"
+    video = out / "video" / "wan21_ati_i2v_00001_.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
+    history = _video_history("15", "images", video.name)
+    extract_completion(ati, history, out, tmp_path / "thumbs", "deleted",
+                       params=dict(ati.default_params(), motion_hz=0.5))
+
+    params = dict(ati.default_params(), motion_hz=1.5)
+    extract_completion(ati, history, out, tmp_path / "thumbs", "namesake", params=params)
+
+    assert read_actions(funscript_of(video, output_dir=out)) == ati.authored_actions(params)
+
+
 def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
     Image.new("RGB", (8, 8), (1, 2, 3)).save(tmp_path / "a.png")
     calls = []
     monkeypatch.setattr(
-        "origenerator.completion.ensure_funscript",
+        "origenerator.completion.synthesize_funscript",
         lambda *a, **k: calls.append((a, k)),
     )
     extract_completion(SDXL, SDXL_HISTORY, tmp_path, tmp_path / "thumbs", "n1")
     assert calls == []  # a still image has nothing to drive a device with
+
+
+def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    video = _mp4(out / "video" / "wan22_i2v_00001_.mp4", seconds=1.0)
+
+    def refuse(*_a, **_k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("origenerator.completion.synthesize_funscript", refuse)
+    files, _thumb, _duration = extract_completion(
+        I2V, _video_history("19", "images", video.name), out, tmp_path / "thumbs", "n1")
+
+    assert files == [{"filename": video.name, "subfolder": "video"}]

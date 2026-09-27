@@ -13,9 +13,8 @@ from pathlib import Path
 
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
-    ensure_funscript,
-    funscript_of,
     funscript_path_for,
+    synthesize_funscript,
     write_funscript,
 )
 from origenerator.media import MediaType
@@ -39,7 +38,7 @@ def extract_completion(workflow, history_data, output_dir: Path, thumb_dir: Path
     """
     files = workflow.extract_output_info(history_data)
     thumb = _make_thumbnail(workflow, files, output_dir, thumb_dir, name)
-    _ensure_video_funscript(workflow, files, output_dir, params)
+    _write_video_funscript(workflow, files, output_dir, params)
     try:
         duration = execution_duration_seconds(history_data)
     except Exception as e:
@@ -58,16 +57,10 @@ def _first_output_file(files, output_dir: Path) -> Path | None:
     return source if source.exists() else None
 
 
-def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | None):
-    """Write the funscript beside a finished video (best-effort, videos only).
-
-    Runs on the same shared path as thumbnailing, so every completion route — the
-    Generate tab, a gallery re-roll, the startup reconciler — leaves a ``.funscript``
-    in the scripts folder for each new video. A workflow that authored its motion supplies the exact
-    script (``authored_actions``); the rest get the synthesized metronome. Both are
-    idempotent (an existing sidecar is left alone) and swallow-and-log on failure,
-    so this can never strand a real completion.
-    """
+def _write_video_funscript(workflow, files, output_dir: Path, params: dict | None):
+    """ComfyUI gives a deleted video's filename to the next video it saves, and
+    the deleted one's script is still filed under that name, so the finished
+    video's own script is written over it."""
     if workflow.output_type != MediaType.VIDEO:
         return
     source = _first_output_file(files, output_dir)
@@ -76,12 +69,10 @@ def _ensure_video_funscript(workflow, files, output_dir: Path, params: dict | No
     try:
         authored = workflow.authored_actions(params) if params else None
         if authored:
-            if funscript_of(source, output_dir=output_dir) is None:
-                write_funscript(
-                    funscript_path_for(source, output_dir=output_dir), authored)
+            write_funscript(funscript_path_for(source, output_dir=output_dir), authored)
         else:
-            ensure_funscript(source, loop=workflow.looping, hz=MOTION_DEFAULT_HZ,
-                             output_dir=output_dir)
+            synthesize_funscript(source, loop=workflow.looping, hz=MOTION_DEFAULT_HZ,
+                                 output_dir=output_dir)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
 

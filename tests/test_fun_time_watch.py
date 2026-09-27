@@ -93,11 +93,16 @@ def test_a_session_starting_beside_an_open_window_takes_the_device_from_it(qtbot
     watch.withdraw()
 
 
-def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_everyday_copy(
-        qtbot, tmp_path):
+def _preview_and_everyday(tmp_path):
     preview, everyday = tmp_path / "preview", tmp_path / "everyday"
     preview.mkdir()
     everyday.mkdir()
+    return preview, everyday
+
+
+def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_everyday_copy(
+        qtbot, tmp_path):
+    preview, everyday = _preview_and_everyday(tmp_path)
     said = []
     watch = FunTimeWatch(preview, take_over=lambda session: None,
                          device_claimed=said.append, library_state_dir=everyday)
@@ -106,6 +111,32 @@ def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_everyday_copy(
     qtbot.waitUntil(lambda: said[-1] is True)
 
     watch.withdraw()
+
+
+def test_a_preview_offers_itself_in_the_everyday_copy_s_state_where_every_session_looks(
+        tmp_path):
+    preview, everyday = _preview_and_everyday(tmp_path)
+
+    watch = FunTimeWatch(preview, take_over=lambda session: None, library_state_dir=everyday)
+
+    assert (everyday / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
+        str(os.getpid()), str(this_process_creation_time())]
+    watch.withdraw()
+
+
+def test_a_session_that_found_the_offer_in_the_everyday_copy_s_state_takes_the_preview(
+        qtbot, tmp_path):
+    preview, everyday = _preview_and_everyday(tmp_path)
+    taken = []
+    watch = FunTimeWatch(preview, take_over=taken.append, library_state_dir=everyday)
+
+    _takeover(everyday, pid=os.getpid())
+    qtbot.waitUntil(lambda: bool(taken))
+
+    assert [session.main_rect for session in taken] == [Rect(0, 206, 853, 1234)]
+    assert not (preview / "fun_time_offer.txt").exists()
+    assert not (everyday / "fun_time_offer.txt").exists()
+    del watch
 
 
 def test_a_claim_left_by_a_session_that_died_holds_nothing(qtbot, tmp_path):

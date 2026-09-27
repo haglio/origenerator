@@ -461,9 +461,10 @@ def offer_of_this_process(*, starting: bool = False) -> str:
     return f"{offer} {OFFER_STILL_STARTING}" if starting else offer
 
 
-def offer_the_window_while_it_is_built(state_dir: Path) -> None:
-    state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / OFFER_NAME).write_text(offer_of_this_process(starting=True), encoding="utf-8")
+def offer_the_window_while_it_is_built(*state_dirs: Path) -> None:
+    for state_dir in dict.fromkeys(state_dirs):
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / OFFER_NAME).write_text(offer_of_this_process(starting=True), encoding="utf-8")
 
 
 def a_session_holds_the_device(state_dir: Path) -> bool:

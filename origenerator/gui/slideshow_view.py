@@ -1,32 +1,19 @@
-"""The fullscreen player — the one way this app fills the screen with a picture.
+"""The fullscreen player -- the one way this app fills the screen with a picture.
 
 It plays a set of generations: a folder's, a shelf's, or the one folder a
-double-clicked picture came from. **A double-click opens this same view at a
+double-clicked picture came from.  **A double-click opens this same view at a
 pace of nought**, holding the clicked picture until an arrow moves it, which is
-why there is no second fullscreen viewer with its own keys and its own copy of
-the counter, the neighbor stills and the culling; turning the console's
-clip-seconds pace up off nought sets such a show going.
+why there is no second fullscreen viewer with its own keys; turning the pace up
+off nought sets such a show going.  The set is not frozen at the opening: a run
+joins it on its first frame, which is what a show of a filling folder is
+watched for.  The creep into a picture is the engine's, not this window's, so a
+show handed to one of a session's players creeps the same way.
 
-The set is not frozen at the opening: a run joins it on its first frame rather
-than when it lands, because the first iterations are what a show of a filling
-folder is watched for — and not before, a black screen reading "Generating…"
-being nothing to watch.
-
-A picture's move while it holds the screen is the *engine's*, not this
-window's, so a show handed to one of a session's players moves the same way,
-and turning the pace up slows the move instead of cropping harder.
-
-One panel, not two. Fun Time splits the device across the main player's console
-and the set across each satellite's HUD, because there they are two players; a
-show is one host doing both, and wearing both panels says the status twice in
-two lines that can disagree, with prev/next/lock/trash drawn on each.
-
-Being the deliberate foreground view, it plays sound — the inline preview pane
-stays muted.
-
-The lower strip's queue rides on that one panel too
-(:mod:`origenerator.gui.hud_queue`), since the strip that carries it is
-under this window, and a show is exactly when the line stops moving.
+One panel, not two: the set, the clip's own track and volume, the device and
+the lower strip's queue (:mod:`origenerator.gui.hud_queue`) all ride on the
+players' own HUD (:mod:`origenerator.gui.show_hud`), a second plate over the
+same picture being a second HUD.  Being the deliberate foreground view, it
+plays sound -- the inline preview stays muted.
 
 What every key does, what the lock takes with it, what a filter narrows and
 where a closing show leaves you are `tests/test_slideshow_view.py`'s to state:
@@ -36,6 +23,9 @@ from __future__ import annotations
 
 import logging
 
+from player_core.hud_row import RowHud
+from player_core.playhead import video_playhead
+from player_core.volume import MAX_VOLUME, VolumeHud
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -124,6 +114,7 @@ class SlideshowView(QWidget):
         self._pane = ShowSurface(engine=engine, muted=False,
                                     on_double_click=self.close,
                                     on_press=self._toggle_pause)
+        self._volume = MAX_VOLUME
         self._pane.media_ended.connect(self._on_media_ended)
         self._pane.media_unplayable.connect(self._on_media_unplayable)
         # The media is refitted a beat after the window resizes (and again when a
@@ -350,6 +341,31 @@ class SlideshowView(QWidget):
         what the panel draws at its foot."""
         return self._queue_items, self._foreign_queued
 
+    @property
+    def hud_scrubber(self):
+        """The clip's row for the panel, or None on a picture."""
+        if not self._pane.is_showing_video():
+            return None
+        position, duration = self._pane.position(), self._pane.duration()
+        return RowHud(
+            position_ms=position, duration_ms=duration,
+            volume=VolumeHud(volume=self._volume, muted=self._pane.audio_muted()),
+            playhead=video_playhead(position, duration, self._pane.frame_rate()))
+
+    @property
+    def hud_funscript(self) -> list[dict]:
+        """The script the video has, whose colors fill that track."""
+        return self._pane.funscript_actions()
+
+    def set_volume(self, level: int) -> None:
+        """Set how loud this show plays — the chip on the panel."""
+        self._volume = level
+        self._pane.set_volume(level)
+
+    def scrub_to(self, ms: float) -> None:
+        """Run the video on screen to *ms* — a press along the panel's track."""
+        self._pane.scrub_to(ms)
+
     def requeue(self, keys) -> None:
         """Re-line the queue in this order — a row dragged somewhere else on the
         panel.
@@ -381,16 +397,13 @@ class SlideshowView(QWidget):
 
     def resume(self, state: ShowState) -> bool:
         """Open where a closed show left off rather than at the top of a fresh
-        shuffle. Returns whether the place carried.
+        shuffle, and say whether the place carried.
 
-        Closing a show is usually a detour — the folder under the picture, a fix
-        in a tab — so coming back is coming back to that picture: the slide it
-        ended on, still locked if it was locked, still showing the version it had been
-        stepped to. The place carries only while that slide is among these items,
-        since a show of another folder has nowhere to put it.
-
-        Called after :meth:`set_levels`, because which version a slide was showing
-        is only a version once the levels under it are armed.
+        Closing a show is usually a detour, so coming back is coming back to
+        that picture: the slide it ended on, its lock, and the version it had
+        been stepped to -- which is why this is called after
+        :meth:`set_levels`.  It carries only while that slide is among these
+        items.
         """
         if self._live or not self._playlist.resume(state.order, state.current):
             return False
@@ -405,19 +418,13 @@ class SlideshowView(QWidget):
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
                    favorite: bool = False, enhanced: bool = False) -> None:
-        """A generation that belongs to what this show is playing has landed: it
-        joins the set, queued to come up next.  ``favorited`` and ``enhanced`` are
-        what the gallery knows of its row, so the two switches can judge it.
+        """A generation that belongs to what this show is playing has landed:
+        it joins the set, queued to come up next, so a show of a folder that is
+        auto-generating reaches the items being made while it runs.
+        ``favorited`` and ``enhanced`` are what the gallery knows of its row.
 
-        A folder that is auto-generating is the case this is for. Without it the
-        show plays the fixed set it opened with, so the very items being made
-        while it runs — the ones being watched for — are the ones it never gets
-        to. The slide on screen is left alone; only the counter and the stills
-        either side move, since the set they describe just grew.
-
-        One the show has been watching being made is already in the set as its
-        own frames, and finishing is not a second slide: it keeps its place in
-        the pass and simply becomes the file.
+        The slide on screen is left alone; one the show has been watching being
+        made keeps its place in the pass and simply becomes the file.
         """
         if favorite:
             self._set.favorite_ids.add(prompt_id)
@@ -503,11 +510,9 @@ class SlideshowView(QWidget):
 
         Two things on one key, as on a satellite, and the star on screen says
         which: locking a slide starred it, so the first press takes that back
-        and only the second condemns it.  A slide that is still being made has
-        nothing to condemn: the run is on the GPU and its row is a record of
-        that, not a picture that has been judged.  Up takes such a slide off
-        the show and leaves the run alone — calling one off is the Cancel on
-        that run's own row of the panel.
+        and only the second condemns it.  A slide still being made has nothing
+        to condemn, so Up takes it off the show and leaves the run alone --
+        calling one off is the Cancel on that run's own row of the panel.
         """
         self._playlist.unlock()  # the locked slide is the one being culled
         item = self._playlist.current()
@@ -662,21 +667,14 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def retune(self, items, *, enhanced_ids=None) -> None:
-        """Point this show at the region's base set instead.
+        """Point this show at the region's base set instead -- what a hosted
+        reset does, with the window left up because a region that blinks black
+        between two shows is what the base state exists to avoid.
 
-        What a hosted reset does.  The window stays up rather than being closed
-        and reopened: it covers a satellite player, and a region that blinks
-        black between two shows is the thing the base state exists to avoid.
-        Both switches and the lock come off the way any reset takes them off,
-        and the pass is a fresh shuffle.
-
-        A base state is one KIND of set and always the same one, so it is
-        re-dressed rather than re-described: shuffled, and NOT a loop anyone
-        asked for — that side browsing its whole library, which is what a
-        satellite does with no loop on.  It kept the favorited ids it had, and
-        still does; nothing about a reset changes which items are favorites.
-        ``enhanced_ids`` is which of the new items carry an enhancement — a
-        new set, so a new answer.
+        A base state is always the same kind of set: a fresh shuffle of that
+        side's whole library, no loop, both switches and the lock off, the
+        favorited ids it had kept.  ``enhanced_ids`` is which of the new items
+        carry an enhancement.
         """
         self._live = not items
         self._set.retune(items, enhanced_ids=enhanced_ids)
@@ -1034,18 +1032,12 @@ class SlideshowView(QWidget):
                      working: bool = False, kind: str = NOTICE) -> None:
         """Say what the spoken *request* did, where the speaker is looking.
 
-        *working* means it hasn't done it yet: the corner holds that line
-        instead of flashing it, because working out what a request changes can
-        mean asking the local LLM which of the prompt's own terms the speaker
-        meant — the case that outlasts a flash — and a corner that empties while
-        the app is still working says the request was dropped when it wasn't.
-
-        Which is why that line comes down only for the request that put it up.
-        Nothing stops a second request being said over the first, and an answer
-        to the first would otherwise blank the corner while the second is still
-        out at the model — the same defect, one request later. An answer to
-        anything else flashes over the held line and leaves it standing,
-        because it is still true.
+        *working* means it has not done it yet, so the corner holds that line
+        rather than flashing it: working out what a request changes can mean
+        asking the local LLM, which outlasts a flash.  It comes down only for
+        the request that put it up -- a second request said over the first
+        would otherwise blank the corner while that one is still out -- and any
+        other answer flashes over it and leaves it standing.
         """
         if working:
             self._working_note, self._working_request = message, request

@@ -1,21 +1,16 @@
 """The generation queue, painted onto the one panel a show wears.
 
-A show covers the lower strip that carries the queue, and a show is the worst
-moment to lose it: it is the one stretch where the line deliberately stops
-moving — every video in it is held until the show closes
-(:mod:`origenerator.queue_line`) — and it is when the user keeps *adding* to it,
-since locking a slide favorites it and asks for the better version of that
-picture.  So the line comes along, onto the panel the show already wears
-(:mod:`origenerator.gui.show_hud`) rather than onto a plate of its own in the
-corner: a show wears ONE panel, and a second plate over the same picture is a
-second HUD.
+A show covers the lower strip that carries the queue, and it is the worst
+moment to lose it: the line deliberately stops moving there (every video in it
+is held until the show closes, :mod:`origenerator.queue_line`) and it is when
+the user keeps adding to it.  So it rides on the panel the show already wears
+rather than on a plate of its own, which would be a second HUD.
 
-It says what the strip says, in the panel's own look: the job being made with
-its live frame and the clock written across its bar, then every waiting job as a
-row of its own — the button that throws it away, the picture it is made from,
-and what it costs.  The panel presses and names those controls exactly as it
-presses its own, because they go back as the declared buttons
-(:class:`player_core.hud_button.Button`) it already knows how to draw.
+It says what the strip says: the job being made with its live frame and the
+clock across its bar, then each waiting job as a row -- the button that throws
+it away, the picture it is made from, and what it costs.  They go back as the
+panel's own declared buttons (:class:`player_core.hud_button.Button`), so it
+presses and names them exactly as it presses its own.
 """
 from __future__ import annotations
 
@@ -172,7 +167,6 @@ class QueueSection:
     first: int = 0
     drop_at: int | None = None
 
-    # --- what it asks the panel for ----------------------------------------
 
     @property
     def drawn(self) -> tuple[JobLine, ...]:
@@ -181,7 +175,6 @@ class QueueSection:
 
     @property
     def windowed(self) -> bool:
-        """Whether the line runs on past the rows drawn, either way."""
         return len(self.lines) > ROWS
 
     def size(self) -> tuple[int, int]:
@@ -217,7 +210,6 @@ class QueueSection:
             width += _GAP + text_width(_tiny(), line.note)
         return width
 
-    # --- and what it paints there ------------------------------------------
 
     def paint(self, image, x: int, y: int, width: int,
               pointer: tuple[int, int] | None) -> list[tuple[tuple, Button]]:
@@ -336,7 +328,6 @@ class QueueSection:
         self._paint_drop(draw, x, y, width)
 
     def _paint_drop(self, draw, x, y, width) -> None:
-        """Where a dragged row would land, the way the strip marks it."""
         if self.drop_at is None:
             return
         slot = min(max(self.drop_at - self.first, 0), len(self.drawn))
@@ -507,11 +498,8 @@ def _leader(item) -> Leader:
 def queue_section(items, foreign: int = 0, *, first: int = 0,
                   drop_at: int | None = None) -> QueueSection | None:
     """The block the panel hangs at its foot, or ``None`` with nothing to say.
-
     The head is whatever ComfyUI is making; with nothing of ours on the GPU it
-    says why instead — the hold this very show is imposing, else another app's
-    backlog.
-    """
+    says why instead -- this show's own hold, else another app's backlog."""
     if not items and not foreign:
         return None
     leading = items[0] if items and not items[0].held else None

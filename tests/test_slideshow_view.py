@@ -11,9 +11,9 @@ from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPointF, QSize, Qt
-from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QResizeEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent
+from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
 from origenerator.funscript import (
@@ -1639,6 +1639,16 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     # Filling the screen with a clip is deliberate, so it's heard.
     view = _view(qtbot)
     assert view._pane.audio_muted() is False
+
+
+def test_a_scripted_clip_hands_its_motion_to_the_panel(qtbot, tmp_path):
+    """The colors used to be a strip under the picture; they fill the panel's
+    own track now, and this is where they come from."""
+    vid = tmp_path / "c.mp4"
+    write_funscript(vid.with_suffix(".funscript"),
+                    synthesize_actions(2.0, hz=1.0))
+    view = _view(qtbot, [(str(vid), "video")])
+    assert view.hud_funscript
 
 
 def test_closing_releases_the_video_file(qtbot, tmp_path):

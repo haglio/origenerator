@@ -310,6 +310,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     stub.hud_map = lambda: None  # a host with no set draws no map
     stub.hud_device = None  # and no device of its own to put on that panel
     stub.hud_queue = ([], 0)  # and nothing in flight for the panel's foot
+    stub.hud_scrubber = None  # nor a clip of its own to run through
     view._shows._present_surface(stub, "portrait")
     assert calls == ["raise", "activate"]
 

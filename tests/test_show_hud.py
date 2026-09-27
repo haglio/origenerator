@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import json
+
+import pytest
 from player_core.hud_placement import HudCorner
 from player_core.satellite_hud import MARGIN
+from player_core.timeline import TIMELINE_HEIGHT, bar_track_x
+from player_core.volume import CHIP_H, MIN_VOLUME, SPEAKER_W, chip_xy
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QApplication
@@ -64,6 +69,12 @@ def _wheel(hud, command, delta):
     hud.wheelEvent(QWheelEvent(where, where, QPoint(0, 0), QPoint(0, delta),
                                Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
                                Qt.ScrollPhase.NoScrollPhase, False))
+
+
+def _panel_pixels(hud) -> bytes:
+    """Every pixel the panel is showing right now."""
+    image = hud.pixmap().toImage()
+    return image.constBits().asstring(image.sizeInBytes())
 
 
 def _lit_order(model) -> list[str]:
@@ -464,3 +475,151 @@ class TestTheQueueOnTheOnePanel:
         _wheel(hud, f"{OPEN}|j2", -120)
 
         assert [line.key for line in hud._model.foot.drawn][0] == "j1"
+
+
+class TestTheScrubberOnTheOnePanel:
+    """The track, the time and the volume ride on the one panel a show wears."""
+
+    def _show(self, items, **kw):
+        return SlideshowView(items, engine=FakeEngine(duration_ms=60_000),
+                             shuffle=in_order, **kw)
+
+    def _hud(self, qtbot, show):
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+        qtbot.addWidget(hud)
+        show.adopt_hud(hud)
+        return hud
+
+    def test_a_show_of_a_video_draws_the_scrubber_on_the_panel(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+
+        hud = self._hud(qtbot, show)
+
+        assert hud._targets.row is not None
+
+    def test_pressing_the_middle_of_the_track_runs_the_video_to_its_middle(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+        hud = self._hud(qtbot, show)
+        x, y, width, height = hud._targets.row
+        track_x0, track_x1 = bar_track_x(width)
+
+        hud.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress,
+                                   x + (track_x0 + track_x1) // 2,
+                                   y + height - TIMELINE_HEIGHT // 2))
+
+        assert show._pane._engine.position_ms == pytest.approx(30_000, abs=200)
+
+    def _chip_press(self, hud, along: int):
+        """Press the volume chip *along* pixels in from its own left edge."""
+        x, y, width, height = hud._targets.row
+        cx, cy = chip_xy(win_w=width, win_h=height, timeline_h=TIMELINE_HEIGHT)
+        hud.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress,
+                                   x + cx + along, y + cy + CHIP_H // 2))
+
+    def test_pressing_the_slider_at_its_left_end_turns_the_show_silent(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+        hud = self._hud(qtbot, show)
+
+        self._chip_press(hud, SPEAKER_W)
+
+        assert show._pane._engine.volume == MIN_VOLUME
+
+    def test_pressing_the_speaker_mutes_the_show_and_pressing_it_again_does_not(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+        hud = self._hud(qtbot, show)
+
+        self._chip_press(hud, SPEAKER_W // 2)
+        muted = show._pane.audio_muted()
+        self._chip_press(hud, SPEAKER_W // 2)
+
+        assert (muted, show._pane.audio_muted()) == (True, False)
+
+    def test_a_show_of_a_picture_draws_no_scrubber(self, qtbot):
+        show = self._show([("scene one.png", "image")])
+        qtbot.addWidget(show)
+
+        hud = self._hud(qtbot, show)
+
+        assert hud._targets.row is None
+
+    def test_the_panel_follows_the_video_along_the_track(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+        hud = self._hud(qtbot, show)
+        before = _panel_pixels(hud)
+
+        show._pane._engine.position_ms = 30_000
+        hud._tick()
+
+        assert _panel_pixels(hud) != before
+
+    def _track_fill(self, hud, fraction: float) -> int:
+        """The color of the track *fraction* of the way along it."""
+        x, y, width, height = hud._targets.row
+        track_x0, track_x1 = bar_track_x(width)
+        image = hud.pixmap().toImage()
+        return image.pixel(x + round(track_x0 + (track_x1 - track_x0 - 1) * fraction),
+                           y + height - TIMELINE_HEIGHT // 2)
+
+    def _show_of(self, qtbot, tmp_path, name, actions=None):
+        video = tmp_path / name
+        video.write_bytes(b"")
+        if actions is not None:
+            video.with_suffix(".funscript").write_text(
+                json.dumps({"actions": actions}), encoding="utf-8")
+        show = SlideshowView([(str(video), "video")],
+                             engine=FakeEngine(duration_ms=4_000), shuffle=in_order)
+        qtbot.addWidget(show)
+        return show
+
+    def test_the_track_is_colored_by_the_funscript_of_the_video_on_screen(
+            self, qtbot, tmp_path):
+        # Half as much motion in the first half of the clip as in the second.
+        slow = [{"at": at, "pos": 100 * (index % 2)}
+                for index, at in enumerate(range(0, 2_000, 500))]
+        fast = [{"at": at, "pos": 100 * (index % 2)}
+                for index, at in enumerate(range(2_000, 4_001, 125))]
+        show = self._show_of(qtbot, tmp_path, "scene one.mp4", slow + fast)
+
+        hud = self._hud(qtbot, show)
+
+        assert self._track_fill(hud, 0.25) != self._track_fill(hud, 0.75)
+
+    def test_a_video_with_no_funscript_gets_the_plain_track(self, qtbot, tmp_path):
+        scripted = self._show_of(qtbot, tmp_path, "scene one.mp4",
+                                 [{"at": at, "pos": 100 * (index % 2)}
+                                  for index, at in enumerate(range(0, 4_001, 125))])
+        plain = self._show_of(qtbot, tmp_path, "scene two.mp4")
+
+        colored = self._hud(qtbot, scripted)
+        bare = self._hud(qtbot, plain)
+
+        assert self._track_fill(bare, 0.5) != self._track_fill(colored, 0.5)
+
+    def test_dragging_along_the_track_keeps_running_the_video(self, qtbot):
+        show = self._show([("scene one.mp4", "video")])
+        qtbot.addWidget(show)
+        hud = self._hud(qtbot, show)
+        x, y, width, height = hud._targets.row
+        track_x0, track_x1 = bar_track_x(width)
+        along = y + height - TIMELINE_HEIGHT // 2
+        quarter = x + track_x0 + (track_x1 - track_x0) // 4
+
+        hud.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, quarter, along))
+        hud.mouseMoveEvent(_mouse(QEvent.Type.MouseMove,
+                                  quarter + (track_x1 - track_x0) // 2, along))
+
+        assert show._pane._engine.position_ms == pytest.approx(45_000, abs=600)
+
+    def test_a_show_whose_engine_is_not_open_yet_still_wears_its_panel(self, qtbot):
+        # The first beat comes before the pane has a window to hand the engine.
+        show = SlideshowView([("scene one.mp4", "video")], shuffle=in_order)
+        qtbot.addWidget(show)
+
+        hud = self._hud(qtbot, show)
+
+        assert hud._targets is not None

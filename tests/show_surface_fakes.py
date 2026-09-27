@@ -11,9 +11,12 @@ from pathlib import Path
 
 
 class FakeEngine:
-    def __init__(self) -> None:
+    def __init__(self, *, duration_ms: float = 0.0) -> None:
         self.loaded: list[Path] = []
         self.swapped: list[Path] = []
+        self.duration_ms = duration_ms
+        self.frame_rate = 30.0
+        self.volume = 100
         self.pace: float | None = None
         self.paused: bool | None = None
         self.muted = True
@@ -45,6 +48,12 @@ class FakeEngine:
 
     def set_muted(self, muted: bool) -> None:
         self.muted = muted
+
+    def set_volume(self, volume: int) -> None:
+        self.volume = volume
+
+    def seek_ms(self, ms: float) -> None:
+        self.position_ms = ms
 
     def push_still(self) -> None:
         self.pushes += 1

@@ -90,7 +90,7 @@ def _reds(image) -> int:
     return int(np.count_nonzero(near & (pixels[:, 3] > 0)))
 
 
-def test_the_word_that_throws_a_job_away_is_drawn_in_the_panel_own_ink():
+def test_the_word_that_throws_a_job_away_is_drawn_in_the_panels_own_ink():
     """The strip under the window draws Cancel in the panel's ordinary gray,
     and the panel's own copy of that queue reads the same: red here is the
     color the players keep for a live recording."""

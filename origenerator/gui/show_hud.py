@@ -1,58 +1,21 @@
-"""The satellite lock HUD, worn by every fullscreen show — the players' own.
+"""The one panel a show wears -- the players' own, drawn by their own code.
 
 A show covering a satellite region covers that player's HUD, so what replaces
-it has to be the same panel rather than a strip of Qt buttons gesturing at it.
-This widget draws the real one: the same panel the players composite into
-their video, rendered by the same shared code (``player_core.satellite_hud`` /
-``_paint``), so a show's HUD and a player's HUD cannot drift apart — the status
-line, the buttons this show declares (:mod:`origenerator.show_buttons`) and
-the nav map.
+it is the same panel rather than a strip of Qt buttons gesturing at it
+(``player_core.satellite_hud`` / ``_paint``).  A standalone show wears it too:
+nothing about a show is different for not being inside a session.
 
-Standalone Origenerator wears it too, over its own fullscreen show.  Nothing
-about a show is different for not being inside a session: it is the same set,
-played the same way, out of the same window, and this is the one panel this
-family of apps has for saying so.  What a standalone show has no counterpart
-for is the pair of things that address a SESSION, and each is answered rather
-than faked — see :func:`show_hud_model` for the mode row and
-:meth:`ShowHud._act_here` for the transport.
+Everything a show has to say is on it, because a second plate over the same
+picture is a second HUD: the set and its map (:mod:`origenerator.gui.show_map`),
+the clip's own track, time and volume (:mod:`player_core.hud_row`), the device
+on a host driving one (:attr:`~origenerator.gui.show_host.ShowHost.hud_device`),
+and at its foot the generation queue the covered lower strip would be showing
+(:mod:`origenerator.gui.hud_queue`).  Fun Time splits the first two across two
+windows because there they are two players; a show is one host doing both, and
+wearing both panels put two disagreeing status lines on one screen.
 
-The map is the players' map drawn over this app's generations
-(:mod:`origenerator.gui.show_map`): the slide on screen in the corner, the
-same act under other seeds running right as the seed row, what else was made
-of the same picture running down as the column, the loop button
-lit for whichever axis is playing round and round, and the cell actually on
-screen the lit one — exactly a satellite mapping its clip against its
-library.  A thumbnail click jumps the show to that item, the way a map click
-switches a player, and the map's own chrome — the two loop buttons and the
-expand mark — means here what it means there.
-
-It is the ONE panel a show wears, and everything a show has to say is on it:
-the set, the device on a host driving one, and — at its foot — the generation
-queue the covered lower strip would be showing
-(:mod:`origenerator.gui.hud_queue`), whose rows are pressed, dragged and named
-through the same declared buttons as the panel's own.  Fun Time splits what is
-here across two windows — each satellite's HUD for the set, the main player's console for the
-device — because there they are two players; a show is one host doing both, and
-wearing both panels put two status lines that disagreed on one screen with
-prev/next/lock/trash drawn on each.  So the host hands over its device half
-(:attr:`~origenerator.gui.show_host.ShowHost.hud_device`) and it rides here, all
-the main console's own code: the clip-seconds pace with the rows that step the
-set, since the pace is about the set — and then, together at the foot of the
-panel, every control that acts on the OSR2 itself, the hands-free switches and
-the four control states above the line naming whichever driver has the device
-and the readout of what is being sent.
-
-Presses that mean something to the session — the mode pair, this side's
-prev/next/lock/trash — post onto the dashboard command file, the channel the
-players' HUDs and the global hotkeys share.  The two filter switches — F-mode,
-and the enhanced-only switch beside it that only a show's HUD grows — are the
-show's own and land on it directly, hosted or not (:meth:`ShowHud._deliver`), and
-so is everything about the device: the OSR2 is this app's to drive wherever the
-show is drawn, so those go back to the host
-(:meth:`~origenerator.gui.show_host.ShowHost.press_console`) rather than out to
-the session.  The map's own chrome is the panel's rather than this show's, so a
-press on a concept a hosted show does not have (the loops) is swallowed here,
-where it can never reach the blacked player underneath.
+Presses that mean something to the session post onto the dashboard command
+file; everything else lands on the show itself (:meth:`ShowHud._deliver`).
 """
 
 from __future__ import annotations
@@ -62,6 +25,14 @@ from dataclasses import replace
 
 from player_core.file_channel import append_command
 from player_core.hud_placement import HudCorner, hud_origin
+from player_core.hud_row import (
+    MUTE,
+    SCRUBBER,
+    VOLUME,
+    row_part,
+    scrub_to,
+    volume_to,
+)
 from player_core.hud_status import looping_label, status_line
 from player_core.modes import Osr2State
 from player_core.satellite_hud import (
@@ -74,11 +45,13 @@ from player_core.satellite_hud import (
     hit_test_targets,
 )
 from player_core.satellite_hud_paint import HudRenderer
+from player_core.timeline import bar_track_x
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.console_commands import side_press, spelled_for
+from origenerator.funscript import heatmap_colors
 from origenerator.gui.console import REPAINT_MS
 from origenerator.gui.hud_queue import (
     CANCEL,
@@ -130,26 +103,12 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     """The host show's state as the players' HUD model, or ``None`` for a show
     with nothing to map (``hud_map`` unanswered).
 
-    *hosted* is whether a Fun Time session is under the show and *own_window*
-    whether this app is drawing it in a window of its own; together they decide
-    which buttons the panel declares (see
-    :func:`~origenerator.show_buttons.show_rows`) and what reset goes back
-    to.  Both default to what a region show wants, which is what every reading
-    of one wants; :class:`ShowHud` and a show handed to a player pass their own.
-
-    *foot* is the block the host paints at the panel's foot — Origenerator's own
-    generation queue (:mod:`origenerator.gui.hud_queue`), since a show covers the
-    strip that carries it and a show wears ONE panel.  None where there is
-    nothing in flight, and on any reading of the model that only wants the set.
-
-    *device* is what this window is doing to the OSR2
-    (:class:`~origenerator.gui.console.ShowDevice`), for the one panel a show
-    wears in a window of its own: the pace row under the control band, then the
-    rows that aim the device, who has it, and the readout, all three together at
-    the foot.  None where this app is not the
-    one driving -- a show handed to a session's player, whose device half is on
-    the session's own main console, and any reading of the model that only wants
-    the set.
+    *hosted* and *own_window* decide which buttons the panel declares
+    (:func:`~origenerator.show_buttons.show_rows`) and what reset goes back to;
+    both default to what a region show wants.  *foot* is the generation queue
+    (:mod:`origenerator.gui.hud_queue`) and *device* what this window is doing
+    to the OSR2 (:class:`~origenerator.gui.console.ShowDevice`) -- each None
+    where there is none, which is what a show on a session's player answers.
     """
     shown = host.hud_map()
     if shown is None:
@@ -240,6 +199,18 @@ class ShowHud(QLabel):
         # The queue block's own state, which belongs to the panel rather than to
         # the line: which row its window opens on, the press waiting to turn out
         # a click or a drag, and where that drag would drop.
+        # What the row at the panel's foot last showed, kept because the panel
+        # is redrawn when it moves and a press along its track is placed
+        # against the length it was drawn with.
+        self._row = None
+        # The funscript's colors across the track, and the width they were
+        # built for: the panel sizes itself, so a render that comes back a
+        # different size rebuilds them.
+        self._heatmap = None
+        self._heatmap_of: tuple[str, int] | None = None
+        # Which control of that row a press is holding, so a level or a place
+        # in the clip can be dragged and not only clicked.
+        self._row_hold = ""
         self._queue_first = 0
         self._queue_press: tuple[str, int, int, bool] | None = None
         self._queue_drag: str | None = None
@@ -288,8 +259,9 @@ class ShowHud(QLabel):
         # panel.
         self._clicks.active_loop = model.active_loop if model is not None else ""
         self._clicks.active_filter = model.filter_query if model is not None else ""
-        if model != self._model:
-            self._model = model
+        row = self._host.hud_scrubber
+        if (model, row) != (self._model, self._row):
+            self._model, self._row = model, row
             self._draw()
         elif self._model is not None:
             raise_over_media(self)
@@ -301,29 +273,18 @@ class ShowHud(QLabel):
         self._sync_beat()
 
     def _sync_beat(self) -> None:
-        """Beat fast enough for the trace while something is driving, and back
-        to the panel's own beat when nothing is.
-
-        The trace scrolls with the phase, so at the panel's resting beat it
-        stepped in visible jumps; ten a second is what the console redraws a
-        moving line at.  A still panel redrawn that often is the same picture at
-        Pillow's price, paid for the whole show.
+        """Beat fast enough for whatever is moving on the panel — the drive's
+        trace, and the playcursor along a video's track — and back to the
+        panel's own beat when nothing is, a still panel redrawn ten times a
+        second being the same picture at Pillow's price.
         """
-        driving = self._model is not None and self._model.osr2 in _MOVING
-        self._timer.setInterval(REPAINT_MS if driving else _REFRESH_MS)
+        moving = (self._model is not None and self._model.osr2 in _MOVING)             or self._row is not None
+        self._timer.setInterval(REPAINT_MS if moving else _REFRESH_MS)
 
     def _file_on_screen(self) -> str:
-        """The muted line under the status: what is on this region right now.
-
-        The players print the file they are decoding there, and this panel left
-        it blank — the one line of the HUD that says WHAT you are looking at.
-
-        Named the way THIS app names things, not the way the disk does.  Naming
-        a generation off its path gives "image / ComfyUI_00123_" — the folder is
-        the media type, which says nothing, and the file is a counter no one has
-        ever seen in this UI.  The app calls the folder by what the tree calls
-        it ("615F7744", or whatever the user typed onto it) and the item by its
-        seed, which is what its tile in the browser is captioned with.
+        """The muted line under the status: what is on this region right now,
+        named the way THIS app names it — the folder as the tree shows it and
+        the item by its seed, not "image / ComfyUI_00123_" off the path.
         """
         prompt_id = getattr(self._host, "hud_prompt_id", "")
         if not prompt_id or self._label_for is None:
@@ -338,11 +299,12 @@ class ShowHud(QLabel):
             self._targets = None
             self.hide()
             return
-        rendered = self._renderer.render(
-            self._model, video=self._file_on_screen(),
-            hover_loop=self._hover_loop,
-            hover_tip=self._hover_tip, hover_pos=self._hover_pos,
-        )
+        rendered = self._render()
+        row = rendered.targets.row
+        if row is not None:
+            drawn_with = self._heatmap
+            if self._colors_for(_track_width(row[2])) is not drawn_with:
+                rendered = self._render()
         self._targets = rendered.targets
         bgra = rendered.bgra
         height, width, _ = bgra.shape
@@ -358,6 +320,23 @@ class ShowHud(QLabel):
         if self.isHidden():
             self.show()
 
+    def _render(self):
+        return self._renderer.render(
+            self._model, video=self._file_on_screen(),
+            hover_loop=self._hover_loop,
+            hover_tip=self._hover_tip, hover_pos=self._hover_pos,
+            clip_row=self._row, heatmap=self._heatmap,
+        )
+
+    def _colors_for(self, track_width: int):
+        """The funscript's colors across a track that wide, kept until the clip
+        or the width moves."""
+        key = (self._host.current_media_path(), track_width)
+        if key != self._heatmap_of:
+            self._heatmap_of = key
+            self._heatmap = heatmap_colors(self._host.hud_funscript, track_width) or None
+        return self._heatmap
+
     # --- the queue block, which is this app's own ---------------------------
 
     def _queue(self):
@@ -371,12 +350,9 @@ class ShowHud(QLabel):
         return next((item for item in self._host.hud_queue[0] if item.key == key), None)
 
     def _press_queue(self, verb: str, key: str) -> None:
-        """A press on the block: throw a job away, go to the folder it will land
-        in, or drop another app's work.
-
-        A press on a ROW reaches this only once the release says it was a click
-        rather than the start of a drag down the line
-        (:meth:`mouseReleaseEvent`).
+        """A press on the block: throw a job away, go to the folder it will
+        land in, or drop another app's work -- a press on a ROW only once
+        :meth:`mouseReleaseEvent` says it was a click rather than a drag.
         """
         if verb == CLEAR:
             self._host.clear_foreign_queue()
@@ -447,6 +423,29 @@ class ShowHud(QLabel):
         self._queue_first = max(0, min(self._queue_first - steps, max(0, lines - ROWS)))
         self._tick()
 
+    # --- the row at the foot, which is the players' own --------------------
+
+    def _press_row(self, px: int, py: int) -> bool:
+        """A press on the track, the chip or the time; False if it missed them.
+        The row is hit-tested in its own coordinates, the way every panel that
+        hosts it does (:func:`player_core.hud_row.row_part`)."""
+        rect = self._targets.row if self._targets is not None else None
+        if rect is None or self._row is None:
+            return False
+        x, y, width, height = rect
+        if not (x <= px < x + width and y <= py < y + height):
+            return False
+        part = self._row_hold = row_part(px - x, py - y, width=width)
+        if part == SCRUBBER:
+            self._host.scrub_to(scrub_to(px - x, width=width,
+                                         duration_ms=self._row.duration_ms))
+        elif part == VOLUME:
+            self._host.set_volume(volume_to(px - x, py - y, width=width))
+        elif part == MUTE:
+            self._host.set_audio_muted(not self._host.audio_muted())
+        self._tick()
+        return True
+
     # --- presses, the players' own grammar --------------------------------
 
     def mousePressEvent(self, event):
@@ -455,6 +454,8 @@ class ShowHud(QLabel):
         # Bitmap pixels, not logical ones: the panel is drawn unscaled over a
         # scaled window, so its control rects are indexed in its own pixels.
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        if self._press_row(px, py):
+            return
         command = self._clicks.press(self._targets, px, py,
                                      now=time.monotonic())
         verb, _, key = command.partition("|")
@@ -471,6 +472,7 @@ class ShowHud(QLabel):
         """Let go of whichever readout band the press took hold of, and finish
         whatever a press on the queue turned out to be."""
         self._clicks.release()
+        self._row_hold = ""
         pending, self._queue_press = self._queue_press, None
         dragged, drop = self._queue_drag, self._queue_drop
         self._queue_drag, self._queue_drop = None, None
@@ -486,6 +488,9 @@ class ShowHud(QLabel):
             return
 
         px, py = to_bitmap_pos(event.position().x(), event.position().y())
+        if self._row_hold and event.buttons() & Qt.MouseButton.LeftButton:
+            self._press_row(px, py)
+            return
         if self._queue_press is not None and event.buttons() & Qt.MouseButton.LeftButton:
             self._drag_row(px, py)
             return
@@ -522,17 +527,10 @@ class ShowHud(QLabel):
 
     def _deliver(self, command: str) -> None:
         """Route one HUD press: what the show answers for itself lands on it,
-        and the session's transport goes out on the dashboard channel — or, with
-        no session under this show, onto the show as well (:meth:`_act_here`).
-
-        The console's own verbs -- the pace, the motion, the four control
-        states, a level dragged on the readout -- land on this window's motion
-        and its OSR2 switch, hosted or not: the device is this app's to drive
-        wherever the show is drawn, and the session has no say in it.
-
-        The map's own chrome that a show has no counterpart for (the expand
-        mark) is swallowed either way, so it can never reach the player a
-        region window covers.
+        the session's transport goes out on the dashboard channel — or, with no
+        session under this show, onto the show as well (:meth:`_act_here`) —
+        and the device's own verbs land on this window either way, the OSR2
+        being this app's to drive wherever the show is drawn.
         """
         if not command:
             return
@@ -573,19 +571,19 @@ class ShowHud(QLabel):
     def _act_here(self, action: str) -> None:
         """A press with no session under it: the show answers it itself.
 
-        Standalone there is no dashboard channel and no player under the show,
-        so the transport cannot take the round trip a hosted press takes — out
-        onto the session's command file, through its dispatch, and back onto
-        this very show.  It lands on the show directly instead, through the same
-        answers that round trip ends at, so the button does the one thing it is
-        labeled for either way.
-
-        Minimize is the button that only a show on its own has: the show IS the
-        window here, so the button parks it exactly as it parks a satellite's,
-        where a hosted show has no window of its own and declares none.
+        Standalone there is no command file to take the round trip a hosted
+        press takes, so the press lands on the show through the same answers
+        that round trip would have ended at.  Minimize is the one button only a
+        show on its own has, the show being the window here.
         """
         if action == "minimize":
             self._host.window().showMinimized()
             return  # nothing on the panel changed, and it is off screen anyway
         if answer(self._host, action):
             self._tick()  # the readout answers the press without waiting for the beat
+
+
+def _track_width(row_width: int) -> int:
+    """How many pixels of a row that wide the track itself covers."""
+    x0, x1 = bar_track_x(row_width)
+    return x1 - x0

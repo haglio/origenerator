@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from player_core.hud_placement import HudCorner
 from player_core.satellite_hud import MARGIN
+from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import media_overlay
 from origenerator.gui.motion_panel import MotionPanel
@@ -208,6 +211,34 @@ class TestWhereTheShowsPanelSits:
 
         assert collapsed == [True]
 
+    def test_a_click_landing_on_the_minus_is_what_collapses_it(self, qtbot):
+        """The whole way in: a left button down on the square, where the panel
+        drew it, and the panel is a plus by the time the button comes back up."""
+        show = self._show(qtbot)
+        collapsed: list[bool] = []
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None,
+                      collapse=collapsed.append)
+        show.adopt_hud(hud)
+        (rect, _minus), = [(rect, button) for rect, button in hud._targets.buttons
+                           if button.command.endswith("hud_minimize")]
+
+        _click_at(hud, rect)
+
+        assert collapsed == [True]
+
+    def test_a_click_on_the_plus_asks_for_the_panel_back(self, qtbot):
+        show = self._show(qtbot)
+        collapsed: list[bool] = []
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None,
+                      collapse=collapsed.append)
+        show.adopt_hud(hud)
+        hud.set_hud_place(HudCorner.UPPER_LEFT, True)
+        (rect, _plus), = hud._targets.buttons
+
+        _click_at(hud, rect)
+
+        assert collapsed == [False]
+
     def test_a_hosted_press_on_the_minus_goes_out_on_the_sessions_channel(
             self, qtbot, tmp_path):
         show = self._show(qtbot)
@@ -218,3 +249,13 @@ class TestWhereTheShowsPanelSits:
         hud._deliver("portrait_hud_minimize")
 
         assert channel.read_text(encoding="utf-8").split() == ["portrait_hud_minimize"]
+
+
+def _click_at(widget, rect) -> None:
+    """A left click at the middle of *rect*, in the panel's own pixels."""
+    at = QPointF(rect[0] + rect[2] / 2, rect[1] + rect[3] / 2)
+    for kind, buttons in ((QEvent.Type.MouseButtonPress, Qt.MouseButton.LeftButton),
+                          (QEvent.Type.MouseButtonRelease, Qt.MouseButton.NoButton)):
+        QApplication.sendEvent(widget, QMouseEvent(
+            kind, at, at, Qt.MouseButton.LeftButton, buttons,
+            Qt.KeyboardModifier.NoModifier))

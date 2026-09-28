@@ -2362,3 +2362,19 @@ def test_a_run_the_show_opened_on_comes_back_finished_after_the_picture_on_scree
 
     assert moved_on_to == "a.png"
     assert view.current_media_path() == "run.png"
+
+
+def test_a_finished_picture_comes_up_before_the_next_runs_first_frames(qtbot):
+    view = _view(qtbot, _THREE)
+    view.note_generating("id-first", _png_bytes())
+    view._on_media_ended()
+    view._on_media_ended()
+
+    view.note_added("first.png", "image", "id-first")
+    view.note_generating("id-second", _png_bytes(color=(200, 40, 40)))
+    view._on_media_ended()
+    first_up = view.current_media_path()
+    view._on_media_ended()
+
+    assert first_up == "first.png"
+    assert view._playlist.current()[2] == "id-second"

@@ -1846,8 +1846,8 @@ def _frame_bytes(tmp_path, size: int = 8) -> bytes:
 def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_path):
     # An enhancement is not a run of these settings — it is the coming state of
     # the very picture they are being edited away from — so the mark holds over
-    # its frames, message and dim together. Clearing it per frame left the two
-    # trading places several times a second while the form was typed in.
+    # its frames. Clearing it per frame left the two trading places several
+    # times a second while the form was typed in.
     panel, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     panel.show_saved_generation(image, [image])
@@ -1856,7 +1856,6 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
     panel.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
 
     assert _notice(panel) == "(not yet generated with modifications)"
-    assert not panel._preview._notice_dim.isHidden()
 
     # ...and it goes on standing as the run streams, rather than blinking off
     # with every frame that arrives.
@@ -1950,7 +1949,7 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
 
 def test_a_tab_on_an_imported_pictures_own_settings_says_generate_will_draw_a_random_seed(
         saved_panel, qtbot):
-    # Wherever the item on display came from, the darkening gone means these are
+    # Wherever the item on display came from, the notice gone means these are
     # the settings it was made with, and the button says so the same way.
     panel, db = saved_panel
     params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(), positive_prompt="a cat",

@@ -8,10 +8,11 @@ generation that is still being made, and driving the OSR2 off the clip on screen
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPointF, QSize, Qt
-from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QPixmap, QResizeEvent
+from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
@@ -1512,9 +1513,17 @@ def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
 
 # --- opened over a generation still being made ------------------------------
 
+def _frame_up(view):
+    """The frame the engine was last handed, as bytes -- None while a file of
+    the set or a line is up instead."""
+    pane = view._pane
+    if pane._media is not None or pane._opened is None:
+        return None
+    return pane._opened.read_bytes()
+
+
 def _showing_a_picture(view):
-    picture = view._pane._frame
-    return picture is not None and not picture.isNull()
+    return _frame_up(view) is not None
 
 
 def test_opens_over_a_running_generation_showing_its_frame(qtbot):
@@ -1602,23 +1611,6 @@ def test_a_live_show_drives_no_device(qtbot):
 
 
 # --- what a fullscreen show is, as media ------------------------------------
-
-def test_a_streamed_frame_fits_the_screen_without_clipping(qtbot):
-    # The reported "black on all four sides" was the picture left scaled at its
-    # tiny pre-show size on the full screen.  A file is fitted by the engine;
-    # a run's streamed frame is the one picture this app still draws itself.
-    buf = BytesIO()
-    Image.new("RGB", (24, 60), (10, 120, 200)).save(buf, "PNG")
-    view = _view(qtbot, [], frame=buf.getvalue())
-    label = view._pane._picture
-    old = label.size()
-    label.resize(600, 500)  # stand in for the screen the window grows to
-    QApplication.sendEvent(label, QResizeEvent(QSize(600, 500), old))
-
-    pm = label.pixmap()
-    assert pm.width() <= 600 and pm.height() <= 500        # nothing clipped off
-    assert pm.width() == 600 or pm.height() == 500         # as large as it fits
-
 
 def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     # Filling the screen with a clip is deliberate, so it's heard.
@@ -1958,12 +1950,10 @@ def test_a_live_slide_shows_the_newest_frame_while_it_is_on_screen(qtbot):
     view.note_generating("id-run", _png_bytes())
     _press(view, Qt.Key.Key_Right)                    # step onto it
 
-    later = _png_bytes()
+    later = _png_bytes(color=(200, 40, 40))
     view.note_generating("id-run", later)
 
-    newest = QPixmap()
-    newest.loadFromData(later)
-    assert view._pane._frame.toImage() == newest.toImage()
+    assert _frame_up(view) == later
 
 
 def test_a_live_slide_becomes_the_file_when_the_run_lands(qtbot, tmp_path):
@@ -2142,8 +2132,14 @@ def test_a_show_opened_while_a_picture_of_it_is_being_enhanced_opens_on_it(qtbot
 def test_a_picture_being_enhanced_holds_the_screen_for_half_the_pace(qtbot):
     view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
 
-    assert view._pane._engine.pace == 2.0
+    assert (view._early_move_on.isActive(), view._early_move_on.interval()) == (True, 2000)
     view.step(1)
+    assert not view._early_move_on.isActive()
+
+
+def test_a_picture_being_made_makes_its_move_at_the_ordinary_pace(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
+
     assert view._pane._engine.pace == 4
 
 
@@ -2161,9 +2157,8 @@ def test_a_picture_still_being_generated_moves_on_after_half_the_pace(qtbot):
     view.note_generating("id-run", _png_bytes())
     view.step(1)
 
-    assert view._live_clock.isActive()
-    assert view._live_clock.interval() == 2000
-    view._live_clock.timeout.emit()
+    assert view._early_move_on.interval() == 2000
+    view._early_move_on.timeout.emit()
 
     assert view._playlist.current()[2] == "id-b"
 
@@ -2173,8 +2168,9 @@ def test_a_picture_still_being_generated_under_a_pace_of_nought_is_held(qtbot):
     view.note_generating("id-run", _png_bytes())
 
     view.step(1)
+    view._on_media_ended()
 
-    assert not view._live_clock.isActive()
+    assert view._playlist.current()[2] == "id-run"
 
 
 def test_a_frozen_room_holds_a_picture_still_being_generated_until_it_thaws(qtbot):
@@ -2183,19 +2179,11 @@ def test_a_frozen_room_holds_a_picture_still_being_generated_until_it_thaws(qtbo
     view.step(1)
 
     view.set_paused(True)
-    assert not view._live_clock.isActive()
+    frozen = (view._pane._engine.paused, view._early_move_on.isActive())
     view.set_paused(False)
-    assert view._live_clock.isActive()
 
-
-def test_a_closed_show_lets_go_of_the_clock_on_a_picture_still_being_generated(qtbot):
-    view = _view(qtbot, _THREE, image_dwell_ms=4000)
-    view.note_generating("id-run", _png_bytes())
-    view.step(1)
-
-    view.close()
-
-    assert not view._live_clock.isActive()
+    assert frozen == (True, False)
+    assert (view._pane._engine.paused, view._early_move_on.isActive()) == (False, True)
 
 
 def test_a_show_picked_back_up_opens_on_what_is_being_made_then_where_it_left_off(qtbot):
@@ -2245,7 +2233,7 @@ def test_a_show_told_to_lead_with_what_is_being_made_puts_it_on_screen_now(qtbot
     view.lead_with_what_is_being_made()
 
     assert view._playlist.current()[2] == "id-run"
-    assert view._live_clock.isActive()
+    assert _frame_up(view) == _png_bytes()
 
 
 def test_a_picture_enhanced_during_the_show_steps_its_versions_without_reopening(
@@ -2262,24 +2250,13 @@ def test_a_picture_enhanced_during_the_show_steps_its_versions_without_reopening
     assert view.hud_item_note == "Original — 2 of 2"
 
 
-def _frame_on(view) -> QPixmap:
-    return view._pane._frame
-
-
-def _pixmap_of(data: bytes) -> QPixmap:
-    pixmap = QPixmap()
-    pixmap.loadFromData(data)
-    return pixmap
-
-
 def test_a_picture_being_enhanced_shows_the_enhancement_as_it_comes_in(qtbot):
     view = _view(qtbot, _THREE, image_dwell_ms=4000)
     frame = _png_bytes()
 
     view.note_enhancing({"id-a": "running"}, frames={"id-a": frame})
 
-    assert _frame_on(view).toImage() == _pixmap_of(frame).toImage()
-    assert view._live_clock.isActive()
+    assert _frame_up(view) == frame
 
 
 def test_each_new_frame_of_the_enhancement_replaces_the_last(qtbot):
@@ -2289,7 +2266,7 @@ def test_each_new_frame_of_the_enhancement_replaces_the_last(qtbot):
 
     view.note_enhancing({"id-a": "running"}, frames={"id-a": newer})
 
-    assert _frame_on(view).toImage() == _pixmap_of(newer).toImage()
+    assert _frame_up(view) == newer
 
 
 def test_the_finished_enhancement_takes_the_place_of_its_frames(qtbot):
@@ -2299,7 +2276,49 @@ def test_the_finished_enhancement_takes_the_place_of_its_frames(qtbot):
     view.note_enhanced("id-a", "a_enhanced.png")
 
     assert view._pane._media[0] == "a_enhanced.png"
-    assert not view._live_clock.isActive()
+
+
+def test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    engine = view._pane._engine
+    assert (engine.loaded, len(engine.swapped)) == ([Path("a.png")], 1)
+
+
+def test_a_picture_come_to_while_it_is_enhanced_opens_on_its_newest_frame(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    frame_of_b = _png_bytes(color=(30, 160, 60))
+    view.note_enhancing({"id-b": "running"}, frames={"id-b": frame_of_b})
+
+    view._on_media_ended()
+
+    assert (_frame_up(view), view._pane._engine.swapped) == (frame_of_b, [])
+
+
+def test_a_show_following_a_run_stays_on_it_when_its_pace_runs_out(qtbot, tmp_path):
+    a, b, c = (_png(tmp_path / n) for n in ("a.png", "b.png", "c.png"))
+    view = _view(qtbot, [], frame=_png_bytes(), image_dwell_ms=4000)
+    view.set_playlist([(a, "image", "id-a"), (b, "image", "id-b"), (c, "image", "id-c")], 0)
+
+    view._on_media_ended()
+    still_following = view.is_live() and _frame_up(view) == _png_bytes()
+    _press(view, Qt.Key.Key_Right)
+
+    assert still_following
+    assert view._pane._media == (b, "image")
+
+
+def test_a_locked_picture_being_enhanced_is_held_by_the_lock_not_moved_on_early(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 actions=ShowActions(enhance=lambda prompt_id: True))
+    _press(view, Qt.Key.Key_Down)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view._on_media_ended()
+
+    assert (view._pane._engine.pace, view._early_move_on.isActive()) == (4, False)
 
 
 def test_a_cancelled_enhancement_puts_the_picture_itself_back(qtbot):
@@ -2378,3 +2397,22 @@ def test_a_finished_picture_comes_up_before_the_next_runs_first_frames(qtbot):
 
     assert first_up == "first.png"
     assert view._playlist.current()[2] == "id-second"
+
+
+def test_locking_a_picture_shows_its_enhancement_on_the_move_to_the_finished_picture(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 actions=ShowActions(enhance=lambda prompt_id: True))
+    whole, face, hand = (_png_bytes(color=color) for color in ((1, 2, 3), (4, 5, 6), (7, 8, 9)))
+    engine = view._pane._engine
+
+    _press(view, Qt.Key.Key_Down)
+    for frame in (whole, face, hand):
+        view.note_enhancing({"id-a": "running"}, frames={"id-a": frame})
+    each_on_the_pictures_move = [swapped.read_bytes() for swapped in engine.swapped]
+    view._on_media_ended()
+    the_newest_on_a_move_of_its_own = engine.loaded[-1].read_bytes()
+    view.note_enhanced("id-a", "a_enhanced.png")
+
+    assert each_on_the_pictures_move == [whole, face, hand]
+    assert the_newest_on_a_move_of_its_own == hand
+    assert view.current_media_path() == "a_enhanced.png"

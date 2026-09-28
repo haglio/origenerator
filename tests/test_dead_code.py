@@ -265,7 +265,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 18767 when a show's arrivals began coming up in the order they arrived: what
 # the playlist said about putting each one straight after the picture on
 # screen is test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it.
-MAX_PROSE_LINES = 18767
+#
+# 18756 when a picture still being made put its frames on the engine: the notes
+# on refitting a frame drawn on a label went with the label, and what a frame
+# does now is
+# test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames.
+MAX_PROSE_LINES = 18756
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

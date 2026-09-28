@@ -18,10 +18,12 @@ floated over it -- the stills either side, the panels, the queue -- stacks
 against it the way it already had to stack against a video surface
 (:mod:`origenerator.gui.media_overlay`).
 
-What the engine cannot show is a generation that has no file yet -- the frames
-streaming out of a run in flight, and the wait before the first of them.  Those
-are a fitted pixmap on a label, the page this pane turns to when there is no
-file to open.
+A picture still being made has no file of its own, only the frames ComfyUI
+streams of it; each is written to a file of this pane's and swapped in on the
+engine in the place of the picture on screen, so the frames carry on the move
+and the time that picture had.  What has no frame yet -- the wait before a run's
+first -- is a line on a label, the page this pane turns to when there is nothing
+to open.
 """
 from __future__ import annotations
 
@@ -30,8 +32,7 @@ import os
 from pathlib import Path
 
 from app_support.funscript import read_actions
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -41,8 +42,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from origenerator.config import COMFYUI_OUTPUT_DIR, project_dir
+from origenerator.config import COMFYUI_OUTPUT_DIR, FRAMES_BEING_MADE_DIR, project_dir
 from origenerator.funscript import funscript_of
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funscript_strip import FunscriptStrip
 from origenerator.media import MediaType
 
@@ -54,9 +56,11 @@ logger = logging.getLogger(__name__)
 # engine paints its own window, so drawing is not on this clock.
 _TICK_MS = 16
 
+_ON_SCREEN = "on_screen"
+
 
 class ShowSurface(QWidget):
-    """The show's pane: the engine's picture, with a live run's frames over it."""
+    """The show's pane: the engine's picture, or a line where it would be."""
 
     # The item on screen ran out -- a video that finished, or a picture whose
     # dwell expired.  One signal for both, because to a show they are one thing.
@@ -67,16 +71,15 @@ class ShowSurface(QWidget):
     media_resized = pyqtSignal()
 
     def __init__(self, parent=None, *, engine=None, muted: bool = False,
-                 on_double_click=None, on_press=None):
+                 on_double_click=None, on_press=None, frames: FrameFiles | None = None):
         super().__init__(parent)
+        self._frames = frames or FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")
         self._on_double_click = on_double_click
         self._on_press = on_press
-        # The on-disk media as (path, media_type), or None while a live run's
-        # frames or a message is up.
+        # The on-disk media as (path, media_type), or None while a run's frames
+        # or a message is up.
         self._media: tuple | None = None
-        # The newest frame of a run still being made, kept so a resize redraws
-        # it rather than dropping to an empty label.
-        self._frame: QPixmap | None = None
+        self._opened: Path | None = None
         self._paused = False
         self._dims: tuple[int, int] = (0, 0)
         # What was said about the item on screen already: the engine goes on
@@ -96,14 +99,7 @@ class ShowSurface(QWidget):
         self._picture = QLabel()
         self._picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._picture.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        # The frame it holds must never set a floor under the window: a label
-        # sized by its pixmap keeps the show at the size of the biggest frame
-        # it has shown, and a show is whatever size the screen is.
         self._picture.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        # Refit off the label's OWN resize rather than this widget's: going
-        # fullscreen resizes the label a beat after the window, and a frame
-        # fitted to the not-yet-grown size lands small and centered in black.
-        self._picture.installEventFilter(self)
         self._stack.addWidget(self._picture)
         self._engine_pane = _EnginePane(self)
         self._stack.addWidget(self._engine_pane)
@@ -160,13 +156,25 @@ class ShowSurface(QWidget):
         # Kept as it was handed over, not as a string: what is asked for it
         # afterwards -- the clip to drive the device off, the file to let go of
         # -- is asked in the caller's own spelling.
-        self._media = (path, media_type)
+        self._frames.forget(_ON_SCREEN)
+        self._open(Path(path), media=(path, media_type))
+        self._update_strip(str(path) if media_type == MediaType.VIDEO else None)
+
+    def show_frame(self, data: bytes) -> None:
+        self._frames.forget(_ON_SCREEN)
+        path = self._frames.write(_ON_SCREEN, data)
+        if path is not None:
+            self._open(path, media=None)
+            self._update_strip(None)
+
+    def _open(self, path: Path, *, media) -> None:
+        self._media = media
+        self._opened = path
         self._stack.setCurrentWidget(self._engine_pane)
         self._said = False
         self._dims = (0, 0)
-        self._engine.load(Path(path))
+        self._engine.load(path)
         self._engine.set_paused(self._paused)
-        self._update_strip(str(path) if media_type == MediaType.VIDEO else None)
 
     def current_media_path(self) -> str:
         return str(self._media[0]) if self._media else ""
@@ -179,13 +187,15 @@ class ShowSurface(QWidget):
         """
         self._engine.set_pace(seconds)
 
-    def show_frame(self, data: bytes) -> None:
-        """A frame of a run still being made: no file, so no engine."""
-        pixmap = QPixmap()
-        pixmap.loadFromData(data)
-        self._take_the_pane()
-        self._frame = pixmap
-        self._draw_the_frame()
+    def swap_in_frame(self, data: bytes) -> None:
+        if self._opened is None:
+            self.show_frame(data)
+            return
+        path = self._frames.write(_ON_SCREEN, data)
+        if path not in (None, self._opened):
+            self._media = None
+            self._opened = path
+            self._engine.swap_still(path)
 
     def show_message(self, text: str) -> None:
         """A line where the picture would be -- the wait before a run's first frame."""
@@ -197,28 +207,17 @@ class ShowSurface(QWidget):
         self._take_the_pane()
 
     def _take_the_pane(self) -> None:
-        """Turn to the label, with nothing on it and nothing on the engine.
-
-        A run in flight arrives frame after frame, so the engine is only asked
-        to let go where it was holding something.
-        """
-        if self._media is not None:
+        if self._opened is not None:
             self._engine.stop()
+        self._frames.forget(_ON_SCREEN)
         self._media = None
+        self._opened = None
         self._said = False
-        self._frame = None
         self._picture.clear()
         self._picture.setText("")
         self._strip.set_actions([])
         self._strip.hide()
         self._stack.setCurrentWidget(self._picture)
-
-    def _draw_the_frame(self) -> None:
-        if self._frame is None or self._frame.isNull():
-            return
-        self._picture.setPixmap(self._frame.scaled(
-            self._picture.size(), Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation))
 
     def set_paused(self, paused: bool) -> None:
         """Freeze or resume what is on screen, and keep it frozen across slides:
@@ -244,7 +243,7 @@ class ShowSurface(QWidget):
         """
         width, height = self._engine.video_dims
         area = self._media_host.geometry()
-        if not width or not height or self._media is None:
+        if not width or not height or self._opened is None:
             return area
         drawn = QSize(width, height).scaled(area.size(), Qt.AspectRatioMode.KeepAspectRatio)
         rect = QRect(QPoint(0, 0), drawn)
@@ -295,11 +294,6 @@ class ShowSurface(QWidget):
             self._on_double_click()
         super().mouseDoubleClickEvent(event)
 
-    def eventFilter(self, watched, event):
-        if watched is self._picture and event.type() == QEvent.Type.Resize:
-            self._draw_the_frame()
-        return super().eventFilter(watched, event)
-
     def _follow_the_engine(self) -> None:
         """Carry a still's move on, and pass on whatever the engine has to report."""
         self._engine.push_still()
@@ -307,11 +301,11 @@ class ShowSurface(QWidget):
         if dims != self._dims:
             self._dims = dims
             self.media_resized.emit()
-        if self._media is None or self._said:
+        if self._opened is None or self._said:
             return
         if self._engine.idle:
             self._said = True
-            logger.warning("A show's engine would not open %s", self._media[0])
+            logger.warning("A show's engine would not open %s", self._opened)
             self.media_unplayable.emit()
         elif self._engine.eof:
             self._said = True
@@ -366,6 +360,9 @@ class _NotYetOpened:
         self.muted: bool | None = None
 
     def load(self, path: Path) -> None:
+        self.file = path
+
+    def swap_still(self, path: Path) -> None:
         self.file = path
 
     def set_pace(self, seconds: float) -> None:

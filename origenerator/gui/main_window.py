@@ -21,7 +21,7 @@ from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
-from origenerator.gui.headset_window import HeadsetWindow
+from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.win32 import place_window_in_device_pixels
@@ -240,6 +240,8 @@ class OrigeneratorWindow(QMainWindow):
         bridge.take_back_asked.connect(self._taken_back_to_the_monitors)
 
     def _handed_to_a_headset(self, frames_file, input_file) -> None:
+        logger.info("A headset session has this window now; its picture goes to %s "
+                    "and its presses come from %s", frames_file, input_file)
         self._take_the_window_back()
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=True))
         self._wear_the_desktop_geometry()
@@ -247,6 +249,8 @@ class OrigeneratorWindow(QMainWindow):
             self._fun_time, frames_file=frames_file, input_file=input_file))
 
     def _taken_back_to_the_monitors(self) -> None:
+        logger.info("A session on the monitors has this window now; it stops "
+                    "publishing its picture and parks")
         self._take_the_window_back()
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=False))
         self._sit_at_the_sessions_rect(self._fun_time.main_rect)
@@ -292,7 +296,9 @@ class OrigeneratorWindow(QMainWindow):
             | Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
         )
-        if not session.in_a_headset:
+        if session.in_a_headset:
+            self._fill_the_pictures_cap()
+        else:
             self._sit_at_the_sessions_rect(session.main_rect)
 
     def _wear_the_desktop_geometry(self) -> None:
@@ -304,6 +310,23 @@ class OrigeneratorWindow(QMainWindow):
             self._restore_geometry()
         else:
             self.restoreGeometry(self._found[0])
+        self._fill_the_pictures_cap()
+
+    def _fill_the_pictures_cap(self) -> None:
+        """Open as big as the picture the room is handed can carry.
+
+        A headset room has no monitor to fit this window to and room to spare,
+        so the size worth having is the most detail the channel will take: the
+        cap on the published picture's longest edge, in the shape the window
+        stands alone in.  Left at the size it has on his monitor, the whole
+        desktop layout arrives squeezed into a small window and reads as the
+        shrunken hosted one all over again.
+        """
+        width, height = self.width(), self.height()
+        if width <= 0 or height <= 0:
+            return
+        grow = CAP_PX / max(width, height)
+        self.resize(round(width * grow), round(height * grow))
 
     def _sit_at_the_sessions_rect(self, rect: Rect) -> None:
         # Set here so the window opens near the right size, then pinned to

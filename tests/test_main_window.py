@@ -24,6 +24,7 @@ from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import main_window
+from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -1087,6 +1088,21 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     assert win.isMinimized()
 
 
+def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(
+        qtbot, tmp_path):
+    """The path his own session takes: the desktop session launches this app
+    hosted, he says "enter vr", and the arriving headset session adopts the app
+    it was left and says the crossing on the command file.  A window taken over
+    while standalone crosses (the test below); a window launched hosted is a
+    different constructor, and nothing covered it."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    qtbot.addWidget(win)
+    assert win.hands_its_window_over is None
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+
 def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, tmp_path):
     """A session on the monitors shrank it to the HUD's size; the headset room
     it crosses into has no HUD beside it, so the crossing undoes that."""
@@ -1105,20 +1121,20 @@ def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, 
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
 
-def test_crossing_into_the_headset_gives_the_window_its_desktop_size_back(qtbot, tmp_path):
+def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot, tmp_path):
     """A session on the monitors sat it in the Random Favs Browser's rect.  The
-    headset room it crosses into has no such rect, so it goes back to the size
-    it stood alone at -- and stops being pinned to a monitor's coordinates."""
+    headset room it crosses into has no such rect, so it leaves it — for the
+    size the picture can carry — and stops being pinned to a monitor."""
     win = _window(qtbot, tmp_path)
-    win.resize(640, 480)
-    stood_alone_at = win.size()
-    win.become_hosted(_hosted_with_a_channel(tmp_path))
-    assert win.size() != stood_alone_at
+    monitors = _hosted_with_a_channel(tmp_path)
+    win.become_hosted(monitors)
+    assert (win.width(), win.height()) == (monitors.main_rect.width,
+                                           monitors.main_rect.height)
 
     _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
     qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
 
-    assert win.size() == stood_alone_at
+    assert max(win.width(), win.height()) == CAP_PX
 
 
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
@@ -1137,17 +1153,35 @@ def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, t
     assert win.hands_its_window_over is None
 
 
-def test_a_window_hosted_in_the_headset_keeps_its_desktop_size(qtbot, tmp_path):
+def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, tmp_path):
     """The rect a session names is the Random Favs Browser's, measured off a
-    monitor.  A headset room has no such rect and room to spare, so the window
-    hangs there at the size it has standalone."""
+    monitor a headset room does not have.  How big it opens instead is the test
+    below this one."""
     win = _window(qtbot, tmp_path)
-    win.resize(640, 480)
+    session = _headset_session(tmp_path)
+
+    win.become_hosted(session)
+
+    assert (win.width(), win.height()) != (session.main_rect.width,
+                                           session.main_rect.height)
+
+
+def test_a_window_hosted_in_the_headset_opens_as_big_as_the_picture_can_carry(
+        qtbot, tmp_path):
+    """There is no monitor in a headset room to fit it to, and the picture the
+    room is handed is capped at CAP_PX on its longest edge -- so the window
+    opens at exactly that, in the shape it stands alone in.  Opened at the size
+    it has on his monitor instead, the whole desktop layout arrived squeezed
+    into a small window and read as the cramped hosted one all over again."""
+    win = _window(qtbot, tmp_path)
+    win.resize(400, 300)
     stood_alone_at = win.size()
 
     win.become_hosted(_headset_session(tmp_path))
 
-    assert win.size() == stood_alone_at
+    assert max(win.width(), win.height()) == CAP_PX
+    assert win.width() / win.height() == pytest.approx(
+        stood_alone_at.width() / stood_alone_at.height(), abs=0.02)
 
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):

@@ -4130,7 +4130,7 @@ def _linked_view(qtbot, source="i7", count=12):
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(FakeDB([video] + images))
     qtbot.addWidget(view)
-    view.resize(1100, 700)
+    view.resize(1100, 800)
     view.show()
     qtbot.waitExposed(view)
     view.refresh()

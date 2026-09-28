@@ -123,6 +123,8 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
     assert [[b.command for b in row] for row in hud.console.rows] == [
         ["genau_prev_clip", "genau_next_clip", "main_lock", "genau_weird_clip"],
         ["", "genau_clip_seconds_down", "", "genau_clip_seconds_up"],
+    ]
+    assert [[b.command for b in row] for row in hud.console.osr2_rows] == [
         ["robot_hand_toggle_cruise", "robot_hand_toggle_learned", "robot_hand_cycle_shape",
          "quarter_button", "osr2_control_off", "robot_hand_park", "robot_hand_retract",
          "robot_hand_release"],
@@ -135,8 +137,8 @@ def test_every_button_the_console_declares_does_something_here(qtbot):
     panel, motion, host = _panel(qtbot, control=control)
     motion.active = True
     panel.render_console()
-    declared = [b.command for row in console_hud(motion, host, control=control.state()).console.rows
-                for b in row if b.command]
+    console = console_hud(motion, host, control=control.state()).console
+    declared = [b.command for row in (*console.rows, *console.osr2_rows) for b in row if b.command]
 
     for command in declared:
         before = len(motion.calls) + len(host.calls) + len(control.asked)
@@ -405,7 +407,7 @@ def test_the_slideshows_pace_rides_the_console(qtbot):
     assert hud.console.advance_interval == 7
     assert hud.drive.advance_interval == 7
     assert isinstance(hud, ConsoleHud)
-    assert len(hud.console.rows) == 3
+    assert (len(hud.console.rows), len(hud.console.osr2_rows)) == (2, 1)
 
 
 def test_the_panel_actually_paints(qtbot):

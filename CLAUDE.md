@@ -266,11 +266,16 @@ by fun_time's `standalone_origenerator.py`). A copy Fun Time opens itself never
 refuses, since refusing would leave the session's room with no Origenerator at
 all; it is only ever opened when no copy has offered itself.
 
-A change a Fun Time session reaches gets its hosted half judged too, and
-anything he can see in this app's window is such a change: a session shows the
-same window at its own smaller scale, so bigger toolbar marks handed over in a
-standalone preview alone came back with "Standalone Origenerator alone is
-insufficient" (2026-09-26). Make a
+A change a Fun Time session could show differently gets its hosted half judged
+too. A session draws this same window at its own smaller scale, reaches it with
+its own keys and spoken commands, and runs code only a hosted window runs, so a
+change to a size, to a key or a command, or to hosted-only code owes a Fun Time
+launcher beside the standalone one: bigger toolbar marks handed over in a
+standalone preview alone were sent back for exactly that. A change that looks
+and works the same at any size and in either host, such as taking the dim off a
+picture under the not-yet-generated line, goes out with the standalone preview
+alone; a second launcher would only ask him to accept it twice. When the hosted
+half is owed, make a
 fun_time worktree on fun_time's current `main`, put your Origenerator worktree's
 path in its git-ignored `state/origenerator_dir.txt`, and run
 `python -m fun_time.branch_session --shortcut` from it (fun_time's venv, with

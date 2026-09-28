@@ -27,7 +27,7 @@ from player_core.console import (
     OSR2_RETRACTED,
 )
 from player_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
-from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from player_core.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
 from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -55,11 +55,28 @@ class Osr2Control(QObject):
         self._checked = False
         # Whether a Fun Time session beside this window has claimed the device.
         self._session_has_it = False
+        self._max_intensity = FULL_INTENSITY
 
     def drive_with(self, motion, script) -> None:
         self.setChecked(False)
         self._motion = motion
         self.script = script
+        self._hold_the_drivers_to_the_max_intensity()
+
+    @property
+    def max_intensity(self) -> int:
+        return self._max_intensity
+
+    def set_max_intensity(self, level: int) -> None:
+        self._max_intensity = max(0, min(FULL_INTENSITY, level))
+        self._hold_the_drivers_to_the_max_intensity()
+        self.changed.emit()
+
+    def _hold_the_drivers_to_the_max_intensity(self) -> None:
+        if self._motion is not None:
+            self._motion.set_max_intensity(self._max_intensity)
+        if self.script is not None:
+            self.script.max_intensity = self._max_intensity
 
     def isEnabled(self) -> bool:  # noqa: N802 - a button's name, deliberately
         """Whether this app may drive the device at all.

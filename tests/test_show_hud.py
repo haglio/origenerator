@@ -101,6 +101,15 @@ class TestTheOnePanelAShowWears:
         assert model.osr2 != ""          # who has the device
         assert model.drive is not None   # and the motion it is being sent
 
+    def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(self, qtbot):
+        show = self._show(qtbot)
+        show._motion.set_max_intensity(35)
+
+        assert show_hud_model("portrait", show, device=show.hud_device).max_intensity == 35
+
+    def test_a_show_that_is_not_driving_the_device_carries_no_max_intensity(self, qtbot):
+        assert show_hud_model("portrait", self._show(qtbot)).max_intensity is None
+
     def test_the_pace_rides_with_the_rows_that_step_the_set(self, qtbot):
         """It sets how long an unheld slide stays up, which is about the set."""
         posted = [button.command for row in self._model(qtbot).rows for button in row]

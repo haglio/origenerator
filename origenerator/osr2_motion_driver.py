@@ -264,6 +264,10 @@ class Osr2MotionDriver(QObject):
             with self._lock:
                 motion_engine.set_center(self._state.state, value)
 
+    def set_max_intensity(self, value: int) -> None:
+        with self._lock:
+            motion_engine.set_max_intensity(self._state.state, value)
+
     def cycle_shape(self, step: int = 1) -> None:
         if self._held_at is None:
             with self._lock:
@@ -358,10 +362,8 @@ class Osr2MotionDriver(QObject):
             held, self._held, self._held_at = self._held, None, None
             if held is None:
                 return
-            dials = self._state.state
-            motion_engine.set_amplitude(dials, held.amplitude)
-            motion_engine.set_center(dials, held.center)
-            motion_engine.set_speed(dials, held.speed)
+            motion_engine.set_dials(self._state.state, speed=held.speed,
+                                    amplitude=held.amplitude, center=held.center)
             if held.cruise:
                 motion_engine.enable_cruise_control(self._state)
 

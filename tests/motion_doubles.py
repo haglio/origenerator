@@ -63,6 +63,10 @@ class FakeMotion:
     def release(self):
         self.calls.append("release")
 
+    def set_max_intensity(self, level):
+        self.calls.append(("max_intensity", level))
+        self.state.state.max_intensity = level
+
 
 class FakeHost:
     """Stands in for the slideshow the transport and the pace act on."""

@@ -11982,6 +11982,9 @@ class _SignalMotion(QObject):
         self.held_at = None
         self.calls.append(("release",))
 
+    def set_max_intensity(self, level):
+        self.state.state.max_intensity = level
+
     def toggle(self):
         self.active = not self.active
         self.calls.append(("toggle", self.active))

@@ -12,6 +12,7 @@ from player_core.drive_readout import CONTROL_TIPS, track_command
 from origenerator.console_commands import (
     ROBOT_HAND,
     level_asked_for,
+    max_intensity_asked_for,
     side_press,
     side_spoken_to,
     spelled_for,
@@ -43,6 +44,17 @@ def test_a_press_that_is_not_a_level_is_left_for_the_rest_of_the_router():
     assert level_asked_for(f"{ROBOT_HAND}amp_") is None
     assert level_asked_for("main_lock") is None
     assert level_asked_for("") is None
+
+
+def test_the_max_intensity_a_slider_posts_is_read_back_as_the_level_it_set():
+    track = drive_layout.DriveTrack((0, 0, 101, 14), drive_layout.MAX_INTENSITY, "")
+
+    assert max_intensity_asked_for(track_command(track, 30, 7)) == 30
+
+
+def test_a_press_that_is_not_the_max_intensity_leaves_it_alone():
+    assert max_intensity_asked_for(f"{ROBOT_HAND}speed_30") is None
+    assert max_intensity_asked_for(f"{drive_layout.MAX_INTENSITY}_loud") is None
 
 
 def test_a_side_press_is_the_verb_it_asks_and_what_it_carries():

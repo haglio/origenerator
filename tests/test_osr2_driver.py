@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from player_core.funscript import Funscript
+
 from origenerator.osr2_driver import Osr2Driver
 
 
@@ -60,6 +62,19 @@ def test_poll_wraps_position_onto_a_looping_clip(qapp):
     assert broker.positions[-1] == (100, 400)
 
 
+def test_a_script_past_the_max_intensity_is_streamed_as_shallow_as_it_leaves(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.max_intensity = 30
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.poll()
+
+    script = Funscript(actions=[(a["at"], a["pos"]) for a in ACTIONS])
+    assert broker.positions[-1] == (
+        round(script.paced_position_at(500, 1.0, max_intensity=30)), 400)
+
+
 def test_stop_parks_the_device(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
@@ -101,6 +116,17 @@ def test_the_line_it_draws_is_the_script_from_the_playhead_forward(qapp):
     assert heights[0] == 0.0     # the script opens on the floor
     assert heights[2] == 1.0     # its peak, half a second in
     assert heights[4] == 0.0     # and back down by the end
+
+
+def test_the_line_it_draws_gives_up_the_depth_the_max_intensity_takes(qapp):
+    driver = Osr2Driver(broker=FakeBroker())
+    driver.max_intensity = 30
+    driver.start(FakePlayer(pos=0), ACTIONS)
+
+    heights = driver.trace(5, 1.0)
+
+    script = Funscript(actions=[(a["at"], a["pos"]) for a in ACTIONS])
+    assert heights[2] == script.paced_position_at(500, 1.0, max_intensity=30) / 100
 
 
 def test_the_line_folds_onto_the_script_the_way_the_stream_does(qapp):

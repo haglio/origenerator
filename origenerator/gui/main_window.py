@@ -49,6 +49,7 @@ SESSION_UI_STATE = (
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
     ("gallery_combine", GalleryView.combine_selection, GalleryView.restore_combine_selection),
     ("osr2_enabled", GalleryView.osr2_state, GalleryView.restore_osr2_state),
+    ("max_intensity", GalleryView.max_intensity, GalleryView.set_max_intensity),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
     ("audio_enabled", GalleryView.audio_enabled, GalleryView.set_audio_enabled),
     # The mic switch. Absent from a session saved before it was persisted — and
@@ -70,7 +71,8 @@ SESSION_UI_STATE = (
 # __init__), so neither is a view getter and neither belongs in the table.
 _GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
-_SWITCHES_THE_SESSION_OWNS = frozenset({"audio_enabled", "osr2_enabled", "mic_enabled"})
+_SWITCHES_THE_SESSION_OWNS = frozenset(
+    {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity"})
 
 SESSION_PERSIST_INTERVAL_MS = 5_000
 

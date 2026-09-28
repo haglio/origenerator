@@ -5,7 +5,7 @@ import threading
 import time
 
 from player_core.learned_model import LearnedModel, Phrase, classify
-from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER, RobotHandState, set_max_intensity
 
 from origenerator import motion_engine
 from origenerator.osr2_motion_driver import (
@@ -321,6 +321,32 @@ def test_a_hold_refuses_every_dial_that_would_break_it(qtbot):
     assert driver.state.state.amplitude == 0
     assert driver.state.state.center == PARK_CENTER
     assert driver.state.cruise.active is False
+
+
+def test_the_max_intensity_is_the_devices_to_keep_even_through_a_hold(qtbot):
+    driver, _broker, _clock = _driver(qtbot)
+    driver.start()
+    driver.hold(PARK_CENTER)
+
+    driver.set_max_intensity(30)
+
+    assert driver.state.state.max_intensity == 30
+
+
+def test_a_hold_let_go_under_a_lowered_max_intensity_gives_back_the_motion_pushed_down(qtbot):
+    driver, _broker, _clock = _driver(qtbot)
+    driver.set_amplitude(90)
+    driver.set_speed(90)
+    dials = driver.state.state
+    pushed = RobotHandState(amplitude=90, speed=90, intended_center=dials.intended_center)
+    set_max_intensity(pushed, 30)
+    driver.hold(PARK_CENTER)
+    driver.set_max_intensity(30)
+
+    driver.release()
+
+    assert (dials.speed, dials.amplitude, dials.center) == (
+        pushed.speed, pushed.amplitude, pushed.center)
 
 
 def test_the_dials_answer_again_once_the_hold_is_let_go(qtbot):

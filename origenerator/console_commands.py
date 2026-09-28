@@ -38,16 +38,19 @@ class Level(NamedTuple):
 
 
 def level_asked_for(action: str) -> Level | None:
-    """*action* as the level it sets, or ``None`` for any other press.
-
-    The bands post a whole number rather than a step, so this is the one verb
-    whose name carries a value; everything else is a word.
-    """
+    """*action* as the level it sets, or ``None`` for any other press."""
     if not action.startswith(ROBOT_HAND):
         return None
     axis, _, value = action.removeprefix(ROBOT_HAND).rpartition("_")
     if axis in AXES and value.isdigit():
         return Level(axis, int(value))
+    return None
+
+
+def max_intensity_asked_for(action: str) -> int | None:
+    value = action.removeprefix(f"{drive_layout.MAX_INTENSITY}_")
+    if value != action and value.isdigit():
+        return int(value)
     return None
 
 

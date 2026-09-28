@@ -51,6 +51,14 @@ def _press(panel, action):
     panel._post(panel._painter.press_at(x + w // 2 + margin, y + h // 2 + margin))
 
 
+def _slide(panel, along: float) -> None:
+    max_intensity = next(t for t in panel._painter.tracks if t.axis == drive_layout.MAX_INTENSITY)
+    x, y, w, h = max_intensity.rect
+    margin = MotionPanel.MARGIN
+    panel._post(panel._painter.press_at(x + round(along * (w - 1)) + margin,
+                                        y + h // 2 + margin))
+
+
 def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
     # Over a show the two switches saying what it may play are on the players'
     # HUD this panel sits under, and a second pair here would be two switches
@@ -161,6 +169,7 @@ class FakeControl(QObject):
         self._state = state
         self.script = script
         self.asked = []
+        self.max_intensities = []
 
     def source(self):
         if self.script is not None and self.script.active:
@@ -173,6 +182,35 @@ class FakeControl(QObject):
     def set_state(self, state):
         self._state = state
         self.asked.append(state)
+
+    def set_max_intensity(self, level):
+        self.max_intensities.append(level)
+
+
+def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(qtbot):
+    motion = FakeMotion()
+    motion.set_max_intensity(35)
+
+    assert console_hud(motion, FakeHost()).console.max_intensity == 35
+
+
+def test_the_max_intensity_slider_asks_the_apps_one_switch_for_the_level(qtbot):
+    control = FakeControl()
+    panel, motion, _host = _panel(qtbot, control=control)
+    panel.render_console()
+
+    _slide(panel, 1.0)
+
+    assert control.max_intensities == [100] and motion.calls == []
+
+
+def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
+    panel, motion, _host = _panel(qtbot)
+    panel.render_console()
+
+    _slide(panel, 0.0)
+
+    assert motion.calls == [("max_intensity", 0)]
 
 
 def test_the_control_group_asks_the_apps_one_switch(qtbot):

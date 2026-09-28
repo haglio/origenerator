@@ -7951,7 +7951,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     win = _preview_of(view).open_fullscreen()  # the double-click, mid-generation
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
-    assert not win._pane._frame.isNull()  # seeded with the frame
+    assert win._pane._opened.read_bytes() == _png_bytes()  # seeded with the frame
 
     buf = BytesIO()
     Image.new("RGB", (8, 8), (200, 30, 30)).save(buf, format="PNG")  # a later, redder frame

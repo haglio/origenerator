@@ -154,8 +154,8 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        self._live_clock = HoldableTimer(self)
-        self._live_clock.timeout.connect(self._on_media_ended)
+        self._early_move_on = HoldableTimer(self)
+        self._early_move_on.timeout.connect(self._on_media_ended)
         self._frames_on_screen = False
         self._hud = None
 
@@ -243,6 +243,7 @@ class SlideshowView(QWidget):
         if self._live:
             # Nothing on disk yet: the run's own frames stand in for a slide.
             if self._frame is not None:
+                self._pane.set_pace(self._dwell_s)
                 self._pane.show_frame(self._frame)
             else:
                 self._pane.show_message(GENERATING)  # opened before the first one
@@ -256,11 +257,11 @@ class SlideshowView(QWidget):
         frame = self._set.frame_being_made_of(slide)
         self._frames_on_screen = frame is not None
         if self._frames_on_screen:
+            self._pane.set_pace(self._dwell_s)
             self._pane.show_frame(frame)
-            self._start_the_live_clock()
         else:
-            self._live_clock.cancel()
             self._open_on_engine(slide.path, slide.media_type)
+        self._move_on_early_from(slide)
         self._update_counter()
         self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
@@ -271,17 +272,15 @@ class SlideshowView(QWidget):
 
     def _open_on_engine(self, path, media_type) -> None:
         # The pace before the file: the engine reads it as it opens one.
-        self._pane.set_pace(self._pace_on_screen())
+        self._pane.set_pace(self._dwell_s)
         self._pane.show_media(path, media_type)
 
-    def _pace_on_screen(self) -> float:
-        return self._set.pace_for(self._playlist.current(), self._dwell_s)
-
-    def _start_the_live_clock(self) -> None:
-        if self._dwell_s:
-            self._live_clock.run_for(int(self._pace_on_screen() * 1000))
+    def _move_on_early_from(self, slide) -> None:
+        held_for = self._set.pace_for(slide, self._dwell_s)
+        if held_for < self._dwell_s and not self._playlist.locked:
+            self._early_move_on.run_for(int(held_for * 1000))
         else:
-            self._live_clock.cancel()
+            self._early_move_on.cancel()
 
     def _apply_freeze(self) -> None:
         """Hand the engine whatever is holding the show still.
@@ -297,7 +296,7 @@ class SlideshowView(QWidget):
                                     and not self._pane.is_showing_video())
         held = self._paused or request_stills_a_picture
         self._pane.set_paused(held)
-        self._live_clock.hold(held)
+        self._early_move_on.hold(held)
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -408,7 +407,7 @@ class SlideshowView(QWidget):
         self._set.remember(slide)
         if self._playlist.replace_live(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
-                self._show_current()  # the file itself now, and on a clock again
+                self._show_current()  # the file itself now
             self._update_neighbors()  # it may be the still riding either side
             return
         # Into the pass only past the switches: a show narrowed to its favorites
@@ -435,7 +434,7 @@ class SlideshowView(QWidget):
             return  # already following one run full-screen; this is that job
         if self._playlist.update_live(prompt_id, frame):
             if self._current_prompt_id() == prompt_id:
-                self._pane.show_frame(frame)
+                self._pane.swap_in_frame(frame)
             else:
                 self._update_neighbors()  # it may be the still riding either side
             return
@@ -570,7 +569,7 @@ class SlideshowView(QWidget):
         it has landed (or the show has stepped away), which is no longer this run."""
         if self._live:
             self._frame = data
-            self._pane.show_frame(data)
+            self._pane.swap_in_frame(data)
 
     def show_landed(self, media: tuple, generation: str | None) -> None:
         """The followed generation finished: its saved file takes the place of
@@ -949,7 +948,7 @@ class SlideshowView(QWidget):
         self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
-        self._pane.set_pace(self._pace_on_screen())
+        self._pane.set_pace(self._dwell_s)
         if not self._playlist.locked:
             # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.
@@ -957,13 +956,13 @@ class SlideshowView(QWidget):
 
     def _on_media_ended(self):
         """The item ran out — a clip that finished, or a picture whose dwell
-        expired.  Replay it while locked, else move on. A lock is
+        expired.  Replay it while locked or following a run, else move on. A lock is
         repeat-one here, as it is on a Fun Time satellite — and a pace of nought
         holds the clip the same way, since nought means nothing moves on its own.
         A request being spoken stops it too: paging on mid-sentence is exactly
         what that pause exists to stop.
         """
-        if self._playlist.locked_or_paused() or not self._dwell_s:
+        if self._live or self._playlist.locked_or_paused() or not self._dwell_s:
             self._show_current()
         else:
             self._advance()
@@ -1092,9 +1091,10 @@ class SlideshowView(QWidget):
         if current is None or self._live or self._levels.stepping:
             return
         frame = self._set.frame_being_made_of(current)
-        if frame is not None and self._frames_on_screen:
-            self._pane.show_frame(frame)
-        elif (frame is not None) != self._frames_on_screen:
+        if frame is not None:
+            self._frames_on_screen = True
+            self._pane.swap_in_frame(frame)
+        elif self._frames_on_screen:
             self._show_current()
 
     def lead_with_what_is_being_made(self) -> None:
@@ -1169,6 +1169,7 @@ class SlideshowView(QWidget):
         it twice in two ways.
         """
         if self._playlist.toggle_lock():
+            self._early_move_on.cancel()
             self.favorite()
             self._update_counter()
             if self._actions.lock is not None:
@@ -1320,7 +1321,7 @@ class SlideshowView(QWidget):
         self.hide()
         self._pane.clear()  # release any held file so it can be deleted
         self._pane.close_engine()
-        self._live_clock.cancel()
+        self._early_move_on.cancel()
         landing = self._land_on
         if landing is None and self._playlist.locked:
             landing = self._current_prompt_id()

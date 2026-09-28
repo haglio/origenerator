@@ -928,36 +928,44 @@ def _middle_of_the_media(w) -> QColor:
     return shot.pixelColor(shot.width() // 2, shot.height() // 2)
 
 
+def _show_a_red_video(w, tmp_path):
+    w.show_video(tmp_path / "clip.mp4")
+    w._video.video_sink().setVideoFrame(_video_frame("red"))
+
+
+def _show_a_red_still(w, tmp_path):
+    path = tmp_path / "red.png"
+    Image.new("RGB", (64, 36), (255, 0, 0)).save(path, "PNG")
+    w.show_image(path)
+
+
 def test_a_playing_video_is_drawn_in_the_preview_itself(make_preview, tmp_path):
     w = make_preview()
     w.resize(320, 240)
-    w.show_video(tmp_path / "clip.mp4")
 
-    w._video.video_sink().setVideoFrame(_video_frame("red"))
+    _show_a_red_video(w, tmp_path)
 
     assert _middle_of_the_media(w) == QColor("red")
 
 
-def test_the_notice_darkens_a_playing_video_as_it_does_a_still(make_preview, tmp_path):
+@pytest.mark.parametrize("show_red", [_show_a_red_video, _show_a_red_still],
+                         ids=["video", "still"])
+def test_a_notice_leaves_the_picture_under_it_as_it_was(make_preview, tmp_path, show_red):
     w = make_preview()
     w.resize(320, 240)
-    w.show_video(tmp_path / "clip.mp4")
-    w._video.video_sink().setVideoFrame(_video_frame("red"))
+    show_red(w, tmp_path)
 
     w.set_notice("(not yet generated with modifications)")
 
-    darkened = _middle_of_the_media(w)
-    assert 0 < darkened.red() < 200
-    assert darkened.green() == darkened.blue() == 0
+    assert _middle_of_the_media(w) == QColor("red")
 
 
 def test_a_preview_starts_with_no_notice(make_preview):
     w = make_preview()
     assert w._notice.isHidden()
-    assert w._notice_dim.isHidden()
 
 
-def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
+def test_a_notice_says_its_piece(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
 
@@ -965,24 +973,21 @@ def test_a_notice_dims_the_media_and_says_its_piece(make_preview, tmp_path):
 
     assert not w._notice.isHidden()
     assert w._notice.text() == "(not yet generated with modifications)"
-    assert not w._notice_dim.isHidden()  # the picture under it is dimmed
 
 
-def test_the_dim_covers_the_media_and_the_plate_sits_top_left(make_preview, tmp_path):
+def test_the_plate_sits_in_the_top_left_corner_clear_of_both_edges(make_preview, tmp_path):
     w = make_preview()
     w._media_host.resize(300, 200)
     w.show_image(_make_png(tmp_path / "p.png"))
 
     w.set_notice("modified")
 
-    assert w._notice_dim.geometry() == w._media_host.rect()   # the whole picture
-    # ...and the message in its top-left corner, clear of both edges.
     assert 0 < w._notice.x() < w._media_host.width() // 2
     assert 0 < w._notice.y() < w._media_host.height() // 2
     assert w._notice.width() <= w._media_host.width()
 
 
-def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
+def test_clearing_the_notice_takes_it_away(make_preview, tmp_path):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     w.set_notice("modified")
@@ -990,7 +995,6 @@ def test_clearing_the_notice_takes_the_dim_with_it(make_preview, tmp_path):
     w.set_notice(None)
 
     assert w._notice.isHidden()
-    assert w._notice_dim.isHidden()
 
 
 @pytest.mark.parametrize("show", [
@@ -1011,7 +1015,6 @@ def test_a_new_view_drops_the_notice_about_the_last_one(make_preview, tmp_path, 
     show(w, tmp_path)
 
     assert w._notice.isHidden()
-    assert w._notice_dim.isHidden()
 
 
 def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path):
@@ -1028,7 +1031,6 @@ def test_frames_of_the_picture_itself_leave_the_notice_up(make_preview, tmp_path
 
     assert not w._notice.isHidden()
     assert w._notice.text() == "modified"
-    assert not w._notice_dim.isHidden()  # dimmed over the frames as well
 
 
 def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
@@ -1042,22 +1044,21 @@ def test_a_kept_notice_rides_over_the_frame_that_lands_under_it(make_preview, tm
 
     order = w._media_host.children()
     assert order.index(w._notice) > order.index(w._image_label)
-    assert order.index(w._notice_dim) > order.index(w._image_label)
 
 
-def test_resizing_re_places_the_notice(make_preview, tmp_path):
+def test_narrowing_the_pane_wraps_the_plate_to_fit_inside_it(make_preview, tmp_path):
     w = make_preview()
-    w._media_host.resize(300, 200)
+    w._media_host.resize(600, 200)
     w.show_image(_make_png(tmp_path / "p.png"))
-    w.set_notice("modified")
+    w.set_notice("(not yet generated with modifications)")
     old = w._image_label.size()
 
-    w._media_host.resize(500, 400)
-    w._image_label.resize(500, 400)
+    w._media_host.resize(120, 200)
+    w._image_label.resize(120, 200)
     # The label's resize is what the pane's refit rides on (see eventFilter).
-    QApplication.sendEvent(w._image_label, QResizeEvent(QSize(500, 400), old))
+    QApplication.sendEvent(w._image_label, QResizeEvent(QSize(120, 200), old))
 
-    assert w._notice_dim.geometry() == w._media_host.rect()
+    assert w._notice.x() + w._notice.width() <= w._media_host.width()
 
 
 

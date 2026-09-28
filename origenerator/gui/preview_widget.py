@@ -59,9 +59,6 @@ from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
 
-# The notice laid over media that no longer matches the settings beside it: a
-# plate carrying the message, over a dimmed picture (see set_notice).
-_NOTICE_DIM = "background: rgba(0, 0, 0, 130);"
 _NOTICE_PLATE = ("color: white; background: rgba(0, 0, 0, 200);"
                  " padding: 6px 12px; border-radius: 4px;")
 _NOTICE_MARGIN = 12  # how far the plate floats from the media's top-left corner
@@ -197,10 +194,6 @@ class PreviewWidget(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
-        self._notice_dim = QLabel(media_host)
-        self._notice_dim.setStyleSheet(_NOTICE_DIM)
-        self._notice_dim.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._notice_dim.hide()
         self._notice = QLabel(media_host)
         self._notice.setStyleSheet(_NOTICE_PLATE)
         self._notice.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
@@ -372,7 +365,7 @@ class PreviewWidget(QWidget):
         self._stack.setCurrentWidget(self._image_label)
 
     def set_notice(self, text: str | None) -> None:
-        """Dim the media under ``text``, or take the notice away (``None``).
+        """Write ``text`` over the media, or take the notice away (``None``).
 
         For a pane whose picture no longer answers the settings beside it: the
         media stays on screen — it is still the last thing generated — but is
@@ -382,26 +375,22 @@ class PreviewWidget(QWidget):
         """
         if not text:
             self._notice.hide()
-            self._notice_dim.hide()
             return
         if not self._notice.isHidden() and self._notice.text() == text:
             return  # already saying exactly this — don't re-raise it mid-typing
         self._notice.setText(text)
-        self._notice_dim.show()
         self._notice.show()
         self._place_notice()
         self._raise_notice()
 
     def _place_notice(self) -> None:
-        """Spread the dim over the whole media area and float the message plate
-        in its top-left corner.
+        """Float the message plate in the media's top-left corner.
 
         The plate stays one line wherever the pane is wide enough for it, and
         wraps only where it isn't: ``adjustSize`` on a wrapping label picks a
         squarish block instead, which turns a one-line message into a slab.
         """
         host = self._media_host
-        self._notice_dim.setGeometry(host.rect())
         limit = max(1, host.width() - 2 * _NOTICE_MARGIN)
         self._notice.setWordWrap(False)
         self._notice.adjustSize()
@@ -413,9 +402,6 @@ class PreviewWidget(QWidget):
     def _raise_notice(self) -> None:
         """A stacked layout raises the widget it switches to above every sibling
         it has, the notice included."""
-        if self._notice.isHidden():
-            return
-        self._notice_dim.raise_()
         self._notice.raise_()
 
     def _end_live(self, media: tuple | None) -> None:

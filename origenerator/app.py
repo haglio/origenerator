@@ -744,11 +744,10 @@ def main(argv: list[str] | None = None) -> int:
     if still_offered:
         _bring_to_front(window)
 
-    from origenerator.freeze_watch import FreezeWatch
-    freeze_watch = FreezeWatch(crash_log) if crash_log is not None else None
+    from origenerator.freeze_watch import watch_the_window
+    if crash_log is not None:
+        watch_the_window(app, crash_log)
     exit_code = app.exec()
-    if freeze_watch is not None:
-        freeze_watch.stop()
     if watch is not None:
         watch.withdraw()
     client.stop()

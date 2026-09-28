@@ -1205,6 +1205,13 @@ class GalleryView(QWidget):
         self._osr2_left_in = saved
         self.osr2_control.restore(saved)
 
+    def max_intensity(self) -> int:
+        return self.osr2_control.max_intensity
+
+    def set_max_intensity(self, saved) -> None:
+        if isinstance(saved, int):
+            self.osr2_control.set_max_intensity(saved)
+
     # --- the audio bed: one app-global switch, following nothing on screen ----
 
     def _on_audio_toggle(self, on: bool):

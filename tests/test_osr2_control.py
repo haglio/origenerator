@@ -29,6 +29,9 @@ class FakeMotion:
         self.held_at = None
         self.calls.append("release")
 
+    def set_max_intensity(self, level):
+        self.calls.append(("max_intensity", level))
+
 
 def _control(motion=None):
     return Osr2Control(motion if motion is not None else FakeMotion())
@@ -204,6 +207,27 @@ def test_a_switch_handed_its_drivers_back_drives_them_again():
     control.set_state(OSR2_DRIVING)
 
     assert control.state() == OSR2_DRIVING and control.source() == "funscript"
+
+
+def test_the_max_intensity_reaches_both_drivers():
+    motion, script = FakeMotion(), FakeScript()
+    control = _control(motion)
+    control.drive_with(motion, script)
+
+    control.set_max_intensity(30)
+
+    assert (control.max_intensity, motion.calls[-1], script.max_intensity) == (30, ("max_intensity", 30), 30)
+
+
+def test_drivers_handed_over_after_the_max_intensity_was_set_are_held_to_it():
+    control = _control()
+    control.drive_with(None, None)
+    control.set_max_intensity(30)
+    motion, script = FakeMotion(), FakeScript()
+
+    control.drive_with(motion, script)
+
+    assert (motion.calls, script.max_intensity) == ([("max_intensity", 30)], 30)
 
 
 def test_a_session_taking_the_device_puts_the_switch_off_and_keeps_it_there():

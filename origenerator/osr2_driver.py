@@ -13,6 +13,7 @@ import logging
 
 from app_support.funscript import read_actions
 from player_core.funscript import Funscript
+from player_core.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
@@ -46,12 +47,10 @@ class Osr2Driver(QObject):
         super().__init__(parent)
         self._broker = broker or Osr2Broker()
         self._player = None
-        self._actions: list[tuple[int, int]] = []  # (at_ms, pos), sorted by time
-        # The same actions as the family's own model, for the line the console
-        # draws: where the script has the device at any moment.
         self._script: Funscript | None = None
         self._duration_ms = 0
         self._streaming = False
+        self.max_intensity = FULL_INTENSITY
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
@@ -66,13 +65,12 @@ class Osr2Driver(QObject):
         if not actions:
             return
         self._player = player
-        self._actions = sorted((int(a["at"]), int(a["pos"])) for a in actions)
-        self._script = Funscript(self._actions)
-        self._duration_ms = self._actions[-1][0]
+        self._script = Funscript(sorted((int(a["at"]), int(a["pos"])) for a in actions))
+        self._duration_ms = self._script.actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
         self._timer.start()
         logger.info("OSR2 drive engaged: %d actions, %d ms",
-                    len(self._actions), self._duration_ms)
+                    len(self._script.actions), self._duration_ms)
 
     def stop(self) -> None:
         """Release the device: stop streaming and park it."""
@@ -80,7 +78,6 @@ class Osr2Driver(QObject):
             return
         self._timer.stop()
         self._player = None
-        self._actions = []
         self._script = None
         self._duration_ms = 0
         self._broker.park()
@@ -104,7 +101,8 @@ class Osr2Driver(QObject):
             return ()
         now = int(self._player.position())
         step = seconds * 1000 / max(1, count - 1)
-        return tuple(self._script.position_at(self._folded(now + round(i * step))) / 100
+        return tuple(self._script.paced_position_at(self._folded(now + round(i * step)), 1.0,
+                                                    max_intensity=self.max_intensity) / 100
                      for i in range(count))
 
     def _folded(self, at_ms: int) -> int:
@@ -124,20 +122,21 @@ class Osr2Driver(QObject):
             return
         now_ms = self._folded(int(player.position()))  # the preview loops
         pos, interval = self._next_target(now_ms)
-        if pos is not None:
-            self._broker.send_position(pos, interval)
-            if not self._streaming:
-                self._streaming = True
-                logger.info("OSR2 drive streaming: first T-code pos=%d interval=%d "
-                            "(playhead %d ms)", pos, interval, now_ms)
+        self._broker.send_position(pos, interval)
+        if not self._streaming:
+            self._streaming = True
+            logger.info("OSR2 drive streaming: first T-code pos=%d interval=%d "
+                        "(playhead %d ms)", pos, interval, now_ms)
 
-    def _next_target(self, now_ms: int):
+    def _next_target(self, now_ms: int) -> tuple[int, int]:
         """The next action strictly after ``now_ms`` and the time until it — or, past
         the last action, the first action of the next loop."""
-        for at, pos in self._actions:
+        actions = self._script.actions
+        for at, _pos in actions:
             if at > now_ms:
-                return pos, max(1, at - now_ms)
-        if self._actions:
-            at, pos = self._actions[0]
-            return pos, max(1, self._duration_ms - now_ms + at)
-        return None, 0
+                return self._aimed_at(at), max(1, at - now_ms)
+        at = actions[0][0]
+        return self._aimed_at(at), max(1, self._duration_ms - now_ms + at)
+
+    def _aimed_at(self, at_ms: int) -> int:
+        return round(self._script.paced_position_at(at_ms, 1.0, max_intensity=self.max_intensity))

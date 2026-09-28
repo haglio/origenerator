@@ -269,6 +269,22 @@ def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     assert state.get("osr2_enabled") == OSR2_RETRACTED
 
 
+def test_reopens_with_the_osr2_held_to_the_max_intensity_it_was_left_at(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("max_intensity", 35)
+    win = _window(qtbot, tmp_path, state)
+    assert win._gallery_view.osr2_control.max_intensity == 35
+
+
+def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    win = _window(qtbot, tmp_path, state)
+    win._gallery_view.osr2_control.set_max_intensity(35)
+
+    win.close()
+    assert state.get("max_intensity") == 35
+
+
 def test_restores_the_audio_switch_from_app_state(qtbot, tmp_path):
     # Left on, the audio bed comes back on at the next launch — the same standing
     # preference the OSR2 and experiments switches are.
@@ -1147,13 +1163,15 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     view.set_audio_enabled(True)
     view.osr2_control.set_state(OSR2_RETRACTED)
     view.set_mic_enabled(True)
+    view.osr2_control.set_max_intensity(35)
 
     win.become_hosted(_fun_time_session())
     win.close()
 
     saved = AppState(path)
-    assert [saved.get(key) for key in ("audio_enabled", "osr2_enabled", "mic_enabled")] == [
-        True, OSR2_RETRACTED, True]
+    assert [saved.get(key) for key in (
+        "audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity")] == [
+        True, OSR2_RETRACTED, True, 35]
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

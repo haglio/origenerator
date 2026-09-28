@@ -43,6 +43,8 @@ from player_core.robot_hand import (
     position_fraction,
     set_amplitude,
     set_center,
+    set_dials,
+    set_max_intensity,
     set_speed,
 )
 from player_core.robot_hand import trace_window as wave_trace_window
@@ -69,6 +71,8 @@ __all__ = [
     "quarter_offset",
     "set_amplitude",
     "set_center",
+    "set_dials",
+    "set_max_intensity",
     "set_speed",
     "tick_cruise_control",
     "tick_learned_motion",
@@ -206,7 +210,7 @@ def _wave_position(motion: Motion) -> float:
     # under a repaint, and asking twice can be answered twice differently.
     stack = motion.cruise.stack
     if stack:
-        return wave_stack.position(stack, motion.clock)
+        return wave_stack.position(stack, motion.clock, max_intensity=motion.state.max_intensity)
     return _at(motion, motion.phase)
 
 
@@ -233,7 +237,8 @@ def position_ahead(motion: Motion, lead_s: float) -> float:
         return learned_motion.position(motion.learned, motion.state, lead_s)
     stack = motion.cruise.stack
     if stack:
-        return wave_stack.position_ahead(stack, motion.clock, lead_s)
+        return wave_stack.position_ahead(stack, motion.clock, lead_s,
+                                         max_intensity=motion.state.max_intensity)
     return _at(motion, motion.phase + lead_s * motion.state.bpm / 60.0)
 
 
@@ -252,7 +257,8 @@ def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[floa
         return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
     stack = motion.cruise.stack
     if stack:
-        return wave_stack.trace_window(stack, motion.clock, samples, span_s)
+        return wave_stack.trace_window(stack, motion.clock, samples, span_s,
+                                       max_intensity=motion.state.max_intensity)
     state = motion.state
     return wave_trace_window(
         state.shape, state.amplitude, state.center, phase=motion.phase_total,

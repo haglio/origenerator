@@ -167,8 +167,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     put before one went. 266 -> 268: the room's keys move this app's panels too, so
     where each side's show wears its panel is answered here and set from the
     session's line -- the corner and whether it is collapsed read back together,
-    because a show wears them together.)"""
+    because a show wears them together. 268 -> 270: the OSR2's max intensity is saved
+    with the session beside its control state, through the pair every switch the
+    session file keeps is read and put back by.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 268
+               for x in _class_def(VIEW, "GalleryView").body) == 270
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 83

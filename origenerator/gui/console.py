@@ -40,7 +40,7 @@ from player_core.robot_hand import (
 )
 
 from origenerator import motion_engine
-from origenerator.console_commands import level_asked_for
+from origenerator.console_commands import level_asked_for, max_intensity_asked_for
 from origenerator.gui.console_buttons import console_rows, device_rows
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
@@ -157,6 +157,7 @@ def console_hud(motion, host, *, device_on: bool = True,
                               cruise=motion.state.cruise.active,
                               learned=motion.state.learned.active,
                               shape=motion.state.state.shape.value),
+            max_intensity=motion.state.state.max_intensity,
         ),
         drive=device.drive,
     )
@@ -182,6 +183,7 @@ class ShowDevice:
     # nobody handed a switch over -- the panel resolves the pair into one word.
     osr2_control: str
     drive: DriveHud
+    max_intensity: int
 
 
 def show_device(motion, host, *, device_on: bool = True,
@@ -209,6 +211,7 @@ def show_device(motion, host, *, device_on: bool = True,
               else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
         drive=(script_hud(script, motion.state, host.dwell_s) if scripted
                else drive_hud(motion.state, driving, host.dwell_s)),
+        max_intensity=motion.state.state.max_intensity,
     )
 
 
@@ -224,7 +227,7 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
     whichever player owns them — and this routes them to what this app has: the
     show (or the pace-only stand-in) for the transport and the pace, the motion
     for everything about the motion, and the app's one OSR2 switch for the
-    control-state group.
+    control-state group and the max intensity.
 
     *control* is that switch, or None where nobody handed one over — a panel
     outside the gallery, and a test's bare console.  The two holds still reach
@@ -235,6 +238,10 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
     """
     if not action:
         return False
+    max_intensity = max_intensity_asked_for(action)
+    if max_intensity is not None:
+        (control if control is not None else motion).set_max_intensity(max_intensity)
+        return True
     level = level_asked_for(action)
     if level is not None:
         {drive_layout.AMPLITUDE: motion.set_amplitude,

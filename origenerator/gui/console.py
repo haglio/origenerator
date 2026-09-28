@@ -41,7 +41,7 @@ from player_core.robot_hand import (
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
-from origenerator.gui.console_buttons import console_rows, device_rows
+from origenerator.gui.console_buttons import device_rows, transport_row
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which of the console's four control buttons asks for which state, read off
@@ -152,11 +152,8 @@ def console_hud(motion, host, *, device_on: bool = True,
             main_mode=MainMode.GENAU, active=True, locked=host.locked,
             osr2=device.osr2, osr2_control=control,
             advance_interval=host.dwell_s,
-            rows=console_rows(locked=host.locked, pace_s=host.dwell_s,
-                              control=control,
-                              cruise=motion.state.cruise.active,
-                              learned=motion.state.learned.active,
-                              shape=motion.state.state.shape.value),
+            rows=(transport_row(locked=host.locked, pace_s=host.dwell_s), *device.rows),
+            osr2_rows=device.osr2_rows,
             max_intensity=motion.state.state.max_intensity,
         ),
         drive=device.drive,

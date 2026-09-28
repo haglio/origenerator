@@ -19,14 +19,6 @@ from player_core.hud_marks import shared_mark
 Rows = tuple[tuple[Button, ...], ...]
 
 
-def console_rows(*, locked: bool, pace_s: int, control: str, cruise: bool,
-                 learned: bool, shape: str) -> Rows:
-    return (
-        _transport_row(locked=locked, pace_s=pace_s),
-        *device_rows(control=control, cruise=cruise, learned=learned, shape=shape),
-    )
-
-
 def device_rows(*, control: str, cruise: bool, learned: bool, shape: str,
                 pace_s: int | None = None) -> Rows:
     """The same console without its transport row.
@@ -47,7 +39,7 @@ def device_rows(*, control: str, cruise: bool, learned: bool, shape: str,
     )
 
 
-def _transport_row(*, locked: bool, pace_s: int) -> tuple[Button, ...]:
+def transport_row(*, locked: bool, pace_s: int) -> tuple[Button, ...]:
     return (
         Button("genau_prev_clip", "⏮", "Previous clip"),
         Button("genau_next_clip", "⏭", "Next clip"),

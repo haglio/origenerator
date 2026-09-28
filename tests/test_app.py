@@ -449,21 +449,21 @@ def test_arming_the_crash_log_hands_back_the_log_a_freeze_is_written_to(tmp_path
     assert not crash_log.closed
 
 
-def test_the_window_is_watched_for_a_freeze_for_as_long_as_it_is_up(qapp, monkeypatch):
+def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
     events = []
     crash_log = object()
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: crash_log)
-    freeze_watch = MagicMock(side_effect=lambda log: events.append(("watching", log))
-                             or MagicMock(stop=lambda: events.append("stopped")))
+    watch_the_window = MagicMock(
+        side_effect=lambda app, log: events.append(("watching", app, log)))
 
     with _a_faked_boot([], **{
-        "origenerator.freeze_watch.FreezeWatch": freeze_watch,
+        "origenerator.freeze_watch.watch_the_window": watch_the_window,
         "PyQt6.QtWidgets.QApplication.exec": MagicMock(
             side_effect=lambda: events.append("running") or 0),
     }):
         assert main([]) == 0
 
-    assert events == [("watching", crash_log), "running", "stopped"]
+    assert events == [("watching", qapp, crash_log), "running"]
 
 
 def test_main_reclaims_unreachable_trash_on_startup(qapp):

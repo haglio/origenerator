@@ -5,7 +5,7 @@ import struct
 from unittest.mock import MagicMock
 
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QPoint
+from PyQt6.QtCore import QEvent, QPoint, Qt
 from PyQt6.QtGui import QColor, QImage
 from PyQt6.QtMultimedia import QVideoFrame
 from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
@@ -105,6 +105,24 @@ class TestTheRoomsPressesReachTheWindow:
             headset.close()
 
         assert pressed == ["5,5"], "the press did not arrive where it was aimed"
+
+    def test_a_right_click_asks_the_widget_under_it_for_its_menu(self, tmp_path, qtbot):
+        """There is no second button on a controller, so the room says this in
+        words.  Every menu this app opens on a right-click is asked for by the
+        context-menu event Qt would send, never by the button itself."""
+        window = self._window(qtbot)
+        target = window.findChild(QLabel, "target")
+        target.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        asked: list[str] = []
+        target.customContextMenuRequested.connect(
+            lambda at: asked.append(f"{at.x()},{at.y()}"))
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        try:
+            headset._heard("rightclick 25 35")
+        finally:
+            headset.close()
+
+        assert asked == ["5,5"], "the menu was not asked for where it was aimed"
 
     def test_a_press_lands_where_it_was_aimed_on_a_picture_drawn_smaller(
             self, tmp_path, qtbot):

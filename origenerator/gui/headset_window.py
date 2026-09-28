@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from player_core.file_channel import consume_command_file
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
-from PyQt6.QtGui import QImage, QMouseEvent, QPainter, QWheelEvent
+from PyQt6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.frame_channel import FrameWriter
@@ -29,6 +29,7 @@ from origenerator.fun_time_mode import (
     HEADSET_HOVER,
     HEADSET_PRESS,
     HEADSET_RELEASE,
+    HEADSET_RIGHT_CLICK,
     HEADSET_SCROLL,
     FunTimeSession,
 )
@@ -157,7 +158,7 @@ class HeadsetWindow(QObject):
 
     def _heard(self, line: str) -> None:
         kind, _, rest = line.strip().partition(" ")
-        if kind in (HEADSET_PRESS, HEADSET_DRAG, HEADSET_HOVER):
+        if kind in (HEADSET_PRESS, HEADSET_DRAG, HEADSET_HOVER, HEADSET_RIGHT_CLICK):
             try:
                 x, y = (int(part) for part in rest.split())
             except ValueError:
@@ -194,6 +195,8 @@ class HeadsetWindow(QObject):
         elif kind == HEADSET_DRAG:
             self._mouse(self._pressed, QMouseEvent.Type.MouseMove,
                         Qt.MouseButton.LeftButton)
+        elif kind == HEADSET_RIGHT_CLICK:
+            self._ask_for_the_menu(self._under_the_pointer())
         elif self._pressed is None:
             self._mouse(self._under_the_pointer(), QMouseEvent.Type.MouseMove,
                         Qt.MouseButton.NoButton)
@@ -220,6 +223,17 @@ class HeadsetWindow(QObject):
             QApplication.sendEvent(target, QMouseEvent(
                 kind, target.mapFromGlobal(at), at, Qt.MouseButton.LeftButton, buttons,
                 Qt.KeyboardModifier.NoModifier))
+
+    def _ask_for_the_menu(self, target: QWidget | None) -> None:
+        """A controller has one trigger, so the room says a right-click in
+        words.  Every menu this app opens on one comes from the context-menu
+        event Qt sends off the platform's own right button, which a synthesized
+        mouse press does not produce."""
+        if target is None or sip.isdeleted(target) or _held_off(target):
+            return
+        at = self._window.mapToGlobal(self._pointer)
+        QApplication.sendEvent(target, QContextMenuEvent(
+            QContextMenuEvent.Reason.Mouse, target.mapFromGlobal(at), at))
 
     def _scroll(self, delta: int) -> None:
         target = self._under_the_pointer()

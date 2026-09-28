@@ -1484,7 +1484,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
 def _script_for(video_path, output_dir=None):
     """Write a script for ``video_path`` -- in the scripts folder under
     ``output_dir``, or, with none named, in the old place beside the clip."""
-    actions = synthesize_actions(2.0, hz=1.0, loop=False)
+    actions = synthesize_actions(2.0, hz=1.0)
     dest = (video_path.with_suffix(".funscript") if output_dir is None
             else funscript_path_for(video_path, output_dir=output_dir))
     write_funscript(dest, actions)

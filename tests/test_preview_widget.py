@@ -30,7 +30,7 @@ def _scripted_video(tmp_path, name="clip.mp4"):
     script written before the scripts had a folder of their own still sits."""
     vid = tmp_path / name
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     return vid
 
 
@@ -656,7 +656,7 @@ def test_a_script_in_the_scripts_folder_shows_the_strip(qtbot, tmp_path, monkeyp
     vid = tmp_path / "video" / "filed.mp4"
     vid.parent.mkdir()
     write_funscript(funscript_path_for(vid, output_dir=tmp_path),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
 
     w = _strip_preview(qtbot)
     w.show_video(vid)

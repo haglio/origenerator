@@ -226,6 +226,23 @@ is the two hooks that call the guard, below.
 A new command here gets a line in this list and a test, or it is invisible by
 the time anyone needs it.
 
+## A change to how a video is scripted is finished by the sweep
+
+A video's funscript is synthesized once, when the video finishes. So a change to
+the pace (`config.MOTION_DEFAULT_SPEED`) or to what `synthesize_actions` writes
+reaches only the videos made after it lands, and the library goes on moving the
+device the old way: when the pace came down from 72 cycles a minute to the Robot
+Hand's 29, the user had to ask for the videos he already had to follow
+(2026-09-21). `origenerator.funscript_backfill` is what carries such a change
+back: it rewrites every script that is one of the app's own metronomes at
+another pace, writes one for any video with none, and leaves alone every script
+that follows its own video — ATI's, a measured one, a hand-made one — which it
+tells apart by shape, since most of the library's scripts predate the creator
+stamp. Run it once when such a change lands, from the primary checkout, as
+`python -c "from origenerator.funscript_backfill import main; main()"`: spelled
+with `-m` it names the package first, and the hook that keeps the app's window
+off his screen refuses it.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it

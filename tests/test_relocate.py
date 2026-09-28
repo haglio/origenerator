@@ -187,7 +187,7 @@ def test_a_moved_videos_script_moves_with_it(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     was = output_dir / "video" / "wan22_i2v_00001_.mp4"
     write_funscript(funscript_path_for(was, output_dir=output_dir),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
@@ -195,30 +195,30 @@ def test_a_moved_videos_script_moves_with_it(tmp_path):
     relocate_moved_outputs(db, output_dir)
 
     assert read_actions(funscript_of(moved, output_dir=output_dir)) == synthesize_actions(
-        2.0, hz=1.0, loop=False)
+        2.0, hz=1.0)
 
 
 def test_a_script_already_where_a_video_went_is_left_as_it_is(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
                                        output_dir=output_dir),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
     already = funscript_path_for(moved, output_dir=output_dir)
-    write_funscript(already, synthesize_actions(5.0, hz=1.0, loop=False))
+    write_funscript(already, synthesize_actions(5.0, hz=1.0))
 
     assert relocate_moved_outputs(db, output_dir) == 1
 
-    assert read_actions(already) == synthesize_actions(5.0, hz=1.0, loop=False)
+    assert read_actions(already) == synthesize_actions(5.0, hz=1.0)
 
 
 def test_a_script_that_will_not_move_leaves_its_video_followed(tmp_path, monkeypatch):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
                                        output_dir=output_dir),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     (output_dir / "tidied").mkdir()
     (output_dir / "tidied" / "wan22_i2v_00001_.mp4").write_bytes(b"mp4")
 

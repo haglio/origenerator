@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 
 from app_support.funscript import read_actions
 from PIL import Image
 
+from origenerator import gallery
 from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
-from origenerator.funscript import funscript_of, synthesize_actions, video_duration_seconds
+from origenerator.funscript import (
+    funscript_of,
+    synthesize_actions,
+    synthesize_funscript,
+    video_duration_seconds,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.frame_rate import NATIVE_FPS
 from tests.media_files import write_mp4
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -74,18 +82,14 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
         "origenerator.completion.synthesize_funscript",
-        lambda video_path, *, loop, hz, output_dir: calls.append(
-            (Path(video_path), loop, hz, Path(output_dir))),
+        lambda video_path, *, hz, output_dir: calls.append(
+            (Path(video_path), hz, Path(output_dir))),
     )
     extract_completion(
         I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
         out, tmp_path / "thumbs", "n1",
     )
-    # The synthesized script is asked for by the real output file and the output
-    # root it sits under (the scripts have a folder of their own), one-shot (not
-    # looped), at the configured cadence.
-    assert calls == [
-        (out / "video" / "wan22_i2v_00001_.mp4", False, MOTION_DEFAULT_HZ, out)]
+    assert calls == [(out / "video" / "wan22_i2v_00001_.mp4", MOTION_DEFAULT_HZ, out)]
 
 
 def test_a_video_given_a_deleted_videos_name_is_scripted_for_its_own_length(tmp_path):
@@ -100,23 +104,28 @@ def test_a_video_given_a_deleted_videos_name_is_scripted_for_its_own_length(tmp_
     extract_completion(I2V, history, out, tmp_path / "thumbs", "namesake")
 
     assert read_actions(funscript_of(video, output_dir=out)) == synthesize_actions(
-        video_duration_seconds(video), hz=MOTION_DEFAULT_HZ, loop=I2V.looping)
+        video_duration_seconds(video), hz=MOTION_DEFAULT_HZ)
 
 
-def test_completing_a_loop_video_asks_for_a_looping_funscript(tmp_path, monkeypatch):
+def test_a_video_made_for_genau_is_scripted_as_exactly_one_cycle(tmp_path, monkeypatch):
     out = tmp_path / "out"
-    (out / "video").mkdir(parents=True)
-    (out / "video" / "flf2v_loop_00001.mp4").write_bytes(b"v")
-    calls = []
+    video = out / "video" / "flf2v_loop_00001.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"v")
+    cycle_seconds = gallery.CYCLE_FRAMES / NATIVE_FPS
     monkeypatch.setattr(
         "origenerator.completion.synthesize_funscript",
-        lambda video_path, *, loop, hz, output_dir: calls.append(loop),
+        partial(synthesize_funscript, duration_provider=lambda _video: cycle_seconds),
     )
+
     extract_completion(
-        FLF2V, _video_history("16", "gifs", "flf2v_loop_00001.mp4"),
+        FLF2V, _video_history("16", "gifs", video.name),
         out, tmp_path / "thumbs", "n1",
     )
-    assert calls == [True]  # the loop workflow → a seamlessly-tiling script
+
+    actions = read_actions(funscript_of(video, output_dir=out))
+    assert [a["pos"] for a in actions] == [0, 100, 0]
+    assert actions[-1]["at"] == round(cycle_seconds * 1000)
 
 
 def test_completing_a_track_authored_video_writes_the_authored_funscript(tmp_path, monkeypatch):

@@ -5,20 +5,21 @@ import os
 from io import BytesIO
 
 from PIL import Image
-from PyQt6.QtCore import QPointF, QSize, Qt
+from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import show_surface
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.show_surface import ShowSurface, _NotYetOpened
 from origenerator.media import MediaType
 from tests.show_surface_fakes import FakeEngine
 
 
-def _png_bytes() -> bytes:
+def _png_bytes(color=(10, 120, 200)) -> bytes:
     """A streamed in-progress frame: encoded image bytes, no file on disk."""
     buf = BytesIO()
-    Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
+    Image.new("RGB", (32, 24), color).save(buf, "PNG")
     return buf.getvalue()
 
 
@@ -121,16 +122,79 @@ def test_the_show_owns_its_sound(qtbot):
     assert surface.audio_muted() is True
 
 
-def test_a_run_still_being_made_is_its_frames_rather_than_a_file(qtbot, tmp_path):
+def test_a_frame_goes_up_on_the_engine_in_the_place_of_the_picture_on_screen(qtbot, tmp_path):
     picture = tmp_path / "made-up.png"
     picture.write_bytes(b"")
     surface, engine = _surface(qtbot)
     surface.show_media(str(picture), MediaType.IMAGE)
 
+    surface.swap_in_frame(_png_bytes())
+
+    assert engine.loaded == [picture]
+    assert [frame.read_bytes() for frame in engine.swapped] == [_png_bytes()]
+
+
+def test_a_frame_of_a_picture_coming_up_opens_on_the_engine_on_a_move_of_its_own(qtbot):
+    surface, engine = _surface(qtbot)
+
     surface.show_frame(_png_bytes())
 
-    assert surface.current_media_path() == ""
-    assert engine.loaded == [picture]          # the engine was not asked again
+    assert [frame.read_bytes() for frame in engine.loaded] == [_png_bytes()]
+
+
+def test_a_frame_that_ran_out_is_said_like_any_picture(qtbot):
+    surface, engine = _surface(qtbot)
+    surface.show_frame(_png_bytes())
+    ended = []
+    surface.media_ended.connect(lambda: ended.append(1))
+
+    engine.eof = True
+    surface._follow_the_engine()
+
+    assert ended == [1]
+
+
+def test_a_frame_with_nothing_up_to_carry_on_from_opens_on_a_move_of_its_own(qtbot):
+    surface, engine = _surface(qtbot)
+    surface.show_message("Generating…")
+
+    surface.swap_in_frame(_png_bytes())
+
+    assert (len(engine.loaded), engine.swapped) == (1, [])
+
+
+def test_a_frame_already_up_is_not_handed_to_the_engine_again(qtbot, tmp_path):
+    picture = tmp_path / "made-up.png"
+    picture.write_bytes(b"")
+    surface, engine = _surface(qtbot)
+    surface.show_media(str(picture), MediaType.IMAGE)
+
+    surface.swap_in_frame(_png_bytes())
+    surface.swap_in_frame(_png_bytes())
+
+    assert len(engine.swapped) == 1
+
+
+def test_a_frames_files_go_once_a_file_takes_the_screen(qtbot, tmp_path):
+    picture = tmp_path / "made-up.png"
+    picture.write_bytes(b"")
+    surface, _engine = _surface(qtbot, frames=FrameFiles(tmp_path / "frames"))
+    surface.show_frame(_png_bytes())
+
+    surface.show_media(str(picture), MediaType.IMAGE)
+
+    assert list((tmp_path / "frames").iterdir()) == []
+
+
+def test_a_frame_opened_on_a_move_of_its_own_lets_the_last_pictures_frames_go(qtbot, tmp_path):
+    surface, _engine = _surface(qtbot, frames=FrameFiles(tmp_path / "frames"))
+    surface.show_frame(_png_bytes(color=(1, 2, 3)))
+    surface.swap_in_frame(_png_bytes(color=(4, 5, 6)))
+
+    surface.show_frame(_png_bytes(color=(7, 8, 9)))
+
+    assert [frame.read_bytes() for frame in (tmp_path / "frames").iterdir()] == [
+        _png_bytes(color=(7, 8, 9))]
 
 
 def test_a_message_stands_where_the_picture_would(qtbot):
@@ -247,18 +311,6 @@ def test_a_double_click_over_the_picture_reaches_the_show(qtbot):
     assert twice == [1]
 
 
-def test_a_live_frame_is_refitted_when_the_pane_changes_shape(qtbot):
-    surface, _engine = _surface(qtbot)
-    surface.show()                 # an unshown pane is never resized at all
-    surface._picture.resize(800, 600)
-    surface.show_frame(_png_bytes())
-    assert surface._picture.pixmap().size() == QSize(800, 600)
-
-    surface._picture.resize(400, 300)
-
-    assert surface._picture.pixmap().size() == QSize(400, 300)
-
-
 def test_the_drive_is_told_where_the_clip_has_got_to(qtbot):
     surface, engine = _surface(qtbot)
     engine.position_ms = 12345.6
@@ -307,6 +359,17 @@ def test_the_engine_opens_on_the_slide_and_pace_it_missed(tmp_path):
     assert opened.pace == 6
     assert opened.loaded == [tmp_path / "made-up.png"]
     assert opened.paused is True
+
+
+def test_the_engine_opens_on_the_newest_frame_it_missed(tmp_path):
+    waiting = _NotYetOpened()
+    waiting.load(tmp_path / "made-up.png")
+    waiting.swap_still(tmp_path / "made-up-frame.png")
+    opened = FakeEngine()
+
+    waiting.replay(opened)
+
+    assert opened.loaded == [tmp_path / "made-up-frame.png"]
 
 
 def test_an_engine_that_opens_before_a_slide_is_handed_nothing_to_play():

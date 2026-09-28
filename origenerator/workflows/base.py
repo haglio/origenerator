@@ -195,9 +195,6 @@ class WorkflowTemplate(ABC):
     version: str
     display_name: str
     output_type: MediaType
-    # True when the output video loops (returns to its start frame), so the
-    # funscript synthesized alongside it is tiled to repeat seamlessly. Only the
-    # first-last-frame loop workflow sets this; a one-shot video leaves it False.
     looping: bool = False
     # True when the output size is derived from the input image (kept at its
     # aspect ratio on a fixed pixel budget) rather than set by hand. The i2v

@@ -1630,7 +1630,7 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
 def test_a_scripted_clip_shows_its_strip(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     view = _view(qtbot, [(str(vid), "video")])
     assert view._pane._strip is not None
     assert view._pane._strip._actions
@@ -1690,7 +1690,7 @@ def test_releasing_another_file_leaves_the_show_alone(qtbot, tmp_path):
 def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0, loop=False))
+                    synthesize_actions(2.0, hz=1.0))
     view = SlideshowView([(str(vid), "video")], engine=FakeEngine(),
                          shuffle=lambda order: None)
     qtbot.addWidget(view)

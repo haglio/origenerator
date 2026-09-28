@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app_support import siblings
+from player_core.robot_hand import bpm_for_speed
 
 from origenerator.content import load_content, overlay_value
 
@@ -165,10 +166,8 @@ GENAU_SOURCE = _CONTENT["genau_source"]
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
 
 # --- Funscript ---------------------------------------------------------------
-# Each generated video gets a funscript synthesized alongside it (see
-# funscript.py). The motion isn't measured from the video — it's a steady motion
-# at this cadence (full cycles per second), phased to the clip's duration/loop.
-MOTION_DEFAULT_HZ = 1.2
+MOTION_DEFAULT_SPEED = 50
+MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 
 # --- Voice command → prompt edit ------------------------------------------
 # While a folder auto-generates, the mic listens (always-on); each spoken

@@ -20,7 +20,7 @@ def test_paints_without_error_scripted_and_empty(qtbot):
     qtbot.addWidget(strip)
     strip.resize(120, strip.height())
 
-    strip.set_actions(synthesize_actions(3.0, hz=1.2, loop=False))
+    strip.set_actions(synthesize_actions(3.0, hz=1.2))
     assert not strip.grab().isNull()
 
     strip.set_actions([])
@@ -34,7 +34,7 @@ def test_the_playhead_marks_how_far_into_the_script_playback_is(qtbot):
     strip = FunscriptStrip()
     qtbot.addWidget(strip)
     strip.resize(100, strip.height())
-    actions = synthesize_actions(4.0, hz=1.0, loop=False)
+    actions = synthesize_actions(4.0, hz=1.0)
     strip.set_actions(actions)
     strip.set_playhead(actions[-1]["at"] // 2)
     image = strip.grab().toImage()
@@ -49,9 +49,9 @@ def test_a_new_script_starts_with_no_playhead(qtbot):
     strip = FunscriptStrip()
     qtbot.addWidget(strip)
     strip.resize(100, strip.height())
-    strip.set_actions(synthesize_actions(4.0, hz=1.0, loop=False))
+    strip.set_actions(synthesize_actions(4.0, hz=1.0))
     strip.set_playhead(1000)
-    strip.set_actions(synthesize_actions(2.0, hz=1.0, loop=False))
+    strip.set_actions(synthesize_actions(2.0, hz=1.0))
     assert strip._playhead is None
     image = strip.grab().toImage()
     y = strip.height() // 2

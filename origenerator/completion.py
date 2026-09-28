@@ -71,8 +71,7 @@ def _write_video_funscript(workflow, files, output_dir: Path, params: dict | Non
         if authored:
             write_funscript(funscript_path_for(source, output_dir=output_dir), authored)
         else:
-            synthesize_funscript(source, loop=workflow.looping, hz=MOTION_DEFAULT_HZ,
-                                 output_dir=output_dir)
+            synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, output_dir=output_dir)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
 

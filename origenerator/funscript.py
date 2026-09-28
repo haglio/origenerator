@@ -6,7 +6,7 @@ in this family that reads or writes one and lives in
 :mod:`app_support.funscript`. Origenerator's videos carry no explicit
 motion track — the diffusion model's motion lives only in the pixels — so rather than
 measuring the finished video, this authors a motion *with* it from what the generation
-already knows: the video's duration, and whether it loops. The result is a rhythm, not a
+already knows: the video's duration. The result is a rhythm, not a
 pixel-accurate script; the whole generator is one function so a later swap to a
 measured (FunGen) or authored (ATI) source touches nothing else.
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from app_support.funscript import document, write
+from app_support.funscript import document, read_actions, write
 
 from origenerator.evolver_upscales import original_stem
 from origenerator.media import VIDEO_EXTS
@@ -86,30 +86,15 @@ def _script_of_upscaled(stem: str, output_dir) -> Path | None:
                         *(_beside(video) for video in videos)])
 
 
-def synthesize_actions(duration_s: float, *, hz: float, loop: bool) -> list[dict]:
-    """A periodic motion over ``duration_s`` at ``hz`` full cycles per second.
-
-    Emits alternating floor/top extremes (``0``/``100``) every half-period; the
-    device interpolates between them, so a plain point every half-cycle reads as a
-    steady motion. When ``loop`` is set, the half-period is stretched to fit a whole
-    (even) number of halves into the clip, so the last action lands back at the start
-    position at exactly ``duration`` — the script tiles seamlessly as the clip repeats.
-    """
+def synthesize_actions(duration_s: float, *, hz: float) -> list[dict]:
     duration_ms = int(round(duration_s * 1000))
     if duration_ms <= 0 or hz <= 0:
         return []
-    half_period = 500.0 / hz  # ms between successive extremes (two per full cycle)
-    if loop:
-        halves = max(2, round(duration_ms / half_period))
-        if halves % 2:  # keep it even so the final extreme matches the first (the floor)
-            halves += 1
-        half_period = duration_ms / halves
-        count = halves + 1  # inclusive of both endpoints [0, duration]
-    else:
-        count = int(duration_ms // half_period) + 1
+    halves = 2 * max(1, round(duration_s * hz))
+    half_period_ms = duration_ms / halves
     return [
-        {"at": int(round(i * half_period)), "pos": 0 if i % 2 == 0 else 100}
-        for i in range(count)
+        {"at": int(round(i * half_period_ms)), "pos": 0 if i % 2 == 0 else 100}
+        for i in range(halves + 1)
     ]
 
 
@@ -206,15 +191,37 @@ def video_duration_seconds(video_path) -> float | None:
     return None
 
 
-def synthesize_funscript(video_path, *, loop: bool, hz: float, output_dir,
+def synthesize_funscript(video_path, *, hz: float, output_dir,
                          duration_provider=video_duration_seconds) -> Path | None:
     duration = duration_provider(video_path)
     if not duration or duration <= 0:
         logger.warning("No readable duration for %s; skipping funscript", video_path)
         return None
-    actions = synthesize_actions(duration, hz=hz, loop=loop)
+    actions = synthesize_actions(duration, hz=hz)
     if not actions:
         return None
     dest = funscript_path_for(video_path, output_dir=output_dir)
     write_funscript(dest, actions, duration_seconds=round(duration))
     return dest
+
+
+def resynthesize_funscript(video_path, script, *, hz: float,
+                           duration_provider=video_duration_seconds) -> bool:
+    written = read_actions(script)
+    if not _is_synthesized(written):
+        return False
+    duration = duration_provider(video_path)
+    todays = synthesize_actions(duration or 0.0, hz=hz)
+    if not todays or todays == written:
+        return False
+    write_funscript(script, todays, duration_seconds=round(duration))
+    return True
+
+
+def _is_synthesized(actions: list[dict]) -> bool:
+    if not actions or actions[0]["at"] != 0:
+        return False
+    if any(a["pos"] != (0 if i % 2 == 0 else 100) for i, a in enumerate(actions)):
+        return False
+    gaps = [b["at"] - a["at"] for a, b in zip(actions, actions[1:])]
+    return not gaps or max(gaps) - min(gaps) <= 1

@@ -775,7 +775,8 @@ class GalleryView(QWidget):
         self._arrangement = PaneArrangement(
             toc=toc, browser=browser, info_pane=self._build_info_pane(),
             info_tabs=self._info_tabs, queue=self._queue)
-        layout.addWidget(self._arrangement.hosted() if self._fun_time is not None
+        folded = self._fun_time is not None and not self._fun_time.in_a_headset
+        layout.addWidget(self._arrangement.hosted() if folded
                          else self._arrangement.standalone(), 1)
 
     def _build_toc_pane(self):

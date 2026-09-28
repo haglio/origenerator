@@ -25,7 +25,7 @@ would land at ``scale`` of the way across the screen, at ``scale`` of the size.
 """
 
 # ruff: noqa: PLC0415
-# Qt is imported inside the functions that need it: apply_hosted_scale runs
+# Qt is imported inside the functions that need it: apply_room_scale runs
 # before the first PyQt6 import in the whole process, and a top-level import
 # here would be that import.
 from __future__ import annotations
@@ -64,15 +64,28 @@ def hosted_scale() -> float:
         return HOSTED_SCALE  # unreadable: treat it as unset rather than inherit nonsense
 
 
-def apply_hosted_scale() -> float:
-    """Draw this process at :func:`hosted_scale`, and return the factor set.
+def room_scale(*, in_a_headset: bool) -> float:
+    """How big to draw for the room this app has been taken into.
+
+    Everything this module says about shrinking is a monitor's reason: the
+    buttons match a HUD's because a HUD is inches away in the same rect.  A
+    headset room hangs this window on a screen of its own, so there it draws
+    the size it draws standalone.
+    """
+    return 1.0 if in_a_headset else hosted_scale()
+
+
+def apply_room_scale(*, in_a_headset: bool) -> float:
+    """Draw this process at :func:`room_scale`, and return the factor set.
 
     Must be called before the first PyQt6 import: Qt reads ``QT_SCALE_FACTOR``
     when the platform plugin initializes, and a value written after that is
-    never looked at again.
+    never looked at again.  A factor of 1.0 leaves the variable alone, which is
+    how an unscaled process looks to everything that reads it.
     """
-    scale = hosted_scale()
-    os.environ[_ENV_VAR] = repr(scale)
+    scale = room_scale(in_a_headset=in_a_headset)
+    if scale != 1.0:
+        os.environ[_ENV_VAR] = repr(scale)
     return scale
 
 

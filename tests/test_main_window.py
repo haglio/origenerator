@@ -1026,6 +1026,25 @@ def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_p
     assert win.hands_its_window_over is not None
 
 
+def test_a_takeover_by_the_monitors_shrinks_the_window_to_the_hud_scale(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+
+def test_a_takeover_by_the_headset_draws_at_the_desktop_scale(qtbot, tmp_path):
+    """ui_scale shrinks the hosted app so its buttons match the HUD buttons
+    inches away in the Random Favs Browser's rect.  A headset room has neither:
+    the window hangs on a screen of its own with the whole sky around it."""
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_headset_session(tmp_path))
+
+    assert ui_scale.active_scale() == 1.0
+
+
 def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
     """There the window itself is what is seen, so a frame written every tick
     would be work for nobody."""
@@ -1068,6 +1087,40 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     assert win.isMinimized()
 
 
+def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, tmp_path):
+    """A session on the monitors shrank it to the HUD's size; the headset room
+    it crosses into has no HUD beside it, so the crossing undoes that."""
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_hosted_with_a_channel(tmp_path))
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert ui_scale.active_scale() == 1.0
+
+    _say(tmp_path, "TAKE_BACK")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
+
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+
+def test_crossing_into_the_headset_gives_the_window_its_desktop_size_back(qtbot, tmp_path):
+    """A session on the monitors sat it in the Random Favs Browser's rect.  The
+    headset room it crosses into has no such rect, so it goes back to the size
+    it stood alone at -- and stops being pinned to a monitor's coordinates."""
+    win = _window(qtbot, tmp_path)
+    win.resize(640, 480)
+    stood_alone_at = win.size()
+    win.become_hosted(_hosted_with_a_channel(tmp_path))
+    assert win.size() != stood_alone_at
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert win.size() == stood_alone_at
+
+
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
     """A standalone window a headset session takes over is in the same place as
     one it launched, and the hand-back stops it again."""
@@ -1082,6 +1135,19 @@ def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, t
     win.become_standalone()
 
     assert win.hands_its_window_over is None
+
+
+def test_a_window_hosted_in_the_headset_keeps_its_desktop_size(qtbot, tmp_path):
+    """The rect a session names is the Random Favs Browser's, measured off a
+    monitor.  A headset room has no such rect and room to spare, so the window
+    hangs there at the size it has standalone."""
+    win = _window(qtbot, tmp_path)
+    win.resize(640, 480)
+    stood_alone_at = win.size()
+
+    win.become_hosted(_headset_session(tmp_path))
+
+    assert win.size() == stood_alone_at
 
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):

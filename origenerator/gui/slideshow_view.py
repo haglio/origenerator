@@ -1077,7 +1077,9 @@ class SlideshowView(QWidget):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._playlist.replace_item(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
-                self._show_current()
+                self._levels.restart()
+                self._frames_on_screen = False
+                self._pane.swap_in_picture(path)
             self._update_neighbors()  # it may be the still riding either side
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
             # Kept out of an enhanced-only pass until now, being unenhanced; the
@@ -1095,7 +1097,9 @@ class SlideshowView(QWidget):
             self._frames_on_screen = True
             self._pane.swap_in_frame(frame)
         elif self._frames_on_screen:
-            self._show_current()
+            self._frames_on_screen = False
+            self._pane.swap_in_picture(current.path)
+            self._move_on_early_from(current)
 
     def lead_with_what_is_being_made(self) -> None:
         if self._set.lead_with_what_is_being_made():

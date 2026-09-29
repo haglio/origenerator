@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from pathlib import Path
 
 from app_support.funscript import read_actions
@@ -123,6 +125,8 @@ class ShowSurface(QWidget):
         self._tick.setInterval(_TICK_MS)
         self._tick.timeout.connect(self._follow_the_engine)
         self._tick.start()
+        self._stop_moving = threading.Event()
+        self._mover: threading.Thread | None = None
 
     def open_the_engine(self) -> None:
         """Give the engine the pane's window, and hand it what the stand-in was
@@ -148,6 +152,7 @@ class ShowSurface(QWidget):
             return
         self._engine = engine
         waiting.replay(engine)
+        self.keep_the_picture_moving()
 
     # --- what the show puts on it -------------------------------------------
 
@@ -196,6 +201,12 @@ class ShowSurface(QWidget):
             self._media = None
             self._opened = path
             self._engine.swap_still(path)
+
+    def swap_in_picture(self, path) -> None:
+        self._frames.forget(_ON_SCREEN)
+        self._media = (path, MediaType.IMAGE)
+        self._opened = Path(path)
+        self._engine.swap_still(Path(path))
 
     def show_message(self, text: str) -> None:
         """A line where the picture would be -- the wait before a run's first frame."""
@@ -276,8 +287,24 @@ class ShowSurface(QWidget):
         """
         return int(self._engine.position_ms)
 
+    def keep_the_picture_moving(self) -> None:
+        self._mover = threading.Thread(target=self._move_until_closed,
+                                       name="show-mover", daemon=True)
+        self._mover.start()
+
+    def _move_until_closed(self) -> None:
+        try:
+            while not self._stop_moving.is_set():
+                time.sleep(_TICK_MS / 1000)
+                self._engine.push_still()
+        except Exception:
+            logger.exception("A show's picture stopped moving")
+
     def close_engine(self) -> None:
         """Let the engine go, before the window it draws into is taken down."""
+        self._stop_moving.set()
+        if self._mover is not None:
+            self._mover.join()
         self._tick.stop()
         self._engine.close()
 
@@ -295,8 +322,6 @@ class ShowSurface(QWidget):
         super().mouseDoubleClickEvent(event)
 
     def _follow_the_engine(self) -> None:
-        """Carry a still's move on, and pass on whatever the engine has to report."""
-        self._engine.push_still()
         dims = self._engine.video_dims
         if dims != self._dims:
             self._dims = dims
@@ -373,9 +398,6 @@ class _NotYetOpened:
 
     def set_muted(self, muted: bool) -> None:
         self.muted = muted
-
-    def push_still(self) -> None:
-        pass
 
     def stop(self) -> None:
         self.file = None

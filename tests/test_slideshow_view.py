@@ -2330,6 +2330,27 @@ def test_a_cancelled_enhancement_puts_the_picture_itself_back(qtbot):
     assert view._pane._media[0] == "a.png"
 
 
+def test_a_picture_whose_enhancement_stops_comes_back_on_the_move_it_was_on(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    engine = view._pane._engine
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+    opened_while_it_was_made = len(engine.loaded)
+
+    view.note_enhancing({})
+
+    assert len(engine.loaded) == opened_while_it_was_made
+    assert engine.swapped[-1] == Path("a.png")
+
+
+def test_a_picture_whose_enhancement_stops_takes_the_whole_pace_again(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view.note_enhancing({})
+
+    assert not view._early_move_on.isActive()
+
+
 def test_a_picture_whose_enhancement_is_waiting_shows_as_itself(qtbot):
     view = _view(qtbot, _THREE, image_dwell_ms=4000)
 
@@ -2416,3 +2437,35 @@ def test_locking_a_picture_shows_its_enhancement_on_the_move_to_the_finished_pic
     assert each_on_the_pictures_move == [whole, face, hand]
     assert the_newest_on_a_move_of_its_own == hand
     assert view.current_media_path() == "a_enhanced.png"
+
+
+def test_an_enhancement_landing_on_a_locked_picture_carries_on_the_frames_move(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 actions=ShowActions(enhance=lambda prompt_id: True))
+    engine = view._pane._engine
+    _press(view, Qt.Key.Key_Down)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+    opened_while_it_was_made = len(engine.loaded)
+
+    view.note_enhanced("id-a", "a_enhanced.png")
+    view.note_enhancing({}, frames={})
+
+    assert len(engine.loaded) == opened_while_it_was_made
+    assert engine.swapped[-1] == Path("a_enhanced.png")
+    assert view.current_media_path() == "a_enhanced.png"
+
+
+def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_new_one(
+        qtbot, tmp_path):
+    a, a_base, better = (_png(tmp_path / n) for n in ("a.png", "a0.png", "a2.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    view.note_enhanced("id-a", better)
+    view.add_levels({better: [(better, "image", "Enhance 2"), (a, "image", "Enhance 1"),
+                              (a_base, "image", "Original")]})
+
+    assert view._pane._media[0] == better
+    assert view.hud_item_note == "Enhance 2 — 1 of 3"

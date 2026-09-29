@@ -1,7 +1,9 @@
 """The show's own pane: what it asks the players' engine for."""
 from __future__ import annotations
 
+import logging
 import os
+import time
 from io import BytesIO
 
 from PIL import Image
@@ -291,6 +293,32 @@ def test_closing_the_pane_closes_the_engine(qtbot):
     surface.close_engine()
 
     assert engine.closed is True
+
+
+def test_the_picture_keeps_moving_while_the_window_is_busy(qtbot):
+    surface, engine = _surface(qtbot)
+    surface.keep_the_picture_moving()
+
+    time.sleep(0.3)
+    moved_while_busy = engine.pushes
+    surface.close_engine()
+
+    assert moved_while_busy >= 5
+
+
+def test_a_picture_that_stops_moving_says_why_in_the_log(qtbot, caplog):
+    surface, engine = _surface(qtbot)
+
+    def the_engine_gives_out():
+        raise RuntimeError("made-up engine failure")
+
+    engine.push_still = the_engine_gives_out
+    with caplog.at_level(logging.ERROR, logger="origenerator.gui.show_surface"):
+        surface.keep_the_picture_moving()
+        qtbot.waitUntil(lambda: "made-up engine failure" in caplog.text, timeout=2000)
+    surface.close_engine()
+
+    assert "stopped moving" in caplog.text
 
 
 def test_a_press_over_the_picture_reaches_the_show(qtbot):

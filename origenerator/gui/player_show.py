@@ -675,6 +675,9 @@ class PlayerShow(QObject):
         self._set.note_enhancement_landed(prompt_id)
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
+            if self._set.current_prompt_id() == prompt_id:
+                self._frame_on_player = None
+                self._send(f"{SHOW_FRAME} {path}")
             self._hand_over()
         elif upgraded is not None and self._set.passes(upgraded) and self._set.playlist.add(upgraded):
             # Kept out of an enhanced-only pass until now, being unenhanced; the

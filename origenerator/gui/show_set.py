@@ -44,7 +44,7 @@ from origenerator.gui.show_map import (
     step_in_ring,
 )
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import Slide, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
 
 # What the loop key answers: the axis it started looping, that it ended the
 # loop, or — with nothing on either axis to loop — that the press is the lock
@@ -53,6 +53,11 @@ LOOP_OFF = "off"
 LOOP_IS_A_LOCK = "lock"
 
 NO_ACT_ON_SCREEN = "No act for this one"
+ENHANCEMENT_RUNNING = "running"
+ENHANCEMENT_QUEUED = "queued"
+_ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
+                      ENHANCEMENT_QUEUED: "Enhancement queued"}
+GENERATING = "Generating…"
 
 
 class ShowSet:
@@ -86,11 +91,16 @@ class ShowSet:
         self.favorites_filter = False
         self.enhanced_mode = False
         self.act_filter = ""
+        self._enhancements_asked: set[str] = set()
+        self._enhance_frames: dict[str, bytes] = {}
+        self._runs_offered: set[str] = set()
         # Everything this show has been handed, whatever the switches keep of
         # it; the pass is dealt from what survives them (:meth:`set_modes`).
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
         self.playlist = self._deal(items, image_dwell_ms=image_dwell_ms, start=start)
+        if start is None:
+            self.lead_with_what_is_being_made()
         self._a_row_played_whole_is_its_loop()
 
     # --- the pass ----------------------------------------------------------
@@ -149,6 +159,7 @@ class ShowSet:
                                    start=start, shuffle=shuffle)
         self.playlist.set_paused(paused)
         if new_set:
+            self.lead_with_what_is_being_made()
             self._a_row_played_whole_is_its_loop()
         kept = start is not None
         if self._on_pass_change is not None:
@@ -227,7 +238,8 @@ class ShowSet:
         self._library_moved()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
-                           favorite_ids=self.favorite_ids, enhanced_ids=enhanced_ids))
+                           favorite_ids=self.favorite_ids, enhanced_ids=enhanced_ids,
+                           enhancing=self.enhance_status))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:
             self._widen_back()
@@ -312,6 +324,16 @@ class ShowSet:
         """Every run the whole set holds as frames rather than as a file — in
         the pass or kept out of it by a switch."""
         return [kept.prompt_id for kept in self.all_items if kept.is_live]
+
+    def first_offer_of(self, prompt_id: str) -> bool:
+        first = prompt_id not in self._runs_offered
+        self._runs_offered.add(prompt_id)
+        return first
+
+    def join_live(self, prompt_id: str, frame: bytes) -> bool:
+        live = Slide(frame, LIVE, prompt_id)
+        self.remember(live)
+        return self.passes(live) and self.playlist.add(live)
 
     def upgrade(self, prompt_id, path, media_type, still):
         """Point the whole set's entry for *prompt_id* at a better version of
@@ -493,10 +515,52 @@ class ShowSet:
 
     def wear(self, hud: HudFacts) -> None:
         """Take on what the HUD says about the set: how it is ordered, and
-        which of its items are favorites or carry an enhancement."""
+        which of its items are favorites, carry an enhancement, or have one
+        being made."""
         self.order_label = hud.order_label
         self.favorite_ids = set(hud.favorite_ids or ())
         self.enhanced_ids = set(hud.enhanced_ids or ())
+        self.enhance_status = dict(hud.enhancing or {})
+
+    def note_enhancing(self, statuses, frames=None) -> None:
+        self.enhance_status = dict(statuses)
+        self._enhance_frames = dict(frames or {})
+
+    def frame_being_made_of(self, slide):
+        if slide.is_live:
+            return slide.path
+        if self.enhancement_of(slide.prompt_id) != ENHANCEMENT_RUNNING:
+            return None
+        return self._enhance_frames.get(slide.prompt_id)
+
+    def note_enhancement_asked(self, prompt_id: str) -> None:
+        self._enhancements_asked.add(prompt_id)
+
+    def note_enhancement_landed(self, prompt_id: str) -> None:
+        self._enhancements_asked.discard(prompt_id)
+        self.enhance_status.pop(prompt_id, None)
+        self._enhance_frames.pop(prompt_id, None)
+        self.enhanced_ids.add(prompt_id)
+
+    def enhancement_of(self, prompt_id) -> str:
+        if prompt_id in self.enhance_status:
+            return self.enhance_status[prompt_id]
+        return ENHANCEMENT_QUEUED if prompt_id in self._enhancements_asked else ""
+
+    def being_made(self, slide) -> bool:
+        return slide.is_live or self.enhancement_of(slide.prompt_id) == ENHANCEMENT_RUNNING
+
+    def pace_for(self, slide, seconds: float) -> float:
+        return seconds / 2 if self.being_made(slide) else seconds
+
+    def lead_with_what_is_being_made(self) -> bool:
+        playlist = self.playlist
+        index = next((index for index, item in enumerate(playlist.items)
+                      if self.being_made(item)), None)
+        if index is None or playlist.locked or playlist.order[playlist.index] == index:
+            return False
+        playlist.lead_with(index)
+        return True
 
     def current_prompt_id(self):
         """The id of the item on screen, or ``None`` — a set assembled without
@@ -543,6 +607,17 @@ def narrow_to_the_act_on_screen(show_set: ShowSet) -> tuple[str, bool]:
     if not act:
         return NO_ACT_ON_SCREEN, False
     return narrow_to_acts(show_set, act)
+def item_note(show_set: ShowSet, *, levels, level_index: int) -> str:
+    if show_set.playlist.current_is_live():
+        return GENERATING
+    parts = []
+    if len(levels) > 1:
+        label = levels[level_index][2]
+        parts.append(f"{label} — {level_index + 1} of {len(levels)}")
+    enhancement = show_set.enhancement_of(show_set.current_prompt_id())
+    if enhancement:
+        parts.append(_ENHANCEMENT_WORDS[enhancement])
+    return " · ".join(parts)
 
 
 def looping_note(show_set: ShowSet) -> str:
@@ -555,4 +630,4 @@ def looping_note(show_set: ShowSet) -> str:
 def thumb_of(slide: Slide) -> str:
     """The still a map cell draws for *slide*, as the path the panel takes."""
     still = still_for(slide)
-    return str(still) if still else ""
+    return str(still) if still and not slide.is_live else ""

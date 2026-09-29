@@ -13,6 +13,7 @@ from pathlib import Path
 class FakeEngine:
     def __init__(self) -> None:
         self.loaded: list[Path] = []
+        self.swapped: list[Path] = []
         self.pace: float | None = None
         self.paused: bool | None = None
         self.muted = True
@@ -29,6 +30,9 @@ class FakeEngine:
         self.eof = False
         self.idle = False
         self.stopped = False
+
+    def swap_still(self, path) -> None:
+        self.swapped.append(Path(path))
 
     def stop(self) -> None:
         self.stopped = True

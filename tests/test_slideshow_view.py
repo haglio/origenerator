@@ -8,10 +8,11 @@ generation that is still being made, and driving the OSR2 off the clip on screen
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPointF, QSize, Qt
-from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QPixmap, QResizeEvent
+from PyQt6.QtGui import QIcon, QKeyEvent, QMouseEvent, QResizeEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
@@ -39,10 +40,10 @@ def _png(path):
     return str(path)
 
 
-def _png_bytes():
+def _png_bytes(color=(10, 120, 200)):
     """A streamed in-progress frame: encoded image bytes, no file on disk."""
     buf = BytesIO()
-    Image.new("RGB", (32, 24), (10, 120, 200)).save(buf, "PNG")
+    Image.new("RGB", (32, 24), color).save(buf, "PNG")
     return buf.getvalue()
 
 
@@ -68,7 +69,8 @@ def _will_move_on(view) -> bool:
 def _wired(kw: dict) -> dict:
     """The show takes its HUD facts and its gallery actions as two records;
     these cases name the facts and the actions flat, the way the words read."""
-    facts = {k: kw.pop(k) for k in ("order_label", "favorite_ids", "enhanced_ids") if k in kw}
+    facts = {k: kw.pop(k) for k in ("order_label", "favorite_ids", "enhanced_ids", "enhancing")
+             if k in kw}
     if facts:
         kw["hud"] = HudFacts(**facts)
     acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
@@ -557,9 +559,7 @@ def test_locking_a_slide_asks_for_it_to_be_enhanced(qtbot):
 
     assert asked == ["id-a"]
     assert view._playlist.locked
-    # In the line until the gallery says otherwise — a launch is a place in the
-    # queue, not a picture being made.
-    assert view._note.text() == "Enhancement queued"
+    assert view.hud_item_note == "Enhancement queued"
 
 
 def test_releasing_the_lock_asks_for_nothing(qtbot):
@@ -575,7 +575,7 @@ def test_the_gallery_can_refuse_and_nothing_is_claimed(qtbot):
     # comes from the side that holds the settings, and the corner stays quiet.
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: False))
     _press(view, Qt.Key.Key_Down)
-    assert view._note.isHidden()
+    assert view.hud_item_note == ""
 
 
 def test_the_loop_key_with_nothing_to_loop_is_the_lock_and_always_enhances(qtbot):
@@ -819,41 +819,37 @@ def test_a_slide_whose_run_is_still_in_the_line_says_queued_not_enhancing(qtbot)
 
     view.note_enhancing({"id-a": "running", "id-b": "queued"})
 
-    assert view._note.text() == "Enhancement queued"
+    assert view.hud_item_note == "Enhancement queued"
     _press(view, Qt.Key.Key_Down)        # let go
     _press(view, Qt.Key.Key_Left)        # back to the one being made
-    assert view._note.text() == "Enhancing…"
+    assert view.hud_item_note == "Enhancing…"
 
 
 def test_the_note_follows_the_run_from_the_line_onto_the_gpu(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     _press(view, Qt.Key.Key_Down)
-    assert view._note.text() == "Enhancement queued"
+    assert view.hud_item_note == "Enhancement queued"
 
     view.note_enhancing({"id-a": "running"})
 
-    assert view._note.text() == "Enhancing…"
+    assert view.hud_item_note == "Enhancing…"
 
 
-def test_a_run_of_an_item_this_show_never_asked_about_says_nothing(qtbot):
-    # Enhance All queues its own runs while a show plays; the corner speaks for
-    # the ones this show asked for, and stays out of the way otherwise.
+def test_a_run_of_an_item_this_show_never_asked_about_is_named_all_the_same(qtbot):
     view = _view(qtbot, _KEYED)
     view.note_enhancing({"id-a": "running"})
+    assert view.hud_item_note == "Enhancing…"
     assert view._note.isHidden()
 
 
 def test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer(qtbot):
-    # The statuses arrive every poll; a spoken command's answer is on screen for
-    # a beat, and losing it to one would leave the speaker with no reply.
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.note_voice_run("id-a", "🎤 fixing teeth…")
 
     view.note_enhancing({"id-a": "running"})
 
     assert "fixing teeth" in view._note.text()
-    _fade(view)
-    assert view._note.text() == "Enhancing…"
+    assert view.hud_item_note == "Enhancing…"
 
 
 def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
@@ -864,7 +860,7 @@ def test_the_enhanced_version_replaces_the_slide_when_it_lands(qtbot, tmp_path):
     view.note_enhanced("id-a", better)
 
     assert view._playlist.current()[0] == better
-    assert view._note.isHidden()   # nothing in flight for this slide any more
+    assert view.hud_item_note == ""
 
 
 def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(
@@ -912,21 +908,28 @@ def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):
     view = _view(qtbot, _KEYED)     # nothing wired to enhance with
     _press(view, Qt.Key.Key_Down)
     assert view._playlist.locked
-    assert view._note.isHidden()
+    assert view.hud_item_note == ""
 
 
-def test_the_enhancing_note_is_a_notice_across_the_top(qtbot):
-    # Where Fun Time flashes the same kind of line over a player, and in the
-    # same shape: this surface wears the players' own HUD, so what it says for
-    # itself is said in the players' own notice rather than in a second dialect
-    # at the far end of the screen.
-    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
+def test_a_spoken_answer_is_a_notice_across_the_top(qtbot):
+    view = _view(qtbot, _KEYED)
     view.resize(800, 600)
-    _press(view, Qt.Key.Key_Down)
+
+    view.note_voice_command("🎤 next")
 
     note = view._note.geometry()
     assert note.top() == NOTICE_TOP_MARGIN
     assert abs(note.center().x() - view.width() // 2) <= 1
+
+
+def test_what_is_being_made_of_the_slide_is_no_notice_across_the_top(qtbot):
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
+    _press(view, Qt.Key.Key_Down)
+    _fade(view)
+
+    view.note_enhancing({"id-a": "running"})
+
+    assert view._note.isHidden()
 
 
 def test_the_notice_wears_the_color_of_what_it_says(qtbot):
@@ -1134,16 +1137,13 @@ def test_a_spoken_fix_targets_the_slide_on_screen(qtbot):
     assert view.voice_target() == "id-b"
 
 
-def test_a_spoken_fix_answers_in_the_corner_then_reads_enhancing(qtbot):
+def test_a_spoken_fix_answers_in_the_corner_and_the_hud_follows_its_run(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: True))
     view.note_voice_run("id-a", "🎤 fixing teeth…")
     assert "fixing teeth" in view._note.text()
-    # The flash fades into the same note a lock's enhance earns, which follows
-    # the run: waiting its turn, then being made, until the version lands.
-    _fade(view)
-    assert view._note.text() == "Enhancement queued"
+    assert view.hud_item_note == "Enhancement queued"
     view.note_enhancing({"id-a": "running"})
-    assert view._note.text() == "Enhancing…"
+    assert view.hud_item_note == "Enhancing…"
 
 
 def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
@@ -1152,6 +1152,7 @@ def test_a_declined_spoken_fix_flashes_and_marks_nothing(qtbot):
     assert "no teeth detector" in view._note.text()
     _fade(view)
     assert view._note.isHidden()
+    assert view.hud_item_note == ""
 
 
 def test_closing_announces_itself(qtbot):
@@ -1468,23 +1469,22 @@ def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_p
     assert view._pane._media[0] == second_base
 
 
-def test_the_note_says_which_version_is_on_screen(qtbot, tmp_path):
-    # Two versions of one picture differ by texture, which is exactly what you
-    # cannot tell apart from memory — so the view has to say which one this is.
+def test_the_hud_says_which_version_is_on_screen(qtbot, tmp_path):
     enhanced, original = (_png(tmp_path / n) for n in ("e1.png", "src.png"))
     view = _view(qtbot, [(enhanced, "image", "id-a")])
     view.set_levels({enhanced: [(enhanced, "image", "Enhance 1"),
                                 (original, "image", "Original")]})
 
-    assert view._note.text() == "Enhance 1 — 1 of 2"
+    assert view.hud_item_note == "Enhance 1 — 1 of 2"
     _shift(view, Qt.Key.Key_Right)
-    assert view._note.text() == "Original — 2 of 2"
+    assert view.hud_item_note == "Original — 2 of 2"
+    assert view._note.isHidden()
 
 
 def test_an_image_with_one_version_says_nothing(qtbot, tmp_path):
     view = _view(qtbot, [(_png(tmp_path / "only.png"), "image", "id-a")])
     view.set_levels({})
-    assert view._note.isHidden()
+    assert view.hud_item_note == ""
 
 
 def test_a_version_step_keeps_the_item_as_the_enhance_target(qtbot, tmp_path):
@@ -1513,9 +1513,17 @@ def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
 
 # --- opened over a generation still being made ------------------------------
 
+def _frame_up(view):
+    """The frame the engine was last handed, as bytes -- None while a file of
+    the set or a line is up instead."""
+    pane = view._pane
+    if pane._media is not None or pane._opened is None:
+        return None
+    return pane._opened.read_bytes()
+
+
 def _showing_a_picture(view):
-    picture = view._pane._frame
-    return picture is not None and not picture.isNull()
+    return _frame_up(view) is not None
 
 
 def test_opens_over_a_running_generation_showing_its_frame(qtbot):
@@ -1603,23 +1611,6 @@ def test_a_live_show_drives_no_device(qtbot):
 
 
 # --- what a fullscreen show is, as media ------------------------------------
-
-def test_a_streamed_frame_fits_the_screen_without_clipping(qtbot):
-    # The reported "black on all four sides" was the picture left scaled at its
-    # tiny pre-show size on the full screen.  A file is fitted by the engine;
-    # a run's streamed frame is the one picture this app still draws itself.
-    buf = BytesIO()
-    Image.new("RGB", (24, 60), (10, 120, 200)).save(buf, "PNG")
-    view = _view(qtbot, [], frame=buf.getvalue())
-    label = view._pane._picture
-    old = label.size()
-    label.resize(600, 500)  # stand in for the screen the window grows to
-    QApplication.sendEvent(label, QResizeEvent(QSize(600, 500), old))
-
-    pm = label.pixmap()
-    assert pm.width() <= 600 and pm.height() <= 500        # nothing clipped off
-    assert pm.width() == 600 or pm.height() == 500         # as large as it fits
-
 
 def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
     # Filling the screen with a clip is deliberate, so it's heard.
@@ -1959,12 +1950,10 @@ def test_a_live_slide_shows_the_newest_frame_while_it_is_on_screen(qtbot):
     view.note_generating("id-run", _png_bytes())
     _press(view, Qt.Key.Key_Right)                    # step onto it
 
-    later = _png_bytes()
+    later = _png_bytes(color=(200, 40, 40))
     view.note_generating("id-run", later)
 
-    newest = QPixmap()
-    newest.loadFromData(later)
-    assert view._pane._frame.toImage() == newest.toImage()
+    assert _frame_up(view) == later
 
 
 def test_a_live_slide_becomes_the_file_when_the_run_lands(qtbot, tmp_path):
@@ -2060,8 +2049,7 @@ def test_a_slide_still_being_made_says_so(qtbot, tmp_path):
 
     _press(view, Qt.Key.Key_Right)
 
-    assert view._note.text() == "Generating…"
-    assert not view._note.isHidden()
+    assert view.hud_item_note == "Generating…"
 
 
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot):
@@ -2133,3 +2121,298 @@ class TestMovingTheShowsPanel:
                                      Qt.KeyboardModifier.NoModifier))
 
         assert moves == []
+# --- a picture that something is being made of -------------------------------
+
+def test_a_show_opened_while_a_picture_of_it_is_being_enhanced_opens_on_it(qtbot):
+    view = _view(qtbot, _THREE, enhancing={"id-c": "running"})
+
+    assert view._pane._media[0] == "c.png"
+
+
+def test_a_picture_being_enhanced_holds_the_screen_for_half_the_pace(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
+
+    assert (view._early_move_on.isActive(), view._early_move_on.interval()) == (True, 2000)
+    view.step(1)
+    assert not view._early_move_on.isActive()
+
+
+def test_a_picture_being_made_makes_its_move_at_the_ordinary_pace(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
+
+    assert view._pane._engine.pace == 4
+
+
+def test_the_better_version_landing_on_screen_holds_for_the_whole_pace(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000, enhancing={"id-a": "running"})
+
+    view.note_enhanced("id-a", "a_enhanced.png")
+
+    assert view._pane._media[0] == "a_enhanced.png"
+    assert view._pane._engine.pace == 4
+
+
+def test_a_picture_still_being_generated_moves_on_after_half_the_pace(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_generating("id-run", _png_bytes())
+    view.step(1)
+
+    assert view._early_move_on.interval() == 2000
+    view._early_move_on.timeout.emit()
+
+    assert view._playlist.current()[2] == "id-b"
+
+
+def test_a_picture_still_being_generated_under_a_pace_of_nought_is_held(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=0)
+    view.note_generating("id-run", _png_bytes())
+
+    view.step(1)
+    view._on_media_ended()
+
+    assert view._playlist.current()[2] == "id-run"
+
+
+def test_a_frozen_room_holds_a_picture_still_being_generated_until_it_thaws(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_generating("id-run", _png_bytes())
+    view.step(1)
+
+    view.set_paused(True)
+    frozen = (view._pane._engine.paused, view._early_move_on.isActive())
+    view.set_paused(False)
+
+    assert frozen == (True, False)
+    assert (view._pane._engine.paused, view._early_move_on.isActive()) == (False, True)
+
+
+def test_a_show_picked_back_up_opens_on_what_is_being_made_then_where_it_left_off(qtbot):
+    closed = _view(qtbot, _THREE)
+    closed.step(1)
+    reopened = _view(qtbot, _THREE, enhancing={"id-c": "running"})
+
+    assert reopened.resume(closed.state()) is True
+
+    assert reopened._playlist.current()[2] == "id-c"
+    assert reopened._playlist.peek(1)[2] == "id-b"
+
+
+def test_a_show_picked_back_up_on_a_locked_slide_stays_on_it(qtbot):
+    closed = _view(qtbot, _THREE)
+    closed.step(1)
+    _press(closed, Qt.Key.Key_Down)
+    reopened = _view(qtbot, _THREE, enhancing={"id-c": "running"})
+
+    reopened.resume(closed.state())
+
+    assert reopened._playlist.current()[2] == "id-b"
+    assert reopened.locked
+
+
+def test_the_version_the_last_show_was_on_is_not_stepped_on_what_is_being_made(
+        qtbot, tmp_path):
+    a, a_base, c, c_base = (_png(tmp_path / n) for n in ("a.png", "a0.png", "c.png", "c0.png"))
+    items = [(a, "image", "id-a"), (c, "image", "id-c")]
+    levels = {a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")],
+              c: [(c, "image", "Enhance 1"), (c_base, "image", "Original")]}
+    closed = _view(qtbot, items)
+    closed.set_levels(levels)
+    _shift(closed, Qt.Key.Key_Right)
+    reopened = _view(qtbot, items, enhancing={"id-c": "running"})
+    reopened.set_levels(levels)
+
+    reopened.resume(closed.state())
+
+    assert reopened._pane._media[0] == c
+
+
+def test_a_show_told_to_lead_with_what_is_being_made_puts_it_on_screen_now(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_generating("id-run", _png_bytes())
+
+    view.lead_with_what_is_being_made()
+
+    assert view._playlist.current()[2] == "id-run"
+    assert _frame_up(view) == _png_bytes()
+
+
+def test_a_picture_enhanced_during_the_show_steps_its_versions_without_reopening(
+        qtbot, tmp_path):
+    a, better, b = (_png(tmp_path / n) for n in ("a.png", "a_enhanced.png", "b.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), (b, "image", "id-b")])
+    view.set_levels({})
+    view.note_enhanced("id-a", better)
+
+    view.add_levels({better: [(better, "image", "Enhance 1"), (a, "image", "Original")]})
+    _shift(view, Qt.Key.Key_Right)
+
+    assert view._pane._media[0] == a
+    assert view.hud_item_note == "Original — 2 of 2"
+
+
+def test_a_picture_being_enhanced_shows_the_enhancement_as_it_comes_in(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    frame = _png_bytes()
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": frame})
+
+    assert _frame_up(view) == frame
+
+
+def test_each_new_frame_of_the_enhancement_replaces_the_last(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+    newer = _png_bytes(color=(200, 40, 40))
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": newer})
+
+    assert _frame_up(view) == newer
+
+
+def test_the_finished_enhancement_takes_the_place_of_its_frames(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view.note_enhanced("id-a", "a_enhanced.png")
+
+    assert view._pane._media[0] == "a_enhanced.png"
+
+
+def test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    engine = view._pane._engine
+    assert (engine.loaded, len(engine.swapped)) == ([Path("a.png")], 1)
+
+
+def test_a_picture_come_to_while_it_is_enhanced_opens_on_its_newest_frame(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    frame_of_b = _png_bytes(color=(30, 160, 60))
+    view.note_enhancing({"id-b": "running"}, frames={"id-b": frame_of_b})
+
+    view._on_media_ended()
+
+    assert (_frame_up(view), view._pane._engine.swapped) == (frame_of_b, [])
+
+
+def test_a_show_following_a_run_stays_on_it_when_its_pace_runs_out(qtbot, tmp_path):
+    a, b, c = (_png(tmp_path / n) for n in ("a.png", "b.png", "c.png"))
+    view = _view(qtbot, [], frame=_png_bytes(), image_dwell_ms=4000)
+    view.set_playlist([(a, "image", "id-a"), (b, "image", "id-b"), (c, "image", "id-c")], 0)
+
+    view._on_media_ended()
+    still_following = view.is_live() and _frame_up(view) == _png_bytes()
+    _press(view, Qt.Key.Key_Right)
+
+    assert still_following
+    assert view._pane._media == (b, "image")
+
+
+def test_a_locked_picture_being_enhanced_is_held_by_the_lock_not_moved_on_early(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 actions=ShowActions(enhance=lambda prompt_id: True))
+    _press(view, Qt.Key.Key_Down)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view._on_media_ended()
+
+    assert (view._pane._engine.pace, view._early_move_on.isActive()) == (4, False)
+
+
+def test_a_cancelled_enhancement_puts_the_picture_itself_back(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    view.note_enhancing({})
+
+    assert view._pane._media[0] == "a.png"
+
+
+def test_a_picture_whose_enhancement_is_waiting_shows_as_itself(qtbot):
+    view = _view(qtbot, _THREE, image_dwell_ms=4000)
+
+    view.note_enhancing({"id-a": "queued"}, frames={})
+
+    assert view._pane._media[0] == "a.png"
+
+
+def test_a_version_stepped_to_while_the_picture_is_enhanced_stays_up(qtbot, tmp_path):
+    a, a_base = (_png(tmp_path / n) for n in ("a.png", "a0.png"))
+    view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")],
+                 image_dwell_ms=4000)
+    view.set_levels({a: [(a, "image", "Enhance 1"), (a_base, "image", "Original")]})
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
+
+    _shift(view, Qt.Key.Key_Right)
+    view.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes(color=(1, 2, 3))})
+
+    assert view._pane._media[0] == a_base
+
+
+def test_a_closing_show_is_off_the_screen_before_its_engine_lets_go(qtbot):
+    seen = {}
+
+    class RecordingEngine(FakeEngine):
+        def close(self) -> None:
+            super().close()
+            seen["show visible"] = view.isVisible()
+
+    view = SlideshowView(_ITEMS, engine=RecordingEngine(), shuffle=in_order)
+    qtbot.addWidget(view)
+    view.show()
+
+    view.close()
+
+    assert seen == {"show visible": False}
+
+
+def test_a_run_the_show_opened_on_comes_back_finished_after_the_picture_on_screen(qtbot):
+    view = _view(qtbot, [("a.png", "image", "id-a"), ("b.png", "image", "id-b")])
+    view.note_generating("id-run", _png_bytes())
+    view.lead_with_what_is_being_made()
+    assert view._playlist.current()[2] == "id-run"
+    view._on_media_ended()
+    moved_on_to = view.current_media_path()
+
+    view.note_added("run.png", "image", "id-run")
+    view._on_media_ended()
+
+    assert moved_on_to == "a.png"
+    assert view.current_media_path() == "run.png"
+
+
+def test_a_finished_picture_comes_up_before_the_next_runs_first_frames(qtbot):
+    view = _view(qtbot, _THREE)
+    view.note_generating("id-first", _png_bytes())
+    view._on_media_ended()
+    view._on_media_ended()
+
+    view.note_added("first.png", "image", "id-first")
+    view.note_generating("id-second", _png_bytes(color=(200, 40, 40)))
+    view._on_media_ended()
+    first_up = view.current_media_path()
+    view._on_media_ended()
+
+    assert first_up == "first.png"
+    assert view._playlist.current()[2] == "id-second"
+
+
+def test_locking_a_picture_shows_its_enhancement_on_the_move_to_the_finished_picture(qtbot):
+    view = _view(qtbot, _KEYED, image_dwell_ms=4000,
+                 actions=ShowActions(enhance=lambda prompt_id: True))
+    whole, face, hand = (_png_bytes(color=color) for color in ((1, 2, 3), (4, 5, 6), (7, 8, 9)))
+    engine = view._pane._engine
+
+    _press(view, Qt.Key.Key_Down)
+    for frame in (whole, face, hand):
+        view.note_enhancing({"id-a": "running"}, frames={"id-a": frame})
+    each_on_the_pictures_move = [swapped.read_bytes() for swapped in engine.swapped]
+    view._on_media_ended()
+    the_newest_on_a_move_of_its_own = engine.loaded[-1].read_bytes()
+    view.note_enhanced("id-a", "a_enhanced.png")
+
+    assert each_on_the_pictures_move == [whole, face, hand]
+    assert the_newest_on_a_move_of_its_own == hand
+    assert view.current_media_path() == "a_enhanced.png"

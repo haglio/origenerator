@@ -1171,6 +1171,21 @@ def test_a_picture_being_enhanced_on_the_player_shows_the_enhancement_coming_in(
     assert _frame_shown(_sent(show)) == FRAME
 
 
+def test_a_better_version_landing_on_the_players_picture_goes_up_on_its_move(qtbot,
+                                                                          tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
+    _sent(show)
+
+    show.note_enhanced("id-1", "one_enhanced.png")
+    landing = _sent(show)
+    show.note_enhancing({}, {})
+
+    assert landing[0] == "SHOW_FRAME one_enhanced.png"
+    assert "RELOAD_PLAYLIST" in landing[1:]
+    assert _sent(show) == []
+
+
 def test_an_enhancement_that_stops_takes_its_frame_off_the_player(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
     show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})

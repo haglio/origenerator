@@ -3437,7 +3437,7 @@ class GalleryView(QWidget):
         """
         self._jobs.cancel(key)
         self._auto.note_canceled(key)
-        self._after_a_job_left(key)
+        self._after_a_job_ended_unfinished(key)
 
     def _cancel_job(self, prompt_id: str):
         """Throw away one named run — a queue row's button, and a config tab's.
@@ -3452,13 +3452,13 @@ class GalleryView(QWidget):
         self._jobs.cancel_job(prompt_id)
         if key is not None:
             self._auto.note_canceled(key)
-            self._after_a_job_left(key)
+            self._after_a_job_ended_unfinished(key)
 
-    def _after_a_job_left(self, key: str):
-        """Redraw the folder a run has just been taken out of."""
+    def _after_a_job_ended_unfinished(self, key: str):
         self._abandon_reroll_preview(key)
         self._rerender_current_leaf()
         self._reconcile_generating()  # a tab's run may have stopped
+        self._enhance.reconcile()
 
     def _abandon_reroll_preview(self, key: str):
         """A run in folder ``key`` ended with nothing to show (cancelled or
@@ -3593,10 +3593,7 @@ class GalleryView(QWidget):
         same reason: it is the only thing that happens, so it has to be visible.
         """
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
-        self._abandon_reroll_preview(key)
-        self._rerender_current_leaf()
-        self._reconcile_generating()  # the run ended: the front tab drops its Cancel
-        self._enhance.reconcile()  # nothing is in flight for it now
+        self._after_a_job_ended_unfinished(key)
         QMessageBox.warning(self, "Generation failed", format_execution_error(message))
 
     def _rerender_current_leaf(self):

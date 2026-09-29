@@ -233,7 +233,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_script_that_follows_its_own_video_is_never_rewritten,
 # test_the_output_folder_is_resolved_when_the_sweep_runs and
 # test_the_cadence_is_resolved_when_the_sweep_runs_too.
-MAX_PROSE_LINES = 18856
+#
+# 18852 when a canceled or failed enhancement began leaving the tab showing its
+# picture as it was before the press, taken down to what the tree measured: the
+# note on what the gallery redraws after a job ends unfinished is the name
+# _after_a_job_ended_unfinished and
+# test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press.
+MAX_PROSE_LINES = 18852
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

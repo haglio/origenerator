@@ -62,7 +62,7 @@ from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
-from origenerator.gui.enhance_versions import _LevelRow, _PendingRow
+from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
@@ -10667,6 +10667,49 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
 
     assert panel.displayed_row()["prompt_id"] == "g1"
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
+
+
+def _cancel_from_the_queue(view, job, monkeypatch):
+    view._update_queue()
+    (queued,) = view._queue.rows()
+    queued._cancel.click()
+
+
+def _cancel_from_the_pictures_menu(view, job, monkeypatch):
+    view._enhance.cancel_for([view._db.get_generation("g0")])
+
+
+def _fail_on_comfyui(view, job, monkeypatch):
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
+    view._client.job_error.emit(job.prompt_id, "boom")
+
+
+@pytest.mark.parametrize("end_unfinished", [
+    _cancel_from_the_queue, _cancel_from_the_pictures_menu, _fail_on_comfyui])
+def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
+        qtbot, tmp_path, monkeypatch, end_unfinished):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    picture = output_dir / "image" / "sdxl_t2i_g0.png"
+    picture.write_bytes(_png_bytes())
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    panel = view._info_tabs.current_config_panel()
+    (plus,) = panel._versions._host.findChildren(_AddRow)
+    qtbot.mouseClick(plus, Qt.MouseButton.LeftButton)
+    (job,) = view._jobs.all_jobs
+    client.preview_image.emit(job.prompt_id, _png_bytes())
+
+    end_unfinished(view, job, monkeypatch)
+
+    assert not panel._versions._host.findChildren(_PendingRow)
+    assert panel._versions._host.findChildren(_AddRow)
+    assert panel._preview._live_frame is None
+    assert panel._preview.is_showing_any([picture])
 
 
 def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbot, tmp_path):

@@ -29,7 +29,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from dataclasses import dataclass
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -51,16 +50,6 @@ _LOOKAHEAD_MS = 40
 # as the window closes, so the seam is a movement rather than a slam. (Genau's
 # HandoffGlide, minus its cliff edge at the end.)
 _HANDOFF_MS = 300
-
-
-@dataclass(frozen=True)
-class _HeldBars:
-    """The motion as it stood when a hold stilled it, and as it comes back."""
-
-    cruise: bool
-    speed: int
-    amplitude: int
-    center: int
 
 
 class _TickThread:
@@ -130,10 +119,7 @@ class Osr2MotionDriver(QObject):
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread
         self._ticker = None
-        # Which end a hold has stilled the motion at, and what it was doing
-        # before the first of them -- see hold() and release().
         self._held_at: int | None = None
-        self._held: _HeldBars | None = None
 
     @property
     def active(self) -> bool:
@@ -156,7 +142,7 @@ class Osr2MotionDriver(QObject):
         self._streaming = False
         now = self._now()
         self._last_tick = now
-        self._glide_until = now + _HANDOFF_MS / 1000.0
+        self._glide_from(now)
         logger.info("OSR2 motion engaged: %s", self.status_text())
         self.poll()  # move on the keypress, not a tick later
         self._ticker = self._make_ticker(self.poll, self._interval_s)
@@ -203,7 +189,8 @@ class Osr2MotionDriver(QObject):
             self._last_tick = now
             motion_engine.tick_cruise_control(self._state, now)
             motion_engine.tick_learned_motion(self._state, now)
-            pos = motion_engine.position_ahead(self._state, lead_ms / 1000.0)
+            pos = (self._held_at if self._held_at is not None
+                   else motion_engine.position_ahead(self._state, lead_ms / 1000.0))
         self._broker.send_position(pos, lead_ms)
         if not self._streaming:
             self._streaming = True
@@ -220,14 +207,6 @@ class Osr2MotionDriver(QObject):
         eased = left / (_HANDOFF_MS / 1000.0)
         return round(_LOOKAHEAD_MS + (_HANDOFF_MS - _LOOKAHEAD_MS) * eased)
 
-    # --- the bars the keys and the drive panel move ------------------------
-    #
-    # Every one of them is refused while a hold has the motion stilled at an end
-    # of the travel: a nudge there would move the device while the console still
-    # said it was held, and the hold's own recording is what driving puts back,
-    # so the nudge would be thrown away at the end of it anyway.  The console
-    # dims these same marks, and the keys agree with it.
-
     @property
     def state(self) -> Motion:
         """The live motion, for the drive panel to draw. Read-only by
@@ -235,43 +214,36 @@ class Osr2MotionDriver(QObject):
         return self._state
 
     def adjust_speed(self, delta: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.adjust_speed(self._state.state, delta)
+        with self._lock:
+            motion_engine.adjust_speed(self._state.state, delta)
 
     def adjust_amplitude(self, delta: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.adjust_amplitude(self._state.state, delta)
+        with self._lock:
+            motion_engine.adjust_amplitude(self._state.state, delta)
 
     def adjust_center(self, delta: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.adjust_center(self._state.state, delta)
+        with self._lock:
+            motion_engine.adjust_center(self._state.state, delta)
 
     def set_speed(self, value: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.set_speed(self._state.state, value)
+        with self._lock:
+            motion_engine.set_speed(self._state.state, value)
 
     def set_amplitude(self, value: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.set_amplitude(self._state.state, value)
+        with self._lock:
+            motion_engine.set_amplitude(self._state.state, value)
 
     def set_center(self, value: int) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.set_center(self._state.state, value)
+        with self._lock:
+            motion_engine.set_center(self._state.state, value)
 
     def set_max_intensity(self, value: int) -> None:
         with self._lock:
             motion_engine.set_max_intensity(self._state.state, value)
 
     def cycle_shape(self, step: int = 1) -> None:
-        if self._held_at is None:
-            with self._lock:
-                motion_engine.cycle_shape(self._state.state, step)
+        with self._lock:
+            motion_engine.cycle_shape(self._state.state, step)
 
     def toggle_cruise(self) -> None:
         """Hands off: cruise control takes the motion over (genau's ``/``).
@@ -282,8 +254,6 @@ class Osr2MotionDriver(QObject):
         whole motion's travel, center and pace, so the console still says what is
         being sent. It only moves while the motion is actually running, so arming
         it against a parked device changes nothing until the device is taken."""
-        if self._held_at is not None:
-            return
         with self._lock:
             motion_engine.toggle_cruise_control(self._state)
 
@@ -296,8 +266,6 @@ class Osr2MotionDriver(QObject):
         flip — the same reason every switch in the toolbar answers an explicit
         on and off beside its flip.
         """
-        if self._held_at is not None:
-            return
         with self._lock:
             if on:
                 motion_engine.enable_cruise_control(self._state)
@@ -324,48 +292,23 @@ class Osr2MotionDriver(QObject):
         with self._lock:
             motion_engine.quarter_offset(self._state)
 
-    # --- holding the motion still, at one end of the travel or the other -----
-
     @property
     def held_at(self) -> int | None:
-        """Which end the motion is being held at, or None when it is free."""
         return self._held_at
 
     def hold(self, center: int) -> None:
-        """Still the motion at *center*, remembering what it was doing.
-
-        Cruise goes off first: it rewrites all three bars every tick, so a
-        number set under it is overwritten inside the frame. Then the travel
-        closes before the center moves, so the motion stills where it is and
-        travels to the end from there rather than oscillating its way across.
-
-        A second hold does not overwrite the first recording -- park, then
-        retract, then driving puts back what was playing before the park.
-        """
         with self._lock:
-            bars = self._state.state
-            if self._held_at is None:
-                self._held = _HeldBars(
-                    cruise=self._state.cruise.active, speed=bars.speed,
-                    amplitude=bars.amplitude, center=bars.intended_center)
             self._held_at = center
-            motion_engine.disable_cruise_control(self._state)
-            motion_engine.set_amplitude(bars, 0)
-            motion_engine.set_center(bars, center)
-            motion_engine.set_speed(bars, motion_engine.MIN_SPEED)
+            self._glide_from(self._now())
 
     def release(self) -> None:
-        """Put back whatever the motion was doing, cruise included, and spend
-        the recording.  Cruise goes back last: it draws its waves from what the
-        bars say."""
         with self._lock:
-            held, self._held, self._held_at = self._held, None, None
-            if held is None:
-                return
-            motion_engine.set_dials(self._state.state, speed=held.speed,
-                                    amplitude=held.amplitude, center=held.center)
-            if held.cruise:
-                motion_engine.enable_cruise_control(self._state)
+            if self._held_at is not None:
+                self._held_at = None
+                self._glide_from(self._now())
+
+    def _glide_from(self, now: float) -> None:
+        self._glide_until = now + _HANDOFF_MS / 1000.0
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the

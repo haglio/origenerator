@@ -247,24 +247,57 @@ def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     assert not driver.state.cruise.active and not driver.state.cruise.stack.waves
 
 
-def test_a_hold_stills_the_motion_at_the_end_it_names(qtbot):
-    """Cruise first, because it rewrites all three bars every tick; then the
-    travel closes before the center moves, so the motion stills where it is and
-    travels to the end from there rather than oscillating its way across."""
+def test_a_hold_leaves_amp_speed_and_center_where_they_were(qtbot):
     driver, _broker, _clock = _driver(qtbot)
-    motion_engine.enable_cruise_control(driver.state)
+    driver.set_amplitude(60)
+    driver.set_center(40)
+    driver.set_speed(70)
 
     driver.hold(RETRACT_CENTER)
 
+    bars = driver.state.state
+    assert (bars.amplitude, bars.intended_center, bars.speed) == (60, 40, 70)
+
+
+def test_while_held_the_device_is_sent_the_end_it_is_held_at(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+
+    driver.hold(RETRACT_CENTER)
+    clock.t += 1.0
+    driver.poll()
+
     assert driver.held_at == RETRACT_CENTER
-    assert driver.state.cruise.active is False
-    assert driver.state.state.amplitude == 0
-    assert driver.state.state.center == RETRACT_CENTER
+    assert broker.positions[-1][0] == RETRACT_CENTER
 
 
-def test_driving_puts_back_what_the_first_hold_stilled(qtbot):
-    """Park, then retract, then driving: the second hold must not overwrite the
-    recording the first one took, or the way back is a flat line at an end."""
+def test_the_trip_to_the_held_end_is_given_the_takeovers_glide(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    clock.t += 1.0
+
+    driver.hold(PARK_CENTER)
+    driver.poll()
+
+    assert broker.positions[-1] == (PARK_CENTER, _HANDOFF_MS)
+
+
+def test_driving_brings_the_device_back_to_the_motion_with_the_takeovers_glide(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    driver.hold(PARK_CENTER)
+    clock.t += 1.0
+    driver.poll()
+
+    driver.release()
+    driver.poll()
+
+    pos, interval = broker.positions[-1]
+    assert interval == _HANDOFF_MS
+    assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
+
+
+def test_park_then_retract_then_driving_leaves_amp_speed_and_center_as_they_were(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     motion_engine.set_amplitude(driver.state.state, 60)
     motion_engine.set_center(driver.state.state, 40)
@@ -279,9 +312,7 @@ def test_driving_puts_back_what_the_first_hold_stilled(qtbot):
             driver.state.state.speed) == (60, 40, 70)
 
 
-def test_cruise_comes_back_last_where_it_was_on(qtbot):
-    """It draws its waves from what the bars say, so it is re-armed after they
-    are back rather than before."""
+def test_cruise_stays_on_through_a_hold(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     motion_engine.enable_cruise_control(driver.state)
 
@@ -292,8 +323,6 @@ def test_cruise_comes_back_last_where_it_was_on(qtbot):
 
 
 def test_driving_with_nothing_held_changes_nothing(qtbot):
-    """The console's driving button is also the way back off control-off, where
-    there is no hold to put back."""
     driver, _broker, _clock = _driver(qtbot)
     motion_engine.set_amplitude(driver.state.state, 55)
 
@@ -302,25 +331,20 @@ def test_driving_with_nothing_held_changes_nothing(qtbot):
     assert driver.state.state.amplitude == 55
 
 
-def test_a_hold_refuses_every_bar_that_would_break_it(qtbot):
-    """A nudge under a hold would move the device while the console still said
-    it was held -- and driving puts the recording back, so it would be thrown
-    away at the end of the hold anyway.  The console dims these same marks."""
+def test_amp_speed_center_and_cruise_answer_while_held_as_they_do_in_fun_time(qtbot):
     driver, _broker, _clock = _driver(qtbot)
-    motion_engine.set_amplitude(driver.state.state, 60)
+    driver.set_amplitude(60)
+    speed = driver.state.state.speed
     driver.hold(PARK_CENTER)
 
     driver.adjust_amplitude(10)
-    driver.set_amplitude(80)
-    driver.adjust_center(5)
-    driver.set_center(70)
+    driver.set_center(50)
     driver.adjust_speed(10)
-    driver.toggle_cruise()
     driver.set_cruise(True)
 
-    assert driver.state.state.amplitude == 0
-    assert driver.state.state.center == PARK_CENTER
-    assert driver.state.cruise.active is False
+    bars = driver.state.state
+    assert (bars.amplitude, bars.intended_center, bars.speed) == (70, 50, speed + 10)
+    assert driver.state.cruise.active is True
 
 
 def test_the_max_intensity_is_the_devices_to_keep_even_through_a_hold(qtbot):
@@ -333,7 +357,7 @@ def test_the_max_intensity_is_the_devices_to_keep_even_through_a_hold(qtbot):
     assert driver.state.state.max_intensity == 30
 
 
-def test_a_hold_let_go_under_a_lowered_max_intensity_gives_back_the_motion_pushed_down(qtbot):
+def test_a_max_intensity_lowered_while_held_lowers_the_bars_at_once(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.set_amplitude(90)
     driver.set_speed(90)
@@ -341,22 +365,11 @@ def test_a_hold_let_go_under_a_lowered_max_intensity_gives_back_the_motion_pushe
     pushed = RobotHandState(amplitude=90, speed=90, intended_center=bars.intended_center)
     set_max_intensity(pushed, 30)
     driver.hold(PARK_CENTER)
-    driver.set_max_intensity(30)
 
-    driver.release()
+    driver.set_max_intensity(30)
 
     assert (bars.speed, bars.amplitude, bars.center) == (
         pushed.speed, pushed.amplitude, pushed.center)
-
-
-def test_the_bars_answer_again_once_the_hold_is_let_go(qtbot):
-    driver, _broker, _clock = _driver(qtbot)
-    driver.hold(PARK_CENTER)
-    driver.release()
-
-    driver.set_amplitude(80)
-
-    assert driver.state.state.amplitude == 80
 
 
 def test_a_tick_that_lands_after_the_device_is_given_up_sends_nothing(qtbot):

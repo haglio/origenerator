@@ -43,7 +43,6 @@ from player_core.robot_hand import (
     position_fraction,
     set_amplitude,
     set_center,
-    set_dials,
     set_max_intensity,
     set_speed,
 )
@@ -71,7 +70,6 @@ __all__ = [
     "quarter_offset",
     "set_amplitude",
     "set_center",
-    "set_dials",
     "set_max_intensity",
     "set_speed",
     "tick_cruise_control",

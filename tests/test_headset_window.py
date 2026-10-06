@@ -107,9 +107,6 @@ class TestTheRoomsPressesReachTheWindow:
         assert pressed == ["5,5"], "the press did not arrive where it was aimed"
 
     def test_a_right_click_asks_the_widget_under_it_for_its_menu(self, tmp_path, qtbot):
-        """There is no second button on a controller, so the room says this in
-        words.  Every menu this app opens on a right-click is asked for by the
-        context-menu event Qt would send, never by the button itself."""
         window = self._window(qtbot)
         target = window.findChild(QLabel, "target")
         target.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

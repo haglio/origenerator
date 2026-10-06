@@ -184,9 +184,7 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
 
 
 def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
-    """The upright stack is the Random Favs Browser's rect asking for it, and a
-    headset room has no such rect: it hangs this window on a screen of its own
-    with room to spare, so it gets the arrangement a window of its own opens."""
+    """The upright stack is the Random Favs Browser's rect asking for it."""
     view = GalleryView(FakeDB([]), fun_time=replace(
         _session(), frames_file=Path("frame.bin"), input_file=Path("input.txt")))
     qtbot.addWidget(view)

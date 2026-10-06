@@ -225,10 +225,7 @@ class HeadsetWindow(QObject):
                 Qt.KeyboardModifier.NoModifier))
 
     def _ask_for_the_menu(self, target: QWidget | None) -> None:
-        """A controller has one trigger, so the room says a right-click in
-        words.  Every menu this app opens on one comes from the context-menu
-        event Qt sends off the platform's own right button, which a synthesized
-        mouse press does not produce."""
+        """Qt's own context-menu event: a mouse press does not produce one."""
         if target is None or sip.isdeleted(target) or _held_off(target):
             return
         at = self._window.mapToGlobal(self._pointer)

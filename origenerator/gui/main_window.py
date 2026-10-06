@@ -157,8 +157,7 @@ class OrigeneratorWindow(QMainWindow):
         state — and reopen the last session's config tabs, gallery folder, and
         selected generation.  Inside a Fun Time session the geometry is the
         session's to dictate, so the saved one is neither restored nor (see
-        ``closeEvent``) overwritten -- except in a headset, where the session
-        names no rect and the window hangs at the size it stands alone at."""
+        ``closeEvent``) overwritten -- except in a headset, which names no rect."""
         if self._fun_time is None or self._fun_time.in_a_headset:
             self._restore_geometry()
         for key, _getter, setter in SESSION_UI_STATE:
@@ -302,9 +301,6 @@ class OrigeneratorWindow(QMainWindow):
             self._sit_at_the_sessions_rect(session.main_rect)
 
     def _wear_the_desktop_geometry(self) -> None:
-        """Where this window sits when no session names a rect for it: the size
-        it was at when a session took it over, or the remembered one when it was
-        launched into a session and has never stood alone here."""
         self._device_rect = None
         if self._found is None:
             self._restore_geometry()
@@ -313,15 +309,7 @@ class OrigeneratorWindow(QMainWindow):
         self._fill_the_pictures_cap()
 
     def _fill_the_pictures_cap(self) -> None:
-        """Open as big as the picture the room is handed can carry.
-
-        A headset room has no monitor to fit this window to and room to spare,
-        so the size worth having is the most detail the channel will take: the
-        cap on the published picture's longest edge, in the shape the window
-        stands alone in.  Left at the size it has on his monitor, the whole
-        desktop layout arrives squeezed into a small window and reads as the
-        shrunken hosted one all over again.
-        """
+        """As big as the published picture's longest edge can carry."""
         width, height = self.width(), self.height()
         if width <= 0 or height <= 0:
             return

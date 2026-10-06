@@ -1,27 +1,23 @@
-"""How big this app draws, and why its hosted half draws smaller.
+"""How big this app draws, and why a session on the monitors draws it smaller.
 
-Standalone, Origenerator owns a whole monitor and draws its buttons at the
-shared family's ordinary ``BUTTON_SIZE``.
+Standalone, and in a headset room, Origenerator has a screen to itself and
+draws its buttons at the shared family's ordinary ``BUTTON_SIZE``.
 
-Hosted by a Fun Time session it does not.  It occupies the Random Favs
-Browser's upright rect, inches from that session's satellite HUDs, which draw
-at the family's smaller ``BUTTON_SIZE_HUD``.  Two banks of the same buttons at
-two sizes on one screen read as two different applications sharing a monitor
-rather than as one session — so hosted, this app draws at the ratio between
-them, and its buttons come out the size the HUD's are.
+On the monitors a session puts it in the Random Favs Browser's upright rect,
+inches from that session's satellite HUDs, which draw at the family's smaller
+``BUTTON_SIZE_HUD``.  Two banks of the same buttons at two sizes on one screen
+read as two applications sharing a monitor rather than as one session, so there
+this app draws at the ratio between them.  The whole app scales, not the
+buttons alone -- a 28px bank shrunk to 18px inside panes still sized for 28px
+leaves the marks stranded -- through ``QT_SCALE_FACTOR``, which Qt reads once
+before the first ``QApplication`` exists, so every widget, font, margin and
+stylesheet pixel follows the same number, bare integers included.
 
-The whole app scales, not the buttons alone: a 28px bank shrunk to 18px inside
-panes still sized for 28px leaves the marks stranded in room meant for bigger
-ones.  Qt scales a whole application for us through ``QT_SCALE_FACTOR``, read
-once at startup before the first ``QApplication`` exists, so every widget,
-font, margin and stylesheet pixel in the process follows the same number —
-including the ones written as bare integers years before this module existed.
-
-The one thing that must NOT follow it is a rect Fun Time hands us.  Those
-arrive in device pixels (the session measured them off the monitor with Win32),
-while every Qt coordinate in a scaled process is logical.  :func:`to_logical`
-converts at the boundary; without it a window asked to sit at the RFB's rect
-would land at ``scale`` of the way across the screen, at ``scale`` of the size.
+The one thing that must NOT follow it is a rect Fun Time hands us: those arrive
+in device pixels, measured off the monitor with Win32, while every Qt
+coordinate in a scaled process is logical.  :func:`to_logical` converts at the
+boundary; without it a window asked to sit at that rect would land at ``scale``
+of the way across the screen, at ``scale`` of the size.
 """
 
 # ruff: noqa: PLC0415
@@ -65,13 +61,7 @@ def hosted_scale() -> float:
 
 
 def room_scale(*, in_a_headset: bool) -> float:
-    """How big to draw for the room this app has been taken into.
-
-    Everything this module says about shrinking is a monitor's reason: the
-    buttons match a HUD's because a HUD is inches away in the same rect.  A
-    headset room hangs this window on a screen of its own, so there it draws
-    the size it draws standalone.
-    """
+    """Full size in a headset room, which has no HUD beside this window."""
     return 1.0 if in_a_headset else hosted_scale()
 
 
@@ -80,8 +70,7 @@ def apply_room_scale(*, in_a_headset: bool) -> float:
 
     Must be called before the first PyQt6 import: Qt reads ``QT_SCALE_FACTOR``
     when the platform plugin initializes, and a value written after that is
-    never looked at again.  A factor of 1.0 leaves the variable alone, which is
-    how an unscaled process looks to everything that reads it.
+    never looked at again.
     """
     scale = room_scale(in_a_headset=in_a_headset)
     if scale != 1.0:

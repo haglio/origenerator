@@ -42,9 +42,7 @@ def test_applying_the_scale_sets_what_qt_reads(monkeypatch):
 
 
 def test_a_headset_launch_is_not_shrunk_at_all():
-    """A headset room hangs this window on a screen of its own, so nothing
-    beside it is drawn at the HUD's size -- and leaving Qt's variable unset is
-    what tells the process to draw as it does standalone."""
+    """Leaving Qt's variable unset is what draws it as it does standalone."""
     assert ui_scale.apply_room_scale(in_a_headset=True) == 1.0
     assert "QT_SCALE_FACTOR" not in os.environ
 

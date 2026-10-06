@@ -1036,9 +1036,6 @@ def test_a_takeover_by_the_monitors_shrinks_the_window_to_the_hud_scale(qtbot, t
 
 
 def test_a_takeover_by_the_headset_draws_at_the_desktop_scale(qtbot, tmp_path):
-    """ui_scale shrinks the hosted app so its buttons match the HUD buttons
-    inches away in the Random Favs Browser's rect.  A headset room has neither:
-    the window hangs on a screen of its own with the whole sky around it."""
     win = _window(qtbot, tmp_path)
 
     win.become_hosted(_headset_session(tmp_path))
@@ -1090,11 +1087,7 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
 
 def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(
         qtbot, tmp_path):
-    """The path his own session takes: the desktop session launches this app
-    hosted, he says "enter vr", and the arriving headset session adopts the app
-    it was left and says the crossing on the command file.  A window taken over
-    while standalone crosses (the test below); a window launched hosted is a
-    different constructor, and nothing covered it."""
+    """A window launched hosted is a different constructor from a taken-over one."""
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     qtbot.addWidget(win)
     assert win.hands_its_window_over is None
@@ -1104,8 +1097,6 @@ def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset
 
 
 def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, tmp_path):
-    """A session on the monitors shrank it to the HUD's size; the headset room
-    it crosses into has no HUD beside it, so the crossing undoes that."""
     win = _window(qtbot, tmp_path)
     win.become_hosted(_hosted_with_a_channel(tmp_path))
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
@@ -1122,9 +1113,6 @@ def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, 
 
 
 def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot, tmp_path):
-    """A session on the monitors sat it in the Random Favs Browser's rect.  The
-    headset room it crosses into has no such rect, so it leaves it — for the
-    size the picture can carry — and stops being pinned to a monitor."""
     win = _window(qtbot, tmp_path)
     monitors = _hosted_with_a_channel(tmp_path)
     win.become_hosted(monitors)
@@ -1154,9 +1142,6 @@ def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, t
 
 
 def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, tmp_path):
-    """The rect a session names is the Random Favs Browser's, measured off a
-    monitor a headset room does not have.  How big it opens instead is the test
-    below this one."""
     win = _window(qtbot, tmp_path)
     session = _headset_session(tmp_path)
 
@@ -1168,11 +1153,7 @@ def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, t
 
 def test_a_window_hosted_in_the_headset_opens_as_big_as_the_picture_can_carry(
         qtbot, tmp_path):
-    """There is no monitor in a headset room to fit it to, and the picture the
-    room is handed is capped at CAP_PX on its longest edge -- so the window
-    opens at exactly that, in the shape it stands alone in.  Opened at the size
-    it has on his monitor instead, the whole desktop layout arrived squeezed
-    into a small window and read as the cramped hosted one all over again."""
+    """At its size on a monitor the whole layout arrived squeezed small."""
     win = _window(qtbot, tmp_path)
     win.resize(400, 300)
     stood_alone_at = win.size()

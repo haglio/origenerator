@@ -2,7 +2,7 @@
 
 Every path an utterance takes used to be reachable only by building a 7,000-line
 widget: the caption's one promise and what takes it down, the bank button a word
-presses and what it answers with, the shelf a name stands you in, the dial a
+presses and what it answers with, the shelf a name stands you in, the bar a
 number puts where it says, and a request said over three breaths. Here the bank
 is a handful of recorders and the host a handful of recorded calls.
 
@@ -23,7 +23,7 @@ from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.voice.app_commands import (
     AppCommand,
-    DialSetting,
+    BarSetting,
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
@@ -529,7 +529,7 @@ def test_a_switch_that_cannot_be_flipped_here_says_so(router):
     assert shows.answer_kinds == [WARNING]
 
 
-def test_a_dial_word_turns_the_motion_the_way_its_key_does(router):
+def test_a_bar_word_moves_its_bar_the_way_its_key_does(router):
     motion = FakeMotion()
     voice, _host, shows = router(motion=motion)
 
@@ -539,13 +539,13 @@ def test_a_dial_word_turns_the_motion_the_way_its_key_does(router):
     assert shows.answers == ["🎤 speed 45, amp 50"]
 
 
-def test_a_spoken_number_puts_a_dial_where_it_says(router):
+def test_a_spoken_number_puts_a_bar_where_it_says(router):
     # The nudges are for a motion that is nearly right; this is for one that is
-    # not, and the dial does its own clamping.
+    # not, and the bar does its own clamping.
     motion = FakeMotion()
     voice, _host, _shows = router(motion=motion)
 
-    voice.on_command(DialSetting("amp", 70))
+    voice.on_command(BarSetting("amp", 70))
 
     assert motion.amplitude == 70
 
@@ -556,7 +556,7 @@ def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
 
     voice.become_hosted()
     voice.on_command(AppCommand.SPEED_UP)
-    voice.on_command(DialSetting("amp", 70))
+    voice.on_command(BarSetting("amp", 70))
 
     assert (motion.speed, motion.amplitude) == (40, 50)
     assert shows.answers == ["🎤 the motion is the session's here"] * 2

@@ -225,12 +225,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # rather than a file copy, because
 # test_a_copy_taken_while_the_app_is_mid_write_opens_as_a_database is that claim.
 #
-# 18856 when every video's script took the pace the Robot Hand's speed dial rests
+# 18856 when every video's script took the pace the Robot Hand's Speed bar rests
 # at, in whole cycles, and the sweep learned to carry a change of pace back to
 # the scripts already written: the notes on the cadence, on how the extremes
 # are spread over a video, on what the loop flag is for, on which scripts the
 # sweep rewrites and leaves alone, and on what it resolves only when it runs are
-# test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_dial_rests_at,
+# test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_bar_rests_at,
 # test_a_video_is_scripted_as_the_whole_number_of_cycles_nearest_the_rate_whatever_its_length,
 # test_every_script_is_back_where_it_began_exactly_as_its_video_ends,
 # test_genau_mines_only_looping_videos,

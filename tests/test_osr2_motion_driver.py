@@ -180,18 +180,18 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
     assert gaps and all(abs(g - 0.025) < 1e-9 for g in gaps)
 
 
-def test_the_dials_shape_the_status_line(qtbot):
+def test_the_bars_shape_the_status_line(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.start()
-    driver.adjust_speed(50)          # dial to the top: 200 cycles/min
+    driver.adjust_speed(50)          # bar to the top: 200 cycles/min
     driver.adjust_amplitude(-40)     # 100 -> 60
     driver.adjust_center(-100)       # slides down to the sweep's floor (30)
     driver.cycle_shape()             # sine -> triangle
     assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
 
 
-def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_dials(qtbot):
-    """The dials are readable and tunable before the motion starts.  Stopped is
+def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
+    """The bars are readable and tunable before the motion starts.  Stopped is
     all it says: a funscript may have the device meanwhile, and "OSR2 off" read
     as the device -- or the app's control of it -- being off."""
     driver, _broker, _clock = _driver(qtbot)
@@ -202,7 +202,7 @@ def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_dials(qtbot):
 
 def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     # Hands off to the scripts: the tick streams where the phrases will have
-    # the device when the command's own interval runs out, inside the dials'
+    # the device when the command's own interval runs out, inside the bars'
     # range -- and cruise control, had it the motion, has let go.
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
@@ -234,7 +234,7 @@ def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     driver.start()
     driver.toggle_cruise()
     assert driver.state.cruise.active
-    assert not driver.state.cruise.stack  # drawn on the next tick, from the dials
+    assert not driver.state.cruise.stack  # drawn on the next tick, from the bars
     for _ in range(60):
         clock.t += 0.025
         driver.poll()
@@ -248,7 +248,7 @@ def test_cruise_control_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
 
 
 def test_a_hold_stills_the_motion_at_the_end_it_names(qtbot):
-    """Cruise first, because it rewrites all three dials every tick; then the
+    """Cruise first, because it rewrites all three bars every tick; then the
     travel closes before the center moves, so the motion stills where it is and
     travels to the end from there rather than oscillating its way across."""
     driver, _broker, _clock = _driver(qtbot)
@@ -280,7 +280,7 @@ def test_driving_puts_back_what_the_first_hold_stilled(qtbot):
 
 
 def test_cruise_comes_back_last_where_it_was_on(qtbot):
-    """It draws its waves from what the dials say, so it is re-armed after they
+    """It draws its waves from what the bars say, so it is re-armed after they
     are back rather than before."""
     driver, _broker, _clock = _driver(qtbot)
     motion_engine.enable_cruise_control(driver.state)
@@ -302,7 +302,7 @@ def test_driving_with_nothing_held_changes_nothing(qtbot):
     assert driver.state.state.amplitude == 55
 
 
-def test_a_hold_refuses_every_dial_that_would_break_it(qtbot):
+def test_a_hold_refuses_every_bar_that_would_break_it(qtbot):
     """A nudge under a hold would move the device while the console still said
     it was held -- and driving puts the recording back, so it would be thrown
     away at the end of the hold anyway.  The console dims these same marks."""
@@ -337,19 +337,19 @@ def test_a_hold_let_go_under_a_lowered_max_intensity_gives_back_the_motion_pushe
     driver, _broker, _clock = _driver(qtbot)
     driver.set_amplitude(90)
     driver.set_speed(90)
-    dials = driver.state.state
-    pushed = RobotHandState(amplitude=90, speed=90, intended_center=dials.intended_center)
+    bars = driver.state.state
+    pushed = RobotHandState(amplitude=90, speed=90, intended_center=bars.intended_center)
     set_max_intensity(pushed, 30)
     driver.hold(PARK_CENTER)
     driver.set_max_intensity(30)
 
     driver.release()
 
-    assert (dials.speed, dials.amplitude, dials.center) == (
+    assert (bars.speed, bars.amplitude, bars.center) == (
         pushed.speed, pushed.amplitude, pushed.center)
 
 
-def test_the_dials_answer_again_once_the_hold_is_let_go(qtbot):
+def test_the_bars_answer_again_once_the_hold_is_let_go(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.hold(PARK_CENTER)
     driver.release()

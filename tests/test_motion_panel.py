@@ -471,10 +471,10 @@ def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):
         motion_engine.advance(live, 0.05)
         motion_engine.tick_cruise_control(live, now)
 
-    dials = wave_stack.dials(live.cruise.stack, live.clock)
+    bars = wave_stack.bars(live.cruise.stack, live.clock)
     hud = drive_hud(live, active=True)
-    assert hud.amplitude == round(dials.travel)
-    assert abs(hud.center - dials.center) <= 1
+    assert hud.amplitude == round(bars.travel)
+    assert abs(hud.center - bars.center) <= 1
     assert hud.position == round(
         POSITION_MAX * wave_stack.position(live.cruise.stack, live.clock) / 100)
     assert len(set(hud.waveform)) > 20  # a live trace, not a held line

@@ -14650,40 +14650,40 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
     assert not view._voice.listener.commands_on
 
 
-def test_a_spoken_dial_turns_the_motion_the_way_its_key_does(qtbot, tmp_path):
+def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    dials = view._osr2_motion.state.state
-    amplitude, center = dials.amplitude, dials.center
+    bars = view._osr2_motion.state.state
+    amplitude, center = bars.amplitude, bars.center
 
     view._voice.listener.speak("amp down")   # travel opens at its widest, so down from there
     view._voice.listener.speak("center up")
 
-    assert dials.amplitude == amplitude - 10
-    assert dials.center == center + 5
+    assert bars.amplitude == amplitude - 10
+    assert bars.center == center + 5
     # Answered with what the device now reads, which is the panel's own line.
     assert view._voice.status.text() == f"🎤 {view._osr2_motion.status_text()}"
 
 
-def test_a_spoken_number_puts_a_dial_where_it_says(qtbot, tmp_path):
-    # The nudges walk a dial five or ten at a time, which never arrives from the
+def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
+    # The nudges walk a bar five or ten at a time, which never arrives from the
     # far end; the number said outright is what Fun Time answers with too.
     view = _listening(qtbot, tmp_path)
-    dials = view._osr2_motion.state.state
+    bars = view._osr2_motion.state.state
 
     view._voice.listener.speak("amp fifty")
-    assert dials.amplitude == 50
+    assert bars.amplitude == 50
 
     view._voice.listener.speak("center 30")   # whisper writes the number either way
-    assert dials.intended_center == 30
+    assert bars.intended_center == 30
 
     view._voice.listener.speak("max speed")
-    assert dials.speed == motion_engine.MAX_SPEED
+    assert bars.speed == motion_engine.MAX_SPEED
     assert view._voice.status.text() == f"🎤 {view._osr2_motion.status_text()}"
 
 
-def test_min_speed_lands_on_the_slowest_the_dial_actually_moves(qtbot, tmp_path):
-    # The vocabulary says nought and the dial says what its floor is; the
-    # clamping is the dial's business, which is why the grid can be uniform.
+def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):
+    # The vocabulary says nought and the bar says what its floor is; the
+    # clamping is the bar's business, which is why the grid can be uniform.
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("min speed")
@@ -14704,7 +14704,7 @@ def test_cruise_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     assert not view._osr2_motion.state.cruise.active
 
 
-def test_a_motion_dial_answers_from_a_show_too(qtbot, tmp_path):
+def test_a_motion_word_answers_from_a_show_too(qtbot, tmp_path):
     # The driver is app-wide, so its words belong to no surface — but the answer
     # goes where the speaker is looking.
     view = _listening(qtbot, tmp_path)

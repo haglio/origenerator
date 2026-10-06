@@ -269,6 +269,16 @@ def test_narrowing_hands_the_player_what_is_left(qtbot, tmp_path):
     assert "RELOAD_PLAYLIST" in _sent(show)
 
 
+def test_narrowing_reaches_a_player_partway_through_reading_the_last_list(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
+
+    with _held_open_for(show.channel.playlist, 0.1):
+        assert show.toggle_favorites_filter() is True
+
+    played = [str(item.path) for item in read_playlist(show.channel.playlist)]
+    assert played == ["three.png"]
+
+
 def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
     """The session draws the panel on the player, so this app publishes the
     model for it: the show's map, its status line and the buttons it answers —

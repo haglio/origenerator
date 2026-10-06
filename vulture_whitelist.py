@@ -42,8 +42,8 @@ _.active_filter  # noqa  # origenerator/gui/show_hud.py:207
 # `voice_router._MOTION` maps the spoken on and off words for cruise and human
 # inspired to "set_cruise" and "set_learned", which `_hold_the_motion` hands to
 # getattr.
-_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:290
-_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:313
+_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:260
+_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:281
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231

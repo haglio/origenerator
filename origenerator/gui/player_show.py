@@ -67,6 +67,9 @@ logger = logging.getLogger(__name__)
 # rather than trailing it, and idle ticks cost a read and a comparison.
 _POLL_MS = 200
 
+READER_HOLD_BUDGET_S = 1.0
+_RETRY_SPACING_S = 0.005
+
 
 class PlayerShow(QObject):
     """A show driving one of the session's players."""
@@ -746,7 +749,9 @@ class PlayerShow(QObject):
             return
         self._open = False
         self._timer.stop()
-        publish_whole(self.channel.hud_file, "")
+        publish_whole(self.channel.hud_file, "",
+                      attempts=round(READER_HOLD_BUDGET_S / _RETRY_SPACING_S),
+                      delay_s=_RETRY_SPACING_S)
         self.closed.emit()
 
 

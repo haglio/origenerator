@@ -54,7 +54,7 @@ _HANDOFF_MS = 300
 
 
 @dataclass(frozen=True)
-class _HeldDials:
+class _HeldBars:
     """The motion as it stood when a hold stilled it, and as it comes back."""
 
     cruise: bool
@@ -124,7 +124,7 @@ class Osr2MotionDriver(QObject):
         self._now = now_source
         self._last_tick = 0.0
         self._glide_until = 0.0  # takeover: intervals ease out until this passes
-        # The dials are turned on the GUI thread while the clock samples the
+        # The bars are moved on the GUI thread while the clock samples the
         # state on its own, so both go through this.
         self._lock = threading.RLock()
         self._interval_s = interval_ms / 1000.0
@@ -133,7 +133,7 @@ class Osr2MotionDriver(QObject):
         # Which end a hold has stilled the motion at, and what it was doing
         # before the first of them -- see hold() and release().
         self._held_at: int | None = None
-        self._held: _HeldDials | None = None
+        self._held: _HeldBars | None = None
 
     @property
     def active(self) -> bool:
@@ -220,7 +220,7 @@ class Osr2MotionDriver(QObject):
         eased = left / (_HANDOFF_MS / 1000.0)
         return round(_LOOKAHEAD_MS + (_HANDOFF_MS - _LOOKAHEAD_MS) * eased)
 
-    # --- the dials the keys and the drive panel turn ------------------------
+    # --- the bars the keys and the drive panel move ------------------------
     #
     # Every one of them is refused while a hold has the motion stilled at an end
     # of the travel: a nudge there would move the device while the console still
@@ -278,7 +278,7 @@ class Osr2MotionDriver(QObject):
 
         What it hands the device is several waves summed — a deep slow one with
         a quicker ripple riding it, say — with every wave's speed and share of
-        the travel always on its way somewhere else. The dials go on reading the
+        the travel always on its way somewhere else. The bars go on reading the
         whole motion's travel, center and pace, so the console still says what is
         being sent. It only moves while the motion is actually running, so arming
         it against a parked device changes nothing until the device is taken."""
@@ -334,7 +334,7 @@ class Osr2MotionDriver(QObject):
     def hold(self, center: int) -> None:
         """Still the motion at *center*, remembering what it was doing.
 
-        Cruise goes off first: it rewrites all three dials every tick, so a
+        Cruise goes off first: it rewrites all three bars every tick, so a
         number set under it is overwritten inside the frame. Then the travel
         closes before the center moves, so the motion stills where it is and
         travels to the end from there rather than oscillating its way across.
@@ -343,21 +343,21 @@ class Osr2MotionDriver(QObject):
         retract, then driving puts back what was playing before the park.
         """
         with self._lock:
-            dials = self._state.state
+            bars = self._state.state
             if self._held_at is None:
-                self._held = _HeldDials(
-                    cruise=self._state.cruise.active, speed=dials.speed,
-                    amplitude=dials.amplitude, center=dials.intended_center)
+                self._held = _HeldBars(
+                    cruise=self._state.cruise.active, speed=bars.speed,
+                    amplitude=bars.amplitude, center=bars.intended_center)
             self._held_at = center
             motion_engine.disable_cruise_control(self._state)
-            motion_engine.set_amplitude(dials, 0)
-            motion_engine.set_center(dials, center)
-            motion_engine.set_speed(dials, motion_engine.MIN_SPEED)
+            motion_engine.set_amplitude(bars, 0)
+            motion_engine.set_center(bars, center)
+            motion_engine.set_speed(bars, motion_engine.MIN_SPEED)
 
     def release(self) -> None:
         """Put back whatever the motion was doing, cruise included, and spend
         the recording.  Cruise goes back last: it draws its waves from what the
-        dials say."""
+        bars say."""
         with self._lock:
             held, self._held, self._held_at = self._held, None, None
             if held is None:
@@ -369,13 +369,13 @@ class Osr2MotionDriver(QObject):
 
     def status_text(self) -> str:
         """One line of what the device is (or would be) doing, for the
-        slideshow's standing caption — the dials read the same either way, so
+        slideshow's standing caption — the bars read the same either way, so
         the motion can be tuned before it's started."""
         state = self._state.state
-        dials = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
+        caption = (f"{self._state.bpm:.0f}/min · {state.shape.value}"
                  f" · travel {state.amplitude} around {state.center}")
         if self._state.cruise.active:
-            dials += " · cruise"
+            caption += " · cruise"
         if self._state.learned.active:
-            dials += " · human inspired"
-        return f"OSR2 · {dials}" if self._active else f"Motion stopped · {dials}"
+            caption += " · human inspired"
+        return f"OSR2 · {caption}" if self._active else f"Motion stopped · {caption}"

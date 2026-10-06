@@ -7,7 +7,7 @@ takes OFF it are written once, here, rather than once per surface.
 
 Nothing is drawn here. :class:`player_core.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
-the pace an unlocked slide moves on at, the motion's dials sampled forward, the
+the pace an unlocked slide moves on at, the motion's bars sampled forward, the
 funscript's line where a script has the device, and which of the four control
 states the app's one OSR2 switch is in.
 """
@@ -55,35 +55,35 @@ REPAINT_MS = 100
 
 
 def _limits(state) -> drive_layout.Limits:
-    """Which dials have run out of road — what dims the mark that would now do
+    """Which bars have run out of road — what dims the mark that would now do
     nothing."""
-    dials = state.state
-    half = dials.amplitude // 2
+    bars = state.state
+    half = bars.amplitude // 2
     return drive_layout.Limits(
-        spd_at_min=dials.speed <= motion_engine.MIN_SPEED,
-        spd_at_max=dials.speed >= motion_engine.MAX_SPEED,
-        amp_at_min=dials.amplitude <= 0,
-        amp_at_max=dials.amplitude >= 100,
-        ctr_at_min=dials.intended_center <= half,
-        ctr_at_max=dials.intended_center >= 100 - half,
+        spd_at_min=bars.speed <= motion_engine.MIN_SPEED,
+        spd_at_max=bars.speed >= motion_engine.MAX_SPEED,
+        amp_at_min=bars.amplitude <= 0,
+        amp_at_max=bars.amplitude >= 100,
+        ctr_at_min=bars.intended_center <= half,
+        ctr_at_max=bars.intended_center >= 100 - half,
     )
 
 
 def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     """The live motion as the readout's own view of it.
 
-    The dials, where the device is, and the motion sampled forward — the same
+    The bars, where the device is, and the motion sampled forward — the same
     samples it is being sent, so the trace is the motion rather than a drawing
     of it. ``driven`` is what dims the whole readout: nothing reaching the
     device is a picture of a motion nobody is making, and it goes grey exactly
     as Fun Time's does.
     """
-    dials = state.state
+    bars = state.state
     limits = _limits(state)
     heights, slide = motion_engine.trace_window(state, drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
     return DriveHud(
-        speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
-        shape=dials.shape.value,
+        speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
+        shape=bars.shape.value,
         position=round(POSITION_MAX * motion_engine.position(state) / 100),
         driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
         advance_interval=dwell_s,
@@ -102,15 +102,15 @@ def script_hud(script, motion, dwell_s: int) -> DriveHud:
     the playhead forward, in the green every scripted thing in this family is
     drawn in.
 
-    The dials beside it stay the motion's.  They are what driving puts back the
+    The bars beside it stay the motion's.  They are what driving puts back the
     moment the script is done, and the readout dims every one of them anyway
     while something other than the motion is sending.
     """
     heights = script.trace(drive_layout.TRACE_SAMPLES, _TRACE_SECONDS)
-    dials = motion.state
+    bars = motion.state
     return DriveHud(
-        speed=dials.speed, amplitude=dials.amplitude, center=dials.center,
-        shape=dials.shape.value,
+        speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
+        shape=bars.shape.value,
         position=round(POSITION_MAX * (heights[0] if heights else 0.0)),
         driven=DRIVEN_BY_FUNSCRIPT, advance_interval=dwell_s,
         trace_seconds=_TRACE_SECONDS, waveform=heights)

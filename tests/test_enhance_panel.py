@@ -93,7 +93,7 @@ def test_a_fresh_panel_reads_as_the_workflow_defaults_tick_off(qtbot):
 
 
 def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
-    # The panel's power, not one of its dials: a bare switch on the title row,
+    # The panel's power, not one of its settings: a bare switch on the title row,
     # at the far end from the heading. What it does lives in its tooltip.
     panel, _ = _panel(qtbot)
     assert isinstance(panel._auto, ToggleSwitch)

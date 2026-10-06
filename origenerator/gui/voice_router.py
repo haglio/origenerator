@@ -8,7 +8,7 @@ one.
 What lives here is the whole path an utterance takes. The microphone and what it
 is listening for. The caption that says what was heard and what it did, with the
 one promise it holds while a request is still being worked out. The matching of
-an utterance to a shelf, a switch, a dial, a bank button, an order about the
+an utterance to a shelf, a switch, a bar, a bank button, an order about the
 picture on screen, or a request said over several breaths -- and, for a hosted
 app, the same matching of words the session's own microphone heard and posted on
 this app's channel.
@@ -53,7 +53,7 @@ from origenerator.prompt_edit import apply_request
 from origenerator.prompts import VOICE_REQUEST_MATCH_SYSTEM_PROMPT
 from origenerator.voice.app_commands import (
     AppCommand,
-    DialSetting,
+    BarSetting,
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
@@ -92,7 +92,7 @@ _SHELVES = {
     AppCommand.TRASH: _TRASH_KEY,
 }
 
-# The motion dial each spoken word turns, as (the driver's method, its argument
+# The move each spoken motion word makes, as (the driver's method, its argument
 # or ``None`` for a method that takes none) — the very moves the keys make (see
 # :mod:`origenerator.gui.motion_hud`), said out loud instead of pressed. Bound
 # against the driver at construction, so a method renamed there is an error at
@@ -115,10 +115,10 @@ _MOTION = {
     AppCommand.OFFSET: ("quarter_offset", None),
 }
 
-# The driver's setter for each dial the numeric grid names
-# (:class:`~origenerator.voice.app_commands.DialSetting`), so "amp fifty" puts
-# the dial at fifty rather than walking it there ten at a time.
-_DIALS = {
+# The driver's setter for each bar the numeric grid names
+# (:class:`~origenerator.voice.app_commands.BarSetting`), so "amp fifty" puts
+# the bar at fifty rather than walking it there ten at a time.
+_BARS = {
     "speed": "set_speed",
     "amp": "set_amplitude",
     "center": "set_center",
@@ -291,13 +291,13 @@ class VoiceRouter(QObject):
 
     def _hold_the_motion(self, motion) -> None:
         self._motion = motion
-        self._motion_turns = {
+        self._motion_moves = {
             command: (getattr(motion, method) if motion else None, argument)
             for command, (method, argument) in _MOTION.items()
         }
-        self._dial_setters = {
-            dial: getattr(motion, setter) if motion else None
-            for dial, setter in _DIALS.items()
+        self._bar_setters = {
+            bar: getattr(motion, setter) if motion else None
+            for bar, setter in _BARS.items()
         }
 
     def become_hosted(self) -> None:
@@ -321,7 +321,7 @@ class VoiceRouter(QObject):
         the OSR2 driver is not either — the session's main player owns the
         device for its whole length. Those arrive as ``None``, so
         :meth:`_flip_switch` can still answer that the session owns them, and
-        the dial words find nothing to turn rather than a driver that is absent.
+        the motion words find nothing to move rather than a driver that is absent.
         """
         self._switches = {_AUTO: auto, _AUDIO: audio, _DRIVE: drive, _MIC: mic}
         self._bank = dict(actions)
@@ -518,24 +518,24 @@ class VoiceRouter(QObject):
                 self._on_picture_command(matched)
         elif isinstance(matched, AppCommand):
             self._run_app_command(matched)
-        elif isinstance(matched, DialSetting):
-            self._set_motion_dial(matched)
+        elif isinstance(matched, BarSetting):
+            self._set_motion_bar(matched)
         else:
             # The two matchers between them produce exactly the five above. A
             # sixth kind arriving is a new matcher nobody wired through to here,
             # and dropping it silently is how that goes unnoticed for a release.
             logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
 
-    # --- the bare vocabulary: a shelf, a switch, a dial, or the slide --------
+    # --- the bare vocabulary: a shelf, a switch, the motion, or the slide ----
 
     def _run_app_command(self, command: AppCommand, side: str | None = None) -> None:
         """One bare spoken word.
 
         Four kinds, and which it is decides where it lands: a shelf name stands
         the tree in that shelf, a switch word flips one of the app-wide
-        switches, a dial word turns the motion — and everything else is about
-        whatever surface is in front of the speaker, which is the fullscreen
-        show while one is up and the gallery otherwise.
+        switches, a motion word makes its key's move — and everything else is
+        about whatever surface is in front of the speaker, which is the
+        fullscreen show while one is up and the gallery otherwise.
         """
         if command in _SHELVES:
             self._go_to_shelf(command, side)
@@ -544,7 +544,7 @@ class VoiceRouter(QObject):
         elif command in _SWITCHES:
             self._flip_switch(command)
         elif command in _MOTION:
-            self._turn_motion_dial(command)
+            self._move_the_motion(command)
         elif self._shows.showing is not None and command in _ABOUT_THE_SLIDE:
             self._shows.run_on_slide(command)
         else:
@@ -592,37 +592,37 @@ class VoiceRouter(QObject):
         button.setChecked(on)  # its toggled signal is what does the work
         self._shows.answer(f"🎤 {name} {'on' if on else 'off'}")
 
-    def _turn_motion_dial(self, command: AppCommand) -> None:
-        """Turn one of the motion's dials — the move its key makes.
+    def _move_the_motion(self, command: AppCommand) -> None:
+        """Make the move a motion key makes, said instead of pressed.
 
         The driver is app-wide, so this answers from the gallery and from a show
-        alike, and the dials read the same whether or not the device is running:
+        alike, and the bars read the same whether or not the device is running:
         a motion can be set up before it is started, exactly as the panel allows.
         """
-        turn, argument = self._motion_turns[command]
-        if turn is None:
+        move, argument = self._motion_moves[command]
+        if move is None:
             self._say_the_motion_is_the_sessions()
             return
-        turn() if argument is None else turn(argument)
+        move() if argument is None else move(argument)
         self._shows.answer(f"🎤 {self._motion.status_text()}")
 
     def _say_the_motion_is_the_sessions(self) -> None:
         self._shows.answer("🎤 the motion is the session's here", kind=WARNING)
 
-    def _set_motion_dial(self, setting: DialSetting) -> None:
-        """Put one of the motion's dials where a spoken number asks for it.
+    def _set_motion_bar(self, setting: BarSetting) -> None:
+        """Put one of the motion's bars where a spoken number asks for it.
 
         The nudges above are for a motion that is nearly right; this is for one
         that is not, and it is the same driver either way — so it answers with
-        the same line, and from the gallery and a show alike. The dial does its
+        the same line, and from the gallery and a show alike. The bar does its
         own clamping, which is why "min speed" can say nought and land on the
         slowest the device actually moves at.
         """
-        set_the_dial = self._dial_setters[setting.dial]
-        if set_the_dial is None:
+        set_the_bar = self._bar_setters[setting.bar]
+        if set_the_bar is None:
             self._say_the_motion_is_the_sessions()
             return
-        set_the_dial(setting.value)
+        set_the_bar(setting.value)
         self._shows.answer(f"🎤 {self._motion.status_text()}")
 
     def _run_in_gallery(self, command: AppCommand) -> None:

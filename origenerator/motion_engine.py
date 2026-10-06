@@ -2,24 +2,24 @@
 
 The slideshow shows images, and an image gives the device nothing to follow, so
 this supplies the motion instead. The waveform itself is not written here: the
-shapes, the speed dial's exponential map and the amplitude and center arithmetic
+shapes, the Speed bar's exponential map and the amplitude and center arithmetic
 are :mod:`player_core.robot_hand` — the Robot Hand, genau's own, shared so both
 apps move the same way rather than two ways that look alike until they don't.
 
 What genau keeps elsewhere and this has to carry is the phase. Genau's engine
 advances it against the clip's beats; here there is no clip, so the motion
-free-runs on the driver's clock and the phase rides along with the dials, in
+free-runs on the driver's clock and the phase rides along with the bars, in
 :class:`Motion`.
 
 Hands-free is player_core's too: :mod:`player_core.cruise_control` hands the
 device a motion that is several waves summed, each with its own travel, center
 and speed, and each of those always on its way somewhere else
 (:mod:`player_core.wave_stack` is the arithmetic under it). While it is engaged
-the stack is what the device follows and the dials only report what the sum came
+the stack is what the device follows and the bars only report what the sum came
 to; the rest of the time the motion is the single hand-driven wave it has always
 been. :mod:`player_core.learned_motion` is the other takeover: phrases of real
-scripting in place of the waveform, played inside the dials' range and at the
-speed dial's pace, and never on together with cruise control.
+scripting in place of the waveform, played inside the bars' range and at the
+Speed bar's pace, and never on together with cruise control.
 """
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ __all__ = [
 
 @dataclass
 class Motion:
-    """The live motion: genau's dials, cruise control's waves, and the phase.
+    """The live motion: genau's bars, cruise control's waves, and the phase.
 
     The stack has a clock of its own — the motion's seconds rather than the
     wall's, which stand still while the device is parked — and that lives with
@@ -137,7 +137,7 @@ def tick_learned_motion(motion: Motion, now: float) -> None:
 
 
 def toggle_cruise_control(motion: Motion) -> None:
-    """Hands off, or hands back on — taking the motion over from where the dials
+    """Hands off, or hands back on — taking the motion over from where the bars
     already have it, and handing the single wave back at the phase of the wave
     that was carrying most of the travel, so neither seam is felt."""
     if motion.cruise.active:
@@ -215,7 +215,7 @@ def _wave_position(motion: Motion) -> float:
 
 
 def _envelope_fraction(motion: Motion) -> float:
-    """How far up the dials' envelope the wave has the device, 0 at its floor
+    """How far up the bars' envelope the wave has the device, 0 at its floor
     and 1 at its ceiling — where the learned motion's first phrase begins."""
     state = motion.state
     if state.amplitude <= 0:

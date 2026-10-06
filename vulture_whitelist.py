@@ -39,10 +39,11 @@ supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
 _.active_filter  # noqa  # origenerator/gui/show_hud.py:207
 
 # --- reached by name, from the table a spoken word is dispatched through ---
-# `gallery_view._VOICE_MOTION` maps AppCommand.CRUISE_ON/CRUISE_OFF to the string
-# "set_cruise", which `_turn_motion_dial` hands to getattr.
-_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:257
-_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:273
+# `voice_router._MOTION` maps the spoken on and off words for cruise and human
+# inspired to "set_cruise" and "set_learned", which `_hold_the_motion` hands to
+# getattr.
+_.set_cruise  # noqa  # origenerator/osr2_motion_driver.py:290
+_.set_learned  # noqa  # origenerator/osr2_motion_driver.py:313
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory  # noqa  # origenerator/branch_session.py:149, origenerator/branch_session.py:169, origenerator/branch_session.py:287, origenerator/db.py:231

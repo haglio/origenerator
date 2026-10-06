@@ -13,7 +13,7 @@ from origenerator.gallery.shelves import FAVORITES_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,
-    DialSetting,
+    BarSetting,
     match_app_command,
     phrases_heard_only_outright,
     spoken_phrases,
@@ -58,7 +58,7 @@ def test_the_words_fun_times_players_answer_to_mean_the_same_here():
     assert match_app_command("back") is AppCommand.BACK
 
 
-def test_the_motion_dials_keep_fun_times_phrases():
+def test_the_motion_bars_keep_fun_times_phrases():
     assert match_app_command("speed up") is AppCommand.SPEED_UP
     assert match_app_command("slow down") is AppCommand.SPEED_DOWN
     assert match_app_command("amp down") is AppCommand.AMP_DOWN
@@ -81,28 +81,28 @@ def test_cruise_answers_an_explicit_on_and_off_as_well_as_a_flip():
     assert match_app_command("cruise off") is AppCommand.CRUISE_OFF
 
 
-# --- the dials said outright, which is Fun Time's numeric grid ---------------
+# --- the bars said outright, which is Fun Time's numeric grid ---------------
 
 @pytest.mark.parametrize("said, wanted", [
-    ("amp fifty", DialSetting("amp", 50)),
-    ("speed thirty", DialSetting("speed", 30)),
-    ("center seventy", DialSetting("center", 70)),
-    ("speed zero", DialSetting("speed", 0)),
-    ("amp one hundred", DialSetting("amp", 100)),
+    ("amp fifty", BarSetting("amp", 50)),
+    ("speed thirty", BarSetting("speed", 30)),
+    ("center seventy", BarSetting("center", 70)),
+    ("speed zero", BarSetting("speed", 0)),
+    ("amp one hundred", BarSetting("amp", 100)),
 ])
-def test_a_dial_takes_the_number_said(said, wanted):
+def test_a_bar_takes_the_number_said(said, wanted):
     assert match_app_command(said) == wanted
 
 
 @pytest.mark.parametrize("said, wanted", [
-    ("min speed", DialSetting("speed", 0)),
-    ("max speed", DialSetting("speed", 100)),
-    ("min amp", DialSetting("amp", 0)),
-    ("max amp", DialSetting("amp", 100)),
-    ("min center", DialSetting("center", 0)),
-    ("max center", DialSetting("center", 100)),
+    ("min speed", BarSetting("speed", 0)),
+    ("max speed", BarSetting("speed", 100)),
+    ("min amp", BarSetting("amp", 0)),
+    ("max amp", BarSetting("amp", 100)),
+    ("min center", BarSetting("center", 0)),
+    ("max center", BarSetting("center", 100)),
 ])
-def test_both_ends_of_a_dial_have_a_name(said, wanted):
+def test_both_ends_of_a_bar_have_a_name(said, wanted):
     # The far end in one utterance, rather than a number to remember or a dozen
     # nudges to get there.
     assert match_app_command(said) == wanted
@@ -112,18 +112,18 @@ def test_both_ends_of_a_dial_have_a_name(said, wanted):
 def test_a_number_counts_whether_whisper_wrote_it_in_words_or_digits(said):
     # Whisper picks between "fifty" and "50" on its own, so a vocabulary that
     # knows only one of the two hears half of what was said.
-    assert match_app_command(said) == DialSetting("amp", 50)
+    assert match_app_command(said) == BarSetting("amp", 50)
 
 
 def test_the_nudges_still_outrank_the_grid_they_sit_beside():
     # "speed up" is a nudge and "speed ten" is a setting; neither eats the other.
     assert match_app_command("speed up") is AppCommand.SPEED_UP
-    assert match_app_command("speed ten") == DialSetting("speed", 10)
+    assert match_app_command("speed ten") == BarSetting("speed", 10)
 
 
 def test_a_two_word_command_is_not_shadowed_by_its_first_word():
-    # "next" walks the playlist and "next shape" turns a dial; the whole
-    # utterance decides, so the shorter one never eats the longer.
+    # "next" walks the playlist and "next shape" changes the motion's shape;
+    # the whole utterance decides, so the shorter one never eats the longer.
     assert match_app_command("next") is AppCommand.FORWARD
     assert match_app_command("next shape") is AppCommand.NEXT_SHAPE
 
@@ -257,13 +257,13 @@ def test_every_command_has_at_least_one_word_that_reaches_it():
     assert set(AppCommand) <= set(_PHRASES.values())
 
 
-def test_every_dial_can_be_sent_to_every_stop_on_the_grid():
-    # The grid is uniform on purpose: three dials, the same stops, both ends
-    # named. A gap in it is a number that works on one dial and not another.
+def test_every_bar_can_be_sent_to_every_stop_on_the_grid():
+    # The grid is uniform on purpose: three bars, the same stops, both ends
+    # named. A gap in it is a number that works on one bar and not another.
     reachable = {value for value in _PHRASES.values()
-                 if isinstance(value, DialSetting)}
+                 if isinstance(value, BarSetting)}
     assert reachable == {
-        DialSetting(dial, stop)
-        for dial in ("speed", "amp", "center")
+        BarSetting(bar, stop)
+        for bar in ("speed", "amp", "center")
         for stop in (0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
     }

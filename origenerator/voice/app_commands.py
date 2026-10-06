@@ -14,8 +14,8 @@ says — a fix leads with "fix", a show command names the slideshow — but a ba
 lock of hair over her eye" is a prompt.
 
 Most of the vocabulary is a fixed set of things to ask for, and one part of it
-is not: the motion's dials take a number said outright — "amp fifty", "max
-speed" — so those phrases answer with a :class:`DialSetting` carrying the dial
+is not: the motion's bars take a number said outright — "amp fifty", "max
+speed" — so those phrases answer with a :class:`BarSetting` carrying the bar
 and the value rather than a constant each for three dozen combinations. Both come
 back from the one matcher, and the caller tells them apart by type.
 
@@ -24,7 +24,7 @@ target. A fullscreen show has the floor while one is up and the gallery has it
 otherwise, which is Fun Time's active-side idea with two sides: "back" steps a
 slide over a show and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
-OSR2) and the motion's own dials belong to no surface and answer from either.
+OSR2) and the motion's own bars belong to no surface and answer from either.
 
 One word is deliberately missing. The Requests shelf answers to the plural
 "requests" and never to the singular, because "request" is what opens a spoken
@@ -89,7 +89,7 @@ class AppCommand(Enum):
     FILTER_ENHANCED = "filter_enhanced"
     FILTER_OFF = "filter_off"
 
-    # The OSR2 motion's dials, in Fun Time's own words. The driver is app-wide,
+    # The OSR2 motion's bars, in Fun Time's own words. The driver is app-wide,
     # so these answer from the gallery and from a show alike.
     SPEED_UP = "speed_up"
     SPEED_DOWN = "speed_down"
@@ -109,43 +109,43 @@ class AppCommand(Enum):
 
 
 @dataclass(frozen=True)
-class DialSetting:
-    """One of the motion's dials, said outright rather than nudged.
+class BarSetting:
+    """One of the motion's bars, said outright rather than nudged.
 
-    "speed up" walks a dial five at a time, which is the right shape when the
+    "speed up" walks a bar five at a time, which is the right shape when the
     motion is nearly where you want it and the wrong one when it is not — from
     the far end, arriving takes a dozen utterances and every one of them has to
     be heard. Fun Time answers that with the number said plainly ("amp fifty",
-    "max speed"), and this is that vocabulary: the dial, the value, and nothing
+    "max speed"), and this is that vocabulary: the bar, the value, and nothing
     about how far it has to travel to get there.
 
-    ``dial`` is the driver's own word for it — ``speed``, ``amp``, ``center`` —
+    ``bar`` is the driver's own word for it — ``speed``, ``amp``, ``center`` —
     and ``value`` is on the 0-100 scale all three share
     (:mod:`player_core.robot_hand` clamps, so "min speed" landing under the
-    dial's own floor is the dial's business, not the vocabulary's).
+    bar's own floor is the bar's business, not the vocabulary's).
     """
 
-    dial: str
+    bar: str
     value: int
 
 
 # phrase -> command. Every key is a whole utterance, lowercased, its punctuation
 # already dropped: what :func:`match_app_command` reduces a transcription to.
 # A value is an :class:`AppCommand` for the things there is one of, and a
-# :class:`DialSetting` for the numeric grid, where a constant each would be three
+# :class:`BarSetting` for the numeric grid, where a constant each would be three
 # dozen names for what is really one command with a number in it.
-_PHRASES: dict[str, AppCommand | DialSetting] = {}
+_PHRASES: dict[str, AppCommand | BarSetting] = {}
 
 
-def _say(command: AppCommand | DialSetting, *phrases: str) -> None:
+def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
     """Teach the vocabulary that each of ``phrases`` asks for ``command``.
 
     A phrase already spoken for is a programming error rather than a preference
     between two meanings — one of them would silently never happen — so it
     raises here, where the module is imported, instead of at the mic.
 
-    Compared by value, not identity: two ways of saying the same dial setting
-    ("amp fifty" and "amp 50") arrive as two equal :class:`DialSetting`
+    Compared by value, not identity: two ways of saying the same bar setting
+    ("amp fifty" and "amp 50") arrive as two equal :class:`BarSetting`
     objects built at different moments, and that is agreement, not collision.
     """
     for phrase in phrases:
@@ -222,7 +222,7 @@ _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "upscales", "upscales only", "filter upscales", "upscaled only")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
-# The motion's dials, said the way Fun Time says them, so the muscle memory
+# The motion's bars, said the way Fun Time says them, so the muscle memory
 # carries between the two apps the way the keys already do.
 _say(AppCommand.SPEED_UP, "speed up")
 _say(AppCommand.SPEED_DOWN, "speed down", "slow down")
@@ -243,29 +243,29 @@ _say(AppCommand.LEARNED_ON, "human inspired on")
 _say(AppCommand.LEARNED_OFF, "human inspired off")
 _say(AppCommand.OFFSET, "offset")
 
-# --- the dials said outright: "amp fifty", "max speed" ----------------------
+# --- the bars said outright: "amp fifty", "max speed" ----------------------
 #
-# The dial's name and a number, which is Fun Time's grid exactly. Tens only,
-# because a dial is a feel rather than a figure and "amp fifty five" is a
+# The bar's name and a number, which is Fun Time's grid exactly. Tens only,
+# because a bar is a feel rather than a figure and "amp fifty five" is a
 # sentence nobody says out loud — the nudges above are what fine tuning is for.
-_DIALS = ("speed", "amp", "center")
+_BARS = ("speed", "amp", "center")
 _TENS: dict[str, int] = {
     "zero": 0, "ten": 10, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
     "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90, "one hundred": 100,
 }
-# Both ends of each dial by name, so the far end is one utterance rather than a
-# number nobody has to remember. What "min" means is the dial's to say: speed
+# Both ends of each bar by name, so the far end is one utterance rather than a
+# number nobody has to remember. What "min" means is the bar's to say: speed
 # floors at its own slowest rather than at a stop.
 _EXTREMES: dict[str, int] = {"min": 0, "max": 100}
 
-for _dial in _DIALS:
+for _bar in _BARS:
     for _word, _value in _TENS.items():
         # Said and written. Whisper renders a spoken number as digits about as
         # often as words — "amp fifty" comes back "amp 50" — and a vocabulary
         # that knows only one of the two hears half of what was said.
-        _say(DialSetting(_dial, _value), f"{_dial} {_word}", f"{_dial} {_value}")
+        _say(BarSetting(_bar, _value), f"{_bar} {_word}", f"{_bar} {_value}")
     for _label, _value in _EXTREMES.items():
-        _say(DialSetting(_dial, _value), f"{_label} {_dial}")
+        _say(BarSetting(_bar, _value), f"{_label} {_bar}")
 
 
 def phrases_heard_only_outright() -> frozenset[str]:
@@ -282,7 +282,7 @@ def spoken_phrases() -> frozenset[str]:
                      if not any(character.isdigit() for character in phrase))
 
 
-def match_app_command(text: str) -> AppCommand | DialSetting | None:
+def match_app_command(text: str) -> AppCommand | BarSetting | None:
     """The command an utterance is, or ``None`` when it is not one of them.
 
     The whole utterance has to be the phrase. Whisper's punctuation and case are

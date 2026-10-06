@@ -12,7 +12,7 @@ lands. It follows you rather than the folder, so it shows on the shelves
 Editing writes straight back through ``on_change`` — there is no Apply button —
 and the settings persist with the rest of the session state. Auto-enhance is a
 bare switch on the title row rather than a labeled tick among the settings: it
-is the panel's power, not one of its dials.
+is the panel's power, not one of its settings.
 
 An enhancement level dragged in from the info pane's version strip is absorbed:
 the settings that made that version become the ones on the panel, so "do that
@@ -306,8 +306,8 @@ class EnhancePanel(QWidget):
         column.setSpacing(4)
         # The title row, with the auto switch at its far right — a bare switch,
         # the way a panel's power is a switch on its corner rather than a line
-        # of prose among its dials. What it does is in its tooltip; the settings
-        # below are what it does it with.
+        # of prose among its settings. What it does is in its tooltip; the
+        # settings below are what it does it with.
         title_row = QHBoxLayout()
         title_row.setContentsMargins(0, 0, 0, 0)
         heading = QLabel("Enhance")

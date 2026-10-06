@@ -177,7 +177,7 @@ def test_a_video_is_scripted_as_the_whole_number_of_cycles_nearest_the_rate_what
             for frames in (29, 81, 161, 241)] == [1, 2, 5, 7]
 
 
-def test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_dial_rests_at():
+def test_a_scripted_video_moves_at_the_pace_the_robot_hands_speed_bar_rests_at():
     cycles_a_minute = MOTION_DEFAULT_HZ * 60
     assert cycles_a_minute == pytest.approx(bpm_for_speed(RobotHandState().speed))
 

@@ -6,6 +6,8 @@ on screen — which is the player's answer, read back, not this app's own.
 """
 from __future__ import annotations
 
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from player_core.file_channel import consume_command_file
@@ -79,6 +81,17 @@ def _show_with_the_player_on(qtbot, tmp_path, **status) -> PlayerShow:
     show.tick()
     _sent(show)
     return show
+
+
+@contextmanager
+def _held_open_for(path: Path, seconds: float):
+    reader = path.open(encoding="utf-8")
+    release = threading.Timer(seconds, reader.close)
+    release.start()
+    try:
+        yield
+    finally:
+        release.join()
 
 
 def test_a_show_on_a_player_answers_whatever_a_window_show_is_asked_but_a_windows_own():
@@ -303,6 +316,16 @@ def test_a_show_that_is_over_gives_the_side_back(qtbot, tmp_path):
     show.close()
 
     assert show.is_showing() is False
+    assert show.channel.hud_file.read_text(encoding="utf-8") == ""
+
+
+def test_a_show_that_is_over_takes_its_panel_down_though_the_player_is_reading_it(
+        qtbot, tmp_path):
+    show = _show(qtbot, tmp_path)
+
+    with _held_open_for(show.channel.hud_file, 0.1):
+        show.close()
+
     assert show.channel.hud_file.read_text(encoding="utf-8") == ""
 
 

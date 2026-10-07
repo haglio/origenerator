@@ -218,7 +218,7 @@ _MARK_INSET = 3.0
 
 @cache
 def recent_mark_icon() -> QIcon:
-    """A filled dot — worn at the end of the row of a folder lately worked in.
+    """A filled dot — worn at the start of the row of a folder lately worked in.
 
     A dot rather than a glyph, in the family's one accent color: it says a
     folder is one of the few you were last in and nothing else, and a mark that
@@ -227,13 +227,19 @@ def recent_mark_icon() -> QIcon:
     at whatever size the row gives it; inset a little so that scaling has the
     room its soft edge needs.
     """
+    icon = QIcon(_painted(_disc(BLUE)))
+    icon.addPixmap(_painted(_disc(TEXT_PRIMARY)), QIcon.Mode.Selected)
+    return icon
+
+
+def _disc(color):
     def draw(painter: QPainter):
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(BLUE)
+        painter.setBrush(color)
         painter.drawEllipse(QRectF(_MARK_INSET, _MARK_INSET,
                                    _SIZE - 2 * _MARK_INSET, _SIZE - 2 * _MARK_INSET))
 
-    return QIcon(_painted(draw))
+    return draw
 
 
 @cache

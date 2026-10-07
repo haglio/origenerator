@@ -5,9 +5,12 @@ from io import BytesIO
 
 from PIL import Image
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QWidget
+from shared_ui.colors import BLUE
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.reroll_tile import RerollTile
+from origenerator.gui.stylesheet import build_stylesheet
 
 
 def _png_bytes(color=(10, 120, 200)):
@@ -149,6 +152,26 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
     tile.set_selected(False)
     assert not tile.is_selected()
     assert "dashed" in tile.styleSheet()
+
+
+def test_a_picked_running_tile_is_filled_with_the_familys_blue(qtbot):
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        holder = QWidget()
+        qtbot.addWidget(holder)
+        tile = RerollTile(FakeJob(state="running"), holder)
+        tile.set_selected(True)
+        holder.resize(tile.size())
+        holder.show()
+        qtbot.waitExposed(holder)
+
+        button = tile._cancel.geometry()
+        beside = tile.mapTo(holder, QPoint(button.left() - 1, button.center().y()))
+        assert holder.grab().toImage().pixelColor(beside).name() == BLUE.name()
+    finally:
+        app.setStyleSheet(prior)
 
 
 def test_started_signal_switches_the_scrim_to_generating(qtbot):

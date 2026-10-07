@@ -81,14 +81,14 @@ _VALUE_COLUMN = 1
 # down the list as rows gain or lose the Enhancement line (the original has
 # none). Sized to the widest of these, they line up all the way down.
 _FACT_KEYS = ("Enhancement", "File", "Created")
-# A picked row lightens, the way a picked thumbnail does — same fill, so "this
+# A picked row is filled the way a picked thumbnail is — same fill, so "this
 # one is selected" reads the same in both places. The labels have to be made
 # transparent for it to show at all: the app's global ``QWidget`` background
 # paints every one of them opaque over whatever the row fills with, and the fill
 # would otherwise appear only in the gaps between them.
 _ROW_CSS = "#levelRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
-    f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}"
+    f"#levelRow {{ background-color: {palette.SELECTED}; border-radius: 4px; }}"
     + _ROW_CSS
 )
 _ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"

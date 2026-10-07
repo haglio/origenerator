@@ -105,16 +105,16 @@ def style_caption(label) -> None:
     label.setMaximumHeight(caption_height())
 
 
-from origenerator.gui.palette import CARD_HOVER_BORDER, EMPTY_PLATE, SELECTED_BORDER
+from origenerator.gui.palette import CARD_HOVER_BORDER, EMPTY_PLATE, SELECTED
 
-# The resting dashed outline, versus the solid border marking the card as the item
-# driving the info pane — the same mark a selected thumbnail wears.
+# The resting dashed outline, versus the blue marking the card as the item driving
+# the info pane — the same mark a selected thumbnail wears.
 IDLE_FRAME_CSS = (
     "#{name} {{ border: 1px dashed #4a4a4a; border-radius: 4px; }}"
     "#{name}:hover {{ border-color: " + CARD_HOVER_BORDER + "; }}"
 )
-SELECTED_FRAME_CSS = ("#{name} {{ border: 2px solid " + SELECTED_BORDER
-                      + "; border-radius: 4px; }}")
+SELECTED_FRAME_CSS = ("#{name} {{ border: 2px solid " + SELECTED
+                      + "; background-color: " + SELECTED + "; border-radius: 4px; }}")
 
 # How a glyph itself is drawn: a large muted character on the same plate a
 # thumbnail's picture would occupy.

@@ -1,10 +1,10 @@
 """The colors this app's cards and rows share, and nothing else does.
 
 `shared_ui.colors` carries the family's palette and `stylesheet.build_stylesheet`
-is the one sheet the window wears. What was left over is a handful of greys that
-several widgets each spelled out for themselves: the fill a selected thing takes,
+is the one sheet the window wears. What was left over is a handful of colors that
+several widgets each spelled out for themselves: the blue a picked thing wears,
 the frame a card rests and hovers at, the ground an empty slot shows. The same
-grey ended up written in two unrelated files, so changing it meant finding both
+gray ended up written in two unrelated files, so changing it meant finding both
 — which is the one property the shared palette exists to give.
 
 Local rather than in `shared_ui`: these are this app's own cards. A color the
@@ -16,18 +16,17 @@ drawn the color of a hover frame, a caption the color of a selected border —
 stays a literal. Collapsing two meanings onto one token is what makes a palette
 impossible to change later.
 
-The last two names below are this app's words for colors the family owns, so
-they are read from `shared_ui.palette` rather than typed out again: the family
-has one blue and one green, and a second copy of either is a thing that drifts.
-`tests/test_family_colors.py` fails on any that is typed back in.
+The names read from `shared_ui.palette` below are this app's words for colors the
+family owns, rather than typed out again: the family has one blue and one green,
+and a second copy of either is a thing that drifts. `tests/test_family_colors.py`
+fails on any that is typed back in.
 """
 from __future__ import annotations
 
 from shared_ui.palette import BLUE, GREEN, as_hex
 
-# What a selected tile or version row is filled with, and the frame that says so.
-SELECTED_FILL = "#3a3a3a"
-SELECTED_BORDER = "#8a8a8a"
+# What a picked tile, card or version row wears: its ground and its picture's frame.
+SELECTED = as_hex(BLUE)
 
 # A card's frame at rest, and under the pointer.
 CARD_BORDER = "#3f3f3f"

@@ -270,7 +270,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # on refitting a frame drawn on a label went with the label, and what a frame
 # does now is
 # test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames.
-MAX_PROSE_LINES = 18755
+#
+# 18754 when a picked thing took the family's blue: the line on a picked tile's
+# picture lightening its frame is test_a_picked_tiles_picture_sits_straight_on_the_blue.
+MAX_PROSE_LINES = 18754
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

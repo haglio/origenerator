@@ -33,7 +33,7 @@ _CORNER_BUTTON_CSS = (
     CHIP_CSS + "QPushButton:hover { background: rgba(48,128,224,0.9); }"
 )
 
-# A selected thumbnail lightens its whole tile — under both the image and the
+# A selected thumbnail fills its whole tile — under both the image and the
 # caption — the way a file browser highlights a picked item. Two things make
 # the fill actually show:
 #   * WA_StyledBackground, or a plain QWidget subclass paints no stylesheet
@@ -41,11 +41,10 @@ _CORNER_BUTTON_CSS = (
 #   * transparent child labels, or the app's global `QWidget { background-color }`
 #     paints them opaque and the fill only peeks through the 4px margin as a
 #     frame (which is what an earlier attempt did).
-# The image also lightens its resting border a touch when selected.
 _SELECTED_TILE_CSS = (
-    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}")
+    f"#thumbnailTile {{ background-color: {palette.SELECTED}; border-radius: 4px; }}")
 _BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
-_BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
+_BORDER_SELECTED = f"2px solid {palette.SELECTED}"
 
 
 class CornerAction(NamedTuple):

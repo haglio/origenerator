@@ -463,7 +463,7 @@ class BrowserPane(QObject):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)), favorite=favorite, context=context,
-            badge=icons.level_badge(gallery.folder_level(group)),
+            badge=icons.folder_badge(group),
             detail=gallery.folder_detail(group),
         )
         tile.clicked.connect(self._drill_into)

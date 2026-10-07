@@ -89,18 +89,12 @@ def _name_left(half, item) -> int:
     return _laid_out(half, item, QStyle.SubElement.SE_ItemViewItemText).left()
 
 
-def _holds_images_and_videos(item) -> bool:
-    return isinstance(item.data(0, GROUP_ROLE), gallery.SettingsGroup)
-
-
 def test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next(qtbot):
     half = _table_of_contents(qtbot, [_image("i1", "a cat"), _video("v1", "style_a")],
                               [_folder_of_your_own(1, "Keepers")])
     marks, names = {}, {}
 
     for depth, item in _rows_by_depth(half):
-        if _holds_images_and_videos(item):
-            continue
         assert not item.icon(0).isNull(), item.text(0)
         marks.setdefault(depth, set()).add(_mark_left(half, item))
         names.setdefault(depth, set()).add(_name_left(half, item))
@@ -123,3 +117,18 @@ def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):
     assert (all_row.text(0), latest.text(0)) == ("All", "Latest")
     assert _wears(all_row, "database")
     assert _wears(latest, "latest")
+
+
+def _folders_holding(half, workflow_name):
+    return [item for _depth, item in _rows_by_depth(half)
+            if isinstance(group := item.data(0, GROUP_ROLE), gallery.SettingsGroup)
+            and group.rows[0]["workflow_name"] == workflow_name]
+
+
+def test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark(qtbot):
+    half = _table_of_contents(qtbot, [_image("i1", "a cat"), _video("v1", "style_a")])
+    (images,) = _folders_holding(half, "sdxl_t2i")
+    (videos,) = _folders_holding(half, "wan22_i2v")
+
+    assert _wears(images, "photo")
+    assert _wears(videos, "play")

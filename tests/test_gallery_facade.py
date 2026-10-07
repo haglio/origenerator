@@ -52,7 +52,7 @@ PUBLISHED = {
     "output_disk_files",
     "output_file_path", "output_file_reference", "parse_params",
     "produced_output", "prompts_differ_from", "recent_generations", "recently_worked_folders", "recognized_spelling",
-    "remove_enhance_levels", "requested_generations", "resolve_preview",
+    "remove_enhance_levels", "requested_generations", "rerollable", "resolve_preview",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
     "rows_of_media_types", "rows_under", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",

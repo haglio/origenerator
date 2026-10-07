@@ -1,16 +1,17 @@
 """The gallery's folder tree, with per-leaf star/delete actions on the left.
 
 Only a leaf folder (a row with no sub-folders) that collects nothing carries
-actions, and they sit in the empty indentation just left of its label — a star right beside the text and,
-further left, a delete. Because that space is the row's existing indentation, the
-icons appear there on hover without moving the text at all. The star doubles as
-the favorited indicator: filled and always shown for a favorited leaf, an outline
-offered on hover otherwise, so clicking it to favorite a folder just leaves the star
-in place. Clicking an icon emits ``favorite_clicked`` / ``delete_clicked`` with the
-folder's key instead of selecting the row; the tree hit-tests clicks against the
-same rects it paints. Only a left click ever works the caret: a right one just
-picks the row it lands on, so opening a folder's menu never shuts the folder.
-Which group a row holds is injected, so this stays free of the gallery model.
+actions, and they sit in the empty indentation just left of its mark — a star right
+beside the mark and, further left, a delete. Because that space is the row's
+existing indentation, the icons appear there on hover without moving the row at
+all. The star doubles as the favorited indicator: filled and always shown for a
+favorited leaf, an outline offered on hover otherwise, so clicking it to favorite
+a folder just leaves the star in place. Clicking an icon emits
+``favorite_clicked`` / ``delete_clicked`` with the folder's key instead of
+selecting the row; the tree hit-tests clicks against the same rects it paints.
+Only a left click ever works the caret: a right one just picks the row it lands
+on, so opening a folder's menu never shuts the folder. Which group a row holds is
+injected, so this stays free of the gallery model.
 
 A row carrying ``RECENT_ROLE`` is one of the folders lately worked in, and wears
 a dot at the pane's own left edge — the same place on every row, whatever its
@@ -61,8 +62,8 @@ FOLDER_KEYS_MIME = "application/x-origenerator-folder-keys"
 
 def _action_rects(content: QRect):
     """The (star, delete) icon rects, laid into the indentation to the left of the
-    row's label: the star hugs the text and the delete sits beyond it. The star
-    keeps its place next to the label, so revealing the hover-only delete never
+    row's mark: the star hugs the mark and the delete sits beyond it. The star
+    keeps its place next to the mark, so revealing the hover-only delete never
     shifts it."""
     y = content.y() + (content.height() - _ICON) // 2
     star = QRect(content.left() - _PAD - _ICON, y, _ICON, _ICON)

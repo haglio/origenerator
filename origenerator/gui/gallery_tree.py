@@ -220,9 +220,11 @@ class GalleryTree:
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
+        badge = icons.folder_badge(group)
+        if badge is not None:
+            item.setIcon(0, badge[0])
         level = gallery.folder_level(group)
         if level is not None:
-            item.setIcon(0, icons.level_badge_icon(level))
             item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
         else:
             # A settings leaf is named by a code, so its tooltip is where the

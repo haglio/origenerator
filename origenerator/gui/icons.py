@@ -49,6 +49,8 @@ from shared_ui.colors import (
 )
 from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
 
+from origenerator.gallery.groups import SettingsGroup, folder_level
+from origenerator.gallery.output import media_type_of_row
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -282,8 +284,8 @@ def media_type_icon(media_type: str) -> QIcon:
 
     The badge sits over a thumbnail, so it needs its dark chip to read against
     any picture; this one sits in a row of text — a config tab's label, where it
-    stands in for the thumbnail a tab has no result to show yet — so the chip
-    would be a black square among words.
+    stands in for the thumbnail a tab has no result to show yet, or the row of a
+    folder of images or videos — so the chip would be a black square among words.
     """
     return glyph_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
@@ -532,8 +534,17 @@ def tab_close_icon(widget=None) -> QIcon:
     return QIcon(pixmap)
 
 
-def level_badge(level: str | None) -> tuple[QIcon, str] | None:
-    return (level_badge_icon(level), LEVEL_LABELS[level]) if level else None
+_MEDIA_FOLDER_KINDS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
+
+
+def folder_badge(group) -> tuple[QIcon, str] | None:
+    level = folder_level(group)
+    if level is not None:
+        return level_badge_icon(level), LEVEL_LABELS[level]
+    if isinstance(group, SettingsGroup):
+        media = media_type_of_row(group.rows[0])
+        return media_type_icon(media), _MEDIA_FOLDER_KINDS[media]
+    return None
 
 
 @cache

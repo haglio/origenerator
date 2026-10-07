@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import QLabel
 
+from origenerator import gallery
 from origenerator.gui import grid_card, icons
 from origenerator.gui.folder_tile import FolderTile
 
@@ -34,7 +35,8 @@ def test_folder_tile_without_context_omits_the_breadcrumb_line(qtbot):
 def test_folder_tile_shows_its_recipe_level_badge(qtbot):
     # A model/LoRA/workflow tile wears the same lettered chip the tree does, so a
     # folder's place in the hierarchy reads even in the mixed Favorites shelf.
-    tile = FolderTile("k", "wan model", [], 3, badge=icons.level_badge("model"))
+    tile = FolderTile("k", "wan model", [], 3,
+                      badge=icons.folder_badge(gallery.ModelGroup("k", "wan model", [])))
     qtbot.addWidget(tile)
 
     badges = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]

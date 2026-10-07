@@ -570,9 +570,8 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     assert not lora.icon(0).isNull() and "Add-on" in lora.toolTip(0)
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
-    # all, so it carries no chip — and since its name is a code, its tooltip is
-    # where what it holds is read.
-    assert settings.icon(0).isNull()
+    # all — and since its name is a code, its tooltip is where what it holds is
+    # read.
     assert settings.toolTip(0).startswith(settings.text(0))
     assert "dance" in settings.toolTip(0)
 
@@ -669,6 +668,19 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     # The title carries the full breadcrumb, which the narrow tree truncates.
     assert "SDXL Text-to-Image" in view._title.display_text()
     assert "All" in view._title.display_text()
+
+
+def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    lora = _at(_image_workflow(view._tree), 0, 0)
+
+    view._tree.setCurrentItem(lora)
+
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile.key == _key(_at(lora, 0))]
+    assert any(label.toolTip() == "Images" for label in square.findChildren(QLabel))
 
 
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):

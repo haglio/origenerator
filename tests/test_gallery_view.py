@@ -683,6 +683,21 @@ def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtb
     assert any(label.toolTip() == "Images" for label in square.findChildren(QLabel))
 
 
+def test_the_latest_square_wears_the_calendar_its_row_wears(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile._text == "Latest"]
+    (mark,) = [label for label in square.findChildren(QLabel)
+               if label.toolTip() == "Latest" and not label.pixmap().isNull()]
+    size = mark.pixmap().size()
+    assert mark.pixmap().toImage() == icons.latest_icon().pixmap(size).toImage()
+
+
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),

@@ -15,6 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.process_identity import ProcessNamer
+from shared_ui.preview import Preview, preview_of, taskbar_identity
+
+from origenerator.branch_session import is_branch_session
 
 # The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -39,18 +42,24 @@ def resolve_comfyui_client_id(app_state) -> str:
     return client_id
 
 
+CHECKOUT = Path(__file__).resolve().parent.parent
+
+
+def _shown_as() -> Preview | None:
+    return preview_of(CHECKOUT) if is_branch_session() else None
+
+
 def _name_this_process() -> None:
     """Leave ``launch_origenerator.vbs`` an interpreter that says "Origenerator"
     next time.  The console interpreter, because that is the one the launcher
     runs -- it redirects the app's output into the launcher log.  Why it is one
     launch late, and why it can never cost the launch:
     :meth:`ProcessNamer.name_this_process`."""
-    icon = Path(__file__).resolve().parent.parent / "icon.ico"
-    ProcessNamer("Origenerator", icon=icon).name_this_process(
+    ProcessNamer("Origenerator", icon=CHECKOUT / "icon.ico").name_this_process(
         "Origenerator", interpreter="python.exe")
 
 
-def _init_windows_taskbar_identity(identity: str | None = None) -> None:
+def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None) -> None:
     """Give Origenerator its own taskbar identity so the pinned launcher icon
     activates this window instead of spawning a second taskbar button.
 
@@ -68,7 +77,7 @@ def _init_windows_taskbar_identity(identity: str | None = None) -> None:
 
     from origenerator.win32 import APP_USER_MODEL_ID
     try:
-        set_app_user_model_id(identity or APP_USER_MODEL_ID)
+        set_app_user_model_id(identity or taskbar_identity(APP_USER_MODEL_ID, preview))
     except OSError:
         pass  # Non-fatal — still try to stamp the shortcut below.
     if identity is None:
@@ -515,10 +524,10 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
         logger.warning("Trash orphan reclaim failed: %s", e)
 
 
-def _build_window(client, db, app_state, fun_time):
+def _build_window(client, db, app_state, fun_time, preview):
     from origenerator.gui.main_window import OrigeneratorWindow
 
-    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time)
+    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time, preview=preview)
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -623,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
         from origenerator.ui_scale import apply_hosted_scale
         apply_hosted_scale()
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
-    _init_windows_taskbar_identity(app_args.taskbar_identity)
+    preview = _shown_as()
+    _init_windows_taskbar_identity(app_args.taskbar_identity, preview)
     _name_this_process()
 
     from PyQt6.QtWidgets import QApplication
@@ -662,7 +672,7 @@ def main(argv: list[str] | None = None) -> int:
     # on the application rather than on a window. origenerator.gui.stylesheet
     # says what each of them is answering for.
     from origenerator.gui.stylesheet import dress_application
-    dress_application(app)
+    dress_application(app, preview)
 
     if app_args.check_launch:
         # Everything the launch imports, imported -- including the modules that
@@ -727,7 +737,7 @@ def main(argv: list[str] | None = None) -> int:
     client.start()
 
     status("Building the interface...")
-    window = _build_window(client, db, app_state, fun_time)
+    window = _build_window(client, db, app_state, fun_time, preview)
     watch = None if fun_time is not None else _watch_for_fun_time(
         window, STATE_DIR, LIBRARY_STATE_DIR)
     still_offered = watch is not None and watch.stands_its_offer()

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from PIL import Image
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon
+from shared_ui.palette import PREVIEW_INK
+from shared_ui.preview import Preview
 
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices
@@ -64,3 +67,19 @@ def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monk
     # outlives the copy of the app that wrote it.
     assert named["icon"].read_bytes().startswith(b"\x89PNG")
     assert tmp_path in named["icon"].parents
+
+
+def test_a_previews_notices_are_headed_by_the_feature_it_demos_beside_the_amber_letter(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    registered = []
+    monkeypatch.setattr(desktop_notices, "register_notification_identity",
+                        lambda app_id, **named: registered.append((app_id, named)))
+
+    notices = DesktopNotices(QIcon(), shown_as=Preview(feature="the new seed row"))
+
+    app_id, named = registered[0]
+    assert app_id == f"{APP_USER_MODEL_ID}.Preview"
+    assert named["name"] == notices._tray.toolTip() == "Origenerator \u2014 preview of the new seed row"
+    with Image.open(named["icon"]) as mark:
+        assert mark.convert("RGBA").getpixel((mark.width // 2, 40))[:3] == PREVIEW_INK

@@ -17,6 +17,7 @@ from unittest.mock import DEFAULT, MagicMock, patch
 import pytest
 from PyQt6.QtGui import QColor, QPalette
 from shared_ui.colors import BLUE
+from shared_ui.preview import Preview
 
 from origenerator import config, content, gallery
 from origenerator.app import (
@@ -28,6 +29,7 @@ from origenerator.app import (
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
+    _shown_as,
     _warm_voice_runtimes,
     main,
     resolve_comfyui_client_id,
@@ -184,7 +186,7 @@ def test_init_windows_taskbar_identity_sets_aumid_and_stamps():
     with patch("origenerator.app.sys.platform", "win32"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("app_support.win32.stamp_pinned_shortcuts", return_value={}) as mock_stamp:
-        _init_windows_taskbar_identity()
+        _init_windows_taskbar_identity(None, None)
 
     mock_set_id.assert_called_once_with("Origenerator")
     mock_stamp.assert_called_once_with("Origenerator", ["Origenerator"])
@@ -196,16 +198,41 @@ def test_a_pin_windows_will_not_stamp_is_logged_and_the_launch_goes_on(caplog):
          patch("app_support.win32.set_app_user_model_id"), \
          patch("app_support.win32.stamp_pinned_shortcuts", return_value=refused), \
          caplog.at_level(logging.WARNING):
-        _init_windows_taskbar_identity()
+        _init_windows_taskbar_identity(None, None)
 
     assert "Could not stamp AppUserModelID" in caplog.text
+
+
+def test_a_preview_claims_a_taskbar_button_of_its_own_and_leaves_the_pin_to_the_live_app():
+    with patch("origenerator.app.sys.platform", "win32"), \
+         patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
+         patch("app_support.win32.stamp_pinned_shortcuts", return_value={}) as mock_stamp:
+        _init_windows_taskbar_identity(None, Preview(feature=None))
+
+    mock_set_id.assert_called_once_with("Origenerator.Preview")
+    mock_stamp.assert_called_once_with("Origenerator", ["Origenerator"])
+
+
+def test_a_branch_session_wears_the_preview_its_checkout_describes(monkeypatch):
+    described = Preview(feature="the new seed row")
+    monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
+    monkeypatch.setattr("origenerator.app.preview_of", lambda checkout: described)
+
+    assert _shown_as() is described
+
+
+def test_the_live_app_wears_no_preview_wherever_it_runs_from(monkeypatch):
+    monkeypatch.delenv("ORIGENERATOR_BRANCH_SESSION", raising=False)
+    monkeypatch.setattr("origenerator.app.preview_of", lambda checkout: Preview(feature="unused"))
+
+    assert _shown_as() is None
 
 
 def test_init_windows_taskbar_identity_noop_off_windows():
     with patch("origenerator.app.sys.platform", "linux"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
-        _init_windows_taskbar_identity()
+        _init_windows_taskbar_identity(None, None)
 
     mock_set_id.assert_not_called()
     mock_stamp.assert_not_called()
@@ -521,7 +548,7 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
     with patch("origenerator.app.sys.platform", "win32"), \
          patch("app_support.win32.set_app_user_model_id") as mock_set_id, \
          patch("app_support.win32.stamp_pinned_shortcuts") as mock_stamp:
-        _init_windows_taskbar_identity("FunTime.App")
+        _init_windows_taskbar_identity("FunTime.App", None)
 
     mock_set_id.assert_called_once_with("FunTime.App")
     mock_stamp.assert_not_called()

@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
     QTabBar,
 )
 from shared_ui.colors import BG_BUTTON, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.palette import PREVIEW_INK
+from shared_ui.preview import Preview
 
 from origenerator.gui.stylesheet import build_stylesheet, dress_application
 
@@ -294,8 +296,19 @@ def test_dressing_the_app_hands_it_the_icon_every_window_wears(qapp):
     before = qapp.windowIcon()
     qapp.setWindowIcon(QIcon())
     try:
-        dress_application(qapp)
+        dress_application(qapp, None)
 
         assert not qapp.windowIcon().isNull()
+    finally:
+        qapp.setWindowIcon(before)
+
+
+def test_a_preview_hands_the_app_its_letter_in_the_preview_ink(qapp):
+    before = qapp.windowIcon()
+    try:
+        dress_application(qapp, Preview(feature=None))
+
+        side_of_the_o = qapp.windowIcon().pixmap(256, 256).toImage().pixelColor(48, 128)
+        assert (side_of_the_o.red(), side_of_the_o.green(), side_of_the_o.blue()) == PREVIEW_INK
     finally:
         qapp.setWindowIcon(before)

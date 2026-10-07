@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QIcon
 from shared_ui.chrome import family_stylesheet
 from shared_ui.colors import (
     BG_BUTTON,
@@ -17,6 +16,8 @@ from shared_ui.colors import (
     family_palette,
     hovered,
 )
+from shared_ui.preview import Preview
+from shared_ui.preview_icon import app_icon
 
 from origenerator.config import PROJECT_DIR
 from origenerator.spin_arrows import arrow_paths
@@ -394,7 +395,7 @@ def build_stylesheet() -> str:
     """
 
 
-def dress_application(app) -> None:
+def dress_application(app, preview: Preview | None) -> None:
     """Put the family's palette, this app's sheet and its icon on the QApplication.
 
     The application and not a window, for three reasons that arrived separately.
@@ -409,6 +410,4 @@ def dress_application(app) -> None:
     """
     app.setPalette(family_palette(app.palette()))
     app.setStyleSheet(build_stylesheet())
-    icon_path = PROJECT_DIR / "icon.ico"
-    if icon_path.exists():
-        app.setWindowIcon(QIcon(str(icon_path)))
+    app.setWindowIcon(app_icon(PROJECT_DIR / "icon.ico", preview))

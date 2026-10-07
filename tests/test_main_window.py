@@ -12,6 +12,7 @@ from player_core.file_channel import append_command
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from shared_ui.preview import Preview
 
 from origenerator import gallery, recipe_match, ui_scale
 from origenerator.app_state import AppState
@@ -31,15 +32,22 @@ from tests.test_gallery_view import _selected_folder, _shelf
 from tests.test_hard_to_miss import _faded_backgrounds
 
 
-def _window(qtbot, tmp_path, app_state=None, *, fun_time=None):
+def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None):
     win = OrigeneratorWindow(
         ComfyUIClient(),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
         fun_time=fun_time,
+        preview=preview,
     )
     qtbot.addWidget(win)
     return win
+
+
+def test_a_preview_on_its_own_is_titled_for_the_feature_it_demos(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, preview=Preview(feature="the new seed row"))
+
+    assert win.windowTitle() == "Origenerator \u2014 preview of the new seed row"
 
 
 def _quit_shortcut(win):

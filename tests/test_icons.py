@@ -198,7 +198,7 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 
 def test_toolbar_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
-              icons.delete_icon, icons.clock_icon, icons.audio_icon,
+              icons.delete_icon, icons.latest_icon, icons.audio_icon,
               icons.autoloop_icon, icons.slideshow_icon, icons.enhance_icon,
               icons.custom_folder_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
@@ -317,7 +317,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.delete_icon(), "trash", RED),
         (icons.star_icon(filled=True), "star", GREEN),
         (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
-        (icons.clock_icon(), "clock", TEXT_PRIMARY),
+        (icons.latest_icon(), "latest", TEXT_PRIMARY),
         (icons.flask_icon(), "flask", TEXT_PRIMARY),
         (icons.custom_folder_icon(), "folder", TEXT_PRIMARY),
         (icons.all_icon(), "database", TEXT_PRIMARY),

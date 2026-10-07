@@ -174,7 +174,10 @@ class FolderTree(QTreeWidget):
     def drawRow(self, painter, option, index):
         super().drawRow(painter, option, index)
         if index.data(RECENT_ROLE):
-            self._recent.paint(painter, _mark_rect(self.visualRect(index)))
+            picked = self.selectionModel().isSelected(index)
+            self._recent.paint(painter, _mark_rect(self.visualRect(index)),
+                               Qt.AlignmentFlag.AlignCenter,
+                               QIcon.Mode.Selected if picked else QIcon.Mode.Normal)
         group = self._group_with_actions(index)
         if group is None:
             return

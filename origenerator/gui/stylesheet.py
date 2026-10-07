@@ -356,11 +356,12 @@ def build_stylesheet() -> str:
     /* The picked row in the table of contents, marked by its ground alone.
        Left to the platform, a picked row also wears an accent bar down its left
        edge, which lands squarely on the mark a shelf row draws in its caret
-       column and says nothing the lighter ground has not said already. Naming
+       column and says nothing the blue ground has not said already. Naming
        the ground here is what takes a picked row's painting off the platform,
        bar and all. */
     QTreeView::item:selected {{
-        background-color: {_h(BG_SECONDARY)};
+        background-color: {_h(BLUE)};
+        color: {_h(TEXT_PRIMARY)};
     }}
     /* The standing label over each half of the TOC pane, naming the shape that
        half holds. Outside the tree rather than a row in it, so it is still on

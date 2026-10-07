@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QStyle,
     QStyleOptionSpinBox,
     QTabBar,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
 from shared_ui.colors import BG_BUTTON, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.palette import PREVIEW_INK
@@ -247,6 +249,30 @@ def _tab_bar_image(qtbot):
         bar.setCurrentIndex(0)
         bar.resize(bar.sizeHint())
         return bar.grab().toImage(), bar.tabRect(0), bar.tabRect(1)
+    finally:
+        app.setStyleSheet(prior)
+
+
+def test_a_picked_row_in_the_table_of_contents_wears_the_familys_blue(qtbot):
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        tree = QTreeWidget()
+        qtbot.addWidget(tree)
+        for name in ("folder one", "folder two"):
+            tree.addTopLevelItem(QTreeWidgetItem([name]))
+        tree.resize(300, 120)
+        tree.show()
+        qtbot.waitExposed(tree)
+        tree.setCurrentItem(tree.topLevelItem(0))
+
+        image = tree.viewport().grab().toImage()
+        picked = tree.visualItemRect(tree.topLevelItem(0))
+        other = tree.visualItemRect(tree.topLevelItem(1))
+
+        assert image.pixelColor(picked.right() - 2, picked.center().y()) == BLUE
+        assert image.pixelColor(other.right() - 2, other.center().y()) != BLUE
     finally:
         app.setStyleSheet(prior)
 

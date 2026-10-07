@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY
+from shared_ui.colors import AMBER, BG_PRIMARY, BLUE
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.workflows.detail_parts as parts
@@ -640,6 +640,25 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
 
     assert versions.selected_positions() == [0, 1]
     assert shown == [0]   # only the plain click moved the preview
+
+
+def test_a_picked_level_is_filled_with_the_familys_blue(qtbot):
+    app = QApplication.instance()
+    prior = app.styleSheet()
+    app.setStyleSheet(build_stylesheet())
+    try:
+        versions = EnhanceVersions()
+        qtbot.addWidget(versions)
+        versions.show_levels(_items(_levels(1)))
+        versions.show()
+        qtbot.waitExposed(versions)
+        row = _rows(versions)[0]
+        _click(qtbot, row)
+
+        edge = row.mapTo(versions, QPoint(1, row.height() // 2))
+        assert versions.grab().toImage().pixelColor(edge).name() == BLUE.name()
+    finally:
+        app.setStyleSheet(prior)
 
 
 def test_delete_and_backspace_bin_the_picked_levels(qtbot):

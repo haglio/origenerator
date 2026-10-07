@@ -5,15 +5,15 @@ from io import BytesIO
 
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QEnterEvent, QMovie
+from PyQt6.QtGui import QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
+from shared_ui.colors import BLUE
 
 from origenerator.gui import corner_controls, drag_thumbnail, icons, omnipause
 from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.corner_controls import CORNER_INSET
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.media_badge import MediaBadge
-from origenerator.gui.palette import SELECTED_FILL
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
@@ -393,13 +393,10 @@ def test_thumbnail_starts_unselected(qtbot):
     assert tw.styleSheet() == ""  # no selection fill at rest
 
 
-def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
-    """The fill must reach under the image and the caption, not just the margin.
-
-    Rendered with the app stylesheet, which paints bare QLabels opaque — the
-    exact reason an earlier fill showed only as a frame. Sampling real pixels
-    (not the stylesheet string) is what catches that.
-    """
+def _picked_tile_drawn(qtbot):
+    """A picked tile and its pixels, drawn under the app stylesheet — which paints
+    bare QLabels opaque, the exact reason an earlier fill showed only as a frame.
+    Sampling real pixels (not the stylesheet string) is what catches that."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -410,12 +407,23 @@ def test_selecting_lightens_the_whole_tile_behind_image_and_caption(qtbot):
         tw.set_selected(True)
         tw.show()
         qtbot.waitExposed(tw)
-        img = tw.grab().toImage()
-        fill = QColor(SELECTED_FILL)
-        assert img.pixelColor(8, 8) == fill     # under the image
-        assert img.pixelColor(8, 182) == fill    # under the caption text
+        return tw, tw.grab().toImage()
     finally:
         app.setStyleSheet(prior)
+
+
+def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):
+    _tile, img = _picked_tile_drawn(qtbot)
+
+    assert img.pixelColor(8, 8) == BLUE     # under the image
+    assert img.pixelColor(8, 182) == BLUE    # under the caption text
+
+
+def test_a_picked_tiles_picture_sits_straight_on_the_blue(qtbot):
+    tile, img = _picked_tile_drawn(qtbot)
+    picture = tile._image_label.geometry()
+
+    assert img.pixelColor(picture.left(), picture.center().y()) == BLUE
 
 
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):

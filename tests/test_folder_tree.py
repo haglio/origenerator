@@ -3,6 +3,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRect, Qt
 from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
+from shared_ui.colors import BLUE
 
 from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.gui import folder_tree, icons
@@ -397,15 +398,16 @@ def _row_pixels(tree, item) -> list:
             for x in range(tree.viewport().width())]
 
 
-def test_the_picked_folder_is_marked_by_its_gray_ground_alone(qtbot):
+def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
     # The platform draws a picked row an accent bar down its left edge on top of
     # that ground -- straight through the mark a shelf row wears in its caret
     # column, and saying nothing the ground has not already said.
     tree, leaf = _tree_with_leaf(qtbot)
     tree.setStyleSheet(build_stylesheet())
+    leaf.setText(0, "")
     tree.setCurrentItem(leaf)
 
-    assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
+    assert all(color == BLUE for _x, color in _row_pixels(tree, leaf))
 
 
 def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
@@ -419,6 +421,20 @@ def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
     assert marked                        # the mark is drawn...
     assert max(marked) < delete.left()   # ...at the pane's own edge, clear of the
                                          # row's actions however deep it sits
+
+
+def _is_white(color) -> bool:
+    return min(color.red(), color.green(), color.blue()) > 200
+
+
+def test_a_picked_folder_lately_worked_in_keeps_its_mark_drawn_white(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    leaf.setData(0, RECENT_ROLE, True)
+    tree.setCurrentItem(leaf)
+
+    _star, delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    assert any(_is_white(color) for x, color in _row_pixels(tree, leaf) if x < delete.left())
 
 
 def _is_green(color) -> bool:

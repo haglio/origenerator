@@ -294,7 +294,15 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # mark, are test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next,
 # test_a_picked_shelf_row_is_blue_from_its_mark_to_its_name and
 # test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark.
-MAX_PROSE_LINES = 18710
+#
+# 18625 when a recipe that never recorded the picture it starts from stopped
+# being offered as a re-roll, taken down to what the tree measured: the notes
+# on what a folder's + and a video's seed hovers need are the name
+# gallery.rerollable,
+# test_no_add_tile_for_an_import_that_never_named_its_starting_picture,
+# test_an_i2v_item_that_never_named_its_starting_picture_offers_no_seed_rerolls and
+# test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_picture.
+MAX_PROSE_LINES = 18625
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

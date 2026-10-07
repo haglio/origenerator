@@ -73,7 +73,6 @@ from origenerator.osr2_driver import drive_target_for
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamType
 
 logger = logging.getLogger(__name__)
 
@@ -705,10 +704,7 @@ class GenerateConfigPanel(QWidget):
         wf = WORKFLOW_REGISTRY[key]
         params = self._param_form.get_values()
 
-        missing_images = [
-            pd.label for pd in wf.param_definitions()
-            if pd.type == ParamType.IMAGE and not str(params.get(pd.key, "")).strip()
-        ]
+        missing_images = wf.missing_images(params)
         if missing_images:
             self._generate_btn.flash_guard(f"Select the {' and '.join(missing_images)}")
             return

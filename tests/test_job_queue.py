@@ -265,6 +265,16 @@ def test_start_rerolls_both_the_frame_and_the_video_seed(qtbot, tmp_path):
     assert video_params["noise_seed"] != 11                             # video seed re-rolled too
 
 
+def test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_picture(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+
+    queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row(input_image="")]), [])
+
+    client.submit_job.assert_not_called()
+    assert not queue.has("k")
+
+
 def test_a_second_chained_reroll_queues_behind_the_first(qtbot, tmp_path):
     # A chained image→video re-roll stacks like any other user launch now.
     client = _client()

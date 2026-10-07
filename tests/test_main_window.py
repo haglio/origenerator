@@ -26,19 +26,21 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import main_window
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
+from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.test_gallery_view import _selected_folder, _shelf
 from tests.test_hard_to_miss import _faded_backgrounds
 
 
-def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None):
+def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, preview=None, taskbar=None):
     win = OrigeneratorWindow(
         ComfyUIClient(),
         Database(tmp_path / "t.db"),
         app_state or AppState(tmp_path / "ui.json"),
         fun_time=fun_time,
         preview=preview,
+        taskbar=taskbar,
     )
     qtbot.addWidget(win)
     return win
@@ -1224,6 +1226,39 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     assert [saved.get(key) for key in (
         "audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity")] == [
         True, OSR2_RETRACTED, True, 35]
+
+
+@pytest.fixture
+def taskbar_buttons(qapp):
+    worn: list[str] = []
+    taskbar = TaskbarIdentity(qapp, "Origenerator", None,
+                              dress=lambda hwnd, app_id, app: worn.append(app_id),
+                              described=lambda app_id: None)
+    yield taskbar, worn
+    qapp.removeEventFilter(taskbar)
+
+
+def test_a_window_taken_into_a_session_shows_under_the_sessions_taskbar_button(
+        qtbot, tmp_path, taskbar_buttons):
+    taskbar, worn = taskbar_buttons
+    win = _window(qtbot, tmp_path, taskbar=taskbar)
+    win.show()
+
+    win.become_hosted(replace(_fun_time_session(), taskbar_identity="FunTime.App"))
+
+    assert worn[-1] == "FunTime.App"
+
+
+def test_a_window_handed_back_from_a_session_shows_under_its_own_taskbar_button(
+        qtbot, tmp_path, taskbar_buttons):
+    taskbar, worn = taskbar_buttons
+    win = _window(qtbot, tmp_path, taskbar=taskbar)
+    win.show()
+    win.become_hosted(replace(_fun_time_session(), taskbar_identity="FunTime.App"))
+
+    win.become_standalone()
+
+    assert worn[-1] == "Origenerator"
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

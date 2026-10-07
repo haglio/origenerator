@@ -108,9 +108,8 @@ class ExperimentPolicy:
                 continue
             if row.get("source") == GenerationSource.EXPERIMENT and row.get("experiment_verdict") != "up":
                 continue
-            if "input_image" in workflow.default_params() and \
-                    not parse_params(row.get("params_json")).get("input_image"):
-                continue  # an i2v with no start frame recorded can't be re-run
+            if workflow.missing_images(parse_params(row.get("params_json"))):
+                continue
             out.append((row, workflow))
         return out
 

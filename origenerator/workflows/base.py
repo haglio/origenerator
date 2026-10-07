@@ -269,6 +269,15 @@ class WorkflowTemplate(ABC):
     def _seed_keys(self) -> tuple[str, ...]:
         return tuple(pd.key for pd in self.param_definitions() if pd.type == ParamType.SEED)
 
+    def missing_images(self, params: dict) -> list[str]:
+        return [label for key, label in self._image_params
+                if not str(params.get(key) or "").strip()]
+
+    @cached_property
+    def _image_params(self) -> tuple[tuple[str, str], ...]:
+        return tuple((pd.key, pd.label) for pd in self.param_definitions()
+                     if pd.type == ParamType.IMAGE)
+
     def pins_reused_seed(self) -> bool:
         """Whether loading a past generation's settings into a config tab pins its
         seed(s) — clearing their Random ticks — so the next Generate re-creates

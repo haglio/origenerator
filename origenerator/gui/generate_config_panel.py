@@ -747,11 +747,9 @@ class GenerateConfigPanel(QWidget):
     def launched_runs(self) -> list[str]:
         """The runs this tab's Generate started, oldest first.
 
-        Each named by the prompt id it *began* under, so a chained i2v (a frame,
-        then the video on it) stays one run to this tab. A tab can hold several:
-        ComfyUI takes a queue, so pressing Generate again asks for another. Empty
-        once the tab has been pointed at someone else's generation, or before it
-        has generated anything.
+        Each named by the prompt id it *began* under, so a chained i2v stays one
+        run to this tab, and a tab can hold several. Empty once the tab has been
+        pointed at someone else's generation.
         """
         return list(self._launched_runs)
 
@@ -825,10 +823,29 @@ class GenerateConfigPanel(QWidget):
         wf = WORKFLOW_REGISTRY.get(key)
         if wf is None or self._param_form is None:
             return None
-        params = self._param_form.get_values()
+        params_json = json.dumps(self._param_form.get_values())
         if image_index is None:
             image_index = self._library.now().image_config_index
-        return key, settings_signature(key, json.dumps(params), image_index)
+        return key, settings_signature(
+            key, params_json, image_index,
+            workflow_version=self._recipe_the_shown_run_was_made_on(key, params_json, image_index))
+
+    def _recipe_the_shown_run_was_made_on(self, workflow_name: str, params_json: str,
+                                          image_index: dict) -> str | None:
+        """The workflow version this tab's folder key takes: the shown
+        run's own while the form still holds that run's settings, else today's.
+
+        A run made before the recipe changed is filed under the older recipe's
+        folder, so a tab showing one has to name that folder, or
+        :meth:`InfoPaneTabs.load_selection` cannot see that the tab it already has
+        is that item's own and every open forks another.
+        """
+        row = self._displayed_row
+        if row is None or (row.get("workflow_name") or "") != workflow_name:
+            return None
+        shows_it = (settings_signature(workflow_name, params_json, image_index)
+                    == settings_signature(workflow_name, row.get("params_json"), image_index))
+        return row.get("workflow_version") if shows_it else None
 
     def settings_folder_key(self) -> str | None:
         """The gallery folder this tab's settings have been generating into,
@@ -946,9 +963,7 @@ class GenerateConfigPanel(QWidget):
         config would generate into, else what a tab with no workflow yet is.
 
         Named after what it is showing rather than after its settings, so the row
-        of tabs reads as the things you have open. A config that has never run
-        has no item to name it, so it takes its folder's name — the same name the
-        folder wears in the tree, code or typed.
+        of tabs reads as the things you have open.
         """
         if self._folder_request is not None:
             return self._folder_request.title()
@@ -1146,16 +1161,13 @@ class GenerateConfigPanel(QWidget):
         self._display_result(row, image_rows)
 
     def show_finished_media(self, row: dict):
-        """Put a finished run's saved output in the preview alone — no footer, no
-        form, and not as this tab's displayed generation.
+        """Put a finished run's saved output in the preview alone -- no footer,
+        no form, and not as this tab's displayed generation.
 
-        What the tab *mirroring* a run shows when it lands: the live frames it has
-        been streaming give way to the picture they were making (and a fullscreen
-        show opened over them lands on it too), while the tab itself stays whatever
-        it was. That last part is the point — a run this tab didn't launch must not
-        make the pane's blank resting tab hold a generation, or a click would open
-        a tab beside it instead of filling it. The tab that *did* launch the run
-        gets the whole end-state through :meth:`show_completed_result`.
+        What the tab *mirroring* a run shows when it lands. Taking it on would
+        leave the pane's blank resting tab holding a generation, and the next click
+        would open a tab beside it instead of filling it; the tab that *did* launch
+        the run gets the whole end state through :meth:`show_completed_result`.
         """
         preview = resolve_preview(row, COMFYUI_OUTPUT_DIR)
         if preview is None:

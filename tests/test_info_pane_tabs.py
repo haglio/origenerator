@@ -39,15 +39,14 @@ def _sdxl_full(**over):
     return params
 
 
-def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i"):
+def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i", workflow_version=None):
     """Insert a generation whose params_json reflects its real settings — stamped
-    with the workflow's current version, as a run made by this app would be (the
-    settings signature folds the version in, so a stale one would split this row
-    from a live config tab's key)."""
+    with the workflow's current version unless an older one is asked for, as a run
+    made by this app before the recipe changed would be."""
     db.insert_generation(
         prompt_id=prompt_id,
         workflow_name=workflow_name,
-        workflow_version=WORKFLOW_REGISTRY[workflow_name].version,
+        workflow_version=workflow_version or WORKFLOW_REGISTRY[workflow_name].version,
         positive_prompt=params.get("positive_prompt", ""),
         negative_prompt=params.get("negative_prompt", ""),
         seed=params.get("seed"),
@@ -56,9 +55,10 @@ def _insert_gen(db, prompt_id, params, workflow_name="sdxl_t2i"):
     )
 
 
-def _complete_gen(db, prompt_id, params, filename, subfolder="image"):
+def _complete_gen(db, prompt_id, params, filename, subfolder="image",
+                  workflow_version=None):
     """A completed generation with an output file, ready to be shown in a tab."""
-    _insert_gen(db, prompt_id, params)
+    _insert_gen(db, prompt_id, params, workflow_version=workflow_version)
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": filename, "subfolder": subfolder}]))
     return db.get_generation(prompt_id)
@@ -366,6 +366,27 @@ def test_load_selection_reuses_the_tab_for_the_same_folder(tabs):
 
     assert tabs.count() == count  # reused in place, no new tab
     assert tabs.current_config_panel()._displayed_row is b
+
+
+def test_load_selection_reuses_the_tab_for_a_run_made_before_the_recipe_changed(tabs):
+    # A run made before its workflow's recipe changed is filed under that older
+    # recipe's folder, and the tab showing it belongs to that folder too. Opening
+    # it again lands back in the tab it already has, however many times: one tab,
+    # not a row of identical ones.
+    row = _complete_gen(tabs._db, "old", _sdxl_full(positive_prompt="a wizard", seed=1),
+                        "sdxl_old.png", workflow_version="v001")
+    tabs.currentWidget()._preview.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    tabs.pin_current_tab()
+    count = tabs.count()
+
+    for _ in range(2):
+        for panel in tabs.config_panels():
+            panel._preview.show_media = MagicMock()
+        tabs.load_selection(row, [row])
+        tabs.pin_current_tab()
+
+    assert tabs.count() == count
 
 
 def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):

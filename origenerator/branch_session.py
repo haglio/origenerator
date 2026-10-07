@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 
 ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
+LAUNCHER = "launch_preview_branch.vbs"
 
 
 def is_branch_session(environ=os.environ) -> bool:

@@ -31,7 +31,6 @@ def _png(path: Path, width: int, height: int) -> Path:
 def test_plain_launch_has_no_fun_time_session():
     args = parse_app_args([])
     assert args.fun_time is None
-    assert args.taskbar_identity is None
 
 
 def test_fun_time_launch_carries_rects_channels_and_identity():
@@ -58,7 +57,7 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
     assert session.paused_file == Path("st/origenerator_paused.txt")
     assert session.status_file == Path("st/origenerator_status.txt")
     assert session.dashboard_cmd_file == Path("st/dashboard_cmd.txt")
-    assert args.taskbar_identity == "FunTime.App"
+    assert session.taskbar_identity == "FunTime.App"
 
 
 def test_a_session_hands_over_each_players_own_channel():
@@ -131,6 +130,13 @@ def test_a_takeover_for_this_process_is_the_session_it_names(tmp_path):
     assert session.main_rect == Rect(0, 206, 853, 1234)
     assert session.command_file == Path("st/origenerator_cmd.txt")
     assert not takeover.exists()
+
+
+def test_a_takeover_names_the_taskbar_button_the_window_joins(tmp_path):
+    _takeover(tmp_path, pid=4321,
+              args=[*_SESSION_ARGS, "--taskbar-identity", "FunTime.App.Preview"])
+
+    assert take_the_takeover(tmp_path, pid=4321).taskbar_identity == "FunTime.App.Preview"
 
 
 def test_a_takeover_meant_for_another_process_is_spent_unanswered(tmp_path):

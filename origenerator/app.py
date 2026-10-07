@@ -15,9 +15,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.process_identity import ProcessNamer
-from shared_ui.preview import Preview, preview_of, taskbar_identity
+from shared_ui.preview import Preview, preview_of, taskbar_identity, window_title
 
-from origenerator.branch_session import is_branch_session
+from origenerator.branch_session import LAUNCHER, is_branch_session
 
 # The persisted ComfyUI client id lives under this key in the UI state file.
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -47,6 +47,33 @@ CHECKOUT = Path(__file__).resolve().parent.parent
 
 def _shown_as() -> Preview | None:
     return preview_of(CHECKOUT) if is_branch_session() else None
+
+
+def _the_preview_on_the_taskbar(preview: Preview | None, state_dir: Path):
+    if preview is None:
+        return None
+    from app_support.win32 import TaskbarApp
+    from shared_ui.preview_icon_pil import icon_file
+
+    from origenerator.fun_time_mode import WINDOW_TITLE
+    return TaskbarApp(name=window_title(WINDOW_TITLE, preview),
+                      icon=icon_file(CHECKOUT / "icon.ico", preview, state_dir),
+                      relaunch=f'wscript.exe "{CHECKOUT / LAUNCHER}"')
+
+
+def _taskbar_identity(app, fun_time, preview: Preview | None, state_dir: Path):
+    if sys.platform != "win32":
+        return None
+    from app_support.win32 import described_taskbar_app, dress_window
+
+    from origenerator.gui.taskbar_identity import TaskbarIdentity
+    from origenerator.win32 import APP_USER_MODEL_ID
+    taskbar = TaskbarIdentity(app, taskbar_identity(APP_USER_MODEL_ID, preview),
+                              _the_preview_on_the_taskbar(preview, state_dir),
+                              dress=dress_window, described=described_taskbar_app)
+    if fun_time is not None and fun_time.taskbar_identity:
+        taskbar.join(fun_time.taskbar_identity)
+    return taskbar
 
 
 def _name_this_process() -> None:
@@ -524,10 +551,11 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
         logger.warning("Trash orphan reclaim failed: %s", e)
 
 
-def _build_window(client, db, app_state, fun_time, preview):
+def _build_window(client, db, app_state, fun_time, preview, taskbar):
     from origenerator.gui.main_window import OrigeneratorWindow
 
-    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time, preview=preview)
+    window = OrigeneratorWindow(client, db, app_state, fun_time=fun_time, preview=preview,
+                                taskbar=taskbar)
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -633,7 +661,7 @@ def main(argv: list[str] | None = None) -> int:
         apply_hosted_scale()
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
     preview = _shown_as()
-    _init_windows_taskbar_identity(app_args.taskbar_identity, preview)
+    _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)
     _name_this_process()
 
     from PyQt6.QtWidgets import QApplication
@@ -673,6 +701,7 @@ def main(argv: list[str] | None = None) -> int:
     # says what each of them is answering for.
     from origenerator.gui.stylesheet import dress_application
     dress_application(app, preview)
+    taskbar = _taskbar_identity(app, fun_time, preview, STATE_DIR)
 
     if app_args.check_launch:
         # Everything the launch imports, imported -- including the modules that
@@ -737,7 +766,7 @@ def main(argv: list[str] | None = None) -> int:
     client.start()
 
     status("Building the interface...")
-    window = _build_window(client, db, app_state, fun_time, preview)
+    window = _build_window(client, db, app_state, fun_time, preview, taskbar)
     watch = None if fun_time is not None else _watch_for_fun_time(
         window, STATE_DIR, LIBRARY_STATE_DIR)
     still_offered = watch is not None and watch.stands_its_offer()

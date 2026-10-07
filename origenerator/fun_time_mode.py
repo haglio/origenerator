@@ -265,6 +265,7 @@ class FunTimeSession:
     # where the pointer's presses on it come back through.
     frames_file: Path | None = None
     input_file: Path | None = None
+    taskbar_identity: str | None = None
 
     @property
     def in_a_headset(self) -> bool:
@@ -282,7 +283,6 @@ class FunTimeSession:
 @dataclass(frozen=True)
 class AppArgs:
     fun_time: FunTimeSession | None
-    taskbar_identity: str | None
     check_launch: bool = False
 
 
@@ -431,6 +431,7 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
         landscape_player=_player(args, "landscape"),
         frames_file=args.frames_file,
         input_file=args.input_file,
+        taskbar_identity=args.taskbar_identity,
     )
 
 
@@ -451,8 +452,7 @@ def parse_app_args(argv: list[str]) -> AppArgs:
     if args.fun_time and (missing := _missing_required(argv)):
         parser.error(f"{MODE_FLAG} without {', '.join(missing)}; the launch "
                      f"contract is {CONTRACT_FILE}")
-    return AppArgs(fun_time=_session_of(args), taskbar_identity=args.taskbar_identity,
-                   check_launch=args.check_launch)
+    return AppArgs(fun_time=_session_of(args), check_launch=args.check_launch)
 
 
 OFFER_NAME = "fun_time_offer.txt"

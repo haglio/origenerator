@@ -23,6 +23,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
+from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
@@ -83,10 +84,11 @@ class OrigeneratorWindow(QMainWindow):
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  parent=None, *, fun_time: FunTimeSession | None = None,
-                 preview: Preview | None = None):
+                 preview: Preview | None = None, taskbar: TaskbarIdentity | None = None):
         super().__init__(parent)
         self._app_state = app_state
         self._fun_time = fun_time
+        self._taskbar = taskbar
         # Before anything below builds a param form: a prompt field reads its
         # height as it is constructed, and the view built a few lines down brings
         # its first one with it.
@@ -210,6 +212,8 @@ class OrigeneratorWindow(QMainWindow):
         self._persist_session()
         self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())
         self._fun_time = session
+        if self._taskbar is not None and session.taskbar_identity:
+            self._taskbar.join(session.taskbar_identity)
         self._gallery_view.become_hosted(session)
         self.setWindowState(Qt.WindowState.WindowNoState)
         ui_scale.draw_at(ui_scale.hosted_scale())
@@ -255,6 +259,8 @@ class OrigeneratorWindow(QMainWindow):
         self._bridge.deleteLater()
         self._bridge = None
         self._fun_time = None
+        if self._taskbar is not None:
+            self._taskbar.leave()
         self._gallery_view.become_standalone()
         self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
         self.setWindowFlags(self.windowFlags()

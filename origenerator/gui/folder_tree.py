@@ -9,10 +9,8 @@ offered on hover otherwise, so clicking it to favorite a folder just leaves the 
 in place. Clicking an icon emits ``favorite_clicked`` / ``delete_clicked`` with the
 folder's key instead of selecting the row; the tree hit-tests clicks against the
 same rects it paints. Only a left click ever works the caret: a right one just
-picks the row it lands on, so opening a folder's menu never shuts the folder. A
-row carrying a QIcon under ``BRANCH_ICON_ROLE`` (a shelf, or a folder of your own)
-draws that icon under its folder's own mark. Which group a row holds is injected,
-so this stays free of the gallery model.
+picks the row it lands on, so opening a folder's menu never shuts the folder.
+Which group a row holds is injected, so this stays free of the gallery model.
 
 A row carrying ``RECENT_ROLE`` is one of the folders lately worked in, and wears
 a dot at the pane's own left edge — the same place on every row, whatever its
@@ -32,13 +30,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag, QIcon
-from PyQt6.QtWidgets import (
-    QAbstractItemView,
-    QStyle,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
-    QTreeWidget,
-)
+from PyQt6.QtWidgets import QAbstractItemView, QStyledItemDelegate, QTreeWidget
 
 from origenerator.gui import icons
 
@@ -46,11 +38,6 @@ _ICON = 16   # on-screen size of each action
 _PAD = 4     # gap between the label and the icons, and between the two icons
 _DOT = 6     # diameter of the lately-worked-in mark
 
-# A row carrying a QIcon here draws it where its disclosure chevron would go, so a
-# childless shelf row (Favorites, Recents) aligns with the sibling folders instead
-# of shifting a glyph into its label. Distinct from the injected group role (plain
-# UserRole).
-BRANCH_ICON_ROLE = Qt.ItemDataRole.UserRole + 1
 # A row carrying its own key here collects dropped folders (Favorites, a custom
 # folder). Rows without it refuse a drop, so a folder can never be dragged into
 # the derived hierarchy, whose shape belongs to the generations' settings.
@@ -91,25 +78,12 @@ def _mark_rect(content: QRect) -> QRect:
     return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
-def _name_follows_its_mark(index) -> bool:
-    return isinstance(index.data(BRANCH_ICON_ROLE), QIcon) and index.parent().isValid()
-
-
 class _CountBeforeName(QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         count = index.data(COUNT_ROLE)
         if count:
             option.text = f"({count}) {option.text}"
-        if _name_follows_its_mark(index):
-            option.rect.setLeft(self.parent().name_left_of_marked_row(option.rect))
-
-    def paint(self, painter, option, index):
-        if _name_follows_its_mark(index):
-            tree = self.parent()
-            tree.style().drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem,
-                                       option, painter, tree)
-        super().paint(painter, option, index)
 
 
 class FolderTree(QTreeWidget):
@@ -130,7 +104,7 @@ class FolderTree(QTreeWidget):
         self._recent = icons.recent_mark_icon()  # a lately-worked-in row's dot
         self._hover_key = None  # key of the leaf under the mouse, so its delete shows
         self.setItemDelegate(_CountBeforeName(self))
-        self.setIconSize(QSize(_ICON, _ICON))  # size the per-level chip like the star/delete
+        self.setIconSize(QSize(_ICON, _ICON))  # each row's mark, the size of the star/delete
         # One indentation per level, no wider than the caret that sits in it. The
         # tree is six levels deep by the time it reaches a settings folder and it
         # lives in the window's narrowest column, so the platform default spends
@@ -199,35 +173,6 @@ class FolderTree(QTreeWidget):
         (self._star_on if group.favorite else self._star).paint(painter, star_rect)
         if hovered:
             self._delete.paint(painter, delete_rect)
-
-    def drawBranches(self, painter, rect, index):
-        icon = index.data(BRANCH_ICON_ROLE)
-        if isinstance(icon, QIcon):
-            icon.paint(painter, self.branch_mark_rect(index))
-            return
-        super().drawBranches(painter, rect, index)
-
-    def branch_mark_rect(self, index) -> QRect:
-        row = self.visualRect(index)
-        top = row.top() + (row.height() - _ICON) // 2
-        folder_row = row.translated(-self.indentation(), 0)
-        if not index.parent().isValid():
-            return QRect(folder_row.left() + (self.indentation() - _ICON) // 2, top, _ICON, _ICON)
-        mark = self._folder_layout(folder_row, QStyle.SubElement.SE_ItemViewItemDecoration)
-        return QRect(mark.left(), top, _ICON, _ICON)
-
-    def name_left_of_marked_row(self, row: QRect) -> int:
-        return self._folder_layout(row.translated(-self.indentation(), 0),
-                                   QStyle.SubElement.SE_ItemViewItemText).left()
-
-    def _folder_layout(self, folder_row: QRect, element) -> QRect:
-        option = QStyleOptionViewItem()
-        self.initViewItemOption(option)
-        option.rect = folder_row
-        option.features |= (QStyleOptionViewItem.ViewItemFeature.HasDecoration
-                            | QStyleOptionViewItem.ViewItemFeature.HasDisplay)
-        option.decorationSize = self.iconSize()
-        return self.style().subElementRect(element, option, self)
 
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton:

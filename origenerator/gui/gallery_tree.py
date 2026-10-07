@@ -43,13 +43,7 @@ from origenerator.gallery.shelves import (
     folder_shelf,
 )
 from origenerator.gui import icons
-from origenerator.gui.folder_tree import (
-    BRANCH_ICON_ROLE,
-    COUNT_ROLE,
-    DROP_KEY_ROLE,
-    RECENT_ROLE,
-    TREE_KEY_ROLE,
-)
+from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriented_key, split_key
 
 # A search does not narrow this tree: a narrowed list of folder names is a poor
@@ -153,14 +147,15 @@ class GalleryTree:
         """
         for custom in side.custom_folders:
             self._add_custom_folder(root, custom, side.orientation)
-        self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
+        all_row = self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
+        all_row.setIcon(0, icons.all_icon())
 
     def _add_shelves(self, folder_item, side, folder_key: str) -> None:
         for shelf in _shown_shelves(side):
             key = FolderShelf(shelf, folder_key).key
             item = QTreeWidgetItem([SHELF_LABELS[shelf]])
             item.setData(0, COUNT_ROLE, side.shelf_counts.get(key, 0))
-            item.setData(0, BRANCH_ICON_ROLE, icons.shelf_icon(shelf))
+            item.setIcon(0, icons.shelf_icon(shelf))
             item.setToolTip(0, _SHELF_TIPS[shelf])
             if shelf == FAVORITES_KEY:
                 item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
@@ -209,7 +204,7 @@ class GalleryTree:
         collecting the folders dropped onto it."""
         count = len(gallery.rows_under(group))
         item = QTreeWidgetItem([group.label])
-        item.setData(0, BRANCH_ICON_ROLE, icons.custom_folder_icon())
+        item.setIcon(0, icons.custom_folder_icon())
         item.setToolTip(0, f"{group.label} — {count} item{'s' if count != 1 else ''} "
                            "in a folder you made; drop folders here to add them")
         item.setData(0, GROUP_ROLE, group)
@@ -225,18 +220,6 @@ class GalleryTree:
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
-        # A workflow / model / LoRA / source-image row wears a lettered chip
-        # naming its level, so a row's place in the hierarchy reads at a glance
-        # rather than by counting indentation; the level joins the tooltip too.
-        # The All row and the settings leaves get neither (folder_level returns
-        # None).
-        #
-        # It is the row's *icon*, so it sits right of the caret and reads as the
-        # first character of the folder's name — which is what it is. What that
-        # costs is the label: Qt lays the text out after the icon, so a chipped
-        # row's text starts a chip-width right of an unchipped sibling's. The
-        # thing that stays uniform is where each row's name *block* begins, at
-        # exactly its depth times the indentation.
         level = gallery.folder_level(group)
         if level is not None:
             item.setIcon(0, icons.level_badge_icon(level))

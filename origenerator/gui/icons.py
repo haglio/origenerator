@@ -158,9 +158,9 @@ def audio_icon() -> QIcon:
 
 
 def trash_icon(*, color=None) -> QIcon:
-    """A trash can — the Trash shelf's caret marker, and the Delete button that
-    fills it. One glyph for both ends of a deletion, so the shelf reads as where
-    that button's items go."""
+    """A trash can — the Trash shelf's mark, and the Delete button that fills
+    it. One glyph for both ends of a deletion, so the shelf reads as where that
+    button's items go."""
     return glyph_icon("trash", color=color, size=_SIZE)
 
 
@@ -185,12 +185,11 @@ def star_icon(*, filled: bool) -> QIcon:
 
 
 def clock_icon() -> QIcon:
-    """A clock face — the Recents shelf's caret marker, drawn to match the star."""
+    """A clock face — the Latest shelf's mark, drawn to match the star."""
     return glyph_icon("clock", size=_SIZE)
 
 
 def flask_icon() -> QIcon:
-    """An Erlenmeyer flask — the Experiments shelf's caret marker."""
     return glyph_icon("flask", size=_SIZE)
 
 
@@ -205,9 +204,13 @@ def shelf_badge(shelf: str) -> tuple[QIcon, str]:
     return shelf_icon(shelf), SHELF_LABELS[shelf]
 
 
+def all_icon() -> QIcon:
+    return glyph_icon("database", size=_SIZE)
+
+
 def custom_folder_icon() -> QIcon:
-    """A folder — the caret marker on a folder the user composed, and the toolbar
-    button that composes one out of the picked folders."""
+    """A folder — the mark on a folder the user composed, and the toolbar button
+    that composes one out of the picked folders."""
     return glyph_icon("folder", size=_SIZE)
 
 

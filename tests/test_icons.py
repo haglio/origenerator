@@ -320,6 +320,7 @@ def test_every_toolbar_mark_is_the_familys_shared_glyph(qtbot):
         (icons.clock_icon(), "clock", TEXT_PRIMARY),
         (icons.flask_icon(), "flask", TEXT_PRIMARY),
         (icons.custom_folder_icon(), "folder", TEXT_PRIMARY),
+        (icons.all_icon(), "database", TEXT_PRIMARY),
     )
     for icon, name, color in cases:
         drawn = icon.pixmap(QSize(48, 48), QIcon.Mode.Normal).toImage()

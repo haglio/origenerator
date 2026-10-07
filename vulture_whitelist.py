@@ -18,20 +18,16 @@ belong.
 from __future__ import annotations
 
 # --- Qt event handlers and layout hooks -- called by the C++ event loop, never from here ---
-_.dragMoveEvent  # noqa  # origenerator/gui/drop_slot.py:168, origenerator/gui/enhance_panel.py:454, origenerator/gui/folder_tree.py:242, origenerator/gui/generation_queue.py:633
-_.dropEvent  # noqa  # origenerator/gui/drop_slot.py:174, origenerator/gui/enhance_panel.py:457, origenerator/gui/folder_tree.py:255, origenerator/gui/generation_queue.py:644
+_.dragMoveEvent  # noqa  # origenerator/gui/drop_slot.py:168, origenerator/gui/enhance_panel.py:454, origenerator/gui/folder_tree.py:256, origenerator/gui/generation_queue.py:633
+_.dropEvent  # noqa  # origenerator/gui/drop_slot.py:174, origenerator/gui/enhance_panel.py:457, origenerator/gui/folder_tree.py:269, origenerator/gui/generation_queue.py:644
 _.takeAt  # noqa  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
-_.startDrag  # noqa  # origenerator/gui/folder_tree.py:204
+_.startDrag  # noqa  # origenerator/gui/folder_tree.py:215
 _.wheelEvent  # noqa  # origenerator/gui/no_wheel.py:43, origenerator/gui/no_wheel.py:97, origenerator/gui/no_wheel.py:102
 
-# --- Qt style options -- written here, read by the C++ style laying the option out ---
-_.features  # noqa  # origenerator/gui/folder_tree.py:213
-_.decorationSize  # noqa  # origenerator/gui/folder_tree.py:215
-
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
-supported_actions  # noqa  # origenerator/gui/folder_tree.py:204
+supported_actions  # noqa  # origenerator/gui/folder_tree.py:215
 
 # --- player_core reads this off the click tracker this app mirrors it onto ---
 # `satellite_hud.HudClicks.press` compares a row's filter press against it to

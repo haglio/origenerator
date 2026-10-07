@@ -14,7 +14,7 @@ from typing import NamedTuple
 from origenerator.gallery.tree import ALL_KEY
 
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
-RECENTS_LABEL = "Latest"      # its row label; a clock is drawn in the caret column.
+RECENTS_LABEL = "Latest"
 # "Latest" rather than "Recents" because that is the word the players use
 # for the same ordering — a Fun Time session's browse says Latest, and this
 # shelf is that same newest-first listing of what the app has made.
@@ -24,11 +24,11 @@ FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited
 # "__starred__" so saved expansions and history survive the rename.
 FAVORITES_LABEL = "Favorites"
 EXPERIMENTS_KEY = "__experiments__"  # synthetic node: the background-experiment home
-EXPERIMENTS_LABEL = "Experiments"    # its row label; a flask is drawn in the caret column
+EXPERIMENTS_LABEL = "Experiments"
 REQUESTS_KEY = "__requests__"  # synthetic node: what spoken requests have queued
-REQUESTS_LABEL = "Requests"    # its row label; a mic is drawn in the caret column
+REQUESTS_LABEL = "Requests"
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
-TRASH_LABEL = "Trash"     # its row label; a can is drawn in the caret column
+TRASH_LABEL = "Trash"
 
 SHELVES = (RECENTS_KEY, FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)
 SHELF_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,

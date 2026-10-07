@@ -355,10 +355,9 @@ def build_stylesheet() -> str:
     }}
     /* The picked row in the table of contents, marked by its ground alone.
        Left to the platform, a picked row also wears an accent bar down its left
-       edge, which lands squarely on the mark a shelf row draws in its caret
-       column and says nothing the blue ground has not said already. Naming
-       the ground here is what takes a picked row's painting off the platform,
-       bar and all. */
+       edge, which lands on the mark the row leads with and says nothing the
+       blue ground has not said already. Naming the ground here is what takes a
+       picked row's painting off the platform, bar and all. */
     QTreeView::item:selected {{
         background-color: {_h(BLUE)};
         color: {_h(TEXT_PRIMARY)};

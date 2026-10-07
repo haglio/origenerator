@@ -20,7 +20,7 @@ from player_core.console import (
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
 from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QDrag, QIcon, QKeyEvent, QMovie
+from PyQt6.QtGui import QDrag, QKeyEvent, QMovie
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -65,7 +65,7 @@ from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import BRANCH_ICON_ROLE, RECENT_ROLE
+from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.inflight_card import InFlightCard
@@ -1818,19 +1818,6 @@ def test_favorite_shelf_is_pinned_first_and_collects_favorite_folders(qtbot):
     assert view.visible_prompt_ids() == []
 
 
-def test_favorite_shelf_row_aligns_like_the_media_folders(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    shelf = _alls(view._tree)["Favorites"]
-    # No "★ " text prefix: the star is drawn in the caret column instead, so the
-    # "Favorites" label lines up with "Images"/"Videos" rather than sitting a
-    # chevron-width to the right of them.
-    assert shelf.text(0) == "Favorites"
-    assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
-
-
 def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
                  _image("i3", "a dog", 50, 1)])
@@ -1865,7 +1852,6 @@ def test_experiments_shelf_is_always_reachable(qtbot):
 
     shelf = _alls(view._tree)["Experiments"]
     assert shelf.text(0) == "Experiments"
-    assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
 
 
 def test_experiments_shelf_label_counts_the_unreviewed(qtbot):
@@ -2085,7 +2071,6 @@ def test_the_trash_shelf_is_always_reachable(qtbot):
 
     shelf = _alls(view._tree)["Trash"]
     assert shelf.text(0) == "Trash"
-    assert isinstance(shelf.data(0, BRANCH_ICON_ROLE), QIcon)
 
 
 def test_the_trash_shelf_label_counts_what_it_holds(qtbot):

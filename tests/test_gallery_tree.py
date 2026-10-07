@@ -115,9 +115,11 @@ def _wears(item, mark: str) -> bool:
     return drawn == glyph_pixmap(mark, 48, TEXT_PRIMARY).toImage()
 
 
-def test_all_wears_the_database(qtbot):
+def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):
     half = _table_of_contents(qtbot, [_image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    latest = all_row.child(0)
 
-    assert all_row.text(0) == "All"
+    assert (all_row.text(0), latest.text(0)) == ("All", "Latest")
     assert _wears(all_row, "database")
+    assert _wears(latest, "latest")

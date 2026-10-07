@@ -184,9 +184,8 @@ def star_icon(*, filled: bool) -> QIcon:
     return glyph_icon("star_outline", size=_SIZE)
 
 
-def clock_icon() -> QIcon:
-    """A clock face — the Latest shelf's mark, drawn to match the star."""
-    return glyph_icon("clock", size=_SIZE)
+def latest_icon() -> QIcon:
+    return glyph_icon("latest", size=_SIZE)
 
 
 def flask_icon() -> QIcon:
@@ -195,7 +194,7 @@ def flask_icon() -> QIcon:
 
 def shelf_icon(shelf: str) -> QIcon:
     return {
-        RECENTS_KEY: clock_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
+        RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
         EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon, TRASH_KEY: trash_icon,
     }[shelf]()
 

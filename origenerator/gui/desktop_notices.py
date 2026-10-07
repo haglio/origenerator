@@ -24,6 +24,8 @@ from pathlib import Path
 from PyQt6.QtCore import QObject
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon
+from shared_ui.preview import Preview, taskbar_identity, window_title
+from shared_ui.preview_icon_pil import in_preview_ink
 
 from origenerator.icon_design import render_icon
 from origenerator.run_notice import RunOutcome, notice_for
@@ -40,7 +42,7 @@ APP_NAME = "Origenerator"
 _MARK_PX = 256
 
 
-def _the_apps_mark() -> Path:
+def _the_apps_mark(shown_as: Preview | None) -> Path:
     """Origenerator's O, written where a notification can still find it later.
 
     Outside the checkout on purpose. What is registered below outlives the copy
@@ -48,22 +50,23 @@ def _the_apps_mark() -> Path:
     mark named inside one would be gone by the next notification.
     """
     home = Path(os.environ.get("LOCALAPPDATA") or tempfile.gettempdir())
-    mark = home / APP_NAME / "notification.png"
+    mark = home / APP_NAME / ("notification.png" if shown_as is None else "notification-preview.png")
     mark.parent.mkdir(parents=True, exist_ok=True)
-    render_icon(_MARK_PX).save(mark)
+    letter = render_icon(_MARK_PX)
+    (letter if shown_as is None else in_preview_ink(letter)).save(mark)
     return mark
 
 
 class DesktopNotices(QObject):
     """The tray icon Windows' notifications come from, and what reaches it."""
 
-    def __init__(self, icon: QIcon, parent=None):
+    def __init__(self, icon: QIcon, parent=None, *, shown_as: Preview | None = None):
         super().__init__(parent)
         self._tray = QSystemTrayIcon(icon, self)
-        self._tray.setToolTip(APP_NAME)
+        self._tray.setToolTip(window_title(APP_NAME, shown_as))
         if QSystemTrayIcon.isSystemTrayAvailable():
             self._tray.show()
-        self._name_this_app_to_windows()
+        self._name_this_app_to_windows(shown_as)
 
     def note(self, outcome: RunOutcome) -> None:
         """Say what a run came to, if it is one worth interrupting for."""
@@ -76,10 +79,11 @@ class DesktopNotices(QObject):
             else QSystemTrayIcon.MessageIcon.Warning,
         )
 
-    def _name_this_app_to_windows(self) -> None:
+    def _name_this_app_to_windows(self, shown_as: Preview | None) -> None:
         try:
             register_notification_identity(
-                APP_USER_MODEL_ID, name=APP_NAME, icon=_the_apps_mark())
+                taskbar_identity(APP_USER_MODEL_ID, shown_as), name=window_title(APP_NAME, shown_as),
+                icon=_the_apps_mark(shown_as))
         except Exception as e:
             # Broad on purpose: nothing about the heading over a notification is
             # worth a launch, and an unwritable mark fails in more ways than one.

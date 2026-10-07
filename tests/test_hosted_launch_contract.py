@@ -15,8 +15,10 @@ import re
 from pathlib import Path
 
 import pytest
+from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
+from tests.test_main_window import _fun_time_session, _window
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -71,11 +73,12 @@ def test_a_launch_that_is_not_hosted_needs_none_of_them():
     assert contract.parse_app_args([]).fun_time is None
 
 
-def test_the_caption_the_document_names_is_the_one_the_main_window_wears():
-    source = (REPO_ROOT / "origenerator" / "gui" / "main_window.py").read_text(
-        encoding="utf-8")
+@pytest.mark.parametrize("preview", [None, Preview(feature="the new seed row")])
+def test_the_caption_the_document_names_is_the_one_the_hosted_main_window_wears(
+        qtbot, tmp_path, preview):
+    window = _window(qtbot, tmp_path, fun_time=_fun_time_session(), preview=preview)
 
-    assert f'setWindowTitle("{_document()["window_title"]}")' in source
+    assert window.windowTitle() == _document()["window_title"]
 
 
 def test_no_other_window_here_wears_that_caption():

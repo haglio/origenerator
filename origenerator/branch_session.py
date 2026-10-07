@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 
-from origenerator.config import BRANCH_SESSION_FLAG as ENV_FLAG
+ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
 
 
 def is_branch_session(environ=os.environ) -> bool:

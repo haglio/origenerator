@@ -7,6 +7,7 @@ from dataclasses import replace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QMainWindow, QMessageBox
+from shared_ui.preview import Preview, window_title
 
 from origenerator import ui_scale
 from origenerator.app_state import AppState
@@ -16,7 +17,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
-from origenerator.fun_time_mode import FunTimeSession
+from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
@@ -81,7 +82,8 @@ class OrigeneratorWindow(QMainWindow):
     handed_back = pyqtSignal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
-                 parent=None, *, fun_time: FunTimeSession | None = None):
+                 parent=None, *, fun_time: FunTimeSession | None = None,
+                 preview: Preview | None = None):
         super().__init__(parent)
         self._app_state = app_state
         self._fun_time = fun_time
@@ -89,7 +91,7 @@ class OrigeneratorWindow(QMainWindow):
         # height as it is constructed, and the view built a few lines down brings
         # its first one with it.
         PROMPT_HEIGHTS.restore(app_state.get(_PROMPT_HEIGHTS_KEY))
-        self.setWindowTitle("Origenerator")
+        self.setWindowTitle(WINDOW_TITLE if fun_time else window_title(WINDOW_TITLE, preview))
         # A small floor (not the old 1000x700) so a tiling window manager can snap
         # the window into a monitor third (~853px) or a portrait-monitor half
         # (~720px) — Qt maps this straight to the window's min track size. The
@@ -109,7 +111,7 @@ class OrigeneratorWindow(QMainWindow):
         self.setCentralWidget(self._gallery_view)
         # Where a run that outlasted the user's attention reports itself: the
         # window's own icon, on a tray icon that lives as long as the app does.
-        self._notices = DesktopNotices(self.windowIcon(), parent=self)
+        self._notices = DesktopNotices(self.windowIcon(), parent=self, shown_as=preview)
         self._gallery_view.run_ended.connect(self._notices.note)
         if fun_time is not None:
             # The session's channels: its verbs onto the region shows, the

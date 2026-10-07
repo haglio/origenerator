@@ -1651,7 +1651,7 @@ def test_a_show_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
     before = qapp.windowIcon()
     qapp.setWindowIcon(QIcon())
     try:
-        dress_application(qapp)
+        dress_application(qapp, None)
 
         assert not _view(qtbot).windowIcon().isNull()
     finally:

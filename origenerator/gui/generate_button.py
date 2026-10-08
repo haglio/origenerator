@@ -7,11 +7,6 @@ button does not fill with that run's progress: that would put a third,
 differently-worded account of one run on screen and tie the control that starts
 work to the state of work already going.
 
-It stays pressable throughout, since another press queues another job rather
-than relaunching over the one running. It also flashes a form guard — e.g.
-"Select the Start Image" — when a Generate is blocked, so the panel needs no
-standing status line.
-
 Its resting caption is the panel's to set: settings that would re-create a past
 generation exactly make the press draw a fresh seed instead, and the button says
 so ("Generate with Random seed") rather than a dialog asking after the click.

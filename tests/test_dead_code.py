@@ -302,7 +302,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_no_add_tile_for_an_import_that_never_named_its_starting_picture,
 # test_an_i2v_item_that_never_named_its_starting_picture_offers_no_seed_rerolls and
 # test_a_folder_reroll_launches_nothing_when_no_row_names_its_starting_picture.
-MAX_PROSE_LINES = 18625
+#
+# 18615 when a Generate with nothing to start from grayed out and said why:
+# the notes on when Generate is pressable and on what it flashes are
+# test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why,
+# test_picking_the_picture_to_start_from_lights_generate and
+# test_grayed_generate_and_edit_say_what_they_still_need.
+MAX_PROSE_LINES = 18615
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

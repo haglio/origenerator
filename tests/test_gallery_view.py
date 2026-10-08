@@ -4108,9 +4108,9 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
 
 
 def _linked_view(qtbot, source="i7", count=12):
-    """A view on a video whose start frame is one of ``count`` sibling images, with
-    the browser pane's scrolling recorded — the setup for following a source link
-    into a folder big enough that landing on the right tile matters."""
+    """A view on a video whose start frame is one of ``count`` sibling images, laid
+    out in a window too short to hold them all — the setup for following a source
+    link into a folder big enough that landing on the right picture matters."""
     images = [_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)]
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "seed": 5,
@@ -4118,51 +4118,51 @@ def _linked_view(qtbot, source="i7", count=12):
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(FakeDB([video] + images))
     qtbot.addWidget(view)
+    view.resize(1100, 700)
+    view.show()
+    qtbot.waitExposed(view)
     view.refresh()
-    scrolled = []
-    view._scroll.ensureWidgetVisible = lambda widget, *margins: scrolled.append(widget)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     view._browser._thumbnail_clicked("vid1", _NO_MOD)               # viewing the video
-    return view, scrolled
+    return view
 
 
 def test_following_a_source_link_lands_on_the_image_itself(qtbot):
     # Opening the folder the source image lives in isn't enough: with a dozen
     # siblings in it, which one the link meant has to be picked out — highlighted,
     # and scrolled to rather than left off the foot of the pane.
-    view, scrolled = _linked_view(qtbot)
+    view = _linked_view(qtbot)
 
     view.follow_link("i7")                    # follow its source-image link
 
     assert view.selected_prompt_ids() == ["i7"]
     assert view._browser._thumb_widgets["i7"].is_selected()
-    assert scrolled == [view._browser._thumb_widgets["i7"]]
+    assert _in_view(view, "i7")
 
 
-def test_a_followed_link_scrolls_again_once_the_folder_is_laid_out(qtbot):
-    # The folder's tiles are created but not yet positioned when the link lands, so
-    # that first scroll has no real tile position to aim at. A second pass, after
-    # this turn's layout has run, is what actually puts the tile on screen.
-    view, scrolled = _linked_view(qtbot)
-
-    view.follow_link("i7")
-    qtbot.wait(1)
-
-    tile = view._browser._thumb_widgets["i7"]
-    assert scrolled == [tile, tile]
-
-
-def test_a_followed_link_does_not_scroll_a_folder_moved_on_from(qtbot):
-    # Navigating away before that second pass runs leaves it nothing to do: the
-    # tile is gone, and the view the user chose instead isn't ours to move.
-    view, scrolled = _linked_view(qtbot)
+def test_a_followed_link_puts_the_picture_on_screen_in_the_same_turn(qtbot):
+    # The folder's pictures are created but not yet positioned when the link lands,
+    # so a scroll that aimed at them straight away would aim at nothing. The pane
+    # lays itself out first, which is what puts the picture on screen without
+    # waiting for the turn to end.
+    view = _linked_view(qtbot)
 
     view.follow_link("i7")
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])  # back off before layout
-    scrolled.clear()
+
+    assert _in_view(view, "i7")
+
+
+def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot):
+    # The link's landing is the folder it opened; choosing another folder after it
+    # is the user overruling that, and what they chose is what stays on screen.
+    view = _linked_view(qtbot)
+
+    view.follow_link("i7")
+    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     qtbot.wait(1)
 
-    assert scrolled == []
+    assert view.visible_prompt_ids() == ["vid1"]
+    assert _scroll_bar(view).value() == 0
 
 
 def test_history_spans_folder_navigation(qtbot):

@@ -563,3 +563,11 @@ def test_a_folders_shelf_squares_stand_apart_from_its_folders_behind_a_heading_l
     assert [widget.objectName() for widget in shown] == [
         "folderTile", "folderTile", "tileGroupHeading", "folderTile"]
     assert not shown[2].text().strip()
+
+
+def test_a_pane_with_nothing_drawn_marks_no_folder_square(qtbot):
+    # A show closing as the app itself closes hands its slide to a pane that has
+    # nothing in it, and asking an empty pane for its squares took the app down.
+    pane, _scroll = _pane(qtbot)
+
+    assert pane.reveal_folder("image/sdxl_t2i/abc::landscape") is False

@@ -354,6 +354,7 @@ class FakeHost:
         self.groups = groups or {}
         self.said = []
         self.followed = []
+        self.revealed = []
         self.trashed = []
         self.favorited = []
         self.enhanced = []
@@ -399,6 +400,9 @@ class FakeHost:
 
     def follow_link(self, prompt_id):
         self.followed.append(prompt_id)
+
+    def reveal(self, prompt_id):
+        self.revealed.append(prompt_id)
 
     def trash_generation(self, prompt_id):
         self.trashed.append(prompt_id)
@@ -1033,15 +1037,16 @@ def test_a_favorite_that_lands_says_so_in_the_favorites_green(shows):
     assert made[0].said_kinds == [FAVORITE]
 
 
-def test_leaving_a_show_for_an_item_lands_on_the_item(shows):
-    # Leaving a show *for* an item is a decision to work on it, and the folder
-    # alone under a stale form is not that.
+def test_leaving_a_show_picks_its_slide_where_the_show_was_playing(shows):
+    # Not the folder the picture was generated in: the pictures you were watching
+    # are where you want to be put back, with that one picked among them.
     director, host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
     made[0].open_requested.emit("g1")
 
-    assert host.followed == ["g1"]
+    assert host.revealed == ["g1"]
+    assert host.followed == []
     assert director.showing is None
 
 

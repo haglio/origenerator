@@ -423,13 +423,15 @@ def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
     assert not view.isVisible()
 
 
-def test_ending_a_show_on_an_unlocked_slide_hands_nothing_over(qtbot):
-    # Every other way out is just leaving: the gallery stays where it was.
+def test_ending_a_show_on_an_unlocked_slide_hands_that_slide_over(qtbot):
+    # Escape is a way out like any other, and the picture on screen when you take
+    # it is the one you want to find afterwards.
     view, opened = _shelf_view(qtbot)
+    on_screen = view._playlist.current()[2]
 
     _press(view, Qt.Key.Key_Escape)
 
-    assert opened == []
+    assert opened == [on_screen]
 
 
 def test_enter_on_a_locked_slide_hands_it_over_once(qtbot):

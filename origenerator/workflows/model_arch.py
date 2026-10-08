@@ -92,8 +92,22 @@ class ModelFile:
     is_shard: bool
 
 
+_described: dict[tuple[str, int, int], ModelFile] = {}
+
+
 def describe(path: Path) -> ModelFile:
     """Classify *path* from its header and its name, without loading weights."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return _describe(path)
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    if key not in _described:
+        _described[key] = _describe(path)
+    return _described[key]
+
+
+def _describe(path: Path) -> ModelFile:
     if _SHARD.search(path.name):
         return ModelFile(arch=None, is_lora=False, expert=None, is_shard=True)
     keys = _tensor_names(path)

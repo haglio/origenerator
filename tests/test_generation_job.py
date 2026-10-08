@@ -27,6 +27,10 @@ def _client():
     client.submit_job = MagicMock(return_value="comfy-A")
     client.interrupt = MagicMock()
     client.cancel_prompt = MagicMock()
+    # A job taken back or set aside asks after its earlier run before sending
+    # again; answered here, never by a server on the machine.
+    client.fetch_history = MagicMock(return_value={})
+    client.forget_history = MagicMock()
     return client
 
 
@@ -486,8 +490,8 @@ def test_a_job_that_has_not_started_is_not_on_the_server(qtbot, tmp_path):
 
 def test_readopt_comes_back_unsent_under_the_rows_prompt_id(qtbot, tmp_path):
     # The counterpart to reconnect, for a row the queue was still holding when the
-    # app closed: the server has never heard of it, so there is nothing to rebind
-    # to and everything to re-send when its turn comes.
+    # app closed: nothing of it is running on the server, so there is nothing to
+    # rebind to and everything to send when its turn comes.
     client = _client()
 
     job = GenerationJob.readopt(client, SDXL, _params(), "held-1")
@@ -497,6 +501,28 @@ def test_readopt_comes_back_unsent_under_the_rows_prompt_id(qtbot, tmp_path):
 
     job.start()
     client.submit_job.assert_called_once_with(job.payload, "held-1")
+
+
+def test_a_re_adopted_job_lands_the_run_the_last_session_had_already_sent(qtbot, tmp_path):
+    # The previous session sent this id and the server still holds its record:
+    # the stop that set the job aside reached ComfyUI after its last node had
+    # saved. Sending it again makes a second picture nothing points at, and
+    # leaves every read of the id answering with the first one.
+    client = _client()
+    client.fetch_history = MagicMock(return_value=SDXL_HISTORY)
+    client.forget_history = MagicMock()
+    job = GenerationJob.readopt(
+        client, SDXL, _params(), "held-1",
+        output_dir=tmp_path, thumb_dir=tmp_path / "thumbs",
+    )
+    finished = []
+    job.finished.connect(lambda files, thumb, dur: finished.append(files))
+
+    job.start()
+
+    assert finished == [[{"filename": "a.png", "subfolder": ""}]]
+    assert job.state == "finished"
+    client.submit_job.assert_not_called()
 
 
 def test_a_re_adopted_job_reports_the_run_it_is_finally_given(qtbot, tmp_path):

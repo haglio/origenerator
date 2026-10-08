@@ -14,13 +14,10 @@ from origenerator.content import load_content
 from origenerator.gallery.output import output_file_reference, row_output_files
 from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.param_keys import renamed as renamed_params
+from origenerator.workflows.derived_size import without_an_explicit_size
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _CONTENT = load_content()
-
-# What a size-deriving workflow's stored size is recorded under. Not a recipe
-# setting — it belongs to the frame the recipe ran on, not to the recipe.
-_SIZE_KEYS = ("width", "height")
 
 # How long a Genau clip is generated for, in frames at the native rate. Genau
 # steers a clip as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
@@ -73,10 +70,7 @@ def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
     keeps its proportions.
     """
     params = _run_on(image_row, filled_params(video_row, workflow), workflow)
-    if params is not None and workflow.derives_size_from_input:
-        for key in _SIZE_KEYS:
-            params.pop(key, None)
-    return params
+    return None if params is None else without_an_explicit_size(params, workflow)
 
 
 _PROMPT_KEYS = ("positive_prompt", "negative_prompt", "scene_lines",

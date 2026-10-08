@@ -984,7 +984,7 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
 @pytest.mark.parametrize("pd, written, read_back", [
     (ParamDef("enhance", "Enhance", "bool", True), False, False),
     (ParamDef("name", "Name", "str", ""), "a made-up name", "a made-up name"),
-    (ParamDef("positive_prompt", "Prompt", "str", "", multiline=True),
+    (ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
      "a lighthouse\nat dusk", "a lighthouse\nat dusk"),
     (ParamDef("seed", "Seed", "seed", 0), 680387713615965, 680387713615965),
     (ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=200), 42, 42),
@@ -1661,7 +1661,7 @@ def test_each_box_on_a_card_says_what_it_is(qtbot):
     qtbot.addWidget(form)
     scene = form._widgets["scene_frames"]._scenes[0]
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
-    assert {"Prompt", "Things to Avoid", "Her Lines"} <= captions
+    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
     assert scene.fields["negative_prompt"].toolTip() == param_help("negative_prompt")
     assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
 
@@ -1681,8 +1681,8 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
 
     scene.fields["scene_lines"].setPlainText("Come in.")
     assert scene.speaking()
-    for key, caption in (("positive_prompt", "Prompt"),
-                         ("negative_prompt", "Things to Avoid")):
+    for key, caption in (("positive_prompt", "Positive Prompt"),
+                         ("negative_prompt", "Negative Prompt")):
         field = scene.fields[key]
         assert field.isReadOnly()
         assert field.property("inert") is True
@@ -1702,8 +1702,8 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     scene.fields["scene_lines"].setPlainText("Come in.")
     scene.fields["scene_lines"].setPlainText("   ")
     assert not scene.speaking()
-    for key, caption in (("positive_prompt", "Prompt"),
-                         ("negative_prompt", "Things to Avoid")):
+    for key, caption in (("positive_prompt", "Positive Prompt"),
+                         ("negative_prompt", "Negative Prompt")):
         assert not scene.fields[key].isReadOnly()
         assert scene.fields[key].property("inert") is False
         assert scene.fields[key].toolTip() == param_help(key)
@@ -1821,8 +1821,8 @@ def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
 
 def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
     form = ParamForm(_scene_defs() + [
-        ParamDef("audio_prompt", "Sound Prompt", "str", "", multiline=True),
-        ParamDef("audio_negative_prompt", "Sounds to Avoid", "str", "", multiline=True),
+        ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True),
     ])
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
@@ -1838,7 +1838,7 @@ def test_the_sound_prompts_hide_while_every_scene_speaks(qtbot):
 
 def test_the_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
     form = ParamForm([
-        ParamDef("negative_prompt", "Things to Avoid", "str", "", multiline=True),
+        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
     ])
     qtbot.addWidget(form)
@@ -1851,7 +1851,7 @@ def test_the_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
 
 def test_the_things_to_avoid_show_while_either_pass_pushes_the_prompt(qtbot):
     form = ParamForm([
-        ParamDef("negative_prompt", "Things to Avoid", "str", "", multiline=True),
+        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
         ParamDef("cfg_high", "Prompt Strength (First Pass)", "float", 1.0,
                  min_val=0.0, max_val=30.0, step=0.1),
         ParamDef("cfg_low", "Prompt Strength (Second Pass)", "float", 1.0,

@@ -1409,24 +1409,20 @@ class GalleryView(QWidget):
         return self.folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
-        """Point every config tab's discard button at the run *it* launched.
+        """Point every config tab's discard button at the run *it* launched, and
+        turn its Generate off while its folder is making one.
 
-        A tab tracks its own Generates, not its settings folder: a folder can have
-        several runs queued at once (two pictures of one recipe, both wanted), and
-        a tab showing one of them must not claim the others. Of its own it follows
-        the *oldest still alive* — the one nearest to being made, and so the one
-        its button discards. A press that stopped the job queued after the one on
-        screen was the reported dead click. A chained i2v is two prompts but one
-        run, so a tab follows its origin across the hand-off, and runs that have
-        ended are let go here.
-        Launches from outside a tab — the folder tile's "+", the auto loop — are
-        claimed by the tab looking at that same folder (:meth:`_claim_launch`), so
-        they light it up too.
+        A tab follows the *oldest still alive* of its own runs — the one nearest to
+        being made, and so the one its button discards — across a chained i2v's
+        hand-off, which is two prompts but one run. Launches from outside a tab —
+        the folder tile's "+", the auto loop — are claimed by the tab looking at
+        that same folder (:meth:`_claim_launch`), so they light it up too.
 
         Idempotent — driven by every re-roll lifecycle change and by switching the
         front tab. Every tab is reconciled, not just the front one, so a run
         launched from a tab that is now under another still shows there.
         """
+        making_one = set(self._live_jobs)
         for panel in self._info_tabs.config_panels():
             live = [(origin, job) for origin in panel.launched_runs()
                     if (job := self._jobs.job_for_origin(origin)) is not None]
@@ -1435,6 +1431,7 @@ class GalleryView(QWidget):
             job = live[0][1] if live else None  # the oldest still alive: nearest done
             panel.set_generating(job is not None,
                                  auto_generating=self._auto_generating(job))
+            panel.note_folder_generating(self._panel_reroll_key(panel) in making_one)
 
     def _auto_generating(self, job) -> bool:
         """Whether ``job``'s own folder is auto-looping — so the button that throws
@@ -1519,6 +1516,8 @@ class GalleryView(QWidget):
             return
         params = {**wf.default_params(), **params}  # form values win over defaults
         key = self.folder_key_for(workflow_name, params)
+        if key in self._live_jobs:
+            return  # one item at a time per folder
         # A pinned seed that would reproduce a past run draws a fresh one instead of
         # launching a copy — the press was made against a button already reading
         # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
@@ -2115,10 +2114,6 @@ class GalleryView(QWidget):
         here = self._tree_view.selected_folder_key()
         self._note_folder_visit(here if group is not None else None)
         self._title.set_display(self._tree_view.breadcrumb(current))
-        # The path ends in a code, so what the folder holds — the prompt its
-        # generations ran, and the settings that set it apart from its siblings —
-        # is read by hovering the path, as it is by hovering the row itself.
-        self._title.setToolTip(gallery.folder_detail(group) if group else "")
         self._update_folder_average(group)
         self._show_group_contents(group, current)
         landed = self._land_on_the_first_item()

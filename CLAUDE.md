@@ -128,10 +128,12 @@ face in the other — sat in the quality boilerplate of 853 of this library's
 reported it off the map (2026-09-21); it is out of the overlay now.
 
 So a keyword is measured against the library before it goes in: count what it
-matches in the `positive_prompt` column of `state/origenerator.db` and read the
-words around a sample of the hits. A word that fires inside the boilerplate
-every prompt here carries is not distinctive, however plainly it names the act
-elsewhere. The near miss that still counts: keeping such a word because some
+matches in the `positive_prompt` column of `state/origenerator.db` — the count
+alone, never the words themselves, which no agent on this project reads. A word
+that matches most of the library is firing inside the boilerplate every prompt
+here carries and is not distinctive, however plainly it names the act elsewhere;
+where the count leaves it genuinely in doubt, the reading is the user's, so ask
+him. The near miss that still counts: keeping such a word because some
 prompts do mean the act by it — those prompts nearly always say so another way
 too, which is what the act's other keywords are for, and a row has only one
 name.
@@ -262,7 +264,17 @@ open in the gallery, so without it a preview opens on nothing and reads as a
 dummy -- which is what a Fun Time session handed him on 2026-09-20, and why
 fun_time's `--shortcut` now refuses a hosted checkout that has neither.
 
-Re-copy, not copy-once. The overlay is where `project_roots` lives, and the
+Re-copy as the LAST step before the link goes out, and then import the window
+chain against that copy (`from origenerator.gui.main_window import
+OrigeneratorWindow` in a fresh interpreter, no `PYTHONPATH`): `tests/
+test_launch_smoke.py` deliberately stands the committed example in for the
+local overlay, because a public checkout has only the example, so it cannot
+see a local overlay the code can no longer read. A copy taken two hours
+earlier met exactly that on 2026-09-26 -- `recipe_categories` went from a
+list to a table of keywords on the machine 23 minutes after the copy, and the
+preview died at import with a loading screen that never lifted.
+
+The overlay is where `project_roots` lives, and the
 primary's library is found through it — a worktree carrying a copy taken weeks
 ago, from before a root moved, resolves a primary that isn't there, and the
 launch dies opening a database under a path that doesn't exist. The launcher

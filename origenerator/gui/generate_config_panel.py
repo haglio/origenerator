@@ -79,6 +79,7 @@ logger = logging.getLogger(__name__)
 
 _CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
 _RANDOM_SEED_CAPTION = "Generate with Random seed"
+_ALREADY_MAKING_ONE_TIP = "This folder is already making one"
 _RANDOM_SEED_TIP = (
     "These settings have already been generated with this exact seed, so "
     "Generate draws a fresh one rather than re-creating the same file. "
@@ -188,6 +189,7 @@ class GenerateConfigPanel(QWidget):
         self._db = db
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
+        self._folder_generating = False
         self._launched_runs: list[str] = []            # the runs this tab's Generate started (see launched_runs)
         # The settings folder whose live run this tab's preview follows — its
         # own Generate's, or the run it was pointed at by a click on that
@@ -515,8 +517,16 @@ class GenerateConfigPanel(QWidget):
     def _can_generate(self) -> bool:
         """Is there anything to run? A run needs a server to send it to and a
         workflow to send — a tab still on the picker's placeholder has neither a
-        graph nor params, so its Generate is greyed rather than silently inert."""
-        return self._client is not None and self._workflow_combo.currentData() is not None
+        graph nor params, so its Generate is greyed rather than silently inert —
+        and a folder already making one takes nothing more."""
+        return (self._client is not None
+                and self._workflow_combo.currentData() is not None
+                and not self._folder_generating)
+
+    def note_folder_generating(self, generating: bool) -> None:
+        self._folder_generating = generating
+        self._generate_btn.setEnabled(self._can_generate())
+        self.refresh_generate_caption()
 
     def _on_workflow_changed(self):
         # A different workflow is a different recipe: whatever Combine opened
@@ -676,18 +686,16 @@ class GenerateConfigPanel(QWidget):
         )
         self._generate_btn.set_caption(
             _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
-        self._generate_btn.setToolTip(_RANDOM_SEED_TIP if duplicate else "")
+        self._generate_btn.setToolTip(
+            _ALREADY_MAKING_ONE_TIP if self._folder_generating
+            else (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
 
         A Generate is conceptually a gallery re-roll: it emits the form's workflow
         and values, the seeds as the fields show them, as :attr:`generate_requested`,
-        and the gallery launches the job in that
-        folder and navigates there. Pressing it again while a run of this tab's is
-        still in flight asks for another one — ComfyUI works through a queue — so
-        the panel keeps only the form-level guard that an image workflow has its
-        input picked.
+        and the gallery launches the job in that folder and navigates there.
         """
         if not self._can_generate():
             return  # no server to run against, or no workflow picked yet

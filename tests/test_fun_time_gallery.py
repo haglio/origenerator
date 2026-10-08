@@ -6,6 +6,8 @@ console — and its layout folds to fit the Random Favs Browser's upright rect.
 """
 from __future__ import annotations
 
+import json
+
 from PIL import Image
 from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PyQt6.QtCore import QEvent, QPoint, Qt
@@ -405,6 +407,9 @@ def _fox_library(tmp_path):
                  "wan22_i2v_v1.mp4", recipe_category="alpha")]
     for row in rows:
         row["thumbnail_path"] = str(tall)
+        if row["workflow_name"] == "sdxl_t2i":
+            row["params_json"] = json.dumps(
+                {**json.loads(row["params_json"]), "width": 720, "height": 1280})
     return rows
 
 
@@ -926,9 +931,11 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
     Image.new("RGB", (100, 200)).save(tall)
     Image.new("RGB", (200, 100)).save(wide)
     rows = [
-        _row("p-1", "sdxl_t2i", {"positive_prompt": "a", "seed": 1},
+        _row("p-1", "sdxl_t2i", {"positive_prompt": "a", "seed": 1,
+                                  "width": 720, "height": 1280},
              "sdxl_t2i_p1.png", thumbnail_path=str(tall)),
-        _row("l-1", "sdxl_t2i", {"positive_prompt": "b", "seed": 2},
+        _row("l-1", "sdxl_t2i", {"positive_prompt": "b", "seed": 2,
+                                  "width": 1280, "height": 720},
              "sdxl_t2i_l1.png", thumbnail_path=str(wide)),
     ]
     view = _fun_time_view(qtbot, rows)

@@ -9,6 +9,7 @@ off the key rather than measured back out of the items.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -50,6 +51,13 @@ def _thumbed(row: dict, tmp_path: Path, width: int, height: int) -> dict:
     return row
 
 
+def _shaped(row: dict, tmp_path: Path, width: int, height: int) -> dict:
+    """A picture of this shape in a folder whose size says the same."""
+    params = gallery.parse_params(row["params_json"])
+    row["params_json"] = json.dumps({**params, "width": width, "height": height})
+    return _thumbed(row, tmp_path, width, height)
+
+
 def test_keys_split_and_join():
     assert oriented_key(RECENTS_KEY, "portrait") == "__recents__::portrait"
     assert split_key("__recents__::portrait") == (RECENTS_KEY, "portrait")
@@ -60,15 +68,26 @@ def test_keys_split_and_join():
     assert orientation_of("image/sdxl_t2i/m0011::portrait") == "portrait"
 
 
-def test_row_orientation_reads_the_stored_thumbnail(tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+def test_rows_are_dealt_to_the_side_their_folders_shape_names(tmp_path):
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     assert row_orientation(tall) == "portrait"
     assert row_orientation(wide) == "landscape"
     assert filter_rows([tall, wide], "portrait") == [tall]
     assert filter_rows([tall, wide], "landscape") == [wide]
     assert filter_rows([tall, wide], None) == [tall, wide]
     assert split_rows([tall, wide]) == {"portrait": [tall], "landscape": [wide]}
+
+
+def test_a_picture_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_path):
+    # The side is the folder's, read off the size its configuration states, so
+    # every picture in one folder sits on one side -- and a picture that
+    # disagrees with its folder shows up there rather than hiding on the other.
+    wide = _row("w1", "sdxl_t2i",
+                {"positive_prompt": "scene one", "width": 720, "height": 1280},
+                "sdxl_t2i_w1.png")
+    _thumbed(wide, tmp_path, 160, 90)
+    assert row_orientation(wide) == "portrait"
 
 
 def test_a_generation_with_no_picture_yet_goes_by_the_size_it_asked_for():
@@ -93,15 +112,17 @@ def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path)
     assert row_orientation(in_flight) == "portrait"
 
 
-def test_a_size_asked_for_outranks_the_start_frame(tmp_path):
-    # Unlocking the Dimensions field pins the output's shape whatever the frame's.
+def test_a_video_goes_by_its_folders_start_frame_whatever_size_its_row_stored(tmp_path):
+    # A video folder is keyed by its start frame and not by a size its row
+    # carries -- which on the early video recipe was stored and then never
+    # used, the graph deriving the size from the frame all the same.
     frame = tmp_path / "frame.png"
     Image.new("RGB", (90, 160)).save(frame)
-    in_flight = _row("v2", "wan22_i2v",
-                   {"positive_prompt": "scene five", "input_image": str(frame),
-                    "width": 1280, "height": 720},
-                   "wan22_i2v_v2.mp4", status="running", output_files="[]")
-    assert row_orientation(in_flight) == "landscape"
+    video = _row("v2", "wan22_i2v",
+                 {"positive_prompt": "scene five", "input_image": str(frame),
+                  "width": 720, "height": 544},
+                 "wan22_i2v_v2.mp4")
+    assert row_orientation(video) == "portrait"
 
 
 def test_an_unreadable_shape_files_under_landscape():
@@ -129,29 +150,31 @@ def _video_in_flight(prompt_id: str, frame: Path, **params) -> dict:
 
 def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
     """A folder's key names the picture the run animates, and that picture can be
-    on the other side — here a portrait frame with the size unlocked to a
-    landscape clip. Each side draws its own tree, but from the whole library's
-    start frames: keyed off its own side's pictures alone, the Landscape tree
-    would draw this folder under a name nothing else in the app computes, and the
-    click on its queue row would find no row and do nothing at all."""
+    on the other side — here a tall picture in a folder whose size says
+    landscape, so the picture sits under Landscape while the clip made from its
+    tall frame sits under Portrait. Each side draws its own tree, but from the
+    whole library's start frames: keyed off its own side's pictures alone, the
+    Portrait tree would draw this folder under a name nothing else in the app
+    computes, and the click on its queue row would find no row and do nothing."""
     frame = _start_frame(tmp_path, "sdxl_t2i_p3.png", 90, 160)
-    portrait_image = _thumbed(
+    picture = _thumbed(
         _row("p3", "sdxl_t2i",
-             {"positive_prompt": "scene three", "steps": 50, "seed": 3},
+             {"positive_prompt": "scene three", "steps": 50, "seed": 3,
+              "width": 1280, "height": 720},
              "sdxl_t2i_p3.png"),
         tmp_path, 90, 160)
-    in_flight = _video_in_flight("v3", frame, width=1280, height=720)
+    in_flight = _video_in_flight("v3", frame)
 
-    view = GalleryView(FakeDB([portrait_image, in_flight]))
+    view = GalleryView(FakeDB([picture, in_flight]))
     qtbot.addWidget(view)
     view.refresh()
     view._update_queue()
 
     folder = gallery.settings_folder_key(
-        in_flight, gallery.build_image_config_index([portrait_image]))
+        in_flight, gallery.build_image_config_index([picture]))
     (row,) = view._queue.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
-    assert view.selected_folder_key() == oriented_key(folder, "landscape")
+    assert view.selected_folder_key() == oriented_key(folder, "portrait")
 
 
 def _rows(tree, orientation) -> list[str]:
@@ -166,8 +189,8 @@ def _under_all(tree, orientation) -> list[str]:
 
 
 def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -183,7 +206,7 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
 def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_path):
     """The whole point of two panes: which library you are reading is on screen
     however far down its own rows you have scrolled."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
     qtbot.addWidget(view)
     view.refresh()
@@ -199,7 +222,7 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
     """Which library a heading names is a shape, and a shape reads faster drawn
     than spelled: an upright mark over Portrait, a lying-down one over
     Landscape, each the transpose of the other so the pair reads at a glance."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
     qtbot.addWidget(view)
     view.refresh()
@@ -215,7 +238,7 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
 def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp_path):
     """The mark and the word are two labels in one heading, so the description
     hangs off the heading rather than off whichever half the cursor found."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
     qtbot.addWidget(view)
     view.refresh()
@@ -249,7 +272,7 @@ def _heading_name(half) -> QLabel:
 def test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it(qtbot, tmp_path):
     """The split is what tells a slideshow which screen it is for, so the side
     you have not generated for yet is still somewhere you can stand."""
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -264,8 +287,8 @@ def test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it(qtbot, tmp_pa
 def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
     """Only one folder is ever open, so a set picked across both halves — which
     is how a mixed-shape grouping would be composed — cannot be expressed."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -283,8 +306,8 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
 
 
 def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -294,8 +317,8 @@ def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
 
 
 def test_a_shelf_belongs_to_one_side(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -311,8 +334,8 @@ def test_a_shelf_belongs_to_one_side(qtbot, tmp_path):
 
 
 def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     db = FakeDB([tall, wide])
     db.set_generation_favorite("t1", True)
     db.set_generation_favorite("w1", True)
@@ -329,8 +352,8 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
 def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
     """The half-measure this replaces left Requests, Trash and All whole; the
     whole table of contents means the whole of it."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -350,11 +373,11 @@ def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
 
 
 def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     tall["source"] = "experiment"
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     wide["source"] = "experiment"
-    other = _thumbed(_image("w2", "scene four", 50, 3), tmp_path, 160, 90)
+    other = _shaped(_image("w2", "scene four", 50, 3), tmp_path, 160, 90)
     other["source"] = "experiment"
     view = GalleryView(FakeDB([tall, wide, other]))
     qtbot.addWidget(view)
@@ -366,8 +389,8 @@ def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
 
 def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
     """Reaching a folder deep in one library must not scroll the other away."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -379,8 +402,8 @@ def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
 def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     """A workflow folder gathers whatever settings sit under it, so it can hold
     both — and each side draws the half that is its own."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
@@ -396,7 +419,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
 def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
     """The payoff: which screen a show is for is read off the key it was started
     from, not voted on by measuring the items back out."""
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
     qtbot.addWidget(view)
     view.refresh()
@@ -417,8 +440,8 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
 
 
 def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
-    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()

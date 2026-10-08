@@ -116,14 +116,23 @@ class FakeWorkflow:
         return []
 
 
+class FakeJob:
+    def __init__(self, prompt_id):
+        self.prompt_id = prompt_id
+
+
 class FakeReroll:
-    def __init__(self, launches="new-run"):
+    def __init__(self, launches="new-run", busy=False):
         self.prepared = []
         self.launches = launches
+        self.busy = busy
 
     def start_prepared(self, key, workflow, params):
         self.prepared.append((key, workflow.name, dict(params)))
         return self.launches
+
+    def job_for(self, key):
+        return FakeJob("the-run-already-going") if self.busy else None
 
 
 class FakeDB:
@@ -781,3 +790,25 @@ def test_a_drag_lights_the_slot_it_fits(combine):
 
     assert controller.panel.lit_for == ["img"]
     assert controller.panel.cleared == 1
+
+
+def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch):
+    # One item at a time per folder, and the spoken request still gets its clip: the
+    # run already going is stamped to be handed over when it lands, rather than a
+    # second one being made of the same thing.
+    workflow = FakeWorkflow()
+    monkeypatch.setattr(module.recipe_match, "curated_recipe",
+                        lambda c, i: {"workflow": VIDEO_WORKFLOW})
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
+    shows = FakeShows(showing="img")
+    db = FakeDB([_image("img")])
+    jobs = FakeReroll(launches=None, busy=True)
+    controller, _host = combine(db=db, shows=shows, jobs=jobs)
+
+    controller.generate_category("img", "waving", send=True)
+
+    assert db.requested == ["the-run-already-going"]
+    assert jobs.prepared == []
+    assert [message for _pid, message, _kind in shows.runs_said] == [module.ALREADY_MAKING_ONE]

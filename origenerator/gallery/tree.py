@@ -54,11 +54,9 @@ from origenerator.gallery.keys import (
     source_image_key,
 )
 from origenerator.gallery.labels import (
-    _distinguishing_keys,
     _source_image_label,
     lora_label,
     model_label,
-    settings_label,
     workflow_label,
 )
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
@@ -531,18 +529,12 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
                                            tier.image_index,
                                            workflow_version=r.get("workflow_version"))
     )
-    settings_dicts = [
-        canonical_settings(tier.workflow_name, parse_params(sig_rows[0].get("params_json")))
-        for _sig, sig_rows in grouped
-    ]
-    distinguishing = _distinguishing_keys(settings_dicts)
     groups = []
-    for i, (sig, sig_rows) in enumerate(grouped):
+    for sig, sig_rows in grouped:
         key = settings_key(tier.media_type, tier.workflow_name, sig)
         label, favorite = _overlay(folder_id(key), key, tier.folder_meta)
         groups.append(SettingsGroup(
             key, label, sig_rows, favorite,
-            settings_label(settings_dicts[i], distinguishing, tier.workflow_name),
         ))
     return groups
 

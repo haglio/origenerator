@@ -24,7 +24,6 @@ from origenerator.gallery import (
     favorite_folders,
     favorite_generations,
     find_source_image_id,
-    folder_detail,
     folder_id,
     folder_key_at_level,
     folder_level,
@@ -387,8 +386,7 @@ def test_flux_still_groups_by_its_namesake_upscale_model():
 
 
 def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin():
-    # The tree-level shape of the same rule: one settings leaf, both rows in it,
-    # and a name that doesn't try to tell them apart by the enhancement.
+    # The tree-level shape of the same rule: one settings leaf, both rows in it.
     def render(prompt_id, seed, enhance):
         return _row(
             prompt_id=prompt_id,
@@ -401,7 +399,6 @@ def test_build_gallery_tree_puts_an_enhanced_render_beside_its_unenhanced_twin()
     (lora,) = build_gallery_tree([enhanced, plain])[0].children[0].children
     (leaf,) = lora.children
     assert {r["prompt_id"] for r in leaf.rows} == {"e1", "p1"}
-    assert leaf.detail == "a cat"
 
 
 def test_is_enhanced_row_reads_the_flag_the_workflow_and_the_legacy_era():
@@ -886,18 +883,6 @@ def test_i2v_source_folder_is_named_by_the_image_it_animates():
     assert "smiling" not in source.label
 
 
-def test_i2v_settings_leaf_names_itself_by_video_prompt_not_the_frame():
-    # The source-image folder pins the frame, so the leaf beneath drops it and is
-    # named by the video's own prompt instead.
-    face = _img("face", "a smiling face", 30, 1)
-    (source,) = _i2v_source_folders(
-        [_i2v_frame("vf", "sdxl_t2i_face.png", prompt="a slow zoom"), face]
-    )
-    (leaf,) = source.children
-    assert leaf.detail == "a slow zoom"
-    assert "smiling face" not in leaf.detail
-
-
 def test_i2v_source_folder_labels_a_hand_picked_frame_by_its_filename():
     # A frame that isn't a known generation can't borrow an image's folder name, so
     # the source folder falls back to the bare filename (distinct frames still read
@@ -1126,18 +1111,6 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     assert loras[0].favorite is False
 
 
-def test_settings_labels_drop_the_lora_pinned_by_the_folder_above():
-    # Two LoRAs, identical prompt/settings otherwise: the split is at the LoRA
-    # level, so neither settings leaf needs the LoRA name in it.
-    rows = [_i2v("v1", "styleA"), _i2v("v2", "styleB")]
-    model = build_gallery_tree(rows)[0].children[0]
-    for lora in model.children:
-        (source,) = lora.children
-        (settings,) = source.children
-        assert settings.detail == "dance"
-        assert "safetensors" not in settings.detail
-
-
 def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     rows = [
         _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
@@ -1171,21 +1144,6 @@ def test_model_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     assert models[1].label == "Dreamy"     # custom name applied in place
     assert models[1].favorite is True
     assert models[0].favorite is False
-
-
-def test_settings_labels_drop_the_model_pinned_by_the_folder_above():
-    # Two checkpoints, identical prompt/settings otherwise: the split is at the
-    # model level, so neither settings leaf needs the checkpoint in its name.
-    rows = [
-        _img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1),
-        _img_model("i2", "a cat", "dreamshaper.safetensors", 50, 1),
-    ]
-    workflow = build_gallery_tree(rows)[0]
-    for model in workflow.children:
-        (lora,) = model.children
-        (settings,) = lora.children
-        assert settings.detail == "a cat"
-        assert "safetensors" not in settings.detail
 
 
 def test_build_gallery_tree_excludes_failed_rows_that_produced_no_output():
@@ -1675,8 +1633,7 @@ def test_build_gallery_tree_labels_workflow_with_display_name():
 
 def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     # A prompt is a paragraph where a folder name is a line, so a settings leaf
-    # is named from its key instead. What the prompt said is still there, as the
-    # description under the name.
+    # is named from its key instead.
     prompt = "a cat asleep on a windowsill in the late afternoon sun"
     (lora,) = build_gallery_tree(
         [_img("i1", prompt, 50, 1)])[0].children[0].children
@@ -1685,7 +1642,6 @@ def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     assert leaf.label == folder_id(leaf.key)
     assert leaf.label.isalnum() and leaf.label == leaf.label.upper()
     assert "cat" not in leaf.label.lower()
-    assert folder_detail(leaf) == prompt
 
 
 def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
@@ -1703,15 +1659,13 @@ def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
     assert again[cat.key] == cat.label and again[dog.key] == dog.label
 
 
-def test_a_custom_name_replaces_the_code_and_the_description_stays():
-    # The code is a starting name, not a fixed one: naming a folder replaces it,
-    # and what the folder holds still reads on hover.
+def test_a_custom_name_replaces_the_code():
+    # The code is a starting name, not a fixed one: naming a folder replaces it.
     rows = [_img("i1", "a cat", 50, 1)]
     (leaf,) = build_gallery_tree(rows)[0].children[0].children[0].children
 
     named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0].children[0].children[0].children[0]
     assert named.label == "Cats"
-    assert folder_detail(named) == "a cat"
 
 
 def test_only_a_folder_with_a_name_of_its_own_can_be_renamed():
@@ -1727,61 +1681,6 @@ def test_only_a_folder_with_a_name_of_its_own_can_be_renamed():
     assert is_renamable(SettingsGroup("k", "3A7F2C10", []))
     assert is_renamable(AllGroup(ALL_KEY, "All", []))
     assert is_renamable(CustomGroup("__custom__/1", "Keepers", []))
-
-
-def test_settings_group_details_disambiguate_same_prompt_different_params():
-    # Same prompt, different steps -> two folders whose descriptions must not
-    # read the same, since that description is what a hover has to tell apart.
-    tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
-                               _img("i2", "a cat", 40, 2)])
-    details = [sg.detail for sg in
-               tree[0].children[0].children[0].children]
-    assert len(details) == 2
-    assert details[0] != details[1]
-    assert all("a cat" in detail for detail in details)
-    # the distinguishing param is surfaced so the folders are tellable apart
-    assert any("Steps" in detail for detail in details)
-
-
-def test_settings_group_detail_omits_params_when_only_one_group():
-    # A lone settings folder needs no disambiguating suffix.
-    tree = build_gallery_tree([_img("i1", "a cat", 50, 1),
-                               _img("i2", "a cat", 50, 2)])
-    (lora,) = tree[0].children[0].children
-    (only,) = lora.children
-    assert only.detail == "a cat"
-
-
-def test_a_folders_hover_names_what_sets_it_apart_the_way_the_form_does():
-    rows = [_row(prompt_id=pid, workflow_name="sdxl_t2i",
-                 params_json=json.dumps({"positive_prompt": "a cat", "cfg": cfg, "seed": 1}),
-                 output_files=json.dumps([{"filename": f"sdxl_t2i_{pid}.png"}]))
-            for pid, cfg in (("i1", 7.5), ("i2", 5.0))]
-    (lora,) = build_gallery_tree(rows)[0].children[0].children
-
-    assert sorted(leaf.detail for leaf in lora.children) == [
-        "a cat · Prompt Strength 5.0", "a cat · Prompt Strength 7.5"]
-
-
-def test_a_folders_hover_gives_a_clips_length_in_the_seconds_its_form_shows():
-    rows = [_row(prompt_id=pid, workflow_name="wan22_i2v",
-                 params_json=json.dumps({"positive_prompt": "dance", "frame_count": frames,
-                                         "unet_high": "wan_high.safetensors",
-                                         "unet_low": "wan_low.safetensors", "seed": 1}),
-                 output_files=json.dumps([{"filename": f"wan22_i2v_{pid}.mp4"}]))
-            for pid, frames in (("v1", 81), ("v2", 161))]
-
-    assert sorted(leaf.detail for leaf in _i2v_leaves(rows)) == [
-        "dance · Duration 10 s, Scenes 10 s", "dance · Duration 5 s, Scenes 5 s"]
-
-
-def test_a_folder_with_no_prompt_to_go_by_is_described_in_the_forms_words():
-    rows = [_row(prompt_id="i1", workflow_name="sdxl_t2i", params_json=json.dumps({"seed": 1}),
-                 output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}]))]
-    (lora,) = build_gallery_tree(rows)[0].children[0].children
-    (leaf,) = lora.children
-
-    assert leaf.detail == "1280×720, Steps 50, Prompt Strength 7.5"
 
 
 def test_a_picture_previews_from_its_own_full_file(tmp_path):

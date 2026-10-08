@@ -2,7 +2,8 @@
 
 A prompt graph is ``{node_id: {"class_type": str, "inputs": {...}}}`` where an
 input can be a link ``[source_node_id, slot]``. The importer uses these helpers
-to locate the prompt and conditioning nodes when reading a graph's metadata.
+to locate the prompt, conditioning, latent and model nodes when reading back the
+settings a graph was run with.
 """
 from __future__ import annotations
 
@@ -22,6 +23,18 @@ def conditioning_node(graph: dict) -> dict | None:
         (n for n in graph.values() if n.get("class_type") in _COND_NODES),
         None,
     )
+
+
+def _takes_no_links(node: dict) -> bool:
+    return not any(isinstance(value, list) for value in node.get("inputs", {}).values())
+
+
+def empty_latent(graph: dict) -> dict | None:
+    for node in graph.values():
+        source = follow(graph, node.get("inputs", {}).get("latent_image"))
+        if source is not None and _takes_no_links(source):
+            return source
+    return None
 
 
 def _model_source_files(graph: dict, model_ref) -> tuple[str | None, str | None]:
@@ -141,15 +154,15 @@ def input_image_name(graph: dict) -> str | None:
 
 
 def clip_prompt_nodes(graph: dict):
-    """Return the (positive, negative) CLIPTextEncode nodes.
+    """Return the (positive, negative) CLIPTextEncode nodes, traced back from
+    what the graph conditions on that side; by title only where nothing is
+    wired to trace."""
+    titled_positive, titled_negative = _titled_prompt_nodes(graph)
+    return (_encoder_feeding(graph, "positive") or titled_positive,
+            _encoder_feeding(graph, "negative") or titled_negative)
 
-    Found structurally via a Wan conditioning node's links when present (which
-    is title-independent), otherwise by CLIPTextEncode node titles.
-    """
-    cond = conditioning_node(graph)
-    if cond:
-        ci = cond.get("inputs", {})
-        return follow(graph, ci.get("positive")), follow(graph, ci.get("negative"))
+
+def _titled_prompt_nodes(graph: dict):
     positive = negative = None
     for node in graph.values():
         if node.get("class_type") == "CLIPTextEncode":
@@ -159,3 +172,16 @@ def clip_prompt_nodes(graph: dict):
             elif positive is None:
                 positive = node
     return positive, negative
+
+
+def _encoder_feeding(graph: dict, side: str) -> dict | None:
+    for node in graph.values():
+        source = follow(graph, node.get("inputs", {}).get(side))
+        seen: set[int] = set()
+        while source is not None and id(source) not in seen:
+            if source.get("class_type") == "CLIPTextEncode":
+                return source
+            seen.add(id(source))
+            inputs = source.get("inputs", {})
+            source = follow(graph, inputs.get(side)) or follow(graph, inputs.get("conditioning"))
+    return None

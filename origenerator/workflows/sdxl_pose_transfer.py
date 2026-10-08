@@ -115,8 +115,8 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "upscale_models", [defaults["upscale_model"]], accepts=ANY,
         )
         return [
-            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Structure Image", ParamType.IMAGE, defaults["input_image"],
                      browse_dir=CUSTOM_POSES_DIR),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],

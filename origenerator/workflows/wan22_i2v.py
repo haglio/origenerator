@@ -122,15 +122,15 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         # render deaf, and the expert slots never offer it.
         speech = list_model_files("diffusion_models", [defaults["unet_s2v"]], accepts=(WAN_S2V,))
         return [
-            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("scene_frames", "Scenes", ParamType.SCENES, defaults["scene_frames"], min_val=5,
                      max_val=LONGEST_CLIP_FRAMES, step=4, options=DURATION_OPTIONS,
                      unit="s", rate=NATIVE_FPS),
             ParamDef("scene_lines", "Her Lines", ParamType.LINES, defaults["scene_lines"]),
-            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
-            ParamDef("audio_prompt", "Sound Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
-            ParamDef("audio_negative_prompt", "Sounds to Avoid", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
+            ParamDef("audio_prompt", "Positive Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
+            ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("voice", "Voice", ParamType.COMBO, defaults["voice"], options=list(VOICE_OPTIONS)),
             ParamDef("voice_sample", "Voice Sample", ParamType.AUDIO, defaults["voice_sample"], browse_dir=Path.home()),
             ParamDef("voice_sample_text", "Words in the Voice Sample", ParamType.STR, defaults["voice_sample_text"], multiline=True),

@@ -311,27 +311,16 @@ def _backfill_workflow_labels(library: Library):
     return backfill_unknown_workflows(library.db)
 
 
-def _backfill_model_and_lora(library: Library):
-    """Fill the base model and LoRA onto imports that predate reading them from
-    the embedded graph, so they nest into the gallery's model/LoRA folders."""
-    from origenerator.importer import backfill_model_and_lora_params
+def _backfill_import_params(library: Library):
+    """Fill onto every import the settings its own file states and its row
+    never recorded — the model and LoRA it nests under, the size it was made at,
+    what it was told to avoid, the image an i2v was animated from, the sound it
+    was scored with — so the app
+    offers a re-roll of the picture in front of the user rather than of the
+    workflow's defaults, and files it on the side its folder's size names."""
+    from origenerator.importer import backfill_import_params
 
-    return backfill_model_and_lora_params(library.db)
-
-
-def _backfill_input_images(library: Library):
-    """Fill input_image onto image-to-video imports that predate reading it from
-    the embedded graph, so each video links back to the gallery image it was
-    animated from (the same link a freshly generated i2v/flf2v already carries)."""
-    from origenerator.importer import backfill_input_image
-
-    return backfill_input_image(library.db)
-
-
-def _backfill_sound_settings(library: Library):
-    from origenerator.importer import backfill_sound_params
-
-    return backfill_sound_params(library.db)
+    return backfill_import_params(library.db, library.output_dir)
 
 
 def _backfill_imported_video_seeds(library: Library):
@@ -386,6 +375,12 @@ def _record_workflow_versions(library: Library):
     return stamp_unstamped(library.db)
 
 
+def _repair_records(library: Library):
+    from origenerator.record_repair import repair_records
+
+    return repair_records(library.db, library.output_dir)
+
+
 def _reconcile_bookmarks(library: Library):
     """Heal stars, custom names and hand-composed folders whose folder key
     drifted after a key formula change, and stamp identity onto live ones so the
@@ -423,15 +418,9 @@ MAINTENANCE = (
     BootPass("Updating workflow labels...", _backfill_workflow_labels,
              counted="Relabeled %d previously-unknown imports",
              failure="Workflow backfill failed: %s"),
-    BootPass("Sorting by model and add-on...", _backfill_model_and_lora,
-             counted="Backfilled model/LoRA for %d imports",
-             failure="Model/LoRA backfill failed: %s"),
-    BootPass("Linking videos to their source images...", _backfill_input_images,
-             counted="Backfilled source image for %d video imports",
-             failure="Input-image backfill failed: %s"),
-    BootPass(None, _backfill_sound_settings,
-             counted="Backfilled sound settings for %d video imports",
-             failure="Sound-settings backfill failed: %s"),
+    BootPass("Sorting imports by what made them...", _backfill_import_params,
+             counted="Read settings off the graph of %d imports",
+             failure="Reading settings off imports failed: %s"),
     BootPass(None, _backfill_imported_video_seeds,
              counted="Put back the seed of %d video imports",
              failure="Video-import seed repair failed: %s"),
@@ -449,6 +438,9 @@ MAINTENANCE = (
     BootPass("Recording workflow versions...", _record_workflow_versions,
              counted="Recorded the workflow version of %d generation(s)",
              failure="Recording workflow versions failed: %s"),
+    BootPass("Leaving one record per picture...", _repair_records,
+             counted="Repaired %d generation record(s)",
+             failure="Record repair failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_bookmarks,
              failure="Folder bookmark reconcile failed: %s"),
 )

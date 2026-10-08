@@ -49,6 +49,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 logger = logging.getLogger(__name__)
 
 ALREADY_GENAUD = "🎤 already Genau'd"
+ALREADY_MAKING_ONE = "🎤 already making it — handing that one over"
 
 
 class CombineHost(Protocol):
@@ -433,12 +434,24 @@ class CombineController(QObject):
             return
         workflow, params, video_row, _image_row = built
         key = self._host.folder_key_of(_the_row_this_run_will_make(video_row, params, workflow))
+        if self._already_making_one(key, send):
+            return
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             self._db.set_recipe_source(prompt_id, category=category,
                                        video_prompt_id=video_id)
             self._mark_for_sending(prompt_id, send)
             self._host.reveal_launch(key)
+
+    def _already_making_one(self, key: str, send: bool) -> bool:
+        going = self._jobs.job_for(key)
+        if going is None:
+            return False
+        if send:
+            self._mark_for_sending(going.prompt_id, send)
+            self._shows.note_voice_run(None, ALREADY_MAKING_ONE, kind=NOTICE)
+        self._host.reveal_launch(key)
+        return True
 
     # --- finding the recipe an act names --------------------------------------
 
@@ -561,6 +574,8 @@ class CombineController(QObject):
         logger.info("combine: category=%s intent=%s image=%s -> curated recipe",
                     category, intent, image_id)
         key = self._host.folder_key_for(workflow.name, params, workflow.version)
+        if self._already_making_one(key, send):
+            return True
         prompt_id = self._jobs.start_prepared(key, workflow, params)
         if prompt_id:
             # The act, with no video under it: a curated recipe is pinned in the

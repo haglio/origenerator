@@ -17,6 +17,7 @@ from PIL import Image
 from origenerator.comfy_graph import (
     clip_prompt_nodes,
     conditioning_node,
+    empty_latent,
     follow,
     graph_model_params,
     input_image_name,
@@ -24,8 +25,9 @@ from origenerator.comfy_graph import (
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery_contract import LANES
-from origenerator.generation_state import GenerationSource, GenerationStatus
+from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -114,7 +116,7 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
                 positive_prompt=metadata.get("positive_prompt"),
                 negative_prompt=metadata.get("negative_prompt"),
                 seed=metadata.get("seed"),
-                params_json=json.dumps(_build_params_json(metadata)),
+                params_json=json.dumps(metadata.get("params", {})),
                 workflow_json=json.dumps(metadata.get("prompt_data", {})),
                 source=GenerationSource.IMPORTED,
             )
@@ -294,22 +296,37 @@ def backfill_unknown_workflows(db: Database) -> int:
     return updated
 
 
-def backfill_model_and_lora_params(db: Database) -> int:
-    """Record the base model and LoRA on imports that predate reading them.
+def backfill_import_params(db: Database, output_dir: Path) -> int:
+    """Give every import the settings its own file states and its row is
+    missing — the size it was made at, what it was told to avoid, the models it
+    loaded, the image it started from, the sound it was scored with — read off
+    its stored graph, and its size off the picture itself where the graph gives
+    none.
 
-    Early imports stored the embedded graph but not the model filenames it loads,
-    so those rows lack the params the gallery's model and LoRA folders group by —
-    they collapse under "(unknown model)" / "(no add-on)". This re-reads each row's
-    stored graph and folds any model file it finds (SDXL checkpoint, Flux GGUF
-    UNET, WAN high/low UNET + LoRA) into ``params_json``, filling only keys the
-    row is missing so a row that already carries them (or whose graph has none)
-    is left untouched. Returns how many rows were filled. Idempotent.
+    An import records only what the reading of a file knew to look for on the
+    day it landed, and everything it missed then comes from the workflow's
+    defaults wherever the app shows that picture's configuration: a portrait
+    import read before sizes were read offered a landscape re-roll. So the
+    reading is run again, filling only keys the row lacks — what the app
+    generated itself is already complete, and a re-roll's own edits (a fresh
+    start frame) are never clobbered. Returns how many rows were filled.
+    Idempotent.
     """
-    return _fill_missing_params_from_graph(db, graph_model_params)
-
-
-def backfill_sound_params(db: Database) -> int:
-    return _fill_missing_params_from_graph(db, sound_params)
+    updated = 0
+    for row in db.list_generations():
+        if source_of(row) != GenerationSource.IMPORTED:
+            continue
+        params = parse_params(row.get("params_json"))
+        stated = _graph_params(graph_from_text(row.get("workflow_json") or ""))
+        if "width" not in params and "width" not in stated:
+            stated.update(_size_from_its_own_file(_first_output_path(row, output_dir),
+                                    row.get("workflow_name") or ""))
+        missing = {k: v for k, v in stated.items() if k not in params}
+        if not missing:
+            continue
+        db.set_params_json(row["prompt_id"], json.dumps({**params, **missing}))
+        updated += 1
+    return updated
 
 
 def backfill_imported_video_seeds(db: Database) -> int:
@@ -318,7 +335,7 @@ def backfill_imported_video_seeds(db: Database) -> int:
         params = parse_params(row.get("params_json"))
         if row.get("source") != GenerationSource.IMPORTED or "noise_seed" not in params:
             continue
-        graph = _as_graph(row.get("workflow_json") or "")
+        graph = graph_from_text(row.get("workflow_json") or "")
         seed = _sampler_settings(graph)[0] if graph else None
         if seed is None or params["noise_seed"] == seed:
             continue
@@ -328,44 +345,10 @@ def backfill_imported_video_seeds(db: Database) -> int:
     return updated
 
 
-def _fill_missing_params_from_graph(db: Database, read) -> int:
-    updated = 0
-    for row in db.list_generations():
-        graph = _as_graph(row.get("workflow_json") or "")
-        found = read(graph) if graph else {}
-        params = parse_params(row.get("params_json"))
-        missing = {k: v for k, v in found.items() if k not in params}
-        if not missing:
-            continue
-        params.update(missing)
-        db.set_params_json(row["prompt_id"], json.dumps(params))
-        updated += 1
-    return updated
-
-
-def backfill_input_image(db: Database) -> int:
-    """Record the source image on image-to-video imports that predate reading it.
-
-    Early video imports stored the embedded graph but not the ``LoadImage``
-    filename it starts from, so i2v/flf2v rows couldn't link back to the gallery
-    image they were animated from. This re-reads each row's stored graph and fills
-    ``input_image`` only when the row lacks it and the graph names one — a row that
-    already carries an input image (a re-roll's fresh start frame) or whose graph
-    loads none is left untouched. Returns how many rows were filled. Idempotent.
-    """
-    updated = 0
-    for row in db.list_generations():
-        params = parse_params(row.get("params_json"))
-        if params.get("input_image"):
-            continue
-        graph = _as_graph(row.get("workflow_json") or "")
-        name = input_image_name(graph) if graph else None
-        if not name:
-            continue
-        params["input_image"] = name
-        db.set_params_json(row["prompt_id"], json.dumps(params))
-        updated += 1
-    return updated
+def _first_output_path(row: dict, output_dir: Path) -> Path:
+    files = row_output_files(row)
+    first = files[0] if files else {}
+    return output_dir / first.get("subfolder", "") / first.get("filename", "")
 
 
 def _get_existing_filenames(db: Database) -> set[str]:
@@ -386,7 +369,7 @@ def _get_existing_filenames(db: Database) -> set[str]:
     return result
 
 
-def _as_graph(text: str) -> dict:
+def graph_from_text(text: str) -> dict:
     """Decode a ComfyUI prompt graph, tolerating double-JSON-encoding.
 
     Native ``SaveVideo`` and PNG chunks store the graph as a JSON object;
@@ -402,28 +385,46 @@ def _as_graph(text: str) -> dict:
         return {}
 
 
-def _video_prompt_graph(fpath: Path) -> dict:
-    """Read ComfyUI's embedded prompt graph from a video container via ffprobe.
-
-    Returns {} when ffprobe is unavailable, the ``prompt`` tag is absent, or
-    anything goes wrong — callers fall back to filename inference.
-    """
+def _probe_video(fpath: Path) -> dict:
+    """ffprobe's account of a video container -- its ``format`` (the tags
+    ComfyUI embeds its graph in) and its ``streams`` -- or {} when ffprobe is
+    unavailable or anything goes wrong."""
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
         return {}
     try:
         proc = subprocess.run(
-            [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", str(fpath)],
+            [ffprobe, "-v", "quiet", "-print_format", "json",
+             "-show_format", "-show_streams", str(fpath)],
             capture_output=True, text=True, timeout=30, **hidden_subprocess_kwargs(),
         )
     except (OSError, subprocess.SubprocessError):
         return {}
-    tags = (_as_graph(proc.stdout).get("format", {}) or {}).get("tags", {})
+    return graph_from_text(proc.stdout)
+
+
+def _video_prompt_graph(fpath: Path) -> dict:
+    """Read ComfyUI's embedded prompt graph from a video container, or {} --
+    callers then fall back to filename inference."""
+    tags = (_probe_video(fpath).get("format", {}) or {}).get("tags", {})
     prompt = tags.get("prompt")
-    return _as_graph(prompt) if prompt else {}
+    return graph_from_text(prompt) if prompt else {}
 
 
-def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
+def _media_size(fpath: Path) -> tuple[int, int] | None:
+    if media_type_from_filename(fpath.name) == MediaType.VIDEO:
+        frames = next((stream for stream in _probe_video(fpath).get("streams", [])
+                       if stream.get("codec_type") == "video"), {})
+        width, height = frames.get("width"), frames.get("height")
+        return (width, height) if isinstance(width, int) and isinstance(height, int) else None
+    try:
+        with Image.open(fpath) as image:
+            return image.size
+    except (OSError, ValueError):
+        return None
+
+
+def graph_in_file(fpath: Path, suffix: str) -> dict:
     """Return the embedded ComfyUI prompt graph for an output file, or {}.
 
     Images carry it in the PNG ``prompt`` text chunk; videos carry it in the
@@ -434,18 +435,15 @@ def _read_prompt_graph(fpath: Path, suffix: str) -> dict:
             prompt_str = Image.open(fpath).info.get("prompt")
         except Exception:
             return {}
-        return _as_graph(prompt_str) if prompt_str else {}
+        return graph_from_text(prompt_str) if prompt_str else {}
     if media_type_from_filename(fpath.name) == MediaType.VIDEO:
         return _video_prompt_graph(fpath)
     return {}
 
 
 def _prompt_texts(graph: dict) -> tuple[str | None, str | None]:
-    """The positive and negative prompt a graph was run with, or ``None`` each.
-
-    Located structurally for the Wan workflows and by node title otherwise (see
-    :func:`origenerator.comfy_graph.clip_prompt_nodes`).
-    """
+    """The positive and negative prompt a graph was run with, or ``None`` each
+    (located by :func:`origenerator.comfy_graph.clip_prompt_nodes`)."""
     def text_of(node):
         if node and isinstance(node.get("inputs", {}).get("text"), str):
             return node["inputs"]["text"]
@@ -455,18 +453,18 @@ def _prompt_texts(graph: dict) -> tuple[str | None, str | None]:
     return text_of(positive), text_of(negative)
 
 
-def _conditioning_params(graph: dict) -> dict:
-    """The dimensions the conditioning node was built at: width, height, frames."""
-    node = conditioning_node(graph)
-    if not node:
-        return {}
-    inputs = node.get("inputs", {})
-    return {
-        dst: inputs[src]
-        for src, dst in (("width", "width"), ("height", "height"),
-                         ("length", "frame_count"))
-        if isinstance(inputs.get(src), int)
-    }
+def _size_params(graph: dict) -> dict:
+    conditioning = conditioning_node(graph)
+    if conditioning is not None:
+        inputs = conditioning.get("inputs", {})
+        return {
+            dst: inputs[src]
+            for src, dst in (("width", "width"), ("height", "height"),
+                             ("length", "frame_count"))
+            if isinstance(inputs.get(src), int)
+        }
+    latent = empty_latent(graph)
+    return {} if latent is None else _scalars(latent["inputs"])
 
 
 def _input_image_params(graph: dict) -> dict:
@@ -595,12 +593,11 @@ def _reconciled(filename_guess: str, graph_read: str | None) -> str:
 def _extract_metadata(fpath: Path, suffix: str) -> dict:
     """What an output file says about the run that made it.
 
-    Seven readings of one embedded graph, each its own function above: the
-    prompts, the conditioning dimensions, the input image, the sampler settings
-    and the seed, the model files, and which workflow the node classes name. The
-    filename's prefix is the first guess at that last one and the graph overrules
-    it where it can tell (:func:`_reconciled`), because a file can be renamed and
-    a prefix reused.
+    Its embedded graph first, read by :func:`_graph_params`; the filename's
+    prefix is the first guess at which workflow ran and the graph overrules it
+    where it can tell (:func:`_reconciled`), because a file can be renamed and a
+    prefix reused. Where the graph states no size for a workflow that asks for
+    one, the picture itself does (:func:`_size_from_its_own_file`).
     """
     result: dict = {
         "workflow_name": infer_workflow_name(fpath.name) or "unknown",
@@ -612,39 +609,52 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         "prompt_data": {},
     }
 
-    graph = _read_prompt_graph(fpath, suffix)
+    graph = graph_in_file(fpath, suffix)
     if not graph:
+        result["params"] = _size_from_its_own_file(fpath, result["workflow_name"])
         return result
 
-    seed, sampler_params = _sampler_settings(graph)
-    params = {}
-    params.update(_conditioning_params(graph))
-    params.update(_input_image_params(graph))
-    params.update(sampler_params)
-    # Whichever model files the graph loads (SDXL checkpoint, Flux GGUF UNET,
-    # WAN dual-noise high/low UNET + LoRA), so the gallery can nest the import
-    # by model the same way it does a run generated here.
-    params.update(graph_model_params(graph))
-    params.update(sound_params(graph))
-
-    positive, negative = _prompt_texts(graph)
+    workflow_name = _reconciled(result["workflow_name"], _workflow_from_nodes(graph))
+    params = _graph_params(graph)
+    if "width" not in params:
+        params = {**_size_from_its_own_file(fpath, workflow_name), **params}
     result.update(
         prompt_data=graph,
-        positive_prompt=positive,
-        negative_prompt=negative,
-        seed=seed,
+        positive_prompt=params.get("positive_prompt"),
+        negative_prompt=params.get("negative_prompt"),
+        seed=params.get("seed"),
         params=params,
-        workflow_name=_reconciled(result["workflow_name"], _workflow_from_nodes(graph)),
+        workflow_name=workflow_name,
     )
     return result
 
 
-def _build_params_json(metadata: dict) -> dict:
-    params = dict(metadata.get("params", {}))
-    if metadata.get("positive_prompt") is not None:
-        params["positive_prompt"] = metadata["positive_prompt"]
-    if metadata.get("negative_prompt") is not None:
-        params["negative_prompt"] = metadata["negative_prompt"]
-    if metadata.get("seed") is not None:
-        params["seed"] = metadata["seed"]
-    return params
+def _size_from_its_own_file(fpath: Path, workflow_name: str) -> dict:
+    workflow = WORKFLOW_REGISTRY.get(workflow_name)
+    if workflow is not None and "width" not in workflow.default_params():
+        return {}
+    size = _media_size(fpath)
+    if size is None:
+        return {}
+    width, height = size
+    if workflow is None:
+        return {"orientation": PORTRAIT if height > width else LANDSCAPE}
+    return {"width": width, "height": height}
+
+
+def _graph_params(graph: dict) -> dict:
+    """Every setting a prompt graph states, keyed as the workflows store them:
+    the size it was sampled at, the image it started from, its base sampler's
+    settings and seed, the model files it loaded, and the prompts it was
+    conditioned on. Empty for a graph that states none."""
+    seed, sampler_params = _sampler_settings(graph)
+    positive, negative = _prompt_texts(graph)
+    stated = (("positive_prompt", positive), ("negative_prompt", negative), ("seed", seed))
+    return {
+        **_size_params(graph),
+        **_input_image_params(graph),
+        **sampler_params,
+        **graph_model_params(graph),
+        **sound_params(graph),
+        **{key: value for key, value in stated if value is not None},
+    }

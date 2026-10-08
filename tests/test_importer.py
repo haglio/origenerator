@@ -11,11 +11,9 @@ from PIL.PngImagePlugin import PngInfo
 import origenerator.importer as imp
 from origenerator.db import Database
 from origenerator.importer import (
+    backfill_import_params,
     backfill_imported_video_seeds,
-    backfill_input_image,
-    backfill_model_and_lora_params,
     backfill_shared_thumbnails,
-    backfill_sound_params,
     backfill_unknown_workflows,
     import_comfyui_output,
     merge_video_sidecar_rows,
@@ -23,9 +21,9 @@ from origenerator.importer import (
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-def _make_png_with_metadata(path, prompt_data):
+def _make_png_with_metadata(path, prompt_data, size=(64, 64)):
     """Create a PNG with ComfyUI-style metadata embedded."""
-    img = Image.new("RGB", (64, 64), (128, 0, 0))
+    img = Image.new("RGB", size, (128, 0, 0))
     pnginfo = PngInfo()
     pnginfo.add_text("prompt", json.dumps(prompt_data))
     img.save(path, pnginfo=pnginfo)
@@ -91,7 +89,7 @@ def test_import_video_infers_workflow_from_filename_prefix(tmp_path):
     assert name_by_file["mystery_clip_00001.mp4"] == "unknown"
 
 
-def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
+def test_backfill_fills_the_model_and_lora_an_imports_graph_loaded(tmp_path):
     db = Database(tmp_path / "test.db")
     # An early import: the graph is on the row, but its UNET/LoRA were never
     # pulled into params, so it can't nest by model or LoRA yet.
@@ -112,7 +110,8 @@ def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
         params_json=json.dumps({"positive_prompt": "a fox", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
     )
-    # A row that already carries its model + LoRA is left alone.
+    # What the app generated itself is left alone: its params are already what
+    # it ran, so nothing is read back off the graph onto it.
     db.insert_generation(
         prompt_id="fresh", workflow_name="wan22_i2v", workflow_version="v001",
         params_json=json.dumps({
@@ -122,7 +121,7 @@ def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
         workflow_json=json.dumps(graph),
     )
 
-    updated = backfill_model_and_lora_params(db)
+    updated = backfill_import_params(db, tmp_path)
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
@@ -133,7 +132,7 @@ def test_backfill_fills_model_and_lora_params_from_stored_graph(tmp_path):
     # The already-complete row's LoRA is not overwritten by the graph's.
     assert json.loads(db.get_generation("fresh")["params_json"])["lora_high"] == "l_h.safetensors"
     # Idempotent: a second pass finds nothing left to fill.
-    assert backfill_model_and_lora_params(db) == 0
+    assert backfill_import_params(db, tmp_path) == 0
 
 
 def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
@@ -149,14 +148,14 @@ def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
         workflow_json=json.dumps(_SOUND_STAGE),
     )
 
-    updated = backfill_sound_params(db)
+    updated = backfill_import_params(db, tmp_path)
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
     assert {key: old[key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
     assert old["positive_prompt"] == "a fox"
     assert json.loads(db.get_generation("made")["params_json"])["audio_seed"] == 9
-    assert backfill_sound_params(db) == 0
+    assert backfill_import_params(db, tmp_path) == 0
 
 
 def test_backfill_gives_an_imported_video_back_the_seed_that_added_its_noise(tmp_path):
@@ -185,7 +184,71 @@ def test_backfill_gives_an_imported_video_back_the_seed_that_added_its_noise(tmp
     assert backfill_imported_video_seeds(db) == 0
 
 
-def test_backfill_fills_input_image_from_stored_graph(tmp_path):
+def test_backfill_fills_the_size_and_prompts_an_imports_graph_states(tmp_path):
+    db = Database(tmp_path / "test.db")
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    graph = wf.build_api_payload(dict(
+        wf.default_params(), width=720, height=1280, seed=9,
+        positive_prompt="a lighthouse", negative_prompt="fog",
+    ))
+    db.insert_generation(
+        prompt_id="old", workflow_name="sdxl_t2i", workflow_version="imported",
+        params_json=json.dumps({"positive_prompt": "a lighthouse", "seed": 9}),
+        workflow_json=json.dumps(graph), source="imported",
+    )
+
+    assert backfill_import_params(db, tmp_path) == 1
+
+    params = json.loads(db.get_generation("old")["params_json"])
+    assert (params["width"], params["height"]) == (720, 1280)
+    assert params["negative_prompt"] == "fog"
+    assert backfill_import_params(db, tmp_path) == 0
+
+
+
+def test_backfill_gives_an_import_whose_graph_states_no_size_the_size_of_its_picture(tmp_path):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    Image.new("RGB", (720, 1072)).save(output_dir / "image" / "sdxl_t2i_00009_.png")
+    img2img = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "model.safetensors"}},
+        "3": {"class_type": "VAEEncode", "inputs": {}},
+        "4": {"class_type": "KSampler", "inputs": {"latent_image": ["3", 0], "seed": 9}},
+    }
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(
+        prompt_id="old", workflow_name="sdxl_t2i", workflow_version="imported",
+        params_json=json.dumps({"seed": 9}), workflow_json=json.dumps(img2img),
+        source="imported",
+    )
+    db.update_generation("old", output_files=json.dumps(
+        [{"filename": "sdxl_t2i_00009_.png", "subfolder": "image", "type": "output"}]))
+
+    assert backfill_import_params(db, output_dir) == 1
+
+    params = json.loads(db.get_generation("old")["params_json"])
+    assert (params["width"], params["height"]) == (720, 1072)
+
+
+def test_backfill_splits_the_imports_of_no_known_recipe_by_their_shape(tmp_path):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    db = Database(tmp_path / "test.db")
+    for name, size in (("tall", (480, 832)), ("wide", (832, 480))):
+        Image.new("RGB", size).save(output_dir / "image" / f"{name}.png")
+        db.insert_generation(prompt_id=name, workflow_name="unknown", workflow_version="imported",
+                             params_json="{}", workflow_json="{}", source="imported")
+        db.update_generation(name, output_files=json.dumps(
+            [{"filename": f"{name}.png", "subfolder": "image", "type": "output"}]))
+
+    assert backfill_import_params(db, output_dir) == 2
+
+    shapes = {row["prompt_id"]: json.loads(row["params_json"]) for row in db.list_generations()}
+    assert shapes == {"tall": {"orientation": "portrait"}, "wide": {"orientation": "landscape"}}
+    assert backfill_import_params(db, output_dir) == 0
+
+
+def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
     db = Database(tmp_path / "test.db")
     # An early video import: the graph is on the row (LoadImage names the source
     # frame), but input_image was never pulled into params, so the video can't
@@ -214,7 +277,7 @@ def test_backfill_fills_input_image_from_stored_graph(tmp_path):
         source="imported",
     )
 
-    updated = backfill_input_image(db)
+    updated = backfill_import_params(db, tmp_path)
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
@@ -224,7 +287,7 @@ def test_backfill_fills_input_image_from_stored_graph(tmp_path):
     assert json.loads(db.get_generation("fresh")["params_json"])["input_image"] == "video/x_00001.mp4 [output]"
     assert "input_image" not in json.loads(db.get_generation("t2i")["params_json"])
     # Idempotent: a second pass finds nothing left to fill.
-    assert backfill_input_image(db) == 0
+    assert backfill_import_params(db, tmp_path) == 0
 
 
 def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
@@ -392,6 +455,34 @@ def test_video_prompt_graph_runs_ffprobe_without_a_console_window(tmp_path, monk
 
     assert captured.get("creationflags") == getattr(sp, "CREATE_NO_WINDOW", 0)
 
+
+def test_an_import_of_no_known_recipe_records_its_shape_so_its_folder_has_one(tmp_path):
+    path = tmp_path / "mystery_00001_.png"
+    Image.new("RGB", (480, 832)).save(path)
+
+    meta = imp._extract_metadata(path, ".png")
+
+    assert meta["workflow_name"] == "unknown"
+    assert meta["params"] == {"orientation": "portrait"}
+
+
+def test_a_video_import_whose_graph_states_no_size_takes_the_size_of_its_frames(
+        tmp_path, monkeypatch):
+    graph = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {}}}
+
+    def fake_run(*args, **kwargs):
+        return sp.CompletedProcess(args, 0, stderr="", stdout=json.dumps({
+            "format": {"tags": {"prompt": json.dumps(graph)}},
+            "streams": [{"codec_type": "audio"},
+                        {"codec_type": "video", "width": 616, "height": 768}],
+        }))
+
+    monkeypatch.setattr(imp.shutil, "which", lambda n: "ffprobe")
+    monkeypatch.setattr(imp.subprocess, "run", fake_run)
+
+    params = imp._extract_metadata(tmp_path / "sdxl_t2i_00001.mp4", ".mp4")["params"]
+
+    assert (params["width"], params["height"]) == (616, 768)
 
 def test_import_skips_already_imported(tmp_path):
     output_dir = tmp_path / "output" / "image"
@@ -793,11 +884,11 @@ def test_backfill_fills_flux_unet_from_stored_graph(tmp_path):
         params_json=json.dumps({"positive_prompt": "a portrait", "seed": 1}),
         workflow_json=json.dumps(graph), source="imported",
     )
-    assert backfill_model_and_lora_params(db) == 1
+    assert backfill_import_params(db, tmp_path) == 1
     params = json.loads(db.get_generation("flux-old")["params_json"])
     assert params["unet"] == "cyberrealisticFlux_v25GGUFQ80.gguf"
     assert params["positive_prompt"] == "a portrait"   # existing params kept
-    assert backfill_model_and_lora_params(db) == 0      # idempotent
+    assert backfill_import_params(db, tmp_path) == 0         # idempotent
 
 
 def test_extract_metadata_identifies_wan22_t2i_from_graph(tmp_path):
@@ -848,6 +939,60 @@ def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
     assert meta["params"]["steps"] == 50
     assert meta["params"]["denoise"] == 1.0
 
+
+def test_a_picture_this_app_made_re_imports_at_the_size_it_was_made(tmp_path):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    portrait = dict(wf.default_params(), width=720, height=1280)
+    path = tmp_path / "sdxl_t2i_00001_.png"
+    _make_png_with_metadata(path, wf.build_api_payload(portrait))
+
+    params = imp._extract_metadata(path, ".png")["params"]
+
+    assert (params["width"], params["height"]) == (720, 1280)
+
+
+def test_a_picture_this_app_made_re_imports_with_what_it_was_told_to_avoid(tmp_path):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    made_with = dict(wf.default_params(), positive_prompt="a lighthouse", negative_prompt="fog")
+    path = tmp_path / "sdxl_t2i_00001_.png"
+    _make_png_with_metadata(path, wf.build_api_payload(made_with))
+
+    meta = imp._extract_metadata(path, ".png")
+
+    assert (meta["positive_prompt"], meta["negative_prompt"]) == ("a lighthouse", "fog")
+
+
+def test_the_prompts_wired_to_the_sampler_beat_a_title_left_on_an_unused_one(tmp_path):
+    graph = {
+        "1": {"class_type": "CLIPTextEncode", "inputs": {"text": "an older idea, wired to nothing"},
+              "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "a harbor at dawn"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "fog"}},
+        "4": {"class_type": "KSampler",
+              "inputs": {"positive": ["2", 0], "negative": ["3", 0], "seed": 7}},
+    }
+    path = tmp_path / "sdxl_t2i_00001_.png"
+    _make_png_with_metadata(path, graph)
+
+    meta = imp._extract_metadata(path, ".png")
+
+    assert (meta["positive_prompt"], meta["negative_prompt"]) == ("a harbor at dawn", "fog")
+
+
+
+def test_an_import_whose_graph_states_no_size_takes_the_size_of_its_own_picture(tmp_path):
+    img2img = {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "model.safetensors"}},
+        "2": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},
+        "3": {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0]}},
+        "4": {"class_type": "KSampler", "inputs": {"latent_image": ["3", 0], "seed": 3}},
+    }
+    path = tmp_path / "sdxl_t2i_00001_.png"
+    _make_png_with_metadata(path, img2img, size=(720, 1072))
+
+    params = imp._extract_metadata(path, ".png")["params"]
+
+    assert (params["width"], params["height"]) == (720, 1072)
 
 # --- which workflow made this graph -------------------------------------------
 
@@ -935,4 +1080,10 @@ def test_a_file_with_no_embedded_graph_keeps_the_filenames_guess(tmp_path):
 
     assert meta["workflow_name"] == "wan22_t2i"
     assert meta["prompt_data"] == {}
-    assert meta["params"] == {}
+
+
+def test_a_file_with_no_embedded_graph_still_says_how_big_it_is(tmp_path):
+    path = tmp_path / "wan22_t2i_00001_.png"
+    Image.new("RGB", (832, 480)).save(path)
+
+    assert imp._extract_metadata(path, ".png")["params"] == {"width": 832, "height": 480}

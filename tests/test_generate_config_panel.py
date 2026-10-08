@@ -396,10 +396,11 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     assert panel._cancel_btn.isHidden()
 
 
-def test_set_generating_offers_cancel_beside_a_still_pressable_generate(panel):
-    # While the tab's run is in flight the gallery marks it generating: Cancel
-    # appears, and Generate stays pressable — ComfyUI takes a queue, so another
-    # press asks for another job rather than relaunching over the first.
+def test_set_generating_offers_cancel_and_leaves_generate_to_the_folder(panel):
+    # This flag is about the tab's own run: Cancel appears. Whether Generate is
+    # pressable is the folder's business, and the gallery says so separately
+    # (note_folder_generating), so one item at a time per folder holds however the
+    # run was started.
     panel.set_generating(True)
     assert panel._cancel_btn.isHidden() is False
     assert panel._generate_btn.isEnabled() is True
@@ -2542,3 +2543,17 @@ def test_every_lane_stamps_a_column_the_database_actually_writes(saved_panel):
         assert db.get_generation("vid1")[lane.flag]
         lane.unmark(db, "vid1")
         assert db.get_generation("vid1")[lane.unsent_flag]
+
+
+def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
+    # His rule: one item at a time per folder. The app has been slow enough that
+    # he double-clicks Generate to be sure the press took, and the second press
+    # used to make a second picture nobody asked for.
+    panel.note_folder_generating(True)
+
+    assert panel._generate_btn.isEnabled() is False
+    qtbot.waitUntil(lambda: "already making" in panel._generate_btn.toolTip())
+
+    panel.note_folder_generating(False)
+    assert panel._generate_btn.isEnabled() is True
+    qtbot.waitUntil(lambda: panel._generate_btn.toolTip() == "")

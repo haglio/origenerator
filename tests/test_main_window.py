@@ -19,6 +19,7 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.shelves import RECENTS_KEY
@@ -1083,6 +1084,28 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
 
     assert win.isMinimized()
+
+
+def _picture_published(frames_file) -> tuple[int, int]:
+    """The width and height in the picture channel's header, (0, 0) until one is."""
+    _sequence, _token, width, height = _HEADER.unpack_from(
+        frames_file.read_bytes(), 0)
+    return width, height
+
+
+def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):
+    """A desktop session parks it minimized, and Windows unmaps such a window:
+    the room's Origenerator screen stayed blank for his whole 2026-10-08
+    session.  The suite's Qt grabs one happily, so the state is what this pins."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    win.showMinimized()
+    frames = tmp_path / "frame.bin"
+
+    _say(tmp_path, f"HAND_OVER|{frames}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert not win.isMinimized(), "the room was handed a window Windows had unmapped"
+    qtbot.waitUntil(lambda: _picture_published(frames) != (0, 0), timeout=3000)
 
 
 def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(

@@ -301,6 +301,7 @@ class OrigeneratorWindow(QMainWindow):
             self._sit_at_the_sessions_rect(session.main_rect)
 
     def _wear_the_desktop_geometry(self) -> None:
+        self.setWindowState(Qt.WindowState.WindowNoState)
         self._device_rect = None
         if self._found is None:
             self._restore_geometry()

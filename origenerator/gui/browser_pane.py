@@ -365,6 +365,10 @@ class BrowserPane(QObject):
         self._shelf_folder = gallery.ALL_KEY
         self._placements: dict[str | None, Placement] = {}
         self._image_index: dict = {}
+        self._models_taken = 0
+
+    def model_stamp(self) -> int:
+        return self._models_taken
 
     def set_model(self, recent_rows, side_trees, listed_rows, experiment_rows,
                   trash_rows, request_items=(), image_index=None):
@@ -374,6 +378,7 @@ class BrowserPane(QObject):
         drawn on whichever sides hold rows of that shape, so each Favorites shelf
         collects the copies of the bookmarks its own side has.
         """
+        self._models_taken += 1
         self._recent_rows = recent_rows
         self._listed_rows = listed_rows
         self._experiment_rows = experiment_rows

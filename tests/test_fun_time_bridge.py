@@ -192,7 +192,7 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
 
 
 def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
-    """Entering the mode opens it PLAYING, the way entering player mode leaves
+    """Entering the mode opens it PLAYING, the way entering kino mode leaves
     two players playing — two empty rectangles asked the user to start the mode
     they had just asked for."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)

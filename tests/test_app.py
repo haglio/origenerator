@@ -625,7 +625,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     # What the session's channels are wired to is the window's own business
     # (tests/test_main_window.py); the boot's part is threading the session in.
     # Parked until the session's own mode switch restores it: the session may be
-    # in player mode, where popping over the Random Favs Browser is wrong.
+    # in kino mode, where popping over the Random Favs Browser is wrong.
     window.showMinimized.assert_called_once()
     window.show.assert_not_called()
 

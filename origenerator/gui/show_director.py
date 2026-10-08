@@ -891,7 +891,7 @@ class ShowDirector:
         library, narrowed to that region's shape.
 
         The base state of origenerator mode, and what its reset goes back to.
-        It is what the satellite players do in player mode — each shuffles the
+        It is what the satellite players do in kino mode — each shuffles the
         whole library of its own orientation — and this side is meant to read
         the same way.
         """

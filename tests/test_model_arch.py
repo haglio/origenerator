@@ -64,6 +64,29 @@ def test_reads_the_architecture_off_the_tensor_names(tmp_path, expected, tensor_
     assert model_arch.describe(_write(tmp_path / "m.safetensors", tensor_names)).arch == expected
 
 
+def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch):
+    """Twenty tabs restored at launch listed the model folders 111 times and
+    read 1,099 file headers doing it."""
+    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    reads = []
+    read = model_arch._tensor_names
+    monkeypatch.setattr(model_arch, "_tensor_names", lambda p: reads.append(p) or read(p))
+
+    model_arch.describe(path)
+    model_arch.describe(path)
+
+    assert len(reads) == 1
+
+
+def test_a_model_file_written_over_is_read_again(tmp_path):
+    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    assert model_arch.describe(path).arch == SDXL
+
+    _write(path, ["double_blocks.0.img_attn.qkv.weight", "single_blocks.0.linear1.weight"])
+
+    assert model_arch.describe(path).arch == FLUX
+
+
 def test_an_unrecognized_file_reads_as_unknown_rather_than_wrong(tmp_path):
     # "We could not tell" is its own answer, and every picker keeps those: a
     # listed option that errors costs one submit, where a working model missing

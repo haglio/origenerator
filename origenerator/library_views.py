@@ -1,5 +1,4 @@
-"""What the config tabs ask of the whole library, worked out once for each
-state of it rather than once for each question."""
+"""What the config tabs read off the whole library, once for each state of it."""
 from __future__ import annotations
 
 from functools import cached_property

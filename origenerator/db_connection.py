@@ -34,8 +34,7 @@ class SqliteFile:
             conn.close()
 
     def version(self) -> int:
-        """Changes whenever anything commits to the file: SQLite's
-        ``data_version``, read on a connection that never writes."""
+        """Moves with every commit: SQLite's data_version, on a connection that never writes."""
         with self._watching:
             if self._watcher is None:
                 self._watcher = sqlite3.connect(self.path, check_same_thread=False)

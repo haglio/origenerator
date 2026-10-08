@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from PyQt6.QtCore import QPoint, QRect
+from PyQt6.QtCore import QCoreApplication, QEvent, QPoint, QRect, Qt
+from PyQt6.QtWidgets import QWidget
 
 from origenerator.gui.thumbnail_selection import Picks, ThumbnailSelection
+
+REVEAL_MARGIN = 40
 
 
 @dataclass(frozen=True)
@@ -46,3 +49,26 @@ def _picked_in_view(scroll, selection: ThumbnailSelection, tiles: dict) -> str |
 
 def _below_the_top(scroll, tile) -> int:
     return tile.mapTo(scroll.viewport(), QPoint(0, 0)).y()
+
+
+def bring_into_view(scroll, tile) -> None:
+    _lay_out_now(scroll)
+    bar = scroll.verticalScrollBar()
+    seen = scroll.viewport().rect().height()
+    tall = tile.size().height()
+    room = min(REVEAL_MARGIN, max(0, seen - tall) // 2)
+    top = tile.mapTo(scroll.widget(), QPoint(0, 0)).y()
+    bar.setValue(min(max(bar.value(), top + tall + room - seen), top - room))
+
+
+def _lay_out_now(scroll) -> None:
+    content = scroll.widget()
+    _show_the_tiles_qt_queued_to_show(content)
+    if content.layout() is not None:
+        content.layout().activate()
+    QCoreApplication.sendEvent(scroll, QEvent(QEvent.Type.LayoutRequest))
+
+
+def _show_the_tiles_qt_queued_to_show(content) -> None:
+    for tile in content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+        QCoreApplication.sendPostedEvents(tile, QEvent.Type.MetaCall)

@@ -69,3 +69,22 @@ def test_the_breadcrumb_line_is_the_whole_of_what_makes_a_shelf_tile_taller(qtbo
     qtbot.addWidget(tile)
 
     assert tile.height() == grid_card.folder_card_size(breadcrumb=True)[1]
+
+
+def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
+    # Leaving a slideshow of All or Favorites lands on the folder the picture came
+    # out of, because those panes show folders rather than the pictures inside
+    # them -- so a folder square has to be able to show that it is the picked one.
+    tile = FolderTile("image/sdxl_t2i/abc::landscape", "a folder", [], 3)
+    qtbot.addWidget(tile)
+    assert not tile.is_selected()
+
+    tile.set_selected(True)
+
+    assert tile.is_selected()
+    assert grid_card.selected_css("folderTile") in tile.styleSheet()
+
+    tile.set_selected(False)
+
+    assert not tile.is_selected()
+    assert grid_card.idle_css("folderTile") in tile.styleSheet()

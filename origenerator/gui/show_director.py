@@ -433,7 +433,7 @@ class ShowDirector:
             self._offer_the_frames(show, location, self._host.queue_now()[0])
             show.lead_with_what_is_being_made()
         if not already_live:
-            show.open_requested.connect(self._open_from_slideshow)
+            show.open_requested.connect(self._pick_where_it_played)
             show.closed.connect(lambda s=show: self._on_closed(s))
             show.media_changed.connect(self._host.reconcile_osr2)
         self._host.reconcile_osr2()
@@ -853,20 +853,11 @@ class ShowDirector:
         for show, _location in list(self._live_shows):
             show.close()
 
-    def _open_from_slideshow(self, prompt_id: str):
-        """A slideshow handed its item over on the way out — Enter, or a show
-        ended while that slide was locked. Land in the item's own folder with it
-        selected, the same jump a shelf tile's double-click makes, and open the
-        item itself in a config tab.
-
-        The tab matters as much as the folder: leaving a show *for* an item is a
-        decision to work on it, and a folder open under a form still holding
-        whatever was there before the show is not that — which landing on the
-        item gives it, the way a click on it would (``ShowHost.follow_link``).
-        The slideshow has already closed itself, so this arrives on the gallery.
-        """
+    def _pick_where_it_played(self, prompt_id: str):
+        """A show handed its slide over on the way out: pick that picture where
+        the show was playing, and put it in a tab the way a click on it would."""
         self._slideshow = None
-        self._host.follow_link(prompt_id)
+        self._host.reveal(prompt_id)
 
     def _open_generate_tab_for(self, prompt_id: str) -> None:
         """A lock on a hosted show: go to the locked item, in the browser and in

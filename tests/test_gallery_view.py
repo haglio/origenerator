@@ -85,6 +85,7 @@ from origenerator.orientation import (
     ORIENTATION_LABELS,
     PORTRAIT,
     base_of,
+    key_holds,
     oriented_key,
 )
 from origenerator.prompt_edit import apply_request
@@ -7272,7 +7273,7 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view._shows.showing.close()
 
 
-def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeypatch):
+def test_enter_in_a_shelf_slideshow_picks_the_slide_on_that_shelf(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -7285,18 +7286,18 @@ def test_enter_in_a_shelf_slideshow_lands_in_the_items_own_folder(qtbot, monkeyp
 
     slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
-    assert view._shows.showing is None                  # out of the slideshow...
-    assert shown in view.visible_prompt_ids()       # ...into the folder holding it
-    assert view._browser.selected_ids == {shown}    # with that item picked
+    assert view._shows.showing is None               # out of the slideshow...
+    assert view._tree.currentItem() is _shelf(view, RECENTS_KEY)  # ...still on the shelf
+    assert view._browser.selected_ids == {shown}     # with that picture picked
     # And the item open in a tab: leaving a show for an item is a decision to
     # work on it, which a folder under a stale form isn't.
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
 
 
-def test_a_show_ended_on_a_locked_slide_lands_on_that_item(qtbot, monkeypatch):
+def test_a_show_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
+                                                                         monkeypatch):
     # Locking a slide is the user saying this is the one, so ending the show there
-    # opens it — the same landing Enter makes, rather than leaving the gallery
-    # back where the show was started from.
+    # picks it on the shelf the show was playing, the same as every other way out.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -7316,9 +7317,11 @@ def test_a_show_ended_on_a_locked_slide_lands_on_that_item(qtbot, monkeypatch):
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
 
 
-def test_a_show_ended_on_an_unlocked_slide_leaves_the_gallery_alone(qtbot, monkeypatch):
-    # Nothing was held, so nothing was chosen: closing is just leaving, and the
-    # shelf the show was started from is still what's on screen.
+def test_a_show_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
+        qtbot, monkeypatch):
+    # However you leave -- Escape, a double-click, the spoken "close" -- the
+    # picture you were looking at is the one you want to find, picked on the shelf
+    # the show was playing rather than left for you to hunt for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -7327,10 +7330,12 @@ def test_a_show_ended_on_an_unlocked_slide_leaves_the_gallery_alone(qtbot, monke
     view._shows.start()
     slideshow = view._shows.showing
     qtbot.addWidget(slideshow)
+    shown = slideshow._playlist.current()[2]
 
     slideshow.close()
 
     assert view._tree.currentItem() is _alls(view._tree)["Latest"]
+    assert view._browser.selected_ids == {shown}
 
 
 def _laid_out_folder(qtbot, count=60):
@@ -7344,6 +7349,101 @@ def _laid_out_folder(qtbot, count=60):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     qtbot.wait(1)
     return view, db
+
+
+def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeypatch):
+    # Latest draws fifty pictures at a time, so a show stepped well past them hands
+    # back one the shelf has not drawn yet: it is drawn, picked and scrolled to,
+    # rather than the shelf coming back with nothing marked on it.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n)
+                               for n in reversed(range(120))]))
+    qtbot.addWidget(view)
+    view.resize(1800, 1300)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._shows.start()
+    slideshow = view._shows.showing
+    qtbot.addWidget(slideshow)
+    for _ in range(70):
+        slideshow._step(1)
+    shown = slideshow._playlist.current()[2]
+    assert shown not in view.visible_prompt_ids()
+
+    slideshow.close()
+    qtbot.wait(1)
+
+    assert view._browser.selected_ids == {shown}
+    assert _in_view(view, shown)
+
+
+def _folder_squares(view):
+    return view._scroll.widget().findChildren(FolderTile)
+
+
+def _folder_square_holding(view, prompt_id: str) -> str:
+    """The key of the drawn square whose folder holds this picture -- what the eye
+    looks for when the pane lists folders rather than the pictures in them."""
+    folder = gallery.settings_folder_key(view._db.get_generation(prompt_id),
+                                         view.image_config_index())
+    for tile in _folder_squares(view):
+        if key_holds(tile.key, folder):
+            return tile.key
+    raise AssertionError(f"no drawn square holds {prompt_id} ({folder})")
+
+
+def test_leaving_a_show_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
+                                                                          monkeypatch):
+    # All shows folders, not the pictures inside them, so there is no picture to
+    # pick -- the square the slide came out of is what the eye is looking for.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    all_row = _top_level(view._tree)["All"]
+    view._tree.setCurrentItem(all_row)
+    view._shows.start()
+    slideshow = view._shows.showing
+    qtbot.addWidget(slideshow)
+    shown = slideshow._playlist.current()[2]
+
+    slideshow.close()
+
+    assert view._tree.currentItem() is all_row
+    assert view._browser.selected_ids == set()
+    picked = [tile.key for tile in _folder_squares(view) if tile.is_selected()]
+    assert picked == [_folder_square_holding(view, shown)]
+
+
+def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_from(
+        qtbot, monkeypatch):
+    # A star on a folder puts the folder on the Favorites shelf, not the pictures
+    # inside it, so a slide that came out of one has no picture of its own there.
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.resize(1800, 1300)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    lora = _at(_image_workflow(view._tree), 0, 0)
+    bookmarked = _key(_at(lora, 0))
+    view._toggle_favorite(bookmarked)
+    shelf = _shelf(view, FAVORITES_KEY)
+    view._tree.setCurrentItem(shelf)
+    view._shows.start()
+    slideshow = view._shows.showing
+    qtbot.addWidget(slideshow)
+    shown = slideshow._playlist.current()[2]
+    assert shown not in view.visible_prompt_ids()
+
+    slideshow.close()
+
+    assert view._tree.currentItem() is shelf
+    picked = [tile.key for tile in _folder_squares(view) if tile.is_selected()]
+    assert picked == [bookmarked]
 
 
 def _in_view(view, prompt_id) -> bool:
@@ -7451,13 +7551,14 @@ def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkey
 
 
 def test_a_show_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
-    # A hold is the user saying this is the one: it lands the gallery in that
-    # slide's folder, and the show reopened there is still stopped on it.
+    # A hold is the user saying this is the one: the show reopened on the folder
+    # it was playing is still stopped on that slide. A show of Latest opens on the
+    # newest picture instead, which is what Latest is opened for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
     view._shows.start()
     first = view._shows.showing
     qtbot.addWidget(first)

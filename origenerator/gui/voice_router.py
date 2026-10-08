@@ -45,6 +45,7 @@ from origenerator.gallery.shelves import (
 from origenerator.gallery.shelves import (
     TRASH_KEY as _TRASH_KEY,
 )
+from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.request_worker import ReviseTask, RevisionWorker
@@ -234,6 +235,7 @@ class VoiceRouter(QObject):
             dictation=RequestDictation(),
             phrases=spoken_phrases(),
             never_repaired=phrases_heard_only_outright(),
+            said_in=said_in,
         )
         self.listener.error.connect(
             lambda msg: logger.warning("Voice steering: %s", msg))

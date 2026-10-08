@@ -97,6 +97,15 @@ def test_a_phrase_the_second_listener_reads_differently_arrives_as_the_sentence_
     assert _said(qtbot, hearing) == "undo the last one"
 
 
+def test_a_phrase_said_in_german_is_read_once_more_in_german_before_it_is_doubted(qtbot):
+    hearing = Hearing({"genau"}, said_in={"genau": "de"}.get, engines=_engines(
+        ["genau"], second_opinion=lambda audio, hint: "Good night.",
+        second_opinion_in={"de": lambda audio, hint: "Genau."},
+        take_down=lambda audio, hint: "good night"))
+
+    assert _said(qtbot, hearing) == "genau"
+
+
 def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
     # The pause detector hears far quieter sounds than this app's own did, which is what
     # lets a quiet word through; a quiet nothing is a chair, not something to answer.
@@ -161,3 +170,5 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     assert isinstance(engines.second_opinion, WhisperReader)
     assert isinstance(engines.take_down, WhisperReader)
     assert engines.take_down is not engines.second_opinion
+    assert set(engines.second_opinion_in) == {"de"}
+    assert isinstance(engines.second_opinion_in["de"], WhisperReader)

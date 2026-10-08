@@ -244,6 +244,14 @@ class BootPass:
     counted: str | None = None
 
 
+def _copy_the_records_for_backup(library: Library):
+    from origenerator import config
+    from origenerator.records_copy import copy_the_records
+
+    return len(copy_the_records(
+        library.db.path, config.LIBRARY_OVERLAY_PATH, config.RECORDS_COPY_DIR))
+
+
 def _reconnect_to_running_generations(library: Library):
     """Resolve any generation left mid-run by a previous session against ComfyUI
     (finished-while-away, still-running, or gone). Runs before the import below
@@ -395,6 +403,9 @@ def _reconcile_bookmarks(library: Library):
 #: every backfill above can move a generation's folder. tests/test_app.py reads
 #: this sequence back.
 MAINTENANCE = (
+    BootPass("Backing up the records...", _copy_the_records_for_backup,
+             counted="Copied %d record file(s) for backup",
+             failure="Copying the records for backup failed: %s"),
     BootPass("Reconnecting to running generations...", _reconnect_to_running_generations,
              failure="Reconcile of in-flight generations failed: %s"),
     BootPass("Finding files that moved...", _follow_moved_files,

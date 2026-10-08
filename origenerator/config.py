@@ -110,12 +110,15 @@ LIBRARY_STATE_DIR = project_dir("origenerator") / "state" if _BRANCH_SESSION els
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 THUMB_DIR = LIBRARY_STATE_DIR / "thumbnails"
 TRASH_DIR = LIBRARY_STATE_DIR / "trash"
+LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
 
 
 # The media library and the third-party apps live outside this repo; their
 # location is private, so it comes from the content overlay. ComfyUI is not one
 # of the suite's own repos and did not move with them, so it stays on the suite
 # root rather than coming from the project roots.
+RECORDS_COPY_DIR = LIBRARY_ROOT / "origenerator_records"
+
 COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 COMFYUI_OUTPUT_DIR = COMFYUI_DIR / "output"
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"

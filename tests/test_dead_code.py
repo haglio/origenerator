@@ -220,6 +220,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # still tries beside the video is test_a_script_written_before_the_folder_existed_is_still_found
 # and test_a_videos_own_script_is_found_before_those_older_versions_filed.
 #
+# 18729 when the gallery's records began being copied where the library's own
+# backup carries them: nothing says in prose why the copy is SQLite's own backup
+# rather than a file copy, because
+# test_a_copy_taken_while_the_app_is_mid_write_opens_as_a_database is that claim.
+#
 # 18856 when every video's script took the pace the Robot Hand's speed dial rests
 # at, in whole cycles, and the sweep learned to carry a change of pace back to
 # the scripts already written: the notes on the cadence, on how the extremes
@@ -282,7 +287,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_cursor_rides_the_videos_own_length,
 # test_an_unscripted_video_carries_the_cursor_too and
 # test_a_pane_with_no_room_for_a_track_draws_nothing.
-MAX_PROSE_LINES = 18731
+MAX_PROSE_LINES = 18729
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

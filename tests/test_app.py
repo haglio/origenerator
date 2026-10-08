@@ -939,6 +939,7 @@ def test_the_launch_reclaims_a_trash_folder_no_deletion_names(qapp, library):
 
 # Each maintenance pass, as (module, attribute), in the order main runs them.
 _MAINTENANCE_PASSES = (
+    ("origenerator.records_copy", "copy_the_records"),
     ("origenerator.inflight", "reconcile_in_flight"),
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
@@ -1091,6 +1092,7 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
 # dropped changes what the user reads; and in a hosted session, where there is
 # no splash, these are the lines that go to the log instead.
 _SPLASH_LINES = (
+    "Backing up the records...",
     "Reconnecting to running generations...",
     "Finding files that moved...",
     "Scanning for new images...",
@@ -1106,7 +1108,7 @@ _SPLASH_LINES = (
 )
 
 
-def test_the_boot_says_the_same_twelve_things_it_always_has():
+def test_the_boot_says_the_same_thirteen_things_it_always_has():
     assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
 
 

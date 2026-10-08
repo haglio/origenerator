@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -83,14 +84,16 @@ def test_the_facade_forwards_exactly_what_the_stores_offer():
 
 
 def test_every_store_is_one(file):
-    """A store binds the file's `connect` and nothing else. One that reached for
-    a second table's store, or kept its own connection policy, would make the
+    """A store reads and writes through the file's `connect`. One that reached
+    for a second table's store, or kept a connection of its own, would make the
     'hand a unit the store it needs' above a promise rather than a fact."""
     for attribute, (store_class, _) in STORES.items():
         store = store_class(file)
 
         assert isinstance(store, Store)
-        assert set(vars(store)) == {"_connect"}, attribute
+        assert store._connect == file.connect, attribute
+        assert not [value for value in vars(store).values()
+                    if isinstance(value, (Store, Database, sqlite3.Connection))], attribute
 
 
 class TestDeletionStore:

@@ -11,7 +11,9 @@ seven of these columns read-only, so tests/test_db_schema.py holds them.
 """
 from __future__ import annotations
 
-from origenerator.db_connection import Store
+import threading
+
+from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS
 from origenerator.generation_state import GenerationSource, GenerationStatus
 
@@ -30,6 +32,12 @@ LIFECYCLE_COLUMNS = frozenset({
 
 class GenerationStore(Store):
     """The queries over the `generations` table."""
+
+    def __init__(self, file: SqliteFile):
+        super().__init__(file)
+        self._version = file.version
+        self._listed: tuple[int, list[dict]] | None = None
+        self._listing = threading.Lock()
 
     def _set(self, prompt_id: str, column: str, value):
         """Write one column outside :data:`LIFECYCLE_COLUMNS`.
@@ -336,11 +344,15 @@ class GenerationStore(Store):
             return dict(row) if row else None
 
     def list_generations(self) -> list[dict]:
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM generations ORDER BY id DESC"
-            ).fetchall()
-            return [dict(r) for r in rows]
+        with self._listing:
+            version = self._version()
+            if self._listed is None or self._listed[0] != version:
+                with self._connect() as conn:
+                    rows = conn.execute(
+                        "SELECT * FROM generations ORDER BY id DESC"
+                    ).fetchall()
+                self._listed = (version, [dict(r) for r in rows])
+            return [dict(r) for r in self._listed[1]]
 
     def seed_history_rows(self) -> list[dict]:
         with self._connect() as conn:

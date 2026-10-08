@@ -1,13 +1,9 @@
-"""The database file, and the one way this package opens it.
-
-`db.py` is a 626-line class holding the schema, the connection policy and every
-query for six unrelated tables. The queries are coming out one table to a
-module; what every one of them shares is exactly this — the file, and how a
-connection to it is opened, used and closed.
-"""
+"""The database file, and the one way this package opens it."""
 from __future__ import annotations
 
 import sqlite3
+import threading
+import weakref
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -24,6 +20,8 @@ class SqliteFile:
 
     def __init__(self, path: Path | str):
         self.path = Path(path)
+        self._watcher: sqlite3.Connection | None = None
+        self._watching = threading.Lock()
 
     @contextmanager
     def connect(self):
@@ -34,6 +32,15 @@ class SqliteFile:
                 yield conn
         finally:
             conn.close()
+
+    def version(self) -> int:
+        """Changes whenever anything commits to the file: SQLite's
+        ``data_version``, read on a connection that never writes."""
+        with self._watching:
+            if self._watcher is None:
+                self._watcher = sqlite3.connect(self.path, check_same_thread=False)
+                weakref.finalize(self, self._watcher.close)
+            return self._watcher.execute("PRAGMA data_version").fetchone()[0]
 
 
 

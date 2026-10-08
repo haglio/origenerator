@@ -162,7 +162,7 @@ class FakeVoiceSteering(QObject):
     request = pyqtSignal(object)
 
     def __init__(self, *, command_matcher=None, bare_matcher=None, dictation=None,
-                 phrases=(), never_repaired=()):
+                 phrases=(), never_repaired=(), said_in=None):
         super().__init__()
         self.started = False
         self.stopped = False

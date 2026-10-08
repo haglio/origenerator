@@ -174,9 +174,12 @@ def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypat
     built = Mock()
     monkeypatch.setattr("origenerator.voice.steering.Hearing", built)
 
-    VoiceSteering(phrases={"fix teeth", "mic off"}, never_repaired={"mic off"})
+    said_in = {"genau": "de"}.get
 
-    built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"})
+    VoiceSteering(phrases={"fix teeth", "mic off"}, never_repaired={"mic off"}, said_in=said_in)
+
+    built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"},
+                                  said_in=said_in)
 
 
 def test_a_command_is_logged_by_what_it_matched_and_how_many_words_it_was(qtbot, caplog):

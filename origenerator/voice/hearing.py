@@ -7,7 +7,7 @@ for word. Both arrive as the same signal, so everything downstream reads one tex
 """
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from voice_core.commands import CommandRules
@@ -37,10 +37,12 @@ class Hearing(QObject):
     failed = pyqtSignal(str)
 
     def __init__(self, phrases: Collection[str], *, never_repaired: Collection[str] = (),
+                 said_in: Callable[[str], str | None] | None = None,
                  engines: Engines | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rules = CommandRules(phrases=frozenset(phrases),
-                                   never_rescued=frozenset(never_repaired).__contains__)
+                                   never_rescued=frozenset(never_repaired).__contains__,
+                                   said_in=said_in)
         self._engines = engines
         self._thread = ListeningThread(
             self._listener, failed=lambda exc: self.failed.emit(str(exc) or type(exc).__name__))
@@ -58,7 +60,8 @@ class Hearing(QObject):
                              device_name=config.VOICE_DEVICE_NAME, speech_hint=request_bias()),
             ListenerEvents(heard=self._on_heard, speech=self._on_speech),
             self._engines or Engines(second_opinion=WhisperReader(),
-                                     take_down=WhisperReader(for_dictation=True)))
+                                     take_down=WhisperReader(for_dictation=True),
+                                     second_opinion_in={"de": WhisperReader(language="de")}))
 
     def _on_heard(self, heard: Heard) -> None:
         if heard.recognition.phrase:

@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
 from origenerator.gui.voice_router import VoiceRouter
@@ -334,6 +335,7 @@ def test_the_microphone_is_given_the_whole_vocabulary_to_listen_for(router):
     built_with = voice.listener.built_with
     assert built_with["phrases"] == spoken_phrases()
     assert built_with["never_repaired"] == phrases_heard_only_outright()
+    assert built_with["said_in"] is said_in
     assert "transcribe_bias" not in built_with
 
 

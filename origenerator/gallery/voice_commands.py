@@ -32,13 +32,11 @@ from origenerator.workflows.detail_parts import (
 # whatever picture is on the screen being spoken over.
 GENAU_COMMAND = "genau"
 
-# What the recognizer is actually listening for. "Genau" is not English and no
-# recognizer in this suite hears it: Fun Time settled on the sound-alike "go now"
-# for every one of its Genau commands, and displays it back as "genau" — so this
-# listens for the same sound and answers in the same word. The spelling and the
-# renderings whisper has actually come back with ride alongside, because it is a
-# looser transcriber than Fun Time's vosk grammar; each was heard off this mic
-# rather than guessed at. A trailing "it" is all any of them may carry
+# What a Genau command is heard as. The recognizer hears the German word and the
+# "go now" said when it is not heard, as Fun Time does, and answers in the one word.
+# The renderings whisper has actually come back with ride alongside, because it is a
+# looser transcriber than the vosk grammar; each was heard off this mic rather than
+# guessed at. A trailing "it" is all any of them may carry
 # (:data:`_MAX_TRAILING_WORDS`), which is what keeps the two that are ordinary
 # English — "good now", "can now" — from claiming a sentence.
 GENAU_PHRASES: tuple[str, ...] = (
@@ -146,12 +144,16 @@ def recognized_spelling(text: str) -> str | None:
     return None
 
 
-# What a speaker says for Genau: the sound-alike Fun Time settled on. The rest of
-# GENAU_PHRASES are whisper's spellings of it, which nobody pronounces.
-_GENAU_AS_SAID = "go now"
+# What a speaker says for Genau: the German word, and the "go now" said when it is not
+# heard. The rest of GENAU_PHRASES are whisper's spellings of it, which nobody pronounces.
+GENAU_SAID: tuple[str, ...] = ("genau", "go now")
+
+
+def said_in(phrase: str) -> str | None:
+    return "de" if phrase.removesuffix(" it") in GENAU_SAID else None
 
 
 def command_phrases() -> frozenset[str]:
     """Every command about the picture that a recognizer listening for words should hear."""
-    bare = (_GENAU_AS_SAID, ENHANCE_COMMAND)
+    bare = (*GENAU_SAID, ENHANCE_COMMAND)
     return fix_command_phrases() | {phrase for verb in bare for phrase in (verb, f"{verb} it")}

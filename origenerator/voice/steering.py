@@ -56,12 +56,12 @@ class VoiceSteering(QObject):
 
     def __init__(self, *, listener=None, worker=None, command_matcher=None,
                  bare_matcher=None, dictation=None, phrases=(), never_repaired=(),
-                 parent=None):
+                 said_in=None, parent=None):
         super().__init__(parent)
         # *phrases* is the vocabulary said outright, which the listener hears fast and
         # exactly; everything else reaches the same matchers as a sentence taken down.
         self._listener = listener if listener is not None else Hearing(
-            phrases, never_repaired=never_repaired)
+            phrases, never_repaired=never_repaired, said_in=said_in)
         self._async = worker is None  # a real worker runs on the pool; an injected one inline
         self._worker = worker if worker is not None else self._build_worker()
         self._get_prompts = None

@@ -10,9 +10,7 @@ from origenerator import gallery
 from origenerator.gallery import voice_commands
 
 
-def test_the_sound_alike_fun_time_settled_on_is_what_it_listens_for():
-    # No recognizer in this suite hears "genau"; Fun Time uses "go now" for every
-    # one of its Genau commands and displays it back as "genau".
+def test_go_now_said_the_english_way_is_genau_too():
     assert voice_commands.match_genau_command("go now") == voice_commands.GENAU_COMMAND
     assert voice_commands.match_genau_command("Go now, it!") == voice_commands.GENAU_COMMAND
 
@@ -78,10 +76,17 @@ def test_the_recognizer_is_asked_to_hear_every_command_about_the_picture():
     assert [phrase for phrase in heard if voice_commands.match_command(phrase) is None] == []
 
 
-def test_genau_is_listened_for_by_its_sound_alike_alone():
+def test_genau_is_listened_for_as_the_german_word_and_as_go_now():
     # The other renderings are whisper's misspellings of it, which nobody says.
     assert {phrase for phrase in voice_commands.command_phrases()
-            if voice_commands.match_genau_command(phrase)} == {"go now", "go now it"}
+            if voice_commands.match_genau_command(phrase)} == {"genau", "genau it", "go now", "go now it"}
+
+
+def test_the_phrases_that_say_genau_are_said_in_german_and_no_others():
+    assert {phrase for phrase in voice_commands.command_phrases()
+            if voice_commands.said_in(phrase) == "de"} == {"genau", "genau it", "go now", "go now it"}
+    assert {voice_commands.said_in(phrase) for phrase in voice_commands.command_phrases()
+            if not voice_commands.match_genau_command(phrase)} == {None}
 
 
 def test_the_gallery_facade_exposes_the_one_matcher():

@@ -579,6 +579,59 @@ def test_list_generations_ordered_newest_first(tmp_path):
     assert rows[2]["prompt_id"] == "list-000"
 
 
+def _add_listed(db, prompt_id):
+    db.insert_generation(prompt_id=prompt_id, workflow_name="sdxl_t2i",
+                         workflow_version="v002", params_json="{}", workflow_json="{}")
+
+
+def test_a_generation_another_copy_of_the_app_adds_is_listed_at_once(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
+    db.list_generations()
+
+    _add_listed(Database(tmp_path / "test.db"), "listed-2")
+
+    assert [r["prompt_id"] for r in db.list_generations()] == ["listed-2", "listed-1"]
+
+
+def test_a_change_to_a_listed_row_is_listed_at_once(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
+    db.list_generations()
+
+    Database(tmp_path / "test.db").set_generation_favorite("listed-1", True)
+
+    assert db.list_generations()[0]["starred"] == 1
+
+
+def test_the_library_is_read_once_while_nothing_changes(tmp_path, monkeypatch):
+    """Restoring twenty open tabs at launch listed the library 187 times, each a
+    full read of every row, and left the loading window not responding."""
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
+    statements: list[str] = []
+    connect = sqlite3.connect
+
+    def traced(*args, **kwargs):
+        conn = connect(*args, **kwargs)
+        conn.set_trace_callback(statements.append)
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", traced)
+    db.list_generations()
+    db.list_generations()
+
+    assert sum(s.startswith("SELECT * FROM generations") for s in statements) == 1
+
+
+def test_each_listing_hands_out_rows_of_its_own(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
+    db.list_generations()[0]["workflow_name"] = "changed by a caller"
+
+    assert db.list_generations()[0]["workflow_name"] == "sdxl_t2i"
+
+
 def test_opening_db_without_experiment_verdict_column_migrates_it(tmp_path):
     db_path = tmp_path / "old.db"
     # Faithful pre-experiment schema: the table as it was before this column.

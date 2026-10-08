@@ -348,9 +348,9 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     hud, = show.findChildren(ShowHud)
     assert hud._targets is not None
     names = hud_button_names(hud)
-    # The mode pair is on it — the way back to player mode from atop a show.
+    # The mode pair is on it — the way back to kino mode from atop a show.
     assert [n for n in names if n in MODE_VERBS] == [
-        "satellites_video_activate", "origenerator_activate"]
+        "satellites_kino_activate", "origenerator_activate"]
     # The transport controls are the players' own set.
     assert {"prev", "next", "lock", "trash"} <= set(names)
     # The window a player's minimize parks is not this show's, so the panel
@@ -448,7 +448,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     # And the mode pair leads the panel, with this mode lit: the way back to
     # the player under the show.
     assert [(button.command, button.lit) for button in model.rows[0]] == [
-        ("satellites_video_activate", False), ("origenerator_activate", True)]
+        ("satellites_kino_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
 
     show.show_toggle_lock()

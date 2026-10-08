@@ -397,7 +397,7 @@ class ShowHud(QLabel):
         if self._dashboard_cmd_file is None:
             self._act_here(action)
             return
-        allowed = ("satellites_video_activate", "origenerator_activate",
+        allowed = ("satellites_kino_activate", "origenerator_activate",
                    *(spelled_for(self._side, verb)
                      for verb in ("prev", "next", "lock", "trash")))
         if command in allowed:

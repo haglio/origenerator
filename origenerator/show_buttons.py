@@ -41,11 +41,11 @@ _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name 
 # back to the players' own videos, and this mode lit beside it.  Its verbs are
 # the session's dashboard commands, posted verbatim.
 MODE_BUTTONS = (
-    ("satellites_video_activate", "Video", False),
+    ("satellites_kino_activate", "Kino", False),
     ("origenerator_activate", "Origenerator", True),
 )
 MODE_TOOLTIPS = {
-    "satellites_video_activate": "Video mode — the satellite players and the Random Favs Browser",
+    "satellites_kino_activate": "Kino mode — the satellite players and the Random Favs Browser",
     "origenerator_activate":
         "Origenerator mode — Origenerator over the browser, its shows over the players",
 }

@@ -310,15 +310,24 @@ class FakePace:
 
 
 class FakeBrowser:
-    """The middle pane reduced to the four questions a show asks of it."""
+    """The middle pane reduced to the questions a show asks of it.
 
-    def __init__(self, shelves=None, recents=False, searching=False):
+    Its gallery reads as new at every look unless a test gives it a *stamp*,
+    since most tests here change its shelves between looks."""
+
+    def __init__(self, shelves=None, recents=False, searching=False, stamp=None):
         self.shelves = shelves or {}
         self.recents = recents
         self.searching = searching
+        self.stamp = stamp
+        self.shelves_asked = 0
 
     def rows_for_shelf(self, key):
+        self.shelves_asked += 1
         return self.shelves.get(key)
+
+    def model_stamp(self):
+        return object() if self.stamp is None else self.stamp
 
     def showing_recents(self):
         return self.recents
@@ -671,6 +680,38 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(shows):
     director.note_generating("g8", b"frame")
 
     assert made[0].generating == []
+
+
+def test_a_run_turned_down_frame_after_frame_looks_at_the_shows_set_once(shows):
+    """Every in-progress picture asked each show that was not playing the run
+    whether it would, and answering collected that show's whole set again -- on
+    a region's base state, sorting the whole library by shape -- until Core
+    stopped answering and Windows closed it (2026-10-07 23:31)."""
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")]}, stamp="one gallery")
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    browser.shelves_asked = 0
+
+    for frame in (b"one", b"two", b"three"):
+        director.note_generating("g-run", frame)
+
+    assert made[0].generating == []
+    assert browser.shelves_asked == 1
+
+
+def test_a_run_a_shelf_lists_only_after_the_next_rebuild_joins_on_the_frame_after_it(shows):
+    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")]}, stamp=1)
+    director, _host, made = shows(browser=browser, db=FakeDB([_row("g7")]),
+                                  fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+
+    director.note_generating("g7", b"frame-one")
+    browser.shelves["shelf/a"].append(_row("g7"))
+    browser.stamp = 2
+    director.note_generating("g7", b"frame-two")
+
+    assert made[0].generating == [("g7", b"frame-two")]
 
 
 def test_a_run_of_the_folder_on_screen_joins_on_its_first_frame(shows):

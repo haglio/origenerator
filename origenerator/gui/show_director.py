@@ -198,6 +198,8 @@ class ShowDirector:
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
         self._enhance_status: dict[str, str] = {}
+        self._held_at_stamp = None
+        self._held_at: dict[str, frozenset[str]] = {}
 
     def become_hosted(self, session) -> None:
         if self._slideshow is not None:
@@ -1093,9 +1095,18 @@ class ShowDirector:
         row = self._db.get_generation(prompt_id)
         if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             return False
-        rows = self.rows_at(location) if location else self._host.rows_to_play()
-        return (any(r["prompt_id"] == prompt_id for r in rows)
-                or self._recents_would_take(row, location))
+        held = (self._held_at_location(location) if location
+                else {r["prompt_id"] for r in self._host.rows_to_play()})
+        return prompt_id in held or self._recents_would_take(row, location)
+
+    def _held_at_location(self, location) -> frozenset[str]:
+        stamp = self._browser.model_stamp()
+        if stamp != self._held_at_stamp:
+            self._held_at_stamp, self._held_at = stamp, {}
+        if location not in self._held_at:
+            self._held_at[location] = frozenset(
+                r["prompt_id"] for r in self.rows_at(location))
+        return self._held_at[location]
 
     def _recents_would_take(self, row: dict, location) -> bool:
         base, side = _split_shelf_key(location)

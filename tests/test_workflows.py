@@ -2625,10 +2625,12 @@ def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
 # ---- what the form calls a setting ----
 
 # The graph's names for these stay in the tooltips; the label says what the
-# setting does to the picture.
+# setting does to the picture. The two prompts are the exception the test below
+# pins: "positive prompt" and "negative prompt" are what everyone who makes
+# pictures calls them, so renaming those cost the user the words he uses.
 _GRAPH_JARGON = re.compile(
     r"CFG|Denoise|Stage|Guidance|Input Image|LoRA|ControlNet|Sampler|Scheduler|Shift"
-    r"|\((High|Low|Speech)\)|Positive|Negative|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
+    r"|\((High|Low|Speech)\)|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
 )
 
 
@@ -2636,6 +2638,17 @@ _GRAPH_JARGON = re.compile(
 def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
     labels = [pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()]
     assert [label for label in labels if _GRAPH_JARGON.search(label)] == []
+
+
+@pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
+def test_the_two_prompts_keep_the_names_everyone_already_uses(name):
+    labels = {pd.key: pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    for key, expected in (("positive_prompt", "Positive Prompt"),
+                          ("negative_prompt", "Negative Prompt"),
+                          ("audio_prompt", "Positive Prompt"),
+                          ("audio_negative_prompt", "Negative Prompt")):
+        if key in labels:
+            assert labels[key] == expected
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))

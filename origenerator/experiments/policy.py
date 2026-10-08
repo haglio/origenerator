@@ -22,6 +22,7 @@ from origenerator.generation_config import filled_params, randomize_seeds
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamType
+from origenerator.workflows.derived_size import without_an_explicit_size
 
 # A base is worth more when the user has explicitly liked it: a star is the
 # strongest signal, an up-voted experiment close after it, newness a mild boost.
@@ -81,7 +82,7 @@ class ExperimentPolicy:
             return None
         weights = [self._base_weight(row, i) for i, (row, _) in enumerate(bases)]
         row, workflow = self._weighted_choice(bases, weights)
-        params = filled_params(row, workflow)
+        params = without_an_explicit_size(filled_params(row, workflow), workflow)
         mutated = self._mutate(params, workflow, rows)
         params = randomize_seeds(params, workflow.seed_keys())
         return Proposal(workflow, params, row["prompt_id"], tuple(mutated))

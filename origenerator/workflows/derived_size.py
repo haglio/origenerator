@@ -62,6 +62,15 @@ def resolve_input_image_path(input_image: str | None) -> Path | None:
                           input_dir=COMFYUI_INPUT_DIR, temp_dir=COMFYUI_TEMP_DIR)
 
 
+SIZE_KEYS = ("width", "height")
+
+
+def without_an_explicit_size(params: dict, workflow) -> dict:
+    if not workflow.derives_size_from_input:
+        return dict(params)
+    return {key: value for key, value in params.items() if key not in SIZE_KEYS}
+
+
 def override_size(params: dict) -> tuple[int, int] | None:
     """The explicit ``(width, height)`` the user set by unlocking the derived
     Dimensions field, or ``None`` when the size should be derived — the usual

@@ -50,6 +50,7 @@ class FakeI2vWorkflow(FakeWorkflow):
     name = "fake_i2v"
     output_type = "video"
     lora_keys = ("lora_name",)
+    derives_size_from_input = True
 
     def default_params(self) -> dict:
         return {**super().default_params(), "input_image": "",
@@ -285,3 +286,13 @@ def test_proposal_mutates_declared_dims_and_rerolls_the_seed():
         untouched = set(base_params) - set(proposal.mutated_keys) - {"seed"}
         for key in untouched:
             assert proposal.params[key] == base_params[key]
+
+
+def test_an_experiment_leaves_a_videos_size_to_the_picture_it_animates():
+    base = make_row("v1", workflow_name="fake_i2v",
+                    params={"input_image": "face.png", "width": 720, "height": 544})
+    policy = ExperimentPolicy(REGISTRY, random.Random(0))
+
+    proposal = policy.propose([base])
+
+    assert "width" not in proposal.params and "height" not in proposal.params

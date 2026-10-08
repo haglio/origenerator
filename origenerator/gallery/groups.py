@@ -26,10 +26,6 @@ class SettingsGroup:
     label: str
     rows: list[dict]
     favorite: bool = False
-    # What the folder's generic name doesn't say: the prompt it ran, plus the
-    # settings that set it apart from its siblings. Shown on hover rather than as
-    # the name, which is a short code (see :mod:`origenerator.gallery.keys`).
-    detail: str = ""
     level: ClassVar[str] = "settings"
     children: ClassVar[tuple] = ()
 
@@ -140,13 +136,6 @@ def is_renamable(group) -> bool:
     and naming those is the entire point of starting them off with a code.
     """
     return folder_level(group) is None
-
-
-def folder_detail(group) -> str:
-    """What a folder's name doesn't say, for its tooltip — the prompt and settings
-    under a settings leaf. Empty for every folder whose own name already says
-    what it holds (a workflow, a model, a LoRA)."""
-    return getattr(group, "detail", "")
 
 
 def child_groups(group) -> list:

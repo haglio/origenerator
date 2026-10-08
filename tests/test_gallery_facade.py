@@ -36,7 +36,7 @@ PUBLISHED = {
     "displayed_levels", "enhance_levels", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",
     "enhancement_recency", "find_source_image_id", "fix_params_for",
-    "fold_completed_enhancements", "fold_enhancement", "folder_detail",
+    "fold_completed_enhancements", "fold_enhancement",
     "folder_id", "folder_key_at_level", "folder_level", "generation_of_file",
     "generation_seed", "group_level",
     "is_custom_key", "is_enhance_product_row", "is_enhanceable_row",

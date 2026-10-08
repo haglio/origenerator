@@ -879,8 +879,12 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
                          workflow_version="imported", params_json="{}",
                          workflow_json="{}", source="imported")
     finished = datetime(2026, 6, 29, 12, 20, 53).timestamp()
+    picture = config.COMFYUI_OUTPUT_DIR / "image" / "sdxl_t2i_00001_.png"
+    picture.parent.mkdir(parents=True, exist_ok=True)
+    picture.write_bytes(b"")
     db.update_generation(
         "p1", status="completed",
+        output_files=json.dumps([{"filename": picture.name, "subfolder": "image"}]),
         completed_at=datetime.fromtimestamp(finished, tz=UTC).isoformat())
     (config.COMFYUI_LOG_DIR / "comfyui.log").write_text(
         "[2026-06-29 12:20:53.244] Prompt executed in 15.26 seconds\n",
@@ -946,15 +950,14 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
     ("origenerator.importer", "backfill_unknown_workflows"),
-    ("origenerator.importer", "backfill_model_and_lora_params"),
-    ("origenerator.importer", "backfill_input_image"),
-    ("origenerator.importer", "backfill_sound_params"),
+    ("origenerator.importer", "backfill_import_params"),
     ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),
     ("origenerator.gallery", "disown_foreign_runs"),
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),
+    ("origenerator.record_repair", "repair_records"),
     ("origenerator.bookmark_reconcile", "reconcile_bookmarks"),
 )
 
@@ -1098,17 +1101,17 @@ _SPLASH_LINES = (
     "Scanning for new images...",
     "Tidying up video previews...",
     "Updating workflow labels...",
-    "Sorting by model and add-on...",
-    "Linking videos to their source images...",
+    "Sorting imports by what made them...",
     "Folding enhancements into their images...",
     "Repairing thumbnails...",
     "Recovering generation times...",
     "Recording workflow versions...",
+    "Leaving one record per picture...",
     "Restoring folder bookmarks...",
 )
 
 
-def test_the_boot_says_the_same_thirteen_things_it_always_has():
+def test_the_boot_says_the_thirteen_things_it_says():
     assert tuple(p.status for p in MAINTENANCE if p.status is not None) == _SPLASH_LINES
 
 

@@ -323,16 +323,19 @@ class GenerationJob(QObject):
 
     @classmethod
     def readopt(cls, client, workflow, params, prompt_id, **kwargs):
-        """Take back a job this app queued but never handed to ComfyUI.
+        """Take back a job the queue was still holding when the app closed.
 
-        The counterpart to :meth:`reconnect`, for a row the queue was still
-        holding when the app closed — a video waiting out a slideshow, say. The
-        server has never heard of it, so there is nothing to rebind to: it comes
-        back as a job that has not started, keeping its row's prompt id so the
-        row it already owns is the one it eventually runs under.
+        The counterpart to :meth:`reconnect`, for a row that is not running — a
+        video waiting out a slideshow, say, or a run set aside mid-way. There is
+        nothing to rebind to, so it comes back as a job that has not started,
+        keeping its row's prompt id so the row it already owns is the one it
+        eventually runs under. It is taken as sent before: a run set aside may
+        have reached the server's last node after all, and its first start asks
+        after that run rather than making the same picture again.
         """
         job = cls(client, workflow, params, **kwargs)
         job.prompt_id = prompt_id
+        job._sent_before = True
         return job
 
     def start(self, submit=None):

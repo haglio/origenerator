@@ -78,8 +78,8 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         )
         return [
             ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
-            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("checkpoint", "Model", ParamType.COMBO, defaults["checkpoint"],
                      options=checkpoints),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),

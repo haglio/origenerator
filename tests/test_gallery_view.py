@@ -553,7 +553,7 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     assert not _at(workflow, 0).data(0, RECENT_ROLE)    # and nothing the model left out
 
 
-def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
+def test_tree_rows_carry_a_recipe_level_badge(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -571,10 +571,9 @@ def test_tree_rows_carry_a_recipe_level_badge_and_tooltip(qtbot):
     assert not lora.icon(0).isNull() and "Add-on" in lora.toolTip(0)
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
-    # all — and since its name is a code, its tooltip is where what it holds is
-    # read.
+    # all, so its hover says its own name and nothing more.
     assert settings.toolTip(0).startswith(settings.text(0))
-    assert "dance" in settings.toolTip(0)
+    assert "dance" not in settings.toolTip(0)
 
 
 def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
@@ -589,9 +588,8 @@ def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
 
     workflow = _image_workflow(view._tree)
     lora = _at(workflow, 0, 0)
-    leaves = _subs(lora)
-    (cat,) = [leaf for leaf in leaves if "a cat" in leaf.toolTip(0)]
-    (dog,) = [leaf for leaf in leaves if "a dog" in leaf.toolTip(0)]
+    by_prompt = _children_by_prompt(lora)
+    cat, dog = by_prompt["a cat"], by_prompt["a dog"]
     source = _at(_video_workflow(view._tree), 0, 0, 0)
 
     assert _shown(_top_level(view._tree)["All"]) == "(4) All"
@@ -600,20 +598,6 @@ def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
     assert _shown(cat) == f"(2) {cat.text(0)}"
     assert _shown(dog) == f"(1) {dog.text(0)}"
     assert _shown(source) == f"(1) {source.text(0)}"
-
-
-def test_the_header_path_carries_what_its_last_code_doesnt_say(qtbot):
-    # The path ends in a code, so the folder's prompt and settings are read by
-    # hovering it — and a header that isn't a folder carries nothing to read.
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    _select_first_leaf(view)
-    assert view._title.toolTip() == "a cat"
-
-    _search_for(view, "cat")
-    assert view._title.toolTip() == ""       # the header is the query now
 
 
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
@@ -792,10 +776,10 @@ def _first_leaf(view):
     return _at(_image_workflow(view._tree), 0, 0, 0)
 
 
-def _children_by_detail(item):
-    """A folder's settings children keyed by what they hold — the description
-    under their name, since the name itself is a code (see gallery.keys)."""
-    return {gallery.folder_detail(child.data(0, _GROUP_ROLE)): child
+def _children_by_prompt(item):
+    """A folder's settings children keyed by the prompt their generations ran,
+    since the name itself is a code (see gallery.keys)."""
+    return {child.data(0, _GROUP_ROLE).rows[0]["positive_prompt"]: child
             for child in _subs(item)}
 
 
@@ -846,7 +830,7 @@ def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
     view.refresh()
     workflow = _image_workflow(view._tree)
     lora = _at(workflow, 0, 0)
-    dog = _children_by_detail(lora)["a dog"]
+    dog = _children_by_prompt(lora)["a dog"]
     before = view._tree.currentItem()
 
     _search_for(view, "cat")
@@ -862,7 +846,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
+    view._tree.setCurrentItem(_children_by_prompt(lora)["a dog"])
     assert view.visible_prompt_ids() == ["i2"]
 
     _search_for(view, "dog")
@@ -1158,7 +1142,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    leaf = _children_by_detail(
+    leaf = _children_by_prompt(
         _at(_image_workflow(view._tree), 0, 0))["a dog"]
     view._tree.setCurrentItem(leaf)
 
@@ -1340,7 +1324,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    view._tree.setCurrentItem(_children_by_detail(lora)["a dog"])
+    view._tree.setCurrentItem(_children_by_prompt(lora)["a dog"])
 
     _search_for(view, "cat")
 
@@ -1854,7 +1838,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    (cat,) = [row for row in _subs(lora) if "a cat" in row.toolTip(0)]
+    cat = _children_by_prompt(lora)["a cat"]
 
     view._toggle_favorite(_key(cat))  # the favorited item is in the favorited folder
 
@@ -3153,11 +3137,14 @@ def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
     assert not _workflow_rows(view._tree)
 
 
-def test_unticking_videos_empties_both_halves_of_their_folders(qtbot):
-    rows = [_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
-                                     "width": 100, "height": 200}, "wan22_i2v_00001_.mp4"),
-            _row("v2", "wan22_i2v", {"positive_prompt": "dance", "seed": 6,
-                                     "width": 200, "height": 100}, "wan22_i2v_00002_.mp4")]
+def test_unticking_videos_empties_both_halves_of_their_folders(qtbot, tmp_path):
+    rows = []
+    for prompt_id, seed, size in (("v1", 5, (100, 200)), ("v2", 6, (200, 100))):
+        thumb = tmp_path / f"{prompt_id}.png"
+        Image.new("RGB", size).save(thumb)
+        rows.append(_row(prompt_id, "wan22_i2v",
+                         {"positive_prompt": "dance", "seed": seed},
+                         f"wan22_i2v_{prompt_id}_.mp4", thumbnail_path=str(thumb)))
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
@@ -4464,7 +4451,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    view._tree.setCurrentItem(_children_by_detail(lora)["a cat"])
+    view._tree.setCurrentItem(_children_by_prompt(lora)["a cat"])
     depth = len(view._navigation._history._stack)
 
     _search_for(view, "cat")
@@ -9889,7 +9876,7 @@ def _front_panel(view):
 
 def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
     # A Generate launched from a tab makes that tab offer to cancel it, mirroring
-    # the folder's live re-roll tile — with Generate still pressable for another.
+    # the folder's live re-roll tile.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -9900,7 +9887,6 @@ def test_generate_shows_the_front_tabs_cancel_button(qtbot, tmp_path):
 
     assert view._live_jobs                          # a run is in flight
     assert panel._cancel_btn.isHidden() is False      # the tab offers to cancel it
-    assert panel._generate_btn.isEnabled() is True
 
 
 def _two_image_db(tmp_path, prompts=("the first one", "a completely different one")):
@@ -9924,10 +9910,10 @@ def _click_thumbnail(view, row, image_rows):
     return _front_panel(view)
 
 
-def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_path):
-    # The reported block: two pictures of one recipe. Generate the first, click the
-    # second, and its Generate button was still mid-run — so a second could not be
-    # started at all, and the button claimed the shown image was the one in_flight.
+def test_another_picture_of_the_folder_being_generated_cannot_be_generated_too(qtbot, tmp_path):
+    # One item at a time per folder, whichever of its pictures is open: a folder
+    # already making one takes no second Generate, and the tab on the other picture
+    # still does not claim the run it did not start.
     db = _two_image_db(tmp_path, prompts=("a shared prompt", "a shared prompt"))
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -9942,13 +9928,12 @@ def test_a_second_image_from_the_same_folder_can_be_generated_too(qtbot, tmp_pat
     panel = _click_thumbnail(view, rows["b"], image_rows)
 
     assert panel._generating is False
-    assert panel._generate_btn.text() == "Generate"
-    assert panel._generate_btn.isEnabled() is True
+    assert panel._generate_btn.isEnabled() is False
 
     panel.use_random_seed()
     panel._on_generate()
 
-    assert len(view._jobs.all_jobs) == 2  # both queued, as ComfyUI will run them
+    assert len(view._jobs.all_jobs) == 1  # still the one being made
 
 
 def test_another_images_tab_can_still_generate_while_the_first_runs(qtbot, tmp_path):
@@ -9995,11 +9980,9 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     assert panel._generate_btn.isEnabled() is True
 
 
-def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
-    # Generate twice from one tab and the tab owns two runs. Its bar follows the
-    # one being made, so its Cancel stops that one — the reported dead click was
-    # the tab having quietly swapped its claim to the run queued after, so a
-    # press stopped something off screen and what was rendering carried on.
+def test_a_tabs_cancel_stops_its_run_and_hands_the_folder_back(qtbot, tmp_path):
+    # Its bar follows the run it started, so its Cancel stops that one, throws the
+    # abandoned row away, and leaves the folder free to be generated into again.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -10007,19 +9990,18 @@ def test_a_tabs_cancel_stops_the_run_its_bar_is_showing(qtbot, tmp_path):
     panel.prefill("sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a brand new prompt"))
     panel.use_random_seed()
     panel._on_generate()
-    panel._on_generate()
-    being_made, queued_after = [job.prompt_id for job in view._jobs.all_jobs]
-
-    panel._cancel_btn.click()
-
-    assert [job.prompt_id for job in view._jobs.all_jobs] == [queued_after]
-    assert view._db.get_generation(being_made) is None
-    assert panel._generating is True  # the one after it is still its run to watch
+    (being_made,) = [job.prompt_id for job in view._jobs.all_jobs]
 
     panel._cancel_btn.click()
 
     assert view._jobs.all_jobs == []
+    assert view._db.get_generation(being_made) is None
     assert panel._generating is False
+    assert panel._generate_btn.isEnabled() is True
+
+    panel._on_generate()
+
+    assert len(view._jobs.all_jobs) == 1
 
 
 def test_cancel_works_on_a_run_launched_from_a_clicked_image(qtbot, tmp_path):
@@ -14436,10 +14418,11 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     # produced nothing must not read as this picture having been Genau'd.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._shows._slideshow = _VoiceSurface("img_act")
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (failed,) = _spoken_genau_rows(view)
-    view._db.update_generation(failed["prompt_id"], status="error")
+    view._jobs.job_for_prompt(failed["prompt_id"]).failed.emit("ComfyUI said no")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
@@ -15100,3 +15083,52 @@ def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_
     view.animated_preview({"prompt_id": "p1"})
 
     assert asked == [(tmp_path / "output", tmp_path / "thumbs")]
+
+
+def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
+    # The name is a short code, and what the folder holds used to ride on the
+    # hover: the prompt and the settings that set it apart, each cut to 24
+    # characters. Cut that short it said nothing you could act on, so it is gone.
+    rows = [_image("i1", "a cat asleep on a windowsill in the late sun", 50, 1)]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    (leaf,) = _subs(_at(_image_workflow(view._tree), 0, 0))
+
+    assert leaf.toolTip(0).startswith(leaf.text(0))
+    assert "a cat" not in leaf.toolTip(0)
+
+
+def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp_path):
+    # His rule: one item at a time per folder. The press that starts a run takes
+    # the button with it, so the second half of a double-click lands on nothing.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
+    assert panel._generate_btn.isEnabled() is True
+    config = panel.current_config()
+
+    view._on_generate_requested(config.workflow_name, config.params)
+
+    assert panel._generate_btn.isEnabled() is False
+
+
+def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tmp_path):
+    # The double-click he describes: the app has been slow enough that he presses
+    # Generate twice to be sure it took, and the second press used to draw its own
+    # seed and make a picture he never asked for.
+    db = _seeded_db(tmp_path, seed=42)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
+    config = panel.current_config()
+
+    view._on_generate_requested(config.workflow_name, config.params)
+    view._on_generate_requested(config.workflow_name, config.params)
+
+    assert len(view._live_jobs) == 1

@@ -231,12 +231,11 @@ class JobQueue(QObject):
     def _launchable(self, key: str, source: str = GenerationSource.GENERATED) -> bool:
         """Whether a launch may join ``key``.
 
-        User work always may, even into a folder already generating: ComfyUI runs
-        one prompt at a time and the lower strip shows the line, so a second
-        Generate of the same settings queues after the first instead of being
-        silently refused — which is what blocked two pictures of one recipe from
-        being re-rolled together. A background experiment still takes only an idle
-        folder, and never stacks; user work preempts one in :meth:`_launch`.
+        A background experiment takes only an idle folder and never stacks; user
+        work preempts one in :meth:`_launch`. The user's own batches — Enhance All,
+        a folder's settings rewrite — queue one run per picture into a folder that
+        is already busy, so a folder holding several jobs is normal here; it is a
+        second *press* that the gallery turns down.
         """
         return source != GenerationSource.EXPERIMENT or not self._jobs.get(key)
 
@@ -635,11 +634,13 @@ class JobQueue(QObject):
     def _readopt(self, row: dict, image_index: dict):
         """Take a row the line was still holding back into the line.
 
-        It was never submitted, so there is nothing on the server to rebind to
-        and nothing lost by rebuilding it: the job comes back unsent, under the
-        row's own prompt id, and waits its turn like any other. One whose
-        workflow the app no longer has is deleted instead — it could never be
-        sent, and left alone it would sit in the queue forever.
+        Nothing of it is running on the server, so there is nothing to rebind
+        to and nothing lost by rebuilding it: the job comes back under the row's
+        own prompt id and waits its turn like any other — asking, when the turn
+        comes, after any run of it the line had set aside
+        (:meth:`GenerationJob.readopt`). One whose workflow the app no longer
+        has is deleted instead — it could never be sent, and left alone it
+        would sit in the queue forever.
         """
         key = gallery.settings_folder_key(row, image_index)
         if self.job_for_prompt(row["prompt_id"]) is not None:

@@ -112,11 +112,11 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         loras_high = list_lora_files([], accepts=(WAN,), expert="high")
         loras_low = list_lora_files([], accepts=(WAN,), expert="low")
         return [
-            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
-            ParamDef("audio_prompt", "Sound Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
-            ParamDef("audio_negative_prompt", "Sounds to Avoid", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
+            ParamDef("audio_prompt", "Positive Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
+            ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
             ParamDef("motion_hz", "Cycles per Second", ParamType.FLOAT, defaults["motion_hz"], min_val=0.2, max_val=4.0, step=0.1),

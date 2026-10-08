@@ -23,16 +23,15 @@ this — a star, a custom name, and a place in a folder the user composed all
 still hang off the plain key, because those are properties of the folder rather
 than of the side it is being looked at from.
 
-The shape is read from the item's stored thumbnail (a cheap header read that
-preserves the media's aspect), falling back to the media file itself for an
-image with no thumbnail, then to the size the generation asked for, and then
-to the start frame it is being made from — a video workflow derives its size
-from that picture in-graph and asks for none, so the frame is the only thing
-saying which way its video will come out. An in-flight row has nothing but
-those last two, and without them a running portrait generation would appear
-under Landscape and jump sides the moment it landed. An item that answers
-none of them files under Landscape, the roomier region — the same default the
-region routing uses for an unmeasurable set.
+The shape is the folder's wherever its settings state a size: every picture of
+that folder sits on that side, a running one is placed before it has a
+picture, and a picture that disagrees with its folder shows up beside it
+rather than hiding on the other side. A folder whose settings state no size --
+a video's, whose recipe derives the size in-graph from its start frame -- goes
+by the item's own shape, read off its thumbnail (a cheap header read that
+keeps the aspect) or its file, and by its start frame while it has neither. An
+item that answers none of them files under Landscape, the roomier region --
+the same default the region routing uses for an unmeasurable set.
 """
 
 from __future__ import annotations
@@ -53,6 +52,7 @@ from origenerator.gallery.sides import (  # noqa: F401
     ORIENTATIONS,
     PORTRAIT,
 )
+from origenerator.gallery.signatures import canonical_settings
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -113,19 +113,16 @@ def orientation_of(key: str | None) -> str | None:
 
 
 def row_orientation(row: dict) -> str:
-    """Which region *row*'s media belongs on, by its own shape.
-
-    Its own files first; then, for a row with none yet, the size it asked for;
-    then the start frame it is being made from (see :func:`_frame_candidate`).
-    """
-    measured = _measure_any(_probe_candidates(row))
-    if measured is not None:
-        return measured
+    """Which region *row*'s media belongs on: its folder's side (see the
+    module's account of the order)."""
+    workflow_name = row.get("workflow_name")
     params = gallery.parse_params(row.get("params_json"))
-    asked = requested_orientation(params)
+    asked = requested_orientation(canonical_settings(workflow_name, params))
     if asked is not None:
         return asked
-    return _measure_any(_frame_candidate(params)) or LANDSCAPE
+    return (_measure_any(_probe_candidates(row))
+            or _measure_any(_frame_candidate(params))
+            or LANDSCAPE)
 
 
 def _measure_any(candidates) -> str | None:
@@ -177,12 +174,7 @@ def _frame_candidate(params: dict) -> list[Path]:
 
 def requested_orientation(params: dict) -> str | None:
     """The shape a generation's *params* ask it to come out — ``None`` when they
-    don't say.
-
-    What a generation that has produced nothing yet is placed by: its folder
-    joins the tree the moment it starts running, and it has to join on the side
-    the picture will land on rather than move there once it has.
-    """
+    don't say."""
     try:
         width, height = int(params["width"]), int(params["height"])
     except (KeyError, TypeError, ValueError):

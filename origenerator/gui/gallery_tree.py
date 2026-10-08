@@ -81,12 +81,6 @@ class SideModel:
     shelf_counts: dict[str, int] = field(default_factory=dict)
 
 
-def _row_tip(group) -> str:
-    """A folder row's hover text: its name, and what its name doesn't say."""
-    detail = gallery.folder_detail(group)
-    return f"{group.label} · {detail}" if detail else group.label
-
-
 class GalleryTree:
     """The folder tree: builds it from the gallery model and answers the lookups
     (key→item, prompt→item, breadcrumb, the selected folder's key) the view
@@ -227,10 +221,7 @@ class GalleryTree:
         if level is not None:
             item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
         else:
-            # A settings leaf is named by a code, so its tooltip is where the
-            # prompt and the settings that set it apart from its siblings are
-            # read — the row itself stays one short line.
-            item.setToolTip(0, _row_tip(group))
+            item.setToolTip(0, group.label)
         self._register(item, oriented_key(group.key, side.orientation), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):

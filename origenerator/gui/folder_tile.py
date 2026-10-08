@@ -35,7 +35,7 @@ class FolderTile(QFrame):
     _BADGE = 16  # on-tile size of the recipe-level chip
 
     def __init__(self, key, text, preview_paths, count, favorite=False,
-                 context="", badge=None, detail="", parent=None):
+                 context="", badge=None, parent=None):
         super().__init__(parent)
         self._key = key
         self._selected = False
@@ -80,7 +80,7 @@ class FolderTile(QFrame):
         # A settings folder is named by a code, so what it holds — the prompt and
         # the settings that set it apart — is read on hover rather than under the
         # collage, where it would take more of the tile than the pictures do.
-        caption.setToolTip(detail or text)
+        caption.setToolTip(text)
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)
 

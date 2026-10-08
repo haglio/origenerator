@@ -62,8 +62,8 @@ class Wan22T2iWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         return [
-            ParamDef("positive_prompt", "Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Things to Avoid", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=2048, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=2048, step=16),

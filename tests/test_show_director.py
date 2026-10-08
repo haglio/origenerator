@@ -16,6 +16,7 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from PIL import Image
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PyQt6.QtCore import Qt
 
@@ -1304,15 +1305,20 @@ def _picture(prompt_id, prompt, *, seed, steps=50, width=100, height=200):
     return row
 
 
-def _animation(prompt_id, *, frame, act, width=100, height=200):
+def _animation(prompt_id, *, frame, act, tmp_path, width=100, height=200):
     """A finished video animated from the picture that wrote *frame*, showing
-    *act* — picked for it in Combine, which is where an act is written down."""
-    params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame,
-              "width": width, "height": height}
+    *act* — picked for it in Combine, which is where an act is written down.
+
+    A video recipe asks for no size, so what puts this one on a side is the
+    shape of the film itself, which is what its thumbnail carries."""
+    params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame}
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
     row["params_json"] = json.dumps(params)
     row["recipe_category"] = act
+    thumb = tmp_path / f"{prompt_id}_thumb.png"
+    Image.new("RGB", (width, height)).save(thumb)
+    row["thumbnail_path"] = str(thumb)
     return row
 
 
@@ -1326,7 +1332,7 @@ def _library(rows):
     return host
 
 
-def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(shows):
+def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(shows, tmp_path):
     """The same configuration under other seeds is the row and the videos
     animated from the picture are the column, each named for its act — read
     off every generation of that side's shape, whatever set the show itself is
@@ -1334,9 +1340,9 @@ def test_the_library_of_the_shows_side_answers_for_the_map_around_a_generation(s
     fox = _picture("g1", "a red fox", seed=1)
     fox["output_files"] = json.dumps([{"filename": "g1.png"}])
     rows = [fox, _picture("g2", "a red fox", seed=2),
-            _animation("v1", frame="g1.png", act="alpha"),
-            _animation("v2", frame="g1.png", act="beta"),
-            _animation("v3", frame="g1.png", act="beta"),
+            _animation("v1", frame="g1.png", act="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="g1.png", act="beta", tmp_path=tmp_path),
+            _animation("v3", frame="g1.png", act="beta", tmp_path=tmp_path),
             _picture("w1", "a red fox", seed=3, width=200, height=100)]
     director, _host, _made = shows(_library(rows), db=FakeDB(rows))
 
@@ -1355,7 +1361,7 @@ def _fox(prompt_id, *, seed):
     return picture
 
 
-def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(shows):
+def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(shows, tmp_path):
     """Both halves, in that order: the same seed under another configuration,
     named by its folder as the tree names it, and then the videos animated from
     this picture, named by the act each shows."""
@@ -1363,7 +1369,7 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sho
     tweaked = _picture("g2", "a red fox at dawn", seed=1)
     tweaked["output_files"] = json.dumps([{"filename": "g2.png"}])
     rows = [fox, tweaked, _fox("g3", seed=2),
-            _animation("v1", frame="g1.png", act="alpha")]
+            _animation("v1", frame="g1.png", act="alpha", tmp_path=tmp_path)]
     director, _host, _made = shows(_library(rows), db=FakeDB(rows))
 
     around = director.neighbors_of("g1", side="portrait")
@@ -1374,14 +1380,14 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sho
     assert folder and folder not in ("alpha", "Source image")   # the tree's name for it
 
 
-def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(shows):
+def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(shows, tmp_path):
     """A video's own sampler seed says nothing about which picture it is of, so
     its row is its act animated from its picture's other seeds, and its column
     opens on the picture it was animated from."""
     rows = [_fox("g1", seed=1), _fox("g2", seed=2),
-            _animation("v1", frame="g1.png", act="alpha"),
-            _animation("v2", frame="g2.png", act="alpha"),
-            _animation("v3", frame="g1.png", act="beta")]
+            _animation("v1", frame="g1.png", act="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="g2.png", act="alpha", tmp_path=tmp_path),
+            _animation("v3", frame="g1.png", act="beta", tmp_path=tmp_path)]
     director, _host, _made = shows(_library(rows), db=FakeDB(rows))
 
     around = director.neighbors_of("v1", side="portrait")
@@ -1392,9 +1398,9 @@ def test_a_video_sits_under_its_pictures_seed_with_the_picture_down_its_column(s
         "alpha", ("Source image", "beta"))
 
 
-def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named_for(shows):
+def test_the_library_says_what_each_generation_an_act_filter_asks_about_is_named_for(shows, tmp_path):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2),
-            _animation("v1", frame="g1.png", act="alpha")]
+            _animation("v1", frame="g1.png", act="alpha", tmp_path=tmp_path)]
     director, _host, _made = shows(_library(rows), db=FakeDB(rows))
 
     assert director.acts_of(["g1", "v1", "nobody"], side="portrait") == {

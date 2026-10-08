@@ -343,6 +343,9 @@ class GenerationStore(Store):
             ).fetchone()
             return dict(row) if row else None
 
+    def library_version(self) -> int:
+        return self._version()
+
     def list_generations(self) -> list[dict]:
         with self._listing:
             version = self._version()

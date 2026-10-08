@@ -221,6 +221,9 @@ class FakeDB:
     def list_generations(self):
         return list(self._rows)
 
+    def library_version(self):
+        return object()  # tests change the rows directly, so every look is fresh
+
     def record_seed_use(self, **use):
         self._seed_uses.insert(0, use)
 

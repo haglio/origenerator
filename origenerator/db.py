@@ -125,6 +125,9 @@ class Database:
     def list_generations(self) -> list[dict]:
         return self.generations.list_generations()
 
+    def library_version(self) -> int:
+        return self.generations.library_version()
+
     def seed_history_rows(self) -> list[dict]:
         return self.generations.seed_history_rows()
 

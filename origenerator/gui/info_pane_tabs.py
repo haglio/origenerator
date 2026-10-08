@@ -48,6 +48,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -106,6 +107,7 @@ class InfoPaneTabs(QTabWidget):
         # hosted layout depends on it, and nothing in the tab itself resized.
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
+        self._library = LibraryViews(db)
         # Install the eliding bar before setTabsClosable: swapping the bar
         # afterwards drops that setting (it doesn't carry to a new bar).
         self.setTabBar(ElidingTabBar())
@@ -173,7 +175,7 @@ class InfoPaneTabs(QTabWidget):
         in either of them reaches the gallery.
         """
         panel = GenerateConfigPanel(self._client, self._db, fun_time=self._fun_time,
-                                    heights=self._heights)
+                                    heights=self._heights, library=self._library)
         index = self.addTab(panel, tab_mark(panel.tab_icon()), panel.title())
         panel.title_changed.connect(lambda _text, p=panel: self._update_tab(p))
         # Editing anything in a tab keeps it, the way a double-click on its name

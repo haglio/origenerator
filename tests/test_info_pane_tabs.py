@@ -994,6 +994,21 @@ def test_generate_requested_surfaces_from_a_forked_tab(tabs):
     assert requested == ["sdxl_t2i"]
 
 
+def test_restored_tabs_read_the_library_once_between_them(tabs, monkeypatch):
+    """Twenty tabs restored at launch read the whole library 187 times and left
+    the loading window not responding for most of a minute."""
+    _complete_gen(tabs._db, "pic-1", _sdxl_full(seed=7), "pic-1.png")
+    db = tabs._db
+    reads = []
+    listing = db.list_generations
+    monkeypatch.setattr(db, "list_generations", lambda: reads.append(1) or listing())
+
+    tabs.restore_state({"tabs": [_config_tab("sdxl_t2i", _sdxl_full(seed=seed))
+                                 for seed in (7, 8, 9)], "current": 0})
+
+    assert len(reads) == 1
+
+
 def test_restore_state_rebuilds_config_tabs(tabs):
     tabs._add_subtab()  # a pre-existing tab, to be replaced
     state = {"tabs": [

@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY, BLUE
+from shared_ui.colors import AMBER, BG_PRIMARY, BLUE, TEXT_PRIMARY
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.workflows.detail_parts as parts
@@ -659,6 +659,38 @@ def test_a_picked_level_is_filled_with_the_familys_blue(qtbot):
         assert versions.grab().toImage().pixelColor(edge).name() == BLUE.name()
     finally:
         app.setStyleSheet(prior)
+
+
+def _ink(label) -> str:
+    label.ensurePolished()
+    return label.palette().color(label.foregroundRole()).name()
+
+
+def test_a_picked_levels_facts_are_written_in_white(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0})))
+    row = _rows(versions)[0]
+    resting = {_ink(label) for label in row._fact_cells if isinstance(label, QLabel)}
+
+    _click(qtbot, row)
+
+    facts = [label for label in row._fact_cells if isinstance(label, QLabel)]
+    assert TEXT_PRIMARY.name() not in resting
+    assert facts and {_ink(label) for label in facts} == {TEXT_PRIMARY.name()}
+
+
+def test_a_level_let_go_of_has_its_facts_back_in_gray(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_levels(_items(_levels(1, {"enhance_scale": 2.0})))
+    first, second = _rows(versions)[:2]
+    resting = [_ink(label) for label in first._fact_cells if isinstance(label, QLabel)]
+
+    _click(qtbot, first)
+    _click(qtbot, second)
+
+    assert [_ink(label) for label in first._fact_cells if isinstance(label, QLabel)] == resting
 
 
 def test_delete_and_backspace_bin_the_picked_levels(qtbot):

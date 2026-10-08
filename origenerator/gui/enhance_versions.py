@@ -52,7 +52,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import AMBER, BG_PRIMARY
+from shared_ui.colors import AMBER, BG_PRIMARY, TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 
 from origenerator.generation_metadata import MetaItem, created_item, file_item
@@ -88,9 +88,10 @@ _FACT_KEYS = ("Enhancement", "File", "Created")
 # would otherwise appear only in the gaps between them.
 _ROW_CSS = "#levelRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
-    f"#levelRow {{ background-color: {palette.SELECTED}; border-radius: 4px; }}"
+    f"#levelRow {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}"
     + _ROW_CSS
 )
+_PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {AMBER.name()}; border-radius: 3px;"
 
 
@@ -203,6 +204,7 @@ class _Row(QWidget):
         facts.addWidget(self._title, 0, 0, 1, -1)
         self._facts = facts
         self._fact_cells: list[QWidget] = []
+        self._resting_ink: dict[QLabel, str] = {}
         row.addLayout(facts, 1)
 
     def minimumSizeHint(self):
@@ -248,6 +250,7 @@ class _Row(QWidget):
             widget.setParent(None)
             widget.deleteLater()
         self._fact_cells = []
+        self._resting_ink = {}
         key_width = label_column_width([MetaItem(key, "") for key in _FACT_KEYS])
         for line, item in enumerate(items, start=1):
             for column, widget in enumerate(meta_cells(item, key_width)):
@@ -263,6 +266,8 @@ class _Row(QWidget):
                     self._facts.addWidget(widget, line, column,
                                           Qt.AlignmentFlag.AlignTop)
                 self._fact_cells.append(widget)
+                if isinstance(widget, QLabel):
+                    self._resting_ink[widget] = widget.styleSheet()
 
     def _show_picture(self, pixmap: QPixmap) -> None:
         self._picture.setPixmap(pixmap.scaled(
@@ -332,6 +337,8 @@ class _LevelRow(_Row):
             return
         self._selected = selected
         self.setStyleSheet(_SELECTED_ROW_CSS if selected else _ROW_CSS)
+        for label, resting in self._resting_ink.items():
+            label.setStyleSheet(_PICKED_FACT_CSS if selected else resting)
 
     def set_highlighted(self, on: bool) -> None:
         """Light this level's picture — what the ``+ Enhance`` row points at

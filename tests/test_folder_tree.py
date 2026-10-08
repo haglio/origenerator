@@ -462,7 +462,8 @@ def _decoration_left(tree, item) -> int:
         QStyle.SubElement.SE_ItemViewItemDecoration, option, tree).left()
 
 
-def test_a_shelf_rows_mark_stands_under_its_folders_own_mark(qtbot):
+def _tree_with_a_shelf(qtbot):
+    """A shelf row under a workflow folder, under All, the way a side lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")
@@ -475,6 +476,12 @@ def test_a_shelf_rows_mark_stands_under_its_folders_own_mark(qtbot):
     tree.addTopLevelItem(top)
     tree.expandAll()
     tree.show()
+    qtbot.waitExposed(tree)
+    return tree, folder, shelf
+
+
+def test_a_shelf_rows_mark_stands_under_its_folders_own_mark(qtbot):
+    tree, folder, shelf = _tree_with_a_shelf(qtbot)
 
     assert tree.branch_mark_rect(tree.indexFromItem(shelf)).left() == \
         _decoration_left(tree, folder)
@@ -491,20 +498,22 @@ def _text_left(tree, item) -> int:
 
 
 def test_a_shelf_rows_name_starts_where_its_folders_name_starts(qtbot):
-    tree = FolderTree(_ROLE)
-    qtbot.addWidget(tree)
-    top = _folder_row("All", "all")
-    folder = _folder_row("Workflow", "wf")
-    folder.setIcon(0, icons.level_badge_icon("workflow"))
-    shelf = QTreeWidgetItem(["Latest"])
-    shelf.setData(0, BRANCH_ICON_ROLE, icons.shelf_icon(RECENTS_KEY))
-    folder.addChild(shelf)
-    top.addChild(folder)
-    tree.addTopLevelItem(top)
-    tree.expandAll()
-    tree.show()
+    tree, folder, shelf = _tree_with_a_shelf(qtbot)
 
     assert _text_left(tree, shelf) == _text_left(tree, folder)
+
+
+def test_a_picked_shelf_row_is_blue_from_its_mark_to_its_name(qtbot):
+    tree, _folder, shelf = _tree_with_a_shelf(qtbot)
+    tree.setStyleSheet(build_stylesheet())
+    tree.setCurrentItem(shelf)
+
+    mark = tree.branch_mark_rect(tree.indexFromItem(shelf))
+    middle = tree.visualRect(tree.indexFromItem(shelf)).center().y()
+    image = tree.viewport().grab().toImage()
+    between = [image.pixelColor(x, middle).name()
+               for x in range(mark.right() + 1, _text_left(tree, shelf))]
+    assert between and set(between) == {BLUE.name()}
 
 
 def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):

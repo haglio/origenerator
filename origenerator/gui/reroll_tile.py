@@ -29,7 +29,7 @@ from origenerator.gui.inflight import TICK_MS, RunReading, discard_run_text, dis
 from origenerator.gui.progress_caption import BAR_HEIGHT, ProgressCaption
 from origenerator.gui.stage_scrim import StageScrim
 
-# The dashed resting outline and the selected blue are the family look every
+# The dashed resting outline and the selected blue and white are the family look every
 # non-picture card in the grid wears (see :mod:`origenerator.gui.grid_card`).
 _IDLE_FRAME_CSS = grid_card.idle_css("rerollTile")
 _SELECTED_FRAME_CSS = grid_card.selected_css("rerollTile")

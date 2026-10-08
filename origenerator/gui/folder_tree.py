@@ -91,14 +91,25 @@ def _mark_rect(content: QRect) -> QRect:
     return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
+def _name_follows_its_mark(index) -> bool:
+    return isinstance(index.data(BRANCH_ICON_ROLE), QIcon) and index.parent().isValid()
+
+
 class _CountBeforeName(QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         count = index.data(COUNT_ROLE)
         if count:
             option.text = f"({count}) {option.text}"
-        if isinstance(index.data(BRANCH_ICON_ROLE), QIcon) and index.parent().isValid():
+        if _name_follows_its_mark(index):
             option.rect.setLeft(self.parent().name_left_of_marked_row(option.rect))
+
+    def paint(self, painter, option, index):
+        if _name_follows_its_mark(index):
+            tree = self.parent()
+            tree.style().drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem,
+                                       option, painter, tree)
+        super().paint(painter, option, index)
 
 
 class FolderTree(QTreeWidget):

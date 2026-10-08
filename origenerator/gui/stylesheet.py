@@ -202,9 +202,8 @@ def build_stylesheet() -> str:
         border: none;
         width: 16px;
     }}
-    /* A read-only gallery (no ComfyUI client) can never launch, so Generate grays
-       out; the id selector above out-specifies the base :disabled rule, so restate
-       it here. */
+    /* Generate grays out while it cannot launch; the id selector above
+       out-specifies the base :disabled rule, so restate it here. */
     QPushButton#generateBtn:disabled {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_MUTED)};

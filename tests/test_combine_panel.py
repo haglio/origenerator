@@ -55,6 +55,28 @@ def test_generate_is_disabled_until_both_slots_are_filled(qtbot):
     assert panel._generate_btn.isEnabled()       # both filled: ready
 
 
+def test_grayed_generate_and_edit_say_what_they_still_need(qtbot):
+    panel = _panel(qtbot)
+    needs_image = "Nothing to start from — drop an image first"
+    assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_image, needs_image)
+
+    panel.image_slot.set_item("img1")
+
+    needs_recipe = "Pick an act or drop a video first"
+    assert (panel._generate_btn.toolTip(), panel._open_btn.toolTip()) == (needs_recipe, needs_recipe)
+
+
+def test_once_ready_generate_drops_its_reason_and_edit_says_what_it_does(qtbot):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+
+    panel.video_slot.set_item("vid1")
+
+    assert panel._generate_btn.toolTip() == ""
+    assert panel._open_btn.toolTip() == (
+        "Load this combination into a generate tab to edit before running it.")
+
+
 def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     panel = _panel(qtbot)
     panel.image_slot.set_item("img1")

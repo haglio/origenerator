@@ -475,15 +475,18 @@ class BrowserPane(QObject):
 
     def reveal_folder(self, folder_key: str) -> bool:
         """Mark the drawn square that holds this folder and scroll it into view."""
-        for tile in self._scroll.widget().findChildren(FolderTile):
+        drawn = self._scroll.widget()
+        if drawn is None:
+            return False  # a pane with nothing in it: a show closing as the app does
+        for tile in drawn.findChildren(FolderTile):
             if key_holds(tile.key, folder_key):
-                self._mark_only_this_folder(tile)
+                self._mark_only_this_folder(drawn, tile)
                 bring_into_view(self._scroll, tile)
                 return True
         return False
 
-    def _mark_only_this_folder(self, picked) -> None:
-        for tile in self._scroll.widget().findChildren(FolderTile):
+    def _mark_only_this_folder(self, drawn, picked) -> None:
+        for tile in drawn.findChildren(FolderTile):
             tile.set_selected(tile is picked)
 
     def mark_folder_favorite(self, folder_key: str, favorite: bool) -> None:

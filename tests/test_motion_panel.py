@@ -438,7 +438,7 @@ def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtb
     qtbot.addWidget(panel)
     panel.render_console()
     _press(panel, "genau_clip_seconds_up")
-    view = SlideshowView([("a.png", "image", 1)], shuffle=lambda items: None,
+    view = SlideshowView([("a.png", "image", "g1")], shuffle=lambda items: None,
                          pace=pace)
     qtbot.addWidget(view)
     assert view._playlist.image_dwell_ms == pace.seconds * 1000
@@ -446,7 +446,7 @@ def test_setting_the_pace_with_nothing_playing_is_what_the_next_one_opens_at(qtb
 
 def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
     pace = SlideshowPace()
-    view = SlideshowView([("a.png", "image", 1), ("b.png", "image", 2)],
+    view = SlideshowView([("a.png", "image", "g1"), ("b.png", "image", "g2")],
                          shuffle=lambda items: None, pace=pace)
     qtbot.addWidget(view)
     pace.set_seconds(9)

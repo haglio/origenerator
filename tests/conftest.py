@@ -355,8 +355,33 @@ def pytest_collection_finish(session):
 _WIDGET_TAIL_ALLOWANCE = 50
 
 
+class _DeferredDeleteCounter(QObject):
+    """Counts DeferredDelete events. Installed on the application object, which
+    Qt gives every event in this thread, whatever object it was sent to."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.seen = 0
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.DeferredDelete:
+            self.seen += 1
+        return False
+
+
+def _deliver_deferred_deletes() -> int:
+    counter = _DeferredDeleteCounter()
+    app = QApplication.instance()
+    app.installEventFilter(counter)
+    try:
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    finally:
+        app.removeEventFilter(counter)
+    return counter.seen
+
+
 def _deliver_the_deletions_already_scheduled():
-    """Carry out Qt's pending ``deleteLater`` deletions now.
+    """Carry out Qt's pending ``deleteLater`` deletions now, and the ones they set off.
 
     pytest-qt hands each test's registered widgets a ``deleteLater`` at
     teardown, but a posted DeferredDelete is only delivered once an event loop
@@ -365,10 +390,17 @@ def _deliver_the_deletions_already_scheduled():
     driven rather than waited for: a lone ``pytest tests/test_gallery_view.py``
     otherwise ends holding 1,048 widgets that are already condemned, and every
     one of them goes when this runs.
+
+    PyQt keeps an object of its own for each Python slot connected to a
+    signal, and when the signal's sender is destroyed it queues a call that
+    hands that object a ``deleteLater``, so the queued calls are delivered
+    between rounds until a round has nothing left to delete.
     """
     if QApplication.instance() is None:
         return
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QCoreApplication.sendPostedEvents()
+    while _deliver_deferred_deletes():
+        QCoreApplication.sendPostedEvents()
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -431,7 +463,11 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
     which is what the suite's one flake was (tests/test_deferred_deletes.py).
     By now pytest-qt has closed what the test registered, so letting go of it
     here cannot free anything Qt is still drawing.
+
+    The drain runs as each test starts too: pytest lets go of the last test's
+    fixture values only after every teardown hook, this one included.
     """
+    _deliver_the_deletions_already_scheduled()
     yield
     _widgets_registered_this_test.clear()
     gc.collect()

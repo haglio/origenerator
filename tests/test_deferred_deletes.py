@@ -17,24 +17,10 @@ the test went red on two runs in five.
 from __future__ import annotations
 
 from PyQt6 import sip
-from PyQt6.QtCore import QCoreApplication, QEvent, QObject
+from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QWidget
 
-from tests.conftest import _deliver_the_deletions_already_scheduled
-
-
-class _DeferredDeleteCounter(QObject):
-    """Counts DeferredDelete events. Installed on the application object, which
-    Qt gives every event in this thread, whatever object it was sent to."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.seen = 0
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.DeferredDelete:
-            self.seen += 1
-        return False
+from tests.conftest import _deliver_deferred_deletes, _deliver_the_deletions_already_scheduled
 
 
 def test_a_widget_asked_to_go_is_gone_once_the_deletions_are_drained(qapp):
@@ -47,16 +33,22 @@ def test_a_widget_asked_to_go_is_gone_once_the_deletions_are_drained(qapp):
     assert sip.isdeleted(widget)
 
 
+def test_the_deletions_a_drain_sets_off_are_carried_out_too(qapp):
+    sender = QObject()
+    sender.objectNameChanged.connect(lambda name: None)
+    sender.deleteLater()
+
+    _deliver_the_deletions_already_scheduled()
+    qapp.processEvents()
+
+    assert _deliver_deferred_deletes() == 0
+
+
 def test_this_test_starts_with_no_deletions_left_over_from_another(qapp):
     """Whatever ran before this, its deletions were its own to pay for."""
-    counter = _DeferredDeleteCounter()
-    qapp.installEventFilter(counter)
-    try:
-        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    finally:
-        qapp.removeEventFilter(counter)
+    left_over = _deliver_deferred_deletes()
 
-    assert counter.seen == 0, (
-        f"{counter.seen} objects were still waiting to be deleted when this test "
+    assert left_over == 0, (
+        f"{left_over} objects were still waiting to be deleted when this test "
         "began — the next test that pumps an event loop pays for all of them"
     )

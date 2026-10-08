@@ -84,6 +84,15 @@ def oriented_key(base_key: str, orientation: str) -> str:
     return f"{base_key}{_SEPARATOR}{orientation}"
 
 
+def key_holds(outer: str, inner: str) -> bool:
+    """Whether *outer* is *inner* or a folder it sits in, on the same side."""
+    outer_base, outer_side = split_key(outer)
+    inner_base, inner_side = split_key(inner)
+    if outer_side != inner_side or not outer_base or not inner_base:
+        return False
+    return inner_base == outer_base or inner_base.startswith(outer_base + "/")
+
+
 def split_key(key: str | None) -> tuple[str | None, str | None]:
     """``(base_key, orientation)`` — orientation ``None`` for a plain key."""
     if not key:

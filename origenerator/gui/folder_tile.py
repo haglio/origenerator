@@ -38,6 +38,7 @@ class FolderTile(QFrame):
                  context="", badge=None, detail="", parent=None):
         super().__init__(parent)
         self._key = key
+        self._selected = False
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # The same card the generations beside it in the flow stand in, plus the
@@ -94,6 +95,16 @@ class FolderTile(QFrame):
 
     def set_favorite(self, favorite: bool) -> None:
         self._caption.setText(self._captioned(favorite))
+
+    def is_selected(self) -> bool:
+        return self._selected
+
+    def set_selected(self, selected: bool) -> None:
+        if selected == self._selected:
+            return
+        self._selected = selected
+        self.setStyleSheet(grid_card.selected_css("folderTile") if selected
+                           else grid_card.idle_css("folderTile"))
 
     def _captioned(self, favorite: bool) -> str:
         return ("★ " if favorite else "") + self._text

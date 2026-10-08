@@ -342,6 +342,20 @@ def test_a_show_that_is_over_takes_its_panel_down_though_the_player_is_reading_i
     assert show.channel.hud_file.read_text(encoding="utf-8") == ""
 
 
+def test_a_show_on_the_players_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
+    # The same promise as the full-screen slideshow: whichever way a show ends,
+    # the picture it was on is the one to find in the gallery afterwards.
+    show = _show(qtbot, tmp_path)
+    handed = []
+    show.open_requested.connect(handed.append)
+    on_screen = show.playing_now()[0][show.playing_now()[1]][2]
+
+    show.close()
+
+    assert show.is_showing() is False
+    assert handed == [on_screen]
+
+
 def test_a_new_set_lands_the_player_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
 

@@ -831,7 +831,7 @@ class PlayerShow(QObject):
         return self._open
 
     def close(self) -> None:
-        """Give the side back: nothing of this app's is on it now.
+        """Give the side back, handing the gallery the slide that was on it.
 
         The panel goes with it, so the session draws its own again; the player
         keeps playing this list until the session hands it its own, which is
@@ -840,12 +840,15 @@ class PlayerShow(QObject):
         if not self._open:
             return
         self._open = False
+        slide = self._set.playlist.current()
         self._timer.stop()
         publish_whole(self.channel.hud_file, "",
                       attempts=round(READER_HOLD_BUDGET_S / _RETRY_SPACING_S),
                       delay_s=_RETRY_SPACING_S)
         self._frames.forget_all()
         self.closed.emit()
+        if slide is not None:
+            self.open_requested.emit(slide[2])
 
 
 def _playlist_item(path, media_type) -> PlaylistItem:

@@ -1321,21 +1321,19 @@ class SlideshowView(QWidget):
         self._reposition_note()
 
     def closeEvent(self, event):
-        """Leave, handing the gallery the item the show ended on if there is one.
+        """Leave, handing the gallery the slide that was on screen.
 
-        Enter names that item; so does a lock, which is the user saying this is
-        the one — so a show ended on a locked slide lands on that slide, rather
-        than leaving the gallery wherever it was before the show. Ended on a
-        slide nobody locked (Escape, a double-click, the spoken "close", the last
-        item culled), it hands nothing over and leaves the gallery alone.
+        However the show is left — Escape, a double-click, Enter, the spoken
+        "close", or ending on a locked slide — the picture you were looking at is
+        the one you want to find afterwards, so the gallery picks it where the
+        show was playing. Only a show with nothing on screen hands nothing over,
+        which is a show whose last item was culled.
         """
         self.hide()
         self._pane.clear()  # release any held file so it can be deleted
         self._pane.close_engine()
         self._early_move_on.cancel()
-        landing = self._land_on
-        if landing is None and self._playlist.locked:
-            landing = self._current_prompt_id()
+        landing = self._land_on or self._current_prompt_id()
         # Both cleared before a second close could read them, so the handover
         # happens once. The lock outlives the first emit because the gallery
         # reads this show's state there, and a slide closed under a lock is one

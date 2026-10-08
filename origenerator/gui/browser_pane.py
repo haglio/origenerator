@@ -61,11 +61,16 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.inflight_items import InFlightItems
-from origenerator.gui.pane_place import PanePlace, place_of, stand_at
+from origenerator.gui.pane_place import (
+    PanePlace,
+    bring_into_view,
+    place_of,
+    stand_at,
+)
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
-from origenerator.orientation import filter_rows, split_key
+from origenerator.orientation import filter_rows, key_holds, split_key
 
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
@@ -77,6 +82,7 @@ _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
 # end — far enough ahead (three tile rows) that the next page is there before the
 # user arrives at it, rather than after a visible stop.
 _RECENTS_PAGE = 50
+_NEIGHBORS_PAST_A_REVEAL = 12  # three rows at the pane's widest, six at its narrowest
 _RECENTS_REACH = 600
 # Room above a search section's heading, so the headings read as the dividers
 # they are rather than as captions stuck to the row of tiles above them.
@@ -113,11 +119,6 @@ class BrowserScrollArea(QScrollArea):
             event.accept()  # nothing above wants it — end the walk up here
             return
         super().mousePressEvent(event)
-
-
-# Vertical breathing room left around a tile a link scrolls to, so it lands with
-# its neighbors in view rather than flush against an edge of the pane.
-_REVEAL_MARGIN = 40
 
 
 def _unique_rows(rows) -> list[dict]:
@@ -471,6 +472,19 @@ class BrowserPane(QObject):
         tile.context_requested.connect(self.folder_menu_requested)
         flow.addWidget(tile)
         self._visible_keys.append(group.key)
+
+    def reveal_folder(self, folder_key: str) -> bool:
+        """Mark the drawn square that holds this folder and scroll it into view."""
+        for tile in self._scroll.widget().findChildren(FolderTile):
+            if key_holds(tile.key, folder_key):
+                self._mark_only_this_folder(tile)
+                bring_into_view(self._scroll, tile)
+                return True
+        return False
+
+    def _mark_only_this_folder(self, picked) -> None:
+        for tile in self._scroll.widget().findChildren(FolderTile):
+            tile.set_selected(tile is picked)
 
     def mark_folder_favorite(self, folder_key: str, favorite: bool) -> None:
         for tile in self._scroll.widget().findChildren(FolderTile):
@@ -1325,20 +1339,35 @@ class BrowserPane(QObject):
         )
         self._refresh_selection_highlights()
 
-    def reveal_tile(self, prompt_id: str):
-        """Land on a tile the way arriving from elsewhere should: picked, and
+    def reveal_tile(self, prompt_id: str) -> bool:
+        """Land on a picture the way arriving from elsewhere should: picked, and
         scrolled to if it sits outside the visible part of the pane. What a
         followed link needs — a folder of dozens otherwise leaves you looking at
-        its newest items with the one you asked for highlighted off-screen."""
-        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+        its newest items with the one you asked for highlighted off-screen.
+
+        False where this pane has no picture of its own for it."""
+        self._draw_open_shelf_past(prompt_id)
         widget = self._thumb_widgets.get(prompt_id)
         if widget is None:
-            return  # nothing drawn for it here (an in-flight row, a shelf page away)
+            return False  # nothing drawn for it here: an in-flight row, or a folder
+        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self._scroll_to(widget)
         # The pane it was just drawn in hasn't been laid out yet, so that first
         # attempt had no real tile position to aim at — hence a second one once
         # this turn's layout has run (as :meth:`return_to` does).
         defer(self, lambda: self._reapply_reveal(prompt_id, widget))
+        return True
+
+    def _draw_open_shelf_past(self, prompt_id: str) -> None:
+        if self._recents_flow is None:
+            return
+        listed = [row["prompt_id"] for row in self._open_shelf_rows(RECENTS_KEY)]
+        if prompt_id not in listed:
+            return
+        beyond = (listed.index(prompt_id) + 1 + _NEIGHBORS_PAST_A_REVEAL
+                  - self._recents_drawn)
+        if beyond > 0:
+            self._draw_recents_page(beyond)
 
     def _reapply_reveal(self, prompt_id: str, widget):
         """Scroll to a revealed tile again after layout — unless the pane has since
@@ -1348,7 +1377,7 @@ class BrowserPane(QObject):
             self._scroll_to(widget)
 
     def _scroll_to(self, widget):
-        self._scroll.ensureWidgetVisible(widget, 0, _REVEAL_MARGIN)
+        bring_into_view(self._scroll, widget)
 
     def place(self) -> PanePlace:
         return place_of(self._scroll, self._selection, self._thumb_widgets)

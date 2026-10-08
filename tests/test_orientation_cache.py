@@ -55,6 +55,22 @@ def test_the_remembered_shapes_stop_piling_up():
     assert len(orientation._measured) <= orientation._MEASURED_LIMIT
 
 
+def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypatch):
+    """A show on a Fun Time region re-sorts the whole library by shape on every
+    picture a running generation streams; looking each item's file up on disk
+    again, for a shape already known, froze the window long enough for Windows
+    to close it."""
+    row = {"thumbnail_path": "/library/known.png",
+           "output_files": '[{"filename": "known.png", "subfolder": ""}]'}
+    orientation.row_orientation(row)
+    looked_up = []
+    monkeypatch.setattr(orientation.gallery, "resolve_preview",
+                        lambda *args: looked_up.append(args))
+
+    assert orientation.row_orientation(row) == orientation.PORTRAIT
+    assert looked_up == []
+
+
 def test_the_one_it_drops_is_the_one_nothing_has_asked_for():
     """A library past the cap still has one folder open in front of it, and the
     rows the poll redraws must outlast the ones scrolled past once."""

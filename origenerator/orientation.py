@@ -37,6 +37,7 @@ the same default the region routing uses for an unmeasurable set.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Iterator
 from pathlib import Path
 
 from PIL import Image
@@ -120,7 +121,7 @@ def row_orientation(row: dict) -> str:
     asked = requested_orientation(canonical_settings(workflow_name, params))
     if asked is not None:
         return asked
-    return (_measure_any(_probe_candidates(row))
+    return (_measure_any(_own_files(row))
             or _measure_any(_frame_candidate(params))
             or LANDSCAPE)
 
@@ -152,15 +153,13 @@ def _remember(path: str, measured: str) -> None:
         _measured.popitem(last=False)
 
 
-def _probe_candidates(row: dict) -> list[Path]:
-    candidates: list[Path] = []
+def _own_files(row: dict) -> Iterator[Path]:
     thumb = row.get("thumbnail_path")
     if thumb:
-        candidates.append(Path(thumb))
+        yield Path(thumb)
     resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
     if resolved is not None and resolved[1] == MediaType.IMAGE:
-        candidates.append(Path(resolved[0]))
-    return candidates
+        yield Path(resolved[0])
 
 
 def _frame_candidate(params: dict) -> list[Path]:

@@ -882,6 +882,9 @@ class SpyDB:
     def list_generations(self):
         return []
 
+    def library_version(self):
+        return 0
+
     def folder_meta_map(self):
         return {}
 

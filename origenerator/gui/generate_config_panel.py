@@ -31,7 +31,6 @@ from origenerator.db import Database
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.gallery import (
     EnhanceSettings,
-    build_image_config_index,
     config_folder_key,
     config_folder_name,
     describe_enhance_params,
@@ -43,7 +42,6 @@ from origenerator.gallery import (
     output_file_path,
     prompts_differ_from,
     resolve_preview,
-    rows_in_settings,
     settings_signature,
     workflow_output_type,
 )
@@ -68,6 +66,7 @@ from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
@@ -177,7 +176,8 @@ class GenerateConfigPanel(QWidget):
 
     def __init__(self, client: ComfyUIClient | None, db: Database, parent=None,
                  *, fun_time=None, heights=None,
-                 inbox: evolver_export.EvolverInbox | None = None):
+                 inbox: evolver_export.EvolverInbox | None = None,
+                 library: LibraryViews | None = None):
         super().__init__(parent)
         self._heights = heights  # the window's prompt heights, for its forms
         # Where a clip is handed to Evolver. Asked for rather than performed
@@ -187,6 +187,7 @@ class GenerateConfigPanel(QWidget):
         self._inbox = inbox or evolver_export.default_inbox()
         self._client = client                        # None in a read-only gallery: the form shows, but Generate is off
         self._db = db
+        self._library = library or LibraryViews(db)
         self._param_form: ParamForm | None = None
         self._generating = False                       # a run this tab launched is in flight (offers the discard button)
         self._folder_generating = False
@@ -680,7 +681,7 @@ class GenerateConfigPanel(QWidget):
             wf is not None and self._can_generate()
             and (self.generate_would_remake_what_it_shows()
                  or would_reproduce_a_completed_run(
-                     self._db.list_generations(), wf, config.params,
+                     self._library.now().rows, wf, config.params,
                      seed_is_random=config.seed_is_random,
                  ))
         )
@@ -836,8 +837,7 @@ class GenerateConfigPanel(QWidget):
                                  width=width, height=height)
 
     def _image_rows(self):
-        return [r for r in self._db.list_generations()
-                if media_type_of_row(r) == MediaType.IMAGE]
+        return self._library.now().image_rows
 
     def workflow_and_signature(self, image_index: dict | None = None,
                                ) -> tuple[str, str] | None:
@@ -854,7 +854,7 @@ class GenerateConfigPanel(QWidget):
             return None
         params = self._param_form.get_values()
         if image_index is None:
-            image_index = build_image_config_index(self._image_rows())
+            image_index = self._library.now().image_config_index
         return key, settings_signature(key, json.dumps(params), image_index)
 
     def settings_folder_key(self) -> str | None:
@@ -952,10 +952,8 @@ class GenerateConfigPanel(QWidget):
 
     def _recent_matching_row(self) -> dict | None:
         """The newest saved generation in this tab's settings folder, or None."""
-        rows = self._db.list_generations()  # newest first
-        index = build_image_config_index(
-            [r for r in rows if media_type_of_row(r) == MediaType.IMAGE])
-        matching = rows_in_settings(rows, self.workflow_and_signature(index), index)
+        library = self._library.now()
+        matching = library.in_settings(self.workflow_and_signature(library.image_config_index))
         return matching[0] if matching else None
 
     def current_config(self) -> ConfigSnapshot:
@@ -1663,8 +1661,7 @@ class GenerateConfigPanel(QWidget):
             self._param_form.show_prompt_diff(key, before or "", after or "")
 
     def _video_rows(self) -> list[dict]:
-        return [r for r in self._db.list_generations()
-                if media_type_of_row(r) == MediaType.VIDEO]
+        return self._library.now().video_rows
 
     # --- the export lanes: hand a displayed clip to a sibling app -----------
 

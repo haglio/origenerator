@@ -272,7 +272,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_an_enhancement_that_starts_on_screen_carries_the_pictures_move_onto_its_frames.
 #
 # 18754 when a picked thing took the family's blue: the line on a picked tile's
-# picture lightening its frame is test_a_picked_tiles_picture_sits_straight_on_the_blue.
+# picture lightening its frame is test_a_picked_tiles_picture_wears_a_white_frame.
 MAX_PROSE_LINES = 18754
 
 

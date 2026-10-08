@@ -6,7 +6,7 @@ from io import BytesIO
 from PIL import Image
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QWidget
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.reroll_tile import RerollTile
@@ -154,7 +154,9 @@ def test_set_selected_toggles_the_tile_highlight(qtbot):
     assert "dashed" in tile.styleSheet()
 
 
-def test_a_picked_running_tile_is_filled_with_the_familys_blue(qtbot):
+def _picked_running_tile_drawn(qtbot):
+    """A picked running tile, and the pixels of the card it sits in, drawn under
+    the app stylesheet."""
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -166,12 +168,24 @@ def test_a_picked_running_tile_is_filled_with_the_familys_blue(qtbot):
         holder.resize(tile.size())
         holder.show()
         qtbot.waitExposed(holder)
-
-        button = tile._cancel.geometry()
-        beside = tile.mapTo(holder, QPoint(button.left() - 1, button.center().y()))
-        assert holder.grab().toImage().pixelColor(beside).name() == BLUE.name()
+        return tile, holder.grab().toImage()
     finally:
         app.setStyleSheet(prior)
+
+
+def test_a_picked_running_tile_is_filled_with_the_familys_blue(qtbot):
+    tile, image = _picked_running_tile_drawn(qtbot)
+    button = tile._cancel.geometry()
+
+    beside = tile.mapToParent(QPoint(button.left() - 1, button.center().y()))
+    assert image.pixelColor(beside).name() == BLUE.name()
+
+
+def test_a_picked_running_tile_wears_a_white_frame(qtbot):
+    tile, image = _picked_running_tile_drawn(qtbot)
+
+    edge = tile.mapToParent(QPoint(0, tile.height() // 2))
+    assert image.pixelColor(edge).name() == TEXT_PRIMARY.name()
 
 
 def test_started_signal_switches_the_scrim_to_generating(qtbot):

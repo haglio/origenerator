@@ -23,10 +23,11 @@ fails on any that is typed back in.
 """
 from __future__ import annotations
 
-from shared_ui.palette import BLUE, GREEN, as_hex
+from shared_ui.palette import BLUE, GREEN, TEXT_PRIMARY, as_hex
 
-# What a picked tile, card or version row wears: its ground and its picture's frame.
-SELECTED = as_hex(BLUE)
+# A picked tile, card or version row: the ground it is filled with, and its frame.
+SELECTED_FILL = as_hex(BLUE)
+SELECTED_BORDER = as_hex(TEXT_PRIMARY)
 
 # A card's frame at rest, and under the pointer.
 CARD_BORDER = "#3f3f3f"

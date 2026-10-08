@@ -42,9 +42,9 @@ _CORNER_BUTTON_CSS = (
 #     paints them opaque and the fill only peeks through the 4px margin as a
 #     frame (which is what an earlier attempt did).
 _SELECTED_TILE_CSS = (
-    f"#thumbnailTile {{ background-color: {palette.SELECTED}; border-radius: 4px; }}")
+    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: 4px; }}")
 _BORDER_UNSELECTED = f"2px solid {palette.CARD_BORDER}"
-_BORDER_SELECTED = f"2px solid {palette.SELECTED}"
+_BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
 
 
 class CornerAction(NamedTuple):

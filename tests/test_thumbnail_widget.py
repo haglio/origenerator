@@ -7,7 +7,7 @@ from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QEnterEvent, QMovie
 from PyQt6.QtWidgets import QApplication
-from shared_ui.colors import BLUE
+from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 from origenerator.gui import corner_controls, drag_thumbnail, icons, omnipause
 from origenerator.gui.browser_pane import REROLL_IMAGE, REROLL_VIDEO
@@ -419,11 +419,11 @@ def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):
     assert img.pixelColor(8, 182) == BLUE    # under the caption text
 
 
-def test_a_picked_tiles_picture_sits_straight_on_the_blue(qtbot):
+def test_a_picked_tiles_picture_wears_a_white_frame(qtbot):
     tile, img = _picked_tile_drawn(qtbot)
     picture = tile._image_label.geometry()
 
-    assert img.pixelColor(picture.left(), picture.center().y()) == BLUE
+    assert img.pixelColor(picture.left(), picture.center().y()) == TEXT_PRIMARY
 
 
 def test_a_looping_tile_can_be_held_still(qtbot, tmp_path):

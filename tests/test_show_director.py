@@ -379,6 +379,7 @@ class FakeHost:
         self.enhanced = []
         self.drive_toggles = 0
         self.reconciles = 0
+        self.room_paused = []
         self.cleared_queue = 0
         self.queue = ([], 0)
         self.visible = [row["prompt_id"] for row in self.rows]
@@ -446,6 +447,10 @@ class FakeHost:
     def reconcile_osr2(self):
         self.reconciles += 1
 
+    def set_room_paused(self, paused):
+        self.room_paused.append(paused)
+        self.shows.set_room_paused(paused)
+
     def say(self, message):
         self.said.append(message)
 
@@ -486,6 +491,7 @@ def shows(monkeypatch):
             host, db=db or FakeDB(), browser=browser or FakeBrowser(),
             jobs=FakeReroll(), pace=FakePace(), motion=None,
             fun_time=fun_time)
+        host.shows = director
         # The playlist is what a show is of; deriving it from files on disk is
         # resolve_preview's own tested job, not this one's.
         director.items_of = lambda rows: [
@@ -1123,11 +1129,58 @@ def test_a_click_on_a_hosted_show_asks_for_omnipause_on_the_sessions_channel(sho
         "omnipause_toggle"]
 
 
-def test_a_show_with_no_session_to_ask_is_left_to_pause_itself(shows):
-    director, _host, made = shows()
+def test_a_click_on_a_show_standing_on_its_own_pauses_the_whole_room(shows):
+    director, host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
-    assert made[0].actions.omnipause is None
+    made[0].actions.omnipause()
+
+    assert host.room_paused == [True]
+    assert made[0].paused is True
+
+
+def test_a_second_click_on_it_plays_the_room_again(shows):
+    director, host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+
+    made[0].actions.omnipause()
+    made[0].actions.omnipause()
+
+    assert host.room_paused == [True, False]
+    assert made[0].paused is False
+
+
+def test_closing_a_show_standing_on_its_own_lets_the_room_it_paused_play_again(shows):
+    director, host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+    made[0].actions.omnipause()
+
+    made[0].close()
+
+    assert host.room_paused == [True, False]
+
+
+def test_the_second_press_of_a_double_click_does_not_pause_the_room_behind_the_show(shows):
+    """The double-click closes the show between its two presses, so the
+    second lands on a show that is gone."""
+    director, host, made = shows()
+    director.open([("a.png", "image", "g1", None)])
+    made[0].actions.omnipause()
+    made[0].close()
+
+    made[0].actions.omnipause()
+
+    assert host.room_paused == [True, False]
+
+
+def test_a_hosted_show_closing_leaves_the_sessions_pause_to_the_session(shows):
+    director, host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+    director.set_room_paused(True)
+
+    made[0].close()
+
+    assert host.room_paused == []
 
 
 def test_the_spoken_close_with_no_show_up_says_so(shows):

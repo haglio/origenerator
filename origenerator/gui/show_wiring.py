@@ -46,8 +46,9 @@ class ShowActions:
     the app's one OSR2 switch rather than straight to this show's motion, and
     ``osr2_control`` is that same switch handed over whole, which is what the
     console's four control buttons read and set.
-    ``omnipause`` takes nothing and is a session's: hosted, a click on the
-    picture asks the room to pause, where a show on its own pauses itself.
+    ``omnipause`` takes nothing: a click on the picture asks the room to pause,
+    the hosting session's or this app's own, and a show handed none pauses
+    itself.
 
     ``neighbors`` and ``widen`` take a prompt_id and answer for the library
     the show cannot see: what shows that generation's act under other seeds

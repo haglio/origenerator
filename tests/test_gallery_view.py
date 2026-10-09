@@ -17,6 +17,7 @@ from player_core.console import (
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
+from player_core.pointer import OMNIPAUSE_TOGGLE
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
 from PyQt6.QtCore import (
@@ -74,7 +75,7 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import combine_controller, corner_controls, diff_text, icons
+from origenerator.gui import combine_controller, corner_controls, diff_text, icons, omnipause
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import generating_tile as generating_tile_module
@@ -12517,6 +12518,50 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
 
     assert driver.started == [("pA", "aA")]
     assert not view._osr2_motion.active  # the motion stood down for the script
+
+
+def _a_show_standing_on_its_own(qtbot, monkeypatch, **gallery):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
+                       client=ComfyUIClient(), **gallery)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view._shows.start()
+    show = view._shows.showing
+    qtbot.addWidget(show)
+    return view, show
+
+
+def _click_the_picture(show):
+    show.press(OMNIPAUSE_TOGGLE)
+
+
+def test_a_click_on_a_show_pauses_the_device_the_sound_and_the_pictures_with_it(
+        qtbot, monkeypatch):
+    bed, motion = _FakeAmbientAudio(), _SignalMotion()
+    _view, show = _a_show_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+                                              osr2_motion=motion)
+
+    _click_the_picture(show)
+    assert (show._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+        True, True, True, True)
+
+    _click_the_picture(show)
+    assert (show._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+        False, False, False, False)
+    show.close()
+
+
+def test_closing_a_paused_show_plays_the_room_again(qtbot, monkeypatch):
+    bed, motion = _FakeAmbientAudio(), _SignalMotion()
+    _view, show = _a_show_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+                                              osr2_motion=motion)
+    _click_the_picture(show)
+
+    show.close()
+
+    assert (motion.frozen, bed.frozen, omnipause.frozen()) == (False, False, False)
 
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):

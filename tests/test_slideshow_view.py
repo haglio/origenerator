@@ -1375,7 +1375,7 @@ def _click(view):
     view._pane.press(QPointF(view._pane.width() / 2, view._pane.height() / 2))
 
 
-def test_a_click_pauses_a_show_standing_on_its_own_at_once_and_a_second_plays_it(qtbot):
+def test_a_click_pauses_a_show_with_no_room_to_ask_at_once_and_a_second_plays_it(qtbot):
     view = _view(qtbot, _KEYED, image_dwell_ms=4000)
 
     _click(view)
@@ -1387,7 +1387,7 @@ def test_a_click_pauses_a_show_standing_on_its_own_at_once_and_a_second_plays_it
     assert _engine(view).paused is False
 
 
-def test_a_click_on_a_hosted_show_asks_the_room_to_pause_instead_of_pausing_itself(qtbot):
+def test_a_click_asks_the_room_to_pause_rather_than_pausing_the_show_alone(qtbot):
     asked = []
     view = _view(qtbot, _KEYED, image_dwell_ms=4000,
                  on_omnipause=lambda: asked.append(True))

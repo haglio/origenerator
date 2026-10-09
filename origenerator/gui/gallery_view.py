@@ -3163,7 +3163,8 @@ class GalleryView(QWidget):
         each is its own step: a freeze that stopped at the shows left the
         thumbnails running with no sign of why.
         """
-        logger.info("The room is %s", "paused" if paused else "playing")
+        if paused != omnipause.frozen():
+            logger.info("The room is %s", "paused" if paused else "playing")
         self._shows.set_room_paused(paused)
         omnipause.freeze(paused)
 

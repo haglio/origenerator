@@ -144,6 +144,10 @@ class ShowHost(Protocol):
     def reconcile_osr2(self) -> None:
         """Re-pick what the device follows, a surface having changed."""
 
+    def set_room_paused(self, paused: bool) -> None:
+        """Stop the room or play it again: the shows, the pictures, the sound
+        and the device."""
+
     def say(self, message: str) -> None:
         """Flash a line on the gallery's own caption."""
 
@@ -468,9 +472,8 @@ class ShowDirector:
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
-            # Three of these are a session's: a lock opens the locked item as a
-            # generate tab, a reset means the REGION's base state, and a click
-            # on the picture asks the room to pause.
+            # Two of these are a session's: a lock opens the locked item as a
+            # generate tab, and a reset means the REGION's base state.
             lock=(self._open_generate_tab_for
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),
@@ -485,8 +488,7 @@ class ShowDirector:
             # and the console's control group reads and sets that same one.
             drive_toggle=self._host.toggle_osr2_drive,
             osr2_control=self._host.osr2_control,
-            omnipause=(partial(ask_for_omnipause, self._session_channel)
-                       if self._session_channel is not None else None),
+            omnipause=self._ask_the_room_to_pause(),
             neighbors=partial(self.neighbors_of, side=side),
             widen=partial(self.beyond_the_row_of, side=side),
             acts=partial(self.acts_of, side=side),
@@ -497,6 +499,17 @@ class ShowDirector:
     def _note_filters(self, filters: ShowFilters) -> None:
         if self._fun_time is None:
             self._filters = filters
+
+    def _ask_the_room_to_pause(self):
+        if self._fun_time is None:
+            return self._pause_or_play_the_room
+        if self._session_channel is None:
+            return None
+        return partial(ask_for_omnipause, self._session_channel)
+
+    def _pause_or_play_the_room(self) -> None:
+        if self._window_up() is not None:
+            self._host.set_room_paused(not self._room_paused)
 
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
@@ -823,9 +836,11 @@ class ShowDirector:
 
     def _on_closed(self, show=None):
         """A show was dismissed (however): let it go, with the hold it put on
-        videos, and hand the OSR2 back to whatever the toggle was driving. The
-        mic is untouched — it answers to its own button, and "start slideshow"
-        has to still be heard now there is no show to hear it over.
+        videos, and hand the OSR2 back to whatever the toggle was driving. A
+        show standing on its own lets go of the room's pause too, since it was
+        the one thing a click could play the room again from. The mic is
+        untouched — it answers to its own button, and "start slideshow" has to
+        still be heard now there is no show to hear it over.
 
         Named rather than assumed, because inside Fun Time two shows run at
         once: closing the portrait one must not forget the landscape one — and
@@ -843,6 +858,8 @@ class ShowDirector:
         if self._slideshow is None:
             self._jobs.hold_videos(False)
         self._host.reconcile_osr2()
+        if self._fun_time is None and self._room_paused:
+            self._host.set_room_paused(False)
         if side is not None:
             # Whatever ended it -- the loop button pressed off, an Escape, a set
             # culled empty -- the region goes back to browsing its library.  The

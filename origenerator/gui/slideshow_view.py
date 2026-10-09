@@ -187,11 +187,10 @@ class SlideshowView(QWidget):
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
 
-        # A pause — the hosting session's OmniPause, or a click on a show with no
-        # session — held here so it survives navigation: a step lands on a NEW
-        # slide (the freeze does not un-aim the transport), but the slide must
-        # arrive frozen — no dwell armed, its video paused — rather than playing
-        # out from under the freeze.
+        # The room's pause, held here so it survives navigation: a step lands on
+        # a NEW slide (the freeze does not un-aim the transport), but the slide
+        # must arrive frozen — no dwell armed, its video paused — rather than
+        # playing out from under the freeze.
         self._paused = False
 
         self._show_current()
@@ -1247,8 +1246,7 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def set_paused(self, paused: bool) -> None:
-        """Freeze or resume the show whole — the hosting session's OmniPause, or
-        a click on a show standing on its own.
+        """Freeze or resume the show whole, with the room.
 
         Distinct from the lock: a lock holds one slide by choice and replays
         its clip; this stops time itself.  The Funestra's clock is the show's,

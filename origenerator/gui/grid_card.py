@@ -105,6 +105,8 @@ def style_caption(label) -> None:
     label.setMaximumHeight(caption_height())
 
 
+from shared_ui.palette import TEXT_MUTED, as_hex
+
 from origenerator.gui.palette import (
     CARD_HOVER_BORDER,
     EMPTY_PLATE,
@@ -117,14 +119,16 @@ from origenerator.gui.palette import (
 IDLE_FRAME_CSS = (
     "#{name} {{ border: 1px dashed #4a4a4a; border-radius: 4px; }}"
     "#{name}:hover {{ border-color: " + CARD_HOVER_BORDER + "; }}"
+    "#{name}:disabled {{ border-color: #4a4a4a; }}"
+    "#{name} QLabel:disabled {{ color: " + as_hex(TEXT_MUTED) + "; }}"
 )
 SELECTED_FRAME_CSS = ("#{name} {{ border: 2px solid " + SELECTED_BORDER
                       + "; background-color: " + SELECTED_FILL + "; border-radius: 4px; }}")
 
 # How a glyph itself is drawn: a large muted character on the same plate a
 # thumbnail's picture would occupy.
-GLYPH_CSS = ("color: #6f6f6f; font-size: {size}px; background: " + EMPTY_PLATE
-             + "; border-radius: 3px;")
+GLYPH_CSS = ("QLabel {{ color: #6f6f6f; font-size: {size}px; background: " + EMPTY_PLATE
+             + "; border-radius: 3px; }} QLabel:disabled {{ color: #4a4a4a; }}")
 
 
 def idle_css(name: str) -> str:

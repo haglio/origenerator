@@ -200,6 +200,7 @@ def _draw_between_headings(flow, rows, headings, draw, *, start=0):
 class LeadTiles:
     reroll: QWidget | None = None
     request: QWidget | None = None
+    generating: QWidget | None = None
 
 
 @dataclass(frozen=True)
@@ -226,8 +227,9 @@ class PaneHost:
     enhance_settings: Callable[[], object]
     # Whether the background experimenter is on (the empty shelf teaches off it).
     experiments_enabled: Callable[[], bool]
-    # A settings folder's own tiles from the view — the live re-roll tile and its
-    # request mirror, each None where the folder has none — for the pane to place.
+    # A settings folder's own tiles from the view — the re-roll tile, its request
+    # mirror and the run in front of its line, each None where the folder has
+    # none — for the pane to place.
     lead_tiles: Callable[[object], LeadTiles]
 
 
@@ -425,7 +427,7 @@ class BrowserPane(QObject):
         would otherwise outlive the tiles it referred to.
         """
         self.clear_selection()
-        self.pane_reset.emit()  # the view drops its re-roll tile with the old pane
+        self.pane_reset.emit()  # the view drops its generating tile with the old pane
         self._inflight_cards = {}    # ...as are the live cards, by whichever pane draws them
         self._inflight_by_key = {}
         self._selection.forget_what_was_shown()
@@ -1218,10 +1220,10 @@ class BrowserPane(QObject):
             self._thumb_widgets[row["prompt_id"]] = tw
 
         # The re-roll tile leads the flow so it sits beside the newest item
-        # (thumbnails are sorted newest-first). A generation running in this folder —
-        # a re-roll, which is also what a tab's Generate now is — is this tile: it
-        # shows the live frame, so the running row is left out of the static grid
-        # below rather than drawn as a broken, output-less thumbnail.
+        # (thumbnails are sorted newest-first). The run in front of this folder's
+        # line has the generating tile after it, where its picture will land: the
+        # running row is left out of the static grid below rather than drawn as a
+        # broken, output-less thumbnail.
         finished = [row for row in group.rows if gallery.produced_output(row)]
         headings = gallery.section_headings(finished)
         lead = self._host.lead_tiles(group)
@@ -1234,7 +1236,8 @@ class BrowserPane(QObject):
             flow.addWidget(lead.request)
 
         def draw_leading():
-            for tile in (lead.reroll, None if request_above else lead.request):
+            for tile in (lead.reroll, None if request_above else lead.request,
+                         lead.generating):
                 if tile is not None:
                     flow.addWidget(tile)
             for item in cards:
@@ -1247,7 +1250,7 @@ class BrowserPane(QObject):
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
         """Every other run of this folder still in flight, for a card each.
 
-        The re-roll tile shows the one in front, and used to be the whole of
+        The generating tile shows the one in front, and used to be the whole of
         what a folder said about work in flight — so a request over a folder,
         which queues a run per image at once, showed up as a single card the
         images then arrived through one at a time. They are all being made;

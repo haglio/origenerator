@@ -60,7 +60,11 @@ from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
-from origenerator.gui.inflight import discard_run_text, discard_run_tooltip
+from origenerator.gui.inflight import (
+    ALREADY_MAKING_ONE_TIP,
+    discard_run_text,
+    discard_run_tooltip,
+)
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.param_form import ParamForm
@@ -78,7 +82,6 @@ logger = logging.getLogger(__name__)
 
 _CAPTION_DELAY_MS = 250    # settle before re-reading whether Generate would duplicate
 _RANDOM_SEED_CAPTION = "Generate with Random seed"
-_ALREADY_MAKING_ONE_TIP = "This folder is already making one"
 _RANDOM_SEED_TIP = (
     "These settings have already been generated with this exact seed, so "
     "Generate draws a fresh one rather than re-creating the same file. "
@@ -688,7 +691,7 @@ class GenerateConfigPanel(QWidget):
         self._generate_btn.set_caption(
             _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
         self._generate_btn.setToolTip(
-            _ALREADY_MAKING_ONE_TIP if self._folder_generating
+            ALREADY_MAKING_ONE_TIP if self._folder_generating
             else (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):

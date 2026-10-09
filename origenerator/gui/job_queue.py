@@ -172,7 +172,7 @@ class JobQueue(QObject):
         """The folder-facing view: each folder's *leading* live job, by folder key.
 
         A folder can have several queued at once, but the things keyed by folder —
-        its one live re-roll tile, the selection that follows it — show the one in
+        its one generating tile, the selection that follows it — show the one in
         front: being made, or next to be. That is not always the one asked for
         first, since a picture asked for second takes the machine from the first
         (:meth:`_set_aside_for`). Use :attr:`all_jobs` for everything in flight.

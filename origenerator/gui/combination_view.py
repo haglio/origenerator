@@ -3,7 +3,7 @@
 Two renderings of one look. :class:`CombinationView` is the live one, for a pane
 with room to loop the clip; :func:`combination_pixmap` is the same arithmetic as
 a still, for the surfaces that hold a picture rather than a widget — the queue
-strip's corner and a folder's re-roll tile. They are together here because what
+strip's corner and a folder's generating tile. They are together here because what
 they have to agree on is the look: a run in flight shows the same pair in all
 three places until ComfyUI streams a frame of the run itself, and three
 surfaces each drawing their own idea of it is what left one blurred, one blank

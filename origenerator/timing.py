@@ -224,7 +224,7 @@ class RunTiming:
         ``"First pass · 45% · 1:23 elapsed · ~4:10 left"``.
 
         One wording, shared by the lower strip's queue, the shelf's in-flight cards
-        and a folder's re-roll tile, so the same run reads the same wherever it is
+        and a folder's generating tile, so the same run reads the same wherever it is
         being watched, rather than three surfaces each saying a different half of
         it in different words.
 

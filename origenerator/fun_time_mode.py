@@ -85,8 +85,9 @@ HEADSET_RELEASE = "release"
 HEADSET_DRAG = "drag"
 HEADSET_HOVER = "hover"
 HEADSET_SCROLL = "scroll"
+HEADSET_RIGHT_CLICK = "rightclick"
 HEADSET_WORDS = (HEADSET_PRESS, HEADSET_RELEASE, HEADSET_DRAG, HEADSET_HOVER,
-                 HEADSET_SCROLL)
+                 HEADSET_SCROLL, HEADSET_RIGHT_CLICK)
 
 OPEN_SHOWS = "OPEN_SHOWS"
 CLOSE_SHOWS = "CLOSE_SHOWS"
@@ -493,18 +494,34 @@ def a_session_holds_the_device(state_dir: Path) -> bool:
     return process_creation_time(pid) == created_at
 
 
+def _stayed_standalone(why: str) -> None:
+    logger.warning("A Fun Time session's takeover was not taken: %s. This window "
+                   "stays standalone, so that session has no Origenerator.", why)
+
+
 def take_the_takeover(state_dir: Path, *, pid: int) -> FunTimeSession | None:
     takeover = state_dir / TAKEOVER_NAME
+    if not takeover.exists():
+        return None
     try:
         asked = json.loads(takeover.read_text(encoding="utf-8"))
-        if asked["pid"] != pid:
-            return None
+        whose = asked["pid"]
         args, unknown = build_parser().parse_known_args(asked["args"])
-    except (OSError, ValueError, TypeError, KeyError):
+    except (OSError, ValueError, TypeError, KeyError) as not_one:
+        _stayed_standalone(f"it did not read as a session ({not_one!r})")
         return None
     finally:
         takeover.unlink(missing_ok=True)
-    return None if unknown else _session_of(args)
+    if whose != pid:
+        _stayed_standalone(f"it asked for another window, pid {whose}")
+        return None
+    if unknown:
+        _stayed_standalone(f"it named {unknown}, a flag this app does not know")
+        return None
+    session = _session_of(args)
+    if session is None:
+        _stayed_standalone("it named no session at all")
+    return session
 
 
 if __name__ == "__main__":

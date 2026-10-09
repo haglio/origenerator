@@ -19,11 +19,13 @@ from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import main_window
+from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.main_window import OrigeneratorWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -1026,6 +1028,22 @@ def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_p
     assert win.hands_its_window_over is not None
 
 
+def test_a_takeover_by_the_monitors_shrinks_the_window_to_the_hud_scale(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+
+def test_a_takeover_by_the_headset_draws_at_the_desktop_scale(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_headset_session(tmp_path))
+
+    assert ui_scale.active_scale() == 1.0
+
+
 def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
     """There the window itself is what is seen, so a frame written every tick
     would be work for nobody."""
@@ -1068,6 +1086,98 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
     assert win.isMinimized()
 
 
+def _picture_published(frames_file) -> tuple[int, int]:
+    """The width and height in the picture channel's header, (0, 0) until one is."""
+    _sequence, _token, width, height = _HEADER.unpack_from(
+        frames_file.read_bytes(), 0)
+    return width, height
+
+
+def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
+    """The window a desktop session launches is folded into the upright column
+    its rect asks for; the headset room it crosses into has no such rect.  His
+    2026-10-08 session got the folded one in the room."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    assert win._gallery_view._arrangement.stack is not None, "it did not open folded"
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert win._gallery_view._arrangement.stack is None, "the room got the upright fold"
+
+
+def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
+    """The room appends a press per aim and the window drains them on its poll.
+    On 2026-10-08 it drained none: 813 lines of his aims, 11 of them presses,
+    were still waiting in the file when the session ended."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    presses = tmp_path / "input.txt"
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    qtbot.waitUntil(lambda: _picture_published(tmp_path / "frame.bin") != (0, 0),
+                    timeout=3000)
+    append_command(presses, "hover 10 10")
+
+    qtbot.waitUntil(lambda: not presses.exists() or not presses.read_text(
+        encoding="utf-8").strip(), timeout=3000)
+
+
+def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):
+    """A desktop session parks it minimized, and Windows unmaps such a window:
+    the room's Origenerator screen stayed blank for his whole 2026-10-08
+    session.  The suite's Qt grabs one happily, so the state is what this pins."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    win.showMinimized()
+    frames = tmp_path / "frame.bin"
+
+    _say(tmp_path, f"HAND_OVER|{frames}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert not win.isMinimized(), "the room was handed a window Windows had unmapped"
+    qtbot.waitUntil(lambda: _picture_published(frames) != (0, 0), timeout=3000)
+
+
+def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(
+        qtbot, tmp_path):
+    """A window launched hosted is a different constructor from a taken-over one."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    qtbot.addWidget(win)
+    assert win.hands_its_window_over is None
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+
+def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_hosted_with_a_channel(tmp_path))
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert ui_scale.active_scale() == 1.0
+
+    _say(tmp_path, "TAKE_BACK")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
+
+    assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
+
+
+def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    monitors = _hosted_with_a_channel(tmp_path)
+    win.become_hosted(monitors)
+    assert (win.width(), win.height()) == (monitors.main_rect.width,
+                                           monitors.main_rect.height)
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert max(win.width(), win.height()) == CAP_PX
+
+
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
     """A standalone window a headset session takes over is in the same place as
     one it launched, and the hand-back stops it again."""
@@ -1082,6 +1192,30 @@ def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, t
     win.become_standalone()
 
     assert win.hands_its_window_over is None
+
+
+def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    session = _headset_session(tmp_path)
+
+    win.become_hosted(session)
+
+    assert (win.width(), win.height()) != (session.main_rect.width,
+                                           session.main_rect.height)
+
+
+def test_a_window_hosted_in_the_headset_opens_as_big_as_the_picture_can_carry(
+        qtbot, tmp_path):
+    """At its size on a monitor the whole layout arrived squeezed small."""
+    win = _window(qtbot, tmp_path)
+    win.resize(400, 300)
+    stood_alone_at = win.size()
+
+    win.become_hosted(_headset_session(tmp_path))
+
+    assert max(win.width(), win.height()) == CAP_PX
+    assert win.width() / win.height() == pytest.approx(
+        stood_alone_at.width() / stood_alone_at.height(), abs=0.02)
 
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):

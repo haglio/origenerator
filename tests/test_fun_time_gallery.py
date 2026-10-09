@@ -7,6 +7,8 @@ console — and its layout folds to fit the Random Favs Browser's upright rect.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from pathlib import Path
 
 from PIL import Image
 from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
@@ -178,6 +180,17 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     # The second pane is the info-pane wrapper (tabs + the find bar).
     assert view._arrangement.panes.widget(1).findChild(type(view._info_tabs)) is view._info_tabs
+    assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
+
+
+def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
+    """The upright stack is the Random Favs Browser's rect asking for it."""
+    view = GalleryView(FakeDB([]), fun_time=replace(
+        _session(), frames_file=Path("frame.bin"), input_file=Path("input.txt")))
+    qtbot.addWidget(view)
+
+    assert view._arrangement.stack is None, "the headset got the upright fold"
+    assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     assert view._arrangement.folder_panes.count() == 2  # the tree, then the browser
 
 

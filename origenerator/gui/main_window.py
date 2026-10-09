@@ -17,11 +17,11 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
 from origenerator.fun_time_bridge import FunTimeBridge
-from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession
+from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.desktop_notices import DesktopNotices
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hard_to_miss import hard_to_miss
-from origenerator.gui.headset_window import HeadsetWindow
+from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.win32 import place_window_in_device_pixels
@@ -124,6 +124,7 @@ class OrigeneratorWindow(QMainWindow):
             self._answer_the_crossings(
                 FunTimeBridge(fun_time, self._gallery_view, parent=self))
         self.hands_its_window_over: HeadsetWindow | None = None
+        self._found: tuple[QByteArray, float, bool] | None = None
         if fun_time is not None and fun_time.in_a_headset:
             self._hand_the_window_over(fun_time)
 
@@ -156,8 +157,8 @@ class OrigeneratorWindow(QMainWindow):
         state — and reopen the last session's config tabs, gallery folder, and
         selected generation.  Inside a Fun Time session the geometry is the
         session's to dictate, so the saved one is neither restored nor (see
-        ``closeEvent``) overwritten."""
-        if self._fun_time is None:
+        ``closeEvent``) overwritten -- except in a headset, which names no rect."""
+        if self._fun_time is None or self._fun_time.in_a_headset:
             self._restore_geometry()
         for key, _getter, setter in SESSION_UI_STATE:
             setter(self._gallery_view, self._app_state.get(key))
@@ -216,7 +217,7 @@ class OrigeneratorWindow(QMainWindow):
             self._taskbar.join(session.taskbar_identity)
         self._gallery_view.become_hosted(session)
         self.setWindowState(Qt.WindowState.WindowNoState)
-        ui_scale.draw_at(ui_scale.hosted_scale())
+        ui_scale.draw_at(ui_scale.room_scale(in_a_headset=session.in_a_headset))
         self._wear_the_session(session)
         self._bridge = FunTimeBridge(session, self._gallery_view, parent=self)
         self._bridge.released.connect(self.become_standalone)
@@ -238,12 +239,26 @@ class OrigeneratorWindow(QMainWindow):
         bridge.take_back_asked.connect(self._taken_back_to_the_monitors)
 
     def _handed_to_a_headset(self, frames_file, input_file) -> None:
+        logger.info("A headset session has this window now; its picture goes to %s "
+                    "and its presses come from %s", frames_file, input_file)
         self._take_the_window_back()
-        self._hand_the_window_over(replace(
-            self._fun_time, frames_file=frames_file, input_file=input_file))
+        self._fun_time = replace(
+            self._fun_time, frames_file=frames_file, input_file=input_file)
+        ui_scale.draw_at(ui_scale.room_scale(in_a_headset=True))
+        self._gallery_view.wear_the_room(self._fun_time)
+        self._dress_for_the_room(self._fun_time)
+        self._wear_the_desktop_geometry()
+        self._hand_the_window_over(self._fun_time)
 
     def _taken_back_to_the_monitors(self) -> None:
+        logger.info("A session on the monitors has this window now; it stops "
+                    "publishing its picture and parks")
         self._take_the_window_back()
+        self._fun_time = replace(self._fun_time, frames_file=None, input_file=None)
+        ui_scale.draw_at(ui_scale.room_scale(in_a_headset=False))
+        self._gallery_view.wear_the_room(self._fun_time)
+        self._dress_for_the_room(self._fun_time)
+        self._sit_at_the_sessions_rect(self._fun_time.main_rect)
         self.showMinimized()
 
     def _take_the_window_back(self) -> None:
@@ -281,12 +296,41 @@ class OrigeneratorWindow(QMainWindow):
         # area IS the rect Fun Time named (the Random Favs Browser's), and
         # in the topmost band where every managed window lives — Fun Time
         # decides who within the band is in front.
-        self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        rect = session.main_rect
+        self._dress_for_the_room(session)
+        if session.in_a_headset:
+            self._fill_the_pictures_cap()
+        else:
+            self._sit_at_the_sessions_rect(session.main_rect)
+
+    def _dress_for_the_room(self, session: FunTimeSession) -> None:
+        """Frameless and in the topmost band for the rect a session on the
+        monitors names.  A headset room has neither, and Windows refuses to
+        resize a frameless topmost window past the rect it was given -- which
+        left the published picture at the session's small upright size."""
+        managed = (Qt.WindowType.FramelessWindowHint
+                   | Qt.WindowType.WindowStaysOnTopHint)
+        flags = self.windowFlags()
+        self.setWindowFlags(flags & ~managed if session.in_a_headset
+                            else flags | managed)
+
+    def _wear_the_desktop_geometry(self) -> None:
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        self._device_rect = None
+        if self._found is None:
+            self._restore_geometry()
+        else:
+            self.restoreGeometry(self._found[0])
+        self._fill_the_pictures_cap()
+
+    def _fill_the_pictures_cap(self) -> None:
+        """As big as the published picture's longest edge can carry."""
+        width, height = self.width(), self.height()
+        if width <= 0 or height <= 0:
+            return
+        grow = CAP_PX / max(width, height)
+        self.resize(round(width * grow), round(height * grow))
+
+    def _sit_at_the_sessions_rect(self, rect: Rect) -> None:
         # Set here so the window opens near the right size, then pinned to
         # the exact DEVICE rect once it is shown (see showEvent): a scaled
         # process cannot say a second monitor's coordinates in Qt's space at

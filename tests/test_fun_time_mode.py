@@ -161,6 +161,32 @@ def test_a_takeover_that_does_not_read_as_a_session_is_spent_unanswered(tmp_path
     assert not takeover.exists()
 
 
+@pytest.mark.parametrize("written, said", [
+    ("not json", "did not read as a session"),
+    ('{"pid": 4321, "args": ["--fun-time", "--a-flag-from-a-newer-session"]}',
+     "a flag this app does not know"),
+    ('{"pid": 4321, "args": ["--x", "5"]}', "named no session"),
+    ('{"pid": 9999, "args": ["--fun-time"]}', "asked for another window"),
+])
+def test_a_takeover_this_window_cannot_take_says_why(tmp_path, caplog, written, said):
+    """Each of these left no trace at all until 2026-10-06, so a session that
+    reported hosting this app while this app went on standalone -- which is a
+    room whose Origenerator mode button stays dim -- could be read from neither
+    app's log."""
+    (tmp_path / "fun_time_takeover.json").write_text(written, encoding="utf-8")
+
+    assert take_the_takeover(tmp_path, pid=4321) is None
+
+    assert said in caplog.text
+
+
+def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
+    """Four of these a second, for as long as the window stands its offer."""
+    assert take_the_takeover(tmp_path, pid=4321) is None
+
+    assert caplog.text == ""
+
+
 def test_a_window_still_being_built_offers_itself_as_starting(tmp_path):
     offer_the_window_while_it_is_built(tmp_path)
 

@@ -662,8 +662,8 @@ def main(argv: list[str] | None = None) -> int:
         # Hosted, draw at the session's HUD scale (origenerator.ui_scale says
         # why). Here and not later: Qt reads QT_SCALE_FACTOR as the platform
         # plugin starts, so it has to be set before PyQt6 is imported at all.
-        from origenerator.ui_scale import apply_hosted_scale
-        apply_hosted_scale()
+        from origenerator.ui_scale import apply_room_scale
+        apply_room_scale(in_a_headset=fun_time.in_a_headset)
     _warm_voice_runtimes()  # must precede the first PyQt6 import below
     preview = _shown_as()
     _init_windows_taskbar_identity(fun_time and fun_time.taskbar_identity, preview)

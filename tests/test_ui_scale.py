@@ -19,7 +19,7 @@ from tests.hosted_launch import hosted_launch
 
 @pytest.fixture(autouse=True)
 def clean_env():
-    """QT_SCALE_FACTOR is process-global, and apply_hosted_scale writes it
+    """QT_SCALE_FACTOR is process-global, and apply_room_scale writes it
     straight into os.environ — so it is cleared on the way OUT as well as in.
     Left set, it scales every Qt widget built by every later test in the run."""
     os.environ.pop("QT_SCALE_FACTOR", None)
@@ -35,21 +35,27 @@ def test_the_hosted_scale_makes_this_apps_buttons_the_huds_buttons():
 
 def test_applying_the_scale_sets_what_qt_reads(monkeypatch):
     assert ui_scale.active_scale() == 1.0  # nothing has scaled us
-    applied = ui_scale.apply_hosted_scale()
+    applied = ui_scale.apply_room_scale(in_a_headset=False)
     assert applied == ui_scale.HOSTED_SCALE
     assert float(os.environ["QT_SCALE_FACTOR"]) == ui_scale.HOSTED_SCALE
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
 
+def test_a_headset_launch_is_not_shrunk_at_all():
+    """Leaving Qt's variable unset is what draws it as it does standalone."""
+    assert ui_scale.apply_room_scale(in_a_headset=True) == 1.0
+    assert "QT_SCALE_FACTOR" not in os.environ
+
+
 def test_a_scale_already_in_the_environment_wins(monkeypatch):
     monkeypatch.setenv("QT_SCALE_FACTOR", "1.5")
-    assert ui_scale.apply_hosted_scale() == 1.5
+    assert ui_scale.apply_room_scale(in_a_headset=False) == 1.5
     assert ui_scale.active_scale() == 1.5
 
 
 def test_an_unreadable_scale_is_treated_as_unset(monkeypatch):
     monkeypatch.setenv("QT_SCALE_FACTOR", "not-a-number")
-    assert ui_scale.apply_hosted_scale() == ui_scale.HOSTED_SCALE
+    assert ui_scale.apply_room_scale(in_a_headset=False) == ui_scale.HOSTED_SCALE
 
 
 def test_unscaled_lengths_pass_through_untouched():
@@ -62,7 +68,7 @@ def test_an_unscaled_rect_passes_through_untouched():
 
 
 def test_a_length_scales_back_to_the_device_pixels_it_named():
-    ui_scale.apply_hosted_scale()
+    ui_scale.apply_room_scale(in_a_headset=False)
     scale = ui_scale.HOSTED_SCALE
     for edge in (0, 720, 1280, 1281, 1440, 2560):
         assert abs(ui_scale.to_logical_size(edge) * scale - edge) <= 1
@@ -74,7 +80,7 @@ def test_a_rect_converts_against_its_own_screens_origin(monkeypatch):
     x by the scale lands deep inside the second monitor rather than at its left
     edge — which put the portrait show in the right third of its region, hanging
     off the monitor."""
-    ui_scale.apply_hosted_scale()
+    ui_scale.apply_room_scale(in_a_headset=False)
     scale = ui_scale.HOSTED_SCALE
     # The real pair off this machine: a 2560-wide primary, a portrait beside it.
     monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
@@ -88,7 +94,7 @@ def test_a_rect_converts_against_its_own_screens_origin(monkeypatch):
 
 
 def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypatch):
-    ui_scale.apply_hosted_scale()
+    ui_scale.apply_room_scale(in_a_headset=False)
     scale = ui_scale.HOSTED_SCALE
     monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
     x, _y, _w, _h = ui_scale.to_logical_rect(2560 + 400, 3, 200, 200)
@@ -100,7 +106,7 @@ def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypa
 def test_the_hud_bitmap_is_pinned_to_device_pixels(qapp):
     """An 18px HUD button is already the size it should be on screen, so the
     core window's scale must not shrink it: the pixmap's ratio cancels it."""
-    ui_scale.apply_hosted_scale()
+    ui_scale.apply_room_scale(in_a_headset=False)
     pixmap = ui_scale.unscaled_pixmap(QPixmap(280, 140))
 
     assert pixmap.devicePixelRatio() == ui_scale.HOSTED_SCALE
@@ -111,7 +117,7 @@ def test_the_hud_bitmap_is_pinned_to_device_pixels(qapp):
 
 
 def test_a_press_on_that_bitmap_indexes_it_in_its_own_pixels():
-    ui_scale.apply_hosted_scale()
+    ui_scale.apply_room_scale(in_a_headset=False)
     # A click at the far corner of the widget is the far corner of the bitmap.
     assert ui_scale.to_bitmap_pos(0, 0) == (0, 0)
     x, y = ui_scale.to_bitmap_pos(280 / ui_scale.HOSTED_SCALE, 140 / ui_scale.HOSTED_SCALE)
@@ -130,7 +136,7 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
     main = ast.parse(inspect.getsource(app_module.main))
     applied = min(node.lineno for node in ast.walk(main)
                   if isinstance(node, ast.Call)
-                  and ast.unparse(node.func).endswith("apply_hosted_scale"))
+                  and ast.unparse(node.func).endswith("apply_room_scale"))
     imported = min(node.lineno for node in ast.walk(main)
                    if isinstance(node, ast.ImportFrom)
                    and (node.module or "").startswith("PyQt6"))

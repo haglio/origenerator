@@ -775,7 +775,8 @@ class GalleryView(QWidget):
         self._arrangement = PaneArrangement(
             toc=toc, browser=browser, info_pane=self._build_info_pane(),
             info_tabs=self._info_tabs, queue=self._queue)
-        layout.addWidget(self._arrangement.hosted() if self._fun_time is not None
+        folded = self._fun_time is not None and not self._fun_time.in_a_headset
+        layout.addWidget(self._arrangement.hosted() if folded
                          else self._arrangement.standalone(), 1)
 
     def _build_toc_pane(self):
@@ -1034,7 +1035,17 @@ class GalleryView(QWidget):
             self._motion_pane.hide()
         self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
         self._osr2_motion = self._osr2_driver = self._motion_panel = None
-        self._arrangement.fold_into_the_session_column(self.layout())
+        self.wear_the_room(session)
+
+    def wear_the_room(self, session) -> None:
+        """The panes in the shape this room leaves them: the upright fold for
+        the rect a session on the monitors names, side by side anywhere else."""
+        folded = self._arrangement.stack is not None
+        wants_the_fold = session is not None and not session.in_a_headset
+        if wants_the_fold and not folded:
+            self._arrangement.fold_into_the_session_column(self.layout())
+        elif folded and not wants_the_fold:
+            self._arrangement.unfold_from_the_session_column(self.layout())
 
     def become_standalone(self) -> None:
         self.set_session_paused(False)
@@ -1050,7 +1061,7 @@ class GalleryView(QWidget):
             self._osr2_motion, audio=self._bank.audio,
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
-        self._arrangement.unfold_from_the_session_column(self.layout())
+        self.wear_the_room(None)
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

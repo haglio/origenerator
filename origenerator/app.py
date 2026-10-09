@@ -278,9 +278,13 @@ def _merge_soundless_copies(library: Library):
 
 
 def _backfill_workflow_labels(library: Library):
-    from origenerator.importer import backfill_import_workflows
+    from origenerator.importer import (
+        backfill_import_workflows,
+        refile_enhancements_another_recipe_made,
+    )
 
-    return backfill_import_workflows(library.db)
+    return (backfill_import_workflows(library.db)
+            + refile_enhancements_another_recipe_made(library.db))
 
 
 def _backfill_import_params(library: Library):
@@ -307,9 +311,22 @@ def _fold_enhancements(library: Library):
     an enhance no instance recorded -- one queued straight on ComfyUI -- reaches
     here as a bare file, and the standalone image the scan just reconstructed
     from it is exactly what there is to fold away."""
-    from origenerator.gallery import fold_completed_enhancements
+    from origenerator import config
+    from origenerator.gallery import enhancements_of_pictures_gone, fold_completed_enhancements
 
     fold_completed_enhancements(library.db)
+    return _scrap(library, enhancements_of_pictures_gone(library.db.list_generations(),
+                                                         output_dir=library.output_dir,
+                                                         input_dir=config.COMFYUI_INPUT_DIR))
+
+
+def _scrap(library: Library, rows: list[dict]) -> int:
+    from origenerator import config
+    from origenerator.gallery_actions import GalleryActions
+    from origenerator.trash import Trash
+
+    GalleryActions(library.db, library.output_dir, Trash(config.TRASH_DIR)).delete_rows(rows)
+    return len(rows)
 
 
 def _disown_foreign_runs(library: Library):
@@ -397,6 +414,7 @@ MAINTENANCE = (
              counted="Put back the seed of %d video imports",
              failure="Video-import seed repair failed: %s"),
     BootPass("Folding enhancements into their images...", _fold_enhancements,
+             counted="Moved %d enhancement(s) of deleted pictures to the Trash",
              failure="Enhancement fold failed: %s"),
     BootPass(None, _disown_foreign_runs,
              counted="Disowned a preview's run id on %d enhanced image(s)",

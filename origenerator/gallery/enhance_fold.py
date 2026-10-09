@@ -32,7 +32,9 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
+from origenerator.file_refs import reference_path
 from origenerator.gallery.enhance import (
     enhance_level_params,
     enhance_target_id,
@@ -44,6 +46,7 @@ from origenerator.gallery.output import (
     parse_file_list,
     row_output_files,
 )
+from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 
@@ -167,6 +170,16 @@ def fold_completed_enhancements(db) -> int:
     if folded:
         logger.info("Folded %d enhancements into their source images", folded)
     return folded
+
+
+def enhancements_of_pictures_gone(rows, *, output_dir: Path, input_dir: Path) -> list[dict]:
+    return [
+        row for row in rows
+        if row.get("workflow_name") == ENHANCE_WORKFLOW
+        and row.get("status") == GenerationStatus.COMPLETED
+        and (picture := parse_params(row.get("params_json")).get("input_image"))
+        and reference_path(picture, output_dir=output_dir, input_dir=input_dir) is None
+    ]
 
 
 def disown_foreign_runs(db) -> int:

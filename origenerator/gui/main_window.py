@@ -242,16 +242,22 @@ class OrigeneratorWindow(QMainWindow):
         logger.info("A headset session has this window now; its picture goes to %s "
                     "and its presses come from %s", frames_file, input_file)
         self._take_the_window_back()
+        self._fun_time = replace(
+            self._fun_time, frames_file=frames_file, input_file=input_file)
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=True))
+        self._gallery_view.wear_the_room(self._fun_time)
+        self._dress_for_the_room(self._fun_time)
         self._wear_the_desktop_geometry()
-        self._hand_the_window_over(replace(
-            self._fun_time, frames_file=frames_file, input_file=input_file))
+        self._hand_the_window_over(self._fun_time)
 
     def _taken_back_to_the_monitors(self) -> None:
         logger.info("A session on the monitors has this window now; it stops "
                     "publishing its picture and parks")
         self._take_the_window_back()
+        self._fun_time = replace(self._fun_time, frames_file=None, input_file=None)
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=False))
+        self._gallery_view.wear_the_room(self._fun_time)
+        self._dress_for_the_room(self._fun_time)
         self._sit_at_the_sessions_rect(self._fun_time.main_rect)
         self.showMinimized()
 
@@ -290,15 +296,22 @@ class OrigeneratorWindow(QMainWindow):
         # area IS the rect Fun Time named (the Random Favs Browser's), and
         # in the topmost band where every managed window lives — Fun Time
         # decides who within the band is in front.
-        self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
+        self._dress_for_the_room(session)
         if session.in_a_headset:
             self._fill_the_pictures_cap()
         else:
             self._sit_at_the_sessions_rect(session.main_rect)
+
+    def _dress_for_the_room(self, session: FunTimeSession) -> None:
+        """Frameless and in the topmost band for the rect a session on the
+        monitors names.  A headset room has neither, and Windows refuses to
+        resize a frameless topmost window past the rect it was given -- which
+        left the published picture at the session's small upright size."""
+        managed = (Qt.WindowType.FramelessWindowHint
+                   | Qt.WindowType.WindowStaysOnTopHint)
+        flags = self.windowFlags()
+        self.setWindowFlags(flags & ~managed if session.in_a_headset
+                            else flags | managed)
 
     def _wear_the_desktop_geometry(self) -> None:
         self.setWindowState(Qt.WindowState.WindowNoState)

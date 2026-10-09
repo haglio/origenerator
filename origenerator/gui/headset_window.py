@@ -141,20 +141,35 @@ class HeadsetWindow(QObject):
         self._published: tuple[int, int] | None = None
         self._looked_at: float | None = None
         self._asked = False
+        self._taken = 0
+        self._threw = False
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(_POLL_MS)
+        logger.info("Publishing this window for the headset every %dms, %dx%d to "
+                    "start, and taking its presses from %s",
+                    _POLL_MS, window.width(), window.height(), self._input)
 
     def close(self) -> None:
         self._timer.stop()
         self._frames.close()
+        logger.info("Stopped publishing this window for the headset after %d "
+                    "pictures and %d presses", self._frames.written, self._taken)
 
     # --- the room's presses, as this window's own events ---------------------
 
     def _tick(self) -> None:
-        for line in consume_command_file(self._input, uppercase=False):
-            self._heard(line)
-        self.publish()
+        try:
+            for line in consume_command_file(self._input, uppercase=False):
+                self._taken += 1
+                self._heard(line)
+            self.publish()
+        except Exception:
+            # Qt swallows what a slot raises, and a poll that throws every tick
+            # leaves a screen in the room that never changes and never answers.
+            if not self._threw:
+                self._threw = True
+                logger.exception("This window's headset poll threw; it keeps polling")
 
     def _heard(self, line: str) -> None:
         kind, _, rest = line.strip().partition(" ")

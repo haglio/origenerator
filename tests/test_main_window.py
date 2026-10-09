@@ -1093,6 +1093,36 @@ def _picture_published(frames_file) -> tuple[int, int]:
     return width, height
 
 
+def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
+    """The window a desktop session launches is folded into the upright column
+    its rect asks for; the headset room it crosses into has no such rect.  His
+    2026-10-08 session got the folded one in the room."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    assert win._gallery_view._arrangement.stack is not None, "it did not open folded"
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+    assert win._gallery_view._arrangement.stack is None, "the room got the upright fold"
+
+
+def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
+    """The room appends a press per aim and the window drains them on its poll.
+    On 2026-10-08 it drained none: 813 lines of his aims, 11 of them presses,
+    were still waiting in the file when the session ended."""
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
+    presses = tmp_path / "input.txt"
+
+    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
+    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    qtbot.waitUntil(lambda: _picture_published(tmp_path / "frame.bin") != (0, 0),
+                    timeout=3000)
+    append_command(presses, "hover 10 10")
+
+    qtbot.waitUntil(lambda: not presses.exists() or not presses.read_text(
+        encoding="utf-8").strip(), timeout=3000)
+
+
 def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):
     """A desktop session parks it minimized, and Windows unmaps such a window:
     the room's Origenerator screen stayed blank for his whole 2026-10-08

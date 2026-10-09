@@ -172,8 +172,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     session file keeps is read and put back by. And the pane 86 -> 87: a show
     collects what a set holds once for each model the pane takes rather than
     once for each picture a running generation sends, and the pane's stamp is
-    what says a new model has come.)"""
+    what says a new model has come. 270 -> 271: the panes fold for the rect a
+    session on the monitors names and sit side by side in a headset room, so
+    which shape they wear is one question, asked at a takeover and at each
+    crossing.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 270
+               for x in _class_def(VIEW, "GalleryView").body) == 271
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

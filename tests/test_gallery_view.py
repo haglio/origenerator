@@ -8022,6 +8022,24 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch)
     assert warn.call_args.args[2] == "RIFE VFI failed: Tried all base urls but no success"
 
 
+def test_a_generate_comfyui_refuses_to_start_says_so_too(qtbot, tmp_path, monkeypatch):
+    warn = MagicMock()
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
+    client = _reroll_client()
+    client.submit_job = MagicMock(side_effect=RuntimeError(
+        "UNETLoader: unet_name: 'example_high.safetensors' not in (list of length 38)"))
+    view = GalleryView(Database(tmp_path / "test.db"), client=client)
+    qtbot.addWidget(view)
+
+    view._on_generate_requested("wan22_t2i", {
+        "positive_prompt": "a lighthouse", "width": 1088, "height": 1920,
+        "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors"})
+
+    warn.assert_called_once()
+    assert warn.call_args.args[1] == "Generation failed"
+    assert "example_high.safetensors" in warn.call_args.args[2]
+
+
 def test_cancel_from_the_tile_dequeues_and_stops_the_run_by_name(qtbot, tmp_path):
     # Both calls, whatever the view last heard about the run: the server takes
     # the prompt out of its line if it is waiting there, and stops it if it is

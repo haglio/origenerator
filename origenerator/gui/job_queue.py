@@ -414,20 +414,20 @@ class JobQueue(QObject):
             if newcomer is not None and self._key_of(newcomer) is not None:
                 self._set_aside_for(newcomer)
 
-    def _hand_over(self, job: GenerationJob, off_thread: bool = True) -> bool:
+    def _hand_over(self, job: GenerationJob, *, closing: bool = False) -> bool:
         """Submit one job to ComfyUI, reporting whether the server took it.
 
         The submit waits off the GUI thread with the window kept alive
         (:func:`_off_the_gui_thread`), so a Cancel can arrive while it is out:
         the job is gone from the line by the time the server answers, and a
-        server that took it is told to let it go. ``off_thread`` False makes
-        the plain blocking call, for the closing app, which has no window left
-        to keep alive.
+        server that took it is told to let it go. A refused job has failed and
+        says so through :attr:`failed`, unless the app is ``closing``, with no
+        window left to keep alive or to say it in.
         """
         key = self._key_of(job)
         self._in_flight = job
         try:
-            job.start(_off_the_gui_thread if off_thread else None)
+            job.start(None if closing else _off_the_gui_thread)
         except Exception as e:
             if self._key_of(job) is None:
                 return False  # canceled while out, and never taken: nothing to undo
@@ -435,6 +435,8 @@ class JobQueue(QObject):
             self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
                                        error_message=str(e))
             self._drop(key, job)
+            if not closing:
+                self.failed.emit(key, str(e))
             return False
         finally:
             self._in_flight = None
@@ -463,7 +465,7 @@ class JobQueue(QObject):
         handed = 0
         for job in list(self._waiting):
             self._waiting.remove(job)
-            if self._hand_over(job, off_thread=False):
+            if self._hand_over(job, closing=True):
                 handed += 1
         if handed:
             logger.info("Handed ComfyUI %d queued job(s) as the app closed", handed)

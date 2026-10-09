@@ -679,6 +679,22 @@ def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
     assert db.get_generation(second.prompt_id)["status"] == "running"
 
 
+def test_a_submit_refused_as_the_app_closes_is_recorded_but_not_announced(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.hold_videos(True)
+    held = _launch_video(queue, "v1", seed=1)
+    client.submit_job = MagicMock(side_effect=RuntimeError("bad prompt"))
+    said = []
+    queue.failed.connect(lambda key, message: said.append(key))
+
+    queue.flush_to_server()
+
+    assert said == []
+    assert db.get_generation(held.prompt_id)["status"] == "error"
+
+
 def test_flush_with_nothing_waiting_is_harmless(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)

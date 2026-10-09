@@ -45,6 +45,23 @@ def test_what_qt_says_lands_in_the_apps_log(caplog):
     ]
 
 
+@pytest.mark.no_qt_log
+def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
+    before = install_qt_message_logging()
+    try:
+        qWarning("an earlier window's complaint")
+        qWarning("an earlier window's complaint")
+        install_qt_message_logging()
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="qt"):
+            qWarning("scene one is not a QObject")
+    finally:
+        qInstallMessageHandler(before)
+
+    assert [r.getMessage() for r in caplog.records if r.name == "qt"] == [
+        "scene one is not a QObject"]
+
+
 def _collapser():
     said = []
     return RepeatCollapser(lambda level, message: said.append((level, message))), said

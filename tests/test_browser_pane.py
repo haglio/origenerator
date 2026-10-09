@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
@@ -101,9 +102,10 @@ class _StubAuto:
         return False
 
 
-def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles()):
-    scroll = BrowserScrollArea()
-    qtbot.addWidget(scroll)
+def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None):
+    if scroll is None:
+        scroll = BrowserScrollArea()
+        qtbot.addWidget(scroll)
     pane = BrowserPane(
         scroll, _StubDB(rows), _StubReroll(), _StubAuto(),
         TreeNavigation(
@@ -147,6 +149,18 @@ def test_the_pane_stands_alone_on_six_stubs(qtbot):
     pane.show_empty()
     assert scroll.widget() is not None       # the pane filled its own canvas
     assert pane.visible_prompt_ids() == []
+
+
+def test_the_second_look_for_a_place_goes_with_the_canvas_it_was_for(qtbot):
+    holder = QWidget()
+    qtbot.addWidget(holder)
+    pane, scroll = _pane(qtbot, scroll=BrowserScrollArea(holder))
+    pane.show_empty()
+    pane.return_to(pane.place())
+
+    sip.delete(scroll)
+
+    qtbot.wait(10)
 
 
 def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot):

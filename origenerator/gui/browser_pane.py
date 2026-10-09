@@ -1356,7 +1356,7 @@ class BrowserPane(QObject):
         # The pane it was just drawn in hasn't been laid out yet, so that first
         # attempt had no real tile position to aim at — hence a second one once
         # this turn's layout has run (as :meth:`return_to` does).
-        defer(self, lambda: self._reapply_reveal(prompt_id, widget))
+        defer(self._scroll, lambda: self._reapply_reveal(prompt_id, widget))
         return True
 
     def _draw_open_shelf_past(self, prompt_id: str) -> None:
@@ -1389,7 +1389,7 @@ class BrowserPane(QObject):
         drawn = self._scroll.widget()
         stand_at(self._scroll, self._thumb_widgets, place, drawn)
         # Again once laid out: a pane drawn this turn has no tile positions yet.
-        defer(self, lambda: stand_at(self._scroll, self._thumb_widgets, place, drawn))
+        defer(self._scroll, lambda: stand_at(self._scroll, self._thumb_widgets, place, drawn))
 
     def _refresh_selection_highlights(self):
         for pid, widget in self._thumb_widgets.items():

@@ -334,7 +334,7 @@ class OrigeneratorWindow(QMainWindow):
                 continue
             self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())
-        if self._fun_time is None:
+        if self._fun_time is None and self.isVisible():
             # Hosted, the geometry is the session's to decide, so remembering
             # this launch's would overwrite the window the user actually sizes.
             self._app_state.set(

@@ -22,6 +22,7 @@ from origenerator.fun_time_mode import (
     a_session_holds_the_device,
     offer_of_this_process,
     take_the_takeover,
+    withdraw_the_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,9 +92,7 @@ class FunTimeWatch(QObject):
 
     def withdraw(self) -> None:
         self._timer.stop()
-        for state_dir in self._state_dirs:
-            (state_dir / OFFER_NAME).unlink(missing_ok=True)
-            (state_dir / SHOWING_NAME).unlink(missing_ok=True)
+        withdraw_the_offer(*self._state_dirs)
 
 
 def _stand(path: Path, mark: str | None) -> None:

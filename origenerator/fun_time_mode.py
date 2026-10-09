@@ -473,6 +473,12 @@ def offer_the_window_while_it_is_built(*state_dirs: Path) -> None:
         (state_dir / OFFER_NAME).write_text(offer_of_this_process(starting=True), encoding="utf-8")
 
 
+def withdraw_the_offer(*state_dirs: Path) -> None:
+    for state_dir in state_dirs:
+        (state_dir / OFFER_NAME).unlink(missing_ok=True)
+        (state_dir / SHOWING_NAME).unlink(missing_ok=True)
+
+
 def a_session_holds_the_device(state_dir: Path) -> bool:
     """Whether a live Fun Time session has claimed the OSR2.
 

@@ -502,41 +502,16 @@ def _arm_the_crash_log(state_dir: Path, logger):
     return stream
 
 
-def _open_the_splash(fun_time, app):
-    """The boot's own window, or ``None`` when the session owns that job.
+def _open_the_loading(fun_time, app, logger):
+    from origenerator.gui.loading_screen import Loading, LoadingScreen
 
-    Shown before the slow imports and boot work so the user gets immediate
-    feedback; each phase updates its status line, and ``processEvents`` keeps the
-    busy sweep animating while the main thread is blocked.
-
-    Hosted by Fun Time there is NO splash at all: the session's own loading
-    screen owns the boot experience and this app boots parked, so a splash here
-    has no audience -- and it is an always-on-top window whose lifetime is the
-    boot, which on a slow boot left it sitting over a satellite region after the
-    session revealed ("the landscape player is under other windows on startup":
-    the covering window was this splash). The boot phases still land in the log.
-    """
     if fun_time is not None:
-        return None
-    from origenerator.gui.loading_screen import LoadingScreen
-
-    loading = LoadingScreen()
-    loading.show()
-    _bring_to_front(loading)
+        return Loading(app, logger)
+    screen = LoadingScreen()
+    screen.show()
+    _bring_to_front(screen)
     app.processEvents()
-    return loading
-
-
-def _status_line(loading, app, logger):
-    """Where a phase says what it is doing: the splash, or the log without one."""
-    def status(message: str) -> None:
-        if loading is not None:
-            loading.set_status(message)
-        else:
-            logger.info("Boot: %s", message)
-        app.processEvents()
-
-    return status
+    return Loading(app, logger, screen)
 
 
 def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
@@ -564,6 +539,26 @@ def _build_window(client, db, app_state, fun_time, preview, taskbar):
     if fun_time is not None and not fun_time.in_a_headset:
         window.showMinimized()
     return window
+
+
+def _put_away_unseen(window, app, crash_log) -> None:
+    window.close()
+    if crash_log is not None:
+        from origenerator.freeze_watch import watch_the_window
+        watch_the_window(app, crash_log).end_the_process_if_the_close_sticks()
+    _run_the_loop_only_to_quit(app)
+
+
+def _run_the_loop_only_to_quit(app) -> None:
+    from origenerator.gui.deferred import defer
+
+    defer(app, app.quit)
+    app.exec()
+
+
+def _disconnect(client) -> None:
+    client.stop()
+    client.wait(3000)
 
 
 def _watch_for_fun_time(window, state_dir, library_state_dir):
@@ -734,20 +729,7 @@ def main(argv: list[str] | None = None) -> int:
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 
-    loading = _open_the_splash(fun_time, app)
-    status = _status_line(loading, app, logger)
-
-    status("Starting ComfyUI server...")
-    _ensure_comfyui_server(
-        logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
-        on_status=status, pump_events=app.processEvents,
-    )
-
-    status("Opening the image library...")
-    from origenerator.db import Database
-    logger.info("Library: %s", DB_PATH)
-    db = Database(DB_PATH)
-    _reclaim_orphaned_trash(db, TRASH_DIR, logger)
+    loading = _open_the_loading(fun_time, app, logger)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -761,31 +743,51 @@ def main(argv: list[str] | None = None) -> int:
         client_id=resolve_comfyui_client_id(app_state),
     )
 
-    from origenerator.evolver_export import default_inbox
-    _run_maintenance(
-        Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
-                thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
-        MAINTENANCE, status, logger,
-    )
+    from origenerator.gui.loading_screen import LoadingCanceled
+    window = None
+    try:
+        loading.say("Starting ComfyUI server...")
+        _ensure_comfyui_server(
+            logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
+            on_status=loading.say, pump_events=app.processEvents,
+        )
 
-    status("Connecting to ComfyUI...")
-    client.start()
+        loading.say("Opening the image library...")
+        from origenerator.db import Database
+        logger.info("Library: %s", DB_PATH)
+        db = Database(DB_PATH)
+        _reclaim_orphaned_trash(db, TRASH_DIR, logger)
 
-    status("Building the interface...")
-    window = _build_window(client, db, app_state, fun_time, preview, taskbar)
+        from origenerator.evolver_export import default_inbox
+        _run_maintenance(
+            Library(db=db, client=client, output_dir=COMFYUI_OUTPUT_DIR,
+                    thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
+            MAINTENANCE, loading.say, logger,
+        )
+
+        loading.say("Connecting to ComfyUI...")
+        client.start()
+
+        loading.say("Building the interface...")
+        window = _build_window(client, db, app_state, fun_time, preview, taskbar)
+        loading.stop_if_canceled()
+    except LoadingCanceled:
+        logger.info("Loading canceled from the loading screen")
+        if window is not None:
+            _put_away_unseen(window, app, crash_log)
+        _disconnect(client)
+        from origenerator.fun_time_mode import withdraw_the_offer
+        withdraw_the_offer(STATE_DIR, LIBRARY_STATE_DIR)
+        loading.done()
+        return 0
+
     watch = None if fun_time is not None else _watch_for_fun_time(
         window, STATE_DIR, LIBRARY_STATE_DIR)
     still_offered = watch is not None and watch.stands_its_offer()
     if still_offered:
         window.show()
 
-    if loading is not None:
-        loading.close()
-        # Let the splash's closing settle before asking for the foreground:
-        # Windows hands activation on from a closing window to whatever is next
-        # in the Z-order, and unpumped that lands *after* the request below and
-        # undoes it.
-        app.processEvents()
+    loading.done()
     if still_offered:
         _bring_to_front(window)
 
@@ -795,6 +797,5 @@ def main(argv: list[str] | None = None) -> int:
     exit_code = app.exec()
     if watch is not None:
         watch.withdraw()
-    client.stop()
-    client.wait(3000)
+    _disconnect(client)
     return exit_code

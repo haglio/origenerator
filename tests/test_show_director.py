@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 from PIL import Image
+from player_core.hud_placement import HudCorner
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PyQt6.QtCore import Qt
 
@@ -26,7 +27,7 @@ from origenerator.gui import show_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.show_director import ShowDirector
 from origenerator.orientation import oriented_key
-from origenerator.slideshow import ShowState
+from origenerator.slideshow import ShowFilters, ShowState, Slide
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 
@@ -77,6 +78,8 @@ class FakeShow:
         self.levels = None
         self.playlist = None
         self.resumed = None
+        self.taken_up = None
+        self.filters = ShowFilters()
         self.retuned = None
         self.reordered = None
         self.kept_the_slide = None
@@ -109,6 +112,7 @@ class FakeShow:
         self.played = []
         self.leads = 0
         self.levels_added = []
+        self.hud_order_label = ""
 
     # what a show is, and what it holds
     def is_live(self):
@@ -119,6 +123,9 @@ class FakeShow:
 
     def state(self):
         return self.state_at_close
+
+    def whole_set(self):
+        return [Slide.of(item) for item in self.items]
 
     def is_showing(self):
         return self.visible
@@ -137,6 +144,12 @@ class FakeShow:
 
     def resume(self, state):
         self.resumed = state
+
+    def take_up(self, filters, *, keep_the_slide=False):
+        self.taken_up = (filters, keep_the_slide)
+        self.filters = filters
+        self.hud_favorites_filter = filters.favorites
+        self.hud_enhanced_mode = filters.enhanced
 
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
@@ -537,6 +550,21 @@ def test_a_double_clicked_picture_plays_its_folder_newest_first_and_says_latest(
     assert show.hud.order_label == LATEST_LABEL
 
 
+def test_a_show_esc_put_back_goes_on_taking_in_what_lands_where_it_plays(shows):
+    landed = _row("g2")
+    director, _host, made = shows(browser=FakeBrowser(shelves={"shelf/a": [_row("g1"), landed]}))
+    director.open([("g1.png", "image", "g1", None)], location="shelf/a")
+    made[0].dwell_s = 4
+    held = director.held_show()
+    made[0].close()
+
+    again = director.put_back(held)
+    director.note_finished(landed)
+
+    assert again is not made[0]
+    assert again.added == [("g2", False, False)]
+
+
 def test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation(shows):
     host = FakeHost(rows=[_row("a1"), _row("t1")])
     host.visible = ["a1"]
@@ -592,6 +620,20 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
 
     assert director.region_show(PORTRAIT).levels == {"g4.png": ["newer", "older"]}
     assert director.region_show(LANDSCAPE).levels == {"g5.png": ["newer", "older"]}
+
+
+def test_a_sessions_regions_open_on_their_base_state_whatever_was_pressed(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, made = shows(browser=browser, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    made[0].actions.filters_changed(ShowFilters(enhanced=True))
+    made[0].close()
+
+    director.fill_the_regions()
+
+    assert director.region_show(PORTRAIT).taken_up == (ShowFilters(), False)
+    assert director.region_show(LANDSCAPE).taken_up == (ShowFilters(), False)
 
 
 def test_a_region_says_how_long_it_took_to_fill(shows, caplog):
@@ -1602,6 +1644,95 @@ def test_a_show_of_latest_opens_on_the_newest_rather_than_where_the_last_one_sto
     director.start()
 
     assert made[0].resumed is None
+
+
+def test_a_slideshow_of_another_folder_opens_on_the_filters_the_last_was_left_on(shows):
+    host = FakeHost(location="workflow/a", rows=[_picture("g1", "a red fox", seed=1)])
+    director, host, made = shows(host)
+    director.start()
+    made[0].actions.filters_changed(ShowFilters(enhanced=True))
+    made[0].close()
+
+    host.location = "workflow/b"
+    host.rows = [_picture("g2", "a blue car", seed=2)]
+    director.start()
+
+    assert made[-1].taken_up == (ShowFilters(enhanced=True), False)
+
+
+def test_the_next_launch_picks_up_the_show_the_last_one_left(shows):
+    rows = [_picture("g1", "a red fox", seed=1)]
+    director, _host, made = shows(FakeHost(location="workflow/a", rows=rows))
+    director.start()
+    left = ShowState(order=("g1",), current="g1", locked=True)
+    made[0].state_at_close = left
+    made[0].actions.filters_changed(ShowFilters(enhanced=True))
+    made[0].close()
+
+    relaunched, _host, _made = shows(FakeHost(location="workflow/a", rows=rows))
+    relaunched.remember(json.loads(json.dumps(director.remembered())))
+    relaunched.start()
+
+    assert made[-1].resumed == left
+    assert made[-1].taken_up == (ShowFilters(enhanced=True), False)
+
+
+def test_the_next_launch_opens_its_shows_at_the_pace_the_last_one_was_left_at(shows):
+    director, _host, _made = shows()
+    director._pace.set_seconds(9)
+
+    relaunched, _host, _made = shows()
+    relaunched.remember(json.loads(json.dumps(director.remembered())))
+
+    assert relaunched._pace.seconds == 9
+
+
+def test_the_next_launch_wears_the_panel_where_the_last_one_left_it(shows):
+    director, _host, _made = shows()
+    director.move_the_hud("right", side=LANDSCAPE)
+    director.collapse_the_hud(True, side=LANDSCAPE)
+
+    relaunched, _host, _made = shows()
+    relaunched.remember(json.loads(json.dumps(director.remembered())))
+
+    assert relaunched.hud_place(LANDSCAPE) == (HudCorner.UPPER_RIGHT, True)
+    assert relaunched.hud_place(PORTRAIT) == (HudCorner.UPPER_LEFT, False)
+
+
+def test_the_favorites_shelf_holds_f_mode_down_without_turning_it_on_for_the_next(shows):
+    rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
+    folder = oriented_key("workflow/a", PORTRAIT)
+    favorites = oriented_key(FolderShelf(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
+    host = FakeHost(location=favorites, rows=[rows[0]], groups={folder: _folder_of(rows)})
+    director, host, made = shows(host)
+    director.start()
+    made[0].close()
+
+    host.location = folder
+    director.start()
+
+    assert made[0].taken_up == (ShowFilters(favorites=True), False)
+    assert made[-1].taken_up == (ShowFilters(), False)
+
+
+def test_a_show_of_latest_opens_on_the_newest_under_the_one_filter_state(shows):
+    director, _host, made = shows(FakeHost(location=LATEST_PORTRAIT, rows=_a_sitting()))
+    director._note_filters(ShowFilters(enhanced=True))
+
+    director.start()
+
+    assert made[0].resumed is None
+    assert made[0].taken_up == (ShowFilters(enhanced=True), False)
+
+
+def test_a_double_clicked_picture_opens_under_the_one_filter_state_and_stays_up(shows):
+    host = FakeHost(rows=[_row("a1"), _row("a2")])
+    director, _host, made = shows(host)
+    director._note_filters(ShowFilters(enhanced=True))
+
+    director.open_on_preview(("a2.png", "image"), None, "a2")
+
+    assert made[0].taken_up == (ShowFilters(enhanced=True), True)
 
 
 def test_a_show_of_a_folder_still_picks_up_where_the_last_one_stopped(shows):

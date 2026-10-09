@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
 from player_core.file_channel import append_command
+from player_core.hud_placement import HudCorner
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
@@ -29,7 +30,7 @@ from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
-from tests.test_gallery_view import _selected_folder, _shelf
+from tests.test_gallery_view import _select_first_leaf, _selected_folder, _shelf
 from tests.test_hard_to_miss import _faded_backgrounds
 
 
@@ -422,19 +423,42 @@ class _QueueSpyClient(ComfyUIClient):
         return prompt_id
 
 
-def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1):
+def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1, **params):
     """One finished generation for the policy to build experiments on."""
     db.insert_generation(
         prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
         positive_prompt=prompt, seed=seed,
         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
-                                    positive_prompt=prompt, seed=seed)),
+                                    positive_prompt=prompt, seed=seed, **params)),
         workflow_json="{}",
     )
     db.update_generation(
         prompt_id, status="completed",
         output_files=json.dumps([{"filename": f"{prompt_id}.png", "subfolder": ""}]),
     )
+
+
+def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
+    _completed_image(Database(tmp_path / "t.db"), enhance=True)
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view.refresh()
+    _select_first_leaf(first._gallery_view)
+    first._gallery_view._shows.start()
+    qtbot.addWidget(first._gallery_view._shows.showing)
+    first._gallery_view._shows.showing.toggle_enhanced_mode()
+
+    first.close()
+    second = _window(qtbot, tmp_path, AppState(path))
+    second._gallery_view.refresh()
+    second._gallery_view._shows.start()
+
+    show = second._gallery_view._shows.showing
+    qtbot.addWidget(show)
+    assert show.hud_enhanced_mode
 
 
 def test_closing_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
@@ -1259,6 +1283,21 @@ def test_a_window_handed_back_from_a_session_shows_under_its_own_taskbar_button(
     win.become_standalone()
 
     assert worn[-1] == "Origenerator"
+
+
+def test_a_window_a_session_launched_leaves_the_standalone_shows_as_it_found_them(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    kept = {"panels": {"landscape": {"corner": "upper_right", "minimized": True}}}
+    state = AppState(path)
+    state.set("slideshows", kept)
+    state.save()
+
+    win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
+    assert win._gallery_view._shows.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
+    win.close()
+
+    assert AppState(path).get("slideshows") == kept
 
 
 def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tmp_path):

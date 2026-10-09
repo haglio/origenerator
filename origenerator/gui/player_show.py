@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import replace
 from pathlib import Path
 
 from player_core.file_channel import append_command, publish_whole
@@ -62,7 +63,7 @@ from origenerator.gui.show_set import (
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.media import MediaType
-from origenerator.slideshow import ShowState, Slide
+from origenerator.slideshow import ShowFilters, ShowState, Slide
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,8 @@ class PlayerShow(QObject):
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
                             start=start, hud=hud, on_pass_change=self._pass_changed,
                             neighbors=self._actions.neighbors, widen=self._actions.widen,
-                            acts=self._actions.acts)
+                            acts=self._actions.acts,
+                            on_filters_change=self._actions.filters_changed)
 
     def play(self, items, *, image_dwell_ms=None, start=None, shuffle=None,
              hud=None) -> None:
@@ -467,7 +469,7 @@ class PlayerShow(QObject):
         """This show's own reset: both switches dropped, the lock released, and
         the set it is already playing started over."""
         self._lock(False)
-        if self._set.drop_the_switches():
+        if self._set.drop_the_filters():
             return  # the player has the fresh pass already (see _pass_changed)
         self._set.playlist.restart()
         self._hand_over(land=True)
@@ -606,15 +608,15 @@ class PlayerShow(QObject):
 
     @property
     def hud_favorites_filter(self) -> bool:
-        return self._set.favorites_filter
+        return self._set.filters.favorites
 
     @property
     def hud_enhanced_mode(self) -> bool:
-        return self._set.enhanced_mode
+        return self._set.filters.enhanced
 
     @property
     def hud_act_filter(self) -> str:
-        return self._set.act_filter
+        return self._set.filters.act
 
     @property
     def hud_order_label(self) -> str:
@@ -630,19 +632,19 @@ class PlayerShow(QObject):
         return False
 
     def toggle_favorites_filter(self) -> bool:
-        return self.set_favorites_filter(not self._set.favorites_filter)
+        return self.set_favorites_filter(not self._set.filters.favorites)
 
     def set_favorites_filter(self, on: bool) -> bool:
-        return self._set.set_modes(favorites_filter=bool(on), enhanced=self._set.enhanced_mode)
+        return self._set.set_filters(replace(self._set.filters, favorites=bool(on)))
 
     def toggle_enhanced_mode(self) -> bool:
-        return self.set_enhanced_mode(not self._set.enhanced_mode)
+        return self.set_enhanced_mode(not self._set.filters.enhanced)
 
     def set_enhanced_mode(self, on: bool) -> bool:
-        return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
+        return self._set.set_filters(replace(self._set.filters, enhanced=bool(on)))
 
     def clear_modes(self) -> bool:
-        return self._set.set_modes(favorites_filter=False, enhanced=False, act_filter="")
+        return self._set.set_filters(ShowFilters())
 
     def current_media_path(self) -> str:
         """The file on screen — the player's own answer, which is what the
@@ -848,6 +850,7 @@ class PlayerShow(QObject):
             order=tuple(self._set.playlist.order_ids()),
             current=self._set.current_prompt_id(),
             locked=self._locked,
+            loop=self._set.loop.axis if self._set.loop is not None else "",
         )
 
     def resume(self, state: ShowState) -> bool:
@@ -855,12 +858,21 @@ class PlayerShow(QObject):
         pass.  Returns whether the place carried."""
         if not self._set.playlist.resume(state.order, state.current):
             return False
+        if state.loop:
+            self._set.start_loop(state.loop)
         self._set.lead_with_what_is_being_made()
         self._hand_over(land=True)
         return True
 
-    def playing_now(self):
-        return self._set.playlist.playing_now()
+    def whole_set(self) -> list[Slide]:
+        return self._set.whole_set()
+
+    @property
+    def filters(self) -> ShowFilters:
+        return self._set.filters
+
+    def take_up(self, filters: ShowFilters, *, keep_the_slide: bool = False) -> None:
+        self._set.take_up(filters, keep_the_slide=keep_the_slide)
 
     def is_showing(self) -> bool:
         """Whether this show still holds its side."""

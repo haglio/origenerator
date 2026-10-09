@@ -2,7 +2,17 @@
 and advance policy."""
 from __future__ import annotations
 
-from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
+import json
+from dataclasses import asdict
+
+from origenerator.slideshow import (
+    LIVE,
+    ShowFilters,
+    ShowState,
+    Slide,
+    SlideshowPlaylist,
+    in_order,
+)
 
 
 def _playlist(**kw):
@@ -333,20 +343,6 @@ def test_a_slide_that_is_no_longer_here_resumes_nothing():
     assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]
 
 
-def test_a_pass_taken_up_by_another_show_is_its_play_order_its_place_and_its_pace():
-    playlist = _four(shuffle=lambda order: order.reverse(), image_dwell_ms=6000)
-    playlist.advance()
-
-    items, index, dwell_ms = playlist.playing_now()
-
-    assert [item.prompt_id for item in items] == ["id-d", "id-c", "id-b", "id-a"]
-    assert (index, dwell_ms) == (1, 6000)
-
-
-def test_an_empty_pass_has_nothing_for_another_show_to_take_up():
-    assert SlideshowPlaylist([]).playing_now() is None
-
-
 def test_items_the_remembered_order_never_saw_follow_the_ones_it_did():
     # Two landed while the show was away. They were no part of the pass being
     # picked back up, and the next pass reshuffles the lot anyway.
@@ -566,3 +562,25 @@ def test_dropping_something_that_was_never_here_changes_nothing():
     playlist = _four()
     assert playlist.drop("id-elsewhere") is False
     assert playlist.order_ids() == ["id-a", "id-b", "id-c", "id-d"]
+
+
+def test_where_a_show_was_left_reads_back_as_it_was_saved():
+    state = ShowState(order=("id-b", "id-a"), current="id-a", locked=True, level_index=1,
+                      loop="seed")
+
+    assert ShowState.restored(json.loads(json.dumps(state.saved()))) == state
+
+
+def test_the_filters_read_back_as_they_were_saved():
+    filters = ShowFilters(favorites=True, enhanced=True, act="alpha")
+
+    assert ShowFilters.restored(json.loads(json.dumps(asdict(filters)))) == filters
+    assert ShowFilters.restored({"favorites": 1, "act": ["alpha"]}) == ShowFilters()
+
+
+def test_a_saved_show_that_makes_no_sense_reads_back_as_nowhere():
+    nonsense = {"order": "id-a", "current": 3, "locked": "yes", "level_index": -2,
+                "loop": 5}
+
+    assert ShowState.restored(nonsense) == ShowState()
+    assert ShowState.restored(None) == ShowState()

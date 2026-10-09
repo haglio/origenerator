@@ -7053,6 +7053,31 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert view._bank.slideshow.isHidden()
 
 
+def test_a_show_after_one_of_the_favorites_shelf_is_not_held_to_the_favorites(qtbot,
+                                                                               monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _row("i2", "sdxl_t2i",
+                                    {"positive_prompt": "a cat", "steps": 50, "seed": 2},
+                                    "sdxl_t2i_i2.png", starred=1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._shows.start()
+    qtbot.addWidget(view._shows.showing)
+    assert view._shows.showing.hud_favorites_filter
+    view._shows.showing.close()
+
+    _select_first_leaf(view)
+    view._shows.start()
+
+    show = view._shows.showing
+    qtbot.addWidget(show)
+    assert not show.hud_favorites_filter
+    assert sorted(item[2] for item in show._playlist._items) == ["i1", "i2"]
+    show.close()
+
+
 def test_slideshow_plays_the_recents_shelf(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
@@ -11877,7 +11902,7 @@ class _FakeDriver:
 def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
                        target=None):
     """The double-click path end to end: the gallery opens the folder under the
-    pane as a real show, held at a pace of nought.
+    pane as a real show.
 
     ``media`` is what the pane was showing — ``None`` for a generation still
     running under it, which opens the show over ``frame`` — and the generation
@@ -12166,7 +12191,6 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
                                      for pid in order]
     assert show._playlist.order == list(range(len(order)))  # the browser's order
     assert show._playlist.current()[2] == "i2"  # opened on the shown item
-    assert show.dwell_s == 0                    # and holding it
     show.close()
 
 
@@ -12714,7 +12738,8 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     # press it again and it comes back as it was — the way leaving an OmniPause
     # hands the room back rather than leaving every switch to be found again.
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    playing = view._shows.showing.playing_now()
+    playlist = view._shows.showing._playlist
+    playing = (playlist.in_play_order(), playlist.current())
 
     _press_escape(view)
     assert not view._auto.is_active(key) and view._shows.showing is None
@@ -12725,7 +12750,8 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     assert view._bank.audio.isChecked() and bed.starts == 2
     assert view._shows.showing is not None
     qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing.playing_now() == playing  # same set, same picture
+    playlist = view._shows.showing._playlist
+    assert (playlist.in_play_order(), playlist.current()) == playing  # same set, same picture
 
 
 def test_the_resumed_show_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
@@ -12744,6 +12770,31 @@ def test_the_resumed_show_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
     qtbot.addWidget(view._shows.showing)
     assert view._shows.showing._playlist.current() == was_showing
     assert view._shows.showing._playlist.index == was_at
+
+
+def test_the_resumed_show_is_narrowed_the_way_it_was_and_can_still_widen(qtbot,
+                                                                         monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    _keys_are_the_gallerys(view)
+    view.refresh()
+    _open_recents(view)
+    view._shows.start()
+    qtbot.addWidget(view._shows.showing)
+    view._shows.showing.toggle_enhanced_mode()
+
+    _press_escape(view)
+    _press_escape(view)
+
+    show = view._shows.showing
+    qtbot.addWidget(show)
+    assert show.hud_enhanced_mode
+    assert [item[2] for item in show._playlist._items] == ["i2"]
+    show.toggle_enhanced_mode()
+    assert sorted(item[2] for item in show._playlist._items) == ["i1", "i2"]
+    show.close()
 
 
 def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_path,
@@ -12787,7 +12838,7 @@ def test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder(
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     view._shows.open([], frame=_png_bytes())  # following a run, no items yet
     qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing.playing_now() is None
+    assert view._shows.showing.is_live()
 
     _press_escape(view)
     assert view._shows.showing is None
@@ -13846,10 +13897,23 @@ def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
     view._shows.showing.close()
 
 
-def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
-    # The one a double-click opened is at nought; this is what un-pauses it,
-    # and there is no separate resume to learn.
+def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
+        qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._pace.set_seconds(7)
+
+    show = _double_click_show(view, qtbot)
+
+    assert show.dwell_s == 7
+    assert _will_move_on(show)
+    show.close()
+
+
+def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
+    # A show held at nought is set going by this, and there is no separate
+    # resume to learn.
+    view = _voiceable(qtbot, tmp_path, monkeypatch)
+    view._pace.set_seconds(0)
     show = _double_click_show(view, qtbot)
     assert show.dwell_s == 0
 

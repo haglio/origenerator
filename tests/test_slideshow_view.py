@@ -28,7 +28,7 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
-from origenerator.slideshow import LIVE, Slide, in_order
+from origenerator.slideshow import LIVE, ShowFilters, Slide, in_order
 from tests.motion_doubles import FakeMotion
 from tests.show_surface_fakes import FakeEngine
 
@@ -1900,6 +1900,38 @@ def test_a_slide_closed_under_a_lock_reopens_locked(qtbot):
     assert reopened._playlist.locked
     assert not _will_move_on(reopened)  # locked, so nothing moves it on
     assert "locked" in reopened._counter.text()
+
+
+def test_a_show_takes_up_each_filter_that_leaves_it_something(qtbot):
+    view = _view(qtbot, _THREE, favorite_ids={"id-a"}, enhanced_ids={"id-b", "id-c"})
+
+    view.take_up(ShowFilters(favorites=True, enhanced=True))
+
+    assert (view.hud_favorites_filter, view.hud_enhanced_mode) == (True, False)
+    assert [item[2] for item in view._playlist._items] == ["id-a"]
+
+
+def test_a_show_opened_on_a_picture_keeps_it_up_under_filters_that_leave_it_out(qtbot):
+    view = _view(qtbot, _THREE, start=0, enhanced_ids={"id-b", "id-c"})
+
+    view.take_up(ShowFilters(enhanced=True), keep_the_slide=True)
+
+    assert view.hud_enhanced_mode
+    assert view._playlist.current()[2] == "id-a"
+    _press(view, Qt.Key.Key_Right)
+    assert view._playlist.current()[2] == "id-b"
+
+
+def test_a_show_closed_looping_a_row_reopens_looping_it(qtbot):
+    browsing = [*_KEYED, ("z.png", "image", "id-z")]
+    closed = _view(qtbot, browsing, actions=ShowActions(neighbors=_around))
+    _press(closed, Qt.Key.Key_E)
+
+    reopened = _view(qtbot, browsing, actions=ShowActions(neighbors=_around))
+    reopened.resume(closed.state())
+
+    assert reopened.hud_map().loop == "seed"
+    assert [item[2] for item in reopened._playlist._items] == ["id-a", "id-b"]
 
 
 def test_a_show_of_a_set_without_that_slide_starts_fresh(qtbot):

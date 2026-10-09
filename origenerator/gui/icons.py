@@ -194,6 +194,7 @@ def flask_icon() -> QIcon:
     return glyph_icon("flask", size=_SIZE)
 
 
+@cache
 def shelf_icon(shelf: str) -> QIcon:
     return {
         RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),

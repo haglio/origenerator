@@ -128,6 +128,7 @@ class FakePlayer:
     def __init__(self):
         self.sources = []
         self.play_count = 0
+        self.paused = 0
         self.stopped = 0
         self.active_video_track = 0
         self._on_status = None
@@ -147,6 +148,9 @@ class FakePlayer:
 
     def play(self):
         self.play_count += 1
+
+    def pause(self):
+        self.paused += 1
 
     def stop(self):
         self.stopped += 1
@@ -334,3 +338,27 @@ def test_one_voice_giving_up_leaves_the_others_playing(qtbot, tmp_path):
     assert players[1].play_count == 5
     assert players[0].play_count == 2
     assert players[2].play_count == 1
+
+
+# --- the room's pause ------------------------------------------------------
+
+def test_a_frozen_room_holds_every_voice_and_lets_them_all_play_again(qtbot, tmp_path):
+    bed, players = _bed(tmp_path)
+    bed.start()
+
+    bed.set_frozen(True)
+    assert [p.paused for p in players] == [1, 1, 1]
+
+    bed.set_frozen(False)
+    assert [p.play_count for p in players] == [2, 2, 2]
+
+
+def test_a_bed_switched_on_in_a_frozen_room_waits_for_it_to_play(qtbot, tmp_path):
+    bed, players = _bed(tmp_path)
+    bed.set_frozen(True)
+
+    bed.start()
+    assert [p.play_count for p in players] == [0, 0, 0]
+
+    bed.set_frozen(False)
+    assert [p.play_count for p in players] == [1, 1, 1]

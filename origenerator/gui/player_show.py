@@ -331,6 +331,10 @@ class PlayerShow(QObject):
         which is what the panel's padlock and its lock ring are drawn from."""
         return self._locked
 
+    @property
+    def locked_on(self) -> str | None:
+        return self._set.current_prompt_id() if self._locked else None
+
     def show_step(self, delta: int) -> None:
         """Step the player either way.  Moving off a locked slide releases the
         lock, the way the players' own prev/next cancel a lock — and a loop
@@ -696,11 +700,12 @@ class PlayerShow(QObject):
 
     def _enhance_current(self) -> None:
         """Ask the gallery for a better version of the item on screen, if it
-        wants one — locking a slide is how that is asked for here too."""
+        wants one, and first — locking a slide is how that is asked for here
+        too."""
         if self._actions.enhance is None:
             return
         prompt_id = self._set.current_prompt_id()
-        if prompt_id is None or self._set.enhancement_of(prompt_id):
+        if prompt_id is None:
             return
         if self._actions.enhance(prompt_id):
             self._set.note_enhancement_asked(prompt_id)

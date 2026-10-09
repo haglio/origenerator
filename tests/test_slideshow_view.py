@@ -564,6 +564,25 @@ def test_locking_a_slide_asks_for_it_to_be_enhanced(qtbot):
     assert view.hud_item_note == "Enhancement queued"
 
 
+def test_locking_a_slide_whose_enhancement_is_waiting_still_asks_so_it_goes_first(qtbot):
+    asked = []
+    view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or False))
+    view.note_enhancing({"id-a": "queued"})
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert asked == ["id-a"]
+
+
+def test_a_locked_show_names_the_generation_it_is_locked_on(qtbot):
+    view = _view(qtbot, _KEYED)
+    assert view.locked_on is None
+
+    _press(view, Qt.Key.Key_Down)
+
+    assert view.locked_on == "id-a"
+
+
 def test_releasing_the_lock_asks_for_nothing(qtbot):
     asked = []
     view = _view(qtbot, _KEYED, actions=ShowActions(enhance=lambda pid: asked.append(pid) or True))

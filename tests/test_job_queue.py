@@ -1139,3 +1139,92 @@ def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_wh
         video.prompt_id, seen["image"].prompt_id
     ]
     assert queue.queue_order == [seen["image"].prompt_id, video.prompt_id]
+
+
+# --- what a show is locked on is made first -------------------------------------
+
+def test_a_job_put_first_leads_the_line_and_takes_the_machine(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    oldest = _launch_image(queue, "i1", seed=1)
+    middle = _launch_image(queue, "i2", seed=2)
+    newest = _launch_image(queue, "i3", seed=3)
+    _rendering(client, newest)
+
+    queue.put_first({oldest.prompt_id})
+
+    assert client.interrupt.call_args_list[-1].args[0] == newest.prompt_id
+    assert client.submit_job.call_args_list[-1].args[1] == oldest.prompt_id
+    assert queue.queue_order == [oldest.prompt_id, newest.prompt_id, middle.prompt_id]
+
+
+def test_a_picture_asked_for_leaves_a_job_put_first_on_the_machine(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    locked = _launch_image(queue, "i1", seed=1)
+    _rendering(client, locked)
+    queue.put_first({locked.prompt_id})
+
+    newer = _launch_image(queue, "i2", seed=2)
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [locked.prompt_id, newer.prompt_id]
+
+
+def test_a_picture_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    waiting = _launch_image(queue, "i1", seed=1)
+    rendering = _launch_image(queue, "i2", seed=2)
+    queue.put_first({waiting.prompt_id, rendering.prompt_id})
+
+    newer = _launch_image(queue, "i3", seed=3)
+
+    assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
+
+
+def test_the_picture_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    oldest = _launch_image(queue, "i1", seed=1)
+    middle = _launch_image(queue, "i2", seed=2)
+    newest = _launch_image(queue, "i3", seed=3)
+    _rendering(client, newest)
+
+    queue.put_first({oldest.prompt_id, middle.prompt_id})
+
+    assert queue.queue_order == [middle.prompt_id, oldest.prompt_id, newest.prompt_id]
+
+
+def test_a_drag_cannot_put_anything_ahead_of_a_job_put_first(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    waiting = _launch_image(queue, "i1", seed=1)
+    rendering = _launch_image(queue, "i2", seed=2)
+    queue.put_first({waiting.prompt_id, rendering.prompt_id})
+    newer = _launch_image(queue, "i3", seed=3)
+
+    queue.reorder([newer.prompt_id, waiting.prompt_id])
+
+    assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
+
+
+def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_lands(
+        qtbot, tmp_path):
+    client, gate = _gated_client()
+    gate.set()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    locked = _launch_image(queue, "i1", seed=1)
+    handed_over_next = _launch_image(queue, "i2", seed=2)
+    rendering = _launch_image(queue, "i3", seed=3)
+    gate.clear()
+
+    def while_the_submit_is_out():
+        queue.put_first({locked.prompt_id})
+        gate.set()
+
+    QTimer.singleShot(0, while_the_submit_is_out)
+    rendering.finished.emit([{"filename": "out.png"}], None, 1.0)
+
+    client.interrupt.assert_called_with(handed_over_next.prompt_id)
+    assert client.submit_job.call_args_list[-1].args[1] == locked.prompt_id
+    assert queue.queue_order == [locked.prompt_id, handed_over_next.prompt_id]

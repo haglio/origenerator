@@ -1655,6 +1655,7 @@ class GalleryView(QWidget):
         try:
             if facts is not None:  # None only if the batched fetch itself died
                 self._apply_poll_facts(jobs, facts)
+            self._enhance.put_what_is_locked_first()
         except Exception:
             self._poll_inflight = False
             raise

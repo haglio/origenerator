@@ -7,12 +7,14 @@ set down and picked back up. So a queue that means to change its mind has to do
 it before the prompt is sent, which means holding the line on this side of the
 wire.
 
-Two rules, and both are about what the user is doing while the GPU works:
+Three rules, and all three are about what the user is doing while the GPU works:
 
+* **What a show is locked on is made first:** the user is looking at it, so its
+  enhancement leads the line and nothing takes the machine from it.
 * **An image joins the front, newest first.** A picture is seconds of GPU and it
   is usually the thing being waited for — a fresh variation, an enhancement of
-  what is on screen. Asking for one means "now", so it starts next, ahead of
-  everything that hasn't started yet.
+  what is on screen. Asking for one means "now", so it goes next, after only
+  what a show is locked on.
 * **A video joins the back.** Minutes of GPU, and asking for one means "later":
   it goes after every image, and after every video asked for before it. That
   is what keeps a handful of queued videos from taking the machine away from the
@@ -45,8 +47,8 @@ nobody asked for.
 
 Pure ordering, no Qt and no server: it works on anything carrying a
 ``media_type`` ("image"/"video"), an optional ``run_media_type`` for a stage whose
-run makes something other than what it makes itself, and a ``source`` — which is
-what makes the queue's behavior testable without a running ComfyUI.
+run makes something other than what it makes itself, a ``source`` and a
+``prompt_id``, which is what makes it testable without a running ComfyUI.
 """
 from __future__ import annotations
 
@@ -90,6 +92,10 @@ def insertion_index(line: list, job) -> int:
     looking at the one before it.
     """
     return 0 if takes_the_front(job) else len(line)
+
+
+def put_first(line: list, prompt_ids) -> None:
+    line.sort(key=lambda job: job.prompt_id not in prompt_ids)
 
 
 def next_ready(line: list, *, videos_held: bool):

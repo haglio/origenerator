@@ -253,6 +253,10 @@ class ShowDirector:
             surfaces.append(surface)
         return surfaces
 
+    def locked_prompt_ids(self) -> set[str]:
+        return {show.locked_on for show in self.surfaces()
+                if show.is_showing() and show.locked_on is not None}
+
     def surface_for(self, side: str | None):
         """The show a spoken command means: *side*'s region show when it named
         one, else the show that is up.

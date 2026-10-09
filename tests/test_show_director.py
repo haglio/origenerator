@@ -113,6 +113,7 @@ class FakeShow:
         self.leads = 0
         self.levels_added = []
         self.hud_order_label = ""
+        self.locked_on = None
 
     # what a show is, and what it holds
     def is_live(self):
@@ -1760,6 +1761,17 @@ def test_how_the_enhancements_are_going_reaches_every_show_that_is_up(shows):
     director.note_enhancing({"g1": "running"})
 
     assert [show.enhancing for show in made] == [{"g1": "running"}] * 2
+
+
+def test_what_each_show_still_up_is_locked_on_is_known(shows):
+    director, _host, made = shows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
+    made[0].locked_on = "g1"
+    made[1].locked_on = "g2"
+    made[1].visible = False
+
+    assert director.locked_prompt_ids() == {"g1"}
 
 
 def test_a_show_opens_knowing_what_is_being_enhanced(shows):

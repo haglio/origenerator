@@ -129,7 +129,8 @@ class JobQueue(QObject):
     a Generate starts at once instead of queuing after a long experiment run.
     And the user's image work owns it outright: whatever is being rendered when a
     picture is asked for is set aside -- stopped, and put back in the line to
-    start over once the pictures are done (:meth:`_set_aside_for`)."""
+    start over once the pictures are done (:meth:`_set_aside_for`) -- unless it
+    is what a show is locked on (:meth:`put_first`)."""
 
     changed = pyqtSignal()            # the set of live jobs changed (add/reconnect)
     # (folder key, prompt_id, frame) a job streamed a frame. Named by run as well
@@ -166,6 +167,7 @@ class JobQueue(QObject):
         # the machine from what lands (see _set_aside_for and _pump).
         self._takes_over_on_landing: GenerationJob | None = None
         self._videos_held = False  # the slideshow's gate (see :meth:`hold_videos`)
+        self._first: frozenset[str] = frozenset()
 
     @property
     def jobs(self) -> dict:
@@ -373,7 +375,8 @@ class JobQueue(QObject):
         # is just handed to something else.
         if source != GenerationSource.EXPERIMENT:
             self._preempt_experiments()
-        self._set_aside_for(job)
+        if queue_line.takes_the_front(job):
+            self._set_aside_for(job)
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
         # written, so that is when its tile appears.
@@ -387,6 +390,7 @@ class JobQueue(QObject):
     def _enqueue(self, job: GenerationJob):
         """Put a built job in the line, wherever the queue's rules place it."""
         self._waiting.insert(queue_line.insertion_index(self._waiting, job), job)
+        queue_line.put_first(self._waiting, self._first)
 
     def _pump(self):
         """Hand ComfyUI the next job it may start, if it isn't holding one of ours.
@@ -488,26 +492,20 @@ class JobQueue(QObject):
             del self._jobs[key]
 
     def _set_aside_for(self, newcomer: GenerationJob):
-        """Take everything off the server for ``newcomer``, if it is the user's
-        own image work, and put each job back in the line to start over once
-        the newcomer is done.
+        """Take everything but what is put first off the server for
+        ``newcomer``, and put each job back in the line to start over once the
+        newcomer is done (:mod:`origenerator.queue_line` says why).
 
-        ComfyUI cannot set a run down and pick it back up, so whatever was
-        rendered is thrown away, however close to done it was. That is the
-        user's own call for this queue: their work goes first while they are
-        working, and everything else's turn comes when they are not. Each job
-        goes back where :func:`queue_line.rejoin_index` says, placed last to
-        first so that several (a restart can leave the server holding more than
-        one) keep their order. A job whose hand-over is still out cannot be
-        taken off a server that does not hold it yet: it is taken off the
-        moment it lands (see :meth:`_pump`).
+        Each job goes back where :func:`queue_line.rejoin_index` says, placed
+        last to first so that several (a restart can leave the server holding
+        more than one) keep their order. A job whose hand-over is still out
+        cannot be taken off a server that does not hold it yet: it is taken off
+        the moment it lands (see :meth:`_pump`).
         """
-        if not queue_line.takes_the_front(newcomer):
-            return
         if self._in_flight is not None:
             self._takes_over_on_landing = newcomer
         for job in reversed(list(self._on_server)):
-            if job is newcomer or not job.defer():
+            if job is newcomer or job.prompt_id in self._first or not job.defer():
                 continue
             self._on_server.remove(job)
             self._waiting.insert(queue_line.rejoin_index(self._waiting, job, newcomer), job)
@@ -517,6 +515,7 @@ class JobQueue(QObject):
                                        progress_json=None)
             logger.info("Set aside %s for the user's image work; it starts over after",
                         job.prompt_id)
+        queue_line.put_first(self._waiting, self._first)
 
     def _preempt_experiments(self):
         """Clear the GPU for user work: cancel every in-flight background
@@ -689,8 +688,16 @@ class JobQueue(QObject):
         self._pump()
         self.changed.emit()
 
+    def put_first(self, prompt_ids):
+        self._first = frozenset(prompt_ids)
+        queue_line.put_first(self._waiting, self._first)
+        if self._waiting and self._waiting[0].prompt_id in self._first:
+            self._set_aside_for(self._waiting[0])
+        self._pump()
+
     def reorder(self, prompt_ids: list[str]):
-        """Rearrange the waiting line into ``prompt_ids`` order.
+        """Rearrange the waiting line into ``prompt_ids`` order, after what is
+        put first.
 
         A drag in the queue strip, and it costs nothing: a waiting job has never
         been sent, so its place is ours to change. Ids this app holds no waiting
@@ -700,6 +707,7 @@ class JobQueue(QObject):
         """
         place = {pid: index for index, pid in enumerate(prompt_ids)}
         self._waiting.sort(key=lambda job: place.get(job.prompt_id, len(place)))
+        queue_line.put_first(self._waiting, self._first)
 
     def cancel(self, key: str):
         """Stop and forget the job leading a folder's queue, dropping its row.

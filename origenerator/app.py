@@ -461,10 +461,10 @@ def _run_maintenance(library: Library, passes, status, logger) -> None:
 def _configure_logging(state_dir: Path):
     """The family's rotating file log, on the root logger so the siblings' lines
     land in it too, with a console copy for the launcher's redirect -- and Qt's
-    own messages routed into it, the fatal it prints on its way down included."""
+    own messages and every error nothing caught routed into it."""
     import logging
 
-    from app_support.logging_utils import configure_logging
+    from app_support.logging_utils import configure_logging, install_exception_logging
 
     from origenerator.qt_messages import (
         install_qt_message_logging,
@@ -479,7 +479,9 @@ def _configure_logging(state_dir: Path):
                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     install_qt_message_logging()
     silence_the_ffmpeg_format_dump()
-    return logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
+    install_exception_logging(logger)
+    return logger
 
 
 def _arm_the_crash_log(state_dir: Path, logger):

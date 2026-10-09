@@ -67,6 +67,33 @@ def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_p
     assert installed == [True]
 
 
+def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
+    state = tmp_path / "state"
+    child = textwrap.dedent(f"""
+        import sys
+        from pathlib import Path
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QApplication
+        from origenerator.app import _configure_logging
+        app = QApplication(sys.argv[:1])
+        _configure_logging(Path({str(state)!r}))
+        def go_wrong():
+            raise RuntimeError("an invented error no handler expects")
+        QTimer.singleShot(0, go_wrong)
+        QTimer.singleShot(100, app.quit)
+        app.exec()
+        print("still running", flush=True)
+    """)
+    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, timeout=120,
+                         env=os.environ | {"QT_QPA_PLATFORM": "offscreen"},
+                         capture_output=True, encoding="utf-8", errors="replace",
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert "still running" in ran.stdout, ran.stdout + ran.stderr
+    logged = (state / "origenerator.log").read_text(encoding="utf-8")
+    assert "an invented error no handler expects" in logged
+
+
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
     """The launcher keeps the app's stdout and stderr in its log, and Qt's player
     had FFmpeg print a readout of every video it opened there, each of its tags
@@ -112,6 +139,14 @@ def _no_crash_log_in_the_checkout(monkeypatch):
     The crash-log tests below hold the real function under its own name, so
     this leaves them untouched."""
     monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: None)
+
+
+@pytest.fixture(autouse=True)
+def _a_boot_leaves_the_suites_own_error_hooks_in_place(monkeypatch):
+    """pytest sets its thread hook once per run, so a boot that put the app's in
+    its place would hide every later test's thread errors in a log."""
+    monkeypatch.setattr("app_support.logging_utils.install_exception_logging",
+                        lambda logger: None)
 
 
 @pytest.fixture(autouse=True)

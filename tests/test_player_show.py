@@ -242,8 +242,8 @@ def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
 
 def test_a_file_the_player_will_not_let_go_of_is_said_rather_than_raised(qtbot, tmp_path):
     """A player with nothing else to move on to keeps its file open for good —
-    a delete refused, said where the speaker can see it, not an error that
-    takes the app down."""
+    a delete refused, said where the speaker can see it, not an error only the
+    log ever hears of."""
     said = []
 
     def delete(_prompt_id):

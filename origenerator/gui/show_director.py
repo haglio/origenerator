@@ -201,9 +201,9 @@ class ShowDirector:
         self._region_shows: dict[str, QWidget | None] = (
             dict.fromkeys(_ORIENTATIONS) if fun_time is not None else {}
         )
-        # Whether the hosting session is OmniPaused, remembered so a show
-        # opened mid-pause opens frozen (see :meth:`_present_surface`).
-        self._session_paused = False
+        # Whether the room is paused, remembered so a show opened mid-pause
+        # opens frozen (see :meth:`_present_surface`).
+        self._room_paused = False
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
@@ -516,7 +516,7 @@ class ShowDirector:
         self._region_shows[side] = show
         # A show opened while the hosting session is frozen opens frozen, the
         # way a window one does.
-        if self._session_paused:
+        if self._room_paused:
             show.set_paused(True)
         return show
 
@@ -738,7 +738,7 @@ class ShowDirector:
         # A show opened while the hosting session is frozen opens frozen: the
         # room's OmniPause holds everything, this surface included, from its
         # first frame — not from whenever the flag next changes.
-        if self._session_paused:
+        if self._room_paused:
             view.set_paused(True)
         self._wear_the_hud(view, side)
 
@@ -1085,17 +1085,17 @@ class ShowDirector:
                      keep_slide=keep_slide)
         return True
 
-    def set_session_paused(self, paused: bool) -> None:
-        """The hosting session's OmniPause, applied to every open show and
-        remembered for the ones not opened yet (see :meth:`_present_surface`).
-        The bridge calls this on the flag's edges; the memory is what makes the
-        freeze cover a show the user opens mid-pause.
+    def set_room_paused(self, paused: bool) -> None:
+        """The room's pause, applied to every open show and remembered for the
+        ones not opened yet (see :meth:`_present_surface`).  The gallery calls
+        this on the pause's edges; the memory is what makes the freeze cover a
+        show the user opens mid-pause.
 
         Each show is its own step, and one that raises must not take the rest
         with it: a freeze that stopped at the first show left the others running
         with no sign of why.
         """
-        self._session_paused = paused
+        self._room_paused = paused
         # Every show this window has open, taken from the list it keeps of them
         # rather than from the region map: that map answers only for a show it
         # considers VISIBLE, and a show the session has covered or parked is

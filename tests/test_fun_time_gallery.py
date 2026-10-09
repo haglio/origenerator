@@ -1073,11 +1073,11 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
     assert _moving_pictures(view), "nothing was moving, so the sweep would prove nothing"
 
-    view.set_session_paused(True)
+    view.set_room_paused(True)
 
     assert _moving_pictures(view) == []
 
-    view.set_session_paused(False)
+    view.set_room_paused(False)
     assert _moving_pictures(view)
 
 
@@ -1097,7 +1097,7 @@ def test_omnipause_reaches_a_show_the_region_map_does_not_answer_for(
     qtbot.addWidget(show)
     monkeypatch.setattr(view, "region_show", lambda side: None)
 
-    view.set_session_paused(True)
+    view.set_room_paused(True)
 
     assert show._paused is True
     assert not _will_move_on(show)
@@ -1111,7 +1111,7 @@ def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, mo
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
-    view.set_session_paused(True)
+    view.set_room_paused(True)
     at = show._playlist.index
 
     engine_of(show).idle = True
@@ -1339,7 +1339,7 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_pictures_move_agai
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
     view.become_hosted(_session())
-    view.set_session_paused(True)
+    view.set_room_paused(True)
 
     view.become_standalone()
 

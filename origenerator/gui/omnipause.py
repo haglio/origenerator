@@ -1,24 +1,16 @@
-"""The hosting session's freeze: one flag, asked rather than remembered.
+"""The room's freeze: one flag, asked rather than remembered.
 
-A Fun Time session stops the room, and a room with looping thumbnails and
-playing videos still going in it is not stopped. What made that hard is that
-the freeze has to reach things built *after* it was set -- a tab opened
-mid-freeze, a pane re-pointed at a video, a strip rebuilt -- so four places
-each kept their own copy of the flag under four names (``_paused``,
-``_session_paused``, ``_previews_paused``, ``_playback_paused``), each
-re-applying it to whatever it built, and each with a docstring explaining the
-same lesson.
+A hosting Fun Time session's OmniPause stops the room, and so does a click on a
+show standing on its own; a room with looping thumbnails, playing videos, an
+audio bed or a moving OSR2 still going in it is not stopped.  Whatever is held
+here is told when the room freezes, and is told the current answer the moment
+it joins, so a pane built mid-freeze opens frozen because it asked, not because
+whoever built it remembered to say so.
 
-There is one flag here instead, and nothing under it keeps a copy: whatever is
-held is told when the room freezes, and is told the current answer the moment
-it joins. So a pane built mid-freeze opens frozen because it asked, not because
-whoever built it remembered to say so -- which is how all but the grid tiles
-were missed the first time.
-
-What a freeze reaches is registered rather than wired per widget, for the same
-reason: :func:`~origenerator.gui.looping_preview.looping_movie` builds every
-looping thumbnail in the app, so one call there covers the grid, the shelves, a
-tab's history strip and the "Animated in" strip together.
+What a freeze reaches is registered rather than wired per widget:
+:func:`~origenerator.gui.looping_preview.looping_movie` builds every looping
+thumbnail in the app, so one call there covers the grid, the shelves, a tab's
+history strip and the "Animated in" strip together.
 """
 
 from __future__ import annotations

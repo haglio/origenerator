@@ -50,7 +50,6 @@ class InFlightItem:
     # job for is not one this session can stop either.
     stop_auto: Callable[[], None] | None = None
     foreign_ahead: int | None = None  # jobs another app has in front of it in ComfyUI
-    held: bool = False           # the queue is holding it back (a video, during a slideshow)
     # What kind of work this is in one word — "Image", "Video", "Enhance"
     # (:func:`gallery.job_kind_label`), or "" for a workflow this build has no
     # template for. The workflow's display name is in :attr:`caption` and answers
@@ -265,19 +264,6 @@ def queue_wait_text(foreign_ahead: int | None) -> str | None:
     return f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'} from another app"
 
 
-def queue_held_text(held: int | None) -> str | None:
-    """What a queue holding videos back for a slideshow reads like.
-
-    A line that stops moving with the GPU idle is the same mystery as a wait
-    on another app's work, and worse for being this app's own doing — so the
-    strip says it outright, and says what ends it. ``None`` when the gate is
-    holding nothing, which is every moment no slideshow is playing.
-    """
-    if not held:
-        return None
-    return (f"{held} video{'' if held == 1 else 's'} held until the slideshow closes")
-
-
 def starting_row_text(starting: bool) -> str | None:
     """What a row that is not a job yet says in place of a wait.
 
@@ -291,11 +277,6 @@ def starting_row_text(starting: bool) -> str | None:
     ``None`` once it is, which is every row that came off the database.
     """
     return "Starting…" if starting else None
-
-
-def held_row_text(held: bool) -> str | None:
-    """The same thing said in one queue row's width, or ``None`` if it can start."""
-    return "Held until the slideshow closes" if held else None
 
 
 def foreign_queue_text(total: int | None) -> str | None:

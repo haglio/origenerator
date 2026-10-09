@@ -7065,22 +7065,19 @@ def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monk
     show.close()
 
 
-def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
-    # A video generation saturates the card the show is being drawn with, and a
-    # show is exactly the stretch when nobody is waiting on a video.
+def test_a_video_asked_for_while_the_slideshow_plays_is_made(qtbot, monkeypatch, tmp_path):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
 
-    assert view._jobs._videos_held is True
+    video = view._jobs.start_prepared("k", _WAN_I2V, _WAN_I2V.default_params())
 
-    view._shows.showing.close()
-    assert view._jobs._videos_held is False  # closing lets the held ones run
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [video]
 
 
 def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
@@ -9318,8 +9315,7 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
-    # The show covers the strip, and a show is the one stretch where the line
-    # deliberately stops moving — so the queue follows onto the panel in front
+    # The show covers the strip, so the queue follows onto the panel in front
     # of the user, in the same order.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])

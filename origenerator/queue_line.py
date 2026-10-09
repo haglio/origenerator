@@ -1,4 +1,4 @@
-"""Where a new generation joins the line, and which of the waiting ones starts next.
+"""Where a new generation joins the line, and where one set aside rejoins it.
 
 Origenerator keeps the line itself and hands ComfyUI one prompt at a time. It has
 to: ComfyUI's queue is a heap ordered by submit, it has no pause, and a prompt
@@ -26,12 +26,6 @@ Three rules, and all three are about what the user is doing while the GPU works:
 Work nobody asked for — a background experiment, a base re-render — never joins
 the front whatever it makes, because putting one in front of the user's own work
 would be the whole cost of the feature.
-
-And one gate: **while the slideshow is playing, no video starts.** A video
-generation saturates the GPU the show is being drawn with, and a show is exactly
-when nobody is waiting for a video. So a video that comes up while one plays is
-passed over — every image after it goes first — and with nothing but videos
-left the line simply holds until an image is asked for or the show ends.
 
 The front of the line is not enough on its own, because a run already on the
 GPU holds it until it is done, minutes for a video. So **whatever is being
@@ -96,31 +90,6 @@ def insertion_index(line: list, job) -> int:
 
 def put_first(line: list, prompt_ids) -> None:
     line.sort(key=lambda job: job.prompt_id not in prompt_ids)
-
-
-def next_ready(line: list, *, videos_held: bool):
-    """The first job in ``line`` that may start now, or ``None`` if none may.
-
-    With videos held, a video is passed over rather than moved: the line keeps
-    the order the videos were asked for, and passing one over has exactly the
-    effect of sending it to the end, since everything that can start goes
-    first. A line holding nothing but videos yields ``None`` — the queue waits,
-    the GPU stays out of the show's way, and the next image asked for is what
-    starts it moving again.
-    """
-    for job in line:
-        if not (videos_held and is_video(job)):
-            return job
-    return None
-
-
-def held_back(line: list, *, videos_held: bool) -> list:
-    """The jobs in ``line`` that cannot start while the gate is what it is.
-
-    What a surface asks to explain a queue that isn't moving: with videos held,
-    every video in the line is waiting on the show rather than on the GPU.
-    """
-    return [job for job in line if videos_held and is_video(job)]
 
 
 def rejoin_index(line: list, job, newcomer) -> int:

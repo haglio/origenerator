@@ -996,13 +996,11 @@ def _inflight(**kw):
 
 
 def test_the_view_holds_what_is_in_flight_for_its_panel(qtbot):
-    # The lower strip that normally carries the line is under this view, and a
-    # show is when the queue stops moving: its videos are held until it ends.
+    # The lower strip that normally carries the line is under this view.
     view = _view(qtbot)
 
     view.set_queue([_inflight(status="running", typical_seconds=30, job_kind="Image"),
-                    _inflight(key="j2", typical_seconds=600, job_kind="Video",
-                              held=True)], 3)
+                    _inflight(key="j2", typical_seconds=600, job_kind="Video")], 3)
 
     items, foreign = view.hud_queue
     assert [item.key for item in items] == ["j1", "j2"]

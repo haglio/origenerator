@@ -45,13 +45,18 @@ def test_the_job_being_made_leads_the_block_with_its_frame_and_its_clock():
     assert "%" in section.leader.caption
 
 
-def test_a_line_whose_head_is_held_has_no_job_being_made():
-    """A video the queue is holding for the show is not on the GPU, so the head
-    of the block says what the hold is instead of drawing an empty bar."""
-    section = queue_section([_item("held-one", held=True, job_kind="Video")], 0)
+def test_a_video_waiting_at_the_head_of_the_line_leads_the_block():
+    section = queue_section([_item("waiting-one", job_kind="Video")], 0)
+
+    assert section.leader.key == "waiting-one"
+    assert section.idle_note == ""
+
+
+def test_with_nothing_of_ours_in_flight_the_block_names_another_apps_backlog():
+    section = queue_section([], 3)
 
     assert section.leader is None
-    assert section.idle_note == "1 video held until the slideshow closes"
+    assert section.idle_note == "3 jobs from another app are queued on ComfyUI"
 
 
 def _painted(section, width=400):

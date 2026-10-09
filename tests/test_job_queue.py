@@ -467,7 +467,7 @@ def test_queue_order_starts_out_empty(qtbot, tmp_path):
 
 def test_comfyui_is_handed_one_job_at_a_time(qtbot, tmp_path):
     # The line is kept on this side of the wire precisely so it can still be
-    # re-ordered and gated: a prompt already on the server can only be interrupted.
+    # re-ordered: a prompt already on the server can only be interrupted.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -626,105 +626,39 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
     assert queue.queue_order[1] == user_video.prompt_id
 
 
-# --- the slideshow's gate: no video starts while a show plays -----------------
-
-def test_a_video_does_not_start_while_the_slideshow_plays(qtbot, tmp_path):
-    client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.hold_videos(True)
-
-    video = _launch_video(queue, "v", seed=1)
-
-    client.submit_job.assert_not_called()
-    assert queue.held_jobs() == [video]
-
-
-def test_an_image_still_goes_while_the_slideshow_plays(qtbot, tmp_path):
-    # Only the GPU-hungry work is held: the enhancement asked for from the show
-    # itself is exactly what must still run.
-    client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.hold_videos(True)
-
-    image = _launch_image(queue, "i")
-
-    client.submit_job.assert_called_once_with(image.payload, image.prompt_id)
-    assert queue.held_jobs() == []
-
-
-def test_a_held_video_is_passed_over_rather_than_blocking_the_line(qtbot, tmp_path):
-    # "Sent to the end": everything that can start goes first, and the videos
-    # keep the order they were asked in for when the show ends.
-    client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.hold_videos(True)
-    video = _launch_video(queue, "v", seed=1)
-    queued = queue.start_prepared("e", WORKFLOW_REGISTRY[_IMAGE_WF],
-                                       _image_params(), source="experiment")
-
-    assert queued
-    client.submit_job.assert_called_once()  # the image after it, not the video
-    assert queue.queue_order[-1] == video.prompt_id
-
-
-def test_closing_the_slideshow_starts_what_it_held(qtbot, tmp_path):
-    client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    queue.hold_videos(True)
-    video = _launch_video(queue, "v", seed=1)
-
-    queue.hold_videos(False)
-
-    client.submit_job.assert_called_once_with(video.payload, video.prompt_id)
-    assert queue.held_jobs() == []
-
-
-def test_a_video_already_being_rendered_is_left_alone(qtbot, tmp_path):
-    # Nothing is gained by interrupting one: ComfyUI cannot set a run down and
-    # pick it back up, so the minutes already spent would simply be thrown away.
-    client = _client()
-    queue = JobQueue(Database(tmp_path / "test.db"), client)
-    video = _launch_video(queue, "v", seed=1)
-
-    queue.hold_videos(True)
-
-    client.interrupt.assert_not_called()
-    assert queue.queue_order == [video.prompt_id]
-
-
 # --- handing the line over as the app closes ---------------------------------
 
 def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
-    # There is about to be nobody watching, so every reason to hold work back is
-    # gone and the server can work through the rest alone.
+    # There is about to be nobody watching, so every reason to keep the line on
+    # this side is gone and the server can work through the rest alone.
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    queue.hold_videos(True)
-    first = _launch_video(queue, "v1", seed=1)
+    being_made = _launch_video(queue, "v1", seed=1)
     second = _launch_video(queue, "v2", seed=2)
+    third = _launch_video(queue, "v3", seed=3)
 
     assert queue.flush_to_server() == 2
     assert [call.args[1] for call in client.submit_job.call_args_list] == [
-        first.prompt_id, second.prompt_id
+        being_made.prompt_id, second.prompt_id, third.prompt_id
     ]
-    assert db.get_generation(second.prompt_id)["status"] == "running"
+    assert db.get_generation(third.prompt_id)["status"] == "running"
 
 
 def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    queue.hold_videos(True)
-    held = _launch_video(queue, "v1", seed=1)
+    _launch_video(queue, "v1", seed=1)
+    waiting = _launch_video(queue, "v2", seed=2)
     client.submit_job = MagicMock(side_effect=RuntimeError("bad prompt"))
     said = []
     queue.failed.connect(lambda key, message: said.append(key))
 
     queue.flush_to_server()
 
-    assert said == ["v1"]
-    assert db.get_generation(held.prompt_id)["status"] == "error"
+    assert said == ["v2"]
+    assert db.get_generation(waiting.prompt_id)["status"] == "error"
 
 
 def test_flush_with_nothing_waiting_is_harmless(qtbot, tmp_path):
@@ -753,13 +687,12 @@ def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path)
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    queue.hold_videos(True)
     _pending_row(db, "held-1")
     _pending_row(db, "held-2")
 
     queue.reconnect_running()
 
-    client.submit_job.assert_not_called()
+    assert [call.args[1] for call in client.submit_job.call_args_list] == ["held-1"]
     assert queue.queue_order == ["held-1", "held-2"]  # oldest first, as asked
 
 

@@ -1,10 +1,9 @@
 """The generation queue, painted onto the one panel a show wears.
 
 A show covers the lower strip that carries the queue, and it is the worst
-moment to lose it: the line deliberately stops moving there (every video in it
-is held until the show closes, :mod:`origenerator.queue_line`) and it is when
-the user keeps adding to it.  So it rides on the panel the show already wears
-rather than on a plate of its own, which would be a second HUD.
+moment to lose it: a show is when the user keeps adding to it.  So it rides on
+the panel the show already wears rather than on a plate of its own, which would
+be a second HUD.
 
 It says what the strip says: the job being made with its live frame and the
 clock across its bar, then each waiting job as a row -- the button that throws
@@ -41,8 +40,6 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
     foreign_queue_text,
-    held_row_text,
-    queue_held_text,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
@@ -162,7 +159,6 @@ class QueueSection:
 
     lines: tuple[JobLine, ...] = ()
     leader: Leader | None = None
-    idle_note: str = ""
     foreign: int = 0
     # Which row the drawn window opens on, and where a dragged row would land —
     # both the panel's own doing rather than the queue's, and both redrawn
@@ -172,6 +168,12 @@ class QueueSection:
     # The pointer on the block, told where each row and button was painted so
     # a press can be placed against them in the block's own pixels.
     pointer: QueuePointer | None = field(default=None, compare=False)
+
+    @property
+    def idle_note(self) -> str:
+        if self.leader is not None:
+            return ""
+        return foreign_queue_text(self.foreign) or ""
 
     @property
     def drawn(self) -> tuple[JobLine, ...]:
@@ -195,12 +197,10 @@ class QueueSection:
 
     def _head_size(self) -> tuple[int, int]:
         if self.leader is None:
-            if not self.idle_note and not self.foreign:
+            if not self.foreign:
                 return 0, 0
-            width = text_width(_tiny(), self.idle_note)
-            if self.foreign:
-                width += _GAP + _word_width(CLEAR_WORD)
-            return width, max(_line_height(), CTRL_BTN if self.foreign else 0)
+            width = text_width(_tiny(), self.idle_note) + _GAP + _word_width(CLEAR_WORD)
+            return width, max(_line_height(), CTRL_BTN)
         bar = text_width(_tiny(), self.leader.caption) + 2 * _BAR_PAD
         column = max(bar, text_width(_tiny(), self.leader.wait))
         if self.foreign:
@@ -476,7 +476,7 @@ def _line(item) -> JobLine:
     return JobLine(
         key=item.key,
         lead=queue_lead_text(item),
-        note=starting_row_text(item.starting) or held_row_text(item.held) or "",
+        note=starting_row_text(item.starting) or "",
         tooltip=f"{item.caption}\n\n{queue_lead_tooltip(item)}",
         discard=discard_run_text(item.auto_generating) if item.cancel is not None else "",
         discard_tooltip=discard_run_tooltip(item.auto_generating),
@@ -506,18 +506,14 @@ def queue_section(items, foreign: int = 0, *, first: int = 0,
                   drop_at: int | None = None,
                   pointer: QueuePointer | None = None) -> QueueSection | None:
     """The block the panel hangs at its foot, or ``None`` with nothing to say.
-    The head is whatever ComfyUI is making; with nothing of ours on the GPU it
-    says why instead -- this show's own hold, else another app's backlog."""
+    The head is whatever ComfyUI is making; with nothing of ours in flight it
+    names another app's backlog instead."""
     if not items and not foreign:
         return None
-    leading = items[0] if items and not items[0].held else None
-    idle = "" if leading is not None else (
-        queue_held_text(sum(1 for item in items if item.held))
-        or foreign_queue_text(foreign) or "")
     lines = tuple(_line(item) for item in items)
     return QueueSection(lines=lines,
-                        leader=_leader(leading) if leading is not None else None,
-                        idle_note=idle, foreign=foreign,
+                        leader=_leader(items[0]) if items else None,
+                        foreign=foreign,
                         first=max(0, min(first, max(0, len(lines) - ROWS))),
                         drop_at=drop_at, pointer=pointer)
 

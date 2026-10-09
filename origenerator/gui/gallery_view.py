@@ -1319,11 +1319,10 @@ class GalleryView(QWidget):
     def flush_queue_to_server(self) -> int:
         """Hand ComfyUI everything the queue is still holding, as the app closes.
 
-        The queue holds work back for the sake of whoever is watching — videos off
-        the GPU while a slideshow plays, one prompt at a time so the line stays
-        re-orderable — and closing the app ends every one of those reasons. ComfyUI
-        outlives it and works through the rest alone; the next launch picks up
-        whatever finished. Returns how many jobs went.
+        The queue hands ComfyUI one prompt at a time so the line stays
+        re-orderable for whoever is watching, and closing the app ends that
+        reason. ComfyUI outlives it and works through the rest alone; the next
+        launch picks up whatever finished. Returns how many jobs went.
         """
         self._generation_failed.hold_for_next_launch()
         return self._jobs.flush_to_server()
@@ -3675,8 +3674,7 @@ class GalleryView(QWidget):
         anything, and they last only until the real row exists.
 
         An open slideshow is fed the same list twice over: once for the queue it
-        covers, which is the one stretch where the line deliberately stops
-        moving, and once for the slides themselves, since a run that has begun to
+        covers, and once for the slides themselves, since a run that has begun to
         look like something is a slide of that show.
 
         ``inflight`` is the already-built card list, when the caller (the poll)

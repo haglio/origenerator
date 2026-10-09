@@ -14,6 +14,7 @@ from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
+from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.gui.gallery_view import GalleryView
@@ -23,6 +24,7 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.show_panel import show_hud_model
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import ShelfCommand, SurfaceCommand
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
 from tests.show_hud_support import engine_of, funestra_of, hud_button_names
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
@@ -32,6 +34,7 @@ from tests.test_gallery_view import (  # the in-memory Database stand-in, and a 
     _image,
     _keys_are_the_gallerys,
     _press_escape,
+    _reroll_client,
     _row,
     _SignalMotion,
 )
@@ -898,6 +901,19 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     assert show.locked is False            # the hold released with everything else
 
 
+def _a_library_of_each_shape(view, tmp_path, monkeypatch) -> dict:
+    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    Image.new("RGB", (200, 100)).save(wide)
+    library = {
+        "__all__::portrait": [{"prompt_id": "p-1", "thumbnail_path": str(tall)}],
+        "__all__::landscape": [{"prompt_id": "l-1", "thumbnail_path": str(wide)}],
+    }
+    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
+    monkeypatch.setattr(view._shows, "items_of", _items_of)
+    return library
+
+
 def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         qtbot, tmp_path, monkeypatch):
     """The base state of origenerator mode: each region shuffling every item of
@@ -908,18 +924,7 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     library — and on a black screen before that.
     """
     view = _fun_time_view(qtbot)
-    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
-    Image.new("RGB", (100, 200)).save(tall)
-    Image.new("RGB", (200, 100)).save(wide)
-    library = {
-        "__all__::portrait": [{"prompt_id": "p-1", "thumbnail_path": str(tall)}],
-        "__all__::landscape": [{"prompt_id": "l-1", "thumbnail_path": str(wide)}],
-    }
-    monkeypatch.setattr(view._shows, "rows_at", lambda key: library.get(key, []))
-    monkeypatch.setattr(
-        view._shows, "items_of",
-        lambda rows: [(row["thumbnail_path"], "image", row["prompt_id"],
-                       row["thumbnail_path"]) for row in rows])
+    library = _a_library_of_each_shape(view, tmp_path, monkeypatch)
 
     view.fill_the_regions()
 
@@ -934,6 +939,22 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     # reaches a region sitting in its base state.
     assert sorted(where for _show, where in view._shows._live_shows) == [
         "__all__::landscape", "__all__::portrait"]
+
+
+def test_a_video_asked_for_in_origenerator_mode_is_made_while_both_regions_play(
+        qtbot, tmp_path, monkeypatch):
+    client = _reroll_client()
+    view = GalleryView(Database(tmp_path / "test.db"), fun_time=_session(), client=client)
+    qtbot.addWidget(view)
+    _a_library_of_each_shape(view, tmp_path, monkeypatch)
+    view.fill_the_regions()
+    for side in ("portrait", "landscape"):
+        qtbot.addWidget(view.region_show(side))
+
+    i2v = WORKFLOW_REGISTRY["wan22_i2v"]
+    video = view._jobs.start_prepared("k", i2v, i2v.default_params())
+
+    assert [call.args[1] for call in client.submit_job.call_args_list] == [video]
 
 
 def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):

@@ -17,8 +17,6 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
     foreign_queue_text,
-    held_row_text,
-    queue_held_text,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
@@ -154,21 +152,9 @@ def test_a_wait_on_another_app_counts_its_jobs_and_says_job_or_jobs():
     assert queue_wait_text(4) == "Waiting on 4 jobs from another app"
 
 
-def test_a_queue_holding_videos_back_says_so_and_says_what_ends_it():
-    assert queue_held_text(None) is None
-    assert queue_held_text(0) is None
-    assert queue_held_text(1) == "1 video held until the slideshow closes"
-    assert queue_held_text(3) == "3 videos held until the slideshow closes"
-
-
 def test_a_row_that_is_not_a_job_yet_says_it_is_not_in_the_line():
     assert starting_row_text(starting=True) == "Starting…"
     assert starting_row_text(starting=False) is None
-
-
-def test_a_held_row_says_the_same_thing_in_one_rows_width():
-    assert held_row_text(held=True) == "Held until the slideshow closes"
-    assert held_row_text(held=False) is None
 
 
 def test_the_line_to_read_before_pressing_generate_counts_the_foreign_queue():

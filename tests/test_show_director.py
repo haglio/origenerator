@@ -303,13 +303,9 @@ class FakeSession:
         return self.players.get(side)
 
 
-class FakeReroll:
+class FakeJobQueue:
     def __init__(self):
-        self.holds = []
         self.reordered = []
-
-    def hold_videos(self, held):
-        self.holds.append(held)
 
     def reorder(self, keys=None):
         self.reordered.append(keys)
@@ -489,7 +485,7 @@ def shows(monkeypatch):
         host = host or FakeHost()
         director = ShowDirector(
             host, db=db or FakeDB(), browser=browser or FakeBrowser(),
-            jobs=FakeReroll(), pace=FakePace(), motion=None,
+            jobs=FakeJobQueue(), pace=FakePace(), motion=None,
             fun_time=fun_time)
         host.shows = director
         # The playlist is what a show is of; deriving it from files on disk is
@@ -509,24 +505,13 @@ def test_a_show_is_remembered_with_the_place_it_opened_from(shows):
     assert director._live_shows == [(made[0], "workflow/a")]
 
 
-def test_opening_a_show_holds_the_videos_back(shows):
-    # A video generation would saturate the card the show is drawn with, and a
-    # show is exactly the stretch when nobody is waiting on a video.
-    director, _host, _made = shows()
-
-    director.open([("a.png", "image", "g1", None)])
-
-    assert director._jobs.holds == [True]
-
-
-def test_the_last_show_closing_lets_the_videos_go(shows):
+def test_the_last_show_closing_leaves_nothing_showing(shows):
     director, _host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
     made[0].close()
 
     assert director.showing is None
-    assert director._jobs.holds == [True, False]
 
 
 def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
@@ -586,9 +571,7 @@ def test_a_double_click_on_a_picture_no_folder_lists_still_names_its_generation(
     assert show.levels == {"t1.png": ["newer", "older"]}
 
 
-def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):
-    # Hosted, two run at once: closing the portrait one must not forget the
-    # landscape one, and the videos stay held while it is still playing them.
+def test_one_of_two_hosted_shows_closing_leaves_the_other_showing(shows):
     director, _host, made = shows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
@@ -596,7 +579,6 @@ def test_one_of_two_shows_closing_keeps_the_hold_and_the_other(shows):
     made[1].close()
 
     assert director.showing is made[0]
-    assert director._jobs.holds == [True, True]
 
 
 def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regions(shows):
@@ -883,7 +865,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 def _director():
     return ShowDirector(FakeHost(), db=FakeDB(), browser=FakeBrowser(),
-                        jobs=FakeReroll(), pace=FakePace(), motion=None,
+                        jobs=FakeJobQueue(), pace=FakePace(), motion=None,
                         fun_time=None)
 
 
@@ -1404,8 +1386,6 @@ def test_nothing_to_play_opens_no_show_at_all(shows):
 
 
 def test_the_queue_block_comes_up_filled_rather_than_blank(shows):
-    # The hold on videos is this opening's own doing, so the panel says what is
-    # waiting on it rather than going blank for a second and a half.
     host = FakeHost()
     waiting = _being_made("g-waiting", frame=None)
     host.queue = ([waiting], 3)

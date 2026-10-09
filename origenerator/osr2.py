@@ -26,6 +26,7 @@ from player_core.tcode import (
     format_tcode_command,
     to_tcode_position,
 )
+from PyQt6.QtCore import QTimer
 
 from origenerator.config import project_dir
 
@@ -35,6 +36,9 @@ logger = logging.getLogger(__name__)
 # family's one spelling of it, which the broker parks with too -- so a stopped
 # video leaves the OSR2 where the broker expects it.
 PARK_TCODE = PARK_COMMAND
+# The broker's own wait before an OmniPause park (osr2_broker.hold's
+# HoldScheduler.DELAY_SECONDS): a room that plays again inside it is never parked.
+PARK_SETTLE_MS = 1000
 
 BROKER_HOST = "127.0.0.1"
 TCODE_UDP_PORT = ports.TCODE_UDP
@@ -131,3 +135,16 @@ class Osr2Broker:
             if not self._send_error_logged:
                 self._send_error_logged = True
                 logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
+
+
+def park_once_settled(broker, parent) -> QTimer:
+    timer = QTimer(parent)
+    timer.setSingleShot(True)
+    timer.setInterval(PARK_SETTLE_MS)
+    timer.timeout.connect(lambda: _park_for_the_pause(broker))
+    return timer
+
+
+def _park_for_the_pause(broker) -> None:
+    broker.park()
+    logger.info("OSR2 parked: the room is paused")

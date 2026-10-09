@@ -1,10 +1,9 @@
 """Drive the OSR2 from a playing video's funscript, one device at a time.
 
-The app owns a single :class:`Osr2Driver`. When a tab enables "Drive OSR2" for a
-scripted video, the view points the driver at that preview's media player and the
-video's actions; the driver then streams T-code toward the next action on a timer,
-following the player's position (wrapping onto the script as the preview loops). It
-pauses genau while it drives and parks the device + restores genau when it stops.
+The app owns a single :class:`Osr2Driver`, which the gallery's one OSR2 switch
+points at whichever scripted video is in front. It streams T-code toward the next
+action on a timer, following the player's position (wrapping onto the script as
+the preview loops), and parks the device when it lets go.
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
-from origenerator.osr2 import Osr2Broker
+from origenerator.osr2 import Osr2Broker, park_once_settled
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +53,15 @@ class Osr2Driver(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
+        self._frozen = False
+        self._park_once_settled = park_once_settled(self._broker, self)
+
+    def set_frozen(self, frozen: bool) -> None:
+        self._frozen = frozen
+        if frozen and self._player is not None:
+            self._park_once_settled.start()
+        else:
+            self._park_once_settled.stop()
 
     def start(self, player, actions: list[dict]) -> None:
         """Take over the device for ``player``'s video, streaming ``actions``.
@@ -77,6 +85,7 @@ class Osr2Driver(QObject):
         if self._player is None:
             return
         self._timer.stop()
+        self._park_once_settled.stop()
         self._player = None
         self._script = None
         self._duration_ms = 0
@@ -85,7 +94,7 @@ class Osr2Driver(QObject):
 
     @property
     def active(self) -> bool:
-        """Whether this is the thing sending to the device right now."""
+        """Whether a script has the device, sending or held by the room's pause."""
         return self._player is not None
 
     def trace(self, count: int, seconds: float) -> tuple[float, ...]:
@@ -118,7 +127,7 @@ class Osr2Driver(QObject):
         at the current target.
         """
         player = self._player
-        if player is None:
+        if player is None or self._frozen:
             return
         now_ms = self._folded(int(player.position()))  # the preview loops
         pos, interval = self._next_target(now_ms)

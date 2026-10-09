@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from player_core.funscript import Funscript
 
+from origenerator import osr2
 from origenerator.osr2_driver import Osr2Driver
 
 
@@ -142,3 +143,60 @@ def test_the_line_folds_onto_the_script_the_way_the_stream_does(qapp):
 
 def test_a_driver_with_nothing_to_follow_draws_nothing(qapp):
     assert Osr2Driver(broker=FakeBroker()).trace(8, 1.0) == ()
+
+
+def test_a_frozen_room_stops_a_script_at_once_and_parks_it_once_settled(qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.set_frozen(True)
+    driver.poll()
+
+    assert broker.positions == [] and broker.parked == 0
+    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+    assert driver.active
+
+
+def test_a_script_played_again_before_the_room_settles_follows_the_playhead_unparked(
+        qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.set_frozen(True)
+    driver.set_frozen(False)
+    qtbot.wait(30)
+    driver.poll()
+
+    assert broker.parked == 0
+    assert broker.positions == [(100, 400)]
+
+
+def test_a_script_let_go_of_in_a_frozen_room_is_parked_once_and_at_once(qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+    driver.set_frozen(True)
+
+    driver.stop()
+    qtbot.wait(30)
+
+    assert broker.parked == 1
+
+
+def test_a_script_started_in_a_frozen_room_waits_for_it_to_play(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.set_frozen(True)
+
+    driver.start(FakePlayer(pos=0), ACTIONS)
+    driver.poll()
+    assert broker.positions == []
+
+    driver.set_frozen(False)
+    driver.poll()
+    assert broker.positions == [(100, 500)]

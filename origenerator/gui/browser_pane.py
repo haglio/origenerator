@@ -253,15 +253,6 @@ class TreeNavigation:
     group_for_key: Callable[[str], object]
 
 
-# The job kinds whose queue row shows what they are made from rather than what
-# their folder holds (:func:`gallery.job_kind_label`).
-
-# What that same function calls a standalone enhance — the kind the Recents shelf
-# draws no card for. Asked of the function rather than spelled "Enhance" here, so
-# the shelf keeps agreeing with the queue if the queue ever renames the kind.
-ENHANCE_KIND = gallery.job_kind_label(gallery.ENHANCE_WORKFLOW)
-
-
 @dataclass(frozen=True)
 class Shelf:
     """One shelf: what it collects, and how it draws that.
@@ -803,7 +794,7 @@ class BrowserPane(QObject):
         side = self._shelf_orientation
         return [it for it in self.inflight_items(rows=rows, requests=requests)
                 if it.media_type in media_types
-                and it.job_kind != ENHANCE_KIND
+                and it.job_kind != gallery.JobKind.ENHANCE
                 and (side is None or it.orientation == side)]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list:

@@ -13,6 +13,8 @@ hover.
 """
 from __future__ import annotations
 
+from enum import StrEnum
+
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.output import row_output_files
@@ -142,6 +144,12 @@ def config_folder_name(workflow_name: str, signature: str,
     return meta.get("custom_name") or folder_id(key)
 
 
+class JobKind(StrEnum):
+    IMAGE = "Image"
+    VIDEO = "Video"
+    ENHANCE = "Enhance"
+
+
 def job_kind_label(workflow_name: str | None) -> str:
     """What kind of work a run of ``workflow_name`` is, in the queue's vocabulary.
 
@@ -156,11 +164,11 @@ def job_kind_label(workflow_name: str | None) -> str:
     guesses "Image" at a video is read, wrongly, as seconds away.
     """
     if workflow_name == ENHANCE_WORKFLOW:
-        return "Enhance"
+        return JobKind.ENHANCE
     output_type = workflow_output_type(workflow_name)
     if output_type is None:
         return ""
-    return "Video" if output_type == MediaType.VIDEO else "Image"
+    return JobKind.VIDEO if output_type == MediaType.VIDEO else JobKind.IMAGE
 
 
 def _source_image_label(params: dict, image_index: dict) -> str:

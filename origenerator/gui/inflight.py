@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.timing import RunTiming, elapsed_since, queue_estimate_label
 
@@ -152,12 +153,10 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     return "\n".join(lines)
 
 
-# What each of :func:`gallery.job_kind_label`'s three words means, spelled out
-# for the hover. An unregistered workflow's "" has no entry and contributes no line.
 _KIND_TOOLTIPS = {
-    "Image": "An image",
-    "Video": "A video made from a start image",
-    "Enhance": "An enhancement of an image already made",
+    JobKind.IMAGE: "An image",
+    JobKind.VIDEO: "A video made from a start image",
+    JobKind.ENHANCE: "An enhancement of an image already made",
 }
 
 

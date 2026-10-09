@@ -7,8 +7,15 @@ into the sections defined in :mod:`origenerator.gui.param_sections`.
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFormLayout, QVBoxLayout, QWidget
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtWidgets import (
+    QFormLayout,
+    QStyle,
+    QStyleOptionButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from origenerator.gui.eliding import ElidingButton
 
@@ -16,6 +23,55 @@ from origenerator.gui.eliding import ElidingButton
 # triangle when open, a right-pointing one when shut.
 _ARROW_OPEN = "▾"   # ▾
 _ARROW_SHUT = "▸"   # ▸
+_MARK_GAP = 6
+
+
+class _Header(ElidingButton):
+    def __init__(self):
+        super().__init__()
+        self._mark: QPixmap | None = None
+
+    def set_mark(self, mark: QPixmap | None, tip: str) -> None:
+        self._mark = mark
+        self.setToolTip(tip)
+        self.updateGeometry()
+        self.update()
+
+    def sizeHint(self):
+        return self._with_room_for_the_mark(super().sizeHint())
+
+    def minimumSizeHint(self):
+        return self._with_room_for_the_mark(super().minimumSizeHint())
+
+    def _with_room_for_the_mark(self, hint: QSize) -> QSize:
+        hint.setWidth(hint.width() + self._mark_room())
+        return hint
+
+    def _mark_room(self) -> int:
+        return 0 if self._mark is None else _MARK_GAP + self._mark_size().width()
+
+    def _mark_size(self) -> QSize:
+        return self._mark.deviceIndependentSize().toSize()
+
+    def _text_room(self, opt: QStyleOptionButton) -> int:
+        return super()._text_room(opt) - self._mark_room()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._mark is not None:
+            QPainter(self).drawPixmap(self._mark_rect(), self._mark)
+
+    def _mark_rect(self) -> QRect:
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        contents = self.style().subElementRect(
+            QStyle.SubElement.SE_PushButtonContents, opt, self)
+        title = self.display_text(self._text_room(opt))
+        size = self._mark_size()
+        return QRect(
+            QPoint(contents.left() + self.fontMetrics().horizontalAdvance(title) + _MARK_GAP,
+                   contents.top() + (contents.height() - size.height()) // 2),
+            size)
 
 
 class CollapsibleSection(QWidget):
@@ -39,7 +95,7 @@ class CollapsibleSection(QWidget):
 
         # Elides its title rather than propping the whole form open at the
         # title's own width; it also handles the "&" in "Models & Add-ons".
-        self._header = ElidingButton()
+        self._header = _Header()
         self._header.setObjectName("foldingSectionHeader")
         self._header.setFlat(True)
         self._header.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -83,6 +139,9 @@ class CollapsibleSection(QWidget):
         self._header.setText(f"{arrow}  {self._title}")
 
     # --- content -------------------------------------------------------------
+
+    def set_mark(self, mark: QPixmap | None, tip: str) -> None:
+        self._header.set_mark(mark, tip)
 
     def content(self) -> QWidget:
         """The widget holding the rows — the parent for any free-floating child

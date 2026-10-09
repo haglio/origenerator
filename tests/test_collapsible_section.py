@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QFormLayout, QLineEdit
 
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.stylesheet import build_stylesheet
+
+_MARK_COLOR = QColor(255, 0, 255)
 
 
 def test_starts_expanded_shows_its_content(qtbot):
@@ -83,3 +87,60 @@ def test_a_long_title_does_not_hold_the_form_open(qtbot):
     whole = section._header.fontMetrics().horizontalAdvance(title)
     assert section.minimumSizeHint().width() < whole
     assert section._header.display_text(whole // 3).endswith("…")
+
+
+def _shown_section(qtbot, title: str, width: int) -> CollapsibleSection:
+    section = CollapsibleSection(title, collapsed=True)
+    section.setStyleSheet(build_stylesheet())
+    qtbot.addWidget(section)
+    section.resize(width, section.sizeHint().height())
+    section.show()
+    qtbot.waitExposed(section)
+    return section
+
+
+def _solid_mark(side: int = 12) -> QPixmap:
+    mark = QPixmap(side, side)
+    mark.fill(_MARK_COLOR)
+    return mark
+
+
+def _drawn_above_the_rule(header) -> list[tuple[int, int]]:
+    image = header.grab().toImage()
+    background = image.pixelColor(image.width() - 1, 0)
+    return [(x, y) for y in range(image.height() - 1) for x in range(image.width())
+            if image.pixelColor(x, y) != background]
+
+
+def _mark_pixels(header) -> list[tuple[int, int]]:
+    image = header.grab().toImage()
+    return [(x, y) for y in range(image.height()) for x in range(image.width())
+            if image.pixelColor(x, y) == _MARK_COLOR]
+
+
+def test_a_mark_is_drawn_just_after_the_title_and_level_with_it(qtbot):
+    section = _shown_section(qtbot, "Size", width=300)
+    title = _drawn_above_the_rule(section._header)
+
+    section.set_mark(_solid_mark(), "Portrait")
+    mark = _mark_pixels(section._header)
+
+    assert len(mark) == 12 * 12
+    title_right = max(x for x, _ in title)
+    mark_left = min(x for x, _ in mark)
+    assert title_right < mark_left <= title_right + 12
+    title_middle = (min(y for _, y in title) + max(y for _, y in title)) / 2
+    mark_middle = (min(y for _, y in mark) + max(y for _, y in mark)) / 2
+    assert abs(title_middle - mark_middle) <= 2
+
+
+def test_a_squeezed_header_cuts_its_title_short_and_keeps_its_mark_whole(qtbot):
+    section = _shown_section(qtbot, "Enhancement levels", width=300)
+    section.set_mark(_solid_mark(), "Portrait")
+    section.resize(section.minimumSizeHint().width(), section.height())
+    qtbot.wait(10)
+
+    mark = _mark_pixels(section._header)
+    title = set(_drawn_above_the_rule(section._header)) - set(mark)
+    assert len(mark) == 12 * 12
+    assert max(x for x, _ in title) < min(x for x, _ in mark)

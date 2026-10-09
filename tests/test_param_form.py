@@ -18,7 +18,8 @@ from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.tick_control import TickControl
 
 import origenerator.gui.param_form as pf
-from origenerator.gui import param_sections, seed_combo
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gui import icons, param_sections, seed_combo
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
@@ -514,6 +515,19 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
     assert picture.pixelColor(picture.width() // 2, 1).alpha() > 0
 
 
+def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
+    form = ParamForm([ParamDef("input_image", "Start Image", "image", ""),
+                      ParamDef("seed", "Seed", "seed", 0)],
+                     size_deriver=lambda values: (400, 800) if values.get("input_image") else None)
+    qtbot.addWidget(form)
+
+    form._widgets["input_image"].setText("frame.png")
+
+    picture = form._widgets["seed"]._picture.pixmap().toImage()
+    assert picture.pixelColor(0, picture.height() // 2).alpha() == 0
+    assert picture.pixelColor(picture.width() // 2, 1).alpha() > 0
+
+
 def test_a_seed_picked_from_the_dropdown_keeps_its_picture_closed(qtbot, tmp_path):
     form, field = _seed_form(qtbot, [SeedUse(30, _red_square(tmp_path)), SeedUse(20, None)])
     field.showPopup()
@@ -708,6 +722,30 @@ def _dimension_defs():
     ]
 
 
+def _size_heading_wears(form, orientation) -> bool:
+    mark = form._sections["Size"]._header._mark
+    return mark is not None and mark.toImage() == icons.orientation_mark(orientation).toImage()
+
+
+def test_the_size_heading_wears_the_frame_of_the_shape_the_size_makes(qtbot):
+    form = ParamForm(_dimension_defs())
+    qtbot.addWidget(form)
+    assert _size_heading_wears(form, LANDSCAPE)
+
+    form._widgets["width"].setValue(704)
+    form._widgets["height"].setValue(1280)
+    assert _size_heading_wears(form, PORTRAIT)
+
+
+def test_a_square_size_wears_the_landscape_frame_and_says_it_is_square(qtbot):
+    form = ParamForm(_dimension_defs())
+    qtbot.addWidget(form)
+    form._widgets["height"].setValue(1280)
+
+    assert _size_heading_wears(form, LANDSCAPE)
+    assert form._sections["Size"]._header.toolTip() == "Square, so it goes under Landscape"
+
+
 def test_swap_dimensions_button_exchanges_width_and_height(qtbot):
     form = ParamForm(_dimension_defs())
     qtbot.addWidget(form)
@@ -862,6 +900,14 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     assert btn.right() <= width_label.geometry().left()
     assert btn.right() <= height_label.geometry().left()
     assert btn.right() <= top.left()
+
+
+def test_a_size_read_off_the_start_image_puts_that_shape_on_the_size_heading(qtbot):
+    form = _sized_form(qtbot, size=(464, 912))
+    assert form._sections["Size"]._header._mark is None
+
+    form._widgets["input_image"].setText("frame.png")
+    assert _size_heading_wears(form, PORTRAIT)
 
 
 def test_derived_dimensions_track_the_input_image(qtbot):

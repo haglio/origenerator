@@ -84,11 +84,13 @@ class ElidingButton(QPushButton):
         painter = QStylePainter(self)
         opt = QStyleOptionButton()
         self.initStyleOption(opt)
-        room = self.style().subElementRect(
+        opt.text = self.display_text(self._text_room(opt)).replace("&", "&&")
+        painter.drawControl(QStyle.ControlElement.CE_PushButton, opt)
+
+    def _text_room(self, opt: QStyleOptionButton) -> int:
+        return self.style().subElementRect(
             QStyle.SubElement.SE_PushButtonContents, opt, self
         ).width()
-        opt.text = self.display_text(room).replace("&", "&&")
-        painter.drawControl(QStyle.ControlElement.CE_PushButton, opt)
 
 
 class ElidingLabel(QLabel):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PyQt6 import sip
+from PyQt6.QtCore import QCoreApplication, QEvent
 from PyQt6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -219,3 +221,16 @@ def test_landing_on_a_match_scrolls_the_form_to_its_field(qtbot):
     find.search("cat")
 
     assert scroll.verticalScrollBar().value() > 0  # the match was brought into view
+
+
+def test_a_field_gone_before_the_second_scroll_leaves_nothing_to_fail(qtbot):
+    _host, (field,) = _fields(qtbot, "a cat")
+    find = PromptFind()
+    find.set_fields([field])
+    find.search("cat")
+
+    field.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert sip.isdeleted(field)
+
+    qtbot.wait(50)

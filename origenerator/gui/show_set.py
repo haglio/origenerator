@@ -31,7 +31,6 @@ from dataclasses import fields, replace
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from player_core.satellite_hud import label_is_filtered
 
-from origenerator.gui.neighbor_previews import still_for
 from origenerator.gui.show_map import (
     ACTION_AXIS,
     LOOP_CYCLE,
@@ -45,6 +44,7 @@ from origenerator.gui.show_map import (
     step_in_ring,
 )
 from origenerator.gui.show_wiring import HudFacts
+from origenerator.media import MediaType
 from origenerator.slideshow import LIVE, ShowFilters, Slide, SlideshowPlaylist, in_order
 
 # What the loop key answers: the axis it started looping, that it ended the
@@ -651,6 +651,11 @@ def looping_note(show_set: ShowSet) -> str:
 
 
 def thumb_of(slide: Slide) -> str:
-    """The still a map cell draws for *slide*, as the path the panel takes."""
-    still = still_for(slide)
-    return str(still) if still and not slide.is_live else ""
+    """The still a map cell draws for *slide*, as the path the panel takes: its
+    stored thumbnail when it carries one (a video's only still), else the
+    picture itself, and nothing for a generation still being made."""
+    if slide.is_live:
+        return ""
+    if slide.still:
+        return str(slide.still)
+    return str(slide.path) if slide.media_type == MediaType.IMAGE else ""

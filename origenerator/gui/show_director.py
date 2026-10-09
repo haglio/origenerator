@@ -51,7 +51,6 @@ from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.player_show import PlayerShow
-from origenerator.gui.show_hud import ShowHud
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
@@ -773,14 +772,10 @@ class ShowDirector:
         those two — no channel to post on, so the transport lands on the show
         itself, and no session to switch modes on, so no mode row.
         """
-        # The view is handed the panel itself rather than only told one is on:
-        # a motion key redraws the device rows riding on it.
         corner, minimized = self.hud_place(side)
-        view.adopt_hud(ShowHud(view, side=side,
-                               dashboard_cmd_file=self._session_channel,
-                               label_for=self._item_label,
-                               corner=corner, minimized=minimized,
-                               collapse=partial(self.collapse_the_hud, side=side)))
+        view.wear_the_hud(side, dashboard_cmd_file=self._session_channel,
+                          label_for=self._item_label, corner=corner, minimized=minimized,
+                          collapse=partial(self.collapse_the_hud, side=side))
 
     @property
     def _session_channel(self):

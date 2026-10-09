@@ -1,7 +1,7 @@
 """What a show answers to — the interface, written down once.
 
 Three things drive whatever is holding a region or sitting under a console:
-the players' own HUD (:mod:`origenerator.gui.show_hud`), the on-video console
+the players' own panel (:mod:`origenerator.gui.show_panel`), the on-video console
 (:mod:`origenerator.gui.motion_panel`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.fun_time_bridge`). They reached it through
 sixteen ``hasattr``/``getattr`` probes spread over those three modules, each
@@ -104,7 +104,7 @@ class ShowHost(Protocol):
         (:class:`~origenerator.gui.show_map.ShowMap`), which says which of its
         axes is looping — or ``None`` for nothing to map, which is how a host
         with no set says so, and what
-        :func:`~origenerator.gui.show_hud.show_hud_model` reads as no map at all.
+        :func:`~origenerator.gui.show_panel.show_hud_model` reads as no map at all.
         """
 
     @property
@@ -186,10 +186,6 @@ class ShowHost(Protocol):
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named; *lock* keeps it there."""
 
-    def current_media_path(self) -> str:
-        """The file on screen — what a hosting session's status file says."""
-        return ""
-
     @property
     def hud_queue(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
@@ -197,27 +193,6 @@ class ShowHost(Protocol):
         (:mod:`origenerator.gui.hud_queue`).  Nothing at all for a host with no
         line to report, which draws no block."""
         return [], 0
-
-    @property
-    def hud_scrubber(self):
-        """The clip's row for the panel to draw (`player_core.hud_row.RowHud`)
-        — None on a picture, and None where the media is somebody else's."""
-        return None
-
-    @property
-    def hud_funscript(self) -> list[dict]:
-        """The script the video on screen has, whose colors fill that track."""
-        return []
-
-    def scrub_to(self, ms: float) -> None:
-        """Run the video on screen to *ms* — a press along that track."""
-
-    def set_volume(self, level: int) -> None:
-        """How loud this show plays — the chip beside that track."""
-
-    def audio_muted(self) -> bool:
-        """Whether this show is silenced — the speaker on that chip."""
-        return False
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence this show, or let it be heard."""

@@ -165,7 +165,7 @@ class ShowDevice:
     """The device half of this app's console: the pace, the rows that aim the
     OSR2, who has the device, and the motion being sent.
 
-    Handed to the one panel a show wears (:mod:`origenerator.gui.show_hud`) so
+    Handed to the one panel a show wears (:mod:`origenerator.gui.show_panel`) so
     it says all of it without a second panel underneath, and used to build the
     whole console for the surface that has no show under it at all.
     """

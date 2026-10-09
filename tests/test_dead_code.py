@@ -310,7 +310,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # and test_a_workflow_this_build_has_no_template_for_contributes_no_line, and the
 # Recents shelf's note on asking the queue for its word for an enhance is the
 # name JobKind.ENHANCE.
-MAX_PROSE_LINES = 18609
+#
+# 18408 when the Slideshow moved onto a Funestra: the window the show drew for
+# itself, the HUD it painted, the stills either side and the position line went
+# with the paragraphs that explained them; how the Funestra plays a pass, draws
+# the panel and places a press is player_core's to state, and what the show
+# keeps of the set is tests/test_slideshow_view.py's, each claim a test's name.
+MAX_PROSE_LINES = 18408
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

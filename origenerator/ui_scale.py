@@ -179,25 +179,3 @@ def _screen_origin(x: int, y: int) -> tuple[int, int]:
     return (primary.geometry().x(), primary.geometry().y()) if primary else (0, 0)
 
 
-def unscaled_pixmap(pixmap):
-    """*pixmap* set to draw one bitmap pixel per DEVICE pixel, scale or no scale.
-
-    The satellite HUDs are bitmaps painted at the family's own sizes — an 18px
-    button is already the size it is meant to be on screen — so the app-wide
-    scale, which exists to shrink the core window's panes, must not shrink them
-    a second time.  Qt draws a pixmap at ``size / devicePixelRatio`` logical px,
-    which the scale then multiplies back: setting the ratio TO the scale makes
-    those two cancel, and the bitmap lands 1:1 on device pixels with no
-    resampling at all.  Its widget must be sized to
-    ``pixmap.deviceIndependentSize()`` to match, and coordinates coming back
-    from a mouse are logical, so they multiply by the scale to index the bitmap
-    (:func:`to_bitmap_pos`).
-    """
-    pixmap.setDevicePixelRatio(active_scale())
-    return pixmap
-
-
-def to_bitmap_pos(x: float, y: float) -> tuple[int, int]:
-    """A mouse position on an :func:`unscaled_pixmap` widget, in bitmap pixels."""
-    scale = active_scale()
-    return int(x * scale), int(y * scale)

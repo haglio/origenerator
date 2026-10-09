@@ -16,7 +16,7 @@ driving, control off -- is the app's one OSR2 switch now, and the toolbar's
 separate one is gone.
 
 This is the surface with no show under it.  A show does not float one of these:
-it wears ONE panel (:mod:`origenerator.gui.show_hud`), which carries the device
+it wears ONE panel (:mod:`origenerator.gui.show_panel`), which carries the device
 rows, the OSR2 line and the readout itself -- two panels in one corner said the
 status twice, in two lines that disagreed, and drew prev/next/lock/trash on
 each.

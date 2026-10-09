@@ -10,7 +10,7 @@ import json
 
 from PIL import Image
 from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
-from PyQt6.QtCore import QEvent, QPoint, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
@@ -20,11 +20,11 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.notice_overlay import NOTICE, WARNING
-from origenerator.gui.show_hud import ShowHud, show_hud_model
+from origenerator.gui.show_panel import show_hud_model
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import ShelfCommand, SurfaceCommand
 from origenerator.workflows.detail_parts import part_table
-from tests.show_hud_support import hud_button_names
+from tests.show_hud_support import engine_of, funestra_of, hud_button_names
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
@@ -306,7 +306,7 @@ def test_a_region_show_is_muted_like_every_satellite(qtbot, tmp_path):
     show = view._shows.open_on_preview((str(wide), "image"), None, None)
 
     qtbot.addWidget(show)
-    assert show.audio_muted()
+    assert engine_of(show).muted is True
 
 
 def test_a_presented_show_takes_the_keyboard(qtbot):
@@ -326,7 +326,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     # the last through ShowHost — and the view calls them outright.
     stub.set_audio_muted = lambda muted: None
     stub.set_paused = lambda paused: None
-    stub.adopt_hud = lambda panel: None  # handed the panel itself, to seat its console under
+    stub.wear_the_hud = lambda side, **how: None  # told whose panel it wears, and where
     stub.hud_map = lambda: None  # a host with no set draws no map
     stub.hud_device = None  # and no device of its own to put on that panel
     stub.hud_queue = ([], 0)  # and nothing in flight for the panel's foot
@@ -367,9 +367,7 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
 
-    hud, = show.findChildren(ShowHud)
-    assert hud._targets is not None
-    names = hud_button_names(hud)
+    names = hud_button_names(show)
     # The mode pair is on it — the way back to kino mode from atop a show.
     assert [n for n in names if n in MODE_VERBS] == [
         "satellites_kino_activate", "origenerator_activate"]
@@ -378,12 +376,10 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     # The window a player's minimize parks is not this show's, so the panel
     # declares no such button rather than drawing one whose press goes nowhere.
     assert "minimize" not in names
-    # The furnishings the map replaces are off.
-    assert show._counter.isHidden()
 
     # A transport press posts on the session's channel, exactly as a player's
     # HUD posts it.
-    hud._deliver("portrait_next")
+    show.press("portrait_next")
     posted = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
     assert posted == ["portrait_next"]
 
@@ -395,8 +391,9 @@ def test_a_click_on_a_hosted_show_asks_the_room_for_omnipause(qtbot, tmp_path, m
     show = view.region_show("portrait")
     qtbot.addWidget(show)
     channel = tmp_path / "dashboard_cmd.txt"
+    funestra_of(show)
 
-    qtbot.mouseClick(show._pane, Qt.MouseButton.LeftButton)
+    show._pane.press(QPointF(show._pane.width() / 2, show._pane.height() / 2))
 
     qtbot.waitUntil(lambda: channel.exists() and channel.read_text(
         encoding="utf-8").split() == ["omnipause_toggle"])
@@ -565,16 +562,15 @@ def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monk
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
 
-    hud._deliver("portrait_fmode")
+    show.press("portrait_fmode")
 
     assert show.hud_favorites_filter is True
     assert show.pass_size() == 1  # narrowed to the one favorite
     model = show_hud_model("portrait", show)
     assert _lit(model, "portrait_fmode") and "F-Mode" in model.lock_label
 
-    hud._deliver("portrait_fmode")
+    show.press("portrait_fmode")
     assert show.pass_size() == 3  # widened back
     # The star readout lights exactly on the favorite item.  (Every fixture
     # item shares one file, so land on it by position, not by path.)
@@ -667,9 +663,8 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
-    hud, = show.findChildren(ShowHud)
 
-    hud._deliver("portrait_seed_loop")
+    show.press("portrait_seed_loop")
 
     assert [item[2] for item in show._playlist.items] == ["g1", "g2"]
     model = show_hud_model("portrait", show)
@@ -681,7 +676,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert "Unlocked" not in model.lock_label
     assert show._note.text() == "Looping seeds: 2"
 
-    hud._deliver("portrait_no_loop")
+    show.press("portrait_no_loop")
 
     assert show.isVisible()                      # the region is not handed back
     assert show.pass_size() == 5                 # it browses its set again
@@ -699,9 +694,8 @@ def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     show = _open_the_fox_show(qtbot, view, monkeypatch, rows)
-    hud, = show.findChildren(ShowHud)
 
-    hud._deliver("portrait_more_seeds")
+    show.press("portrait_more_seeds")
 
     model = show_hud_model("portrait", show)
     assert [cell.path for cell in model.seeds] == ["g2.png", "g3.png", "g4.png"]
@@ -890,14 +884,13 @@ def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monk
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
 
-    hud._deliver("portrait_fmode")
+    show.press("portrait_fmode")
     show._playlist.jump_to(1)
     show._flip_lock()
     assert show.hud_favorites_filter is True
 
-    hud._deliver("portrait_reset")
+    show.press("portrait_reset")
 
     assert show.hud_favorites_filter is False
     assert show.pass_size() == 3           # widened back to the whole set
@@ -989,11 +982,10 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
     monkeypatch.setattr(view._shows, "items_of", _items_of)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
     assert show.pass_size() == 2      # the folder it was started on
     view._shows._live_shows = [(show, "folder-a")]
 
-    hud._deliver("portrait_reset")
+    show.press("portrait_reset")
 
     assert show.pass_size() == len(base)   # the library of its shape
     assert show.hud_order_label == "Shuffle"
@@ -1015,9 +1007,8 @@ def test_latest_on_a_hosted_shows_panel_plays_its_side_newest_first(
     monkeypatch.setattr(view._shows, "items_of", _items_of)
     show = view.region_show("portrait")
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
 
-    hud._deliver("portrait_latest")
+    show.press("portrait_latest")
 
     playlist = show._playlist
     assert [playlist.items[index][2] for index in playlist.order] == [
@@ -1123,7 +1114,8 @@ def test_a_frozen_show_does_not_walk_past_an_unplayable_clip(qtbot, tmp_path, mo
     view.set_session_paused(True)
     at = show._playlist.index
 
-    show._pane.media_unplayable.emit()
+    engine_of(show).idle = True
+    show._pane.tick()
 
     assert show._playlist.index == at
 
@@ -1511,11 +1503,10 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
-    names = hud_button_names(hud)
+    names = hud_button_names(show)
     assert names.index("enhanced") == names.index("fmode") + 1
 
-    hud._deliver("portrait_enhanced")
+    show.press("portrait_enhanced")
 
     assert show.hud_enhanced_mode is True
     assert show.pass_size() == 1          # narrowed to the one enhanced
@@ -1524,7 +1515,7 @@ def test_a_hosted_shows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp
     # Nothing went out on the session's channel: the switch is the show's own.
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 
-    hud._deliver("portrait_enhanced")
+    show.press("portrait_enhanced")
     assert show.pass_size() == 3          # widened back
 
 

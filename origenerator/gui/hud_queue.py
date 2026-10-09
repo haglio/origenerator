@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import io
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 
 from PIL import Image, ImageDraw
@@ -68,6 +68,9 @@ FRAME_TOOLTIP = "Open the folder this run will land in"
 # whole: a panel that grew a row per queued job would run off the screen the
 # first time a folder-wide request filled it.
 ROWS = 4
+# How far a press on a row has to travel before it is a drag rather than the
+# click that opens the job's folder.
+_DRAG_START = 6
 
 _TINY_PT = 8            # the panel's own small face, as its own painters size it
 _WORD_PAD = 6           # the room a word button keeps either side of its word
@@ -166,7 +169,9 @@ class QueueSection:
     # through here because the block is painted, not laid out in widgets.
     first: int = 0
     drop_at: int | None = None
-
+    # The pointer on the block, told where each row and button was painted so
+    # a press can be placed against them in the block's own pixels.
+    pointer: QueuePointer | None = field(default=None, compare=False)
 
     @property
     def drawn(self) -> tuple[JobLine, ...]:
@@ -228,6 +233,8 @@ class QueueSection:
             if self.windowed:
                 self._paint_mark(draw, x, top + len(self.drawn) * _ROW_H, width,
                                  self.first + ROWS < len(self.lines))
+        if self.pointer is not None:
+            self.pointer.painted(targets, (x, y))
         return targets
 
     def _paint_head(self, image, draw, x, y, width, pointer, targets) -> None:
@@ -496,7 +503,8 @@ def _leader(item) -> Leader:
 
 
 def queue_section(items, foreign: int = 0, *, first: int = 0,
-                  drop_at: int | None = None) -> QueueSection | None:
+                  drop_at: int | None = None,
+                  pointer: QueuePointer | None = None) -> QueueSection | None:
     """The block the panel hangs at its foot, or ``None`` with nothing to say.
     The head is whatever ComfyUI is making; with nothing of ours on the GPU it
     says why instead -- this show's own hold, else another app's backlog."""
@@ -511,4 +519,131 @@ def queue_section(items, foreign: int = 0, *, first: int = 0,
                         leader=_leader(leading) if leading is not None else None,
                         idle_note=idle, foreign=foreign,
                         first=max(0, min(first, max(0, len(lines) - ROWS))),
-                        drop_at=drop_at)
+                        drop_at=drop_at, pointer=pointer)
+
+
+class QueuePointer:
+    """The pointer on the block, in the block's own pixels.
+
+    The panel hands it a press, a drag, the button coming up and the wheel,
+    and it places each against the rows and buttons as they were last painted:
+    a press on a row's button throws that job away, a press on the row goes
+    to the folder its job will land in once the button comes up where it went
+    down, and a press that travels picks the row up and drops it further down
+    the line.  Which row the window opens on and where a drag would land are
+    the block's own state rather than the line's, kept here because the block
+    is painted afresh each beat.
+    """
+
+    def __init__(self, host) -> None:
+        self._host = host
+        self._buttons: list[tuple[tuple, str]] = []
+        self.first = 0
+        self._press: tuple[str, int, int, bool] | None = None
+        self._drag: str | None = None
+        self.drop: int | None = None
+
+    def painted(self, targets, origin: tuple[int, int]) -> None:
+        left, top = origin
+        self._buttons = [((x - left, y - top, width, height), button.command)
+                         for (x, y, width, height), button in targets]
+
+    def where(self, command: str) -> tuple | None:
+        """Where that button was painted, in the block's own pixels."""
+        return next((rect for rect, posted in self._buttons if posted == command), None)
+
+    def press(self, px: int, py: int) -> None:
+        verb, _, key = self._command_at(px, py).partition("|")
+        if verb in (OPEN, FRAME):
+            # A row is pressed for two things -- its folder and a place further
+            # down the line -- so the press is held until the release says
+            # which.  The head's picture is pressed for the folder alone.
+            self._press = (key, px, py, verb == OPEN)
+        elif verb == CANCEL:
+            item = self._item(key)
+            if item is not None and item.cancel is not None:
+                item.cancel()
+        elif verb == CLEAR:
+            self._host.clear_foreign_queue()
+
+    def drag(self, px: int, py: int) -> None:
+        """A press on a row that travels is a drag, and the block marks where it
+        would land.  The row being rendered stays where it is: nothing can be
+        moved in front of what ComfyUI is already working on, itself included."""
+        if self._press is None:
+            return
+        key, start_x, start_y, draggable = self._press
+        if self._drag is None:
+            if not draggable or abs(px - start_x) + abs(py - start_y) < _DRAG_START:
+                return
+            item = self._item(key)
+            if item is None or item.reading.rendering:
+                self._press = None
+                return
+            self._drag = key
+        self.drop = self._drop_index(py)
+
+    def release(self, px: int, py: int) -> None:
+        """The button coming up finishes whatever the press turned out to be."""
+        pending, self._press = self._press, None
+        dragged, drop = self._drag, self.drop
+        self._drag, self.drop = None, None
+        if dragged is not None:
+            if drop is not None:
+                self._drag_to(dragged, drop)
+        elif pending is not None:
+            item = self._item(pending[0])
+            if item is not None:
+                item.reveal()
+
+    def wheel(self, steps: int, px: int, py: int) -> None:
+        """Scroll the line past the rows the block draws -- over the rows
+        themselves, never over the head."""
+        if not any(_on(rect, (px, py)) for rect, _key in self._rows()):
+            return
+        lines = len(self._host.hud_queue[0])
+        self.first = max(0, min(self.first - steps, max(0, lines - ROWS)))
+
+    def _command_at(self, px: int, py: int) -> str:
+        return next((posted for rect, posted in self._buttons if _on(rect, (px, py))), "")
+
+    def _rows(self) -> list[tuple[tuple, str]]:
+        """Each drawn row's rect and the job it stands for, in the order drawn."""
+        return [(rect, posted.partition("|")[2]) for rect, posted in self._buttons
+                if posted.startswith(f"{OPEN}|")]
+
+    def _item(self, key: str):
+        """The job that row stands for, or ``None`` once it has left the line."""
+        return next((item for item in self._host.hud_queue[0] if item.key == key), None)
+
+    def _drop_index(self, py: int) -> int:
+        """Which slot in the line a drop at ``py`` lands in: above the row whose
+        upper half it fell on, else at the end of what is drawn."""
+        rows = self._rows()
+        for index, (rect, _key) in enumerate(rows):
+            if py < rect[1] + rect[3] / 2:
+                return self.first + index
+        return self.first + len(rows)
+
+    def _drag_to(self, key: str, target: int) -> None:
+        """Re-line the queue with *key*'s row let go at *target*.
+
+        Nothing may be moved in front of what ComfyUI is already rendering, and
+        a row let go where it already was asks for nothing.
+        """
+        items = self._host.hud_queue[0]
+        keys = [item.key for item in items]
+        if key not in keys:
+            return
+        source = keys.index(key)
+        # The slot was read with the dragged row still in place, so a drop below
+        # it names one further along than it will end up in.
+        target = min(target - 1 if target > source else target, len(keys) - 1)
+        first = next((index for index, item in enumerate(items)
+                      if not item.reading.rendering), len(items))
+        if not first <= source or not first <= target:
+            return
+        moved = list(keys)
+        moved.insert(target, moved.pop(source))
+        if moved != keys:
+            self._host.requeue(moved)

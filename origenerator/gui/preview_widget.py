@@ -498,9 +498,6 @@ class PreviewWidget(QWidget):
         """Silence (or voice) this pane's playback outright."""
         self._audio.setMuted(muted)
 
-    def audio_muted(self) -> bool:
-        return self._audio.isMuted()
-
     def set_frozen(self, frozen: bool) -> None:
         """Hold what is moving here, or let it go: a playing video, or an
         animated image's own movie.
@@ -519,10 +516,6 @@ class PreviewWidget(QWidget):
             self._player.pause()
         else:
             self._player.play()
-
-    def current_media_path(self) -> str:
-        """The file on screen, or "" while showing a placeholder or live frame."""
-        return str(self._media[0]) if self._media is not None else ""
 
     def media_size(self) -> tuple[int, int] | None:
         """The shown media's own ``(width, height)``, or ``None`` for nothing.
@@ -600,13 +593,6 @@ class PreviewWidget(QWidget):
         if self._timeline is not None:
             self._timeline.set_actions([])
             self._timeline.hide()
-
-    def current_video_path(self):
-        """The on-disk video currently shown, or ``None`` for an image/placeholder/
-        live frame — what a funscript lookup and device driving key off."""
-        if self._media is not None and self._media[1] == MediaType.VIDEO:
-            return self._media[0]
-        return None
 
     def mousePressEvent(self, event) -> None:
         # The media children are transparent to the mouse, so a press over the

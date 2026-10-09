@@ -24,14 +24,16 @@ _.takeAt  # noqa  # origenerator/gui/flow_layout.py:46
 _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
+_.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:263, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
 
-# --- player_core reads this off the click tracker this app mirrors it onto ---
-# `satellite_hud.HudClicks.press` compares a row's filter press against it to
-# decide between narrowing and lifting; nothing here reads it back.
-_.active_filter  # noqa  # origenerator/gui/show_hud.py:207
+# --- player_core's Funestra asks these of what runs on it, through its User protocol ---
+_.apply_command  # noqa  # origenerator/gui/slideshow_view.py:1617
+_.status_fields  # noqa  # origenerator/gui/slideshow_view.py:1623
+_.top_block  # noqa  # origenerator/gui/slideshow_view.py:1626
+_.set_showing  # noqa  # origenerator/gui/slideshow_view.py:1629
 
 # --- reached by name, from the table a spoken word is dispatched through ---
 # `voice_router._MOTION` maps the spoken on and off words for cruise and human

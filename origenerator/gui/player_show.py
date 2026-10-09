@@ -44,13 +44,12 @@ from player_core.satellite_hud import hud_text
 from player_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
-from origenerator.config import COMFYUI_OUTPUT_DIR
-from origenerator.funscript import funscript_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.notice_overlay import NOTICE, WARNING
-from origenerator.gui.show_hud import show_hud_model
 from origenerator.gui.show_map import SEED_AXIS
+from origenerator.gui.show_panel import show_hud_model
+from origenerator.gui.show_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.show_set import (
     LOOP_IS_A_LOCK,
     LOOP_OFF,
@@ -154,7 +153,7 @@ class PlayerShow(QObject):
         this show stands on: a player showing nothing of it opens there, and a
         reload keeps the item a player is on wherever that item survived."""
         current = self._set.playlist.current()
-        rotated = _rotated_onto(self._set.playlist.in_play_order(), current)
+        rotated = rotated_onto(self._set.playlist.in_play_order(), current)
         write_playlist(self.channel.playlist,
                        [self._player_item(item) for item in rotated])
         if land and current is not None and self._file_of(current) != self._showing:
@@ -171,7 +170,7 @@ class PlayerShow(QObject):
     def _player_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
-        return _slide_item(slide)
+        return slide_item(slide)
 
     def _send(self, verb: str) -> None:
         if not append_command(self.channel.command_file, verb):
@@ -294,7 +293,7 @@ class PlayerShow(QObject):
         if level is None:
             return
         path, media_type, _label = level
-        self._send(play_file(_playlist_item(path, media_type)))
+        self._send(play_file(playlist_item(path, media_type)))
 
     def _current_base(self) -> str:
         """The file the set lists the item on screen under — what its versions
@@ -646,11 +645,6 @@ class PlayerShow(QObject):
     def clear_modes(self) -> bool:
         return self._set.set_filters(ShowFilters())
 
-    def current_media_path(self) -> str:
-        """The file on screen — the player's own answer, which is what the
-        session's status file says about this side."""
-        return self._showing
-
     def voice_target(self):
         """The generation a spoken order is about: the item on screen."""
         return self._set.current_prompt_id()
@@ -759,27 +753,6 @@ class PlayerShow(QObject):
     def hud_queue(self) -> tuple[list, int]:
         """And so this show has none to report."""
         return [], 0
-
-    @property
-    def hud_scrubber(self):
-        """And no row of its own: the clip is the player's to run, so the
-        track, the time and the chip are the player's too."""
-        return None
-
-    @property
-    def hud_funscript(self) -> list[dict]:
-        """Nor a script to color a track this show does not draw."""
-        return []
-
-    def scrub_to(self, ms: float) -> None:
-        """Nor a track to press along."""
-
-    def set_volume(self, level: int) -> None:
-        """Nor a chip: a session sets its players' levels itself."""
-
-    def audio_muted(self) -> bool:
-        """Nor a speaker on one."""
-        return False
 
     def set_audio_muted(self, muted: bool) -> None:
         """Nor a mute of its own to answer."""
@@ -897,28 +870,6 @@ class PlayerShow(QObject):
         self.closed.emit()
         if slide is not None:
             self.open_requested.emit(slide[2])
-
-
-def _playlist_item(path, media_type) -> PlaylistItem:
-    path = Path(str(path))
-    if media_type != MediaType.VIDEO:
-        return PlaylistItem(path)
-    return PlaylistItem(path, funscript_of(path, output_dir=COMFYUI_OUTPUT_DIR))
-
-
-def _slide_item(slide) -> PlaylistItem:
-    return _playlist_item(slide.path, slide.media_type)
-
-
-def _rotated_onto(items: list, current) -> list:
-    """*items* turned so *current* leads, leaving the order otherwise alone."""
-    if current is None:
-        return items
-    for index, item in enumerate(items):
-        if item is current or (item.prompt_id is not None
-                               and item.prompt_id == current.prompt_id):
-            return items[index:] + items[:index]
-    return items
 
 
 def _read_fields(path: Path) -> dict[str, str]:

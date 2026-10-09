@@ -20,10 +20,10 @@ from origenerator.fun_time_mode import PlayerChannel
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_host import ShowHost
-from origenerator.gui.show_hud import show_hud_model
+from origenerator.gui.show_panel import show_hud_model
 from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
-from tests.show_surface_fakes import FakeEngine
+from tests.funestra_fakes import FakePlayer
 
 # What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
@@ -39,7 +39,6 @@ TRANSPORT = (
 THE_SET = (
     "show_reset", "hud_map", "hud_favorites_filter", "hud_order_label",
     "hud_is_favorite", "hud_item_note", "toggle_favorites_filter", "show_item",
-    "current_media_path",
     # F-mode said which way, as the lock is: "f mode on" and "f mode off".
     "set_favorites_filter",
     # The map's own chrome and the session's keys over it: the loops along
@@ -61,17 +60,16 @@ THE_SET = (
     # The queue block at that panel's foot: what is in flight, the order a row
     # dragged down it asks for, and the Clear that drops another app's work.
     "hud_queue", "requeue", "clear_foreign_queue",
-    # The row at that panel's foot — the track, the time and the volume the
-    # players lay along the lower edge of their video: what it shows, the
-    # funscript coloring it, and what a press on each part of it asks for.
-    "hud_scrubber", "hud_funscript", "scrub_to", "set_volume",
-    "audio_muted", "set_audio_muted",
+    # The one thing a hosting session does to a show's sound: a show landing
+    # on a satellite region is silenced.  The track, the time and the volume
+    # are the Funestra's own, so no host answers for them.
+    "set_audio_muted",
 )
 
 # The three modules that drive a host. Each is checked for probes separately, so
 # a probe put back in one of them cannot be paid for by one removed in another.
 DRIVERS = (
-    "origenerator/gui/show_hud.py",
+    "origenerator/gui/show_panel.py",
     "origenerator/fun_time_bridge.py",
     "origenerator/gui/motion_panel.py",
     "origenerator/gui/console.py",
@@ -86,7 +84,7 @@ def test_the_protocol_is_exactly_the_attributes_written_down_here():
 
 @pytest.fixture
 def slideshow(qtbot):
-    view = SlideshowView([("a.png", "image")], engine=FakeEngine(),
+    view = SlideshowView([("a.png", "image")], player=FakePlayer(),
                          shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view
@@ -138,7 +136,6 @@ def test_a_host_with_no_set_says_it_has_no_set(pace_only):
     assert host.hud_order_label == ""
     assert host.hud_is_favorite is False
     assert host.hud_item_note == ""
-    assert host.current_media_path() == ""
 
 
 def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):

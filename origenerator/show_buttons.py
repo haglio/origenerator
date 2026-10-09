@@ -1,6 +1,6 @@
 """The buttons Origenerator declares on a show's HUD.
 
-A show wears the players' own panel (:mod:`origenerator.gui.show_hud`), and a
+A show wears the players' own panel (:mod:`origenerator.gui.show_panel`), and a
 panel's buttons are its source's to declare: rows of
 :class:`player_core.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the

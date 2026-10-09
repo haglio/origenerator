@@ -650,6 +650,8 @@ class GenerateConfigPanel(QWidget):
         duplicate = (
             wf is not None and self._can_generate()
             and (self._would_remake_what_it_shows()
+                 or (config.seed_is_random
+                     and self._shown_run_the_form_still_holds() is not None)
                  or would_reproduce_a_completed_run(
                      self._library.now().rows, wf, config.params,
                      seed_is_random=config.seed_is_random,
@@ -826,26 +828,27 @@ class GenerateConfigPanel(QWidget):
         params_json = json.dumps(self._param_form.get_values())
         if image_index is None:
             image_index = self._library.now().image_config_index
-        return key, settings_signature(
-            key, params_json, image_index,
-            workflow_version=self._recipe_the_shown_run_was_made_on(key, params_json, image_index))
+        shown = self._shown_run_the_form_still_holds(params_json, image_index) or {}
+        return key, settings_signature(key, params_json, image_index,
+                                       workflow_version=shown.get("workflow_version"))
 
-    def _recipe_the_shown_run_was_made_on(self, workflow_name: str, params_json: str,
-                                          image_index: dict) -> str | None:
-        """The workflow version this tab's folder key takes: the shown
-        run's own while the form still holds that run's settings, else today's.
-
-        A run made before the recipe changed is filed under the older recipe's
-        folder, so a tab showing one has to name that folder, or
-        :meth:`InfoPaneTabs.load_selection` cannot see that the tab it already has
-        is that item's own and every open forks another.
-        """
+    def _shown_run_the_form_still_holds(self, params_json: str | None = None,
+                                       image_index: dict | None = None) -> dict | None:
+        """The saved generation on display while the form still holds its
+        settings, else ``None`` — the seeds left out of the question."""
         row = self._displayed_row
-        if row is None or (row.get("workflow_name") or "") != workflow_name:
+        workflow_name = self._workflow_combo.currentData()
+        if row is None or self._param_form is None or not workflow_name:
             return None
-        shows_it = (settings_signature(workflow_name, params_json, image_index)
+        if (row.get("workflow_name") or "") != workflow_name:
+            return None
+        if params_json is None:
+            params_json = json.dumps(self._param_form.get_values())
+        if image_index is None:
+            image_index = self._library.now().image_config_index
+        holds_it = (settings_signature(workflow_name, params_json, image_index)
                     == settings_signature(workflow_name, row.get("params_json"), image_index))
-        return row.get("workflow_version") if shows_it else None
+        return row if holds_it else None
 
     def settings_folder_key(self) -> str | None:
         """The gallery folder this tab's settings have been generating into,

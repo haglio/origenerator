@@ -44,14 +44,12 @@ from PIL import Image
 
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
-
-# ORIENTATION_LABELS is re-exported for the gallery window, which still
-# imports it from here; every other reader takes it from sides directly.
 from origenerator.gallery.sides import (  # noqa: F401
     LANDSCAPE,
     ORIENTATION_LABELS,
     ORIENTATIONS,
     PORTRAIT,
+    orientation_of_size,
 )
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.media import MediaType
@@ -136,10 +134,9 @@ def _measure_any(candidates) -> str | None:
             return remembered
         try:
             with Image.open(candidate) as image:
-                width, height = image.size
+                measured = orientation_of_size(*image.size)
         except (OSError, ValueError):
             continue
-        measured = PORTRAIT if height > width else LANDSCAPE
         _remember(path, measured)
         return measured
     return None
@@ -178,7 +175,7 @@ def requested_orientation(params: dict) -> str | None:
         width, height = int(params["width"]), int(params["height"])
     except (KeyError, TypeError, ValueError):
         return None
-    return PORTRAIT if height > width else LANDSCAPE
+    return orientation_of_size(width, height)
 
 
 def filter_rows(rows, orientation: str | None) -> list[dict]:

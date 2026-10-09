@@ -13,3 +13,7 @@ PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
 ORIENTATIONS = (PORTRAIT, LANDSCAPE)
 ORIENTATION_LABELS = {PORTRAIT: "Portrait", LANDSCAPE: "Landscape"}
+
+
+def orientation_of_size(width: int, height: int) -> str:
+    return PORTRAIT if height > width else LANDSCAPE

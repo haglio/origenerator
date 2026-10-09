@@ -65,14 +65,12 @@ class RepeatCollapser:
         self._last, self._repeats = None, 0
 
 
-_collapse = RepeatCollapser(lambda level, message: logger.log(level, "%s", message))
-
-
-def log_qt_message(kind, _context, message: str) -> None:
-    _collapse(_LEVELS.get(kind, logging.WARNING), message)
-
-
 def install_qt_message_logging():
+    collapse = RepeatCollapser(lambda level, message: logger.log(level, "%s", message))
+
+    def log_qt_message(kind, _context, message: str) -> None:
+        collapse(_LEVELS.get(kind, logging.WARNING), message)
+
     return qInstallMessageHandler(log_qt_message)
 
 

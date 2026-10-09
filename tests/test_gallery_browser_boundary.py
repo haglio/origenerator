@@ -174,8 +174,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     once for each picture a running generation sends, and the pane's stamp is
     what says a new model has come. 270 -> 272: the slideshows -- where the last
     one was left, its filters, where each side's panel sits and the pace -- are
-    saved with the session too, through that same pair.)"""
+    saved with the session too, through that same pair. 272 -> 273: a Fun Time
+    session opening while a slideshow is up takes that slideshow into the room,
+    so whether one is up is asked here for the offer the window stands.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 272
+               for x in _class_def(VIEW, "GalleryView").body) == 273
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

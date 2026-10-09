@@ -17,6 +17,7 @@ from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.fun_time_mode import (
     OFFER_NAME,
+    SHOWING_NAME,
     FunTimeSession,
     a_session_holds_the_device,
     offer_of_this_process,
@@ -31,12 +32,14 @@ _POLL_MS = 250
 class FunTimeWatch(QObject):
     def __init__(self, state_dir: Path, *, take_over: Callable[[FunTimeSession], None],
                  device_claimed: Callable[[bool], None] | None = None,
+                 showing: Callable[[], bool] | None = None,
                  library_state_dir: Path | None = None,
                  parent: QObject | None = None):
         super().__init__(parent)
         self._state_dirs = tuple(dict.fromkeys((state_dir, library_state_dir or state_dir)))
         self._take_over = take_over
         self._device_claimed = device_claimed or (lambda held: None)
+        self._showing = showing or (lambda: False)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self._answer_the_session)
@@ -69,8 +72,14 @@ class FunTimeWatch(QObject):
             logger.info("The offer to Fun Time could not be read; standing ours again")
         offer.write_text(mine, encoding="utf-8")
 
+    def _mark_the_slideshow(self) -> None:
+        mark = offer_of_this_process() if self._showing() else None
+        for state_dir in self._state_dirs:
+            _stand(state_dir / SHOWING_NAME, mark)
+
     def _answer_the_session(self) -> None:
         self._stand_the_offer()
+        self._mark_the_slideshow()
         self._device_claimed(any(map(a_session_holds_the_device, self._state_dirs)))
         session = next(filter(None, (take_the_takeover(state_dir, pid=os.getpid())
                                      for state_dir in self._state_dirs)), None)
@@ -84,3 +93,16 @@ class FunTimeWatch(QObject):
         self._timer.stop()
         for state_dir in self._state_dirs:
             (state_dir / OFFER_NAME).unlink(missing_ok=True)
+            (state_dir / SHOWING_NAME).unlink(missing_ok=True)
+
+
+def _stand(path: Path, mark: str | None) -> None:
+    if mark is None:
+        path.unlink(missing_ok=True)
+        return
+    try:
+        if path.read_text(encoding="utf-8") == mark:
+            return
+    except OSError:
+        pass
+    path.write_text(mark, encoding="utf-8")

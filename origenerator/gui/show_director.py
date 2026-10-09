@@ -211,8 +211,10 @@ class ShowDirector:
         self._enhance_status: dict[str, str] = {}
         self._held_at_stamp = None
         self._held_at: dict[str, frozenset[str]] = {}
+        self._taken_into_the_session: HeldShow | None = None
 
     def become_hosted(self, session) -> None:
+        self._taken_into_the_session = self.held_show()
         if self._slideshow is not None:
             self._slideshow.close()
         self._fun_time = session
@@ -220,6 +222,7 @@ class ShowDirector:
         self._region_shows = dict.fromkeys(_ORIENTATIONS)
 
     def become_standalone(self, motion) -> None:
+        self._taken_into_the_session = None
         self.close_the_shows()
         self._fun_time = None
         self._motion = motion
@@ -868,9 +871,16 @@ class ShowDirector:
                                                     HudCorner.UPPER_LEFT)
                 self._hud_minimized[side] = place.get("minimized") is True
 
-    def held_show(self) -> HeldShow | None:
+    def _show_to_hold(self):
         show = self._slideshow
-        if show is None or show.is_live():
+        return None if show is None or show.is_live() else show
+
+    def shows_a_slideshow(self) -> bool:
+        return self._show_to_hold() is not None
+
+    def held_show(self) -> HeldShow | None:
+        show = self._show_to_hold()
+        if show is None:
             return None
         return HeldShow(items=tuple(show.whole_set()),
                         location=next((where for live, where in self._live_shows
@@ -945,16 +955,21 @@ class ShowDirector:
         return oriented_key(gallery.ALL_KEY, side)
 
     def fill_the_regions(self) -> None:
-        """Put a show on each region: the whole library, shuffled, one shape each.
+        """Put a show on each region: the slideshow this window was taken over
+        on, on its side, and elsewhere the whole library, shuffled, one shape each.
 
         What entering origenerator mode means — the session's own mode opens
         with both players playing, so this one opens with both regions playing
         rather than with two empty rectangles and a mode that has to be started
-        by hand.  Each side gets the shape it can show, and a region already
-        holding a show is left alone: the switch is no reason to interrupt
-        something already up.
+        by hand.  A region already holding a show is left alone: the switch is
+        no reason to interrupt something already up.
         """
         self._regions_wanted = True
+        taken, self._taken_into_the_session = self._taken_into_the_session, None
+        if taken is not None and self.put_back(taken) is not None:
+            logger.info("The %s region takes up the slideshow that was up when the "
+                        "session took this window over: %d items", taken.side,
+                        len(taken.items))
         for side in _ORIENTATIONS:
             if self.region_show(side) is not None:
                 continue

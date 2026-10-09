@@ -83,7 +83,7 @@ class FakeShow:
         self.retuned = None
         self.reordered = None
         self.kept_the_slide = None
-        self.dwell_s = None
+        self.dwell_s = 0
         self.paused = None
         self.audio_muted = None
         self.window_title = None
@@ -602,6 +602,68 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regi
     assert made[0].closes == 1
     assert director.region_show(PORTRAIT) is made[1]
     assert made[1].fullscreen == 0
+
+
+def _a_show_he_is_watching_when_the_session_takes_the_window_over(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
+                                   ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, made = shows(FakeHost(rows=[_row("g1"), _row("g2")]),
+                                  browser=browser)
+    director.open([("g1.png", "image", "g1", None), ("g2.png", "image", "g2", None)],
+                  side=PORTRAIT, location="shelf/a")
+    watched = made[0]
+    watched.dwell_s = 6
+    watched.state_at_close = ShowState(order=("g2", "g1"), current="g1", locked=True)
+    watched.filters = ShowFilters(favorites=True)
+    director.become_hosted(FakeSession())
+    return director, watched
+
+
+def test_a_show_up_when_a_session_takes_the_window_over_opens_on_its_side_as_it_was(shows):
+    director, watched = _a_show_he_is_watching_when_the_session_takes_the_window_over(shows)
+
+    director.fill_the_regions()
+
+    carried = director.region_show(PORTRAIT)
+    assert [slide[2] for slide in carried.items] == ["g1", "g2"]
+    assert carried.resumed == watched.state_at_close
+    assert carried.taken_up == (ShowFilters(favorites=True), False)
+    assert carried.opened_with["image_dwell_ms"] == 6000
+    assert [slide[2] for slide in director.region_show(LANDSCAPE).items] == ["g5"]
+
+
+def test_the_show_a_session_took_over_is_put_back_on_the_first_opening_only(shows):
+    director, _watched = _a_show_he_is_watching_when_the_session_takes_the_window_over(shows)
+    director.fill_the_regions()
+
+    director.close_the_shows()
+    director.fill_the_regions()
+
+    assert [slide[2] for slide in director.region_show(PORTRAIT).items] == ["g4"]
+
+
+def test_a_window_handed_back_before_its_regions_opened_lets_go_of_the_show_it_held(shows):
+    director, _watched = _a_show_he_is_watching_when_the_session_takes_the_window_over(shows)
+
+    director.become_standalone(motion=None)
+    director.become_hosted(FakeSession())
+    director.fill_the_regions()
+
+    assert [slide[2] for slide in director.region_show(PORTRAIT).items] == ["g4"]
+
+
+def test_a_director_shows_a_slideshow_while_one_it_could_hand_a_session_is_up(shows):
+    director, _host, made = shows()
+    assert not director.shows_a_slideshow()
+
+    director.open([("a.png", "image", "g1", None)])
+    assert director.shows_a_slideshow()
+
+    made[0].live = True
+    assert not director.shows_a_slideshow()
+
+    made[0].close()
+    assert not director.shows_a_slideshow()
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):

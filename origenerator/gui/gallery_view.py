@@ -2078,6 +2078,9 @@ class GalleryView(QWidget):
     def remembered_shows(self) -> dict:
         return self._shows.remembered()
 
+    def shows_a_slideshow(self) -> bool:
+        return self._shows.shows_a_slideshow()
+
     def remember_shows(self, saved) -> None:
         if self._fun_time is None:
             self._shows.remember(saved)

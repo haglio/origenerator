@@ -225,11 +225,6 @@ def test_video_preview_is_muted(make_preview):
     assert w._audio.isMuted() is True
 
 
-def test_audio_plays_when_not_muted(qtbot):
-    # The fullscreen view opts in to sound; the inline preview stays muted (above).
-    w = PreviewWidget(player=MagicMock(), mute_audio=False)
-    qtbot.addWidget(w)
-    assert w._audio.isMuted() is False
 
 
 def test_show_media_routes_to_video(make_preview, tmp_path):
@@ -311,66 +306,23 @@ def test_show_frame_ignores_undecodable_bytes(make_preview):
     assert w._image_label.pixmap().isNull()
 
 
-# --- slideshow support: play a video once and report when it ends -----------
+# --- a video loops ---------------------------------------------------------
 
-def test_video_loops_by_default(make_preview):
+def test_a_video_loops(make_preview):
     w = make_preview()
     w._player.setLoops.assert_called_with(QMediaPlayer.Loops.Infinite)
 
 
-def test_slideshow_mode_plays_a_video_once(qtbot):
-    w = PreviewWidget(player=MagicMock(), loop_videos=False)
-    qtbot.addWidget(w)
-    w._player.setLoops.assert_called_with(QMediaPlayer.Loops.Once)
 
 
-def test_reaching_end_of_media_emits_video_ended(make_preview):
-    w = make_preview()
-    ended = []
-    w.video_ended.connect(lambda: ended.append(True))
-    w._on_media_status(QMediaPlayer.MediaStatus.EndOfMedia)
-    assert ended == [True]
 
 
-def test_other_media_status_does_not_emit_video_ended(make_preview):
-    w = make_preview()
-    ended = []
-    w.video_ended.connect(lambda: ended.append(True))
-    w._on_media_status(QMediaPlayer.MediaStatus.LoadedMedia)
-    assert ended == []
 
 
-def test_a_clip_the_backend_reports_twice_is_reported_unplayable_once(make_preview, qtbot, tmp_path):
-    w = make_preview()
-    w.show_video(tmp_path / "broken.mp4")
-    reports = []
-    w.video_unplayable.connect(lambda: reports.append("unplayable"))
-
-    w._on_media_error(QMediaPlayer.Error.FormatError, "Could not open file")
-    w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
-    qtbot.waitUntil(lambda: reports != [])
-    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
-        pass
-
-    assert reports == ["unplayable"]
 
 
-def test_a_report_landing_after_the_pane_moved_off_the_clip_is_not_passed_on(make_preview, qtbot, tmp_path):
-    w = make_preview()
-    w.show_video(tmp_path / "broken.mp4")
-    w.show_image(_make_png(tmp_path / "next.png"))
-
-    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
-        w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
 
 
-def test_a_report_still_waiting_when_the_next_clip_comes_up_is_not_passed_on(make_preview, qtbot, tmp_path):
-    w = make_preview()
-    w.show_video(tmp_path / "broken.mp4")
-    w._on_media_status(QMediaPlayer.MediaStatus.InvalidMedia)
-
-    with qtbot.assertNotEmitted(w.video_unplayable, wait=100):
-        w.show_video(tmp_path / "next.mp4")
 
 
 # --- double-click to open the current media fullscreen ----------------------
@@ -422,49 +374,12 @@ def test_a_plain_message_opens_nothing(make_preview):
     assert w.open_fullscreen() is None
 
 
-def test_a_preview_that_opted_out_never_opens_fullscreen(qtbot, tmp_path):
-    # A slideshow's own inner preview passes allow_fullscreen=False.
-    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False)
-    qtbot.addWidget(w)
-    _arm(w)
-    w.show_image(_make_png(tmp_path / "p.png"))
-    assert w.open_fullscreen() is None
 
 
-def test_double_click_runs_the_callback_when_it_cannot_open_fullscreen(qtbot):
-    # A slideshow's inner preview opts out of opening another, so a double-click
-    # there runs the callback (which closes the show) instead.
-    called = []
-    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
-                      on_double_click=lambda: called.append(True))
-    qtbot.addWidget(w)
-    w.mouseDoubleClickEvent(None)
-    assert called == [True]
 
 
-def test_a_press_runs_the_press_callback_at_once(qtbot):
-    presses = []
-    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
-                      on_press=lambda: presses.append(True))
-    qtbot.addWidget(w)
-
-    _press(w)
-
-    assert presses == [True]
 
 
-def test_both_presses_of_a_double_click_run_the_press_callback(qtbot):
-    presses, double_clicks = [], []
-    w = PreviewWidget(player=MagicMock(), allow_fullscreen=False,
-                      on_press=lambda: presses.append(True),
-                      on_double_click=lambda: double_clicks.append(True))
-    qtbot.addWidget(w)
-
-    _press(w)
-    _double_click(w)
-
-    assert presses == [True, True]
-    assert double_clicks == [True]
 
 
 # --- watching a generation fullscreen while it's still being made -----------
@@ -774,14 +689,6 @@ def drags(monkeypatch):
 def _press(w, x=0, y=0):
     w.mousePressEvent(QMouseEvent(
         QEvent.Type.MouseButtonPress, QPointF(x, y), QPointF(x, y),
-        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    ))
-
-
-def _double_click(w, x=0, y=0):
-    w.mouseDoubleClickEvent(QMouseEvent(
-        QEvent.Type.MouseButtonDblClick, QPointF(x, y), QPointF(x, y),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
     ))

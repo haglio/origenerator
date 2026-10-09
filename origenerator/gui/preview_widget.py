@@ -2,16 +2,14 @@
 
 The gallery hands it a resolved ``(path, media_type)`` and it does the rest:
 static images are scaled to fit (and rescaled on resize), animated images
-(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop — muted by
-default, so selecting one gives an immediate moving preview without stealing audio,
-while the fullscreen slideshow opts in to sound.
+(animated WebP/GIF) loop via ``QMovie``, and videos auto-play on a loop, muted, so
+selecting one gives an immediate moving preview without stealing audio.
 
 A pane the owner has armed (:meth:`PreviewWidget.set_actions`) also carries the
 three controls a gallery thumbnail of the same generation wears in its corners,
 and offers the same right-click menu over the picture — because it IS the same
 generation, and where you are standing should not change what you can do to it.
-Unarmed — a live frame, a message, a slideshow's own inner pane — the picture is
-inert.
+Unarmed — a live frame, a message — the picture is inert.
 """
 
 from __future__ import annotations
@@ -26,7 +24,6 @@ from PyQt6.QtCore import (
     QRect,
     QSize,
     Qt,
-    QTimer,
     QUrl,
     pyqtSignal,
 )
@@ -71,18 +68,12 @@ def _path_key(path) -> str:
 
 
 class PreviewWidget(QWidget):
-    video_ended = pyqtSignal()  # a non-looping video reached its end (slideshow use)
-    # This backend cannot open the clip at all — a different thing from ending,
-    # and the one a show has to be told about (see _on_media_status).
-    video_unplayable = pyqtSignal()
     media_resized = pyqtSignal()  # the media was refitted (an overlay must re-place)
     action_triggered = pyqtSignal(str, str)  # a corner control: prompt_id, action
     context_requested = pyqtSignal(str, QPoint)  # right-clicked: prompt_id, global pos
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 loop_videos: bool = True, allow_fullscreen: bool = True,
-                 show_timeline: bool = False, mute_audio: bool = True,
-                 on_double_click=None, on_press=None):
+                 show_timeline: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._movie: QMovie | None = None
@@ -97,14 +88,8 @@ class PreviewWidget(QWidget):
         # generation had to wait for it to land.
         self._live = False
         self._live_frame: bytes | None = None
-        self._allow_fullscreen = allow_fullscreen  # a slideshow's own preview opts out
         self._fullscreen = None  # the show a double-click here opened, kept alive here
         self._open_fullscreen_view = None
-        # A double-click that doesn't open fullscreen (this preview opted out, or has
-        # nothing to open) runs this instead — the slideshow uses it so a second
-        # double-click dismisses it.
-        self._on_double_click = on_double_click
-        self._on_press = on_press
         self._generation: str | None = None
         self.drag_out = DragOut()
 
@@ -126,7 +111,7 @@ class PreviewWidget(QWidget):
         # without spinning up the real (WMF) backend, which deadlocks at exit.
         self._player = player if player is not None else QMediaPlayer(self)
         self._audio = QAudioOutput(self)
-        self._audio.setMuted(mute_audio)
+        self._audio.setMuted(True)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -160,17 +145,7 @@ class PreviewWidget(QWidget):
         self._video.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video.video_sink())
-        # Infinite for the info-pane preview (an immediate moving thumbnail); a
-        # slideshow plays each clip once and advances when it ends.
-        self._player.setLoops(
-            QMediaPlayer.Loops.Infinite if loop_videos else QMediaPlayer.Loops.Once
-        )
-        self._unplayable_report = QTimer(self)
-        self._unplayable_report.setSingleShot(True)
-        self._unplayable_report.setInterval(0)
-        self._unplayable_report.timeout.connect(self._report_unplayable)
-        self._player.mediaStatusChanged.connect(self._on_media_status)
-        self._player.errorOccurred.connect(self._on_media_error)
+        self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
         # Until a clip's resolution arrives, media_rect can only answer "the whole
         # pane"; the corners have to move to the real picture once it can.
@@ -242,7 +217,6 @@ class PreviewWidget(QWidget):
         self._set_movie(None)
         self._pixmap = None
         self._hide_timeline()
-        self._unplayable_report.stop()
         if stop_player:
             self._stop_playback()
         if not enhancing:
@@ -494,10 +468,6 @@ class PreviewWidget(QWidget):
         """The underlying media player — the OSR2 driver follows its position."""
         return self._player
 
-    def set_audio_muted(self, muted: bool) -> None:
-        """Silence (or voice) this pane's playback outright."""
-        self._audio.setMuted(muted)
-
     def set_frozen(self, frozen: bool) -> None:
         """Hold what is moving here, or let it go: a playing video, or an
         animated image's own movie.
@@ -600,11 +570,6 @@ class PreviewWidget(QWidget):
         # shown generation; a plain click still falls through to the double-click.
         if self._generation is not None:
             self.drag_out.note_press(event)
-        self._run_press(event)
-
-    def _run_press(self, event) -> None:
-        if self._on_press is not None and event.button() == Qt.MouseButton.LeftButton:
-            self._on_press()
 
     def mouseMoveEvent(self, event) -> None:
         # Drag the shown generation out to a combine slot, but only once the press
@@ -636,12 +601,7 @@ class PreviewWidget(QWidget):
         self._open_fullscreen_view = make
 
     def mouseDoubleClickEvent(self, event) -> None:
-        # Open fullscreen, or — when this preview can't (it opted out, e.g. the
-        # slideshow's own inner preview) — run the double-click callback, so a
-        # second double-click that lands here closes the slideshow.
-        self._run_press(event)
-        if self.open_fullscreen() is None and self._on_double_click is not None:
-            self._on_double_click()
+        self.open_fullscreen()
 
     def open_fullscreen(self):
         """Pop what's on screen open fullscreen (Escape or a double-click closes it):
@@ -649,42 +609,16 @@ class PreviewWidget(QWidget):
 
         That's the current file, or — while a generation is running under this pane —
         its live frames, in a view that goes on following the run from here and swaps
-        to the finished file when it lands. A no-op when this preview opted out (a
-        slideshow's own inner preview), when nothing has wired
+        to the finished file when it lands. A no-op when nothing has wired
         :meth:`set_fullscreen_factory`, or when there's nothing to watch at all:
         the idle placeholder or a plain message."""
-        if not self._allow_fullscreen or (self._media is None and not self._live):
+        if self._media is None and not self._live:
             return None
         if self._open_fullscreen_view is None:
             return None
         self._fullscreen = self._open_fullscreen_view(self._media, self._live_frame,
                                                       self._generation)
         return self._fullscreen
-
-    def _on_media_status(self, status) -> None:
-        """Report a finished video so a slideshow can advance — and separately,
-        one this backend cannot open at all.
-
-        The second is not a kind of ending, and treating it as one is what left
-        a show on a black rectangle: a clip with no codec here never reports
-        EndOfMedia, and a video carries no dwell timer (its own length is its
-        dwell), so nothing was ever going to move the show off it again.  A
-        browse of the whole library is exactly where such a clip turns up.
-        """
-        if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self.video_ended.emit()
-        elif status == QMediaPlayer.MediaStatus.InvalidMedia:
-            self._unplayable_report.start()
-
-    def _on_media_error(self, error, _message: str = "") -> None:
-        """Same report, from the other direction: the backend can raise the
-        error without ever moving the status to InvalidMedia."""
-        if error != QMediaPlayer.Error.NoError:
-            self._unplayable_report.start()
-
-    def _report_unplayable(self) -> None:
-        if self.is_showing_video():
-            self.video_unplayable.emit()
 
     def _stop_playback(self) -> None:
         self._player.stop()

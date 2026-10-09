@@ -25,13 +25,13 @@ import time
 from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, pyqtSignal
 
 from origenerator import gallery, queue_line
+from origenerator.completion import mark_generation_completed
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.gui.generation_job import (
     GenerationJob,
     JobState,
     insert_generation_row,
-    mark_generation_completed,
     record_unfinished_run,
 )
 from origenerator.media import MediaType

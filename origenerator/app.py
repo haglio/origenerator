@@ -795,4 +795,10 @@ def main(argv: list[str] | None = None) -> int:
     if watch is not None:
         watch.withdraw()
     _disconnect(client)
+    # Whatever ComfyUI is still making outlives this window, and this app is the
+    # only thing watching it, so the waiting goes to a process of its own
+    # (origenerator.landed_while_away).
+    from origenerator.landed_while_away import hand_over_what_is_in_flight
+    from origenerator.win32 import APP_USER_MODEL_ID
+    hand_over_what_is_in_flight(db, taskbar_identity(APP_USER_MODEL_ID, preview))
     return exit_code

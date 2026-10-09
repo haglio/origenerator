@@ -332,7 +332,15 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # what the tree measured: why the boot takes the foreground by force is
 # shared_ui's test_qt_asks_first_and_windows_is_then_made_to_put_the_window_in_front
 # and app_support's force_foreground_window tests.
-MAX_PROSE_LINES = 18089
+# 18028 when a clicked notification came to open the item it is about and a run
+# that lands with the app closed came to say so itself: the modules that answer
+# a click keep only what Windows forced on them, and the waiting that outlives
+# the window says what it does in its tests --
+# test_a_run_that_lands_while_the_app_is_closed_is_announced,
+# test_the_watcher_asks_nothing_once_the_app_is_back and
+# test_the_claim_a_running_copy_holds_is_read_without_taking_it. What a click
+# does is tests/test_app_link.py and tests/test_link_listener.py.
+MAX_PROSE_LINES = 18028
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

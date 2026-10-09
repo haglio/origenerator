@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from origenerator.gallery import JobKind
-from origenerator.generation_state import GenerationSource
+from origenerator.gallery import JobKind, job_kind_label
+from origenerator.generation_state import GenerationSource, source_of
 from origenerator.timing import clock_duration
+from origenerator.workflows import WORKFLOW_REGISTRY
 
 LONG_RUN_SECONDS = 60
 
@@ -13,15 +14,7 @@ LONG_RUN_SECONDS = 60
 class RunOutcome:
     """What a run came to, for whoever reports on it rather than redraws for it.
 
-    ``kind`` and ``recipe`` are the two names a run already wears in the queue:
-    what it is in a word ("Image", "Video", "Enhance") and which recipe made it.
-    ``seconds`` is how long the run itself took, never counting the wait in the
-    line — a quick image that waited its turn after a video is not a long run —
-    and ``None`` from a run that died before ComfyUI ever started it.
-    ``source`` is who asked for it, in the word its database row stores.
-    ``generation`` is the item the run is about, which a notice of it is a way
-    back to: the run's own id, except for an enhance, whose own row is folded
-    into the picture it improved the moment it lands.
+    ``seconds`` is the run itself, never the wait in the line before it.
     """
 
     kind: str
@@ -34,9 +27,6 @@ class RunOutcome:
 
 @dataclass(frozen=True)
 class Notice:
-    """One thing to say, in the two lines a desktop notification gives it, and
-    the item it takes the user to when they answer it."""
-
     title: str
     body: str
     ok: bool
@@ -57,3 +47,17 @@ def notice_for(outcome: RunOutcome) -> Notice | None:
     return Notice(f"{outcome.kind} failed",
                   f"{outcome.recipe} · stopped after {took}", ok=False,
                   generation=outcome.generation)
+
+
+def outcome_of_row(row: dict, *, ok: bool, seconds: float | None) -> RunOutcome:
+    """What a run came to, read off its stored row rather than off a live job."""
+    workflow_name = row.get("workflow_name") or ""
+    workflow = WORKFLOW_REGISTRY.get(workflow_name)
+    return RunOutcome(
+        kind=job_kind_label(workflow_name),
+        recipe=workflow.display_name if workflow is not None else workflow_name,
+        seconds=seconds,
+        ok=ok,
+        source=source_of(row),
+        generation=row.get("enhance_of") or row.get("prompt_id") or "",
+    )

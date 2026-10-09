@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from origenerator.generation_state import GenerationSource
-from origenerator.run_notice import RunOutcome, notice_for
+from origenerator.run_notice import RunOutcome, notice_for, outcome_of_row
 
 
 def test_a_video_over_in_seconds_is_not_worth_interrupting_for():
@@ -62,3 +62,19 @@ def test_a_failed_run_points_at_the_item_too():
     outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=220.0,
                          ok=False, source=GenerationSource.GENERATED, generation="beta-2")
     assert notice_for(outcome).generation == "beta-2"
+
+
+def test_an_enhances_notice_points_at_the_picture_it_improved():
+    # An enhance's own row is folded into the picture it improved the moment it
+    # lands, so its own id is no way back to anything.
+    row = {"workflow_name": "sdxl_t2i", "source": GenerationSource.GENERATED,
+           "prompt_id": "enh-1", "enhance_of": "pic-9"}
+
+    assert outcome_of_row(row, ok=True, seconds=99.0).generation == "pic-9"
+
+
+def test_a_plain_runs_notice_points_at_the_run_itself():
+    row = {"workflow_name": "sdxl_t2i", "source": GenerationSource.GENERATED,
+           "prompt_id": "pic-9"}
+
+    assert outcome_of_row(row, ok=True, seconds=99.0).generation == "pic-9"

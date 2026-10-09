@@ -45,6 +45,7 @@ from origenerator.gallery.enhance_settings import (
 )
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.output import (
+    frame_names_of,
     media_type_of_row,
     output_file_reference,
     parse_file_list,
@@ -424,10 +425,8 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
         # :func:`fold_enhancement` will pick when the run lands.
         if media_type_of_row(row) != MediaType.IMAGE:
             continue
-        for stored in row_output_files(row):
-            name = _frame_name(stored.get("filename"))
-            if name:
-                holders.setdefault(name, row.get("prompt_id"))
+        for name in frame_names_of(row.get("output_files")):
+            holders.setdefault(name, row.get("prompt_id"))
     recency: dict[str, tuple[datetime, int]] = {}
     asked = sorted((row["id"], row["created_at"]) for row in rows
                    if isinstance(row.get("id"), int) and row.get("created_at"))

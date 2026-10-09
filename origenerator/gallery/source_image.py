@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from origenerator.gallery.keys import folder_id, settings_key
-from origenerator.gallery.output import row_output_files
+from origenerator.gallery.output import frame_names_of, row_output_files
 from origenerator.gallery.signatures import (
     _frame_name,
     parse_params,
@@ -95,10 +95,8 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
             signature=signature,
             label=folder_id(settings_key(MediaType.IMAGE, workflow_name, signature)),
         )
-        for f in row_output_files(image):
-            name = _frame_name(f.get("filename"))
-            if name:
-                index.setdefault(name, config)
+        for name in frame_names_of(image.get("output_files")):
+            index.setdefault(name, config)
     return index
 
 

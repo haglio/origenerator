@@ -52,6 +52,7 @@ from origenerator.gallery import (
     rows_under,
     settings_folder_key,
     settings_signature,
+    signatures,
     source_image_id_for,
     unreviewed_experiments,
     videos_from_source_image,
@@ -209,6 +210,64 @@ def test_media_type_of_row_falls_back_to_output_filename_for_unknown_workflow():
                output_files=json.dumps([{"filename": "mystery_00001.mp4"}]))
     assert media_type_of_row(img) == "image"
     assert media_type_of_row(vid) == "video"
+
+
+def test_a_rows_kind_is_read_off_its_file_list_once_however_often_it_is_asked(monkeypatch):
+    reads = []
+    real = gallery_output.parse_file_list
+    monkeypatch.setattr(gallery_output, "parse_file_list",
+                        lambda raw: reads.append(raw) or real(raw))
+    files = json.dumps([{"filename": "asked_often_00001_.png"}])
+
+    for _ in range(3):
+        assert media_type_of_row(_row(workflow_name="sdxl_t2i", output_files=files)) == "image"
+
+    assert reads == [files]
+
+
+def test_whether_a_row_produced_a_file_is_read_once_however_often_it_is_asked(monkeypatch):
+    reads = []
+    real = gallery_output.parse_file_list
+    monkeypatch.setattr(gallery_output, "parse_file_list",
+                        lambda raw: reads.append(raw) or real(raw))
+    files = json.dumps([{"filename": "produced_once_00001_.png"}])
+
+    for _ in range(3):
+        assert gallery_output.produced_output(_row(output_files=files))
+
+    assert reads == [files]
+
+
+def test_the_start_frame_index_reads_each_pictures_file_list_once_across_rebuilds(monkeypatch):
+    reads = []
+    real = gallery_output.parse_file_list
+    monkeypatch.setattr(gallery_output, "parse_file_list",
+                        lambda raw: reads.append(raw) or real(raw))
+    picture = _img("indexed_once", "a picture indexed once", 30, 1)
+
+    for _ in range(3):
+        assert "sdxl_t2i_indexed_once.png" in build_image_config_index([dict(picture)])
+
+    assert reads.count(picture["output_files"]) == 1
+
+
+def test_a_recipes_signature_is_worked_out_once_however_often_it_is_asked(monkeypatch):
+    worked_out = []
+    real = signatures.canonical_settings
+    monkeypatch.setattr(signatures, "canonical_settings",
+                        lambda workflow_name, params: worked_out.append(workflow_name)
+                        or real(workflow_name, params))
+    params = json.dumps({"positive_prompt": "a lantern asked after often", "steps": 30})
+
+    assert len({settings_signature("sdxl_t2i", params) for _ in range(3)}) == 1
+    assert worked_out == ["sdxl_t2i"]
+
+
+def test_a_start_frames_signature_follows_the_index_it_is_given():
+    params = json.dumps({"positive_prompt": "", "input_image": "sdxl_t2i_lantern.png"})
+    lantern = build_image_config_index([_img("lantern", "a lantern", 30, 1)])
+
+    assert settings_signature("wan22_i2v", params, lantern) !=         settings_signature("wan22_i2v", params, {})
 
 
 def test_settings_signature_ignores_seeds_but_keeps_other_params():
@@ -560,6 +619,20 @@ def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
         output_files=json.dumps([{"filename": "wan22_i2v_i.mp4"}]),
     )
     assert settings_folder_key(imported) == settings_folder_key(generated)
+
+
+def test_a_recipes_model_and_lora_are_read_once_however_often_they_are_asked(monkeypatch):
+    reads = []
+    real = signatures.parse_params
+    monkeypatch.setattr(signatures, "parse_params",
+                        lambda params_json: reads.append(params_json) or real(params_json))
+    params = json.dumps({"checkpoint": "asked_often.safetensors", "steps": 31})
+
+    for _ in range(3):
+        model_signature("sdxl_t2i", params)
+        lora_signature("sdxl_t2i", params)
+
+    assert reads == [params, params]
 
 
 def test_model_signature_groups_by_model_params_only():

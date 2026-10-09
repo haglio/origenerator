@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Iterator
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
@@ -51,7 +52,7 @@ from origenerator.gallery.sides import (  # noqa: F401
     PORTRAIT,
     orientation_of_size,
 )
-from origenerator.gallery.signatures import canonical_settings
+from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -114,14 +115,17 @@ def orientation_of(key: str | None) -> str | None:
 def row_orientation(row: dict) -> str:
     """Which region *row*'s media belongs on: its folder's side (see the
     module's account of the order)."""
-    workflow_name = row.get("workflow_name")
-    params = gallery.parse_params(row.get("params_json"))
-    asked = requested_orientation(canonical_settings(workflow_name, params))
+    asked = _asked_shape(row.get("workflow_name"), row.get("params_json"))
     if asked is not None:
         return asked
     return (_measure_any(_own_files(row))
-            or _measure_any(_frame_candidate(params))
+            or _measure_any(_frame_candidate(gallery.parse_params(row.get("params_json"))))
             or LANDSCAPE)
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _asked_shape(workflow_name: str | None, params_json: str | None) -> str | None:
+    return requested_orientation(canonical_settings(workflow_name, gallery.parse_params(params_json)))
 
 
 def _measure_any(candidates) -> str | None:

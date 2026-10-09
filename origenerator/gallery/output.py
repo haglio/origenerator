@@ -13,11 +13,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from origenerator.evolver_upscales import UPSCALE_SUFFIX
 from origenerator.file_refs import frame_name
-from origenerator.gallery.signatures import workflow_output_type
+from origenerator.gallery.signatures import READINGS_KEPT, workflow_output_type
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.thumbnail import generate_animated_thumbnail
@@ -41,6 +42,12 @@ def row_output_files(row: dict) -> list[dict]:
     return parse_file_list(row.get("output_files"))
 
 
+@lru_cache(maxsize=READINGS_KEPT)
+def frame_names_of(output_files: str | None) -> tuple[str, ...]:
+    names = (frame_name(f.get("filename")) for f in parse_file_list(output_files))
+    return tuple(name for name in names if name)
+
+
 def produced_output(row: dict) -> bool:
     """True when a row recorded at least one output file.
 
@@ -49,7 +56,12 @@ def produced_output(row: dict) -> bool:
     (see :func:`is_in_progress`), represented by a live tile until its output
     lands; only a terminal file-less row (an error) is left out entirely.
     """
-    return bool(row_output_files(row))
+    return _lists_a_file(row.get("output_files"))
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _lists_a_file(output_files: str | None) -> bool:
+    return bool(parse_file_list(output_files))
 
 
 def is_in_progress(row: dict) -> bool:
@@ -72,11 +84,16 @@ def media_type_of_row(row: dict) -> MediaType:
     Rows with no file yet (pending) fall back to the workflow's declared type,
     then to an image.
     """
-    for f in row_output_files(row):
+    return _media_type_of(row.get("output_files"), row.get("workflow_name"))
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _media_type_of(output_files: str | None, workflow_name: str | None) -> MediaType:
+    for f in parse_file_list(output_files):
         inferred = media_type_from_filename(f.get("filename", ""))
         if inferred:
             return inferred
-    return workflow_output_type(row.get("workflow_name")) or MediaType.IMAGE
+    return workflow_output_type(workflow_name) or MediaType.IMAGE
 
 
 def rows_of_media_types(rows: list[dict], media_types: set[str] | None = None) -> list[dict]:

@@ -92,17 +92,22 @@ def format_prompt_error(body: str) -> str:
         return body.strip() or "Bad Request"
     if not isinstance(data, dict):
         return body.strip() or "Bad Request"
-    parts = []
-    for node_id, info in (data.get("node_errors") or {}).items():
-        label = info.get("class_type") or f"node {node_id}"
-        for err in info.get("errors") or []:
-            detail = err.get("details") or err.get("message") or ""
-            parts.append(f"{label}: {detail}" if detail else label)
+    parts = [_node_refusal(info.get("class_type") or f"node {node_id}", err)
+             for node_id, info in (data.get("node_errors") or {}).items()
+             for err in info.get("errors") or []]
     if parts:
         return "; ".join(parts)
     error = data.get("error") or {}
     reason = ": ".join(p for p in (error.get("message"), error.get("details")) if p)
     return reason or body.strip() or "Bad Request"
+
+
+def _node_refusal(node: str, error: dict) -> str:
+    missing = (error.get("extra_info") or {}).get("received_value")
+    if error.get("type") == "value_not_in_list" and missing is not None:
+        return f"{node} can't find {missing}"
+    detail = error.get("details") or error.get("message") or ""
+    return f"{node}: {detail}" if detail else node
 
 
 def format_execution_error(message: str) -> str:

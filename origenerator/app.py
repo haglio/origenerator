@@ -571,6 +571,7 @@ def _watch_for_fun_time(window, state_dir, library_state_dir):
 
     watch = FunTimeWatch(state_dir, take_over=window.become_hosted,
                          device_claimed=window.the_session_has_the_device,
+                         showing=window.shows_a_slideshow,
                          library_state_dir=library_state_dir)
     window.handed_back.connect(watch.renew)
     return watch

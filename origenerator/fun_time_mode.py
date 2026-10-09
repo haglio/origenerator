@@ -456,6 +456,7 @@ def parse_app_args(argv: list[str]) -> AppArgs:
 
 
 OFFER_NAME = "fun_time_offer.txt"
+SHOWING_NAME = "fun_time_showing.txt"
 TAKEOVER_NAME = "fun_time_takeover.json"
 SESSION_NAME = "fun_time_session.txt"
 OFFER_STILL_STARTING = "starting"

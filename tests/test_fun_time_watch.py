@@ -237,3 +237,49 @@ def test_a_takeover_arriving_is_recorded(qtbot, tmp_path, caplog):
 
     assert "A Fun Time session asked for this window" in caplog.text
     del watch
+
+
+def _marked(state_dir):
+    mark = state_dir / "fun_time_showing.txt"
+    return mark.read_text(encoding="utf-8").split() if mark.exists() else None
+
+
+def test_an_open_app_says_beside_its_offer_that_a_slideshow_is_up(tmp_path):
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing=lambda: True)
+
+    assert _marked(tmp_path) == [str(os.getpid()), str(this_process_creation_time())]
+    watch.withdraw()
+
+
+def test_the_slideshow_mark_comes_and_goes_with_the_slideshow(qtbot, tmp_path):
+    up = [False]
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing=lambda: up[0])
+    assert _marked(tmp_path) is None
+
+    up[0] = True
+    qtbot.waitUntil(lambda: _marked(tmp_path) is not None)
+    up[0] = False
+    qtbot.waitUntil(lambda: _marked(tmp_path) is None)
+    watch.withdraw()
+
+
+def test_a_window_taken_over_takes_its_slideshow_mark_down_with_its_offer(qtbot, tmp_path):
+    taken = []
+    watch = FunTimeWatch(tmp_path, take_over=taken.append, showing=lambda: True)
+
+    _takeover(tmp_path, pid=os.getpid())
+    qtbot.waitUntil(lambda: bool(taken))
+
+    assert _marked(tmp_path) is None
+    del watch
+
+
+def test_a_preview_marks_its_slideshow_in_the_everyday_copy_s_state_too(tmp_path):
+    preview, everyday = _preview_and_everyday(tmp_path)
+
+    watch = FunTimeWatch(preview, take_over=lambda session: None, showing=lambda: True,
+                         library_state_dir=everyday)
+
+    assert _marked(everyday) == _marked(preview) == [
+        str(os.getpid()), str(this_process_creation_time())]
+    watch.withdraw()

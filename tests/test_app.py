@@ -719,6 +719,7 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
 
     watch.assert_called_once_with(STATE_DIR, take_over=window.become_hosted,
                                   device_claimed=window.the_session_has_the_device,
+                                  showing=window.shows_a_slideshow,
                                   library_state_dir=tmp_path / "everyday" / "state")
     watch.return_value.withdraw.assert_called_once_with()
 

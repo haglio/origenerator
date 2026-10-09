@@ -1189,6 +1189,16 @@ def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path
     assert not win._gallery_view.osr2_control.isEnabled()
 
 
+def test_a_window_shows_a_slideshow_while_its_gallery_has_one_to_hand_a_session(
+        qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path)
+    assert not win.shows_a_slideshow()
+
+    monkeypatch.setattr(win._gallery_view._shows, "shows_a_slideshow", lambda: True)
+
+    assert win.shows_a_slideshow()
+
+
 def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
 

@@ -311,8 +311,9 @@ class PlayerShow(QObject):
         """
         for index, item in enumerate(self._set.playlist.items):
             if self._file_of(item) == video:
+                if item is not self._set.playlist.current():
+                    self._levels.restart()  # a new item, so its own versions from the top
                 self._set.playlist.jump_to(index)
-                self._levels.restart()  # a new item, so its own versions from the top
                 self.media_changed.emit()
                 return
 
@@ -850,6 +851,7 @@ class PlayerShow(QObject):
             order=tuple(self._set.playlist.order_ids()),
             current=self._set.current_prompt_id(),
             locked=self._locked,
+            level_index=self._levels.index,
             loop=self._set.loop.axis if self._set.loop is not None else "",
         )
 
@@ -860,8 +862,12 @@ class PlayerShow(QObject):
             return False
         if state.loop:
             self._set.start_loop(state.loop)
-        self._set.lead_with_what_is_being_made()
+        led = self._set.lead_with_what_is_being_made()
         self._hand_over(land=True)
+        if state.level_index and not led:
+            self.show_step_version(state.level_index)
+        if state.locked:
+            self._lock(True)
         return True
 
     def whole_set(self) -> list[Slide]:

@@ -407,6 +407,56 @@ def test_a_show_picked_back_up_lands_the_player_where_the_last_one_left_off(
     assert _sent(show)[0] == "PLAY_FILE three.png"
 
 
+def test_a_show_picked_back_up_locked_locks_the_player_on_its_slide(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-3", locked=True))
+
+    sent = _sent(show)
+    assert sent.index("PLAY_FILE three.png") < sent.index("LOCK_ON")
+    assert show.locked
+
+
+def test_a_lock_picked_back_up_is_the_lock_alone(qtbot, tmp_path):
+    asked = []
+    actions = ShowActions(favorite=lambda pid: asked.append(("star", pid)),
+                          enhance=lambda pid: asked.append(("enhance", pid)) or True,
+                          lock=lambda pid: asked.append(("lock", pid)))
+    show = _show(qtbot, tmp_path, actions=actions)
+
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-2", locked=True))
+
+    assert asked == []
+
+
+_ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhance 2"),
+                                          ("one_original.png", "image", "Original")]}
+
+
+def test_a_show_picked_back_up_on_another_version_plays_that_version_locked(
+        qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    show.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
+
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-1",
+                          locked=True, level_index=1))
+
+    assert _sent(show)[-2:] == ["PLAY_FILE one_original.png", "LOCK_ON"]
+    assert show.state().level_index == 1
+
+
+def test_the_player_reaching_the_slide_a_show_resumed_on_keeps_its_version(
+        qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    show.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
+    show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-1", level_index=1))
+
+    _says(show, video="one.png")
+    show.tick()
+
+    assert show.state().level_index == 1
+
+
 def test_a_show_on_a_player_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
 

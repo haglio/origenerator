@@ -191,6 +191,20 @@ as an item for later. Both branches exist before either is pushed; which repo's
 queue lands first is the only question, and it is answered by which order leaves
 a live session working.
 
+Every copy of this app that can run is a surface too, a preview included, and
+a handshake with Fun Time has to work whichever copy of each app is running.
+A preview runs its worktree's code with a `state/` of its own, so a file one
+app writes into one checkout's `state/` for the other to find reaches only the
+copy that runs from there, and a preview that reads only its own goes on
+driving the OSR2 beside the session that took the device over. So anything
+one app tells the other about the one device, the one library or the one
+machine is written to the everyday checkout's `state/`, which previews already
+share for their library, and read from there by every copy; and a change to
+such a handshake is tried with a preview on each side before it is called
+done. The near miss that still counts: a fix that reaches the previews built
+after it and says nothing about the ones already handed over, which read only
+their own `state/` until their branches are brought up to date.
+
 ## The commands in `tools/`, and why each one is not a menu item
 
 Two things live here that the app does not put in front of the user, so a
@@ -280,6 +294,22 @@ ago, from before a root moved, resolves a primary that isn't there, and the
 launch dies opening a database under a path that doesn't exist. The launcher
 log's `Library: …` line names the path it tried; if a preview will not open,
 diff the two `content.local.json` files before looking anywhere else.
+
+A branch that leans on a sibling change that has not landed cannot be judged
+through `launch_preview_branch.vbs` alone: that launcher runs the pinned venv,
+which holds the siblings at the versions `pyproject.toml` names and nothing
+newer. Give such a worktree a launcher of its own in its git-ignored `state/`
+that puts the sibling's checkout first on `PYTHONPATH`, the way a hosted
+launch already does, and never reinstall the shared venv for a preview, since
+other sessions' suites run out of it. Every sibling such a launcher puts on
+`PYTHONPATH` comes from a checkout held at the version the branch needs -- the
+sibling branch's own worktree for the unlanded change, a worktree at the
+pinned tag for any other, with `vendor/libmpv-2.dll` copied into a player_core
+one -- never from a primary checkout, which every landing pulls forward under
+the launcher until the link dies on import before a window appears. And before
+that link goes out, replay the launch's imports under the launcher's own
+environment: `tests/test_launch_smoke.py` strips `PYTHONPATH` on purpose, so a
+green run of it cannot see what such a launcher loads.
 
 **A preview replaces his everyday Origenerator; it never runs beside it.** One
 copy runs on a library at a time, the way Fun Time runs one session (his call,

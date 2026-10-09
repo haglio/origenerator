@@ -26,6 +26,7 @@ was browsing waits underneath and comes back when the loop ends.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import fields, replace
 
 from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from player_core.satellite_hud import label_is_filtered
@@ -44,7 +45,7 @@ from origenerator.gui.show_map import (
     step_in_ring,
 )
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import LIVE, Slide, SlideshowPlaylist, in_order
+from origenerator.slideshow import LIVE, ShowFilters, Slide, SlideshowPlaylist, in_order
 
 # What the loop key answers: the axis it started looping, that it ended the
 # loop, or — with nothing on either axis to loop — that the press is the lock
@@ -69,7 +70,8 @@ class ShowSet:
                  on_pass_change: Callable[[bool], None] | None = None,
                  neighbors: Callable[[str], MapNeighbors] | None = None,
                  widen: Callable[[str], tuple[Slide, ...]] | None = None,
-                 acts: Callable[[list], dict] | None = None) -> None:
+                 acts: Callable[[list], dict] | None = None,
+                 on_filters_change: Callable[[ShowFilters], None] | None = None) -> None:
         # Kept so a re-dealt pass is laid out the way this show's was: a
         # double-clicked picture's show reads its folder in order, and a filter
         # applied over one must not quietly shuffle it.  None means the
@@ -87,15 +89,14 @@ class ShowSet:
         # act filter matches it on.  None for a show with no library under it.
         self._acts_of = acts
         self._named: dict[str, str] = {}
+        self._on_filters_change = on_filters_change
         self.loop: Loop | None = None
-        self.favorites_filter = False
-        self.enhanced_mode = False
-        self.act_filter = ""
+        self.filters = ShowFilters()
         self._enhancements_asked: set[str] = set()
         self._enhance_frames: dict[str, bytes] = {}
         self._runs_offered: set[str] = set()
-        # Everything this show has been handed, whatever the switches keep of
-        # it; the pass is dealt from what survives them (:meth:`set_modes`).
+        # Everything this show has been handed, whatever the filters keep of
+        # it; the pass is dealt from what survives them (:meth:`set_filters`).
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
         self.playlist = self._deal(items, image_dwell_ms=image_dwell_ms, start=start)
@@ -178,64 +179,72 @@ class ShowSet:
 
     # --- the two switches --------------------------------------------------
 
-    def set_modes(self, *, favorites_filter: bool, enhanced: bool,
-                  act_filter: str | None = None) -> bool:
-        """Deal the pass from what answers the switches as asked — all on
-        meaning what answers all of them, the way every set of filters in this
-        family stacks — and say whether anything moved.  *act_filter* left
-        unsaid stays as it is.
+    def set_filters(self, filters: ShowFilters) -> bool:
+        """Deal the pass from what answers *filters* — all on meaning what
+        answers all of them, the way every set of filters in this family
+        stacks — and say whether anything moved.
 
-        A switch that would leave nothing is refused rather than obeyed: an
+        A filter that would leave nothing is refused rather than obeyed: an
         empty show is not a mode, and the HUD's button staying dark is the
         answer.  Widening can never empty a set, so the way back is always open.
-        A loop ends with it: the switch is a narrowing of the browse, and the
+        A loop ends with it: the filter is a narrowing of the browse, and the
         pass it deals is the browse.
         """
-        act_filter = self.act_filter if act_filter is None else act_filter
-        if (favorites_filter, enhanced, act_filter) == (
-                self.favorites_filter, self.enhanced_mode, self.act_filter):
+        if filters == self.filters or not self._leaves_something(filters):
             return False
-        narrowed = [item for item in self.all_items
-                    if self.passes(item, favorites_filter=favorites_filter,
-                                   enhanced=enhanced, act_filter=act_filter)]
-        if not narrowed:
-            return False
-        self.favorites_filter, self.enhanced_mode, self.act_filter = (
-            favorites_filter, enhanced, act_filter)
-        self.loop = None
-        self.replace_items(narrowed, keep_slide=True)
+        self._narrow_to(filters)
+        self._tell_of_the_filters()
         return True
 
-    def set_act_filter(self, query: str) -> bool:
-        """Narrow the pass to what is named for the act(s) *query* names — the
-        third switch, stacked on the other two — or lift it for ""."""
-        return self.set_modes(favorites_filter=self.favorites_filter,
-                              enhanced=self.enhanced_mode, act_filter=query)
+    def take_up(self, filters: ShowFilters, *, keep_the_slide: bool = False) -> None:
+        kept = ShowFilters()
+        for field in fields(ShowFilters):
+            trial = replace(kept, **{field.name: getattr(filters, field.name)})
+            if trial != kept and self._leaves_something(trial):
+                kept = trial
+        if kept != self.filters:
+            self._narrow_to(kept, keep_the_slide=keep_the_slide)
 
-    def drop_the_switches(self) -> bool:
-        """Every switch off, the pass re-dealt over the whole set — a reset.
+    def _leaves_something(self, filters: ShowFilters) -> bool:
+        return any(self.passes(item, filters) for item in self.all_items)
+
+    def _narrow_to(self, filters: ShowFilters, *, keep_the_slide: bool = False) -> None:
+        self.filters = filters
+        self.loop = None
+        narrowed = [item for item in self.all_items if self.passes(item)]
+        current = self.playlist.current()
+        if keep_the_slide and current is not None and not self.passes(current):
+            narrowed = [current, *narrowed]
+        self.replace_items(narrowed, keep_slide=True)
+
+    def _tell_of_the_filters(self) -> None:
+        if self._on_filters_change is not None:
+            self._on_filters_change(self.filters)
+
+    def set_act_filter(self, query: str) -> bool:
+        return self.set_filters(replace(self.filters, act=query))
+
+    def drop_the_filters(self) -> bool:
+        """Every filter off, the pass re-dealt over the whole set — a reset.
 
         ``False`` when none was on: there is nothing to widen back to, and
         the pass is left exactly as it is for the surface to start over in.
         """
-        if not self._narrowed():
+        if self.filters == ShowFilters():
             return False
-        self._widen_back()
+        self.filters = ShowFilters()
         self.loop = None
         self.replace_items(self.all_items, keep_slide=False)
+        self._tell_of_the_filters()
         return True
-
-    def _narrowed(self) -> bool:
-        return bool(self.favorites_filter or self.enhanced_mode or self.act_filter)
-
-    def _widen_back(self) -> None:
-        self.favorites_filter = self.enhanced_mode = False
-        self.act_filter = ""
 
     def retune(self, items, *, enhanced_ids=()) -> None:
         """Point the set at the side's base set: a hosted reset."""
-        self._widen_back()
+        dropped = self.filters != ShowFilters()
+        self.filters = ShowFilters()
         self.reorder(items, latest=False, enhanced_ids=enhanced_ids)
+        if dropped:
+            self._tell_of_the_filters()
 
     def reorder(self, items, *, latest: bool, enhanced_ids=(),
                 keep_slide: bool = False) -> None:
@@ -250,25 +259,23 @@ class ShowSet:
                            enhancing=self.enhance_status))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:
-            self._widen_back()
+            self.filters = ShowFilters()
             kept = self.all_items
         self.replace_items(kept, keep_slide=keep_slide, new_set=not keep_slide)
 
-    def passes(self, item, *, favorites_filter=None, enhanced=None, act_filter=None) -> bool:
-        """Whether *item* survives the switches — the ones on, unless asked
-        about a setting the show is not in yet.  An item with no id (a test's,
-        or a run's frames) is neither favorited nor enhanced, so any switch that
+    def passes(self, item, filters: ShowFilters | None = None) -> bool:
+        """Whether *item* survives the filters — the ones on, unless asked
+        about filters the show is not under yet.  An item with no id (a test's,
+        or a run's frames) is neither favorited nor enhanced, so any filter that
         is on leaves it out."""
-        favorites_filter = self.favorites_filter if favorites_filter is None else favorites_filter
-        enhanced = self.enhanced_mode if enhanced is None else enhanced
-        act_filter = self.act_filter if act_filter is None else act_filter
+        filters = self.filters if filters is None else filters
         prompt_id = item.prompt_id
-        if favorites_filter and prompt_id not in self.favorite_ids:
+        if filters.favorites and prompt_id not in self.favorite_ids:
             return False
-        if enhanced and prompt_id not in self.enhanced_ids:
+        if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
-        return not act_filter or label_is_filtered(self._named_for(prompt_id), act_filter,
-                                                   camera_words=())
+        return not filters.act or label_is_filtered(self._named_for(prompt_id), filters.act,
+                                                    camera_words=())
 
     def _named_for(self, prompt_id) -> str:
         """The act(s) *prompt_id*'s map row is named for.  The whole set is
@@ -327,6 +334,9 @@ class ShowSet:
         if self.loop is not None:
             kept = tuple(slide for slide in self.loop.pool if not is_gone(slide))
             self.loop = Loop(self.loop.axis, kept) if kept else None
+
+    def whole_set(self) -> list[Slide]:
+        return [kept for kept in self.all_items if not kept.is_live]
 
     def live_ids(self) -> list:
         """Every run the whole set holds as frames rather than as a file — in
@@ -609,7 +619,7 @@ def narrow_to_acts(show_set: ShowSet, posted: str) -> tuple[str, bool]:
     says about it, the way a satellite says it, and whether that is a dead
     end: an act nothing here is named for leaves the pass alone."""
     acts = acts_posted(posted)
-    if not (show_set.set_act_filter(acts) or acts == show_set.act_filter):
+    if not (show_set.set_act_filter(acts) or acts == show_set.filters.act):
         return f"Filter: no matches for '{acts}'", False
     summary = f"'{acts}'" if acts else "cleared"
     return f"Filter: {summary} ({len(show_set.playlist)})", True

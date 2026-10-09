@@ -66,6 +66,7 @@ SESSION_UI_STATE = (
     # read the answer is a preference, and re-picking it every launch is the kind
     # of small friction that makes a control feel unfinished.
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
+    ("slideshows", GalleryView.remembered_shows, GalleryView.remember_shows),
 )
 
 # The two the view does not own. Geometry is the window's own, and the prompt
@@ -73,8 +74,8 @@ SESSION_UI_STATE = (
 # __init__), so neither is a view getter and neither belongs in the table.
 _GEOMETRY_KEY = "window_geometry"
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
-_SWITCHES_THE_SESSION_OWNS = frozenset(
-    {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity"})
+_KEYS_THE_SESSION_OWNS = frozenset(
+    {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity", "slideshows"})
 
 SESSION_PERSIST_INTERVAL_MS = 5_000
 
@@ -324,7 +325,7 @@ class OrigeneratorWindow(QMainWindow):
 
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:
-            if self._fun_time is not None and key in _SWITCHES_THE_SESSION_OWNS:
+            if self._fun_time is not None and key in _KEYS_THE_SESSION_OWNS:
                 continue
             self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())

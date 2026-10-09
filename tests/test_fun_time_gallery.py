@@ -249,6 +249,24 @@ def test_esc_reaching_a_gallery_in_a_session_stops_its_show(qtbot, tmp_path, mon
     assert not show.is_showing()
 
 
+def test_esc_again_puts_the_show_back_on_its_own_region(qtbot, tmp_path, monkeypatch):
+    view = _fun_time_view(qtbot)
+    _keys_are_the_gallerys(view)
+    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100, count=2)
+    show = view._shows._region_shows["landscape"]
+    qtbot.addWidget(show)
+    show.step(1)
+    was_showing = show.hud_prompt_id
+
+    _press_escape(view)
+    _press_escape(view)
+
+    again = view.region_show("landscape")
+    qtbot.addWidget(again)
+    assert again is not show
+    assert again.hud_prompt_id == was_showing
+
+
 def test_a_new_show_replaces_the_regions_current_occupant(qtbot, tmp_path, monkeypatch):
     view = _fun_time_view(qtbot)
     _open_slideshow(view, monkeypatch, tmp_path, "first", 100, 200)

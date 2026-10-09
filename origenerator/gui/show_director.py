@@ -7,12 +7,6 @@ standalone or on one of Fun Time's satellite regions, kept up with the folder it
 is playing as generations land there, frozen with the room, and let go when it
 closes (which puts a satellite region back on its base state).
 
-The eight pieces of state a show needs are here and only here: the show that is
-up, the shape a show on its own was opened on, every show that is up (hosted,
-two run at once), what each satellite region holds, whether the session still
-wants its regions filled, whether the room is frozen, where the last show left
-off, and how the enhancements in flight are going.
-
 The spoken words about a show are here too -- close it, lock it, narrow it to
 the favorites or to the enhanced ones, step off the slide, play a shelf. They
 are words about a show rather than words about the microphone, and a router that
@@ -26,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import replace
+from dataclasses import asdict, dataclass, replace
 from functools import partial
 from typing import Protocol
 
@@ -80,7 +74,13 @@ from origenerator.orientation import (
     split_key as _split_shelf_key,
 )
 from origenerator.show_buttons import PANEL_CORNER
-from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, ShowState, Slide, in_order
+from origenerator.slideshow import (
+    DEFAULT_IMAGE_DWELL_MS,
+    ShowFilters,
+    ShowState,
+    Slide,
+    in_order,
+)
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.show_commands import ShowCommand
 from origenerator.win32 import place_window_in_device_pixels
@@ -149,6 +149,17 @@ class ShowHost(Protocol):
         """Flash a line on the gallery's own caption."""
 
 
+@dataclass(frozen=True)
+class HeldShow:
+    items: tuple
+    location: str | None
+    side: str | None
+    order_label: str
+    image_dwell_ms: int
+    state: ShowState
+    filters: ShowFilters
+
+
 def _still_up(show):
     """*show* if it is still on screen, else None — a closed one is no
     occupant of anything, however recently it was one."""
@@ -169,8 +180,8 @@ class ShowDirector:
         self._fun_time = fun_time
         # The fullscreen slideshow window while one is open — whether it was
         # started from the toolbar (a whole folder, shuffled) or by
-        # double-clicking a picture (that folder in order, held at a pace of
-        # nought). One slot, because it is one view.
+        # double-clicking a picture (that folder in order). One slot, because
+        # it is one view.
         self._slideshow = None
         self._standalone_side: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
@@ -197,6 +208,7 @@ class ShowDirector:
         # Where the last show was when it closed, so opening one comes back to
         # the slide it left off on rather than the top of a fresh shuffle.
         self._show_state = ShowState()
+        self._filters = ShowFilters()
         self._enhance_status: dict[str, str] = {}
         self._held_at_stamp = None
         self._held_at: dict[str, frozenset[str]] = {}
@@ -307,11 +319,10 @@ class ShowDirector:
         # opens on the newest rather than where the last Latest show stopped:
         # the newest is what it is opened for.
         latest = shelf is not None and shelf.shelf == _RECENTS_KEY
-        show = self.open(items, rows=rows, location=location, side=side,
-                         resume=None if latest else self._show_state,
-                         **self._order(latest))
-        if favorites:
-            show.set_favorites_filter(True)
+        self.open(items, rows=rows, location=location, side=side,
+                  resume=None if latest else self._show_state,
+                  filters=replace(self._filters, favorites=True) if favorites else None,
+                  **self._order(latest))
         logger.info("Slideshow of %s: %d items, %s",
                     self._host.slideshow_subject(), len(items),
                     "latest" if latest else "shuffled")
@@ -325,9 +336,8 @@ class ShowDirector:
         """A double-click on a tab's preview: open the folder of the generation
         it shows as a slideshow standing on that generation.
 
-        The pace is nought — nothing moves until an arrow does, or until the
-        console's clip-seconds pair is turned up — and the set is the folder as
-        the gallery lists it, newest first, which is the order Latest plays.
+        The set is the folder as the gallery lists it, newest first, which is
+        the order Latest plays.
 
         ``media`` is the file the pane is showing, or ``None`` while a generation
         is still running under it — in which case the show opens over ``frame``,
@@ -348,7 +358,8 @@ class ShowDirector:
                 items, start = [(media[0], media[1], generation, None)], 0
                 rows = [row for row in [self._host.row_for(generation)] if row is not None]
         return self.open(items, rows=rows, start=start, frame=frame,
-                         image_dwell_ms=0, shuffle=in_order,
+                         image_dwell_ms=0 if self._fun_time is not None else None,
+                         shuffle=in_order,
                          folder_items=folder_items,
                          hud=HudFacts(
                              order_label=LATEST_LABEL,
@@ -366,7 +377,7 @@ class ShowDirector:
         return oriented_key(key, row_orientation(row))
 
     def open(self, items, *, rows=(), folder_items=None, location=None,
-             side=None, resume=None, **kwargs):
+             side=None, resume=None, filters=None, **kwargs):
         """Build, wire and show a fullscreen slideshow of ``items``.
 
         The one place a show is made, however it was asked for, so the toolbar's
@@ -408,6 +419,7 @@ class ShowDirector:
         # the shifted step keys and the band's versions button walk.
         levels = self.versions_of(rows)
         actions = self._show_actions(where)
+        keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
             show = self._hand_to_the_player(items, where, channel, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
@@ -419,6 +431,9 @@ class ShowDirector:
         already_live = any(live is show for live, _where in self._live_shows)
         self._live_shows = [entry for entry in self._live_shows if entry[0] is not show]
         self._live_shows.append((show, location))
+        if filters is None:
+            filters = self._filters if self._fun_time is None else ShowFilters()
+        show.take_up(filters, keep_the_slide=keep_the_slide)
         if resume is not None:
             # After the levels a window armed above: the version a slide was
             # left showing is only a version once they are armed.
@@ -470,7 +485,12 @@ class ShowDirector:
             widen=partial(self.beyond_the_row_of, side=side),
             acts=partial(self.acts_of, side=side),
             move_hud=partial(self.move_the_hud, side=side),
+            filters_changed=self._note_filters,
         )
+
+    def _note_filters(self, filters: ShowFilters) -> None:
+        if self._fun_time is None:
+            self._filters = filters
 
     def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
@@ -828,6 +848,52 @@ class ShowDirector:
             # is a black rectangle, which is the one thing the base state is for.
             self._region_shows[side] = None
             self._refill_region(side)
+
+    def remembered(self) -> dict:
+        up = _still_up(self._slideshow)
+        state = up.state() if up is not None and not up.is_live() else self._show_state
+        panels = {}
+        for side in sorted(self._hud_corners.keys() | self._hud_minimized.keys()):
+            corner, minimized = self.hud_place(side)
+            panels[side] = {"corner": corner, "minimized": minimized}
+        return {"last_show": state.saved(), "filters": asdict(self._filters),
+                "panels": panels, "pace": self._pace.seconds}
+
+    def remember(self, saved) -> None:
+        if not isinstance(saved, dict):
+            return
+        self._show_state = ShowState.restored(saved.get("last_show"))
+        self._filters = ShowFilters.restored(saved.get("filters"))
+        if type(saved.get("pace")) is int:
+            self._pace.set_seconds(saved["pace"])
+        panels = saved.get("panels")
+        for side, place in (panels.items() if isinstance(panels, dict) else ()):
+            if isinstance(place, dict):
+                self._hud_corners[side] = read_mode(HudCorner, place.get("corner"),
+                                                    HudCorner.UPPER_LEFT)
+                self._hud_minimized[side] = place.get("minimized") is True
+
+    def held_show(self) -> HeldShow | None:
+        show = self._slideshow
+        if show is None or show.is_live():
+            return None
+        return HeldShow(items=tuple(show.whole_set()),
+                        location=next((where for live, where in self._live_shows
+                                       if live is show), None),
+                        side=self._base_side(show), order_label=show.hud_order_label,
+                        image_dwell_ms=show.dwell_s * 1000, state=show.state(),
+                        filters=show.filters)
+
+    def put_back(self, held: HeldShow):
+        ids = (item.prompt_id for item in held.items if item.prompt_id is not None)
+        return self.open(list(held.items),
+                         rows=[row for row in map(self._host.row_for, ids) if row is not None],
+                         location=held.location, side=held.side, resume=held.state,
+                         filters=held.filters,
+                         image_dwell_ms=held.image_dwell_ms,
+                         shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
+                         hud=HudFacts(order_label=held.order_label,
+                                      favorite_ids=self._favorite_prompt_ids()))
 
     def close_live(self):
         """Dismiss a show that was watching a generation which ended with

@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 
 from player_core.hud_status import SHUFFLE_LABEL
 
+from origenerator.slideshow import ShowFilters
+
 
 @dataclass(frozen=True)
 class ShowActions:
@@ -76,6 +78,7 @@ class ShowActions:
     neighbors: Callable[[str], object] | None = None
     widen: Callable[[str], tuple] | None = None
     acts: Callable[[list], dict] | None = None
+    filters_changed: Callable[[ShowFilters], None] | None = None
 
 
 @dataclass(frozen=True)

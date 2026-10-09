@@ -14,8 +14,7 @@ so ``dwell_ms`` returns ``None`` for them. Keeping this a plain, Qt-free object
 lets the policy be unit-tested without a window or a clock.
 
 A dwell of zero means never: the show holds whatever is on screen until an arrow
-moves it. That is the shape a double-clicked picture opens in — one show, opened
-at a pace of nought, rather than a second full-screen viewer with its own keys.
+moves it.
 
 A third stop — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
 the user's or the pace's: speaking a request stops the advance for as long as
@@ -30,7 +29,7 @@ while it was away, and anything it culled is gone.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import NamedTuple
 
 from origenerator.media import MediaType
@@ -90,6 +89,22 @@ class Slide(NamedTuple):
 
 
 @dataclass(frozen=True)
+class ShowFilters:
+    favorites: bool = False
+    enhanced: bool = False
+    act: str = ""
+
+    @classmethod
+    def restored(cls, saved) -> ShowFilters:
+        if not isinstance(saved, dict):
+            return cls()
+        act = saved.get("act")
+        return cls(favorites=saved.get("favorites") is True,
+                   enhanced=saved.get("enhanced") is True,
+                   act=act if isinstance(act, str) else "")
+
+
+@dataclass(frozen=True)
 class ShowState:
     """Where a show was when it closed, for whichever one opens next.
 
@@ -102,6 +117,25 @@ class ShowState:
     current: str | None = None
     locked: bool = False
     level_index: int = 0
+    loop: str = ""
+
+    def saved(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def restored(cls, saved) -> ShowState:
+        if not isinstance(saved, dict):
+            return cls()
+        order, current = saved.get("order"), saved.get("current")
+        level, loop = saved.get("level_index"), saved.get("loop")
+        return cls(
+            order=(tuple(pid for pid in order if isinstance(pid, str))
+                   if isinstance(order, (list, tuple)) else ()),
+            current=current if isinstance(current, str) else None,
+            locked=saved.get("locked") is True,
+            level_index=level if type(level) is int and level > 0 else 0,
+            loop=loop if isinstance(loop, str) else "",
+        )
 
 
 def _without(indices: list, removed: int) -> list:
@@ -216,13 +250,6 @@ class SlideshowPlaylist:
         the set was handed over in — so a playlist built from these, in order,
         takes up where this one stopped."""
         return [self._items[index] for index in self._order]
-
-    def playing_now(self) -> tuple | None:
-        """This pass as another show could take it up: its items in play order,
-        the place of the one on screen, and how long a slide holds."""
-        if self.is_empty():
-            return None
-        return self.in_play_order(), self._pos, self._image_dwell_ms
 
     def order_ids(self) -> list:
         """The pass in ids rather than in places — how a closing show hands its
@@ -394,8 +421,7 @@ class SlideshowPlaylist:
     def image_dwell_ms(self) -> int:
         """How long an image holds the screen, zero meaning never move on.
         Settable, because Genau's console carries the pair that sets it — the same
-        clip-seconds pace Genau leaves its own clips up for, so turning a
-        double-clicked picture's nought up is what sets it going."""
+        clip-seconds pace Genau leaves its own clips up for."""
         return self._image_dwell_ms
 
     @image_dwell_ms.setter

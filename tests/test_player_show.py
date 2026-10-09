@@ -25,7 +25,7 @@ from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
-from origenerator.slideshow import ShowState, Slide, in_order
+from origenerator.slideshow import ShowFilters, ShowState, Slide, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -346,7 +346,7 @@ def test_a_show_on_the_players_hands_its_slide_over_as_it_closes(qtbot, tmp_path
     show = _show(qtbot, tmp_path)
     handed = []
     show.open_requested.connect(handed.append)
-    on_screen = show.playing_now()[0][show.playing_now()[1]][2]
+    on_screen = show.state().current
 
     show.close()
 
@@ -407,13 +407,21 @@ def test_a_show_picked_back_up_lands_the_player_where_the_last_one_left_off(
     assert _sent(show)[0] == "PLAY_FILE three.png"
 
 
-def test_the_pass_esc_keeps_is_the_one_the_player_is_on_where_it_stands(qtbot, tmp_path):
+def test_a_show_on_a_player_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
+    show = _show(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+
+    show.take_up(ShowFilters(enhanced=True))
+
+    assert show.hud_enhanced_mode
+    assert [str(item.path) for item in read_playlist(show.channel.playlist)] == [
+        "two.png", "three.png"]
+
+
+def test_what_esc_keeps_is_the_whole_set_standing_where_the_player_is(qtbot, tmp_path):
     show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
 
-    items, index, dwell_ms = show.playing_now()
-
-    assert [str(item.path) for item in items] == ["one.png", "two.png", "three.png"]
-    assert (index, dwell_ms) == (1, show.dwell_s * 1000)
+    assert [str(item.path) for item in show.whole_set()] == ["one.png", "two.png", "three.png"]
+    assert show.state().current == "id-2"
 
 
 def test_a_show_opened_on_a_slide_lands_the_player_on_it(qtbot, tmp_path):
@@ -615,6 +623,20 @@ def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_s
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
     assert played == ["one.png", "two.png", "three.png"]
     assert said[-1] == "Loop off"
+
+
+def test_a_show_closed_looping_a_row_reopens_looping_it(qtbot, tmp_path):
+    closed = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
+    closed.show_loop("seed")
+
+    elsewhere = tmp_path / "reopened"
+    elsewhere.mkdir()
+    reopened = _show(qtbot, elsewhere, actions=ShowActions(neighbors=_around))
+    reopened.resume(closed.state())
+
+    played = [str(item.path) for item in read_playlist(reopened.channel.playlist)]
+    assert played == ["one.png", "one-b.png"]
+    assert parse_hud(reopened.channel.hud_file.read_text(encoding="utf-8")).active_loop == "seed"
 
 
 def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):

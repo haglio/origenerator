@@ -172,8 +172,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     session file keeps is read and put back by. And the pane 86 -> 87: a show
     collects what a set holds once for each model the pane takes rather than
     once for each picture a running generation sends, and the pane's stamp is
-    what says a new model has come.)"""
+    what says a new model has come. 270 -> 272: the slideshows -- where the last
+    one was left, its filters, where each side's panel sits and the pace -- are
+    saved with the session too, through that same pair.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 270
+               for x in _class_def(VIEW, "GalleryView").body) == 272
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

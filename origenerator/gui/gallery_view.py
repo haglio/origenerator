@@ -111,7 +111,7 @@ from origenerator.gui.panes import FootSplitter, pane, pane_splitter
 from origenerator.gui.prompt_find import PromptFind
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
-from origenerator.gui.show_director import ShowDirector
+from origenerator.gui.show_director import HeldShow, ShowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.toolbar_bank import (
@@ -145,7 +145,6 @@ from origenerator.orientation import (
 )
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
-from origenerator.slideshow import in_order
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -185,10 +184,10 @@ class _Running(NamedTuple):
     auto: str | None = None  # the folder looping, if one is
     audio: bool = False      # the audio bed
     show: bool = False       # a fullscreen slideshow is up
-    # ...and the pass it was playing, to take up again. A show following a
-    # generation in flight has none, which is why this is asked separately from
+    # ...and that show, to put back as it was. A show following a generation in
+    # flight has nothing to put back, which is why this is asked separately from
     # whether there is a show at all.
-    show_pass: tuple | None = None
+    show_held: HeldShow | None = None
 
     @property
     def anything(self) -> bool:
@@ -653,7 +652,7 @@ class GalleryView(QWidget):
             auto=self._auto.active_key(),
             audio=self._bank.audio is not None and self._bank.audio.isChecked(),
             show=show is not None,
-            show_pass=show.playing_now() if show is not None else None,
+            show_held=self._shows.held_show(),
         )
 
     def _all_of_it(self) -> _Running:
@@ -705,10 +704,8 @@ class GalleryView(QWidget):
         if stopped.audio:
             if self._bank.audio is not None:
                 self._bank.audio.setChecked(True)
-        if stopped.show_pass is not None:
-            items, index, dwell_ms = stopped.show_pass
-            self._shows.open(items, start=index, image_dwell_ms=dwell_ms,
-                             shuffle=in_order)
+        if stopped.show_held is not None:
+            self._shows.put_back(stopped.show_held)
         elif stopped.show:
             self._shows.start()
         if stopped.auto:
@@ -2078,6 +2075,13 @@ class GalleryView(QWidget):
     def set_search_sort(self, mode: str | None):
         """Restore the remembered results order."""
         self._search.set_sort(mode)
+
+    def remembered_shows(self) -> dict:
+        return self._shows.remembered()
+
+    def remember_shows(self, saved) -> None:
+        if self._fun_time is None:
+            self._shows.remember(saved)
 
     def _showing_search(self) -> bool:
         return self._browser.showing_search()

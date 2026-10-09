@@ -14,7 +14,7 @@ from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.gui.show_set import ShowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.show_wiring import HudFacts
-from origenerator.slideshow import LIVE, in_order
+from origenerator.slideshow import LIVE, ShowFilters, in_order
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
@@ -34,7 +34,7 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
     show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
     show_set.playlist.jump_to(1)          # standing on the favorite
 
-    assert show_set.set_modes(favorites_filter=True, enhanced=False) is True
+    assert show_set.set_filters(ShowFilters(favorites=True)) is True
     assert dealt == [True]
     assert show_set.current_prompt_id() == "id-2"
 
@@ -44,9 +44,19 @@ def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
     show whatever the new pass opens on rather than leave the old picture up."""
     show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-3"}))
 
-    assert show_set.set_modes(favorites_filter=True, enhanced=False) is True
+    assert show_set.set_filters(ShowFilters(favorites=True)) is True
     assert dealt == [False]
     assert show_set.current_prompt_id() == "id-3"
+
+
+def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
+    told = []
+    show_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}), on_filters_change=told.append)
+
+    show_set.take_up(ShowFilters(favorites=True))
+    show_set.set_filters(ShowFilters())
+
+    assert told == [ShowFilters()]
 
 
 def test_a_switch_that_would_leave_nothing_is_refused():
@@ -54,7 +64,7 @@ def test_a_switch_that_would_leave_nothing_is_refused():
     nothing is re-dealt."""
     show_set, dealt = _set()
 
-    assert show_set.set_modes(favorites_filter=True, enhanced=False) is False
+    assert show_set.set_filters(ShowFilters(favorites=True)) is False
     assert dealt == []
     assert len(show_set.playlist) == 3
 
@@ -64,13 +74,13 @@ def test_a_reset_widens_only_where_something_was_narrowed():
     left exactly as it is for the surface to start over in."""
     show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
 
-    assert show_set.drop_the_switches() is False
+    assert show_set.drop_the_filters() is False
     assert dealt == []
 
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
     dealt.clear()
 
-    assert show_set.drop_the_switches() is True
+    assert show_set.drop_the_filters() is True
     # A reset starts the set over rather than keeping the picture: the surface
     # shows whatever the fresh pass opens on.
     assert dealt == [False]
@@ -81,10 +91,10 @@ def test_the_whole_set_keeps_what_a_switch_left_out():
     """An arrival while a switch is on is still there when it comes off, and
     one taken away is still gone — the set is kept by id beside the pass."""
     show_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
 
     show_set.forget_id("id-2")
-    show_set.drop_the_switches()
+    show_set.drop_the_filters()
 
     assert [item.prompt_id for item in show_set.playlist.items] == ["id-1", "id-3"]
 
@@ -96,7 +106,7 @@ def _pass(show_set) -> list[str]:
 
 def test_latest_plays_the_new_set_as_listed_from_the_top_still_narrowed():
     show_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-5"}))
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
     dealt.clear()
     newest_first = [("five.png", "image", "id-5"), ("four.png", "image", "id-4"),
                     ("one.png", "image", "id-1")]
@@ -106,7 +116,7 @@ def test_latest_plays_the_new_set_as_listed_from_the_top_still_narrowed():
     assert dealt == [False]
     assert _pass(show_set) == ["id-5", "id-1"]
     assert show_set.playlist.index == 0
-    assert show_set.favorites_filter is True
+    assert show_set.filters.favorites is True
     assert show_set.order_label == LATEST_LABEL
 
 
@@ -134,22 +144,22 @@ def test_shuffle_plays_the_new_set_in_a_random_order(seeded):
 
 def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
     show_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
 
     show_set.reorder([("nine.png", "image", "id-9")], latest=True)
 
-    assert show_set.favorites_filter is False
+    assert show_set.filters.favorites is False
     assert _pass(show_set) == ["id-9"]
 
 
 def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded):
     show_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-2"}))
     show_set.reorder(_TWELVE, latest=True)
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
 
     show_set.retune(_TWELVE)
 
-    assert show_set.favorites_filter is False
+    assert show_set.filters.favorites is False
     assert sorted(_pass(show_set)) == sorted(item[2] for item in _TWELVE)
     assert _pass(show_set) != [item[2] for item in _TWELVE]
     assert show_set.order_label == SHUFFLE_LABEL
@@ -512,7 +522,7 @@ def test_a_switch_ends_a_loop_and_deals_the_browse():
     show_set, _dealt = _mapped(hud=HudFacts(favorite_ids={"id-2"}))
     show_set.start_loop("seed")
 
-    show_set.set_modes(favorites_filter=True, enhanced=False)
+    show_set.set_filters(ShowFilters(favorites=True))
 
     assert show_set.loop is None
     assert _ids(show_set.playlist.items) == ["id-2"]
@@ -713,7 +723,7 @@ def test_an_act_filter_narrows_the_pass_to_what_is_named_for_that_act():
     assert show_set.set_act_filter("alpha") is True
 
     assert _ids(show_set.playlist.items) == ["id-1", "id-3"]
-    assert show_set.act_filter == "alpha"
+    assert show_set.filters.act == "alpha"
     assert dealt == [True]                      # the slide on screen shows that act
 
 
@@ -724,7 +734,7 @@ def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
 
     assert show_set.set_act_filter("gamma") is False
 
-    assert (show_set.act_filter, dealt, len(show_set.playlist)) == ("", [], 3)
+    assert (show_set.filters.act, dealt, len(show_set.playlist)) == ("", [], 3)
 
 
 def test_a_filter_naming_two_acts_keeps_only_what_is_named_for_both():
@@ -755,7 +765,7 @@ def test_an_item_named_for_no_act_says_so_and_leaves_the_pass_alone():
     said, narrowed = narrow_to_the_act_on_screen(show_set)
 
     assert (said, narrowed) == ("No act for this one", False)
-    assert (show_set.act_filter, len(show_set.playlist)) == ("", 3)
+    assert (show_set.filters.act, len(show_set.playlist)) == ("", 3)
 
 
 def test_a_reset_drops_the_act_filter_with_the_other_switches():
@@ -763,9 +773,9 @@ def test_a_reset_drops_the_act_filter_with_the_other_switches():
     show_set.set_act_filter("beta")
     dealt.clear()
 
-    assert show_set.drop_the_switches() is True
+    assert show_set.drop_the_filters() is True
 
-    assert (show_set.act_filter, len(show_set.playlist), dealt) == ("", 3, [False])
+    assert (show_set.filters.act, len(show_set.playlist), dealt) == ("", 3, [False])
 
 
 def test_a_landing_is_asked_about_afresh_because_it_can_rename_what_was_there():

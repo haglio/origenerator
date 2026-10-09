@@ -1,13 +1,11 @@
 """The fullscreen player -- the one way this app fills the screen with a picture.
 
 It plays a set of generations: a folder's, a shelf's, or the one folder a
-double-clicked picture came from.  **A double-click opens this same view at a
-pace of nought**, holding the clicked picture until an arrow moves it, which is
-why there is no second fullscreen viewer with its own keys; turning the pace up
-off nought sets such a show going.  The set is not frozen at the opening: a run
-joins it on its first frame, which is what a show of a filling folder is
-watched for.  The creep into a picture is the engine's, not this window's, so a
-show handed to one of a session's players creeps the same way.
+double-clicked picture came from, which is why there is no second fullscreen
+viewer with its own keys.  The set is not frozen at the opening: a run joins it
+on its first frame, which is what a show of a filling folder is watched for.
+The creep into a picture is the engine's, not this window's, so a show handed to
+one of a session's players creeps the same way.
 
 One panel, not two: the set, the clip's own track and volume, the device and
 the lower strip's queue (:mod:`origenerator.gui.hud_queue`) all ride on the
@@ -22,6 +20,7 @@ each is a test named for the claim.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from player_core.hud_row import RowHud
 from player_core.playhead import video_playhead
@@ -54,7 +53,7 @@ from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
-from origenerator.slideshow import ShowState, Slide, in_order
+from origenerator.slideshow import ShowFilters, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +93,8 @@ class SlideshowView(QWidget):
         self._motion = motion  # the gallery's app-global motion driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
-        # same number. An explicit dwell (a double-clicked picture's nought,
-        # or a test's) wins until the console next moves the pace.
+        # same number. An explicit dwell (a test's) wins until the console
+        # next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(items, frame=frame, start=start,
@@ -213,7 +212,8 @@ class SlideshowView(QWidget):
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
                             start=start, hud=hud, on_pass_change=self._pass_changed,
                             neighbors=self._actions.neighbors, widen=self._actions.widen,
-                            acts=self._actions.acts)
+                            acts=self._actions.acts,
+                            on_filters_change=self._actions.filters_changed)
 
     @property
     def _playlist(self):
@@ -313,8 +313,16 @@ class SlideshowView(QWidget):
         else:
             self._show_current()
 
-    def playing_now(self):
-        return None if self._live else self._playlist.playing_now()
+    def whole_set(self) -> list[Slide]:
+        return self._set.whole_set()
+
+    @property
+    def filters(self) -> ShowFilters:
+        return self._set.filters
+
+    def take_up(self, filters: ShowFilters, *, keep_the_slide: bool = False) -> None:
+        if not self._live:
+            self._set.take_up(filters, keep_the_slide=keep_the_slide)
 
     def set_levels(self, levels_by_path: dict) -> None:
         """Arm Shift+Left/Right to step an item's versions.
@@ -393,6 +401,7 @@ class SlideshowView(QWidget):
             current=self._current_prompt_id(),
             locked=self._playlist.locked,
             level_index=self._levels.index,
+            loop=self._set.loop.axis if self._set.loop is not None else "",
         )
 
     def resume(self, state: ShowState) -> bool:
@@ -407,6 +416,8 @@ class SlideshowView(QWidget):
         """
         if self._live or not self._playlist.resume(state.order, state.current):
             return False
+        if state.loop:
+            self._set.start_loop(state.loop)
         self._playlist.set_locked(state.locked)
         led = self._set.lead_with_what_is_being_made()
         self._show_current()
@@ -661,7 +672,7 @@ class SlideshowView(QWidget):
         """This show's own reset: both switches dropped, the lock released, and
         the top of the set it is already playing back on screen."""
         self._playlist.unlock()
-        if self._set.drop_the_switches():
+        if self._set.drop_the_filters():
             return  # the fresh pass is on screen already (see _pass_changed)
         self._playlist.restart()
         self._show_current()
@@ -776,7 +787,7 @@ class SlideshowView(QWidget):
     def hud_act_filter(self) -> str:
         """The act(s) the set is narrowed to — what lights the map's row
         buttons (see :class:`~origenerator.gui.show_host.ShowHost`)."""
-        return self._set.act_filter
+        return self._set.filters.act
 
     def show_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one, the way a
@@ -892,36 +903,36 @@ class SlideshowView(QWidget):
 
     @property
     def hud_favorites_filter(self) -> bool:
-        return self._set.favorites_filter
+        return self._set.filters.favorites
 
     @property
     def hud_enhanced_mode(self) -> bool:
         """Whether the show is narrowed to the pictures that have been enhanced
         — the switch beside F-mode on its HUD."""
-        return self._set.enhanced_mode
+        return self._set.filters.enhanced
 
     def toggle_favorites_filter(self) -> bool:
         """Narrow the set to the favorites, or widen it back — the players' own
         F-mode, over the favorited items.  ``True`` when the switch moved."""
-        return self.set_favorites_filter(not self._set.favorites_filter)
+        return self.set_favorites_filter(not self._set.filters.favorites)
 
     def toggle_enhanced_mode(self) -> bool:
         """Narrow the set to the pictures that have been enhanced, or widen it
         back — the HUD's switch beside F-mode.  ``True`` when the switch moved."""
-        return self.set_enhanced_mode(not self._set.enhanced_mode)
+        return self.set_enhanced_mode(not self._set.filters.enhanced)
 
     def set_favorites_filter(self, on: bool) -> bool:
-        return self._set.set_modes(favorites_filter=bool(on), enhanced=self._set.enhanced_mode)
+        return self._set.set_filters(replace(self._set.filters, favorites=bool(on)))
 
     def set_enhanced_mode(self, on: bool) -> bool:
         """Said which way rather than flipped — a speaker mid-show is not
         looking at the HUD to see which way it stands."""
-        return self._set.set_modes(favorites_filter=self._set.favorites_filter, enhanced=bool(on))
+        return self._set.set_filters(replace(self._set.filters, enhanced=bool(on)))
 
     def clear_modes(self) -> bool:
         """Every switch off at once — what "clear filter" has to mean once
         there is more than one to clear."""
-        return self._set.set_modes(favorites_filter=False, enhanced=False, act_filter="")
+        return self._set.set_filters(ShowFilters())
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same

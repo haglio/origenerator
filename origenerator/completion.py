@@ -8,7 +8,9 @@ Qt-free so the reconciler can use it without a running UI.
 """
 from __future__ import annotations
 
+import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 from origenerator.config import MOTION_DEFAULT_HZ
@@ -17,6 +19,7 @@ from origenerator.funscript import (
     synthesize_funscript,
     write_funscript,
 )
+from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.timing import execution_duration_seconds
@@ -86,3 +89,16 @@ def _make_thumbnail(workflow, files, output_dir: Path, thumb_dir: Path, name):
     except Exception as e:
         logger.warning("Thumbnail generation failed for %s: %s", source, e)
         return None
+
+
+def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
+    """Record a finished run on the row it was launched under."""
+    fields = dict(
+        status=GenerationStatus.COMPLETED,
+        output_files=json.dumps(files),
+        thumbnail_path=thumb_path,
+        completed_at=datetime.now(UTC).isoformat(),
+    )
+    if duration is not None:
+        fields["duration_seconds"] = duration
+    db.update_generation(prompt_id, **fields)

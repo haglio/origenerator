@@ -19,7 +19,6 @@ import json
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -100,19 +99,6 @@ def record_unfinished_run(db, job: GenerationJob, kind: SeedUseKind) -> None:
             db.record_seed_use(kind=kind, seed_key=key, seed=int(job.params[key]),
                                width=width, height=height,
                                thumbnail_path=str(thumbnail) if thumbnail else None)
-
-
-def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
-    """Update an existing row with a finished job's output files/thumbnail/time."""
-    fields = dict(
-        status=GenerationStatus.COMPLETED,
-        output_files=json.dumps(files),
-        thumbnail_path=thumb_path,
-        completed_at=datetime.now(UTC).isoformat(),
-    )
-    if duration is not None:
-        fields["duration_seconds"] = duration
-    db.update_generation(prompt_id, **fields)
 
 
 class GenerationJob(QObject):

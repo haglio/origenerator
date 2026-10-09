@@ -83,6 +83,18 @@ def test_submit_job_surfaces_comfyui_node_validation_detail_on_400():
     assert "Invalid image file: foo.png" in message
     assert "Bad Request" not in message  # the bare status is not what we surface
 
+def test_a_value_comfyui_has_no_choice_for_is_said_as_what_it_cannot_find():
+    body = json.dumps({
+        "error": {"message": "Prompt outputs failed validation"},
+        "node_errors": {"3": {"class_type": "UNETLoader", "errors": [{
+            "type": "value_not_in_list", "message": "Value not in list",
+            "details": "unet_name: 'example_high.safetensors' not in (list of length 38)",
+            "extra_info": {"input_name": "unet_name",
+                           "received_value": "example_high.safetensors"}}]}},
+    })
+
+    assert format_prompt_error(body) == "UNETLoader can't find example_high.safetensors"
+
 def test_format_prompt_error_falls_back_when_body_is_not_the_expected_json():
     # Not every non-2xx body is ComfyUI's node_errors JSON (a proxy may return
     # HTML, a body may be empty). The formatter must degrade gracefully.

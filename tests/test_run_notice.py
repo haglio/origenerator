@@ -4,8 +4,8 @@ from origenerator.generation_state import GenerationSource
 from origenerator.run_notice import RunOutcome, notice_for
 
 
-def test_a_run_over_in_seconds_is_not_worth_interrupting_for():
-    outcome = RunOutcome(kind="Image", recipe="SDXL Text-to-Image", seconds=12.0, ok=True,
+def test_a_video_over_in_seconds_is_not_worth_interrupting_for():
+    outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video", seconds=40.0, ok=True,
                          source=GenerationSource.GENERATED)
     assert notice_for(outcome) is None
 
@@ -33,3 +33,16 @@ def test_the_apps_own_background_work_interrupts_nobody():
         outcome = RunOutcome(kind="Video", recipe="WAN 2.2 Image-to-Video",
                              seconds=600.0, ok=True, source=source)
         assert notice_for(outcome) is None
+
+
+def test_an_enhancement_interrupts_nobody_however_long_it_ran():
+    for ok in (True, False):
+        outcome = RunOutcome(kind="Enhance", recipe="Image Enhance", seconds=600.0, ok=ok,
+                             source=GenerationSource.GENERATED)
+        assert notice_for(outcome) is None
+
+
+def test_an_image_interrupts_nobody_however_long_it_ran():
+    outcome = RunOutcome(kind="Image", recipe="SDXL Text-to-Image", seconds=180.0, ok=True,
+                         source=GenerationSource.GENERATED)
+    assert notice_for(outcome) is None

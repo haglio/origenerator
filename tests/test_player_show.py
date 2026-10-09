@@ -200,6 +200,18 @@ def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
     assert asked == [("star", "id-1"), ("enhance", "id-1"), ("lock", "id-1")]
 
 
+def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_first(
+        qtbot, tmp_path):
+    asked = []
+    show = _show(qtbot, tmp_path,
+                 actions=ShowActions(enhance=lambda pid: asked.append(pid) or False))
+    show.note_enhancing({"id-1": "queued"})
+
+    show.show_toggle_lock()
+
+    assert asked == ["id-1"]
+
+
 def test_culling_tells_the_player_to_drop_it_before_deleting_it(qtbot, tmp_path):
     """The player is playing that very file, and Windows will not move a file a
     process still has open — so the player is told to drop it before the
@@ -368,6 +380,16 @@ def test_a_new_set_does_not_reload_a_player_already_on_its_slide(qtbot, tmp_path
     show.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
 
     assert _sent(show) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
+
+
+def test_the_show_names_the_generation_the_player_says_it_is_locked_on(qtbot, tmp_path):
+    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    assert show.locked_on is None
+
+    _says(show, video="two.png", locked=True)
+    show.tick()
+
+    assert show.locked_on == "id-2"
 
 
 def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):

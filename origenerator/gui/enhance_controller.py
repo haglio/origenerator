@@ -316,6 +316,7 @@ class EnhanceController:
             # launch's own reconcile, which read the row before the stamp.
             self._db.set_enhance_target(prompt_id, row.get("prompt_id"))
             self._targets[prompt_id] = row.get("prompt_id")
+            self.put_what_is_locked_first()
             self.reconcile()
             logger.info("Enhance launched for %s on %s at %s, under %s",
                         row.get("prompt_id"), params.get("input_image"),
@@ -411,15 +412,24 @@ class EnhanceController:
         return row["prompt_id"], f"🎤 {doing}", NOTICE
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        """Locking a slide asked for it to be enhanced. Returns whether a run
-        started — the slideshow shows its corner note only if one did.
+        """Locking a slide asked for it to be enhanced, first. Returns whether a
+        run started — the slideshow shows its corner note only if one did.
 
         The same ask as a spoken "enhance" over the same picture, so the same
         decision makes it (:meth:`enhance_it`); a lock has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
         in the slideshow because it is this side that holds the levels — and a
         video has none to receive."""
-        return self.enhance_it(prompt_id)[0] is not None
+        if self.enhance_it(prompt_id)[0] is not None:
+            return True
+        self.put_what_is_locked_first()
+        self.reconcile()
+        return False
+
+    def put_what_is_locked_first(self) -> None:
+        locked = [row for prompt_id in self._shows.locked_prompt_ids()
+                  if (row := self._host.row_for(prompt_id)) is not None]
+        self._jobs.put_first(job.prompt_id for job in self.jobs_targeting(locked))
 
     # --- the runs in flight, and where each one shows -------------------------
 
@@ -599,9 +609,9 @@ class EnhanceController:
         """Every standalone enhance in flight whose image is one of ``rows``.
 
         :meth:`run_of`'s question asked the other way round — over a set of
-        images rather than one — for the two callers that act on a whole
-        selection: the tile menu's Cancel, and the delete about to take those
-        images out from under their runs.
+        images rather than one — for the callers that act on a whole set: the
+        tile menu's Cancel, the delete about to take those images out from
+        under their runs, and the pictures the shows are locked on.
         """
         running = self._enhances_in_flight()
         return [job for job in running

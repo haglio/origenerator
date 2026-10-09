@@ -1780,6 +1780,18 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
     assert view._tree_item_for(dog) is row
 
 
+def test_each_tick_puts_what_a_show_is_locked_on_first(qtbot, monkeypatch):
+    # However the lock came about: a picture locked from the map, a show put
+    # back the way it was left, a player locking itself.
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    ticks = []
+    monkeypatch.setattr(view._enhance, "put_what_is_locked_first", lambda: ticks.append(1))
+
+    view._poll()
+
+    assert ticks == [1]
+
+
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
                                                                             monkeypatch):
     # Each tick reads the library on a thread of its own, so a read taken a moment
@@ -7063,6 +7075,28 @@ def test_a_playing_slideshow_keeps_videos_off_the_gpu(qtbot, monkeypatch):
     assert view._jobs._videos_held is False  # closing lets the held ones run
 
 
+def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
+        qtbot, tmp_path, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=3), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._shows.start()
+    show = view._shows.showing
+    qtbot.addWidget(show)
+    on_screen = show.voice_target()
+    view.enhance_items([on_screen, *({"g0", "g1", "g2"} - {on_screen})])
+
+    show.toggle_lock()
+
+    (wanted,) = view._enhance.jobs_targeting([view.row_for(on_screen)])
+    assert view._jobs.queue_order[0] == wanted.prompt_id
+    assert client.submit_job.call_args_list[-1].args[1] == wanted.prompt_id
+    show.close()
+
+
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     # A folder gets its node the moment a generation starts, so this one has a
     # row and no picture. A button offering a show that opens nothing is worse
@@ -10755,6 +10789,13 @@ class _VoiceSurface:
 
     def isActiveWindow(self):
         return True
+
+    def is_showing(self):
+        return True
+
+    @property
+    def locked_on(self):
+        return self._prompt_id if self.locked else None
 
     def voice_target(self):
         return self._prompt_id

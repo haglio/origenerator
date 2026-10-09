@@ -7,7 +7,7 @@ from origenerator import queue_line
 
 
 def _job(media_type="image", source="generated", name="", run=None):
-    return SimpleNamespace(media_type=media_type, source=source, name=name,
+    return SimpleNamespace(media_type=media_type, source=source, prompt_id=name,
                            run_media_type=run or media_type)
 
 
@@ -66,6 +66,17 @@ def test_work_nobody_asked_for_never_jumps_the_line():
     line = [_video()]
     for source in ("experiment", "base_render"):
         assert queue_line.insertion_index(line, _job("image", source)) == 1
+
+
+def test_what_is_put_first_leads_the_line_and_each_part_keeps_its_order():
+    newest, locked, older, video, also_locked = (
+        _image("newest"), _image("locked"), _image("older"), _video("video"),
+        _image("also locked"))
+    line = [newest, locked, older, video, also_locked]
+
+    queue_line.put_first(line, {"locked", "also locked"})
+
+    assert line == [locked, also_locked, newest, older, video]
 
 
 # --- what may start now -------------------------------------------------------

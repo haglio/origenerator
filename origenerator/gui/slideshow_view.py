@@ -929,6 +929,10 @@ class SlideshowView(QWidget):
         """Whether what is on screen is locked — the console's padlock."""
         return self._playlist.locked
 
+    @property
+    def locked_on(self) -> str | None:
+        return self._current_prompt_id() if self.locked else None
+
     # --- the transport, for whoever is driving: a key, the console, a word ---
 
     def step(self, delta: int) -> None:
@@ -1357,17 +1361,16 @@ class SlideshowView(QWidget):
         """Ask the gallery to enhance the slide on screen, if it wants one.
 
         The gallery decides whether it does — it is the one that knows whether
-        this image has already been enhanced, whether its Enhance-on-lock
-        switch is on at all, and an enhanced one wants nothing.  ``True`` back
-        means a run started, and the HUD says so until the finished version
-        arrives.
+        this image has already been enhanced or has a run on its way, which the
+        lock makes first.  ``True`` back means a run started, and the HUD says
+        so until the finished version arrives.
         """
         if self._actions.enhance is None:
             return
         if self._playlist.current_is_live():
             return  # no file yet to make a better version of; the lock still holds
         prompt_id = self._current_prompt_id()
-        if prompt_id is None or self._set.enhancement_of(prompt_id):
+        if prompt_id is None:
             return
         if self._actions.enhance(prompt_id):
             self._set.note_enhancement_asked(prompt_id)

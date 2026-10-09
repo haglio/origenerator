@@ -91,9 +91,16 @@ class FakeReroll:
         self.prepared = []
         self.cancelled = []
         self.launches = launches
+        self.first = set()
+
+    def put_first(self, prompt_ids):
+        self.first = set(prompt_ids)
 
     def start_prepared(self, key, workflow, params):
         self.prepared.append((key, dict(params)))
+        if self.launches:
+            self.all_jobs.append(FakeJob(self.launches, input_image=params.get("input_image"),
+                                         state="queued"))
         return self.launches
 
     def cancel_job(self, prompt_id):
@@ -129,9 +136,13 @@ class FakeBrowser:
 
 
 class FakeShows:
-    def __init__(self):
+    def __init__(self, locked=()):
         self.told = None
         self.frames = None
+        self.locked = set(locked)
+
+    def locked_prompt_ids(self):
+        return self.locked
 
     def note_enhancing(self, statuses, frames=None):
         self.told = dict(statuses)
@@ -673,3 +684,37 @@ def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
     assert controller.enhance_from_slideshow("i1") is False
+
+
+def test_a_lock_puts_the_enhancement_of_the_locked_picture_first(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png"})
+    db = FakeDB([_image("i1"), _image("i2")])
+    db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
+    db.rows["run-b"] = {"prompt_id": "run-b", "enhance_of": "i2"}
+    jobs = FakeReroll([FakeJob("run-b", state="queued"), FakeJob("run-a", state="queued")])
+    controller, _host = enhance(FakeHost(rows=[_image("i1"), _image("i2")]), db=db,
+                                jobs=jobs, shows=FakeShows(locked={"i1"}))
+
+    assert controller.enhance_from_slideshow("i1") is False
+    assert jobs.first == {"run-a"}
+
+
+def test_an_enhancement_launched_for_what_a_show_is_locked_on_is_put_first(enhance,
+                                                                         monkeypatch):
+    # The Auto switch enhancing a picture a show stayed locked on while it was
+    # made, or a batch that takes in the locked one.
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png"})
+    monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    jobs = FakeReroll()
+    controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=FakeDB([_image("i1")]),
+                                jobs=jobs, shows=FakeShows(locked={"i1"}))
+
+    controller.enhance_items(["i1"])
+
+    assert jobs.first == {"run-1"}

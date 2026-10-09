@@ -1090,8 +1090,6 @@ class GalleryView(QWidget):
         # browser thumbnail (see :meth:`CombineController.drag_started`).
         panel.preview_drag_started.connect(self._combine.drag_started)
         panel.preview_drag_ended.connect(self._combine.drag_ended)
-        # Picking a different workflow builds a whole new form, so an open find
-        # has to let go of the fields it was holding before they're destroyed.
         panel.form_replaced.connect(self._retarget_find)
         # Every keystroke in a tab's form moves the text an open find is marking
         # up — re-run rather than leave highlights on words that shifted.

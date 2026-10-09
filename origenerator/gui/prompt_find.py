@@ -71,12 +71,7 @@ class PromptFind:
 
     def set_fields(self, fields) -> int:
         """Aim the find at ``fields`` — a tab's prompt inputs, in form order —
-        dropping the highlights the previous set is still wearing.
-
-        Called whenever the front tab changes or its form is swapped out, and the
-        old widgets are still alive at that moment (Qt defers their deletion), so
-        this is also what keeps the paint from outliving them.
-        """
+        dropping the highlights the previous set is still wearing."""
         self._paint([])
         self._fields = list(fields)
         return self._run(reset=True)
@@ -143,12 +138,13 @@ class PromptFind:
         self._reveal()
 
     def clear(self):
-        """End the search: no query, no matches, and no paint left over in the
-        prompts."""
+        """End the search: no query, no matches, no paint left over in the
+        prompts, and no hold on them."""
         self._query = ""
         self._matches = []
         self._index = -1
         self._paint([])
+        self._fields = []
 
     # --- showing them ---------------------------------------------------------
 

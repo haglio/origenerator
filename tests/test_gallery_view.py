@@ -19,7 +19,18 @@ from player_core.console import (
 )
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QMargins, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QMargins,
+    QObject,
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    QTimer,
+    pyqtSignal,
+)
 from PyQt6.QtGui import QDrag, QKeyEvent, QMovie
 from PyQt6.QtWidgets import (
     QApplication,
@@ -1588,6 +1599,36 @@ def test_closing_the_searched_tab_puts_an_open_find_away(qtbot, tmp_path, monkey
     view._info_tabs._close_subtab(view._info_tabs.currentIndex())
 
     assert not view._find_bar.isVisible()
+
+
+def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front(
+        qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    searched = _tab_with_prompts(view).prompt_fields()
+    _press_ctrl_f(view, monkeypatch)
+    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
+    view._info_tabs._close_subtab(view._info_tabs.currentIndex())
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert all(sip.isdeleted(field) for field in searched)
+    in_front = _tab_with_prompts(view)
+
+    assert _press_ctrl_f(view, monkeypatch) is True
+
+    assert view._find._fields == in_front.prompt_fields()
+
+
+def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    searched = _tab_with_prompts(view).prompt_fields()
+    _press_ctrl_f(view, monkeypatch)
+
+    panel = _tab_with_prompts(view, "flux_t2i_upscaled")
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert all(sip.isdeleted(field) for field in searched)
+
+    assert view._find._fields == panel.prompt_fields()
+    view._find_bar.step_requested.emit(1)
+    assert _press_ctrl_f(view, monkeypatch) is True
 
 
 def test_renaming_a_folder_persists_and_relabels_it(qtbot):

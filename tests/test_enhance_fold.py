@@ -236,8 +236,8 @@ def test_a_run_this_table_really_issued_is_left_where_it_is(tmp_path):
 
 
 def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
-    # The enhanced image's source was deleted: nothing to fold onto, so the row
-    # stays as it is (visible and deletable) rather than half-migrated.
+    # The enhanced image's source was deleted: nothing to fold onto, so the fold
+    # leaves the row whole rather than half-migrated, for the Trash to take.
     db = Database(tmp_path / "t.db")
     enhance = _add_enhance(db, "e1", "image/sdxl_t2i_gone.png [output]",
                            "image_enhance_00001_.png")
@@ -248,7 +248,7 @@ def test_fold_leaves_a_sourceless_enhance_alone(tmp_path):
 def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
     # The startup sweep: folds completions that landed while the app was closed
     # (and the retroactive "Image Enhance generation" rows), leaves in-flight
-    # jobs for their live completion and sourceless rows as they are.
+    # jobs for their live completion and sourceless rows for the Trash.
     db = Database(tmp_path / "t.db")
     _add_source(db, "src_a", "sdxl_t2i_a.png")
     _add_source(db, "src_b", "sdxl_t2i_b.png")
@@ -267,10 +267,26 @@ def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
     assert is_enhanced_row(db.get_generation("src_b"))
 
 
+def test_an_enhancement_whose_picture_is_gone_is_one_to_scrap(tmp_path):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    (output_dir / "image" / "sdxl_t2i_here.png").write_bytes(b"still here")
+    db = Database(tmp_path / "t.db")
+    _add_enhance(db, "of_a_deleted_picture", "image/sdxl_t2i_gone.png [output]", "e1.png")
+    _add_enhance(db, "of_a_picture_on_disk", "image/sdxl_t2i_here.png [output]", "e2.png")
+    _add_enhance(db, "still_running", "image/sdxl_t2i_gone.png [output]", "e3.png",
+                 status="running")
+
+    gone = gallery.enhancements_of_pictures_gone(
+        db.list_generations(), output_dir=output_dir, input_dir=tmp_path / "input")
+
+    assert [row["prompt_id"] for row in gone] == ["of_a_deleted_picture"]
+
+
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
     # The transient job row shows as an in-flight card on Recents, never as an
-    # "Image Enhance" folder in the tree; a completed-but-sourceless orphan
-    # still renders, so it can be found and deleted.
+    # "Image Enhance" folder in the tree; a completed one that has not been
+    # folded yet does.
     db = Database(tmp_path / "t.db")
     _add_source(db)
     _add_enhance(db, "running", "image/sdxl_t2i_src.png [output]", "x.png",

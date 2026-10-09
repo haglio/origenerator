@@ -160,7 +160,8 @@ class HeadsetWindow(QObject):
 
     def _tick(self) -> None:
         try:
-            for line in consume_command_file(self._input, uppercase=False):
+            for line in consume_command_file(self._input, logger=logger,
+                                             uppercase=False):
                 self._taken += 1
                 self._heard(line)
             self.publish()

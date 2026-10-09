@@ -1,6 +1,7 @@
 """The gallery handed to a session whose room is in the headset."""
 from __future__ import annotations
 
+import logging
 import struct
 from unittest.mock import MagicMock
 
@@ -38,6 +39,25 @@ def _published_color(tmp_path, at: QPoint) -> QColor:
     pixel = 20 + (at.y() * width + at.x()) * 4
     red, green, blue = published[pixel:pixel + 3]
     return QColor(red, green, blue)
+
+
+def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog):
+    """The channel drops a press file it cannot read and says nothing unless it
+    is given a logger, and a room whose presses go nowhere looks to him exactly
+    like one whose screen is dead -- which is what his 2026-10-08 session was."""
+    window = QWidget()
+    window.resize(200, 100)
+    qtbot.addWidget(window)
+    window.show()
+    headset = HeadsetWindow(window, _hosted(tmp_path))
+    (tmp_path / "input.txt").write_bytes(b"\xff\xfe press 1 1")
+    try:
+        with caplog.at_level(logging.WARNING):
+            headset._tick()
+    finally:
+        headset.close()
+
+    assert "input.txt" in caplog.text
 
 
 def test_the_frame_a_preview_is_playing_is_in_the_picture_the_room_gets(tmp_path, qtbot):

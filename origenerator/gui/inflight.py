@@ -206,6 +206,9 @@ class RunReading:
         return (self.progress, self.pass_progress) if self.rendering else (None, None)
 
 
+ALREADY_MAKING_ONE_TIP = "This folder is already making one"
+
+
 def discard_run_text(auto_generating: bool) -> str:
     """The label on the button that throws away the run being made — one wording
     for the folder's live tile, the lower strip's rows, and the config pane.

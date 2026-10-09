@@ -1,7 +1,7 @@
 """The dimming banner a tile wears while something is being made of it.
 
 Three surfaces say the same thing about a picture that isn't finished — the
-Recents shelf's in-flight cards, a folder's re-roll tile, and a finished
+Recents shelf's in-flight cards, a folder's generating tile, and a finished
 thumbnail whose enhancement is in flight — and they say it the same way: the
 message sits *over* the picture, dimmed, rather than replacing it.
 

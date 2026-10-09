@@ -91,6 +91,7 @@ from origenerator.gui.gallery_tree import (
     GalleryTree,
     SideModel,
 )
+from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.inflight import (
     discard_run_text,
@@ -390,7 +391,7 @@ class GalleryView(QWidget):
         # :meth:`GenerateConfigPanel.watch_folder`), and the frames are routed
         # to it by folder key, never to "the tab in front".
         self._selected_reroll_key: str | None = None
-        self._reroll_tile: RerollTile | None = None
+        self._generating_tile: GeneratingTile | None = None
 
     def _forget_the_listing(self):
         """Empty every slot a rebuild fills in.
@@ -453,7 +454,7 @@ class GalleryView(QWidget):
                 lead_tiles=lambda group: self._lead_tiles(group),
             ),
         )
-        self._browser.pane_reset.connect(self._forget_reroll_tile)
+        self._browser.pane_reset.connect(self._forget_generating_tile)
         self._browser.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._browser.tab_pin_requested.connect(self.pin_config_tab)
         self._browser.item_jump_requested.connect(self.follow_link)
@@ -994,7 +995,7 @@ class GalleryView(QWidget):
             # Qt/Python shutdown can deadlock the real (WMF) backend.
             app.aboutToQuit.connect(self._ambient_audio.stop)
         # A tab's Generate is a re-roll of its settings folder: launch it in that
-        # folder's own re-roll slot and navigate there, live tile and all.
+        # folder and navigate there, its generating tile and all.
         self._info_tabs.generate_requested.connect(self._on_generate_requested)
         self._info_tabs.changes_requested.connect(self._on_changes_requested)
         # ...and its right-click's "Go to folder" goes the other way: from a
@@ -1495,7 +1496,7 @@ class GalleryView(QWidget):
         the browser there, its live tile showing the run.
 
         Identical in outcome to clicking the folder's re-roll "+": the job lands in
-        that folder (its :class:`RerollTile` shows the leading run's live frame), so
+        that folder (its :class:`GeneratingTile` shows the leading run's live frame), so
         an edited config's brand-new folder appears and is navigated to at once —
         the running row it inserts gives the folder a tree node immediately (see
         :func:`build_gallery_tree`). A folder already generating takes the new run
@@ -2473,37 +2474,39 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item else None
 
     def _lead_tiles(self, group) -> LeadTiles:
-        """A settings folder's own tiles — the live re-roll tile and its mirror
-        (the same seeds again, said differently) — where the folder supports
-        each, for the pane to place
+        """A settings folder's own tiles — the re-roll tile, its mirror (the same
+        seeds again, said differently) and the run in front of its line — where
+        the folder has each, for the pane to place
         (:attr:`~origenerator.gui.browser_pane.PaneHost.lead_tiles`)."""
-        return LeadTiles(
-            reroll=self._reroll_tile_for(group) if self._can_reroll(group) else None,
-            request=(self._folder_request_tile_for(group)
-                     if self._can_request_changes(group) else None))
-
-    def _forget_reroll_tile(self):
-        """The pane is dropping what it holds, the re-roll tile with it — it is
-        re-created only when a re-rolling folder is next rendered."""
-        self._reroll_tile = None
-
-    def _reroll_tile_for(self, group) -> RerollTile:
+        if not self._can_reroll(group):
+            return LeadTiles()
         job = self._jobs.job_for(group.key)
-        tile = RerollTile(job,
-                          auto_generating=self._auto.is_active(group.key),
-                          typical_seconds=self.typical_run_seconds(job),
-                          made_from=self._job_made_from(
-                              job, lambda recipe: recipe.get("thumbnail_path")))
-        tile.set_selected(group.key == self._selected_reroll_key)
-        tile.add_requested.connect(lambda k=group.key: self._start_reroll(k))
-        tile.cancel_requested.connect(lambda k=group.key: self._cancel_reroll(k))
-        tile.context_requested.connect(
-            lambda pos, k=group.key: self._reroll_tile_menu(k, pos))
-        tile.selected.connect(lambda k=group.key: self._select_reroll(k))
-        self._reroll_tile = tile
+        plus = RerollTile(making_one=job is not None)
+        plus.add_requested.connect(lambda: self._start_reroll(group.key))
+        return LeadTiles(
+            reroll=plus,
+            request=(self._folder_request_tile_for(group)
+                     if self._can_request_changes(group) else None),
+            generating=None if job is None else self._generating_tile_for(group.key, job))
+
+    def _forget_generating_tile(self):
+        """The pane is dropping what it holds, the generating tile with it."""
+        self._generating_tile = None
+
+    def _generating_tile_for(self, key: str, job) -> GeneratingTile:
+        tile = GeneratingTile(job,
+                              auto_generating=self._auto.is_active(key),
+                              typical_seconds=self.typical_run_seconds(job),
+                              made_from=self._job_made_from(
+                                  job, lambda recipe: recipe.get("thumbnail_path")))
+        tile.set_selected(key == self._selected_reroll_key)
+        tile.cancel_requested.connect(lambda: self._cancel_reroll(key))
+        tile.context_requested.connect(lambda pos: self._generating_tile_menu(key, pos))
+        tile.selected.connect(lambda: self._select_reroll(key))
+        self._generating_tile = tile
         return tile
 
-    def _reroll_tile_menu(self, key: str, global_pos):
+    def _generating_tile_menu(self, key: str, global_pos):
         """Right-click a folder's live tile: throw away the run it is showing.
 
         The same act as the button on its face, on the gesture the rest of the
@@ -3389,8 +3392,8 @@ class GalleryView(QWidget):
         self._selected_reroll_key = key
         self._selected_row = None  # a running re-roll isn't a saved generation
         self._browser.clear_thumbnail_selection()
-        if self._reroll_tile is not None:
-            self._reroll_tile.set_selected(True)
+        if self._generating_tile is not None:
+            self._generating_tile.set_selected(True)
 
     def _wait_note(self, key: str) -> str | None:
         """What re-roll ``key`` is waiting on, when another app is holding ComfyUI
@@ -3427,8 +3430,8 @@ class GalleryView(QWidget):
         """Stop treating a running re-roll's tile as the selected item — a saved
         generation is the selection now, or the re-roll has ended."""
         self._selected_reroll_key = None
-        if self._reroll_tile is not None:
-            self._reroll_tile.set_selected(False)
+        if self._generating_tile is not None:
+            self._generating_tile.set_selected(False)
 
     def reconnect_running_jobs(self):
         """Rebind live jobs to any re-rolls left running by a previous session, so
@@ -3606,7 +3609,7 @@ class GalleryView(QWidget):
         QMessageBox.warning(self, "Generation failed", format_execution_error(message))
 
     def _rerender_current_leaf(self):
-        """Redraw the open settings folder so its re-roll tile reflects the job."""
+        """Redraw the open settings folder so its tiles reflect the job."""
         group = self.current_group()
         if isinstance(group, gallery.SettingsGroup):
             self._browser.show_thumbnails(group)

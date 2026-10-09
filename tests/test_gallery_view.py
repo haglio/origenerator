@@ -70,6 +70,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import combine_controller, corner_controls, diff_text, icons
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_config_panel as gcp_module
+from origenerator.gui import generating_tile as generating_tile_module
 from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
@@ -79,6 +80,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight_card import InFlightCard
 from origenerator.gui.job_queue import JobQueue
@@ -5845,6 +5847,16 @@ def _reroll_tile(view):
     return tiles[0] if tiles else None
 
 
+def _generating_tile(view):
+    tiles = view._scroll.widget().findChildren(GeneratingTile)
+    return tiles[0] if tiles else None
+
+
+def _tile_kinds_in_order(view):
+    layout = view._scroll.widget().layout()
+    return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
+
+
 def _select_first_leaf(view):
     # workflow -> model -> "(no add-on)" -> settings (the thumbnail leaf)
     leaf = _at(_image_workflow(view._tree), 0, 0, 0)
@@ -5980,7 +5992,13 @@ def test_clicking_add_starts_a_reroll_with_a_new_seed(qtbot, tmp_path):
     client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
 
 
-def test_starting_a_reroll_swaps_the_tile_to_active(qtbot, tmp_path):
+def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_request_card(
+        qtbot, tmp_path):
+    # Reported: the press that started a run turned the + itself into the run,
+    # with the run's Cancel where the + had been -- so on a slow app, a second
+    # press on a Cancel already taken landed on the + it had turned back into,
+    # and started another. The + stays put now, grayed out, and the run gets a
+    # tile of its own where its picture will land.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -5988,7 +6006,40 @@ def test_starting_a_reroll_swaps_the_tile_to_active(qtbot, tmp_path):
 
     _reroll_tile(view).add_requested.emit()
 
-    assert not _reroll_tile(view)._cancel.isHidden()  # now the live, cancelable tile
+    assert not _reroll_tile(view).isEnabled()
+    kinds = _tile_kinds_in_order(view)
+    assert kinds.index(FolderRequestTile) == kinds.index(RerollTile) + 1
+    assert kinds.index(GeneratingTile) == kinds.index(FolderRequestTile) + 1
+
+
+def _press_at(qtbot, view, spot):
+    """A press where a pointer would land: on whatever the pane draws at ``spot``
+    now."""
+    container = view._scroll.widget()
+    target = container.childAt(spot) or container
+    qtbot.mouseClick(target, Qt.MouseButton.LeftButton, pos=target.mapFrom(container, spot))
+
+
+def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_path):
+    # Reported: Origenerator answered a Cancel so slowly that he pressed it again,
+    # and the second press landed on the + the run's tile had turned back into.
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.resize(1200, 800)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _reroll_tile(view).add_requested.emit()
+    cancel = _generating_tile(view)._cancel
+    spot = cancel.mapTo(view._scroll.widget(), cancel.rect().center())
+
+    _press_at(qtbot, view, spot)
+    _press_at(qtbot, view, spot)
+
+    assert key not in view._live_jobs
+    assert client.submit_job.call_count == 1
 
 
 def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
@@ -6152,7 +6203,7 @@ def test_the_folders_live_tile_stands_the_image_it_was_asked_of_behind_the_wait(
 
     # The batch's folder is on screen now; its live tile has no frame of its own
     # yet, so it shows the image the request was made of.
-    assert not _reroll_tile(view)._image.pixmap().isNull()
+    assert not _generating_tile(view)._image.pixmap().isNull()
 
 
 def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
@@ -6167,9 +6218,9 @@ def test_the_whole_batch_shows_in_the_new_folder_at_once(qtbot, tmp_path):
 
     queued = [job.prompt_id for job in view._jobs.all_jobs]
     # The one in front -- the last asked for, since each picture takes the
-    # machine from the one before -- is the folder's live tile; the rest each
-    # get their own card.
-    assert _reroll_tile(view) is not None
+    # machine from the one before -- is the folder's generating tile; the rest
+    # each get their own card.
+    assert _generating_tile(view) is not None
     in_front = view._jobs.queue_order[0]
     assert set(view._browser._inflight_cards) == set(queued) - {in_front}
     assert len(queued) == 3
@@ -6335,7 +6386,7 @@ def test_a_tab_watching_the_loop_follows_it_onto_the_next_seed(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     panel = view._info_tabs.current_config_panel()
 
     panel._cancel_btn.click()
@@ -6384,7 +6435,7 @@ def test_auto_relabels_the_discard_button_in_all_three_panes(qtbot, tmp_path):
 
     view._toggle_auto(True)
 
-    assert _reroll_tile(view)._cancel.text() == "Next seed"
+    assert _generating_tile(view)._cancel.text() == "Next seed"
     assert [row._cancel.text() for row in view._queue.rows()] == ["Next seed"]
     assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Next seed"
 
@@ -6403,7 +6454,7 @@ def test_turning_auto_off_says_cancel_again_with_the_run_still_in_flight(qtbot, 
     view._toggle_auto(False)
 
     assert key in view._live_jobs  # the in-flight variation was left alone
-    assert _reroll_tile(view)._cancel.text() == "Cancel"
+    assert _generating_tile(view)._cancel.text() == "Cancel"
     assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
     assert view._info_tabs.current_config_panel()._cancel_btn.text() == "Cancel"
 
@@ -6519,7 +6570,7 @@ def test_watching_a_loop_in_the_pane_carries_on_to_the_next_variation(qtbot, tmp
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    _reroll_tile(view).selected.emit()  # the user points the pane at the loop
+    _generating_tile(view).selected.emit()  # the user points the pane at the loop
     panel = view._info_tabs.current_config_panel()
     panel._preview.show_frame = MagicMock()
 
@@ -6540,7 +6591,7 @@ def test_the_loop_ending_lets_the_pane_go(qtbot, tmp_path):
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_auto(True)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
     view._toggle_auto(False)
@@ -7872,7 +7923,7 @@ def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
     view.reconnect_running_jobs()
     view.refresh()
     _select_first_leaf(view)
-    assert not _reroll_tile(view)._cancel.isHidden()  # the live, cancelable tile
+    assert _generating_tile(view) is not None  # the run's own, cancelable tile
 
     client.job_completed.emit("rr", _REROLL_HISTORY)
 
@@ -7932,7 +7983,7 @@ def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
     prompt_id = view._live_jobs[key].prompt_id
     assert db.get_generation(prompt_id) is not None
 
-    _reroll_tile(view).cancel_requested.emit()
+    _generating_tile(view).cancel_requested.emit()
 
     assert db.get_generation(prompt_id) is None  # the abandoned run leaves no trace
 
@@ -7992,12 +8043,13 @@ def test_cancel_from_the_tile_dequeues_and_stops_the_run_by_name(qtbot, tmp_path
     prompt_id = view._live_jobs[key].prompt_id
 
     client.node_executing.emit(prompt_id, "5")  # job is now executing
-    _reroll_tile(view).cancel_requested.emit()
+    _generating_tile(view).cancel_requested.emit()
 
     client.cancel_prompt.assert_called_once_with(prompt_id)
     client.interrupt.assert_called_once_with(prompt_id)
     assert key not in view._live_jobs
-    assert _reroll_tile(view)._cancel.isHidden()  # reverted to the idle + tile
+    assert _generating_tile(view) is None
+    assert _reroll_tile(view).isEnabled()  # the + is live again
 
 
 def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
@@ -8010,7 +8062,7 @@ def test_active_reroll_survives_a_refresh(qtbot, tmp_path):
     view.refresh()  # a poll-driven rebuild must not drop the running job
 
     assert key in view._live_jobs
-    assert not _reroll_tile(view)._cancel.isHidden()  # still the live tile
+    assert _generating_tile(view) is not None  # the run still has its tile
 
 
 # --- re-roll preview mirrored into the info pane ----------------------------
@@ -8033,7 +8085,7 @@ def test_selecting_a_running_reroll_shows_its_live_preview_in_the_info_pane(qtbo
     client.preview_image.emit(job.prompt_id, frame)  # a frame arrives, cached on the job
     _preview_of(view).show_frame = MagicMock()
 
-    _reroll_tile(view).selected.emit()  # user clicks the running tile
+    _generating_tile(view).selected.emit()  # user clicks the running tile
 
     _preview_of(view).show_frame.assert_called_once_with(frame)
 
@@ -8044,7 +8096,7 @@ def test_new_frames_route_to_the_info_pane_while_the_reroll_is_selected(qtbot, t
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     _preview_of(view).show_frame = MagicMock()
 
     client.preview_image.emit(job.prompt_id, _png_bytes())  # a later frame
@@ -8075,9 +8127,9 @@ def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbo
     view._browser.apply_selection("orig", _NO_MOD)  # a thumbnail is picked while it runs
     assert view.selected_prompt_ids() == ["orig"]
 
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
 
-    assert _reroll_tile(view).is_selected()
+    assert _generating_tile(view).is_selected()
     assert view.selected_prompt_ids() == []  # the thumbnail pick is cleared
 
 
@@ -8087,7 +8139,7 @@ def test_finishing_a_selected_reroll_clears_the_reroll_selection(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
@@ -8188,7 +8240,7 @@ def test_canceling_a_selected_reroll_releases_the_info_pane(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
 
     view._cancel_reroll(key)
 
@@ -8205,7 +8257,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
     win = _preview_of(view).open_fullscreen()  # the double-click, mid-generation
@@ -8241,7 +8293,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
     show = _preview_of(view).open_fullscreen()
     qtbot.addWidget(show)
@@ -8263,7 +8315,7 @@ def test_a_cancelled_generation_closes_the_show_watching_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     show = _double_click_show(view, qtbot, media=None, frame=_png_bytes())
     show.show()
 
@@ -8279,7 +8331,7 @@ def test_a_cancelled_generation_leaves_a_show_of_a_saved_file_alone(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     show = _double_click_show(view, qtbot)
     show.show()
 
@@ -8302,7 +8354,7 @@ def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
 
     assert view._info_tabs.current_config_panel().watched_key() == key
     assert view._selected_reroll_key == key
-    assert _reroll_tile(view).is_selected()
+    assert _generating_tile(view).is_selected()
 
 
 def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, tmp_path):
@@ -8317,7 +8369,7 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     _preview_of(view).show_message = MagicMock(
         side_effect=lambda text, **kwargs: painted.append(text))
 
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
 
     # Seeding the landing tab from the run's settings may pass through the
     # placeholder; what the pane ends on is the point.
@@ -8336,7 +8388,7 @@ def _waiting_view(qtbot, tmp_path, backlog):
     view.refresh()
     _running_reroll(view)
     _preview_of(view).show_message = MagicMock()  # the resting tab, where the click lands
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     return view, client
 
 
@@ -8394,14 +8446,14 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     key, job = _running_reroll(view)
     frame = _png_bytes()
     client.preview_image.emit(job.prompt_id, frame)
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     panel = view._info_tabs.current_config_panel()
     assert panel.watched_key() == key and panel._preview._live_frame == frame
 
     view._poll()  # the rebuild the new running row triggers
 
     assert view._selected_reroll_key == key
-    assert _reroll_tile(view).is_selected()
+    assert _generating_tile(view).is_selected()
     # The tab following the run kept its frame: a rebuild repaints no tab.
     assert view._info_tabs.current_config_panel() is panel
     assert panel.watched_key() == key and panel._preview._live_frame == frame
@@ -8420,7 +8472,7 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
     key = _select_leaf_of(view, "vid")
     _reroll_tile(view).add_requested.emit()  # image stage starts
     img_job = view._live_jobs[key]
-    _reroll_tile(view).selected.emit()
+    _generating_tile(view).selected.emit()
     image_frame = _png_bytes()
     client.preview_image.emit(img_job.prompt_id, image_frame)
 
@@ -8986,7 +9038,7 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     key, _job = _running_reroll(view)
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
-    view._reroll_tile_menu(key, QPoint(0, 0))
+    view._generating_tile_menu(key, QPoint(0, 0))
 
     assert labels == [["Cancel"]]
     assert view._jobs.all_jobs == []
@@ -9003,7 +9055,7 @@ def test_a_looping_folders_live_tile_offers_the_stop_its_button_cannot(
     view._toggle_auto(True)
     labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
 
-    view._reroll_tile_menu(key, QPoint(0, 0))
+    view._generating_tile_menu(key, QPoint(0, 0))
 
     assert labels == [["Next seed", "Cancel and stop auto-generating"]]
     assert not view._auto.is_active(key)
@@ -9018,17 +9070,18 @@ def _running_in_folder(prompt_id, prompt, steps, seed):
                 f"{prompt_id}.png", status="running", output_files="[]")
 
 
-def test_open_folder_shows_a_running_generation_via_the_reroll_tile(qtbot, tmp_path):
+def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tmp_path):
     # A tab's Generate IS a re-roll, so a generation running in a folder is the
-    # folder's RerollTile — it shows the live frame. The output-less running row is
-    # not drawn as a separate card or a (broken) static thumbnail; the tile stands
-    # for it. Its folder's other, finished items still list as static thumbnails.
+    # folder's GeneratingTile — it shows the live frame. The output-less running
+    # row is not drawn as a separate card or a (broken) static thumbnail; the tile
+    # stands for it. Its folder's other, finished items still list as static
+    # thumbnails.
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _running_reroll(view)                 # a real re-roll running in the folder
 
-    assert _reroll_tile(view) is not None            # the running generation IS the tile
+    assert _generating_tile(view) is not None        # the running generation IS the tile
     assert job.prompt_id not in view._browser._inflight_cards  # not a separate in-flight card
     assert job.prompt_id not in view.visible_prompt_ids()  # nor an output-less static tile
     assert view.visible_prompt_ids() == ["orig"]     # only the finished item is a thumbnail
@@ -9051,7 +9104,7 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
 
 
 def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path):
-    # A gallery re-roll running in a folder is already led by its RerollTile; its
+    # A gallery re-roll running in a folder already has its GeneratingTile; its
     # running row must not ALSO appear as a separate in-flight card in that folder.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -9060,7 +9113,7 @@ def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path
 
     view._rerender_current_leaf()               # redraw the open folder with its live tile
 
-    assert _reroll_tile(view) is not None       # the RerollTile leads it...
+    assert _generating_tile(view) is not None   # the GeneratingTile shows it...
     assert job.prompt_id not in view._browser._inflight_cards  # ...and no duplicate in-flight card
 
 
@@ -10587,13 +10640,16 @@ def test_the_clip_of_an_opened_combination_stands_in_parentheses_while_its_promp
 
 
 def test_a_run_from_an_edited_combination_keeps_its_recipe_in_parentheses_while_it_waits(
-        qtbot, tmp_path):
+        qtbot, tmp_path, monkeypatch):
+    drawn = []
+    monkeypatch.setattr(generating_tile_module, "combination_pixmap",
+                        lambda made_from, size: drawn.append(made_from))
     view, panel = _opened_combination(qtbot, tmp_path)
     panel._param_form.set_values({"positive_prompt": "dance in the rain"})
 
     panel._on_generate()
 
-    assert _reroll_tile(view)._made_from.recipe_prompt_edited
+    assert drawn[-1].recipe_prompt_edited
     assert panel._live_source.recipe_prompt_edited
 
 
@@ -12205,7 +12261,7 @@ def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
     view.refresh()
     key = _select_first_leaf(view)
     view._bank.auto.click()
-    _reroll_tile(view).selected.emit()  # watching the loop in the tab
+    _generating_tile(view).selected.emit()  # watching the loop in the tab
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
 

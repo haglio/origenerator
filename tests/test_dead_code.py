@@ -308,7 +308,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why,
 # test_picking_the_picture_to_start_from_lights_generate and
 # test_grayed_generate_and_edit_say_what_they_still_need.
-MAX_PROSE_LINES = 18615
+#
+# 18614 when an enhancement stopped standing in the gallery as a picture of
+# its own: the note on what the label backfill relabels is
+# test_an_import_filed_as_an_enhancement_that_a_flux_recipe_made_is_filed_under_flux.
+MAX_PROSE_LINES = 18614
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

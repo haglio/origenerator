@@ -89,6 +89,7 @@ class FakeReroll:
     def __init__(self, jobs=(), launches="run-1"):
         self.all_jobs = list(jobs)
         self.prepared = []
+        self.asks = []
         self.cancelled = []
         self.launches = launches
         self.first = set()
@@ -97,11 +98,17 @@ class FakeReroll:
         self.first = set(prompt_ids)
 
     def start_prepared(self, key, workflow, params):
-        self.prepared.append((key, dict(params)))
+        (launched,) = self.start_batch(key, workflow, [params])
+        return launched
+
+    def start_batch(self, key, workflow, batch):
+        self.asks.append((key, len(batch)))
+        self.prepared.extend((key, dict(params)) for params in batch)
         if self.launches:
-            self.all_jobs.append(FakeJob(self.launches, input_image=params.get("input_image"),
-                                         state="queued"))
-        return self.launches
+            self.all_jobs.extend(
+                FakeJob(self.launches, input_image=params.get("input_image"), state="queued")
+                for params in batch)
+        return [self.launches for _params in batch]
 
     def cancel_job(self, prompt_id):
         self.cancelled.append(prompt_id)
@@ -337,6 +344,22 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     assert [key for key, _params in jobs.prepared] == [
         "image/image_enhance/abc", "image/image_enhance/abc"]
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
+
+
+def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": f"{row['prompt_id']}.png"})
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: "here" if "i3" not in row["params_json"] else "there")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1"), _image("i2"), _image("i3")]),
+                                jobs=jobs)
+
+    controller.enhance_items(["i1", "i2", "i3"])
+
+    assert jobs.asks == [("here", 2), ("there", 1)]
 
 
 def test_a_picture_with_no_file_to_enhance_is_skipped_not_launched(enhance,

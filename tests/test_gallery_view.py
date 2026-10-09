@@ -6156,6 +6156,19 @@ def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
     assert {job.params["positive_prompt"] for job in jobs} == {"a dog on a couch"}
 
 
+def test_a_rewrite_never_stops_one_of_its_own_pictures_for_the_next(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    _rewritten(view, key)
+
+    client.interrupt.assert_not_called()
+    client.submit_job.assert_called_once()
+
+
 def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_path):
     view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -10966,6 +10979,19 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     assert view._bank.enhance.toolTip() == "Nothing here to enhance"
 
 
+def test_enhance_all_never_stops_one_of_its_own_pictures_for_the_next(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._enhance._enhance_all()
+
+    client.interrupt.assert_not_called()
+    client.submit_job.assert_called_once()
+
+
 def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path), client=client)
@@ -10984,8 +11010,6 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     assert all(j.params["input_image"].startswith("image/sdxl_t2i_g") for j in jobs)
     assert {j.params["positive_prompt"] for j in jobs} == {"a cat"}  # the sources' own
 
-    # The one ComfyUI is rendering is the last asked for: each picture takes
-    # the machine from the one before it.
     running = next(j for j in jobs if j.prompt_id == view._jobs.queue_order[0])
     waiting = next(j for j in jobs if j is not running)
     client.job_completed.emit(running.prompt_id, _ENHANCE_HISTORY)
@@ -11402,20 +11426,18 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
 
     # Both went out — no backlog in here held the second one out of sight — and
     # they landed in the one folder, which is why a tab must not read it by key.
-    # The second asked for leads: each picture takes the machine from the one
-    # before it, which waits after it.
-    follower, leader = view._jobs.all_jobs
+    leader, follower = view._jobs.all_jobs
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._jobs.jobs) == 1
     # The one after it counts too — and reads as queued, since it isn't rendering.
-    assert view._enhance.run_of(db.get_generation("g0")).status == "queued"
+    assert view._enhance.run_of(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
-    assert second._pending_enhancement == (
+    assert first._pending_enhancement == (
         "running", b"a frame", gallery.describe_enhance_params(leader.params))
     # The tab whose image is still waiting shows a queued tile, not that frame.
-    assert first._pending_enhancement == (
+    assert second._pending_enhancement == (
         "queued", None, gallery.describe_enhance_params(follower.params))
 
 
@@ -11559,14 +11581,14 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     _select_first_leaf(view)
 
     view.enhance_items(["g0", "g1"])
-    follower, leader = view._jobs.all_jobs  # the second asked for took the machine
+    leader, follower = view._jobs.all_jobs
     view._client.preview_image.emit(leader.prompt_id, _png_bytes())
 
     tiles = view._browser._thumb_widgets
     assert tiles["g0"]._enhancing is not None and tiles["g1"]._enhancing is not None
-    assert not tiles["g1"]._image_label.pixmap().isNull()
-    assert follower.state == "idle"  # waiting in the line for its turn again
-    assert tiles["g0"]._resting_pixmap is None   # never given the leader's frame
+    assert not tiles["g0"]._image_label.pixmap().isNull()
+    assert follower.state == "idle"  # waiting in the line for its turn
+    assert tiles["g1"]._resting_pixmap is None   # never given the leader's frame
 
 
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,

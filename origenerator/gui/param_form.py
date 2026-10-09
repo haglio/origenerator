@@ -19,7 +19,8 @@ from PyQt6.QtWidgets import (
 from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
-from origenerator.gui import diff_text, param_sections, tracked_prompt
+from origenerator.gallery.sides import ORIENTATION_LABELS, orientation_of_size
+from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
@@ -184,12 +185,25 @@ class ParamForm(QWidget):
                 scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w),
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
             self._scenes.changed.connect(self.changed)
-        self._build(self._param_defs)
+        self._build()
         self._wire_rows_shown_while()
         for pd in self._seed_defs():
             self._draw(pd)
         self.changed.connect(self._describe_seed_fields)
         self._describe_seed_fields()
+        self.changed.connect(self._show_the_shape)
+        self._show_the_shape()
+
+    def _show_the_shape(self) -> None:
+        size = self.output_size()
+        if size is None:
+            self._sections["Size"].set_mark(None, "")
+            return
+        orientation = orientation_of_size(*size)
+        tip = ORIENTATION_LABELS[orientation]
+        if size[0] == size[1]:
+            tip = f"Square, so it goes under {tip}"
+        self._sections["Size"].set_mark(icons.orientation_mark(orientation), tip)
 
     def _wire_rows_shown_while(self):
         self.changed.connect(self._refresh_rows_shown_while)
@@ -212,7 +226,7 @@ class ParamForm(QWidget):
         if key in keys:
             self._sections[title].content_form().setRowVisible(keys.index(key), visible)
 
-    def _build(self, defs: list[ParamDef]):
+    def _build(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(10)
@@ -230,25 +244,35 @@ class ParamForm(QWidget):
 
         # Fields in canonical order, so the workflow's own declaration order can't
         # reshuffle where a setting lands.
-        for pd in sorted(defs, key=lambda d: param_sections.key_rank(d.key)):
+        for pd in sorted(self._param_defs, key=lambda d: param_sections.key_rank(d.key)):
             widget = self._make_widget(pd)
             self._widgets[pd.key] = widget
             if widget is self._scenes:
                 if pd.type == ParamType.SCENES:  # the editor's one row, under the scenes' own key
                     self._add_row(pd.key, pd.label, widget)
                 continue
-            self._kind(pd).change_signal(widget).connect(self.changed)
             if isinstance(widget, PresetComboBox):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
-        for pd in defs:
+        for pd in self._param_defs:
             if pd.rate and self._widgets[pd.key] is not self._scenes:
                 # A frame count is made as seconds, so show it as seconds — its
                 # widget was left blank until the conversion was available.
                 self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()
+        self._announce_every_edit()
         self._refresh_section_visibility()
+
+    def _announce_every_edit(self):
+        for pd in self._param_defs:
+            widget = self._widgets[pd.key]
+            if widget is self._scenes:
+                continue
+            edited = self._kind(pd).change_signal(widget)
+            if pd.key == "input_image":
+                edited.connect(self._update_derived_display)
+            edited.connect(self.changed)
 
     def _add_row(self, key: str, label: str, field):
         """Insert one row (a field cell or a read-only value) into its section at
@@ -549,10 +573,6 @@ class ParamForm(QWidget):
         btn.adjustSize()
         self._unlock_btn = btn
         content.installEventFilter(self)  # follow the section's own relayouts
-        # Recompute the shown size whenever the input image changes, and seed it now.
-        image = self._widgets.get("input_image")
-        if image is not None:
-            image.textChanged.connect(self._update_derived_display)
         self._update_derived_display()
 
     def _position_unlock_button(self):

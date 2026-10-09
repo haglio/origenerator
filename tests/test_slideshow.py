@@ -13,6 +13,7 @@ from origenerator.slideshow import (
     SlideshowPlaylist,
     in_order,
 )
+from tests.slideshow_support import ahead
 
 
 def _playlist(**kw):
@@ -214,9 +215,9 @@ def test_peek_names_the_items_either_side_wrapping():
     playlist = SlideshowPlaylist(
         [("a", "image"), ("b", "image"), ("c", "image")], shuffle=lambda order: None,
     )  # order == [0, 1, 2], current == a
-    assert playlist.peek(1) == Slide("b", "image")
-    assert playlist.peek(-1) == Slide("c", "image")  # wraps to the end of the pass
-    assert SlideshowPlaylist([]).peek(1) is None
+    assert ahead(playlist, 1) == Slide("b", "image")
+    assert ahead(playlist, -1) == Slide("c", "image")  # wraps to the end of the pass
+    assert ahead(SlideshowPlaylist([]), 1) is None
 
 
 # --- an item that lands while the show runs ---------------------------------
@@ -250,8 +251,8 @@ def test_a_slide_led_with_comes_up_now_and_the_one_it_displaced_next():
     playlist.lead_with(2)
 
     assert playlist.current() == Slide("c.png", "image")
-    assert playlist.peek(1) == Slide("b.mp4", "video")
-    assert playlist.peek(2) == Slide("a.png", "image")
+    assert ahead(playlist, 1) == Slide("b.mp4", "video")
+    assert ahead(playlist, 2) == Slide("a.png", "image")
 
 
 def test_a_slide_led_with_from_earlier_in_the_pass_still_comes_up_now():
@@ -262,8 +263,8 @@ def test_a_slide_led_with_from_earlier_in_the_pass_still_comes_up_now():
     playlist.lead_with(0)
 
     assert playlist.current() == Slide("a.png", "image")
-    assert playlist.peek(1) == Slide("c.png", "image")
-    assert playlist.peek(2) == Slide("b.mp4", "video")
+    assert ahead(playlist, 1) == Slide("c.png", "image")
+    assert ahead(playlist, 2) == Slide("b.mp4", "video")
 
 
 # --- an item that gets enhanced while the show runs -------------------------
@@ -384,7 +385,7 @@ def test_a_run_being_made_joins_as_a_slide_of_its_frames():
 
     assert playlist.add((b"frame-1", LIVE, "id-new", None)) is True
 
-    assert playlist.peek(1) == (b"frame-1", LIVE, "id-new", None)
+    assert ahead(playlist, 1) == (b"frame-1", LIVE, "id-new", None)
     assert playlist.live_ids() == ["id-new"]
     assert playlist.holds("id-new")
 
@@ -395,7 +396,7 @@ def test_a_live_slide_takes_the_newest_frame_of_itself():
 
     assert playlist.update_live("id-new", b"frame-2") is True
 
-    assert playlist.peek(1)[0] == b"frame-2"
+    assert ahead(playlist, 1)[0] == b"frame-2"
 
 
 def test_a_frame_for_a_slide_that_already_landed_is_ignored():
@@ -415,7 +416,7 @@ def test_a_live_slide_becomes_the_file_it_lands_as():
     assert playlist.replace_live("id-new", "new.mp4", "video", "thumb.png") is True
 
     assert len(playlist) == 5                        # the same slide, finished
-    assert playlist.peek(1) == ("new.mp4", "video", "id-new", "thumb.png")
+    assert ahead(playlist, 1) == ("new.mp4", "video", "id-new", "thumb.png")
     assert playlist.live_ids() == []
 
 
@@ -428,7 +429,7 @@ def test_a_run_that_lands_after_the_show_moved_past_it_comes_up_next():
     playlist.replace_live("id-new", "new.png", "image")
 
     assert playlist.current() == Slide("c.png", "image", "id-c")
-    assert playlist.peek(1) == ("new.png", "image", "id-new", None)
+    assert ahead(playlist, 1) == ("new.png", "image", "id-new", None)
 
 
 def test_a_landed_run_comes_up_before_a_run_whose_frames_came_in_after_it():

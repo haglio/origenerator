@@ -7,7 +7,6 @@ import inspect
 import os
 
 import pytest
-from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QWidget
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
@@ -95,31 +94,6 @@ def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypa
 
     # 400 device px in from the screen edge, and it renders back to 400.
     assert abs((x - 2560) * scale - 400) <= 1
-
-
-def test_the_hud_bitmap_is_pinned_to_device_pixels(qapp):
-    """An 18px HUD button is already the size it should be on screen, so the
-    core window's scale must not shrink it: the pixmap's ratio cancels it."""
-    ui_scale.apply_hosted_scale()
-    pixmap = ui_scale.unscaled_pixmap(QPixmap(280, 140))
-
-    assert pixmap.devicePixelRatio() == ui_scale.HOSTED_SCALE
-    # Widget size (logical) times the scale is the bitmap's own pixel size.
-    logical = pixmap.deviceIndependentSize()
-    assert abs(logical.width() * ui_scale.HOSTED_SCALE - 280) <= 1
-    assert abs(logical.height() * ui_scale.HOSTED_SCALE - 140) <= 1
-
-
-def test_a_press_on_that_bitmap_indexes_it_in_its_own_pixels():
-    ui_scale.apply_hosted_scale()
-    # A click at the far corner of the widget is the far corner of the bitmap.
-    assert ui_scale.to_bitmap_pos(0, 0) == (0, 0)
-    x, y = ui_scale.to_bitmap_pos(280 / ui_scale.HOSTED_SCALE, 140 / ui_scale.HOSTED_SCALE)
-    assert abs(x - 280) <= 1 and abs(y - 140) <= 1
-
-
-def test_presses_are_untouched_when_nothing_scaled_the_app():
-    assert ui_scale.to_bitmap_pos(37, 21) == (37, 21)
 
 
 def test_the_scale_is_applied_before_pyqt_is_imported():

@@ -1,4 +1,4 @@
-"""Floating a widget over media, and the plate that keeps it readable.
+"""Floating a widget over media.
 
 A video plays on a native window, and an ordinary sibling widget cannot paint
 over one however it is stacked — so an overlay that showed perfectly well over
@@ -7,21 +7,12 @@ against the video by Z-order like any other window. Six widgets learned that
 separately, most of them by shipping the bug first and then carrying a comment
 about it; this is the one place it is written down, so the next overlay a show
 grows does not become the seventh.
-
-The plate is here for the same reason: light text needs a dark ground under it
-over bright media, and that translucent black was spelled out at each site that
-wanted one.
 """
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 
 from origenerator.win32 import raise_window_without_activating
-
-# What an overlay sits on so light text and small pictures stay readable over
-# whatever the media happens to be showing there. Padding is each caller's
-# own — it is about that overlay's contents, not about being readable.
-PLATE_CSS = "background: rgba(0, 0, 0, 140); border-radius: 4px;"
 
 
 def float_over_media(widget, *, click_through: bool = True) -> None:

@@ -241,8 +241,8 @@ class FakeShow:
     def set_locked(self, locked):
         return locked
 
-    def adopt_hud(self, panel):
-        self.hud_panel = panel
+    def wear_the_hud(self, side, **how):
+        self.hud_panel = (side, how)
 
     # the window it is
     def showFullScreen(self):

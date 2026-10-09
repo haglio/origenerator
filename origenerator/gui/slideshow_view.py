@@ -4,14 +4,17 @@ It plays a set of generations: a folder's, a shelf's, or the one folder a
 double-clicked picture came from, which is why there is no second fullscreen
 viewer with its own keys.  The set is not frozen at the opening: a run joins it
 on its first frame, which is what a show of a filling folder is watched for.
-The creep into a picture is the engine's, not this window's, so a show handed to
-one of a session's players creeps the same way.
 
-One panel, not two: the set, the clip's own track and volume, the device and
-the lower strip's queue (:mod:`origenerator.gui.hud_queue`) all ride on the
-players' own HUD (:mod:`origenerator.gui.show_hud`), a second plate over the
-same picture being a second HUD.  Being the deliberate foreground view, it
-plays sound -- the inline preview stays muted.
+The Slideshow runs on a Funestra, the one this app activates for it
+(:mod:`origenerator.gui.funestra_pane`): the Funestra plays the pass it is
+handed, holds a picture for the pace and creeps over it, plays a clip to its
+end and rolls onto the next, repeats what it is locked onto, draws the one
+panel the show wears over the picture and places the presses on it.  What
+this view answers for is the set, the pass dealt from it and the slide on
+screen: it hands the pass over, follows the Funestra as it walks the pass,
+and answers every press and key.  A show on one of a session's players
+(:mod:`origenerator.gui.player_show`) keeps the same set and drives its
+Funestra through files instead.
 
 What every key does, what the lock takes with it, what a filter narrows and
 where a closing show leaves you are `tests/test_slideshow_view.py`'s to state:
@@ -20,24 +23,35 @@ each is a test named for the claim.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import replace
+from pathlib import Path
 
-from player_core.hud_row import RowHud
-from player_core.playhead import video_playhead
-from player_core.volume import MAX_VOLUME, VolumeHud
+from player_core.console import ModeHud
+from player_core.file_channel import append_command
+from player_core.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
+from player_core.hud_placement import HudCorner
+from player_core.modes import Osr2State
+from player_core.playback_rate import RATE_STEP
+from player_core.playlist import PlaylistItem
+from player_core.pointer import OMNIPAUSE_TOGGLE
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from origenerator import osr2 as osr2_device
-from origenerator.gui.console import post_console_action, show_device
-from origenerator.gui.holdable_timer import HoldableTimer
+from origenerator.config import FRAMES_BEING_MADE_DIR
+from origenerator.console_commands import side_press, spelled_for
+from origenerator.gui.console import REPAINT_MS, post_console_action, show_device
+from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.funestra_pane import FunestraPane
+from origenerator.gui.hud_queue import QueuePointer, queue_section
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.neighbor_previews import NeighborPreviews, still_for
 from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
-from origenerator.gui.position_caption import PositionCaption
 from origenerator.gui.show_map import SEED_AXIS
+from origenerator.gui.show_panel import COLLAPSES, THE_SHOWS_OWN, show_hud_model
+from origenerator.gui.show_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.show_set import (
     GENERATING,
     LOOP_IS_A_LOCK,
@@ -48,11 +62,11 @@ from origenerator.gui.show_set import (
     narrow_to_acts,
     narrow_to_the_act_on_screen,
 )
-from origenerator.gui.show_surface import ShowSurface
 from origenerator.gui.show_wiring import ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
+from origenerator.show_buttons import answer
 from origenerator.slideshow import ShowFilters, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
@@ -64,6 +78,14 @@ _WIDENING_FAILED = "Widening net failed"
 _NOTHING_TO_LOOP = "Nothing to loop"
 _NOTHING_THAT_WAY = "Nothing that way"
 
+# The run a show follows full screen, as its frames are filed.
+_FOLLOWED = "followed"
+
+# How often the panel is rebuilt: on its own beat, and faster while something
+# on it is moving -- the drive's trace.
+_REFRESH_MS = 300
+_MOVING = frozenset({Osr2State.ROBOT_HAND, Osr2State.FUNSCRIPT})
+_FOOT_VERBS = frozenset({FOOT_PRESS, FOOT_DRAG, FOOT_RELEASE, FOOT_WHEEL})
 
 _PANEL_MOVES = {
     Qt.Key.Key_Left: "left",
@@ -83,8 +105,8 @@ class SlideshowView(QWidget):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
-                 shuffle=None, actions=None, hud=None, engine=None, motion=None,
-                 pace=None, parent=None):
+                 shuffle=None, actions=None, hud=None, player=None, motion=None,
+                 pace=None, frames=None, clock=time.monotonic, parent=None):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
@@ -97,6 +119,35 @@ class SlideshowView(QWidget):
         # next moves the pace.
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
+        self._clock = clock
+        self._last_tick = clock()
+        self._held_s = 0.0
+        self._moves_on_early = False
+        self._frames = frames if frames is not None else FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")
+        # The file the Funestra was last stood on, and what it is of: a slide,
+        # one of its versions, or nothing while a run's frames are up.
+        self._showing: Path | None = None
+        self._showing_media: tuple | None = None
+        self._frame_on_player: Path | None = None
+        self._frames_on_screen = False
+        self._loads_seen: int | None = None
+        self._refusal_checked = True
+        # The panel this show wears: which side's it is, who draws it, and
+        # where it sits — settled when the show is dressed (see wear_the_hud).
+        self._hud_side = ""
+        self._dashboard_cmd_file = None
+        self._label_for = None
+        self._corner = HudCorner.UPPER_LEFT
+        self._minimized = False
+        self._collapse = None
+        self._panel_model = None
+        self._panel_built_at = float("-inf")
+        self._panel_stale = True
+        # What is in flight, for the block the panel hangs at its foot, and the
+        # pointer on that block.
+        self._queue_items: list = []
+        self._foreign_queued = 0
+        self._queue_pointer = QueuePointer(self)
         self._take_set(items, frame=frame, start=start,
                        image_dwell_ms=image_dwell_ms, shuffle=shuffle, hud=hud)
         self.setWindowTitle("Slideshow")
@@ -110,29 +161,12 @@ class SlideshowView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         # Already the fullscreen view, so a double-click leaves it rather than
         # spawning a nested one. It plays sound, unlike the muted inline pane.
-        self._pane = ShowSurface(engine=engine, muted=False,
-                                    on_double_click=self.close,
-                                    on_press=self._toggle_pause)
-        self._volume = MAX_VOLUME
-        self._pane.media_ended.connect(self._on_media_ended)
-        self._pane.media_unplayable.connect(self._on_media_unplayable)
-        # The media is refitted a beat after the window resizes (and again when a
-        # video's resolution arrives), so re-place the neighbors when it lands.
-        self._pane.media_resized.connect(self._reposition_neighbors)
+        self._pane = FunestraPane(
+            self, user=self._as_the_funestra_sees_it, panel=self._hud_model,
+            on_double_click=self.close, on_open=self._the_funestra_opened,
+            player_for=None if player is None else (lambda _window_id: player))
         layout.addWidget(self._pane, 1)
 
-        # The items either side of this one, floated over the black surround.
-        self._neighbors = NeighborPreviews(self)
-
-        # Where in the set this one is, floated over the foot of the media.
-        self._counter = PositionCaption(self)
-        # What is in flight, for the block its HUD hangs at the panel's foot:
-        # the strip that normally carries the line is under this window, and a
-        # show is both when the queue stops moving (its videos are held) and
-        # when the user keeps adding to it (a locked slide asks for an
-        # enhancement).
-        self._queue_items: list = []
-        self._foreign_queued = 0
         # A note about the item on screen: which of its versions this is, that an
         # enhancement of it is being made, and for a beat whatever a switch or a
         # spoken fix just did — the only way to tell, in a view with no panels,
@@ -152,10 +186,6 @@ class SlideshowView(QWidget):
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
-        self._early_move_on = HoldableTimer(self)
-        self._early_move_on.timeout.connect(self._on_media_ended)
-        self._frames_on_screen = False
-        self._hud = None
 
         # A pause — the hosting session's OmniPause, or a click on a show with no
         # session — held here so it survives navigation: a step lands on a NEW
@@ -163,9 +193,6 @@ class SlideshowView(QWidget):
         # arrive frozen — no dwell armed, its video paused — rather than playing
         # out from under the freeze.
         self._paused = False
-        # The players' HUD replaces this view's own furnishings (the neighbor
-        # stills, the position plate) with its map — see adopt_hud.
-        self._hud_dressed = False
 
         self._show_current()
 
@@ -224,65 +251,153 @@ class SlideshowView(QWidget):
         """A fresh pass was dealt over the set: show whatever is on it now.
 
         *kept* says the slide that was on screen survived into it — a switch
-        narrowing what you are looking through — so the picture stays and only
-        what says where in the set it is has moved.  Without it the pass has
+        narrowing what you are looking through — so the picture stays and the
+        Funestra is handed the new pass around it.  Without it the pass has
         stood somewhere else up, and the view follows.
         """
         if kept:
-            self._update_counter()
-            self._update_neighbors()
+            self._hand_over(land=False)
         else:
             self._show_current()
 
-    # --- playback ----------------------------------------------------------
+    # --- what the Funestra plays --------------------------------------------
 
     def _show_current(self):
-        """Put the current item on the engine, which holds a picture for the
-        pace and ends it the way it ends a finished clip."""
+        """Stand the Funestra on the current item, which holds a picture for
+        the pace and ends it the way it ends a finished clip."""
         if self._live:
             # Nothing on disk yet: the run's own frames stand in for a slide.
             if self._frame is not None:
-                self._pane.set_pace(self._dwell_s)
-                self._pane.show_frame(self._frame)
+                self._put_the_followed_run_up(self._frame)
             else:
                 self._pane.show_message(GENERATING)  # opened before the first one
-            self._update_counter()
-            self._update_neighbors()
             return
         slide = self._playlist.current()
         if slide is None:
             return
         self._levels.restart()  # a new item, so its own versions from the top
-        frame = self._set.frame_being_made_of(slide)
-        self._frames_on_screen = frame is not None
-        if self._frames_on_screen:
-            self._pane.set_pace(self._dwell_s)
-            self._pane.show_frame(frame)
-        else:
-            self._open_on_engine(slide.path, slide.media_type)
+        self._hand_over(land=True)
+        self._show_what_is_being_made()
         self._move_on_early_from(slide)
-        self._update_counter()
-        self._update_neighbors()
         self._refresh_note()  # the note belongs to whatever is on screen now
         self._apply_freeze()  # a slide arrived at under a freeze arrives frozen
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
-    # --- the slide's own clock, which is the engine's -----------------------
+    def _hand_over(self, *, land: bool) -> None:
+        """Give the Funestra this pass to play, turned onto the slide this show
+        stands on; *land* opens that slide afresh, where a pass handed over
+        around the slide already up leaves it playing."""
+        current = self._playlist.current()
+        rotated = rotated_onto(self._playlist.in_play_order(), current)
+        items = [self._player_item(slide) for slide in rotated]
+        if land and current is not None:
+            self._showing = self._file_of(current)
+            self._showing_media = None if current.is_live else (current.path, current.media_type)
+            self._frames_on_screen = False
+            self._frame_on_player = None
+        self._pane.hand_over(items, land=self._showing if land else None)
+        self._settle()
 
-    def _open_on_engine(self, path, media_type) -> None:
-        # The pace before the file: the engine reads it as it opens one.
-        self._pane.set_pace(self._dwell_s)
-        self._pane.show_media(path, media_type)
+    def _settle(self) -> None:
+        """Hand the Funestra the pace and the hold, and take its reading of
+        the pass as the one this show stands on."""
+        playback = self._pane.playback
+        if playback is None:
+            return
+        playback.set_pace(self._dwell_s)
+        # A lock is repeat-one, as it is on a Fun Time satellite; a show
+        # following a run holds its frames the same way, and so does a pace
+        # of nought, since nought means nothing moves on its own -- a finished
+        # clip included.
+        playback.set_locked(self._playlist.locked or self._live or not self._dwell_s)
+        self._loads_seen = playback.loads
+        self._refusal_checked = False
+        self._held_s = 0.0
+        self._last_tick = self._clock()
+
+    def _the_funestra_opened(self) -> None:
+        self._settle()
+        self._show_what_is_being_made()
+        self._apply_freeze()
+
+    def _player_item(self, slide) -> PlaylistItem:
+        if slide.is_live:
+            return PlaylistItem(self._file_of(slide))
+        return slide_item(slide)
+
+    def _file_of(self, slide) -> Path:
+        if slide.is_live:
+            return self._frames.first_of(slide.prompt_id)
+        return Path(str(slide.path))
+
+    def _as_the_funestra_sees_it(self, playback):
+        return SlideshowOnAFunestra(self)
+
+    def follow_the_funestra(self) -> None:
+        """The pass of this show's own the Funestra gives it each frame: stand
+        the set on whatever the Funestra moved onto by itself -- a picture's
+        pace ran out, a clip ended -- step past an item it would not open,
+        and move a picture being enhanced on early."""
+        playback = self._pane.playback
+        if playback is None:
+            return
+        now = self._clock()
+        if playback.loads != self._loads_seen:
+            self._loads_seen = playback.loads
+            self._refusal_checked = False
+            self._held_s = 0.0
+            video = playback.current_video
+            if video != self._showing:
+                self._showing = video
+                self._follow(video)
+        elif not (self._paused or self._playlist.locked_or_paused()):
+            self._held_s += now - self._last_tick
+        self._last_tick = now
+        if not self._refusal_checked and playback.idle:
+            self._refusal_checked = True
+            self._on_media_unplayable()
+        self._move_on_early()
+
+    def _follow(self, video: Path) -> None:
+        """Stand the pass on the item the Funestra just moved to: how the map,
+        the star and every word about "this one" find out which item that is."""
+        for index, item in enumerate(self._playlist.items):
+            if self._file_of(item) == video:
+                self._playlist.jump_to(index)
+                self._levels.restart()
+                self._frames_on_screen = False
+                self._frame_on_player = None
+                self._showing_media = None if item.is_live else (item.path, item.media_type)
+                self._show_what_is_being_made()
+                self._move_on_early_from(item)
+                self._refresh_note()
+                self._apply_freeze()
+                self.media_changed.emit()
+                return
+
+    def _open_again(self) -> None:
+        """Open the slide on screen afresh -- the engine reads the pace as it
+        opens a file, and a released lock's dwell starts counting again."""
+        self._show_current()
 
     def _move_on_early_from(self, slide) -> None:
         held_for = self._set.pace_for(slide, self._dwell_s)
-        if held_for < self._dwell_s and not self._playlist.locked:
-            self._early_move_on.run_for(int(held_for * 1000))
-        else:
-            self._early_move_on.cancel()
+        self._moves_on_early = held_for < self._dwell_s and not self._playlist.locked
+        self._held_s = 0.0
+
+    def _move_on_early(self) -> None:
+        if not (self._moves_on_early and self._dwell_s):
+            return
+        current = self._playlist.current()
+        if current is None or self._held_s < self._set.pace_for(current, self._dwell_s):
+            return
+        self._moves_on_early = False
+        playback = self._pane.playback
+        if playback is not None and not self._playlist.locked_or_paused():
+            playback.step(1)
 
     def _apply_freeze(self) -> None:
-        """Hand the engine whatever is holding the show still.
+        """Hand the Funestra whatever is holding the show still.
 
         The room's freeze stops everything.  A spoken request stops the show
         moving on rather than stopping the clip: it is about what is on screen,
@@ -291,11 +406,20 @@ class SlideshowView(QWidget):
         since the alternative is its dwell running out and starting over under
         the speaker.
         """
-        request_stills_a_picture = (self._playlist.paused
-                                    and not self._pane.is_showing_video())
+        request_stills_a_picture = self._playlist.paused and not self._showing_a_video()
         held = self._paused or request_stills_a_picture
-        self._pane.set_paused(held)
-        self._early_move_on.hold(held)
+        playback = self._pane.playback
+        if playback is not None:
+            playback.set_paused(held)
+
+    def _showing_a_video(self) -> bool:
+        return (self._showing_media is not None and not self._frames_on_screen
+                and self._showing_media[1] == MediaType.VIDEO)
+
+    def _current_video_path(self):
+        """The clip on screen, or None for a picture -- what a funscript lookup
+        and the device drive key off."""
+        return self._showing_media[0] if self._showing_a_video() else None
 
     def set_playlist(self, items, index: int) -> None:
         """Re-seed the set this show plays, on ``index``.
@@ -307,10 +431,7 @@ class SlideshowView(QWidget):
         those files until an arrow leaves them for one.
         """
         self._set.reseed(items, start=index, shuffle=in_order)
-        if self._live:
-            self._update_counter()
-            self._update_neighbors()
-        else:
+        if not self._live:
             self._show_current()
 
     def whole_set(self) -> list[Slide]:
@@ -333,15 +454,171 @@ class SlideshowView(QWidget):
         item — its own axis, because a version is not a neighbor.
         """
         self._levels.arm(levels_by_path)
+        self.refresh_panel()
 
     def add_levels(self, levels_by_path: dict) -> None:
         self._levels.add(levels_by_path)
+        self.refresh_panel()
+
+    # --- the panel this show wears ------------------------------------------
+
+    def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
+                     corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
+                     collapse=None) -> None:
+        """Put the players' own panel on this show, drawn by the Funestra.
+
+        *side* is whose panel it is, which spells its verbs; *dashboard_cmd_file*
+        is the session's command channel, or ``None`` standalone -- which is also
+        how a press knows which of the two it is on (see :meth:`press`);
+        *label_for* names the item on screen in this app's own vocabulary, and
+        *collapse* is what parks the panel in its corner where there is no
+        session to ask.
+        """
+        self._hud_side = side
+        self._dashboard_cmd_file = dashboard_cmd_file
+        self._label_for = label_for
+        self._corner, self._minimized = corner, minimized
+        self._collapse = collapse
+        self.refresh_panel()
+
+    @property
+    def hud_side(self) -> str:
+        return self._hud_side
+
+    def set_hud_place(self, corner, minimized: bool) -> None:
+        if (corner, minimized) == (self._corner, self._minimized):
+            return
+        self._corner, self._minimized = corner, minimized
+        self.refresh_panel()
+
+    def refresh_panel(self) -> None:
+        """The panel's answer may have changed under a press that redraws on
+        no signal of its own: the next frame rebuilds it rather than the beat."""
+        self._panel_stale = True
+
+    def _hud_model(self):
+        """The panel as the Funestra draws it, rebuilt on its own beat -- and
+        faster while the drive's trace is moving across it."""
+        if not self._hud_side:
+            return None
+        now = self._clock()
+        beat = REPAINT_MS if self._panel_moving() else _REFRESH_MS
+        if not self._panel_stale and (now - self._panel_built_at) * 1000 < beat:
+            return self._panel_model
+        self._panel_stale = False
+        self._panel_built_at = now
+        model = show_hud_model(self._hud_side, self,
+                               hosted=self._dashboard_cmd_file is not None,
+                               device=self.hud_device, foot=self._queue())
+        if model is not None:
+            model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)
+        self._panel_model = model
+        return model
+
+    def _panel_moving(self) -> bool:
+        return self._panel_model is not None and self._panel_model.osr2 in _MOVING
+
+    def item_label(self) -> str:
+        """The muted line under the status: what is on screen right now, named
+        the way THIS app names it — the folder as the tree shows it and the
+        item by its seed, not "image / ComfyUI_00123_" off the path."""
+        prompt_id = self.hud_prompt_id
+        if not prompt_id or self._label_for is None:
+            return ""
+        try:
+            return self._label_for(prompt_id) or ""
+        except Exception:  # naming is decoration; it never costs the panel
+            return ""
+
+    def press(self, command: str) -> bool:
+        """Route one press on the panel, as the Funestra hands it over: the
+        block at the foot takes the pointer, what the show answers for itself
+        lands on it, the session's transport goes out on the dashboard channel
+        — or, with no session under this show, onto the show as well
+        (:meth:`_act_here`) — and the device's own verbs land on this window
+        either way, the OSR2 being this app's to drive wherever the show is
+        drawn.  A press on the picture itself asks for the pause.
+        """
+        verb, _, payload = command.partition("|")
+        if verb in _FOOT_VERBS:
+            self._press_the_queue(verb, payload)
+            self.refresh_panel()
+            return True
+        if verb == OMNIPAUSE_TOGGLE:
+            self._toggle_pause()
+            return True
+        action, path = side_press(self._hud_side, verb, payload)
+        if action in COLLAPSES:
+            self._collapse_here_or_out_there(command, COLLAPSES[action])
+            return True
+        if action in THE_SHOWS_OWN:
+            # The two filters, reset, the loops, the expand mark and the map's
+            # own clicks mean on a show what they mean on a player, and the
+            # show owns what each is — so they land here, hosted or not.
+            answer(self, action, path)
+            self.refresh_panel()
+            return True
+        if self.press_console(verb):
+            self.refresh_panel()
+            return True
+        if self._dashboard_cmd_file is None:
+            return self._act_here(action)
+        allowed = ("satellites_kino_activate", "origenerator_activate",
+                   *(spelled_for(self._hud_side, verb)
+                     for verb in ("prev", "next", "lock", "trash")))
+        if command not in allowed:
+            return False
+        append_command(self._dashboard_cmd_file, command)
+        return True
+
+    def _press_the_queue(self, verb: str, payload: str) -> None:
+        numbers = [int(part) for part in payload.split("|")]
+        if verb == FOOT_WHEEL:
+            self._queue_pointer.wheel(*numbers)
+        elif verb == FOOT_PRESS:
+            self._queue_pointer.press(*numbers)
+        elif verb == FOOT_DRAG:
+            self._queue_pointer.drag(*numbers)
+        else:
+            self._queue_pointer.release(*numbers)
+
+    def _collapse_here_or_out_there(self, command: str, minimized: bool) -> None:
+        if self._dashboard_cmd_file is not None:
+            append_command(self._dashboard_cmd_file, command)
+            return
+        if self._collapse is not None:
+            self._collapse(minimized)
+
+    def _act_here(self, action: str) -> bool:
+        """A press with no session under it: the show answers it itself.
+
+        Standalone there is no command file to take the round trip a hosted
+        press takes, so the press lands on the show through the same answers
+        that round trip would have ended at.  Minimize is the one button only a
+        show on its own has, the show being the window here; the rate is the
+        Funestra's own, as on every player.
+        """
+        if action == "minimize":
+            self.window().showMinimized()
+            return True  # nothing on the panel changed, and it is off screen anyway
+        if action in ("speed_up", "speed_down"):
+            playback = self._pane.playback
+            if playback is not None:
+                playback.set_speed(playback.speed + (RATE_STEP if action == "speed_up" else -RATE_STEP))
+            return True
+        if answer(self, action):
+            self.refresh_panel()  # the readout answers the press without waiting for the beat
+            return True
+        return False
+
+    # --- the queue block at the panel's foot ---------------------------------
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """Take what is in flight — the same list, in the same order, the lower
         strip this view is covering would be showing."""
         self._queue_items = list(items)
         self._foreign_queued = foreign_queued
+        self.refresh_panel()
 
     @property
     def hud_queue(self) -> tuple[list, int]:
@@ -349,30 +626,11 @@ class SlideshowView(QWidget):
         what the panel draws at its foot."""
         return self._queue_items, self._foreign_queued
 
-    @property
-    def hud_scrubber(self):
-        """The clip's row for the panel, or None on a picture."""
-        if not self._pane.is_showing_video():
-            return None
-        position, duration = self._pane.position(), self._pane.duration()
-        return RowHud(
-            position_ms=position, duration_ms=duration,
-            volume=VolumeHud(volume=self._volume, muted=self._pane.audio_muted()),
-            playhead=video_playhead(position, duration, self._pane.frame_rate()))
-
-    @property
-    def hud_funscript(self) -> list[dict]:
-        """The script the video has, whose colors fill that track."""
-        return self._pane.funscript_actions()
-
-    def set_volume(self, level: int) -> None:
-        """Set how loud this show plays — the chip on the panel."""
-        self._volume = level
-        self._pane.set_volume(level)
-
-    def scrub_to(self, ms: float) -> None:
-        """Run the video on screen to *ms* — a press along the panel's track."""
-        self._pane.scrub_to(ms)
+    def _queue(self):
+        return queue_section(self._queue_items, self._foreign_queued,
+                             first=self._queue_pointer.first,
+                             drop_at=self._queue_pointer.drop,
+                             pointer=self._queue_pointer)
 
     def requeue(self, keys) -> None:
         """Re-line the queue in this order — a row dragged somewhere else on the
@@ -446,14 +704,15 @@ class SlideshowView(QWidget):
         if self._playlist.replace_live(prompt_id, path, media_type, still):
             if self._current_prompt_id() == prompt_id:
                 self._show_current()  # the file itself now
-            self._update_neighbors()  # it may be the still riding either side
+            else:
+                self._hand_over(land=False)
+            self._frames.forget(prompt_id)
             return
         # Into the pass only past the switches: a show narrowed to its favorites
         # must not fill back up with every unfavorited thing the loop makes.  The
         # whole set remembers it either way, for when the switch comes off.
         if self._set.passes(slide) and self._playlist.add(slide):
-            self._update_counter()
-            self._update_neighbors()
+            self._hand_over(land=False)
 
     def note_generating(self, prompt_id: str, frame: bytes) -> None:
         """A generation that belongs to what this show is playing has started to
@@ -472,13 +731,18 @@ class SlideshowView(QWidget):
             return  # already following one run full-screen; this is that job
         if self._playlist.update_live(prompt_id, frame):
             if self._current_prompt_id() == prompt_id:
-                self._pane.swap_in_frame(frame)
-            else:
-                self._update_neighbors()  # it may be the still riding either side
+                self._put_a_frame_up(self._frames.write(prompt_id, frame))
             return
-        if self._set.first_offer_of(prompt_id) and self._set.join_live(prompt_id, frame):
-            self._update_counter()
-            self._update_neighbors()
+        if (self._set.first_offer_of(prompt_id) and self._frames.write(prompt_id, frame)
+                and self._set.join_live(prompt_id, frame)):
+            self._hand_over(land=False)
+
+    def _put_a_frame_up(self, path) -> None:
+        playback = self._pane.playback
+        if path is None or playback is None or path == self._frame_on_player:
+            return
+        self._frame_on_player = path
+        playback.show_frame(path)
 
     def note_in_flight(self, prompt_ids) -> None:
         """Which runs are still being made, so a slide that has stopped being one
@@ -491,28 +755,32 @@ class SlideshowView(QWidget):
             showing = self._current_prompt_id() == prompt_id
             self._playlist.drop(prompt_id)
             self._set.forget_id(prompt_id)
+            self._frames.forget(prompt_id)
             if self._playlist.is_empty():
                 self.close()  # a show of nothing but that run has nothing left
                 return
             if showing:
                 self._show_current()
             else:
-                self._update_counter()
-                self._update_neighbors()
+                self._hand_over(land=False)
 
     def holds(self, prompt_id: str) -> bool:
         """Whether this show already has a slide for that generation — what the
         gallery asks before working out whether a run belongs in here at all."""
         return self._playlist.holds(prompt_id)
 
-    def _advance(self):
-        self._playlist.advance()
-        self._show_current()
-
     def release_media(self, paths):
         """Let go of any of ``paths`` on screen — a file about to be deleted (its
-        own Up key condemns the item it's playing)."""
-        self._pane.release_media(paths)
+        own Up key condemns the item it's playing): the Funestra holds an open
+        handle on whatever it is playing."""
+        wanted = {str(path) for path in paths}
+        if self._showing is None or str(self._showing) not in wanted:
+            return
+        playback = self._pane.playback
+        if playback is not None:
+            playback.let_go()
+        self._showing = None
+        self._showing_media = None
 
     def _delete_current(self):
         """Up, the players' "weird": a favorite loses its star and the show
@@ -539,6 +807,7 @@ class SlideshowView(QWidget):
         # Out of the whole set too, so widening a switch back cannot resurrect it.
         self._set.forget(item)
         self._playlist.remove_current()
+        self._frames.forget(item.prompt_id)
         if self._playlist.is_empty():
             self.close()
             return
@@ -554,7 +823,6 @@ class SlideshowView(QWidget):
         better version, the gallery — happened, because nobody pressed one.
         The flip is a lock because the cull released it three lines up."""
         self._playlist.toggle_lock()
-        self._update_counter()
         self._flash_note("Locked")
 
     def _step(self, delta: int):
@@ -590,8 +858,20 @@ class SlideshowView(QWidget):
             return
         self._live = False
         self._frames_on_screen = False
-        self._open_on_engine(*level[:2])
+        self._put_up(*level[:2])
         self.media_changed.emit()
+
+    def _put_up(self, path, media_type: str) -> None:
+        """Open a file on the Funestra in the slide's place -- one of the
+        slide's own versions -- as the one it is standing on."""
+        item = playlist_item(path, media_type)
+        self._showing = item.path
+        self._showing_media = (path, media_type)
+        self._frame_on_player = None
+        playback = self._pane.playback
+        if playback is not None:
+            playback.play_file(item.path, item.funscript)
+            self._loads_seen = playback.loads
 
     # --- opened over a generation still being made --------------------------
 
@@ -605,7 +885,22 @@ class SlideshowView(QWidget):
         it has landed (or the show has stepped away), which is no longer this run."""
         if self._live:
             self._frame = data
-            self._pane.swap_in_frame(data)
+            self._put_the_followed_run_up(data)
+
+    def _put_the_followed_run_up(self, data: bytes) -> None:
+        """The run's newest frame in the place of a slide: on the Funestra's
+        move while it holds the screen, opened on it where nothing is up yet."""
+        path = self._frames.write(_FOLLOWED, data)
+        if path is None:
+            return
+        self._showing_media = None
+        if self._pane.playback is None:
+            self._showing = path
+            self._pane.hand_over([PlaylistItem(path)])
+            self._settle()
+            self._apply_freeze()
+            return
+        self._put_a_frame_up(path)
 
     def show_landed(self, media: tuple, generation: str | None) -> None:
         """The followed generation finished: its saved file takes the place of
@@ -615,6 +910,7 @@ class SlideshowView(QWidget):
         self._live = False
         folder = [slide for slide in self._set.all_items if slide.prompt_id != generation]
         self._set.reseed([Slide(*media, generation), *folder], shuffle=in_order)
+        self._frames.forget(_FOLLOWED)
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
@@ -823,9 +1119,6 @@ class SlideshowView(QWidget):
         to a show landing on a satellite region."""
         self._pane.set_audio_muted(muted)
 
-    def audio_muted(self) -> bool:
-        return self._pane.audio_muted()
-
     def set_locked(self, locked: bool) -> bool:
         """Lock the slide on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
@@ -873,10 +1166,6 @@ class SlideshowView(QWidget):
         """
         self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
         self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
-
-    def current_media_path(self) -> str:
-        """The file on screen — what a hosting Fun Time session's status says."""
-        return self._pane.current_media_path()
 
     def is_showing(self) -> bool:
         """Whether this show is on screen — what says a region is occupied."""
@@ -958,9 +1247,9 @@ class SlideshowView(QWidget):
         a click on a show standing on its own.
 
         Distinct from the lock: a lock holds one slide by choice and replays
-        its clip; this stops time itself.  The engine's clock is the show's, so
-        a frozen picture stops counting down its dwell and a frozen clip stops
-        playing, and a slide stepped to while frozen arrives frozen too.
+        its clip; this stops time itself.  The Funestra's clock is the show's,
+        so a frozen picture stops counting down its dwell and a frozen clip
+        stops playing, and a slide stepped to while frozen arrives frozen too.
         """
         self._paused = paused
         self._apply_freeze()
@@ -984,27 +1273,17 @@ class SlideshowView(QWidget):
         self._playlist.image_dwell_ms = seconds * 1000
         if self._live:
             return
-        self._pane.set_pace(self._dwell_s)
+        playback = self._pane.playback
+        if playback is None:
+            return
+        playback.set_pace(self._dwell_s)
         if not self._playlist.locked:
             # The engine reads the pace when it opens the file, so the picture
             # on screen takes the new pace by being opened again.
-            self._show_current()
-
-    def _on_media_ended(self):
-        """The item ran out — a clip that finished, or a picture whose dwell
-        expired.  Replay it while locked or following a run, else move on. A lock is
-        repeat-one here, as it is on a Fun Time satellite — and a pace of nought
-        holds the clip the same way, since nought means nothing moves on its own.
-        A request being spoken stops it too: paging on mid-sentence is exactly
-        what that pause exists to stop.
-        """
-        if self._live or self._playlist.locked_or_paused() or not self._dwell_s:
-            self._show_current()
-        else:
-            self._advance()
+            self._open_again()
 
     def _on_media_unplayable(self):
-        """A file the engine will not open: step past it, whatever holds it.
+        """A file the Funestra will not open: step past it, whatever holds it.
 
         Unlike a clip that ended, this one never will, so the replay a lock or
         a pace of nought asks for would hold a black screen for the rest of the
@@ -1015,10 +1294,12 @@ class SlideshowView(QWidget):
         that walked its set looking for something playable would be moving.
         The black rectangle waits for the resume.
         """
-        if self._paused:
+        if self._paused or self._live:
             return
         logger.warning("Slideshow: a clip would not play; stepping past it")
-        self._advance()
+        self._playlist.unlock()
+        self._set.step(1)
+        self._show_current()
 
     # --- the pause a spoken request puts on the show -----------------------
 
@@ -1090,6 +1371,7 @@ class SlideshowView(QWidget):
             return
         if self._actions.enhance(prompt_id):
             self._set.note_enhancement_asked(prompt_id)
+            self.refresh_panel()
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
                       still=None) -> None:
@@ -1101,7 +1383,8 @@ class SlideshowView(QWidget):
         show opened with — nothing re-reads the folder — so a swap confined to the
         current slide would leave every later pass replaying the version this
         one replaced. What is on screen changes only when the upgraded item is
-        what's on it.
+        what's on it: it carries on the move the picture was on, as the frames
+        of its making did.
         """
         self._set.note_enhancement_landed(prompt_id)
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
@@ -1109,26 +1392,49 @@ class SlideshowView(QWidget):
             if self._current_prompt_id() == prompt_id:
                 self._levels.restart()
                 self._frames_on_screen = False
-                self._pane.swap_in_picture(path)
-            self._update_neighbors()  # it may be the still riding either side
+                self._swap_in(path, media_type)
+                self._move_on_early_from(self._playlist.current())
+            self._hand_over(land=False)
         elif upgraded is not None and self._set.passes(upgraded) and self._playlist.add(upgraded):
             # Kept out of an enhanced-only pass until now, being unenhanced; the
             # better version is exactly what that pass plays, so in it goes.
-            self._update_counter()
-            self._update_neighbors()
+            self._hand_over(land=False)
+        self.refresh_panel()
+
+    def _swap_in(self, path, media_type: str) -> None:
+        """A better file of the item on screen, in the place of the one up,
+        on the move that one was making."""
+        item = playlist_item(path, media_type)
+        self._put_a_frame_up(item.path)
+        self._showing = item.path
+        self._showing_media = (path, media_type)
 
     def note_enhancing(self, statuses: dict, frames=None) -> None:
         self._set.note_enhancing(statuses, frames)
         current = self._playlist.current()
         if current is None or self._live or self._levels.stepping:
             return
-        frame = self._set.frame_being_made_of(current)
+        self._show_what_is_being_made()
+        self.refresh_panel()
+
+    def _show_what_is_being_made(self) -> None:
+        """The frames of the enhancement being made of the slide on screen, in
+        its place while they come in -- and the picture itself back when they
+        stop, on the move it was making."""
+        current = self._playlist.current()
+        playback = self._pane.playback
+        if current is None or playback is None or current.is_live:
+            return
+        frame = (self._set.frame_being_made_of(current)
+                 if self._file_of(current) == self._showing else None)
         if frame is not None:
             self._frames_on_screen = True
-            self._pane.swap_in_frame(frame)
+            self._put_a_frame_up(self._frames.write(current.prompt_id, frame))
         elif self._frames_on_screen:
             self._frames_on_screen = False
-            self._pane.swap_in_picture(current.path)
+            self._frame_on_player = None
+            self._frames.forget(current.prompt_id)
+            playback.clear_frame()
             self._move_on_early_from(current)
 
     def lead_with_what_is_being_made(self) -> None:
@@ -1162,6 +1468,7 @@ class SlideshowView(QWidget):
     def note_voice_run(self, prompt_id, message: str, *, kind: str = NOTICE) -> None:
         if prompt_id is not None:
             self._set.note_enhancement_asked(prompt_id)
+            self.refresh_panel()
         self.note_voice_command(message, kind=kind)
 
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
@@ -1192,9 +1499,6 @@ class SlideshowView(QWidget):
         self._show_note(text, kind=kind)
         self._note_timer.start(ms)
 
-    def _reposition_note(self):
-        self._note.reposition()
-
     def _flip_lock(self) -> bool:
         """Flip the lock; returns whether the slide is now locked.
 
@@ -1203,15 +1507,16 @@ class SlideshowView(QWidget):
         it twice in two ways.
         """
         if self._playlist.toggle_lock():
-            self._early_move_on.cancel()
+            self._moves_on_early = False
             self.favorite()
-            self._update_counter()
+            self._settle()
+            self.refresh_panel()
             if self._actions.lock is not None:
                 prompt_id = self._current_prompt_id()
                 if prompt_id is not None:
                     self._actions.lock(prompt_id)
             return True
-        self._show_current()  # released, so the dwell starts counting again
+        self._open_again()  # released, so the dwell starts counting again
         return False
 
     def _open_current(self):
@@ -1225,82 +1530,12 @@ class SlideshowView(QWidget):
         """``(video_path, player, actions)`` for the video on screen, or ``None`` for
         an image or a video with no funscript — mirrors the config panel's target so
         the gallery can point its one driver at whichever surface is foreground."""
-        return drive_target_for(self._pane.current_video_path(), self._pane)
-
-    # --- the neighboring items ---------------------------------------------
-
-    @property
-    def hud_side(self) -> str:
-        return "" if self._hud is None else self._hud.side
-
-    def set_hud_place(self, corner, minimized: bool) -> None:
-        if self._hud is not None:
-            self._hud.set_hud_place(corner, minimized)
+        return drive_target_for(self._current_video_path(), self._pane)
 
     def _move_the_panel(self, key) -> None:
         direction = _PANEL_MOVES.get(key)
         if direction is not None and self._actions.move_hud is not None:
             self._actions.move_hud(direction)
-
-    def adopt_hud(self, hud=None):
-        """The players' HUD went on this show: its map now says where in the
-        set this is and what is around it, so the view's own furnishings — the
-        neighbor stills, the position plate — come off.
-
-        Every show wears it, hosted on a satellite region or fullscreen on its
-        own: the map is the same map either way, and a show that kept its own
-        stills and plate beside it would be saying everything twice.
-
-        *hud* is the panel itself, when the caller has it: the device rows and
-        the readout ride on it, so a motion key has to reach it to redraw.
-        """
-        self._hud_dressed = True
-        self._neighbors.set_neighbors(None, None)
-        self._counter.hide()
-        if hud is not None:
-            self._hud = hud
-
-    def _update_neighbors(self):
-        """Draw the items either side of this one — nothing on a set too short
-        for a neighbor to be anything but the item already on screen, nothing
-        at all while this is following a generation, which has no place among
-        them yet, and nothing at all once the players' HUD is drawing the map
-        these stills are the small version of."""
-        if self._hud_dressed or self._live or len(self._playlist) < 2:
-            self._neighbors.set_neighbors(None, None)
-            return
-        self._neighbors.set_neighbors(
-            still_for(self._playlist.peek(-1)), still_for(self._playlist.peek(1)),
-            media_rect=self._media_rect(),
-        )
-
-    def _reposition_neighbors(self):
-        self._neighbors.reposition(self._media_rect())
-
-    def _media_rect(self):
-        """Where the media is drawn, in this view's coordinates."""
-        rect = self._pane.media_rect()
-        rect.moveTopLeft(self._pane.mapTo(self, rect.topLeft()))
-        return rect
-
-    # --- caption -----------------------------------------------------------
-
-    def _update_counter(self):
-        """Say where in the set this is — nothing at all while following a
-        generation still being made, which is nowhere in it yet, and nothing
-        once the players' HUD is saying it instead."""
-        if self._hud_dressed:
-            return  # the HUD's map says the position now
-        if self._live or self._playlist.is_empty():
-            self._counter.hide()
-            return
-        self._counter.show()
-        # Show the item's number within the set (its shuffled position), not the
-        # step count — so a random slideshow visibly jumps around, e.g. 7, 23, 16.
-        self._counter.show_position(
-            self._playlist.order[self._playlist.index] + 1, len(self._playlist),
-            "  ·  locked" if self._playlist.locked else "",
-        )
 
     # --- Qt events ---------------------------------------------------------
 
@@ -1331,16 +1566,13 @@ class SlideshowView(QWidget):
             # slideshow is Down, matching the auto-generate view's lock.  The
             # panel redraws on its own beat, and this is the one moment the
             # answer can have changed under a driver that emits no signal.
-            if self._hud is not None:
-                self._hud._tick()
+            self.refresh_panel()
         else:
             super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._counter.reposition()
-        self._reposition_neighbors()
-        self._reposition_note()
+        self._note.reposition()
 
     def closeEvent(self, event):
         """Leave, handing the gallery the slide that was on screen.
@@ -1352,9 +1584,10 @@ class SlideshowView(QWidget):
         which is a show whose last item was culled.
         """
         self.hide()
-        self._pane.clear()  # release any held file so it can be deleted
-        self._pane.close_engine()
-        self._early_move_on.cancel()
+        self._pane.close_engine()  # lets go of every held file, so it can be deleted
+        self._showing = None
+        self._showing_media = None
+        self._frames.forget_all()
         landing = self._land_on or self._current_prompt_id()
         # Both cleared before a second close could read them, so the handover
         # happens once. The lock outlives the first emit because the gallery
@@ -1366,3 +1599,38 @@ class SlideshowView(QWidget):
         if landing is not None:
             self.open_requested.emit(landing)
         super().closeEvent(event)
+
+
+class SlideshowOnAFunestra:
+    """The Slideshow as the Funestra sees it: what runs on the window.
+
+    The Funestra asks it about every press on the panel it wears and every
+    verb, gives it a pass of its own each frame, and heads the panel with what
+    it says it is playing.  The window is the show's own, so closing the
+    Funestra closes nothing here: the show closes the Funestra, not the other
+    way round.
+    """
+
+    def __init__(self, show: SlideshowView) -> None:
+        self._show = show
+
+    def apply_command(self, command: str) -> bool:
+        return self._show.press(command)
+
+    def tick(self) -> None:
+        self._show.follow_the_funestra()
+
+    def status_fields(self) -> dict[str, str]:
+        return {}
+
+    def top_block(self) -> ModeHud:
+        return ModeHud(video=self._show.item_label())
+
+    def set_showing(self, showing: bool) -> None:
+        pass
+
+    def picture(self) -> None:
+        return None
+
+    def close(self) -> None:
+        pass

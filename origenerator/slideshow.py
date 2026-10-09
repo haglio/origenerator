@@ -291,14 +291,6 @@ class SlideshowPlaylist:
         return [index for index, slide in enumerate(self._items)
                 if slide.prompt_id == prompt_id]
 
-    def peek(self, offset: int):
-        """The item ``offset`` steps away in the running pass, wrapping — what the
-        view draws either side of the one on screen. ``None`` when empty."""
-        if not self._items:
-            return None
-        pos = (self._pos + offset) % len(self._items)
-        return self._items[self._order[pos]]
-
     def advance(self):
         """Step to the next item; at the end, reshuffle and start a fresh pass."""
         if self._items:

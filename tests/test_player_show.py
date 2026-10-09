@@ -19,7 +19,7 @@ from player_core.status import PlayerStatus, status_fields
 
 from origenerator.fun_time_mode import PlayerChannel
 from origenerator.funscript import funscript_path_for
-from origenerator.gui import player_show
+from origenerator.gui import show_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
@@ -34,8 +34,9 @@ FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 # A window has a picture of its own to put a run's frames on and a panel it
 # wears -- which it is told where to wear; a player has neither, and the
 # session draws its panel wherever its own keys have put it.
-ONLY_A_WINDOW = {"adopt_hud", "hud_side", "set_hud_place", "set_playlist",
-                 "show_frame", "show_landed"}
+ONLY_A_WINDOW = {"wear_the_hud", "hud_side", "set_hud_place", "set_playlist",
+                 "show_frame", "show_landed", "press", "follow_the_funestra",
+                 "item_label", "refresh_panel"}
 
 
 def _channel(tmp_path: Path) -> PlayerChannel:
@@ -113,7 +114,7 @@ def test_a_show_hands_the_player_the_pass_it_is_to_play(qtbot, tmp_path):
 
 def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
     output = tmp_path / "output"
-    monkeypatch.setattr(player_show, "COMFYUI_OUTPUT_DIR", output)
+    monkeypatch.setattr(show_pass, "COMFYUI_OUTPUT_DIR", output)
     scripts = {}
     for clip in clips:
         script = funscript_path_for(clip, output_dir=output)
@@ -154,7 +155,6 @@ def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
     show.tick()
 
     assert show.hud_prompt_id == "id-2"
-    assert show.current_media_path() == "two.png"
     assert show.hud_map().corner.prompt_id == "id-2"
 
 

@@ -163,7 +163,7 @@ feature and a follow-up. Four shapes it takes: a verb in
 `fun_time_mode.py` declares every line the command file answers and publishes
 them in `origenerator_contract.json`, which fun_time's
 `tests/test_vr_control_parity.py` holds everything its keys and phrases send
-here to), a switch on the shared HUD in `gui/show_hud.py` (which posts a verb
+here to), a switch on the shared HUD in `gui/show_panel.py` (which posts a verb
 `fun_time/tests/test_command_registry.py` holds the dispatcher to), the
 `--fun-time` argv contract in `fun_time_mode.py` (built by fun_time's
 `windows_bridge_startup.py`; that module declares the flags and the window

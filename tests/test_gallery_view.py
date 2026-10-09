@@ -89,7 +89,7 @@ from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.prompt_find import _CURRENT_BG
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.show_hud import ShowHud, show_hud_model
+from origenerator.gui.show_panel import show_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import (
@@ -110,7 +110,8 @@ from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from tests.show_hud_support import hud_button_names
+from tests.show_hud_support import engine_of, hud_button_names, panel_targets
+from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -6942,10 +6943,7 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
 
     show = _standalone_show(qtbot, monkeypatch)
 
-    hud, = show.findChildren(ShowHud)
-    assert hud._targets is not None
-    assert {"prev", "next", "lock", "trash"} <= set(hud_button_names(hud))
-    assert show._counter.isHidden()
+    assert {"prev", "next", "lock", "trash"} <= set(hud_button_names(show))
     show.close()
 
 
@@ -6957,8 +6955,7 @@ def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
 
     show = _standalone_show(qtbot, monkeypatch)
 
-    hud, = show.findChildren(ShowHud)
-    names = hud_button_names(hud)
+    names = hud_button_names(show)
     assert MODE_VERBS.isdisjoint(names)
     assert "minimize" in names
     show.close()
@@ -6970,25 +6967,23 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
     # the press reaches the show directly instead of being swallowed.
 
     show = _standalone_show(qtbot, monkeypatch)
-    hud, = show.findChildren(ShowHud)
-    side = hud._side
+    side = show.hud_side
     opened = show._playlist.current()
 
-    hud._deliver(f"{side}_next")
+    show.press(f"{side}_next")
     assert show._playlist.current() != opened
 
-    hud._deliver(f"{side}_lock")
+    show.press(f"{side}_lock")
     assert show.locked is True
     show.close()
 
 
 def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monkeypatch):
     show = _standalone_show(qtbot, monkeypatch)
-    hud, = show.findChildren(ShowHud)
     played = []
 
     for order in ("latest", "shuffle"):
-        hud._deliver(f"{hud._side}_{order}")
+        show.press(f"{show.hud_side}_{order}")
         playlist = show._playlist
         played.append((show.hud_order_label,
                        sorted(playlist.items[index][2] for index in playlist.order)))
@@ -7147,17 +7142,16 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     view._shows.start()
     show = view._shows.showing
     qtbot.addWidget(show)
-    hud, = show.findChildren(ShowHud)
-    names = hud_button_names(hud)
+    names = hud_button_names(show)
     assert names.index("enhanced") == names.index("fmode") + 1
 
-    hud._deliver(f"{hud._side}_enhanced")
+    show.press(f"{show.hud_side}_enhanced")
 
     assert show.hud_enhanced_mode is True
     assert [item[2] for item in show._playlist._items] == ["i2"]
-    model = show_hud_model(hud._side, show, hosted=False)
+    model = show_hud_model(show.hud_side, show, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{hud._side}_enhanced"] and "Enhanceds" in model.lock_label
+    assert lit[f"{show.hud_side}_enhanced"] and "Enhanceds" in model.lock_label
     show.close()
 
 
@@ -7274,13 +7268,11 @@ def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
     # that aim them.
 
     show = _standalone_show(qtbot, monkeypatch)
-    hud, = show.findChildren(ShowHud)
-
     assert show.findChildren(MotionPanel) == []
-    posted = [button.command for _rect, button in hud._targets.buttons]
+    posted = [button.command for _rect, button in panel_targets(show).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
     assert "genau_clip_seconds_up" in posted    # and the pace's
-    assert hud._model.drive is not None         # with the readout under them
+    assert show._hud_model().drive is not None  # with the readout under them
     show.close()
 
 
@@ -7747,7 +7739,7 @@ def test_a_run_that_starts_to_look_like_something_joins_the_open_show(qtbot, mon
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
     assert slideshow.holds("i2")
-    assert slideshow._playlist.peek(1) == (b"a-frame", LIVE, "i2", None)
+    assert ahead(slideshow._playlist, 1) == (b"a-frame", LIVE, "i2", None)
     slideshow.close()
 
 
@@ -7815,7 +7807,7 @@ def test_a_run_the_show_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch)
     view._on_reroll_finished("some-key", "i2")
 
     assert len(slideshow._playlist) == 2              # the same slide, finished
-    assert slideshow._playlist.peek(1) == ("i2.png", "image", "i2", None)
+    assert ahead(slideshow._playlist, 1) == ("i2.png", "image", "i2", None)
     slideshow.close()
 
 
@@ -8211,7 +8203,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     win = _preview_of(view).open_fullscreen()  # the double-click, mid-generation
     qtbot.addWidget(win)
     assert win is not None and win.is_live()
-    assert win._pane._opened.read_bytes() == _png_bytes()  # seeded with the frame
+    assert engine_of(win).on_screen.read_bytes() == _png_bytes()
 
     buf = BytesIO()
     Image.new("RGB", (8, 8), (200, 30, 30)).save(buf, format="PNG")  # a later, redder frame
@@ -8226,7 +8218,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     # Ends on the result, not the last frame.
-    assert win._pane._media == (done, "image")
+    assert engine_of(win).on_screen == done
     assert not win.is_live()
     win.close()
 
@@ -14134,7 +14126,7 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
     view._voice.listener.speak("Request.")
 
     view._shows.showing._playlist.add(("other.png", "image", "elsewhere", None))
-    view._shows.showing._advance()  # something else is on screen now
+    view._shows.showing.step(1)
     _speak_request(view, qtbot, "no hat. Over.")
 
     (job,) = view._live_jobs.values()

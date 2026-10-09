@@ -14,7 +14,7 @@ from shared_ui.colors import AMBER, RED, TEXT_PRIMARY
 from origenerator.gui import voice_router
 from origenerator.gui.notice_overlay import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView
-from tests.show_surface_fakes import FakeEngine
+from tests.funestra_fakes import FakePlayer
 from tests.test_gallery_view import _requesting_view
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
@@ -29,7 +29,7 @@ _ASKED_AGAIN = object()
 
 
 def _view(qtbot):
-    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None)
+    view = SlideshowView(_ITEMS, player=FakePlayer(), shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view
 

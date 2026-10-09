@@ -92,6 +92,7 @@ from origenerator.gui.gallery_tree import (
     SideModel,
 )
 from origenerator.gui.generating_tile import GeneratingTile
+from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.generation_queue import GenerationQueue
 from origenerator.gui.inflight import (
     discard_run_text,
@@ -365,6 +366,7 @@ class GalleryView(QWidget):
         self._jobs.finished.connect(self._on_reroll_finished)
         self._jobs.failed.connect(self._on_reroll_failed)
         self._jobs.run_ended.connect(self.run_ended)
+        self._generation_failed = GenerationFailed(self)
         # "Repeatedly generate in a folder" is that same re-roll on a loop: launch
         # the next variation each time one finishes, until stopped or one fails.
         self._auto = AutoGenerateController(self._start_auto_reroll)
@@ -3598,19 +3600,10 @@ class GalleryView(QWidget):
 
     def _on_reroll_failed(self, key: str, message: str = ""):
         """A re-roll failed (recorded by the controller): let go of it wherever it
-        was being watched, redraw the folder without its tile, and SAY SO.
-
-        A failed run leaves nothing — no file, so no tile, and the row it
-        does leave is one every shelf filters out for having produced nothing. So
-        without this the whole thing simply vanished: a couple of minutes of GPU,
-        the tile disappearing off the strip, and no word anywhere but the log.
-        The user watching it took that for a success and went looking for the
-        clip. The same dialog a failed hand-off to a sibling app gets, for the
-        same reason: it is the only thing that happens, so it has to be visible.
-        """
+        was being watched, redraw the folder without its tile, and SAY SO."""
         self._auto.note_failed(key)  # end the loop rather than spin on a broken workflow
         self._after_a_job_ended_unfinished(key)
-        QMessageBox.warning(self, "Generation failed", format_execution_error(message))
+        self._generation_failed.say(format_execution_error(message))
 
     def _rerender_current_leaf(self):
         """Redraw the open settings folder so its tiles reflect the job."""

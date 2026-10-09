@@ -6342,9 +6342,8 @@ def test_toggling_auto_off_stops_the_loop(qtbot, tmp_path):
     assert not view._auto.is_active(key)
 
 
-def test_auto_stops_when_a_variation_fails(qtbot, tmp_path, monkeypatch):
+def test_auto_stops_when_a_variation_fails(qtbot, tmp_path):
     client = _reroll_client()
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
@@ -8014,9 +8013,8 @@ def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
     assert db.get_generation(prompt_id) is None  # the abandoned run leaves no trace
 
 
-def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path, monkeypatch):
+def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -8030,14 +8028,18 @@ def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path, monkeypatch)
     assert key not in view._live_jobs
 
 
-def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch):
+def _generation_failed_dialog(view):
+    (dialog,) = view.findChildren(gallery_view_module.QMessageBox)
+    assert dialog.windowTitle() == "Generation failed"
+    return dialog
+
+
+def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
     """A failed run leaves nothing — no file, so no tile, and the row it
     does leave is one every shelf filters out for having produced nothing. So it
     used to simply disappear: minutes of GPU, the tile gone off the strip, and no
     word anywhere but the log. Someone watching read that as a success and went
     looking for the clip."""
-    warn = MagicMock()
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -8050,28 +8052,42 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path, monkeypatch)
          "exception_message": "Tried all base urls but no success"
          + chr(10) * 2 + "long log"}))
 
-    warn.assert_called_once()
-    assert warn.call_args.args[1] == "Generation failed"
     # The node that threw and its first line -- not the download log under it.
-    assert warn.call_args.args[2] == "RIFE VFI failed: Tried all base urls but no success"
+    assert _generation_failed_dialog(view).text() == (
+        "RIFE VFI failed: Tried all base urls but no success")
 
 
-def test_a_generate_comfyui_refuses_to_start_says_so_too(qtbot, tmp_path, monkeypatch):
-    warn = MagicMock()
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", warn)
+def _refusing_client(reason):
     client = _reroll_client()
-    client.submit_job = MagicMock(side_effect=RuntimeError(
+    client.submit_job = MagicMock(side_effect=RuntimeError(reason))
+    return client
+
+
+def test_a_generate_comfyui_refuses_to_start_says_so_too(qtbot, tmp_path):
+    view = GalleryView(Database(tmp_path / "test.db"), client=_refusing_client(
         "UNETLoader: unet_name: 'example_high.safetensors' not in (list of length 38)"))
-    view = GalleryView(Database(tmp_path / "test.db"), client=client)
     qtbot.addWidget(view)
 
     view._on_generate_requested("wan22_t2i", {
         "positive_prompt": "a lighthouse", "width": 1088, "height": 1920,
         "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors"})
 
-    warn.assert_called_once()
-    assert warn.call_args.args[1] == "Generation failed"
-    assert "example_high.safetensors" in warn.call_args.args[2]
+    assert "example_high.safetensors" in _generation_failed_dialog(view).text()
+
+
+def test_a_burst_of_refused_generations_is_one_dialog_saying_the_reason_once(
+        qtbot, tmp_path):
+    view = GalleryView(Database(tmp_path / "test.db"), client=_refusing_client(
+        "UNETLoader: unet_name: 'example_high.safetensors' not in (list of length 38)"))
+    qtbot.addWidget(view)
+
+    for seed in (1, 2, 3):
+        view._on_generate_requested("wan22_t2i", {"positive_prompt": "a lighthouse",
+                                                  "noise_seed": seed, "seed": seed})
+
+    said = _generation_failed_dialog(view).text()
+    assert said.count("example_high.safetensors") == 1
+    assert "3 generations" in said
 
 
 def test_cancel_from_the_tile_dequeues_and_stops_the_run_by_name(qtbot, tmp_path):
@@ -11029,18 +11045,17 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     assert len(panel._versions._host.findChildren(_LevelRow)) == 1
 
 
-def _cancel_from_the_queue(view, job, monkeypatch):
+def _cancel_from_the_queue(view, job):
     view._update_queue()
     (queued,) = view._queue.rows()
     queued._cancel.click()
 
 
-def _cancel_from_the_pictures_menu(view, job, monkeypatch):
+def _cancel_from_the_pictures_menu(view, job):
     view._enhance.cancel_for([view._db.get_generation("g0")])
 
 
-def _fail_on_comfyui(view, job, monkeypatch):
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
+def _fail_on_comfyui(view, job):
     view._client.job_error.emit(job.prompt_id, "boom")
 
 
@@ -11064,7 +11079,7 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
     (job,) = view._jobs.all_jobs
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
-    end_unfinished(view, job, monkeypatch)
+    end_unfinished(view, job)
 
     assert not panel._versions._host.findChildren(_PendingRow)
     assert panel._versions._host.findChildren(_AddRow)
@@ -14632,7 +14647,6 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     # produced nothing must not read as this picture having been Genau'd.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._shows._slideshow = _VoiceSurface("img_act")
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "warning", MagicMock())
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (failed,) = _spoken_genau_rows(view)

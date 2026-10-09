@@ -134,6 +134,11 @@ def is_image_conditioned(workflow_name: str | None) -> bool:
     return wf is not None and "input_image" in wf.default_params()
 
 
+def rerollable(row: dict) -> bool:
+    wf = _registered(row.get("workflow_name"))
+    return wf is not None and not wf.missing_images(parse_params(row.get("params_json")))
+
+
 def canonical_settings(workflow_name: str | None, params: dict) -> dict:
     """The settings that place a row in a folder, normalized so a row's provenance
     can't split it from its own re-roll.

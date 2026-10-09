@@ -28,6 +28,7 @@ from origenerator.app import (
     _bring_to_front,
     _configure_logging,
     _ensure_comfyui_server,
+    _fold_enhancements,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
     _shown_as,
@@ -950,9 +951,11 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
     ("origenerator.importer", "backfill_unknown_workflows"),
+    ("origenerator.importer", "refile_enhancements_another_recipe_made"),
     ("origenerator.importer", "backfill_import_params"),
     ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),
+    ("origenerator.gallery", "enhancements_of_pictures_gone"),
     ("origenerator.gallery", "disown_foreign_runs"),
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
@@ -1067,6 +1070,28 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
     landed = inbox / GENAU.source / "flf2v_loop_00001-audio.mp4"
     assert landed.read_bytes() == b"with its sound"
     assert db.get_generation("video")["genau_exported_at"]
+
+
+def test_an_enhancement_of_a_deleted_picture_goes_to_the_trash_at_startup(tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    (output / "image").mkdir(parents=True)
+    (output / "image" / "image_enhance_00001_.png").write_bytes(b"enhanced")
+    monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
+    monkeypatch.setattr(config, "COMFYUI_INPUT_DIR", tmp_path / "input")
+    db = Database(tmp_path / "t.db")
+    db.insert_generation(prompt_id="enhancement", workflow_name="image_enhance",
+                         workflow_version="v003", workflow_json="{}",
+                         params_json=json.dumps({"input_image": "image/deleted.png [output]"}))
+    db.update_generation("enhancement", status="completed", output_files=json.dumps(
+        [{"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]))
+    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+                      log_dir=tmp_path / "logs", inbox=None)
+
+    assert _fold_enhancements(library) == 1
+
+    assert db.get_generation("enhancement") is None
+    assert db.get_deletion("enhancement") is not None
+    assert not (output / "image" / "image_enhance_00001_.png").exists()
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():

@@ -73,7 +73,6 @@ from origenerator.osr2_driver import drive_target_for
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import ParamType
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +111,12 @@ _WAITING_NOTE = "Waiting for preview…"
 _REQUEST_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
+
+
+def _nothing_to_start_from(missing_images: list[str]) -> str:
+    named = " and ".join(missing_images)
+    article = "an" if named[:1].lower() in "aeiou" else "a"
+    return f"Nothing to start from — pick {article} {named} first"
 
 
 class GenerateConfigPanel(QWidget):
@@ -515,18 +520,27 @@ class GenerateConfigPanel(QWidget):
                 + 2 * _PANE_MARGIN)
 
     def _can_generate(self) -> bool:
-        """Is there anything to run? A run needs a server to send it to and a
-        workflow to send — a tab still on the picker's placeholder has neither a
-        graph nor params, so its Generate is greyed rather than silently inert —
-        and a folder already making one takes nothing more."""
         return (self._client is not None
                 and self._workflow_combo.currentData() is not None
-                and not self._folder_generating)
+                and not self._folder_generating
+                and not self._missing_images())
 
     def note_folder_generating(self, generating: bool) -> None:
         self._folder_generating = generating
-        self._generate_btn.setEnabled(self._can_generate())
+        self._sync_generate_button()
         self.refresh_generate_caption()
+
+    def _missing_images(self) -> list[str]:
+        wf = WORKFLOW_REGISTRY.get(self._workflow_combo.currentData() or "")
+        if wf is None or self._param_form is None:
+            return []
+        return wf.missing_images(self._param_form.get_values())
+
+    def _sync_generate_button(self):
+        self._generate_btn.setEnabled(self._can_generate())
+        missing = self._missing_images()
+        if missing:
+            self._generate_btn.setToolTip(_nothing_to_start_from(missing))
 
     def _on_workflow_changed(self):
         # A different workflow is a different recipe: whatever Combine opened
@@ -570,7 +584,7 @@ class GenerateConfigPanel(QWidget):
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
         self.refresh_generate_caption()
-        self._generate_btn.setEnabled(self._can_generate())
+        self._sync_generate_button()
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
 
@@ -626,6 +640,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self._mark_recipe_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
         self._param_form.changed.connect(self.refresh_generate_caption)
+        self._param_form.changed.connect(self._sync_generate_button)
         self._param_form.seed_drawn.connect(self._record_drawn_seed)
         self._form_host_column.addWidget(self._param_form)
         # Announced while the outgoing form is still alive (Qt defers the actual
@@ -686,9 +701,11 @@ class GenerateConfigPanel(QWidget):
         )
         self._generate_btn.set_caption(
             _RANDOM_SEED_CAPTION if duplicate else DEFAULT_CAPTION)
+        missing = self._missing_images()
         self._generate_btn.setToolTip(
-            _ALREADY_MAKING_ONE_TIP if self._folder_generating
-            else (_RANDOM_SEED_TIP if duplicate else ""))
+            _nothing_to_start_from(missing) if missing
+            else _ALREADY_MAKING_ONE_TIP if self._folder_generating
+            else _RANDOM_SEED_TIP if duplicate else "")
 
     def _on_generate(self):
         """Ask the gallery to generate this config — a re-roll of its settings folder.
@@ -698,20 +715,11 @@ class GenerateConfigPanel(QWidget):
         and the gallery launches the job in that folder and navigates there.
         """
         if not self._can_generate():
-            return  # no server to run against, or no workflow picked yet
+            return  # no server, no workflow picked yet, or no picture to start from
         key = self._workflow_combo.currentData()
         if key not in WORKFLOW_REGISTRY:
             return
-        wf = WORKFLOW_REGISTRY[key]
         params = self._param_form.get_values()
-
-        missing_images = [
-            pd.label for pd in wf.param_definitions()
-            if pd.type == ParamType.IMAGE and not str(params.get(pd.key, "")).strip()
-        ]
-        if missing_images:
-            self._generate_btn.flash_guard(f"Select the {' and '.join(missing_images)}")
-            return
         if self._folder_request is not None:
             # A request that asked for nothing would re-run every seed in the
             # folder to re-create the folder, so the press says what it still

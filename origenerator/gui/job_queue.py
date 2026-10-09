@@ -264,9 +264,7 @@ class JobQueue(QObject):
 
         An i2v whose input image is itself a re-buildable generation re-rolls that
         image first (fresh start frame), then runs the video on it; any other row
-        just re-rolls its one workflow with the same input, as before. A no-op when
-        there's no client, the folder already has a running re-roll, or ``group``
-        isn't a settings leaf with rows.
+        just re-rolls its one workflow with the same input, as before.
         """
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
@@ -298,13 +296,13 @@ class JobQueue(QObject):
         generation) or reused. When neither the frame nor the video seed would
         change, there's nothing to make, so it's a no-op — the guard that keeps an
         image-seed re-roll of a hand-picked (un-rebuildable) frame from duplicating
-        the item. Also a no-op with no client or a folder already re-rolling.
+        the item.
         """
         if self._client is None or not self._launchable(key):
             return  # no client, or this folder already has one running
-        workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-        if workflow is None:
+        if not gallery.rerollable(row):
             return
+        workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
         video_params = prepared_params(row, workflow) if new_video else filled_params(row, workflow)
         source = self._reroll_source_image(row, image_rows) if new_image else None
         if source is None:

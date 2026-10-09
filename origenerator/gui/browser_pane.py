@@ -1285,9 +1285,8 @@ class BrowserPane(QObject):
         self._inflight_by_key[item.key] = item
 
     def _seed_reroll_actions(self, row) -> list:
-        """The per-seed re-roll hover controls for an i2v item: always the video
-        seed (new motion of the same frame), plus the image seed (a new frame)
-        when the item's start frame is itself a re-buildable generation."""
+        if not gallery.rerollable(row):
+            return []
         actions = [CornerAction(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
                                 "Randomize video seed")]
         if gallery.find_source_image_id(row, self._host.image_rows()) is not None:

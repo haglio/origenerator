@@ -53,6 +53,9 @@ from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
 # The dropdown's leading neutral option: no act chosen, so a dropped video is used.
 _NEUTRAL_LABEL = "(custom)"
 _DROP_PLACEHOLDER = "Drop a video"
+_NEEDS_IMAGE = "Nothing to start from — drop an image first"
+_NEEDS_RECIPE = "Pick an act or drop a video first"
+_EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
 @dataclass(frozen=True)
@@ -149,9 +152,6 @@ class CombinePanel(QWidget):
         self._generate_btn = QPushButton("Generate")
         self._generate_btn.clicked.connect(self._emit)
         self._open_btn = QPushButton("Edit…")
-        self._open_btn.setToolTip(
-            "Load this combination into a generate tab to edit before running it."
-        )
         self._open_btn.clicked.connect(self._emit_open)
 
         layout = QVBoxLayout(self)
@@ -292,12 +292,14 @@ class CombinePanel(QWidget):
             self._show_dropped()
 
     def _sync(self):
-        """Both actions go live once a source image sits and a recipe is chosen —
-        either by picking an act or by dropping a video."""
+        has_image = bool(self.image_slot.current_id())
         has_recipe = bool(self.selected_category() or self.video_slot.current_id())
-        ready = bool(self.image_slot.current_id()) and has_recipe
+        ready = has_image and has_recipe
         self._generate_btn.setEnabled(ready)
         self._open_btn.setEnabled(ready)
+        missing = "" if ready else _NEEDS_RECIPE if has_image else _NEEDS_IMAGE
+        self._generate_btn.setToolTip(missing)
+        self._open_btn.setToolTip(missing or _EDIT_TIP)
 
     def _emit(self):
         """Generate: run the chosen recipe on the dropped image now."""

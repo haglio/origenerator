@@ -24,7 +24,7 @@ from origenerator.comfy_graph import (
     sound_params,
 )
 from origenerator.db import Database
-from origenerator.gallery import parse_params, row_output_files
+from origenerator.gallery import ENHANCE_WORKFLOW, parse_params, row_output_files
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
@@ -294,6 +294,19 @@ def backfill_unknown_workflows(db: Database) -> int:
             db.set_workflow_name(row["prompt_id"], name)
             updated += 1
     return updated
+
+
+def refile_enhancements_another_recipe_made(db: Database) -> int:
+    refiled = 0
+    for row in db.list_generations():
+        if row.get("workflow_name") != ENHANCE_WORKFLOW:
+            continue
+        graph = graph_from_text(row.get("workflow_json") or "")
+        name = _reconciled(ENHANCE_WORKFLOW, _workflow_from_nodes(graph) if graph else None)
+        if name != ENHANCE_WORKFLOW:
+            db.set_workflow_name(row["prompt_id"], name)
+            refiled += 1
+    return refiled
 
 
 def backfill_import_params(db: Database, output_dir: Path) -> int:

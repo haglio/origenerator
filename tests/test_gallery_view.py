@@ -5883,6 +5883,15 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
     assert _reroll_tile(view) is None
 
 
+def test_no_add_tile_for_an_import_that_never_named_its_starting_picture(qtbot):
+    rows = [_row("imp", "image_enhance", {"seed": 1}, "imp.png", source="imported")]
+    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    assert _reroll_tile(view) is None
+
+
 def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
     # Re-roll works anywhere Reuse Parameters does, imports included — the
     # workflow's defaults fill in whatever sparse metadata an import lacks.
@@ -8440,15 +8449,13 @@ def test_i2v_reroll_regenerates_its_input_image_then_the_video(qtbot, tmp_path):
     assert gallery.find_source_image_id(new_video, image_rows) == new_image["prompt_id"]
 
 
-def _handpicked_i2v_db(tmp_path):
-    """A DB with a single i2v whose start frame is a hand-picked (un-rebuildable)
-    image — no source generation, so its image seed can't be re-rolled."""
+def _single_i2v_db(tmp_path, input_image):
     db = Database(tmp_path / "hp.db")
     db.insert_generation(
         prompt_id="vid", workflow_name="wan22_i2v", workflow_version="v002",
         positive_prompt="dance", negative_prompt="", seed=3,
         params_json=json.dumps(dict(_WAN_I2V.default_params(), seed=3, noise_seed=9,
-                                    positive_prompt="dance", input_image="handpicked.png")),
+                                    positive_prompt="dance", input_image=input_image)),
         workflow_json="{}",
     )
     db.update_generation("vid", status="completed",
@@ -8480,13 +8487,22 @@ def test_image_folder_item_has_no_seed_reroll_hovers(qtbot, tmp_path):
 
 
 def test_i2v_item_with_a_handpicked_frame_offers_only_the_video_seed(qtbot, tmp_path):
-    view = GalleryView(_handpicked_i2v_db(tmp_path), client=_reroll_client())
+    view = GalleryView(_single_i2v_db(tmp_path, "handpicked.png"), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_leaf_of(view, "vid")
 
     # The frame can't be re-rolled, so only the video-seed control is offered.
     assert _tooltips(view, "vid") == ["Randomize video seed"]
+
+
+def test_an_i2v_item_that_never_named_its_starting_picture_offers_no_seed_rerolls(qtbot, tmp_path):
+    view = GalleryView(_single_i2v_db(tmp_path, ""), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "vid")
+
+    assert _tooltips(view, "vid") == []
 
 
 def test_video_seed_hover_rerolls_only_the_item_video_seed(qtbot, tmp_path):
@@ -14964,7 +14980,7 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
 
 def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
         qtbot, tmp_path):
-    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    view = GalleryView(_single_i2v_db(tmp_path, "handpicked.png"), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     leaf = view._leaf_by_id["vid"]

@@ -518,9 +518,39 @@ def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(pane
     assert panel._param_form.seed_is_random() is True
 
 
-def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
-    client = MagicMock()
-    panel = GenerateConfigPanel(client, Database(tmp_path / "t.db"))
+def test_a_tab_with_no_picture_to_start_from_grays_generate_and_says_why(qtbot, tmp_path):
+    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+
+    panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
+    qtbot.waitUntil(lambda: not panel._caption_timer.isActive())
+
+    assert not panel._generate_btn.isEnabled()
+    assert panel._generate_btn.toolTip() == "Nothing to start from — pick an Image first"
+
+
+def test_picking_the_picture_to_start_from_lights_generate(qtbot, tmp_path):
+    panel = GenerateConfigPanel(ComfyUIClient(), Database(tmp_path / "t.db"))
+    qtbot.addWidget(panel)
+    panel.prefill("image_enhance", WORKFLOW_REGISTRY["image_enhance"].default_params())
+
+    panel._param_form._widgets["input_image"].setText("picked.png")
+
+    assert panel._generate_btn.isEnabled()
+    qtbot.waitUntil(lambda: not panel._caption_timer.isActive())
+    assert panel._generate_btn.toolTip() == ""
+
+
+def test_a_tab_opened_on_a_video_that_names_its_start_picture_can_generate(saved_panel):
+    panel, db = saved_panel
+
+    panel.show_saved_generation(_video_row(db, input_image="frame.png [output]"), [])
+
+    assert panel._generate_btn.isEnabled()
+
+
+def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tmp_path):
+    panel = GenerateConfigPanel(MagicMock(), Database(tmp_path / "t.db"))
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     requested = []
@@ -528,9 +558,10 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
 
     panel._on_generate()
 
-    assert requested == []                            # nothing asked of the gallery
-    assert panel._generate_btn.text() == "Select the Start Image"
-    assert panel._db.list_generations() == []         # nothing recorded
+    assert requested == []
+    assert panel._db.list_generations() == []
+    assert not panel._generate_btn.isEnabled()
+    assert panel._generate_btn.toolTip() == "Nothing to start from — pick a Start Image first"
 
 
 # --- show the newest matching generation instead of the blank placeholder -----
@@ -670,18 +701,9 @@ def test_prefilling_a_clip_keeps_random_and_shows_a_fresh_take_of_its_seeds(pane
     assert shown["noise_seed"] != 11 and shown["audio_seed"] != 33
 
 
-def _clip_row(db, prompt_id="clip1", **seeds):
-    db.insert_generation(
-        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v002",
-        params_json=json.dumps({"positive_prompt": "dance", **seeds}), workflow_json="{}")
-    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
-        [{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
-    return db.get_generation(prompt_id)
-
-
 def test_unticking_random_on_a_clip_on_display_puts_its_own_seed_back(saved_panel):
     panel, db = saved_panel
-    panel.show_saved_generation(_clip_row(db, noise_seed=22), [])
+    panel.show_saved_generation(_video_row(db, input_image="frame.png [output]", noise_seed=22), [])
 
     panel._param_form._randomize_checks["noise_seed"].click()
 
@@ -962,9 +984,9 @@ def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
     return db.get_generation(prompt_id)
 
 
-def _video_row(db, prompt_id="vid1", input_image=None):
+def _video_row(db, prompt_id="vid1", input_image=None, **seeds):
     """A completed WAN i2v video, optionally built on a named source image."""
-    params = {"positive_prompt": "dance", "seed": 5}
+    params = {"positive_prompt": "dance", "seed": 5, **seeds}
     if input_image is not None:
         params["input_image"] = input_image
     db.insert_generation(
@@ -1939,7 +1961,7 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
     # row key for key, yet a tab showing it with both seeds put back makes that
     # video: the button says what a press will do, as it does for an image.
     panel, db = saved_panel
-    panel.show_saved_generation(_clip_row(db, noise_seed=22, audio_seed=33), [])
+    panel.show_saved_generation(_video_row(db, input_image="frame.png [output]", noise_seed=22, audio_seed=33), [])
 
     for key in ("noise_seed", "audio_seed"):
         panel._param_form._randomize_checks[key].click()

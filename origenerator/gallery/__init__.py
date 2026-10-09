@@ -68,6 +68,7 @@ from origenerator.gallery.enhance import (
 )
 from origenerator.gallery.enhance_fold import (
     disown_foreign_runs,
+    enhancements_of_pictures_gone,
     fold_completed_enhancements,
     fold_enhancement,
 )
@@ -123,6 +124,7 @@ from origenerator.gallery.signatures import (
     lora_signature,
     model_signature,
     parse_params,
+    rerollable,
     rows_in_settings,
     settings_signature,
     workflow_output_type,
@@ -214,6 +216,7 @@ __all__ = [
     "enhance_target_id",
     "enhance_targets_row",
     "enhancement_recency",
+    "enhancements_of_pictures_gone",
     "favorite_folders",
     "favorite_generations",
     "find_source_image_id",
@@ -262,6 +265,7 @@ __all__ = [
     "recognized_spelling",
     "remove_enhance_levels",
     "requested_generations",
+    "rerollable",
     "resolve_preview",
     "row_output_files",
     "rows_awaiting_enhancement",

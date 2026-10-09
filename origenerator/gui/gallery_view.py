@@ -206,13 +206,6 @@ class _SearchScope(NamedTuple):
 
     path: str
     ids: set[str] | None
-def _is_reusable_workflow(workflow_name) -> bool:
-    """Whether the app can rebuild this workflow from its template.
-
-    The gate on the gallery re-roll: a re-roll re-runs a folder's own settings
-    with a fresh seed, which needs a template to build the graph from.
-    """
-    return (workflow_name or "") in WORKFLOW_REGISTRY
 
 
 def _takes_a_favorite(group) -> bool:
@@ -2364,16 +2357,9 @@ class GalleryView(QWidget):
     # --- re-roll: a new variation of a folder's settings, here in the gallery
 
     def _can_reroll(self, group) -> bool:
-        """True when this folder's settings can be re-run as a new variation.
-
-        Any folder whose workflow the app knows how to build, imported or not: a
-        re-roll is that folder's own settings + a random seed + Generate (with
-        missing params filled from the workflow's defaults, just as the Generate
-        tab does).
-        """
         if self._client is None or not group.rows:
             return False
-        return _is_reusable_workflow(group.rows[0].get("workflow_name"))
+        return gallery.rerollable(group.rows[0])
 
     @property
     def _live_jobs(self) -> dict:

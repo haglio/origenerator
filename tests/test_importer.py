@@ -319,6 +319,34 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
     assert db.get_generation("bf-known")["workflow_name"] == "wan22_flf2v_loop"
 
 
+_A_FLUX_PICTURES_RECIPE = {
+    "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "example_flux.gguf"}},
+    "2": {"class_type": "DualCLIPLoader", "inputs": {"type": "flux"}},
+    "5": {"class_type": "FluxGuidance", "inputs": {"guidance": 3.5}},
+    "8": {"class_type": "KSampler", "inputs": {"seed": 1}},
+    "12": {"class_type": "SaveImage", "inputs": {"filename_prefix": "image/image_enhance"}},
+}
+
+
+def _import_filed_as_an_enhancement(db, prompt_id, recipe):
+    db.insert_generation(prompt_id=prompt_id, workflow_name="image_enhance",
+                         workflow_version="imported", params_json="{}",
+                         workflow_json=json.dumps(recipe), source="imported")
+
+
+def test_an_import_filed_as_an_enhancement_that_a_flux_recipe_made_is_filed_under_flux(tmp_path):
+    db = Database(tmp_path / "test.db")
+    enhance = WORKFLOW_REGISTRY["image_enhance"]
+    _import_filed_as_an_enhancement(db, "flux-picture", _A_FLUX_PICTURES_RECIPE)
+    _import_filed_as_an_enhancement(db, "enhancement", enhance.build_api_payload(
+        dict(enhance.default_params(), input_image="image/scene_one.png [output]")))
+
+    assert imp.refile_enhancements_another_recipe_made(db) == 1
+
+    assert db.get_generation("flux-picture")["workflow_name"] == "flux_t2i_upscaled"
+    assert db.get_generation("enhancement")["workflow_name"] == "image_enhance"
+
+
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
     # No _meta titles: prompts must be found structurally via the Wan node's links.
     graph = {

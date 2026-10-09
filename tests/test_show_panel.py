@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pytest
 from player_core.hud_overlay import HUD_OVERLAY_ID
 from player_core.hud_placement import HudCorner
 from player_core.satellite_hud import MARGIN
 from player_core.timeline import TIMELINE_HEIGHT, bar_track_x
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QEvent, QPointF
+from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import InFlightItem, RunReading
@@ -282,13 +284,47 @@ class TestWhereTheShowsPanelSits:
 
         assert channel.read_text(encoding="utf-8").split() == ["portrait_hud_minimize"]
 
+    def _a_plus_nobody_has_pointed_at(self, qtbot):
+        show = self._show(qtbot)
+        show.set_hud_place(HudCorner.UPPER_LEFT, True)
+        return _panel(show)[2]
+
+    def test_a_click_on_the_minus_leaves_the_plus_without_its_tooltip(self, qtbot):
+        show = self._show(qtbot, collapse=lambda minimized: show.set_hud_place(
+            HudCorner.UPPER_LEFT, minimized))
+        (rect, _minus), = [(rect, button) for rect, button in panel_targets(show).buttons
+                           if button.command.endswith("hud_minimize")]
+        _point_at(show, rect)
+
+        _click_at(show, rect)
+
+        assert np.array_equal(_panel(show)[2], self._a_plus_nobody_has_pointed_at(qtbot))
+
+    def test_the_plus_drops_its_tooltip_when_the_pointer_leaves_the_window(self, qtbot):
+        show = self._show(qtbot)
+        show.set_hud_place(HudCorner.UPPER_LEFT, True)
+        (rect, _plus), = panel_targets(show).buttons
+        _point_at(show, rect)
+        assert not np.array_equal(_panel(show)[2], self._a_plus_nobody_has_pointed_at(qtbot))
+
+        QApplication.sendEvent(show._pane._window, QEvent(QEvent.Type.Leave))
+
+        assert np.array_equal(_panel(show)[2], self._a_plus_nobody_has_pointed_at(qtbot))
+
+
+def _middle_of(show, rect) -> QPointF:
+    left, top, _bgra = _panel(show)
+    return QPointF(left + rect[0] + rect[2] / 2, top + rect[1] + rect[3] / 2)
+
+
+def _point_at(show, rect) -> None:
+    show._pane.motion(_middle_of(show, rect), held=False)
+
 
 def _click_at(show, rect) -> None:
     """A left click at the middle of *rect*, in the panel's own pixels, where
     the Funestra composited the panel."""
-    left, top, _bgra = _panel(show)
-    at = QPointF(left + rect[0] + rect[2] / 2, top + rect[1] + rect[3] / 2)
-    show._pane.press(at)
+    show._pane.press(_middle_of(show, rect))
     show._pane.release()
 
 

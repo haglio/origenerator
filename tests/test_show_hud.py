@@ -317,6 +317,35 @@ class TestWhereTheShowsPanelSits:
 
         assert collapsed == [False]
 
+    def _a_plus_nobody_has_pointed_at(self, qtbot) -> bytes:
+        hud = ShowHud(self._show(qtbot), side="portrait", dashboard_cmd_file=None)
+        hud.set_hud_place(HudCorner.UPPER_LEFT, True)
+        return _panel_pixels(hud)
+
+    def test_a_click_on_the_minus_leaves_the_plus_without_its_tooltip(self, qtbot):
+        show = self._show(qtbot)
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None,
+                      collapse=lambda minimized: show.set_hud_place(HudCorner.UPPER_LEFT,
+                                                                    minimized))
+        show.adopt_hud(hud)
+        minus = _rect_of(hud, "portrait_hud_minimize")
+        _point_at(hud, minus)
+
+        _click_at(hud, minus)
+
+        assert _panel_pixels(hud) == self._a_plus_nobody_has_pointed_at(qtbot)
+
+    def test_the_plus_drops_its_tooltip_when_the_pointer_leaves_it(self, qtbot):
+        show = self._show(qtbot)
+        hud = ShowHud(show, side="portrait", dashboard_cmd_file=None)
+        show.adopt_hud(hud)
+        hud.set_hud_place(HudCorner.UPPER_LEFT, True)
+        _point_at(hud, _rect_of(hud, "portrait_hud_restore"))
+
+        QApplication.sendEvent(hud, QEvent(QEvent.Type.Leave))
+
+        assert _panel_pixels(hud) == self._a_plus_nobody_has_pointed_at(qtbot)
+
     def test_a_hosted_press_on_the_minus_goes_out_on_the_sessions_channel(
             self, qtbot, tmp_path):
         show = self._show(qtbot)
@@ -329,14 +358,26 @@ class TestWhereTheShowsPanelSits:
         assert channel.read_text(encoding="utf-8").split() == ["portrait_hud_minimize"]
 
 
+def _middle_of(rect) -> QPointF:
+    return QPointF(rect[0] + rect[2] / 2, rect[1] + rect[3] / 2)
+
+
 def _click_at(widget, rect) -> None:
-    """A left click at the middle of *rect*, in the panel's own pixels."""
-    at = QPointF(rect[0] + rect[2] / 2, rect[1] + rect[3] / 2)
+    at = _middle_of(rect)
     for kind, buttons in ((QEvent.Type.MouseButtonPress, Qt.MouseButton.LeftButton),
                           (QEvent.Type.MouseButtonRelease, Qt.MouseButton.NoButton)):
         QApplication.sendEvent(widget, QMouseEvent(
             kind, at, at, Qt.MouseButton.LeftButton, buttons,
             Qt.KeyboardModifier.NoModifier))
+
+
+def _point_at(widget, rect) -> None:
+    at = _middle_of(rect)
+    QApplication.sendEvent(widget, QMouseEvent(
+        QEvent.Type.MouseMove, at, at, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier))
+
+
 def test_a_picture_still_being_generated_is_drawn_on_the_map_without_its_frame_bytes(qtbot):
     show = SlideshowView([("scene one.png", "image", "id-one")], engine=FakeEngine(),
                          shuffle=in_order)

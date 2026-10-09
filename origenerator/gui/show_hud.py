@@ -196,9 +196,6 @@ class ShowHud(QLabel):
         self._hover_loop = ""
         self._hover_tip = ""
         self._hover_pos = (0, 0)
-        # The queue block's own state, which belongs to the panel rather than to
-        # the line: which row its window opens on, the press waiting to turn out
-        # a click or a drag, and where that drag would drop.
         # What the row at the panel's foot last showed, kept because the panel
         # is redrawn when it moves and a press along its track is placed
         # against the length it was drawn with.
@@ -234,6 +231,7 @@ class ShowHud(QLabel):
         if (corner, minimized) == (self._corner, self._minimized):
             return
         self._corner, self._minimized = corner, minimized
+        self._forget_the_pointer()
         self._tick()
         self._place()
 
@@ -505,6 +503,15 @@ class ShowHud(QLabel):
             return
         self._hover_loop, self._hover_tip, self._hover_pos = hover, tip, (px, py)
         self._draw()
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        if self._hover_loop or self._hover_tip:
+            self._forget_the_pointer()
+            self._draw()
+
+    def _forget_the_pointer(self) -> None:
+        self._hover_loop = self._hover_tip = ""
 
     def _drag_row(self, px: int, py: int) -> None:
         """A press on a row that travels is a drag, and the block marks where it

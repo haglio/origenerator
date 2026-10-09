@@ -161,15 +161,8 @@ class PromptFind:
         _scroll_into_view(field)
         # A section unfolded a line ago hasn't been laid out yet, so that scroll
         # aimed at where the field used to be. Aim again once this turn's layout
-        # has run — owned by the field, since a tab closing before then takes the
-        # field with it and there is nothing left to scroll to.
-        defer(field, lambda: self._reapply_reveal(field))
-
-    def _reapply_reveal(self, field):
-        try:
-            _scroll_into_view(field)
-        except RuntimeError:
-            pass  # the field's tab was closed before the layout it was waiting on
+        # has run.
+        defer(field, lambda: _scroll_into_view(field))
 
     def _paint(self, matches):
         for field in self._fields:

@@ -85,13 +85,10 @@ class _StubDB:
         return []
 
 
-class _StubReroll:
+class _StubJobQueue:
     def __init__(self):
         self.jobs_by_folder = {}
         self.queue_order = []
-
-    def held_jobs(self):
-        return []
 
     def job_for(self, key):
         return None
@@ -107,7 +104,7 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None):
         scroll = BrowserScrollArea()
         qtbot.addWidget(scroll)
     pane = BrowserPane(
-        scroll, _StubDB(rows), _StubReroll(), _StubAuto(),
+        scroll, _StubDB(rows), _StubJobQueue(), _StubAuto(),
         TreeNavigation(
             selected_folder_key=lambda: None,
             folder_context=lambda key: "",

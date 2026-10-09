@@ -1,10 +1,9 @@
 """The queue's cards, built with no widget anywhere.
 
 Which is what the move buys: this is a join over four sources — the generations
-table, the requests table, the controller's live jobs with its held set and
-queue order, the auto-generate loop, the folder tree — and it used to be the
-largest function inside a 1,400-line rendering class, reachable only by building
-one.
+table, the requests table, the controller's live jobs with its queue order, the
+auto-generate loop, the folder tree — and it used to be the largest function
+inside a 1,400-line rendering class, reachable only by building one.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -58,14 +57,10 @@ class FakeJob:
         self.params = {}
 
 
-class FakeReroll:
-    def __init__(self, jobs_by_folder=None, held=(), order=()):
+class FakeJobQueue:
+    def __init__(self, jobs_by_folder=None, order=()):
         self.jobs_by_folder = jobs_by_folder or {}
         self.queue_order = list(order)
-        self._held = list(held)
-
-    def held_jobs(self):
-        return list(self._held)
 
 
 class FakeAuto:
@@ -89,11 +84,11 @@ class FakeTree:
 
 @pytest.fixture
 def build():
-    def make(rows=(), *, requests=(), jobs_by_folder=None, held=(), order=(),
+    def make(rows=(), *, requests=(), jobs_by_folder=None, order=(),
              looping=(), image_rows=(), groups=None, cancelled=None, revealed=None):
         model = InFlightItems(
             db=FakeDb(rows, requests),
-            jobs=FakeReroll(jobs_by_folder, held, order),
+            jobs=FakeJobQueue(jobs_by_folder, order),
             auto=FakeAuto(looping),
             tree=FakeTree(groups),
             image_rows=lambda: list(image_rows),
@@ -155,14 +150,6 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build):
     items = build([_row("g1"), _row("unadopted")], order=["g1"])
 
     assert [item.key for item in items] == ["g1", "unadopted"]
-
-
-def test_a_held_run_says_the_line_is_not_waiting_on_the_gpu_for_it(build):
-    job = FakeJob("g1", state="queued")
-    items = build([_row("g1")], jobs_by_folder={"image/sdxl_t2i/aaa": [job]},
-                  held=[job])
-
-    assert items[0].held
 
 
 def test_a_looping_folders_run_offers_next_seed_rather_than_stop(build):

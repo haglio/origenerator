@@ -341,10 +341,10 @@ def test_a_picture_still_being_generated_is_drawn_on_the_map_without_its_frame_b
 class TestTheQueueOnTheOnePanel:
     """The lower strip's queue rides on the panel a show already wears.
 
-    A show covers the strip, and a show is both when the line stops moving (its
-    videos are held) and when the user keeps adding to it (locking a slide asks
-    for an enhancement).  It used to float in the lower-left corner as a plate
-    of its own, which is a second panel over the same picture.
+    A show covers the strip, and a show is when the user keeps adding to it
+    (locking a slide asks for an enhancement).  It used to float in the
+    lower-left corner as a plate of its own, which is a second panel over the
+    same picture.
     """
 
     def test_what_is_in_flight_is_a_block_of_the_panel(self, qtbot):

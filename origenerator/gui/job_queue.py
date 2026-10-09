@@ -6,9 +6,8 @@ both are keyed by their settings folder, so a combine reconnects and lands in
 its folder exactly as a re-roll does.
 
 The line lives on this side of the wire because that is the only side a job can
-be moved on: waiting here it has never been sent, so it can be re-ordered,
-gated or dropped for free, where a job already on ComfyUI can only be
-interrupted. :mod:`origenerator.queue_line` decides the order.
+be moved on: waiting here it has never been sent, so it can be re-ordered or
+dropped for free, where a job already on ComfyUI can only be interrupted. :mod:`origenerator.queue_line` decides the order.
 
 A waiting job gets its database row up front, under the status it will run
 with, so a line held overnight survives a restart — :meth:`reconnect_running`
@@ -125,8 +124,7 @@ class JobQueue(QObject):
     redraws the view should make emitted along the way.
 
     A launched job joins the line and is handed to ComfyUI only when the machine
-    is free and the order allows it, which is what lets an image jump ahead of a
-    video and a playing show keep videos off the GPU entirely.
+    is free, which is what lets an image jump ahead of a video.
 
     User work owns the GPU: launching any user job first cancels every in-flight
     background experiment, the one generator of jobs the user didn't ask for, so
@@ -170,7 +168,6 @@ class JobQueue(QObject):
         # The user's picture asked for while a hand-over was out, which takes
         # the machine from what lands (see _set_aside_for and _pump).
         self._takes_over_on_landing: GenerationJob | None = None
-        self._videos_held = False  # the slideshow's gate (see :meth:`hold_videos`)
         self._first: frozenset[str] = frozenset()
 
     @property
@@ -411,11 +408,8 @@ class JobQueue(QObject):
         """
         if self._in_flight is not None:
             return
-        while not self._on_server:
-            job = queue_line.next_ready(self._waiting, videos_held=self._videos_held)
-            if job is None:
-                return  # nothing may start: an empty line, or only held videos
-            self._waiting.remove(job)
+        while not self._on_server and self._waiting:
+            job = self._waiting.pop(0)
             if not self._hand_over(job):
                 continue
             # A picture asked for while that hand-over was out takes the machine
@@ -466,11 +460,10 @@ class JobQueue(QObject):
         """Hand ComfyUI everything still waiting, and say how much went.
 
         What the closing app calls. ComfyUI outlives Origenerator and works
-        through its queue alone, so a line held back for the user's sake — the
-        videos a slideshow was keeping off the GPU, the batch of experiments the
-        close just queued — belongs to the server the moment there is no longer a
-        user to hold it for. Every rule this queue has is about not interrupting
-        somebody who is watching.
+        through its queue alone, so a line kept for the user's sake — including
+        the batch of experiments the close just queued — belongs to the server
+        the moment there is no longer a user to keep it for. Every rule this
+        queue has is about not interrupting somebody who is watching.
         """
         handed = 0
         for job in list(self._waiting):
@@ -677,24 +670,6 @@ class JobQueue(QObject):
         mark on anything the database records.
         """
         return [job.prompt_id for job in self._on_server + self._waiting]
-
-    def held_jobs(self) -> list:
-        """The waiting jobs the gate is holding — what a surface names as held."""
-        return queue_line.held_back(self._waiting, videos_held=self._videos_held)
-
-    def hold_videos(self, held: bool):
-        """Keep videos off the GPU while a slideshow plays — or let them run again.
-
-        A video generation saturates the card the show is being drawn with, and a
-        show is exactly the stretch when nobody is waiting on a video. So while
-        one plays, videos are passed over and images still go; when it closes,
-        whatever the gate held starts at once.
-        """
-        if held == self._videos_held:
-            return
-        self._videos_held = held
-        self._pump()
-        self.changed.emit()
 
     def put_first(self, prompt_ids):
         self._first = frozenset(prompt_ids)

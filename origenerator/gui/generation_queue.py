@@ -43,11 +43,6 @@ every poll so the frame and progress stay live; a refresh updates rows in place,
 so a drag is never yanked out from under the user. Reordering is asked for, not
 done here: :attr:`reorder_requested` carries the order the rows were dropped into,
 and whoever owns the jobs re-lines the queue.
-
-A row the queue is deliberately holding — a video, while a slideshow plays — says
-so in place of its caption, and with nothing of ours running the left half says it
-for the whole line. A queue that has stopped moving with the GPU idle is exactly
-the thing a user goes hunting for an explanation of.
 """
 from __future__ import annotations
 
@@ -75,8 +70,6 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
     foreign_queue_text,
-    held_row_text,
-    queue_held_text,
     queue_lead_text,
     queue_lead_tooltip,
     queue_wait_text,
@@ -366,9 +359,8 @@ class QueueRow(OpensAFolder, QWidget):
     run will land in (:mod:`origenerator.gui.queue_thumbs`).
 
     Only a wait worth explaining puts more text on the row, and only one this job
-    is in on its own — a video the queue is holding for a slideshow, or a press of
-    Generate not yet submitted — and that note takes the rest of the width, after
-    everything the row always says. A wait on another app is not one of them:
+    is in on its own — a press of Generate not yet submitted — and that note
+    takes the rest of the width, after everything the row always says. A wait on another app is not one of them:
     that is the whole line's, and is said once, under the bar in the left half —
     the bar it is holding up, and the thing it is there to explain.
 
@@ -444,15 +436,12 @@ class QueueRow(OpensAFolder, QWidget):
         # The name the row no longer spends its width on, plus what the shorthand
         # in front of it means. The recipe is worth an answer, just not the row.
         self._lead.setToolTip(f"{item.caption}\n\n{queue_lead_tooltip(item)}")
-        # Two waits are worth explaining in a row's own width, both of them this
-        # job's alone: the stretch before a pressed Generate is a job at all, and
-        # one this queue is imposing (a video, while a slideshow plays). The
+        # One wait is worth explaining in a row's own width, being this job's
+        # alone: the stretch before a pressed Generate is a job at all. The
         # user's own place in the line is the line itself and needs no words, and
         # a wait on another app is about the server, not this job — the left
         # half says that one, under the bar that wait is holding up.
-        self._note_text = (
-            starting_row_text(item.starting) or held_row_text(item.held) or ""
-        )
+        self._note_text = starting_row_text(item.starting) or ""
         self._render_note()
         self._cancel.setText(discard_run_text(item.auto_generating))
         self._cancel.setToolTip(discard_run_tooltip(item.auto_generating))
@@ -620,20 +609,17 @@ class GenerationQueue(QWidget):
     def set_items(self, items: list, foreign_queued: int = 0):
         """Show ``items`` — every in-flight generation, the one being made first.
 
-        The first drives the live half unless the queue is holding it back: a job
-        that cannot start has no frame and no clock, so the half stays free to say
-        why instead of showing an empty square over an unmoving bar. Rows already
-        listed are refreshed in place; only a change to the *set* of jobs (or
-        their order) rebuilds the list, so a poll landing mid-drag doesn't yank the
-        row out from under the gesture.
+        The first drives the live half. Rows already listed are refreshed in
+        place; only a change to the *set* of jobs (or their order) rebuilds the
+        list, so a poll landing mid-drag doesn't yank the row out from under the
+        gesture.
 
         ``foreign_queued`` is how much of ComfyUI's queue belongs to another app.
-        It puts Clear up whenever there is any, and with nothing of ours running
-        it is what the free half says — the point being to see that backlog before
-        a Generate joins the line — after the queue's own hold, which is nearer
-        to hand and is ended by closing the show.
+        It puts Clear up whenever there is any, and with nothing of ours in
+        flight it is what the free half says — the point being to see that
+        backlog before a Generate joins the line.
         """
-        leader = items[0] if items and not items[0].held else None
+        leader = items[0] if items else None
         self._running.show_item(leader)
         self._clear.setVisible(bool(foreign_queued))
         self._clear.setToolTip(
@@ -642,8 +628,7 @@ class GenerationQueue(QWidget):
         )
         free_half = ""
         if leader is None:
-            free_half = (queue_held_text(sum(1 for item in items if item.held))
-                         or foreign_queue_text(foreign_queued) or "")
+            free_half = foreign_queue_text(foreign_queued) or ""
             self._running.show_foreign(free_half)
         # Nothing of ours in flight at all: the line has no rows to show, so it
         # says what it is for instead. The left half stands down with it unless
@@ -666,8 +651,8 @@ class GenerationQueue(QWidget):
             row.deleteLater()
         for index, item in enumerate(items):
             # What ComfyUI is already rendering cannot be moved, and nothing can
-            # be dropped in front of it. Everything else is only waiting — held
-            # or not — and its place is the user's to change.
+            # be dropped in front of it. Everything else is only waiting, and its
+            # place is the user's to change.
             self._rows_column.insertWidget(
                 index, QueueRow(item, movable=not item.reading.rendering)
             )

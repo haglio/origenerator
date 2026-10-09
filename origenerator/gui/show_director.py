@@ -456,11 +456,6 @@ class ShowDirector:
             show.closed.connect(lambda s=show: self._on_closed(s))
             show.media_changed.connect(self._host.reconcile_osr2)
         self._host.reconcile_osr2()
-        # However the show was asked for, it now owns the card it is drawn with: a
-        # video generation would saturate that card, and a show is exactly the
-        # stretch when nobody is waiting on a video. The queue holds them until it
-        # closes and keeps making images.
-        self._jobs.hold_videos(True)
         return show
 
     def _show_actions(self, side: str) -> ShowActions:
@@ -563,9 +558,6 @@ class ShowDirector:
         view.set_levels(levels)
         if built:
             self._present_surface(view, side)
-            # Fill the line at once rather than a poll later: the hold on videos
-            # is this opening's own doing, so the panel comes up already saying
-            # what is waiting on it rather than blank for a second and a half.
             view.set_queue(*self._host.queue_now())
         return view
 
@@ -835,16 +827,15 @@ class ShowDirector:
     # --- letting one go -----------------------------------------------------
 
     def _on_closed(self, show=None):
-        """A show was dismissed (however): let it go, with the hold it put on
-        videos, and hand the OSR2 back to whatever the toggle was driving. A
-        show standing on its own lets go of the room's pause too, since it was
-        the one thing a click could play the room again from. The mic is
-        untouched — it answers to its own button, and "start slideshow" has to
-        still be heard now there is no show to hear it over.
+        """A show was dismissed (however): let it go, and hand the OSR2 back to
+        whatever the toggle was driving. A show standing on its own lets go of
+        the room's pause too, since it was the one thing a click could play the
+        room again from. The mic is untouched — it answers to its own button,
+        and "start slideshow" has to still be heard now there is no show to
+        hear it over.
 
         Named rather than assumed, because inside Fun Time two shows run at
-        once: closing the portrait one must not forget the landscape one — and
-        the videos stay held while the other one is still playing them.
+        once: closing the portrait one must not forget the landscape one.
         """
         # Where it had got to, so the next one opens back on that slide: the
         # look at the folder under a picture doesn't cost the place among them.
@@ -855,8 +846,6 @@ class ShowDirector:
         side = self._side_of(show) if show is not None else None
         if show is None or self._slideshow is show:
             self._slideshow = next((s for s, _loc in reversed(self._live_shows)), None)
-        if self._slideshow is None:
-            self._jobs.hold_videos(False)
         self._host.reconcile_osr2()
         if self._fun_time is None and self._room_paused:
             self._host.set_room_paused(False)

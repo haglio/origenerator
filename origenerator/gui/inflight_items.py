@@ -2,8 +2,8 @@
 
 Not rendering, and it had grown into the pane's largest function by nearly three
 to one -- it joins the generations table, the requests table, the controller's
-live jobs and its held set and queue order, the auto-generate loop, the folder
-tree and a thumbnail index, and builds a twenty-field record per running row.
+live jobs and its queue order, the auto-generate loop, the folder tree and a
+thumbnail index, and builds a twenty-field record per running row.
 The pane held it only because that is where the first consumer lived; three
 surfaces read these items now.
 
@@ -72,9 +72,6 @@ class InFlightItems:
         job_by_pid = {job.prompt_id: (key, job)
                          for key, jobs in self._jobs.jobs_by_folder.items()
                          for job in jobs}
-        # The jobs the queue is holding back rather than waiting on the GPU for,
-        # so a row can say why the line isn't moving.
-        held = {job.prompt_id for job in self._jobs.held_jobs()}
         # Which of these were asked for, and of what. One listing rather than a
         # lookup per job: the table is small and the queue rarely is.
         requested = {r["prompt_id"]: r["source_prompt_id"]
@@ -143,7 +140,6 @@ class InFlightItems:
                 auto_generating=self._auto.is_active(folder_key),
                 stop_auto=stop_auto,
                 foreign_ahead=foreign,
-                held=pid in held,
                 job_kind=kind,
                 requested=pid in requested,
                 # Only where the start frame is what the run is *of*: a video

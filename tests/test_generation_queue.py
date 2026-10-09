@@ -29,7 +29,7 @@ def queue(qtbot):
 
 
 def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame=None,
-          progress=None, reveal=None, cancel=None, foreign_ahead=None, held=False,
+          progress=None, reveal=None, cancel=None, foreign_ahead=None,
           started_at=None, typical_seconds=None, auto_generating=False,
           job_kind="", requested=False, source_image=None, folder_thumbnails=(),
           recipe_category="", recipe_thumbnail=None, recipe_prompt_edited=False,
@@ -39,7 +39,7 @@ def _item(key="j1", caption="Alpha Workflow › a kite", status="running", frame
                                            started_at=started_at,
                                            typical_seconds=typical_seconds),
                         reveal=reveal or (lambda: None), cancel=cancel,
-                        foreign_ahead=foreign_ahead, held=held,
+                        foreign_ahead=foreign_ahead,
                         auto_generating=auto_generating,
                         job_kind=job_kind, requested=requested,
                         source_image=source_image, folder_thumbnails=folder_thumbnails,
@@ -472,37 +472,6 @@ def test_the_users_own_queue_needs_no_explaining(queue):
     assert _timing(queue) == ""
 
 
-# --- a queue holding work back for a slideshow --------------------------------
-
-def test_a_held_row_says_what_it_is_waiting_on(queue):
-    # A line that stops moving with the GPU idle is a mystery worth ending, and
-    # this one ends by closing the show.
-    queue.set_items([_item(status="queued", held=True)])
-    assert queue.rows()[0]._note_text == "Held until the slideshow closes"
-
-
-def test_the_free_half_says_the_hold_when_nothing_of_ours_runs(queue):
-    queue.set_items([_item(key="a", status="queued", held=True),
-                     _item(key="b", status="queued", held=True)])
-
-    assert queue._running.key is None  # a held job has no frame to show
-    assert _timing(queue) == "2 videos held until the slideshow closes"
-
-
-def test_the_hold_is_said_before_another_apps_backlog(queue):
-    # Both are reasons the machine isn't ours, but only one of them ends by
-    # closing something in this window.
-    queue.set_items([_item(status="queued", held=True)], foreign_queued=2)
-    assert _timing(queue) == "1 video held until the slideshow closes"
-
-
-def test_a_running_job_still_takes_the_half_while_others_are_held(queue):
-    queue.set_items([_item(key="a", status="running", started_at=time.time() - 5.5),
-                     _item(key="b", status="queued", held=True)])
-    assert queue._running.key == "a"
-    assert "elapsed" in _timing(queue)
-
-
 # --- how long it's been, and how long is left ---------------------------------
 
 def _timing(queue) -> str:
@@ -646,11 +615,10 @@ def test_the_job_being_made_cannot_be_picked_up(queue, monkeypatch):
 
 
 def test_the_head_of_a_queue_with_nothing_running_can_be_moved(queue, monkeypatch):
-    # It is only what is being *rendered* that is fixed. A queue held for a
-    # slideshow has nothing rendering, and the user may still put it in the order
-    # they want it run in.
-    queue.set_items([_item(key="a", status="queued", held=True),
-                     _item(key="b", status="queued", held=True)])
+    # It is only what is being *rendered* that is fixed. With nothing rendering,
+    # the user may still put the line in the order they want it run in.
+    queue.set_items([_item(key="a", status="queued"),
+                     _item(key="b", status="queued")])
 
     assert queue.rows()[0].movable is True
     assert _press_and_drag(queue.rows()[0], monkeypatch) == ["a"]
@@ -841,17 +809,6 @@ def test_an_unregistered_workflow_leads_with_the_price_alone(queue):
     assert queue.rows()[0]._lead.text() == "~30 sec"
 
 
-def test_the_lead_outlives_a_row_that_is_explaining_a_wait(queue):
-    # A held video still costs what it costs and is still the kind of thing it
-    # is; why it is held goes in the note beside that, not over the top of it.
-    queue.set_items([_item(key="a"),
-                     _item(key="b", status="queued", held=True,
-                           typical_seconds=600.0, job_kind="Video")])
-    row = queue.rows()[1]
-    assert row._lead.text() == "~10 min · Video"
-    assert row._note_text == "Held until the slideshow closes"
-
-
 def test_the_hover_carries_the_name_the_row_no_longer_spends_width_on(queue):
     # The recipe is worth an answer, just not the row: every row of a folder
     # being re-rolled carries the same one. A bare "~?" is shorthand a row has the
@@ -947,14 +904,16 @@ def test_a_wait_note_too_long_for_the_row_is_elided_not_clipped(queue):
     # Clipped, the last word is cut mid-letter and reads as a rendering fault;
     # elided, the row says outright that there is more, and the hover has it.
 
-    queue.resize(300, 60)  # the strip squeezed narrow, as a tiled window does
-    queue.set_items([_item(status="queued", held=True)])
+    queue.set_items([_item(status="queued", starting=True)])
     QApplication.processEvents()
     row = queue.rows()[0]
+    room = row._note.fontMetrics().horizontalAdvance("Starting…") // 2
+
+    row.resize(row.width() - row._note.width() + room, row.height())
 
     assert row._note.text().endswith("…")
-    assert row._note_text == "Held until the slideshow closes"
-    assert row._note.toolTip() == "Held until the slideshow closes"
+    assert row._note.text() != "Starting…"
+    assert row._note.toolTip() == "Starting…"
 
 
 def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
@@ -962,7 +921,7 @@ def test_the_picture_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     # stack into a column at the edge the eye starts from, and a row whose text
     # runs long can never carry one off the far end.
 
-    queue.set_items([_item(job_kind="Image", status="queued", held=True,
+    queue.set_items([_item(job_kind="Image", status="queued", starting=True,
                            folder_thumbnails=(_picture(tmp_path / "m.png"),))])
     QApplication.processEvents()
     row = queue.rows()[0]

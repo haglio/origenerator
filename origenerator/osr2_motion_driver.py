@@ -3,13 +3,11 @@
 The counterpart to :class:`~origenerator.osr2_driver.Osr2Driver` for stills:
 where that one follows a playing video's script, this one *is* the motion
 source, advancing a :class:`~origenerator.motion_engine.Motion` on a clock
-of its own and streaming each sampled position as T-code. Same broker etiquette,
-too: it pauses genau while it drives, and parks the device + restores genau when
-it stops. The gallery owns the one instance, app-global — every surface (the main
-window, the fullscreen show) drives it through the shared
-key cluster in :mod:`origenerator.gui.motion_hud`, and the motion outlives any
-of them: closing a view leaves the device running until Space (or Esc in the
-gallery) stops it.
+of its own and streaming each sampled position as T-code, and parking the device
+when it stops. The gallery owns the one instance, app-global — every surface (the
+main window, the fullscreen show) drives it through the shared key cluster in
+:mod:`origenerator.gui.motion_hud`, and the motion outlives any of them: closing
+a view leaves the device running until Space (or Esc in the gallery) stops it.
 
 Two things make the motion read as motion rather than as lurching, and both were
 missing while this drove off a GUI-thread timer aimed at the present:
@@ -34,7 +32,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion
-from origenerator.osr2 import Osr2Broker
+from origenerator.osr2 import Osr2Broker, park_once_settled
 
 logger = logging.getLogger(__name__)
 
@@ -120,10 +118,16 @@ class Osr2MotionDriver(QObject):
         self._make_ticker = ticker_factory or _TickThread
         self._ticker = None
         self._held_at: int | None = None
+        self._frozen = False
+        self._park_once_settled = park_once_settled(self._broker, self)
 
     @property
     def active(self) -> bool:
         return self._active
+
+    def set_frozen(self, frozen: bool) -> None:
+        self._frozen = frozen
+        self._run_the_clock_while_sending()
 
     def toggle(self) -> bool:
         """Start or stop driving; returns whether the motion is now running."""
@@ -140,13 +144,8 @@ class Osr2MotionDriver(QObject):
         self._active = True
         self._state.state.playing = True
         self._streaming = False
-        now = self._now()
-        self._last_tick = now
-        self._glide_from(now)
         logger.info("OSR2 motion engaged: %s", self.status_text())
-        self.poll()  # move on the keypress, not a tick later
-        self._ticker = self._make_ticker(self.poll, self._interval_s)
-        self._ticker.start()
+        self._run_the_clock_while_sending()
         self.active_changed.emit(True)
 
     def stop(self) -> None:
@@ -155,12 +154,33 @@ class Osr2MotionDriver(QObject):
             return
         self._active = False
         self._state.state.playing = False
-        ticker, self._ticker = self._ticker, None
-        if ticker is not None:
-            ticker.stop()  # waits, so no tick can land after the park below
+        self._stop_the_clock()
+        self._park_once_settled.stop()
         self._broker.park()
         logger.info("OSR2 motion released: parked")
         self.active_changed.emit(False)
+
+    def _sending(self) -> bool:
+        return self._active and (not self._frozen or self._held_at is not None)
+
+    def _run_the_clock_while_sending(self) -> None:
+        if self._sending():
+            self._park_once_settled.stop()
+            if self._ticker is None:
+                now = self._now()
+                self._last_tick = now
+                self._glide_from(now)
+                self.poll()  # move on the keypress, not a tick later
+                self._ticker = self._make_ticker(self.poll, self._interval_s)
+                self._ticker.start()
+        elif self._ticker is not None:
+            self._stop_the_clock()
+            self._park_once_settled.start()
+
+    def _stop_the_clock(self) -> None:
+        ticker, self._ticker = self._ticker, None
+        if ticker is not None:
+            ticker.stop()  # waits, so no tick can land after a park
 
     def poll(self) -> None:
         """One tick: carry the phase up to now, then name where the motion will
@@ -176,7 +196,7 @@ class Osr2MotionDriver(QObject):
         stop() left on the wire is where whoever has it next expects to find the
         device, and one stale position after it takes the device back.
         """
-        if not self._active:
+        if not self._sending():
             return
         now = self._now()
         lead_ms = self._lead_for(now)
@@ -300,12 +320,14 @@ class Osr2MotionDriver(QObject):
         with self._lock:
             self._held_at = center
             self._glide_from(self._now())
+        self._run_the_clock_while_sending()
 
     def release(self) -> None:
         with self._lock:
             if self._held_at is not None:
                 self._held_at = None
                 self._glide_from(self._now())
+        self._run_the_clock_while_sending()
 
     def _glide_from(self, now: float) -> None:
         self._glide_until = now + _HANDOFF_MS / 1000.0

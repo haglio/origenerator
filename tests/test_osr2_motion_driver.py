@@ -7,7 +7,7 @@ import time
 from player_core.learned_model import LearnedModel, Phrase, classify
 from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER, RobotHandState, set_max_intensity
 
-from origenerator import motion_engine
+from origenerator import motion_engine, osr2
 from origenerator.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
@@ -382,6 +382,121 @@ def test_a_tick_that_lands_after_the_device_is_given_up_sends_nothing(qtbot):
     driver.stop()
     clock.t += 0.025
     driver.poll()
+
+    assert broker.parked == 1
+    assert len(broker.positions) == sent
+
+
+def test_a_frozen_room_stops_the_motion_at_once_and_sends_nothing_more(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    sent = len(broker.positions)
+
+    driver.set_frozen(True)
+    clock.t += 0.025
+    driver.poll()
+
+    assert driver.tickers[0].stopped == 1
+    assert len(broker.positions) == sent
+    assert driver.active
+
+
+def test_the_motion_parks_once_the_frozen_room_has_settled(qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+
+    driver.set_frozen(True)
+
+    assert broker.parked == 0
+    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+
+
+def test_a_room_that_plays_again_before_it_settles_is_never_parked(qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+
+    driver.set_frozen(True)
+    driver.set_frozen(False)
+    qtbot.wait(30)
+
+    assert broker.parked == 0
+
+
+def test_the_motion_plays_on_from_where_the_room_froze_it(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    clock.t += 0.5
+    driver.poll()
+    where = motion_engine.position(driver.state)
+
+    driver.set_frozen(True)
+    clock.t += 60.0
+    driver.set_frozen(False)
+
+    assert motion_engine.position(driver.state) == where
+    assert broker.positions[-1][1] == _HANDOFF_MS
+    assert driver.tickers[-1].started == 1
+
+
+def test_a_motion_started_in_a_frozen_room_waits_for_it_to_play(qtbot):
+    driver, broker, _clock = _driver(qtbot)
+    driver.set_frozen(True)
+
+    driver.start()
+    assert driver.active and broker.positions == [] and driver.tickers == []
+
+    driver.set_frozen(False)
+    assert broker.positions and driver.tickers[0].started == 1
+
+
+def test_a_held_motion_stays_at_its_end_through_a_freeze(qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    driver.hold(RETRACT_CENTER)
+
+    driver.set_frozen(True)
+    qtbot.wait(30)
+    clock.t += 1.0
+    driver.poll()
+
+    assert broker.parked == 0
+    assert broker.positions[-1][0] == RETRACT_CENTER
+
+
+def test_a_hold_asked_for_in_a_frozen_room_takes_the_device_to_its_end(qtbot):
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+    driver.set_frozen(True)
+
+    driver.hold(RETRACT_CENTER)
+
+    assert broker.positions[-1] == (RETRACT_CENTER, _HANDOFF_MS)
+
+
+def test_letting_a_hold_go_in_a_frozen_room_parks_the_device_once_it_settles(
+        qtbot, monkeypatch):
+    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+    driver.hold(RETRACT_CENTER)
+    driver.set_frozen(True)
+
+    driver.release()
+
+    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+
+
+def test_a_motion_stopped_in_a_frozen_room_parks_now_and_stays_stopped(qtbot):
+    driver, broker, _clock = _driver(qtbot)
+    driver.start()
+    driver.set_frozen(True)
+    sent = len(broker.positions)
+
+    driver.stop()
+    driver.set_frozen(False)
 
     assert broker.parked == 1
     assert len(broker.positions) == sent

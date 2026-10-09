@@ -2630,23 +2630,23 @@ class GalleryView(QWidget):
         key = self.folder_key_for(workflow_name, params)
         launching = self._info_tabs.current_config_panel()
         seed_keys = wf.seed_keys()
-        launched = 0
         # Oldest first. A folder lists newest first, and a row's place in that
         # list is the order it was made in, so launching in reading order would
         # build the new folder back to front and its seeds would line up with
         # the old one's only in reverse — the one thing a glance is checking.
-        for row in reversed(rows):
-            # The row's own settings, filled from the workflow's defaults the way
-            # a re-roll fills them — so a sparsely-recorded import still yields a
-            # seed to keep rather than silently inheriting the open tab's.
-            was = filled_params(row, wf)
-            run = {**params, **{k: was[k] for k in seed_keys if k in was}}
-            prompt_id = self._jobs.start_prepared(key, wf, run)
+        # The row's own settings, filled from the workflow's defaults the way
+        # a re-roll fills them — so a sparsely-recorded import still yields a
+        # seed to keep rather than silently inheriting the open tab's.
+        olds = [(row, filled_params(row, wf)) for row in reversed(rows)]
+        batch = [{**params, **{k: was[k] for k in seed_keys if k in was}} for _, was in olds]
+        launched = 0
+        for (row, was), run, prompt_id in zip(olds, batch,
+                                              self._jobs.start_batch(key, wf, batch)):
             if not prompt_id:
                 continue  # the submit failed; the rest of the folder still goes
             launched += 1
             if launching is not None:
-                launching.note_launched(self._jobs.newest_job_for(key).origin)
+                launching.note_launched(prompt_id)
             self._db.record_request(
                 prompt_id=prompt_id, source_prompt_id=row["prompt_id"], heard="",
                 old_positive=was.get("positive_prompt", ""),

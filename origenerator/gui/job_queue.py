@@ -235,7 +235,7 @@ class JobQueue(QObject):
         """Whether a launch may join ``key``.
 
         A background experiment takes only an idle folder and never stacks; user
-        work preempts one in :meth:`_launch`. The user's own batches — Enhance All,
+        work preempts one in :meth:`_admit`. The user's own batches — Enhance All,
         a folder's settings rewrite — queue one run per picture into a folder that
         is already busy, so a folder holding several jobs is normal here; it is a
         second *press* that the gallery turns down.
@@ -244,22 +244,23 @@ class JobQueue(QObject):
 
     def start_prepared(self, key: str, workflow, params: dict, *,
                        source: str = GenerationSource.GENERATED) -> str | None:
-        """Launch a job with already-built ``params`` under folder ``key``.
+        (prompt_id,) = self.start_batch(key, workflow, [params], source=source)
+        return prompt_id
 
-        Unlike :meth:`start`, the caller owns the params — no defaults are filled
-        and no seed is re-rolled. This is the gallery's image+video combine and
-        the background experimenter, which tags its rows with
-        ``source="experiment"``. Returns the launched
-        run's prompt id — truthy exactly where this used to return ``True``, so a
-        caller that only asks "did it go?" reads the same, while one acting on the
-        row it just made can name it. ``None`` when there's no client, an
-        experiment already holds ``key``, or the submit failed (``_launch`` drops
-        the job then).
-        """
+    def start_batch(self, key: str, workflow, batch: list[dict], *,
+                    source: str = GenerationSource.GENERATED) -> list[str | None]:
         if self._client is None or not self._launchable(key, source):
-            return None
-        job = self._launch(key, workflow, params, self._on_finished, source=source)
-        return job.prompt_id if job is not None and self.has(key) else None
+            return [None] * len(batch)
+        jobs = [self._new_job(key, workflow, params, self._on_finished, source=source)
+                for params in batch]
+        lined_up = [job for job in jobs if job is not None]
+        if lined_up:
+            self._enqueue(lined_up[0])
+            for ahead, job in zip(lined_up, lined_up[1:]):
+                self._waiting.insert(self._waiting.index(ahead) + 1, job)
+            self._admit(lined_up[-1])
+        return [job.prompt_id if job is not None and self._key_of(job) == key else None
+                for job in jobs]
 
     def start_reroll(self, key: str, group, image_rows: list[dict]):
         """Launch a fresh variation of the settings folder ``key`` names — both
@@ -335,31 +336,25 @@ class JobQueue(QObject):
         workflow = WORKFLOW_REGISTRY.get(source.get("workflow_name") or "") if source else None
         return (source, workflow) if workflow is not None else None
 
-    def _launch(self, key, workflow, params, on_finished, *,
-                source=GenerationSource.GENERATED,
-                origin=None, run_media_type=None):
-        """Build, register and submit one re-roll job, wiring its completion to
-        ``on_finished(key, job, files, thumb_path, duration)``.
-
-        Returns the job, so a caller can name the run it just started — what lets
-        the gallery stamp a spoken "genau it" onto its own row. ``None`` when the
-        job could not even be built; a job whose *submit* failed is returned but
-        has been dropped, which ``has(key)`` reports.
-
-        ``origin`` is the prompt id the run began under, carried across a chained
-        i2v's image→video hand-off so both stages read as one run; a fresh launch
-        is its own origin. ``run_media_type`` is what that whole run makes, for a
-        stage that doesn't make it itself: the chain's first prompt draws a still,
-        and the line must place it as the video it was asked for, or asking for a
-        video would jump every picture already waiting.
-
-        User work preempts a background experiment here, at the one choke point
-        every user path funnels through — so a Generate never sits after an
-        experiment's run (see :meth:`_preempt_experiments`). The job joins the
-        line rather than the server: its row is written first (``pending``, the
-        row it will run under) so a restart can find it either way, and
-        :meth:`_pump` hands it over when its turn comes.
+    def _launch(self, key, workflow, params, on_finished, *, origin=None, run_media_type=None):
+        """``origin`` is the prompt id the run began under, carried across a chained
+        i2v's image→video hand-off so both stages read as one run. ``run_media_type``
+        is what that whole run makes, for a stage that doesn't make it itself: the
+        chain's first prompt draws a still, and the line must place it as the video
+        it was asked for, or asking for a video would jump every picture already
+        waiting.
         """
+        job = self._new_job(key, workflow, params, on_finished,
+                            origin=origin, run_media_type=run_media_type)
+        if job is not None:
+            self._enqueue(job)
+            self._admit(job)
+
+    def _new_job(self, key, workflow, params, on_finished, *,
+                 source=GenerationSource.GENERATED, origin=None, run_media_type=None):
+        """The job joins the line rather than the server: its row is written first
+        (``pending``, the row it will run under) so a restart can find it either
+        way, and :meth:`_pump` hands it over when its turn comes."""
         try:
             job = GenerationJob(self._client, workflow, params, source=source)
         except Exception as e:
@@ -371,22 +366,26 @@ class JobQueue(QObject):
         job.run_media_type = run_media_type or job.media_type
         self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
-        self._enqueue(job)
+        return job
+
+    def _admit(self, newcomer: GenerationJob):
+        """User work preempts a background experiment here, at the one choke point
+        every user path funnels through — so a Generate never sits after an
+        experiment's run (see :meth:`_preempt_experiments`)."""
         # Preempted after this job is in the line, not before: dropping an
         # experiment frees the machine and starts whatever is at the front, and
         # the front has to be this job by then or the wait it was preempted for
         # is just handed to something else.
-        if source != GenerationSource.EXPERIMENT:
+        if newcomer.source != GenerationSource.EXPERIMENT:
             self._preempt_experiments()
-        if queue_line.takes_the_front(job):
-            self._set_aside_for(job)
+        if queue_line.takes_the_front(newcomer):
+            self._set_aside_for(newcomer)
         # Announced before the hand-over, not after: the server can take a
         # minute to answer, and the launch is in the line the moment its row is
         # written, so that is when its tile appears.
         self.changed.emit()
         self._pump()
         self.changed.emit()
-        return job
 
     # --- the line: joining it, and being handed over ------------------------
 

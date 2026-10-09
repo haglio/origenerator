@@ -1026,6 +1026,58 @@ def test_a_picture_being_rendered_is_set_aside_right_after_the_newer_one(qtbot, 
     assert queue.queue_order == [newest.prompt_id, middle.prompt_id, oldest.prompt_id]
 
 
+def test_a_batch_of_pictures_is_made_in_the_order_asked_without_stopping_itself(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+
+    launched = queue.start_batch("k", WORKFLOW_REGISTRY[_IMAGE_WF],
+                                 [_image_params(seed=seed) for seed in (1, 2, 3)])
+
+    client.interrupt.assert_not_called()
+    client.submit_job.assert_called_once()
+    assert queue.queue_order == launched
+    assert [queue.job_for_prompt(pid).params["seed"] for pid in launched] == [1, 2, 3]
+
+
+def test_what_a_batch_of_pictures_takes_the_machine_from_waits_for_the_whole_batch(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_image(queue, "i", seed=9)
+    _rendering(client, rendering)
+
+    launched = queue.start_batch("k", WORKFLOW_REGISTRY[_IMAGE_WF],
+                                 [_image_params(seed=seed) for seed in (1, 2)])
+
+    client.interrupt.assert_called_once_with(rendering.prompt_id)
+    assert queue.queue_order == [*launched, rendering.prompt_id]
+
+
+def test_a_batch_of_videos_joins_the_back_of_the_line_in_the_order_asked(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    rendering = _launch_video(queue, "v", seed=9)
+    _rendering(client, rendering)
+
+    launched = queue.start_batch("k", _I2V, [_params(seed=seed) for seed in (1, 2)])
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [rendering.prompt_id, *launched]
+
+
+def test_a_batch_names_none_where_an_entry_did_not_go(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    client.submit_job.side_effect = [RuntimeError("refused"), "comfy-X"]
+
+    launched = queue.start_batch("k", WORKFLOW_REGISTRY[_IMAGE_WF],
+                                 [_image_params(seed=seed) for seed in (1, 2)])
+
+    assert launched[0] is None
+    assert queue.queue_order == [launched[1]]
+
+
 def test_a_repair_being_rendered_is_set_aside_to_the_back(qtbot, tmp_path):
     # A base re-render adopted from the last absence is work nobody asked for:
     # it yields like anything else, and goes back to where it joined.

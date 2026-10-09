@@ -45,6 +45,14 @@ ALREADY_AT_THESE_SETTINGS = (
 _WHAT_AN_ENHANCE_DOES = "(upscale + light redraw)"
 
 
+def _folder_of(workflow, params: dict, image_index: dict) -> str:
+    return gallery.settings_folder_key(
+        {"workflow_name": workflow.name, "workflow_version": workflow.version,
+         "params_json": json.dumps(params)},
+        image_index,
+    )
+
+
 class Offer(NamedTuple):
     """What the Enhance button would do right now, and what it says it would do.
 
@@ -282,32 +290,34 @@ class EnhanceController:
         controller took only one job per folder; it takes them all now, so the
         buffer had nothing left to do but hide the work.)
         """
+        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
         index = self._host.image_config_index()
+        asks: dict[str, list[tuple[dict, dict]]] = {}
         for row in rows:
             params = gallery.enhance_params_for(row, self._settings)
             if params is None:
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
                 continue
-            self._launch(row, params, index)
+            asks.setdefault(_folder_of(workflow, params, index), []).append((row, params))
+        for key, entries in asks.items():
+            batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
+            for (row, params), prompt_id in zip(entries,
+                                                self._jobs.start_batch(key, workflow, batch)):
+                self._note_launch(row, params, key, prompt_id)
 
-    def _launch(self, row: dict, params: dict, index=None) -> bool:
-        """Hand one standalone enhance to the controller, under the folder its
-        settings shape — a batch shares ``index`` so it isn't rebuilt per row.
-
-        Returns whether the run started. Unlaunchable (no client, or the
-        submit was refused) is logged rather than dropped in silence: a
-        request the user made and never saw run is the one failure they
-        cannot diagnose from the screen.
-        """
+    def _launch(self, row: dict, params: dict) -> bool:
         workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
-        key = gallery.settings_folder_key(
-            {"workflow_name": workflow.name, "workflow_version": workflow.version,
-             "params_json": json.dumps(params)},
-            index if index is not None else self._host.image_config_index(),
-        )
-        prepared = randomize_seeds(params, workflow.seed_keys())
-        prompt_id = self._jobs.start_prepared(key, workflow, prepared)
+        key = _folder_of(workflow, params, self._host.image_config_index())
+        prompt_id = self._jobs.start_prepared(
+            key, workflow, randomize_seeds(params, workflow.seed_keys()))
+        return self._note_launch(row, params, key, prompt_id)
+
+    def _note_launch(self, row: dict, params: dict, key: str, prompt_id: str | None) -> bool:
+        """Unlaunchable (no client, or the submit was refused) is logged rather
+        than dropped in silence: a request the user made and never saw run is
+        the one failure they cannot diagnose from the screen.
+        """
         if prompt_id:
             # Which image the run is of, by id: the params name only the file it
             # reads, and a file name can belong to more than one row. Stamped on

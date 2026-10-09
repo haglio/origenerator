@@ -25,7 +25,7 @@ from origenerator.comfy_graph import (
 )
 from origenerator.db import Database
 from origenerator.gallery import parse_params, row_output_files
-from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
+from origenerator.gallery.sides import orientation_of_size
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
@@ -638,7 +638,7 @@ def _size_from_its_own_file(fpath: Path, workflow_name: str) -> dict:
         return {}
     width, height = size
     if workflow is None:
-        return {"orientation": PORTRAIT if height > width else LANDSCAPE}
+        return {"orientation": orientation_of_size(width, height)}
     return {"width": width, "height": height}
 
 

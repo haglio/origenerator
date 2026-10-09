@@ -45,6 +45,7 @@ from origenerator.gallery import (
     settings_signature,
     workflow_output_type,
 )
+from origenerator.gallery.sides import PORTRAIT, orientation_of_size
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
@@ -927,9 +928,8 @@ class GenerateConfigPanel(QWidget):
             self._media_split.setSizes(sorted(sizes, reverse=beside))
 
     def _media_is_portrait(self) -> bool:
-        """Whether what the preview is showing is taller than it is wide."""
         size = self._preview.media_size()
-        return bool(size and size[1] > size[0])
+        return bool(size) and orientation_of_size(*size) == PORTRAIT
 
     def show_recent_preview(self):
         """Put up the newest saved generation matching this tab's settings, through

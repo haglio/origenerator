@@ -26,6 +26,7 @@ from origenerator.gallery.shelves import (
     TRASH_KEY,
     TRASH_LABEL,
 )
+from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, orientation_of_size
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.orientation import (
     ORIENTATION_LABELS,
@@ -66,6 +67,12 @@ def test_keys_split_and_join():
     assert split_key("__recents__::sideways") == ("__recents__::sideways", None)
     assert base_of("image/sdxl_t2i/m0011::portrait") == "image/sdxl_t2i/m0011"
     assert orientation_of("image/sdxl_t2i/m0011::portrait") == "portrait"
+
+
+def test_a_size_is_portrait_only_when_it_is_taller_than_it_is_wide():
+    assert orientation_of_size(720, 1280) == PORTRAIT
+    assert orientation_of_size(1920, 1080) == LANDSCAPE
+    assert orientation_of_size(512, 512) == LANDSCAPE
 
 
 def test_rows_are_dealt_to_the_side_their_folders_shape_names(tmp_path):

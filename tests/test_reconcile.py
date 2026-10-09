@@ -154,6 +154,22 @@ def test_reconcile_repoints_a_favorite_orphaned_by_the_settings_formula_change(t
     assert summary["repointed"] == 1
 
 
+def test_a_launch_whose_bookmarks_all_still_match_works_out_no_old_keys(tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a quay", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    db.set_folder_favorite(gallery.settings_folder_key(row), True)
+    worked_out = []
+    real = gallery.legacy_settings_folder_key
+    monkeypatch.setattr(bookmark_reconcile.gallery, "legacy_settings_folder_key",
+                        lambda folder_row: worked_out.append(folder_row["prompt_id"])
+                        or real(folder_row))
+
+    reconcile_bookmarks(db)
+
+    assert worked_out == []
+
+
 def test_reconcile_backfills_identity_onto_a_matching_bookmark(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},

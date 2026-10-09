@@ -48,6 +48,7 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.how_many import HOW_MANY
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -87,7 +88,7 @@ class InfoPaneTabs(QTabWidget):
     """A strip of editable config tabs; each tab's Generate becomes a gallery re-roll."""
 
     tab_added = pyqtSignal(object)  # a fresh GenerateConfigPanel, for the view to wire
-    generate_requested = pyqtSignal(str, dict)  # any tab's Generate: (workflow_name, params)
+    generate_requested = pyqtSignal(str, list)  # any tab's Generate: (workflow_name, each one's params)
     # A rewrite tab's Generate: (source folder key, workflow_name, params) — one
     # run per picture in that folder rather than one run of these settings.
     changes_requested = pyqtSignal(str, str, dict)
@@ -130,6 +131,7 @@ class InfoPaneTabs(QTabWidget):
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
         # each close so that stray double-click isn't taken for a rename gesture.
         self._last_close_at = float("-inf")
+        self._how_many = HOW_MANY[0]
         self._add_subtab()  # the pane's resting tab
 
     # --- config tabs -------------------------------------------------------
@@ -158,6 +160,14 @@ class InfoPaneTabs(QTabWidget):
             if isinstance((w := self.widget(i)), GenerateConfigPanel)
         ]
 
+    def how_many(self) -> int:
+        return self._how_many
+
+    def set_how_many(self, count: int) -> None:
+        self._how_many = count
+        for panel in self.config_panels():
+            panel.set_how_many(count)
+
     def current_config_panel(self) -> GenerateConfigPanel | None:
         """The config panel of the tab currently in front, or ``None``."""
         widget = self.currentWidget()
@@ -181,8 +191,10 @@ class InfoPaneTabs(QTabWidget):
         # Editing anything in a tab keeps it, the way a double-click on its name
         # would: it is being worked in now, not looked at.
         panel.user_edited.connect(lambda p=panel: self._pin_panel(p))
+        panel.set_how_many(self._how_many)
+        panel.how_many_chosen.connect(self.set_how_many)
         panel.generate_requested.connect(  # relay every tab's Generate
-            lambda name, params, p=panel: self._on_panel_generate(p, name, params)
+            lambda name, batch, p=panel: self._on_panel_generate(p, name, batch)
         )
         panel.changes_requested.connect(  # ...and a rewrite tab's, which asks for more
             lambda key, name, params, p=panel: self._on_panel_changes(p, key, name, params)
@@ -418,7 +430,7 @@ class InfoPaneTabs(QTabWidget):
         """
         self._pin_panel(panel)
 
-    def _on_panel_generate(self, panel, workflow_name: str, params: dict):
+    def _on_panel_generate(self, panel, workflow_name: str, batch: list[dict]):
         """Relay a tab's Generate for the gallery to launch as a re-roll — and
         keep that tab.
 
@@ -427,7 +439,7 @@ class InfoPaneTabs(QTabWidget):
         tab would take both away while the job kept going.
         """
         self._pin_panel(panel)
-        self.generate_requested.emit(workflow_name, params)
+        self.generate_requested.emit(workflow_name, batch)
 
     def _on_panel_changes(self, panel, folder_key: str, workflow_name: str,
                            params: dict):

@@ -61,6 +61,7 @@ from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
+from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
 from origenerator.gui.inflight import (
     ALREADY_MAKING_ONE_TIP,
     discard_run_text,
@@ -166,12 +167,13 @@ class GenerateConfigPanel(QWidget):
     item_action_requested = pyqtSignal(str, str)   # a preview corner: prompt_id, action
     context_menu_requested = pyqtSignal(str, QPoint)  # preview right-clicked: id, global pos
     go_to_folder_requested = pyqtSignal(str)  # a file row's "Go to folder": the shown prompt_id
-    generate_requested = pyqtSignal(str, dict)  # Generate clicked: (workflow_name, form params)
+    generate_requested = pyqtSignal(str, list)  # Generate clicked: (workflow_name, each one's params)
     # Generate clicked on a folder rewrite: (source folder key, workflow_name, form
     # params). A separate signal because it asks for something else entirely — one
     # run per picture in that folder, each keeping its own seed.
     changes_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()         # Cancel clicked: stop this config's in-flight run
+    how_many_chosen = pyqtSignal(int)
     displayed_changed = pyqtSignal()        # the shown generation changed (drive reconcile cue)
     preview_drag_started = pyqtSignal(str)  # the preview's media began dragging (prompt_id) — combine cue
     preview_drag_ended = pyqtSignal()       # that drag finished (dropped or canceled)
@@ -479,8 +481,11 @@ class GenerateConfigPanel(QWidget):
         self._cancel_btn.hide()
         self._generate_btn = GenerateButton()
         self._generate_btn.clicked.connect(self._on_generate)
+        self._how_many = HowManyPicker()
+        self._how_many.chosen.connect(self.how_many_chosen)
         btn_row.addWidget(self._cancel_btn)
-        btn_row.addWidget(self._generate_btn)
+        self._generate_pair = GenerateWithHowMany(self._generate_btn, self._how_many)
+        btn_row.addWidget(self._generate_pair)
         return btn_row
 
     def minimumSizeHint(self):
@@ -528,9 +533,15 @@ class GenerateConfigPanel(QWidget):
                 and self._workflow_combo.currentData() is not None
                 and not self._folder_generating)
 
+    def _sync_generate(self) -> None:
+        self._generate_pair.setEnabled(self._can_generate())
+
+    def set_how_many(self, count: int) -> None:
+        self._how_many.set_how_many(count)
+
     def note_folder_generating(self, generating: bool) -> None:
         self._folder_generating = generating
-        self._generate_btn.setEnabled(self._can_generate())
+        self._sync_generate()
         self.refresh_generate_caption()
 
     def _on_workflow_changed(self):
@@ -575,7 +586,7 @@ class GenerateConfigPanel(QWidget):
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
         self.refresh_generate_caption()
-        self._generate_btn.setEnabled(self._can_generate())
+        self._sync_generate()
         self._emit_title()
         self.show_recent_preview()  # these settings' newest result, not a blank pane
 
@@ -675,6 +686,7 @@ class GenerateConfigPanel(QWidget):
 
     def _apply_generate_caption(self):
         """Say on the button what a press will do, and why, or leave it plain."""
+        self._generate_pair.offer_how_many(self._folder_request is None)
         if self._folder_request is not None:
             self._generate_btn.set_caption(self._folder_request.caption())
             self._generate_btn.setToolTip(self._folder_request.tooltip())
@@ -683,7 +695,7 @@ class GenerateConfigPanel(QWidget):
         config = self.current_config()
         duplicate = (
             wf is not None and self._can_generate()
-            and (self.generate_would_remake_what_it_shows()
+            and (self._would_remake_what_it_shows()
                  or would_reproduce_a_completed_run(
                      self._library.now().rows, wf, config.params,
                      seed_is_random=config.seed_is_random,
@@ -696,12 +708,8 @@ class GenerateConfigPanel(QWidget):
             else (_RANDOM_SEED_TIP if duplicate else ""))
 
     def _on_generate(self):
-        """Ask the gallery to generate this config — a re-roll of its settings folder.
-
-        A Generate is conceptually a gallery re-roll: it emits the form's workflow
-        and values, the seeds as the fields show them, as :attr:`generate_requested`,
-        and the gallery launches the job in that folder and navigates there.
-        """
+        """Ask the gallery to generate this config — a re-roll of its settings folder,
+        as many times as the dropdown beside the button says."""
         if not self._can_generate():
             return  # no server to run against, or no workflow picked yet
         key = self._workflow_combo.currentData()
@@ -726,8 +734,20 @@ class GenerateConfigPanel(QWidget):
                 return
             self.changes_requested.emit(self._folder_request.folder_key, key, params)
             return
-        self.generate_requested.emit(key, params)
+        if self._would_remake_what_it_shows():
+            self.use_random_seed()
+        self.generate_requested.emit(key, self._batch_of(self._how_many.how_many()))
         self._param_form.roll_random_seeds()
+
+    def _batch_of(self, how_many: int) -> list[dict]:
+        batch = [self._param_form.get_values()]
+        while len(batch) < how_many:
+            if self._param_form.random_seed_keys():
+                self._param_form.roll_random_seeds()
+            else:
+                self.use_random_seed()
+            batch.append(self._param_form.get_values())
+        return batch
 
     def set_recipe_source(self, category: str, video_prompt_id: str | None) -> None:
         """Remember that these settings came out of Combine — the act off its
@@ -1419,10 +1439,10 @@ class GenerateConfigPanel(QWidget):
         notice — so whoever did that re-asserts it.
         """
         modified = (self._displayed_config is not None
-                    and not self.generate_would_remake_what_it_shows())
+                    and not self._would_remake_what_it_shows())
         self._preview.set_notice(_MODIFIED_NOTICE if modified else None)
 
-    def generate_would_remake_what_it_shows(self) -> bool:
+    def _would_remake_what_it_shows(self) -> bool:
         return (self._displayed_config is not None
                 and configs_match(self._displayed_config, self.current_config()))
 

@@ -18,6 +18,7 @@ from shared_ui.colors import (
 )
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
+from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.config import PROJECT_DIR
 from origenerator.spin_arrows import arrow_paths
@@ -27,8 +28,9 @@ def _h(color) -> str:
     return color.name()
 
 
-def _spin_arrow_rules() -> str:
-    """The step-button arrows, as ``image:`` rules over generated triangles.
+def _drawn_arrow_rules() -> str:
+    """The arrows of the step buttons and of Generate's dropdown, as ``image:``
+    rules over generated triangles.
 
     Qt takes an arrow only as a picture — the CSS zero-size-element-with-borders triangle
     draws a filled rectangle here, which is what appeared over the buttons — so
@@ -50,6 +52,12 @@ def _spin_arrow_rules() -> str:
         image: url("{muted[0]}");
     }}
     QSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:disabled {{
+        image: url("{muted[1]}");
+    }}
+    QComboBox#howMany::down-arrow {{
+        image: url("{normal[1]}");
+    }}
+    QComboBox#howMany::down-arrow:disabled {{
         image: url("{muted[1]}");
     }}"""
 
@@ -129,7 +137,7 @@ def build_stylesheet() -> str:
     QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
         background-color: {_h(BLUE)};
     }}
-{_spin_arrow_rules()}
+{_drawn_arrow_rules()}
     QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
         border: 1px solid {_h(BLUE)};
     }}
@@ -157,7 +165,7 @@ def build_stylesheet() -> str:
        the same hairline ring the fields wear, and inside it a light disc a
        couple of pixels short of that ring. The disc is a radial gradient because
        Qt draws no shapes for a subcontrol and takes a picture only as a file
-       (see _spin_arrow_rules above); a gradient also stays crisp at any screen
+       (see _drawn_arrow_rules above); a gradient also stays crisp at any screen
        scale, and its two stops sit a hair apart rather than hard against each
        other so the disc's edge reads smooth instead of stepped. */
     QRadioButton::indicator {{
@@ -171,14 +179,40 @@ def build_stylesheet() -> str:
         background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
             stop:0.66 {_h(TEXT_PRIMARY)}, stop:0.78 {_h(BG_SECONDARY)});
     }}
-    /* Generate is set apart by colour and weight only, not size, so it sits the
-       same height as the other buttons in its row (Go-to-folder, Send-to-Evolver,
-       Cancel) — one consistent button size, not a taller primary. */
+    /* Generate is set apart by color and weight only, not size, so it sits the
+       same height as the other buttons in its row — one consistent button size,
+       not a taller primary. */
     QPushButton#generateBtn {{
         background-color: {_h(BLUE)};
         font-weight: bold;
     }}
-    /* A read-only gallery (no ComfyUI client) can never launch, so Generate greys
+    QFrame#generateWithHowMany {{
+        background-color: {_h(BLUE)};
+        border: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: {BUTTON_RADIUS}px;
+    }}
+    QFrame#generateWithHowMany:disabled {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    QFrame#generateWithHowMany QPushButton#generateBtn {{
+        background-color: transparent;
+        border: none;
+    }}
+    QComboBox#howMany {{
+        background-color: transparent;
+        font-weight: bold;
+        border: none;
+        border-left: 1px solid {_h(BORDER_SUBTLE)};
+        border-radius: 0px;
+    }}
+    QComboBox#howMany:disabled {{
+        color: {_h(TEXT_MUTED)};
+    }}
+    QComboBox#howMany::drop-down {{
+        border: none;
+        width: 16px;
+    }}
+    /* A read-only gallery (no ComfyUI client) can never launch, so Generate grays
        out; the id selector above out-specifies the base :disabled rule, so restate
        it here. */
     QPushButton#generateBtn:disabled {{

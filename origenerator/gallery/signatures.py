@@ -11,12 +11,14 @@ configuration into the settings key.
 from __future__ import annotations
 
 import json
-from functools import cache
+from functools import cache, lru_cache
 
 from origenerator.file_refs import frame_name, reference_basename, unannotated
 from origenerator.media import MediaType
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import is_no_lora
+
+READINGS_KEPT = 20_000
 
 # Params that identify a specific instance of a recipe rather than the recipe
 # itself — dropped from a row's settings so reruns that differ only in these land
@@ -228,11 +230,13 @@ def _named_loras(keys: tuple[str, ...], params: dict) -> dict:
     return {k: params.get(k) for k in keys if not is_no_lora(params.get(k))}
 
 
+@lru_cache(maxsize=READINGS_KEPT)
 def model_signature(workflow_name: str | None, params_json: str | None) -> str:
     """Canonical key for grouping a workflow's rows by the model they used."""
     return _values_signature(workflow_model_keys(workflow_name), params_json)
 
 
+@lru_cache(maxsize=READINGS_KEPT)
 def lora_signature(workflow_name: str | None, params_json: str | None) -> str:
     """Canonical key for grouping a workflow's rows by the LoRA(s) they used.
 
@@ -338,17 +342,25 @@ def settings_signature(
     stored row passes its ``workflow_version`` column; ``None`` (a live form's
     prospective settings) means the current version.
     """
-    params = parse_params(params_json)
+    frame = None
+    if is_image_conditioned(workflow_name):
+        frame = _input_image_config(_input_image_of(params_json), image_index,
+                                    identify=_outputs_video(workflow_name))
+    return _signature_of(workflow_name, params_json, workflow_version, frame)
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _input_image_of(params_json: str | None):
+    return parse_params(params_json).get("input_image")
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _signature_of(workflow_name: str | None, params_json: str | None,
+                  workflow_version: str | None, frame: str | None) -> str:
     settings = {
-        **canonical_settings(workflow_name, params),
+        **canonical_settings(workflow_name, parse_params(params_json)),
         "workflow_version": _grouping_version(workflow_name, workflow_version),
     }
-    if is_image_conditioned(workflow_name):
-        settings = {
-            **settings,
-            "input_image_config": _input_image_config(
-                params.get("input_image"), image_index,
-                identify=_outputs_video(workflow_name),
-            ),
-        }
+    if frame is not None:
+        settings["input_image_config"] = frame
     return json.dumps(settings, sort_keys=True, default=str)

@@ -23,7 +23,7 @@ PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
     "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "GENERATION_SEED_KEYS",
-    "LoraGroup",
+    "JobKind", "LoraGroup",
     "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_path",

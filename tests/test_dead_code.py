@@ -303,7 +303,14 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_an_image_interrupts_nobody_however_long_it_ran, that a failed video is
 # announced too is test_a_long_run_that_died_says_so_rather_than_claiming_a_result,
 # and that run_notice needs no Qt is its line in test_module_boundaries.QT_FREE.
-MAX_PROSE_LINES = 18616
+#
+# 18609 when the queue's three kinds of work were named once, as gallery.JobKind:
+# the notes on what each kind's hover says, and that a workflow this build has
+# no template for adds no line, are test_each_kind_of_work_is_spelled_out_on_hover
+# and test_a_workflow_this_build_has_no_template_for_contributes_no_line, and the
+# Recents shelf's note on asking the queue for its word for an enhance is the
+# name JobKind.ENHANCE.
+MAX_PROSE_LINES = 18609
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

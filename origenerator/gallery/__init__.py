@@ -95,6 +95,7 @@ from origenerator.gallery.groups import (
 )
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.labels import (
+    JobKind,
     config_folder_key,
     config_folder_name,
     config_tab_title,
@@ -184,6 +185,7 @@ __all__ = [
     "CustomGroup",
     "EnhanceLevel",
     "EnhanceSettings",
+    "JobKind",
     "LoraGroup",
     "ModelGroup",
     "SettingsGroup",

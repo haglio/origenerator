@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from origenerator.gallery import JobKind
 from origenerator.generation_state import GenerationSource
 from origenerator.timing import clock_duration
 
@@ -37,7 +38,7 @@ class Notice:
 
 
 def notice_for(outcome: RunOutcome) -> Notice | None:
-    if outcome.kind != "Video":
+    if outcome.kind != JobKind.VIDEO:
         return None
     if outcome.source != GenerationSource.GENERATED:
         return None

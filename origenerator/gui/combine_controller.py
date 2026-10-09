@@ -322,7 +322,7 @@ class CombineController(QObject):
             reading=RunReading(status=JobState.QUEUED),
             reveal=lambda: None,  # no folder to open yet: it has no settings
             media_type=MediaType.VIDEO,
-            job_kind="Video",
+            job_kind=gallery.JobKind.VIDEO,
             recipe_category=category,
             # The same rule the finished row follows: a picked act names itself in
             # the text, and only a dropped video is shown.

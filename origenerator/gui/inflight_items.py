@@ -25,7 +25,7 @@ from origenerator.workflows.derived_size import resolve_input_image_path
 
 # The kinds whose start frame is what the run is *of*, rather than one input
 # among several: a video animating a picture, and an enhancement of one.
-SOURCE_FRAME_KINDS = ("Video", "Enhance")
+SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
 
 
 class InFlightItems:

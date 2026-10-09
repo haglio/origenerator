@@ -294,7 +294,16 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # mark, are test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next,
 # test_a_picked_shelf_row_is_blue_from_its_mark_to_its_name and
 # test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark.
-MAX_PROSE_LINES = 18710
+#
+# 18616 when a desktop notice became a video's alone, taken down to what the
+# tree measured: the notes on which runs are worth one are
+# test_a_video_over_in_seconds_is_not_worth_interrupting_for,
+# test_the_apps_own_background_work_interrupts_nobody,
+# test_an_enhancement_interrupts_nobody_however_long_it_ran and
+# test_an_image_interrupts_nobody_however_long_it_ran, that a failed video is
+# announced too is test_a_long_run_that_died_says_so_rather_than_claiming_a_result,
+# and that run_notice needs no Qt is its line in test_module_boundaries.QT_FREE.
+MAX_PROSE_LINES = 18616
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

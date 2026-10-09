@@ -35,7 +35,7 @@ def test_a_run_nobody_left_the_room_for_says_nothing(qapp, monkeypatch):
     said = []
     monkeypatch.setattr(notices._tray, "showMessage", lambda *args: said.append(args))
 
-    notices.note(_outcome(kind="Image", recipe="SDXL Text-to-Image", seconds=9.0))
+    notices.note(_outcome(seconds=9.0))
 
     assert said == []
 

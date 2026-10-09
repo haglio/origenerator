@@ -45,6 +45,7 @@ QT_FREE = (
     "origenerator.config",
     "origenerator.undo_stack",
     "origenerator.gallery_actions",
+    "origenerator.run_notice",
     # Out of the widget package with the rest of the app's machinery, and
     # needing no Qt once there: the orientation key scheme, the spin-arrow
     # PNGs, the show's press vocabulary and the console press grammar.

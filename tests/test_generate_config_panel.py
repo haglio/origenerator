@@ -2058,6 +2058,19 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
 
 
+def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel, qtbot):
+    # Clicking a finished video fills the form with its settings and leaves its
+    # Random ticks on, so a press makes another take rather than that video
+    # again. The button read a plain "Generate" there, which offers the thing
+    # already on screen, and it took unticking Random to make it say otherwise.
+    panel, db = saved_panel
+
+    panel.show_saved_generation(_clip_row(db, noise_seed=22, audio_seed=33), [])
+
+    assert panel._param_form.seed_is_random()  # which is what draws the fresh one
+    qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate with Random seed")
+
+
 def test_a_tab_on_an_imported_pictures_own_settings_says_generate_will_draw_a_random_seed(
         saved_panel, qtbot):
     # Wherever the item on display came from, the notice gone means these are

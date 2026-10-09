@@ -105,6 +105,10 @@ def _off_the_gui_thread(run) -> None:
         raise outcome[0]
 
 
+def _the_users_own(source: str) -> bool:
+    return source == GenerationSource.GENERATED
+
+
 def _parse_progress_state(raw):
     """The persisted progress snapshot for a row, or ``None`` when absent/corrupt."""
     if not raw:
@@ -363,6 +367,8 @@ class JobQueue(QObject):
             job = GenerationJob(self._client, workflow, params, source=source)
         except Exception as e:
             logger.warning("Could not build a re-roll for %s: %s", key, e)
+            if _the_users_own(source):
+                self.failed.emit(key, f"Origenerator could not put the run together: {e!r}")
             return None
         job.origin = origin or job.prompt_id  # a chained stage keeps the first id
         job.run_media_type = run_media_type or job.media_type
@@ -424,7 +430,7 @@ class JobQueue(QObject):
         The submit waits off the GUI thread with the window kept alive
         (:func:`_off_the_gui_thread`), so a Cancel can arrive while it is out:
         the job is gone from the line by the time the server answers, and a
-        server that took it is told to let it go. A refused job has failed and
+        server that took it is told to let it go. A refused run of the user's
         says so through :attr:`failed`, unless the app is ``closing``, with no
         window left to keep alive or to say it in.
         """
@@ -439,7 +445,7 @@ class JobQueue(QObject):
             self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
                                        error_message=str(e))
             self._drop(key, job)
-            if not closing:
+            if not closing and _the_users_own(job.source):
                 self.failed.emit(key, str(e))
             return False
         finally:

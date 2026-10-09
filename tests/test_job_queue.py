@@ -565,6 +565,38 @@ def test_a_submit_the_server_refuses_hands_over_the_next_one(qtbot, tmp_path):
     assert list(statuses.values()) == ["error"]
 
 
+def test_background_work_the_server_refuses_is_recorded_but_not_announced(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    client.submit_job = MagicMock(side_effect=RuntimeError("bad prompt"))
+    said = []
+    queue.failed.connect(lambda key, message: said.append(key))
+
+    queue.start_prepared("e1", WORKFLOW_REGISTRY[_IMAGE_WF], _image_params(),
+                         source=GenerationSource.EXPERIMENT)
+
+    assert said == []
+    assert [row["status"] for row in db.list_generations()] == ["error"]
+
+
+class _UnbuildableWorkflow:
+    def build_api_payload(self, params):
+        raise KeyError("width")
+
+
+def test_a_run_that_cannot_even_be_built_is_reported_as_failed(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    said = []
+    queue.failed.connect(lambda key, message: said.append((key, message)))
+
+    assert queue.start_prepared("k1", _UnbuildableWorkflow(), {}) is None
+
+    (key, message), = said
+    assert key == "k1"
+    assert "width" in message
+
+
 def test_a_folder_rerolls_start_frame_queues_behind_the_pictures_waiting(qtbot, tmp_path):
     # A chained i2v draws its start frame first, but a video is what was asked
     # for: placed as the image that prompt makes, it would take the front of the

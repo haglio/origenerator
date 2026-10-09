@@ -43,7 +43,9 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
+from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.export_lane import GENAU
+from origenerator.gui.loading_screen import LoadingCanceled, LoadingScreen
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
 from tests.media_files import write_mp4_with_a_comment_tag
@@ -364,12 +366,25 @@ def test_ensure_server_forwards_status_and_pump_callbacks_to_launcher():
     assert kwargs["pump_events"] is pump_events
 
 
-def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
+def test_a_loading_canceled_while_comfyui_starts_is_no_failure_to_start_it():
+    fake_server = MagicMock()
+    fake_server.start.side_effect = LoadingCanceled
+
+    with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
+         patch("socket.create_connection", side_effect=OSError), \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch("importlib.util.spec_from_file_location"), \
+         patch("importlib.util.module_from_spec", return_value=fake_server), \
+         pytest.raises(LoadingCanceled):
+        _ensure_comfyui_server(MagicMock(), "127.0.0.1", 8188, COMFYUI_DIR)
+
+
+def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qapp):
     events = []
 
     loading = MagicMock()
     loading.show.side_effect = lambda: events.append("loading.show")
-    loading.close.side_effect = lambda: events.append("loading.close")
+    loading.accept.side_effect = lambda: events.append("loading.accept")
 
     window = MagicMock()
     window.show.side_effect = lambda: events.append("window.show")
@@ -391,10 +406,184 @@ def test_main_shows_loading_screen_during_boot_and_closes_it_after_window(qapp):
         assert main([]) == 0
 
     # Splash is visible for the whole boot and dismissed once the window shows.
-    assert events == ["loading.show", "window.show", "loading.close"]
+    assert events == ["loading.show", "window.show", "loading.accept"]
     # The boot phases drive the splash status text.
     statuses = " ".join(str(c.args[0]) for c in loading.set_status.call_args_list)
     assert "ComfyUI server" in statuses
+
+
+def _real_loading_screens(screens):
+    def a_real_screen():
+        screens.append(LoadingScreen())
+        return screens[-1]
+
+    return {"origenerator.gui.loading_screen.LoadingScreen": a_real_screen,
+            "origenerator.app._bring_to_front": MagicMock()}
+
+
+def test_a_finished_launch_takes_its_loading_screen_down(qapp):
+    screens = []
+
+    with _a_faked_boot([], **_real_loading_screens(screens)):
+        assert main([]) == 0
+
+    assert not screens[0].isVisible()
+
+
+def test_a_launch_canceled_partway_finishes_the_step_in_hand_and_opens_nothing(qapp):
+    screens = []
+    ran = []
+    window = MagicMock()
+
+    def scan_then_cancel(*args, **kwargs):
+        ran.append("import_comfyui_output")
+        screens[0].reject()
+        return 0
+
+    with _a_faked_boot(ran, passes={"import_comfyui_output": MagicMock(side_effect=scan_then_cancel)},
+                       **_real_loading_screens(screens),
+                       **{"origenerator.gui.main_window.OrigeneratorWindow": window}):
+        assert main([]) == 0
+
+    assert ran[-1] == "import_comfyui_output"
+    window.assert_not_called()
+
+
+def _canceled_at_the_scan(screens):
+    def scan_then_cancel(*args, **kwargs):
+        screens[0].reject()
+        return 0
+
+    return {"import_comfyui_output": MagicMock(side_effect=scan_then_cancel)}
+
+
+def test_a_canceled_launch_takes_its_loading_screen_down(qapp):
+    screens = []
+
+    with _a_faked_boot([], passes=_canceled_at_the_scan(screens),
+                       **_real_loading_screens(screens)):
+        assert main([]) == 0
+
+    assert not screens[0].isVisible()
+
+
+def test_a_canceled_launch_keeps_its_loading_screen_up_until_it_has_let_go_of_comfyui(qapp):
+    screens = []
+    seen = []
+    client = MagicMock()
+    client.wait.side_effect = lambda ms: seen.append(
+        "screen up" if screens[0].isVisible() else "screen down")
+
+    with _a_faked_boot([], passes=_canceled_at_the_scan(screens),
+                       **_real_loading_screens(screens),
+                       **{"origenerator.comfyui_client.ComfyUIClient": MagicMock(return_value=client)}):
+        assert main([]) == 0
+
+    assert seen == ["screen up"]
+
+
+def test_a_canceled_launch_says_in_the_log_that_it_ended_there(qapp):
+    screens = []
+    logger = MagicMock()
+
+    with _a_faked_boot([], passes=_canceled_at_the_scan(screens),
+                       **_real_loading_screens(screens),
+                       **{"origenerator.app._configure_logging": MagicMock(return_value=logger)}):
+        assert main([]) == 0
+
+    assert "Loading canceled from the loading screen" in [
+        said.args[0] for said in logger.info.call_args_list]
+
+
+def test_a_canceled_launch_takes_back_its_offer_to_fun_time(qapp, monkeypatch, tmp_path):
+    own, everyday = tmp_path / "preview" / "state", tmp_path / "everyday" / "state"
+    monkeypatch.setattr(config, "STATE_DIR", own)
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", everyday)
+    screens = []
+
+    with _a_faked_boot([], passes=_canceled_at_the_scan(screens),
+                       **_real_loading_screens(screens)):
+        assert main([]) == 0
+
+    assert not (own / OFFER_NAME).exists()
+    assert not (everyday / OFFER_NAME).exists()
+
+
+def test_a_launch_canceled_once_connected_to_comfyui_disconnects(qapp):
+    screens = []
+    client = MagicMock()
+    client.start.side_effect = lambda: screens[0].reject()
+
+    with _a_faked_boot([], **_real_loading_screens(screens),
+                       **{"origenerator.comfyui_client.ComfyUIClient": MagicMock(return_value=client)}):
+        assert main([]) == 0
+
+    client.stop.assert_called_once_with()
+    client.wait.assert_called_once()
+
+
+def test_a_window_built_while_the_launch_was_canceled_is_put_away_unseen_as_a_quit_would(qapp):
+    screens = []
+    window = MagicMock()
+    quit_through_the_loop = MagicMock()
+
+    def built_as_the_cancel_comes_in(*args, **kwargs):
+        screens[0].reject()
+        return window
+
+    with _a_faked_boot([], **_real_loading_screens(screens), **{
+        "origenerator.gui.main_window.OrigeneratorWindow":
+            MagicMock(side_effect=built_as_the_cancel_comes_in),
+        "origenerator.app._run_the_loop_only_to_quit": quit_through_the_loop,
+    }):
+        assert main([]) == 0
+
+    window.show.assert_not_called()
+    window.close.assert_called_once_with()
+    quit_through_the_loop.assert_called_once_with(qapp)
+
+
+def test_a_window_put_away_unseen_ends_the_process_if_its_quit_sticks(qapp, monkeypatch):
+    crash_log = object()
+    monkeypatch.setattr("origenerator.app._arm_the_crash_log", lambda *a, **k: crash_log)
+    screens = []
+    events = []
+    freeze_watch = MagicMock()
+    freeze_watch.end_the_process_if_the_close_sticks.side_effect = (
+        lambda: events.append("armed to end the process"))
+
+    def built_as_the_cancel_comes_in(*args, **kwargs):
+        screens[0].reject()
+        return MagicMock()
+
+    with _a_faked_boot([], **_real_loading_screens(screens), **{
+        "origenerator.gui.main_window.OrigeneratorWindow":
+            MagicMock(side_effect=built_as_the_cancel_comes_in),
+        "origenerator.freeze_watch.watch_the_window": MagicMock(return_value=freeze_watch),
+        "origenerator.app._run_the_loop_only_to_quit":
+            MagicMock(side_effect=lambda app: events.append("quitting")),
+    }):
+        assert main([]) == 0
+
+    assert events == ["armed to end the process", "quitting"]
+
+
+def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
+    child = textwrap.dedent("""
+        import sys
+        from PyQt6.QtWidgets import QApplication
+        from origenerator.app import _run_the_loop_only_to_quit
+        app = QApplication(sys.argv[:1])
+        app.aboutToQuit.connect(lambda: print("the player let go", flush=True))
+        _run_the_loop_only_to_quit(app)
+        print("the loop returned", flush=True)
+    """)
+    ran = subprocess.run([sys.executable, "-c", child], cwd=REPO_ROOT, timeout=120,
+                         env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+                         capture_output=True, encoding="utf-8", errors="replace",
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    assert ran.stdout.splitlines() == ["the player let go", "the loop returned"], ran.stderr
 
 
 def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
@@ -404,7 +593,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
     events = []
 
     loading = MagicMock()
-    loading.close.side_effect = lambda: events.append("loading.close")
+    loading.accept.side_effect = lambda: events.append("loading.accept")
 
     window = MagicMock()
     window.show.side_effect = lambda: events.append("window.show")
@@ -431,7 +620,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
     assert events == [
         "front:loading",  # the splash leads the launch too, not just the window
         "window.show",
-        "loading.close",
+        "loading.accept",
         "front:window",
     ]
 
@@ -1029,7 +1218,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
             stack.enter_context(patch(
                 f"{module}.{name}",
                 passes.get(name, MagicMock(
-                    side_effect=lambda *a, _n=name, **k: record.append(_n) or 0))))
+                    side_effect=lambda *a, _n=name, **k: record.append(_n) or []))))
         for target, value in patches.items():
             stack.enter_context(patch(target, value))
         yield

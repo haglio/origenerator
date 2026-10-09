@@ -25,6 +25,7 @@ _.expandingDirections  # noqa  # origenerator/gui/flow_layout.py:51
 _.hasHeightForWidth  # noqa  # origenerator/gui/flow_layout.py:54
 _.startDrag  # noqa  # origenerator/gui/folder_tree.py:219
 _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:263, origenerator/gui/no_wheel.py:47, origenerator/gui/no_wheel.py:101, origenerator/gui/no_wheel.py:106
+_.reject  # noqa  # origenerator/gui/loading_screen.py:52, what QDialog runs for Esc and for its close button
 
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219

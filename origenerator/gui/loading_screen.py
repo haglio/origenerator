@@ -1,33 +1,18 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout
-from shared_ui.fonts import FONT_UI, SIZE_BODY, SIZE_HEADING, make_font
+from shared_ui.fonts import FONT_UI, SIZE_BODY, SIZE_HEADING, SIZE_SMALL, make_font
+
+CANCEL_HINT = "Press Esc to cancel opening Origenerator"
+CANCELING = "Canceling..."
 
 
 class LoadingScreen(QDialog):
-    """Indeterminate splash shown while Origenerator starts up.
-
-    Mirrors ComfyUIApp's launch dialog: an app heading, a status line that the
-    boot sequence updates through its phases, and a busy progress bar. The
-    caller is responsible for pumping the event loop while the main thread
-    works (see ``app.processEvents``) so the sweep keeps animating.
-
-    Standalone launches only.  Hosted by Fun Time the app boots with no splash
-    at all: the session's own loading screen owns that boot's feedback, and an
-    always-on-top splash of ours could outlive the reveal and sit over one of
-    the session's players (it did — reported as "the landscape player is
-    under other windows on startup").
-    """
+    canceled = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Deliberately NOT "Origenerator": a hosting Fun Time session resolves
-        # the main window by that exact caption, and a window of some OTHER
-        # process wearing it (a standalone app booting beside a session) must
-        # never be mistaken for the hosted one.  The same trick fun_time's own
-        # loading screen uses ("Fun Time Loading", not the dashboard's
-        # "Fun Time").
         self.setWindowTitle("Origenerator Loading")
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.setFixedWidth(420)
@@ -53,5 +38,56 @@ class LoadingScreen(QDialog):
         progress.setTextVisible(False)
         layout.addWidget(progress)
 
+        self._hint_label = QLabel(CANCEL_HINT)
+        self._hint_label.setObjectName("estimateLabel")
+        self._hint_label.setFont(make_font(FONT_UI, SIZE_SMALL))
+        layout.addWidget(self._hint_label)
+
+        self._canceling = False
+
     def set_status(self, message: str) -> None:
-        self._status_label.setText(message)
+        if not self._canceling:
+            self._status_label.setText(message)
+
+    def reject(self) -> None:
+        self._canceling = True
+        self._status_label.setText(CANCELING)
+        self._hint_label.clear()
+        self.canceled.emit()
+
+
+class LoadingCanceled(BaseException):
+    pass
+
+
+class Loading:
+    def __init__(self, app, logger, screen: LoadingScreen | None = None):
+        self._app = app
+        self._logger = logger
+        self._screen = screen
+        self._canceled = False
+        if screen is not None:
+            screen.canceled.connect(self._cancel)
+
+    def _cancel(self) -> None:
+        self._canceled = True
+
+    def say(self, step: str) -> None:
+        if self._screen is None:
+            self._logger.info("Boot: %s", step)
+        else:
+            self._screen.set_status(step)
+        self.stop_if_canceled()
+
+    def stop_if_canceled(self) -> None:
+        self._app.processEvents()
+        if self._canceled:
+            raise LoadingCanceled
+
+    def done(self) -> None:
+        """Lets the screen's closing settle: Windows hands activation on from a
+        closing window to whatever is next in the Z-order, and unpumped that
+        lands after the window's own request for the foreground and undoes it."""
+        if self._screen is not None:
+            self._screen.accept()
+            self._app.processEvents()

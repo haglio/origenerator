@@ -316,7 +316,13 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # with the paragraphs that explained them; how the Funestra plays a pass, draws
 # the panel and places a press is player_core's to state, and what the show
 # keeps of the set is tests/test_slideshow_view.py's, each claim a test's name.
-MAX_PROSE_LINES = 18408
+#
+# 18338 when closing the loading screen came to cancel the launch, taken down to
+# what the tree measured: the notes on why a launch hosted by Fun Time shows no
+# loading screen and why the screen never wears the app's own caption are
+# test_main_in_fun_time_mode_shows_no_splash and
+# test_the_splash_never_wears_the_apps_own_caption.
+MAX_PROSE_LINES = 18338
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

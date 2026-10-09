@@ -802,6 +802,20 @@ def test_a_generation_comfyui_refuses_as_the_app_closes_is_said_once_at_the_next
     assert AppState(path).get("generations_failed_as_it_closed") == []  # said once
 
 
+def test_a_window_closed_without_ever_being_shown_leaves_the_saved_geometry_as_it_was(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first.showMaximized()
+    first.close()
+    saved = AppState(path).get("window_geometry")
+
+    never_shown = _window(qtbot, tmp_path, AppState(path))
+    never_shown.close()
+
+    assert AppState(path).get("window_geometry") == saved
+
+
 def test_close_event_persists_window_geometry(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
@@ -1258,6 +1272,7 @@ def test_a_scale_set_by_hand_is_kept_when_the_window_is_taken_over(qtbot, tmp_pa
 def test_the_standalone_geometry_is_kept_through_a_session_that_took_the_window(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
+    win.show()
     win.setGeometry(100, 120, 900, 700)
     standalone = base64.b64encode(bytes(win.saveGeometry())).decode("ascii")
 

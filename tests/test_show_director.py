@@ -1095,7 +1095,7 @@ def test_a_freeze_that_one_show_refuses_still_reaches_the_rest(shows):
     director.open([("b.png", "image", "g2", None)], side=PORTRAIT)
     made[0].pause_raises = True
 
-    director.set_session_paused(True)
+    director.set_room_paused(True)
 
     assert made[1].paused is True
 
@@ -1104,7 +1104,7 @@ def test_a_show_opened_while_the_room_is_frozen_opens_frozen(shows):
     # The room's OmniPause holds this surface from its first frame, not from
     # whenever the flag next changes.
     director, _host, made = shows(fun_time=FakeSession())
-    director.set_session_paused(True)
+    director.set_room_paused(True)
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 

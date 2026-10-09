@@ -267,6 +267,7 @@ class GalleryView(QWidget):
         self._ambient_audio = (
             ambient_audio if ambient_audio is not None else AmbientAudio(parent=self)
         )
+        omnipause.holds(self._ambient_audio)
         # The one app-global motion driver (genau's engine, no funscript needed):
         # every surface — this window and whatever slideshow is up —
         # drives it through the shared motion keys, and while it holds the device
@@ -278,6 +279,7 @@ class GalleryView(QWidget):
             self._osr2_motion = None
         else:
             self._osr2_motion = osr2_motion if osr2_motion is not None else Osr2MotionDriver(parent=self)
+            omnipause.holds(self._osr2_motion)
         # The app's one OSR2 switch, and now its only one: the players' console
         # carries the control-state group that sets it, on every surface.  Public
         # because a show is handed it whole -- see ShowActions.
@@ -976,6 +978,8 @@ class GalleryView(QWidget):
         # None where this app may not touch the device at all (hosted by Fun
         # Time, whose main player owns the OSR2).
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
+        if self._osr2_driver is not None:
+            omnipause.holds(self._osr2_driver)
         # The switch answers "what is the OSR2 doing" for every console over it,
         # so it holds both drivers rather than only the motion.
         self.osr2_control.script = self._osr2_driver
@@ -1035,7 +1039,7 @@ class GalleryView(QWidget):
         self._arrangement.fold_into_the_session_column(self.layout())
 
     def become_standalone(self) -> None:
-        self.set_session_paused(False)
+        self.set_room_paused(False)
         self._osr2_motion, self._osr2_driver, self._motion_panel = self._kept_device
         self.osr2_control.drive_with(self._osr2_motion, self._osr2_driver)
         if self._motion_pane is not None:
@@ -3144,13 +3148,14 @@ class GalleryView(QWidget):
         return (self.selected_folder_key()
                 if self.current_group() is not None else None)
 
-    def set_session_paused(self, paused: bool) -> None:
-        """The hosting session's OmniPause: the room stops, not just the shows.
+    def set_room_paused(self, paused: bool) -> None:
+        """The room stops, not just the shows: a hosting session's OmniPause,
+        or a click on a show standing on its own.
 
         The director keeps its own flag for a show not opened yet, because a
         show is built from a set rather than held as a widget. Everything else
-        that moves in this window — every looping thumbnail wherever it is
-        drawn, and the video a generate tab plays — asks
+        that moves or sounds in this window — every looping thumbnail, the
+        video a generate tab plays, the audio bed and the OSR2 — asks
         :mod:`~origenerator.gui.omnipause`, so one write here reaches the ones
         built after it as well.
 
@@ -3158,7 +3163,8 @@ class GalleryView(QWidget):
         each is its own step: a freeze that stopped at the shows left the
         thumbnails running with no sign of why.
         """
-        self._shows.set_session_paused(paused)
+        logger.info("The room is %s", "paused" if paused else "playing")
+        self._shows.set_room_paused(paused)
         omnipause.freeze(paused)
 
     def hud_place(self, side: str) -> tuple:

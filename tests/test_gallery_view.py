@@ -47,7 +47,14 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import BUTTON_SIZE, MARGIN_STANDARD
 
-from origenerator import evolver_export, gallery, motion_engine, recipe_match, search
+from origenerator import (
+    evolver_export,
+    gallery,
+    motion_engine,
+    osr2_driver,
+    recipe_match,
+    search,
+)
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
 from origenerator.config import (
@@ -115,6 +122,7 @@ from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests.show_hud_support import engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
+from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 _WAN_I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -12218,12 +12226,16 @@ class _FakeAmbientAudio:
     def __init__(self):
         self.starts = 0
         self.stops = 0
+        self.frozen = False
 
     def start(self):
         self.starts += 1
 
     def stop(self):
         self.stops += 1
+
+    def set_frozen(self, frozen):
+        self.frozen = frozen
 
 
 def _audio_view(qtbot):
@@ -12252,6 +12264,34 @@ def test_audio_enabled_state_round_trips_for_persistence(qtbot):
 
     assert view.audio_enabled() is True and view._bank.audio.isChecked()
     assert bed.starts == 1  # restoring the switch actually starts it playing
+
+
+def test_the_rooms_pause_reaches_the_audio_bed_and_the_motion(qtbot):
+    bed, motion = _FakeAmbientAudio(), _SignalMotion()
+    view = GalleryView(FakeDB([]), actions=FakeActions(), ambient_audio=bed,
+                       osr2_motion=motion)
+    qtbot.addWidget(view)
+
+    view.set_room_paused(True)
+    assert (bed.frozen, motion.frozen) == (True, True)
+
+    view.set_room_paused(False)
+    assert (bed.frozen, motion.frozen) == (False, False)
+
+
+def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch):
+    broker = FakeBroker()
+    monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: broker)
+    view = GalleryView(FakeDB([]), actions=FakeActions(), osr2_motion=_SignalMotion())
+    qtbot.addWidget(view)
+    panel = view._info_tabs.current_config_panel()
+    panel.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
+    view.osr2_control.setChecked(True)
+
+    view.set_room_paused(True)
+    view.osr2_control.script.poll()
+
+    assert broker.positions == []
 
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
@@ -12355,6 +12395,10 @@ class _SignalMotion(QObject):
         self.calls = []
         self.state = Motion()
         self.held_at = None
+        self.frozen = False
+
+    def set_frozen(self, frozen):
+        self.frozen = frozen
 
     def hold(self, center):
         self.held_at = center

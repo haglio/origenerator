@@ -203,7 +203,7 @@ class FunTimeBridge(QObject):
         # The gallery holds the flag and fans it out, so a show opened between
         # this edge and the next one still opens frozen — the edge alone once
         # left a mid-pause show playing.
-        self._gallery.set_session_paused(paused)
+        self._gallery.set_room_paused(paused)
 
     # --- status out ---------------------------------------------------------
 

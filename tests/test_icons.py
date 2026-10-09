@@ -27,6 +27,19 @@ def _style_tab_close_pixmap():
     return pixmap
 
 
+def test_a_shelfs_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
+    drawn = []
+    real = icons.glyph_icon
+    monkeypatch.setattr(icons, "glyph_icon",
+                        lambda *args, **kwargs: drawn.append(args) or real(*args, **kwargs))
+    icons.shelf_icon.cache_clear()
+
+    for _ in range(3):
+        icons.shelf_icon(icons.EXPERIMENTS_KEY)
+
+    assert drawn == [("flask",)]
+
+
 def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
     # The corner's close-all must wear a tab's own ✕, not a lookalike: the mark
     # comes from the style primitive QTabBar draws, at the size it draws it, so

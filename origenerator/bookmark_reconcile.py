@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from dataclasses import dataclass
+from functools import cached_property
 
 from origenerator import gallery
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
@@ -49,13 +50,17 @@ class Folders:
 
     #: folder key → ``(level, a prompt_id under it)``, for every folder there is.
     current: dict
-    #: a folder's keys under older formulas → its key today.
-    legacy_keys: dict
     #: every generation by prompt id, which is what a stored ref resolves to.
     rows_by_id: dict
     #: the image-config index the key formulas need.
     image_index: dict
     tree: list
+
+    @cached_property
+    def legacy_keys(self) -> dict:
+        """A folder's keys under older formulas → its key today, worked out
+        only once a bookmark has lost its folder."""
+        return _legacy_keys(self.tree, self.image_index)
 
 
 def index_folders(db) -> Folders:
@@ -65,8 +70,9 @@ def index_folders(db) -> Folders:
         [r for r in rows_by_id.values() if gallery.media_type_of_row(r) == MediaType.IMAGE]
     )
     tree = gallery.build_gallery_tree(list(rows_by_id.values()), {})
-    current, legacy_keys = _index_current_folders(tree, image_index)
-    return Folders(current, legacy_keys, rows_by_id, image_index, tree)
+    current = {group.key: (gallery.group_level(group), folder_rows[0]["prompt_id"])
+               for group, folder_rows in _folders_holding_rows(tree)}
+    return Folders(current, rows_by_id, image_index, tree)
 
 
 def reconcile_bookmarks(db) -> dict:
@@ -176,38 +182,33 @@ def _reconcile_keys(rows, folders: Folders, refresh, repoint) -> dict:
     return summary
 
 
-def _index_current_folders(tree, image_index):
-    """Map every current folder key → ``(level, a prompt_id under it)``, plus each
-    folder's legacy keys → its current key (for the historical formula
-    changes, so bookmarks made before stored identity can still be recovered)."""
-    current: dict = {}
+def _folders_holding_rows(groups):
+    for group in groups:
+        folder_rows = gallery.rows_under(group)
+        if folder_rows:
+            yield group, folder_rows
+        yield from _folders_holding_rows(gallery.child_groups(group))
+
+
+def _legacy_keys(tree, image_index) -> dict:
     legacy_keys: dict = {}
-
-    def walk(groups):
-        for group in groups:
-            folder_rows = gallery.rows_under(group)
-            if folder_rows:
-                current[group.key] = (gallery.group_level(group),
-                                      folder_rows[0]["prompt_id"])
-                if isinstance(group, gallery.SettingsGroup):
-                    for legacy in (
-                        gallery.legacy_settings_folder_key(folder_rows[0]),
-                        gallery.legacy_preframe_settings_folder_key(folder_rows[0]),
-                        gallery.legacy_preversion_settings_folder_key(folder_rows[0], image_index),
-                        # Per row, not just the first: the enhancement split
-                        # merged two folders into this one, and a star on either
-                        # of them has to find its way here.
-                        *gallery.legacy_preenhance_settings_folder_keys(folder_rows, image_index),
-                    ):
-                        if legacy != group.key:
-                            legacy_keys.setdefault(legacy, group.key)
-                if isinstance(group, (gallery.LoraGroup, gallery.SourceImageGroup)):
-                    legacy_keys.setdefault(gallery.legacy_parentless_folder_key(
-                        folder_rows[0], group.level, image_index), group.key)
-            walk(gallery.child_groups(group))
-
-    walk(tree)
-    return current, legacy_keys
+    for group, folder_rows in _folders_holding_rows(tree):
+        if isinstance(group, gallery.SettingsGroup):
+            for legacy in (
+                gallery.legacy_settings_folder_key(folder_rows[0]),
+                gallery.legacy_preframe_settings_folder_key(folder_rows[0]),
+                gallery.legacy_preversion_settings_folder_key(folder_rows[0], image_index),
+                # Per row, not just the first: the enhancement split
+                # merged two folders into this one, and a star on either
+                # of them has to find its way here.
+                *gallery.legacy_preenhance_settings_folder_keys(folder_rows, image_index),
+            ):
+                if legacy != group.key:
+                    legacy_keys.setdefault(legacy, group.key)
+        if isinstance(group, (gallery.LoraGroup, gallery.SourceImageGroup)):
+            legacy_keys.setdefault(gallery.legacy_parentless_folder_key(
+                folder_rows[0], group.level, image_index), group.key)
+    return legacy_keys
 
 
 def _repoint_target(row, folders: Folders):

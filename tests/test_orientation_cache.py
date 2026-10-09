@@ -9,6 +9,7 @@ one to leave: a generation deleted an hour ago still holds its slot.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -69,6 +70,20 @@ def test_a_remembered_shape_answers_without_looking_for_the_items_file(monkeypat
 
     assert orientation.row_orientation(row) == orientation.PORTRAIT
     assert looked_up == []
+
+
+def test_the_shape_a_recipe_asks_for_is_read_once_however_often_it_is_asked(monkeypatch):
+    reads = []
+    real = orientation.canonical_settings
+    monkeypatch.setattr(orientation, "canonical_settings",
+                        lambda workflow_name, params: reads.append(workflow_name)
+                        or real(workflow_name, params))
+    row = {"workflow_name": "sdxl_t2i", "params_json": json.dumps({"width": 720, "height": 1281})}
+
+    for _ in range(3):
+        assert orientation.row_orientation(dict(row)) == orientation.PORTRAIT
+
+    assert reads == ["sdxl_t2i"]
 
 
 def test_the_one_it_drops_is_the_one_nothing_has_asked_for():

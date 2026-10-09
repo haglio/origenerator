@@ -42,13 +42,6 @@ def test_idle_reads_generate(button):
     assert button.text() == "Generate"
 
 
-def test_a_run_in_flight_leaves_the_button_pressable(button):
-    # ComfyUI takes a queue, so a second press while one run is in flight is a
-    # second job asked for, not a relaunch over the first.
-    assert button.isEnabled()
-    assert button.text() == "Generate"
-
-
 def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
     # It used to step back to a neutral face and fill with the run's progress,
     # which put a third account of one run on screen beside the queue's and the

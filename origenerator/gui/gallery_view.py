@@ -94,6 +94,7 @@ from origenerator.gui.gallery_tree import (
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.generation_queue import GenerationQueue
+from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
@@ -1501,52 +1502,51 @@ class GalleryView(QWidget):
         return would_reproduce_a_completed_run(
             self._db.list_generations(), workflow, params)
 
-    def _on_generate_requested(self, workflow_name: str, params: dict):
-        """A tab's Generate: launch it as a re-roll of its settings folder and land
-        the browser there, its live tile showing the run.
+    def _on_generate_requested(self, workflow_name: str, batch: list[dict]):
+        """A tab's Generate: launch each of ``batch`` as a re-roll of its settings
+        folder and land the browser there, its live tile showing the run.
 
-        Identical in outcome to clicking the folder's re-roll "+": the job lands in
+        Identical in outcome to clicking the folder's re-roll "+": the jobs land in
         that folder (its :class:`GeneratingTile` shows the leading run's live frame), so
         an edited config's brand-new folder appears and is navigated to at once —
         the running row it inserts gives the folder a tree node immediately (see
-        :func:`build_gallery_tree`). A folder already generating takes the new run
-        too; ComfyUI works through them in turn and the lower strip shows the line.
-        Missing form params are filled from the workflow's defaults, exactly as the
-        old Generate did. A no-op without a client or an unknown workflow.
+        :func:`build_gallery_tree`). Missing form params are filled from the
+        workflow's defaults. A no-op without a client or an unknown workflow.
 
-        The launched run is noted on the tab that asked for it, so that tab's
+        The launched runs are noted on the tab that asked for them, so that tab's
         Cancel and progress fill follow its own Generate rather than its folder.
         """
         wf = WORKFLOW_REGISTRY.get(workflow_name)
         if self._client is None or wf is None:
             return
-        params = {**wf.default_params(), **params}  # form values win over defaults
-        key = self.folder_key_for(workflow_name, params)
+        batch = [{**wf.default_params(), **params} for params in batch]
+        key = self.folder_key_for(workflow_name, batch[0])
         if key in self._live_jobs:
-            return  # one item at a time per folder
+            return  # one press at a time per folder
         # A pinned seed that would reproduce a past run draws a fresh one instead of
         # launching a copy — the press was made against a button already reading
         # "Generate with Random seed" (:meth:`GenerateConfigPanel._apply_generate_caption`),
         # so this is what it said it would do, not a question worth stopping for.
         # The tab keeps the Random seed, so its form goes on saying the same thing.
         launching = self._info_tabs.current_config_panel()
-        if (self.would_reproduce_a_completed_run(wf, params)
-                or (launching is not None and launching.generate_would_remake_what_it_shows())):
-            params = randomize_seeds(params, wf.seed_keys())
+        if self.would_reproduce_a_completed_run(wf, batch[0]):
+            batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
                 launching.use_random_seed()
-        prompt_id = self._jobs.start_prepared(key, wf, params)
-        if not prompt_id:
-            return  # no client, or the submit failed
+        launched = [prompt_id for prompt_id in self._jobs.start_batch(key, wf, batch)
+                    if prompt_id]
+        if not launched:
+            return  # no client, or every submit failed
         if launching is not None:
-            # A tab Combine opened stamps its run with where the recipe came
-            # from, whether it was launched as opened or edited first — that mark
-            # is the only thing telling the queue what act this video is of.
+            # A tab Combine opened stamps its runs with where the recipe came
+            # from, whether they were launched as opened or edited first — that
+            # mark is the only thing telling the queue what act a video is of.
             category, video_id = launching.recipe_source()
-            if category or video_id:
-                self._db.set_recipe_source(prompt_id, category=category,
-                                           video_prompt_id=video_id)
-            launching.note_launched(self._jobs.newest_job_for(key).origin)
+            for prompt_id in launched:
+                if category or video_id:
+                    self._db.set_recipe_source(prompt_id, category=category,
+                                               video_prompt_id=video_id)
+                launching.note_launched(prompt_id)
         self._stand_on_the_run_in(key, rebuild=True)
 
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
@@ -2095,6 +2095,12 @@ class GalleryView(QWidget):
     def remember_shows(self, saved) -> None:
         if self._fun_time is None:
             self._shows.remember(saved)
+
+    def how_many(self) -> int:
+        return self._info_tabs.how_many()
+
+    def set_how_many(self, count) -> None:
+        self._info_tabs.set_how_many(count if count in HOW_MANY else HOW_MANY[0])
 
     def _showing_search(self) -> bool:
         return self._browser.showing_search()

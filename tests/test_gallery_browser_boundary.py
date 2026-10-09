@@ -178,8 +178,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     session opening while a slideshow is up takes that slideshow into the room,
     so whether one is up is asked here for the offer the window stands. 273 -> 275:
     a generation ComfyUI refuses as the app closes is saved with the session and
-    said at the next launch, through that same pair.)"""
+    said at the next launch, through that same pair. 275 -> 277: how many a press
+    of Generate makes is saved with the session the same way.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 275
+               for x in _class_def(VIEW, "GalleryView").body) == 277
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

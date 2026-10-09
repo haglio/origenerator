@@ -10017,7 +10017,7 @@ def test_generate_request_over_a_duplicate_re_rolls_without_asking(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
 
-    view._on_generate_requested("sdxl_t2i", {"seed": 42, "positive_prompt": "a cat"})
+    view._on_generate_requested("sdxl_t2i", [{"seed": 42, "positive_prompt": "a cat"}])
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "sdxl_t2i"
@@ -10056,10 +10056,28 @@ def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
 
-    view._on_generate_requested("sdxl_t2i", {"seed": 999, "positive_prompt": "a novel prompt"})
+    view._on_generate_requested("sdxl_t2i", [{"seed": 999, "positive_prompt": "a novel prompt"}])
 
     job = next(iter(view._live_jobs.values()))
     assert job.params["seed"] == 999           # launched exactly as asked, unprompted
+
+
+def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    panel = view._info_tabs.current_config_panel()
+    panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
+    panel._how_many.set_how_many(4)
+
+    panel._on_generate()
+
+    (folder,) = view._jobs.jobs_by_folder.values()
+    assert len({job.params["seed"] for job in folder}) == 4
+    client.interrupt.assert_not_called()
+    assert len(panel.launched_runs()) == 4
+    assert panel._generate_btn.isEnabled() is False
 
 
 # --- cancel the front tab's run, and remember an accepted random-seed choice ---
@@ -15361,7 +15379,7 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
     assert panel._generate_btn.isEnabled() is True
     config = panel.current_config()
 
-    view._on_generate_requested(config.workflow_name, config.params)
+    view._on_generate_requested(config.workflow_name, [config.params])
 
     assert panel._generate_btn.isEnabled() is False
 
@@ -15378,7 +15396,7 @@ def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tm
     panel._workflow_combo.setCurrentIndex(panel._workflow_combo.findData("sdxl_t2i"))
     config = panel.current_config()
 
-    view._on_generate_requested(config.workflow_name, config.params)
-    view._on_generate_requested(config.workflow_name, config.params)
+    view._on_generate_requested(config.workflow_name, [config.params])
+    view._on_generate_requested(config.workflow_name, [config.params])
 
-    assert len(view._live_jobs) == 1
+    assert len(view._jobs.all_jobs) == 1

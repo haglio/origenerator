@@ -11,6 +11,7 @@ from PIL import Image
 from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter
+from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
 import origenerator.workflows.derived_size as ds
 from origenerator import evolver_export, gallery, osr2_driver
@@ -219,7 +220,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     clipped what was left, so the bank read "o fo", "to E", "to G", "anc", "ner".
     """
     buttons = [*(lane.button for lane in panel._lanes.values()),
-               panel._cancel_btn, panel._generate_btn]
+               panel._cancel_btn, panel._generate_btn.parentWidget()]
     for button in buttons:
         button.show()          # the busiest the bank ever is: every button on
     panel.show()
@@ -228,7 +229,7 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
     QApplication.processEvents()
 
     for button in buttons:
-        assert button.width() == button.sizeHint().width(), button.text()
+        assert button.width() == button.sizeHint().width(), button
     assert len({button.y() for button in buttons}) > 1        # it wrapped
     # ...and every line still ends in the corner the bank sits in.
     lines = {}
@@ -250,7 +251,7 @@ def test_the_pane_keeps_a_margin_round_its_contents(panel):
     assert top_left.y() == 8
     scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
     assert panel.width() - scroll_right - 1 == 8
-    generate = panel._generate_btn
+    generate = panel._generate_btn.parentWidget()
     lower = generate.mapTo(panel, generate.rect().bottomLeft()).y()
     assert panel.height() - lower - 1 == 8
 
@@ -292,7 +293,7 @@ def test_file_info_above_form_related_media_below(panel):
 def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
     # same row as Cancel and Generate.
-    bank = _layout_containing(panel.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn.parentWidget())
     assert bank is not None
     assert bank.indexOf(_lane_button(panel)) != -1
     assert bank.indexOf(panel._cancel_btn) != -1
@@ -392,7 +393,7 @@ def test_cancel_button_sits_beside_generate_hidden_until_generating(panel):
     # gallery marks the tab generating.
     assert isinstance(panel._cancel_btn, QPushButton)
     assert _is_descendant(panel._cancel_btn, panel)  # in the tab's own column
-    assert panel._cancel_btn.parent() is panel._generate_btn.parent()  # same button row host
+    assert panel._cancel_btn.parent() is panel._generate_btn.parentWidget().parent()
     assert panel._cancel_btn.isHidden()
 
 
@@ -487,18 +488,108 @@ def test_use_random_seed_switches_the_seed_to_random(panel):
 
 # --- Generate emits a request; the gallery runs it as a re-roll --------------
 
+def test_generates_dropdown_offers_powers_of_two_up_to_32_and_rests_on_one(panel):
+    how_many = panel._how_many
+
+    assert [how_many.itemText(i) for i in range(how_many.count())] == [
+        "1", "2", "4", "8", "16", "32"]
+    assert how_many.how_many() == 1
+
+
+def test_generates_dropdown_says_on_hover_what_it_counts(panel):
+    assert panel._how_many.toolTip() == "How many to make at once, each with its own seed"
+
+
+def test_generates_dropdown_sits_flush_on_its_right_edge_at_its_height(panel, app_chrome):
+    panel.show()
+    QApplication.processEvents()
+    generate, how_many = panel._generate_btn, panel._how_many
+
+    assert how_many.x() == generate.x() + generate.width()
+    assert (how_many.y(), how_many.height()) == (generate.y(), generate.height())
+
+
+def test_generate_with_its_dropdown_stands_as_tall_as_the_buttons_beside_it(panel, app_chrome):
+    panel._cancel_btn.show()
+    panel.show()
+    QApplication.processEvents()
+
+    assert panel._generate_btn.parentWidget().height() == panel._cancel_btn.height()
+
+
+def _left_of_the_number(panel):
+    pair = panel._generate_btn.parentWidget()
+    return pair.grab().toImage().pixelColor(panel._how_many.x() + 4, pair.height() // 2)
+
+
+def test_generates_dropdown_wears_generates_blue_and_grays_out_with_it(panel, app_chrome):
+    panel.show()
+    QApplication.processEvents()
+    assert _left_of_the_number(panel) == BLUE
+
+    panel.note_folder_generating(True)
+
+    assert _left_of_the_number(panel) == BG_SECONDARY
+
+
+def _arrow_inks(widget):
+    image = widget.grab().toImage()
+    return {image.pixelColor(x, y).name()
+            for x in range(image.width() - 18, image.width())
+            for y in range(image.height())}
+
+
+def test_generates_dropdown_draws_its_arrow_in_generates_ink(panel, app_chrome):
+    panel.show()
+    QApplication.processEvents()
+    assert TEXT_PRIMARY.name() in _arrow_inks(panel._how_many)
+
+    panel.note_folder_generating(True)
+
+    assert TEXT_MUTED.name() in _arrow_inks(panel._how_many)
+
+
+def test_generate_asks_for_as_many_as_its_dropdown_says_each_on_a_seed_of_its_own(panel):
+    shown = panel._param_form.get_values()["seed"]
+    panel._how_many.set_how_many(4)
+    requested = []
+    panel.generate_requested.connect(lambda wf, batch: requested.append(batch))
+
+    panel._on_generate()
+
+    (batch,) = requested
+    seeds = [params["seed"] for params in batch]
+    assert seeds[0] == shown
+    assert len(set(seeds)) == 4
+
+
+def test_a_pinned_seed_is_made_first_and_the_rest_of_the_press_draw_their_own(panel):
+    panel._param_form.put_seeds({"seed": 42}, is_random=False)
+    panel._how_many.set_how_many(2)
+    requested = []
+    panel.generate_requested.connect(lambda wf, batch: requested.append(batch))
+
+    panel._on_generate()
+
+    (batch,) = requested
+    seeds = [params["seed"] for params in batch]
+    assert seeds[0] == 42
+    assert len(set(seeds)) == 2
+    assert panel._param_form.seed_is_random() is True
+
+
 def test_generate_emits_generate_requested_with_workflow_and_params(panel):
     # Clicking Generate no longer runs its own job — it asks the gallery to, by
     # emitting the workflow and the form's values (which the gallery launches as a
     # re-roll of the config's folder). Nothing is submitted or recorded here.
     panel._param_form.set_values({"positive_prompt": "a wizard", "seed": 42})
     requested = []
-    panel.generate_requested.connect(lambda wf, params: requested.append((wf, params)))
+    panel.generate_requested.connect(lambda wf, batch: requested.append((wf, batch)))
 
     panel._on_generate()
 
     assert len(requested) == 1
-    workflow_name, params = requested[0]
+    workflow_name, (params,) = requested[0]
     assert workflow_name == "sdxl_t2i"
     assert params["positive_prompt"] == "a wizard"
     assert params["seed"] == 42
@@ -509,7 +600,7 @@ def test_generate_sends_the_random_seed_on_show_and_then_shows_the_next_one(pane
     shown = panel._param_form.get_values()["seed"]
     assert panel._param_form.seed_is_random() is True
     requested = []
-    panel.generate_requested.connect(lambda wf, params: requested.append(params))
+    panel.generate_requested.connect(lambda wf, batch: requested.extend(batch))
 
     panel._on_generate()
 
@@ -524,7 +615,7 @@ def test_generate_blocks_when_input_image_missing(qtbot, tmp_path):
     qtbot.addWidget(panel)
     panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
     requested = []
-    panel.generate_requested.connect(lambda wf, params: requested.append(wf))
+    panel.generate_requested.connect(lambda wf, batch: requested.append(wf))
 
     panel._on_generate()
 
@@ -677,6 +768,22 @@ def _clip_row(db, prompt_id="clip1", **seeds):
     db.update_generation(prompt_id, status="completed", output_files=json.dumps(
         [{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
     return db.get_generation(prompt_id)
+
+
+def test_a_press_that_would_remake_the_item_on_show_draws_its_first_seed_fresh(saved_panel):
+    panel, db = saved_panel
+    panel.show_saved_generation(
+        _clip_row(db, noise_seed=22, audio_seed=33, input_image="frame.png"), [])
+    for key in ("noise_seed", "audio_seed"):
+        panel._param_form._randomize_checks[key].click()
+    panel._how_many.set_how_many(2)
+    requested = []
+    panel.generate_requested.connect(lambda wf, batch: requested.append(batch))
+
+    panel._on_generate()
+
+    (batch,) = requested
+    assert 22 not in {params["noise_seed"] for params in batch}
 
 
 def test_unticking_random_on_a_clip_on_display_puts_its_own_seed_back(saved_panel):
@@ -1695,7 +1802,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
 
 
 def test_send_to_genau_shares_the_one_button_bank(panel):
-    bank = _layout_containing(panel.layout(), panel._generate_btn)
+    bank = _layout_containing(panel.layout(), panel._generate_btn.parentWidget())
     assert bank.indexOf(_lane_button(panel, "Genau")) != -1
 
 
@@ -2016,6 +2123,31 @@ def requesting(blank_panel, tmp_path):
 
 def _positive_field(panel):
     return panel._param_form._widgets["positive_prompt"]
+
+
+def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(requesting):
+    assert requesting._how_many.isHidden()
+
+    requesting.prefill("sdxl_t2i", _folder_params())
+
+    assert not requesting._how_many.isHidden()
+
+
+def _top_right_corner(widget):
+    corner = widget.mapTo(widget.window(), widget.rect().topRight())
+    return widget.window().grab().toImage().pixelColor(corner.x(), corner.y())
+
+
+def test_generate_keeps_rounded_corners_with_its_dropdown_and_without(requesting, app_chrome):
+    requesting.show()
+    QApplication.processEvents()
+    pair = requesting._generate_btn.parentWidget()
+    assert _top_right_corner(pair) == BG_PRIMARY
+
+    requesting.prefill("sdxl_t2i", _folder_params())
+    QApplication.processEvents()
+
+    assert _top_right_corner(pair) == BG_PRIMARY
 
 
 def _request(count=3, label=_FOLDER_LABEL, opened_on=None):

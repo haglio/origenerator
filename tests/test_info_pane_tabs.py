@@ -973,20 +973,37 @@ def test_generate_requested_surfaces_from_the_initial_tab(tabs):
     # The tab strip re-emits each tab's Generate so the gallery can launch it as a
     # re-roll — here from the initial tab. It carries the workflow and form params.
     requested = []
-    tabs.generate_requested.connect(lambda wf, params: requested.append((wf, params)))
+    tabs.generate_requested.connect(lambda wf, batch: requested.append((wf, batch)))
     panel = _pick_workflow(tabs.currentWidget())
     panel._param_form.set_values({"positive_prompt": "a cat", "seed": 3})
 
     panel._on_generate()
 
-    assert requested == [("sdxl_t2i", panel._param_form.get_values())]
+    assert requested == [("sdxl_t2i", [panel._param_form.get_values()])]
+
+
+def _pick_how_many(panel, count):
+    index = panel._how_many.findData(count)
+    panel._how_many.setCurrentIndex(index)
+    panel._how_many.activated.emit(index)
+
+
+def test_one_how_many_serves_every_tab_and_each_tab_opened_after(tabs):
+    first = _pick_workflow(tabs.currentWidget())
+    second = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
+
+    _pick_how_many(first, 8)
+
+    assert second._how_many.how_many() == 8
+    third = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="an owl"))
+    assert third._how_many.how_many() == 8
 
 
 def test_generate_requested_surfaces_from_a_forked_tab(tabs):
     # A tab forked after construction must also have its Generate wired, like
     # title_changed — so a Generate from any tab reaches the gallery.
     requested = []
-    tabs.generate_requested.connect(lambda wf, params: requested.append(wf))
+    tabs.generate_requested.connect(lambda wf, batch: requested.append(wf))
     forked = tabs.open_config("sdxl_t2i", _sdxl_full(positive_prompt="a fox"))
 
     forked._on_generate()

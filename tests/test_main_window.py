@@ -1016,6 +1016,27 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
     assert win._gallery_view._combine.panel.video_slot.current_id() == "vid"
 
 
+def test_how_many_generate_makes_at_once_survives_close_and_reopen(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._info_tabs.set_how_many(8)
+    first.close()
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+
+    panel = reopened._gallery_view._info_tabs.current_config_panel()
+    assert panel._how_many.how_many() == 8
+
+
+def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("how_many", 7)
+
+    win = _window(qtbot, tmp_path, state)
+
+    assert win._gallery_view.how_many() == 1
+
+
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     # The end-to-end round trip: pick a picture, drop a video in one lane, move
     # to the other, close, and a fresh window restores all of it. The lane

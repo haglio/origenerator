@@ -5,8 +5,8 @@ with no video surface attached anywhere -- and, once a clip loads, with its vide
 track deselected outright -- so the files are videos but all that reaches the
 room is their sound.  Each player is fed by its own walk through the clip set
 (:mod:`origenerator.ambient_audio`), taking the next clip the moment the current
-one ends.  Nothing else in the app touches it: it plays under whatever the user
-is doing until it's switched off.
+one ends.  It plays under whatever the user is doing until it's switched off, and
+holds still only while the room is paused.
 """
 
 from __future__ import annotations
@@ -51,6 +51,15 @@ class AmbientAudio(QObject):
         self._make_player = make_player if make_player is not None else self._real_player
         self._players: list = []
         self._rotation: AmbientRotation | None = None
+        self._frozen = False
+
+    def set_frozen(self, frozen: bool) -> None:
+        self._frozen = frozen
+        for player in self._players:
+            if frozen:
+                player.pause()
+            else:
+                player.play()
 
     def start(self) -> None:
         """Fill every voice and play.
@@ -104,7 +113,8 @@ class AmbientAudio(QObject):
         player = self._players[voice]
         self._started[voice] = self._now()
         player.setSource(QUrl.fromLocalFile(str(clip)))
-        player.play()
+        if not self._frozen:
+            player.play()
 
     def _on_status(self, voice: int, status) -> None:
         """Follow one voice's clip through its life.

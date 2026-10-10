@@ -1282,6 +1282,21 @@ def test_a_picture_asked_for_joins_behind_every_job_put_first(qtbot, tmp_path):
     assert queue.queue_order == [rendering.prompt_id, waiting.prompt_id, newer.prompt_id]
 
 
+def test_a_batch_of_pictures_lines_up_after_a_job_put_first_and_leaves_it_running(
+        qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    locked = _launch_image(queue, "i1", seed=1)
+    _rendering(client, locked)
+    queue.put_first({locked.prompt_id})
+
+    launched = queue.start_batch("k", WORKFLOW_REGISTRY[_IMAGE_WF],
+                                 [_image_params(seed=seed) for seed in (2, 3)])
+
+    client.interrupt.assert_not_called()
+    assert queue.queue_order == [locked.prompt_id, *launched]
+
+
 def test_the_picture_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
         qtbot, tmp_path):
     client = _client()

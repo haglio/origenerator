@@ -8087,9 +8087,9 @@ def test_a_generate_comfyui_refuses_to_start_says_so_too(qtbot, tmp_path):
         "UNETLoader: unet_name: 'example_high.safetensors' not in (list of length 38)"))
     qtbot.addWidget(view)
 
-    view._on_generate_requested("wan22_t2i", {
+    view._on_generate_requested("wan22_t2i", [{
         "positive_prompt": "a lighthouse", "width": 1088, "height": 1920,
-        "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors"})
+        "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors"}])
 
     assert "example_high.safetensors" in _generation_failed_dialog(view).text()
 
@@ -8101,8 +8101,22 @@ def test_a_burst_of_refused_generations_is_one_dialog_saying_the_reason_once(
     qtbot.addWidget(view)
 
     for seed in (1, 2, 3):
-        view._on_generate_requested("wan22_t2i", {"positive_prompt": "a lighthouse",
-                                                  "noise_seed": seed, "seed": seed})
+        view._on_generate_requested("wan22_t2i", [{"positive_prompt": "a lighthouse",
+                                                   "noise_seed": seed, "seed": seed}])
+
+    said = _generation_failed_dialog(view).text()
+    assert said.count("example_high.safetensors") == 1
+    assert "3 generations" in said
+
+
+def test_a_press_for_several_that_comfyui_refuses_is_one_dialog(qtbot, tmp_path):
+    view = GalleryView(Database(tmp_path / "test.db"), client=_refusing_client(
+        "UNETLoader: unet_name: 'example_high.safetensors' not in (list of length 38)"))
+    qtbot.addWidget(view)
+
+    view._on_generate_requested("wan22_t2i", [
+        {"positive_prompt": "a lighthouse", "noise_seed": seed, "seed": seed}
+        for seed in (1, 2, 3)])
 
     said = _generation_failed_dialog(view).text()
     assert said.count("example_high.safetensors") == 1

@@ -11,9 +11,11 @@ from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
     funscript_of,
+    funscript_path_for,
     synthesize_actions,
     synthesize_funscript,
     video_duration_seconds,
+    write_funscript,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import NATIVE_FPS
@@ -167,6 +169,48 @@ def test_a_track_authored_video_given_a_deleted_videos_name_is_scripted_with_its
     extract_completion(ati, history, out, tmp_path / "thumbs", "namesake", params=params)
 
     assert read_actions(funscript_of(video, output_dir=out)) == ati.authored_actions(params)
+
+
+def test_an_enhanced_video_takes_its_sources_script_rather_than_a_metronome(tmp_path, monkeypatch):
+    # The enhancement keeps every frame's timing, so the script that followed
+    # the source video, authored or hand-made, follows the enhanced one too.
+    enhancer = WORKFLOW_REGISTRY["video_enhance"]
+    out = tmp_path / "out"
+    source = out / "video" / "wan22_i2v_00001_.mp4"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"v")
+    authored = [{"at": 0, "pos": 10}, {"at": 700, "pos": 90}, {"at": 1500, "pos": 10}]
+    write_funscript(funscript_path_for(source, output_dir=out), authored)
+    enhanced = out / "video" / "video_enhance_00001_.mp4"
+    enhanced.write_bytes(b"e")
+    metronome = []
+    monkeypatch.setattr("origenerator.completion.synthesize_funscript",
+                        lambda *a, **k: metronome.append(a))
+    params = dict(enhancer.default_params(), input_video="video/wan22_i2v_00001_.mp4 [output]")
+
+    extract_completion(enhancer, _video_history("save", "images", enhanced.name),
+                       out, tmp_path / "thumbs", "n1", params=params)
+
+    assert read_actions(funscript_of(enhanced, output_dir=out)) == authored
+    assert metronome == []
+
+
+def test_an_enhanced_video_whose_source_has_no_script_gets_a_metronome(tmp_path, monkeypatch):
+    enhancer = WORKFLOW_REGISTRY["video_enhance"]
+    out = tmp_path / "out"
+    (out / "video").mkdir(parents=True)
+    (out / "video" / "wan22_i2v_00001_.mp4").write_bytes(b"v")
+    enhanced = out / "video" / "video_enhance_00001_.mp4"
+    enhanced.write_bytes(b"e")
+    metronome = []
+    monkeypatch.setattr("origenerator.completion.synthesize_funscript",
+                        lambda video_path, *, hz, output_dir: metronome.append(Path(video_path)))
+    params = dict(enhancer.default_params(), input_video="video/wan22_i2v_00001_.mp4 [output]")
+
+    extract_completion(enhancer, _video_history("save", "images", enhanced.name),
+                       out, tmp_path / "thumbs", "n1", params=params)
+
+    assert metronome == [enhanced]
 
 
 def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):

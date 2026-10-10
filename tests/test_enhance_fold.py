@@ -81,6 +81,52 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
     assert db.get_generation("e1") is None
 
 
+def _add_video(db, prompt_id="vid", filename="wan22_i2v_vid.mp4"):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name="wan22_i2v", workflow_version="v008",
+        positive_prompt="she waves", seed=1,
+        params_json=json.dumps({"positive_prompt": "she waves", "frame_count": 81, "seed": 1}),
+        workflow_json="{}",
+    )
+    db.update_generation(prompt_id, status="completed", thumbnail_path="vid_thumb.jpg",
+                         output_files=json.dumps([{"filename": filename, "subfolder": "video",
+                                                   "type": "output"}]))
+    return db.get_generation(prompt_id)
+
+
+def test_a_videos_enhancement_folds_onto_the_video_and_lists_as_its_version(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_video(db)
+    db.insert_generation(
+        prompt_id="ve1", workflow_name="video_enhance", workflow_version="v001",
+        params_json=json.dumps({"input_video": "video/wan22_i2v_vid.mp4 [output]",
+                                "enhance_steps": 12, "enhance_denoise": 0.2, "enhance_scale": 1.5}),
+        workflow_json="{}",
+    )
+    db.update_generation("ve1", status="completed", thumbnail_path="ve_thumb.jpg",
+                         output_files=json.dumps([{"filename": "video_enhance_00001.mp4",
+                                                   "subfolder": "video", "type": "output"}]))
+    db.set_enhance_target("ve1", "vid")
+
+    # The startup sweep takes it too, and lands it on the video, never on the
+    # picture that happens to share the library.
+    assert fold_completed_enhancements(db) == 1
+
+    upgraded = db.get_generation("vid")
+    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == \
+        ["video_enhance_00001.mp4", "wan22_i2v_vid.mp4"]
+    assert upgraded["thumbnail_path"] == "ve_thumb.jpg"
+    assert is_enhanced_row(upgraded)
+    assert db.get_generation("ve1") is None
+    assert gallery.row_output_files(db.get_generation("src")) == \
+        [{"filename": "sdxl_t2i_src.png", "subfolder": "image", "type": "output"}]
+    levels = gallery.displayed_levels(upgraded)
+    assert [(level.label, level.file["filename"]) for level in levels] == \
+        [("Enhance 1", "video_enhance_00001.mp4"), ("Original", "wan22_i2v_vid.mp4")]
+    assert levels[0].settings == "1.5x · 12 steps · 0.2 redraw"
+
+
 def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -275,6 +321,9 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
     _add_source(db)
     _add_enhance(db, "running", "image/sdxl_t2i_src.png [output]", "x.png",
                  status="running")
+    db.insert_generation(prompt_id="running-video", workflow_name="video_enhance",
+                         workflow_version="v001", params_json="{}", workflow_json="{}")
+    db.update_generation("running-video", status="running")
     tree = gallery.build_gallery_tree(db.list_generations())
     assert [w.workflow_name for w in tree] == ["sdxl_t2i"]
 

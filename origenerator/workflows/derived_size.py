@@ -32,6 +32,18 @@ from origenerator.file_refs import reference_path
 TARGET_MEGAPIXELS = 0.4
 RESOLUTION_STEPS = 16
 
+# The pixel budgets a video form offers, under the name the form shows for each:
+# 480p is the budget every video rendered at until the choice existed, 720p the
+# largest WAN 2.2 was trained at (1280 by 720, in ComfyUI's 1024-square units).
+RESOLUTION_BUDGETS = {"480p": TARGET_MEGAPIXELS, "720p": 0.88}
+DEFAULT_RESOLUTION = "480p"
+
+
+def pixel_budget(params: dict) -> float:
+    """The megapixels a run's frames are sized to: the budget its ``resolution``
+    names, or the default for a recipe stored before the choice existed."""
+    return RESOLUTION_BUDGETS[params.get("resolution") or DEFAULT_RESOLUTION]
+
 def scale_to_total_pixels(
     src_width: int, src_height: int, megapixels: float = TARGET_MEGAPIXELS,
 ) -> tuple[int, int]:

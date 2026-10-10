@@ -238,7 +238,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"}
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v", "video_enhance"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
     # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
@@ -451,7 +451,7 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     # buttons, never offered in the Generate dropdown. Every real workflow is.
     assert wf.selectable is False
     assert all(WORKFLOW_REGISTRY[n].selectable for n in WORKFLOW_REGISTRY
-               if n != "image_enhance")
+               if n not in ("image_enhance", "video_enhance"))
     # It takes an input image, so — like every input-image workflow — its size
     # derives from it: the source's own dimensions at enhance_scale, no budget.
     assert wf.derives_size_from_input is True
@@ -968,6 +968,19 @@ def test_derived_display_size_is_none_when_not_derived_or_unmeasurable():
     assert i2v.derived_display_size(
         dict(i2v.default_params(), input_image="does_not_exist.png")
     ) is None
+
+
+def test_the_video_forms_offer_a_resolution_and_derive_their_size_from_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    _write_image(tmp_path / "tall.png", (1080, 1920))
+    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+        wf = WORKFLOW_REGISTRY[name]
+        resolution = next(d for d in wf.param_definitions() if d.key == "resolution")
+        assert resolution.options == ["480p", "720p"], name
+        assert wf.default_params()["resolution"] == "480p", name
+        params = dict(wf.default_params(), input_image="tall.png")
+        assert wf.derived_display_size(params) == (480, 864), name
+        assert wf.derived_display_size(dict(params, resolution="720p")) == (720, 1280), name
 
 
 def test_wan22_build_api_payload_structure():
@@ -2180,6 +2193,9 @@ READS_AS = {
     # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
+    # The video enhancer redraws through the same conditioning the i2v
+    # workflow samples with, so its graph reads as that workflow's.
+    "video_enhance": "wan22_i2v",
     # Not recognized at all, which here is the right answer: nothing in the
     # chain matches, so the filename's guess stands, and it is correct.
     "wan21_ati_i2v": None,
@@ -2209,8 +2225,11 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 
 # ---- video length and rate, as the form offers them ----
 
+# The video forms: what makes a video from a picture. The video enhancer makes
+# one from a video, keeps that video's length, rate and soundtrack, and takes
+# its steps from the Enhance panel, so these are not its questions.
 _VIDEO_WORKFLOWS = [
-    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
+    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video" and wf.selectable
 ]
 
 
@@ -2368,6 +2387,22 @@ def test_segment_lengths_stay_on_the_models_frame_grid():
         parts = lengths(count)
         assert parts[0] + sum(n - 1 for n in parts[1:]) == count
         assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
+
+
+def test_a_720p_video_is_sized_to_its_budget_and_chained_in_the_windows_that_budget_allows():
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png", resolution="720p"))
+    assert _find_node(payload, "ImageScaleToTotalPixels")["inputs"]["megapixels"] == pytest.approx(0.88)
+    # A window holds the frames the card held at 480p, scaled down by the
+    # budget and kept on the models' 4k+1 grid.
+    assert WorkflowTemplate.single_window_frames(0.4) == SINGLE_WINDOW_FRAMES
+    assert WorkflowTemplate.single_window_frames(0.88) == 73
+    assert WorkflowTemplate.segment_lengths(161, window=73) == [73, 73, 17]
+    long_clip = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png",
+                                          resolution="720p", frame_count=161))
+    lengths = sorted(n["inputs"]["length"] for n in long_clip.values()
+                     if n["class_type"] == "WanImageToVideo")
+    assert lengths == [17, 73, 73]
 
 
 def test_the_last_scene_carries_on_through_the_scenes_after_it():

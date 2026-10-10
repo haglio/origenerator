@@ -169,7 +169,9 @@ PARAM_HELP: dict[str, str] = {
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. "
-        "2x is the usual finish; past 3x the pass has to invent a lot."
+        "2x is the usual finish; past 3x the pass has to invent a lot. A video "
+        "is always enhanced at 1.5x, the most the graphics card holds a whole "
+        "stretch of frames at."
     ),
     "enhance_steps": (
         "How many times the enhancement goes over the enlarged picture. Around 20 "
@@ -211,6 +213,12 @@ PARAM_HELP: dict[str, str] = {
         "How long the clip runs, in seconds — of real motion, at any frame rate. "
         "Pick a length or type one; it is rounded to the frames the model works "
         "in, and stops where the model stops."
+    ),
+    "resolution": (
+        "How big each frame is drawn. 480p is the size every video was made at "
+        "until this choice existed; 720p keeps far more of the start image's "
+        "detail and takes several times as long, and a long clip is made in "
+        "shorter stretches to fit the graphics card."
     ),
     "frame_rate": (
         "How smooth the motion looks. The model always paces the action at 16 "

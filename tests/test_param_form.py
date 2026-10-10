@@ -920,6 +920,26 @@ def test_derived_dimensions_track_the_input_image(qtbot):
     assert form._widgets["height"].value() == 480
 
 
+def test_derived_dimensions_track_the_resolution_too(qtbot):
+    # The budget the frames are sized to is a form setting of its own, so a
+    # change to it redraws the locked size as a change to the picture does.
+    budgets = {"480p": (480, 864), "720p": (720, 1280)}
+    form = ParamForm(
+        [_image_def(),
+         ParamDef("resolution", "Resolution", "combo", "480p", options=["480p", "720p"])],
+        size_deriver=lambda params: budgets[params["resolution"]] if params.get("input_image") else None,
+    )
+    qtbot.addWidget(form)
+    form._widgets["input_image"].setText("frame.png")
+    assert form._dim_value_labels["height"].text() == "864"
+
+    form._widgets["resolution"].setCurrentText("720p")
+
+    assert form._dim_value_labels["width"].text() == "720"
+    assert form._dim_value_labels["height"].text() == "1280"
+    assert form._widgets["height"].value() == 1280
+
+
 def test_locked_derived_dimensions_stay_out_of_the_values(qtbot):
     # Locked, the form emits no width/height, so the payload derives the size the
     # usual way — the displayed number is informational only.

@@ -1179,7 +1179,7 @@ class ShowDirector:
         would be the same image twice, one of them worse.
         """
         row = self._db.get_generation(prompt_id)
-        if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+        if row is None or row.get("workflow_name") in gallery.ENHANCE_WORKFLOWS:
             return False
         held = (self._held_at_location(location) if location
                 else {r["prompt_id"] for r in self._host.rows_to_play()})

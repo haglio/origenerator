@@ -143,16 +143,17 @@ class InFlightItems:
                 job_kind=kind,
                 requested=pid in requested,
                 # Only where the start frame is what the run is *of*: a video
-                # animating a picture, and an enhancement of one. An image
-                # workflow that happens to take an input (the pose transfer's
-                # structure image) is still an image being made, and its row is
-                # placed the way every other image's is — by the folder it joins.
-                source_image=(params.get("input_image")
+                # animating a picture, and an enhancement of one or of a video
+                # made from one. An image workflow that happens to take an
+                # input (the pose transfer's structure image) is still an image
+                # being made, and its row is placed the way every other image's
+                # is — by the folder it joins.
+                source_image=(params.get("input_image") or params.get("start_image")
                               if kind in SOURCE_FRAME_KINDS else None),
-                # What to stand under the wait: the image this run was
-                # requested of, else the frame it animates or enhances.
+                # What to stand under the wait: the item this run was requested
+                # of or is enhancing, else the frame it animates.
                 source_picture=self._source_picture(
-                    requested.get(pid), row_by_id, params, kind),
+                    requested.get(pid) or row.get("enhance_of"), row_by_id, params, kind),
                 # What the Combine panel was asked for, when this run came from
                 # it: the act off its dropdown, else the video whose settings the
                 # run follows — shown gray beside the frame, being the recipe
@@ -179,10 +180,12 @@ class InFlightItems:
                         kind: str) -> str | None:
         """A file showing what a queued run came from, or ``None``.
 
-        The image a request was made of comes first: a folder-wide request
-        queues a run per image and every one of them animates nothing, so the
-        thing it was asked about is the only picture it has. Failing that, the
-        start frame a video or an enhance is built on.
+        The item a request was made of, or an enhancement is of, comes first:
+        a folder-wide request queues a run per image and every one of them
+        animates nothing, so the thing it was asked about is the only picture
+        it has, and a video being enhanced has its thumbnail where its file is
+        no picture at all. Failing that, the start frame a video or an enhance
+        is built on.
         """
         asked_of = (row_by_id.get(requested_of) or {}).get("thumbnail_path")
         if asked_of:

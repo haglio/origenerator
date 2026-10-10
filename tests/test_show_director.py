@@ -760,14 +760,15 @@ def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(sho
     assert made[0].generating == [("g7", b"frame-two")]
 
 
-def test_an_enhancement_is_never_a_slide_of_its_own_frames(shows):
-    # It is a better version of a picture the show may already be playing, and a
-    # half-rendered second slide would be the same image twice, one of them worse.
+@pytest.mark.parametrize("enhancer", gallery.ENHANCE_WORKFLOWS)
+def test_an_enhancement_is_never_a_slide_of_its_own_frames(shows, enhancer):
+    # It is a better version of an item the show may already be playing, and a
+    # half-rendered second slide would be the same item twice, one of them worse.
     enhance = _row("g8", workflow_name="enhance_image")
     host = FakeHost(rows=[_row("g1"), enhance])
     director, _host, made = shows(host, db=FakeDB([enhance]),
                                   browser=FakeBrowser(recents=True))
-    enhance["workflow_name"] = gallery.ENHANCE_WORKFLOW
+    enhance["workflow_name"] = enhancer
     director.open([("a.png", "image", "g1", None)])
 
     director.note_generating("g8", b"frame")

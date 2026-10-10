@@ -8,8 +8,10 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    resolution_param,
     scene_prompts,
 )
+from origenerator.workflows.derived_size import DEFAULT_RESOLUTION
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
     NATIVE_FPS,
@@ -37,7 +39,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_flf2v_loop"
-    version = "v009"
+    version = "v010"
     display_name = "WAN 2.2 Image-to-Video (Looping)"
     output_type = MediaType.VIDEO
     looping = True
@@ -66,6 +68,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             "lora_strength_high": 1.0,
             "lora_strength_low": 1.0,
             "frame_rate": NATIVE_FPS,
+            "resolution": DEFAULT_RESOLUTION,
             "crf": 19,
             "filename_prefix": "video/flf2v_loop",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
@@ -103,6 +106,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
             ParamDef("shift_low", "Composition Focus (Second Pass)", ParamType.FLOAT, defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
             *wan_expert_model_params(defaults),
             *wan_expert_lora_params(defaults),
+            resolution_param(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),

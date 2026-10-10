@@ -9,7 +9,13 @@ from typing import Any
 
 from origenerator.gallery_contract import SILENT_COPY_ROLE
 from origenerator.media import MediaType
-from origenerator.workflows.derived_size import measure_derived_size, override_size
+from origenerator.workflows.derived_size import (
+    RESOLUTION_BUDGETS,
+    TARGET_MEGAPIXELS,
+    measure_derived_size,
+    override_size,
+    pixel_budget,
+)
 from origenerator.workflows.detail_parts import detail_fix_passes
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.model_files import is_no_lora
@@ -41,7 +47,9 @@ LONGEST_CLIP_FRAMES = 961
 # is 31 GB, which Windows pages through system RAM at a crawl rather than
 # refusing. A longer clip is rendered as a chain of clips this long, each
 # started from the last frame of the one before -- :meth:`WorkflowTemplate.
-# chain_segments`.
+# chain_segments`. That is the window at the 480p budget; a bigger frame
+# takes proportionally fewer per window (:meth:`WorkflowTemplate.
+# single_window_frames`).
 SINGLE_WINDOW_FRAMES = 161
 # A line holding only this, in a long clip's positive prompt, ends one scene's
 # text and starts the next: each segment reads its own scene, and the last
@@ -111,6 +119,13 @@ class EnhanceTail:
     nodes: dict
     image: list
     upscaled: list
+
+
+def resolution_param(defaults: dict) -> ParamDef:
+    """The Resolution row of a video form: which of the pixel budgets its
+    frames are sized to."""
+    return ParamDef("resolution", "Resolution", ParamType.COMBO, defaults["resolution"],
+                    options=list(RESOLUTION_BUDGETS))
 
 
 def story_of(scenes: list[str]) -> str:
@@ -255,7 +270,15 @@ class WorkflowTemplate(ABC):
         """
         if not self.derives_size_from_input:
             return None
-        return measure_derived_size(params.get("input_image", ""))
+        return measure_derived_size(params.get("input_image", ""),
+                                    megapixels=self.pixel_budget(params))
+
+    @staticmethod
+    def pixel_budget(params: dict) -> float:
+        """The megapixels this run's frames are sized to (:func:`~origenerator.
+        workflows.derived_size.pixel_budget`): what the video forms' Resolution
+        row picks, and the default where a form offers no such row."""
+        return pixel_budget(params)
 
     def seed_keys(self) -> tuple[str, ...]:
         """Param keys whose type is ``seed`` — the seed(s) a variation re-rolls.
@@ -316,6 +339,11 @@ class WorkflowTemplate(ABC):
         A track-conditioned workflow (ATI) knows its motion exactly, so its
         funscript comes from here — completion prefers it over the synthesized
         metronome, which remains the fallback for pixels-only workflows."""
+        return None
+
+    def script_source(self, params: dict) -> str | None:
+        """The video whose script this run's output keeps, as the reference the
+        run reads it by, or ``None`` for a run that makes new motion."""
         return None
 
     @staticmethod
@@ -379,9 +407,20 @@ class WorkflowTemplate(ABC):
         segment after the first, its scene's first included, starts on the
         frame before it.
         """
+        window = cls.single_window_frames(cls.pixel_budget(params))
         return [(length, scene)
                 for scene, count in enumerate(cls.scene_lengths(params))
-                for length in cls.segment_lengths(count)]
+                for length in cls.segment_lengths(count, window)]
+
+    @staticmethod
+    def single_window_frames(megapixels: float, at_480p: int | None = None) -> int:
+        """How many frames one window holds at ``megapixels`` per frame: the
+        frames it holds at 480p (:data:`SINGLE_WINDOW_FRAMES` unless said
+        otherwise) shrunk by the budget, on the models' 4k+1 grid."""
+        if at_480p is None:
+            at_480p = SINGLE_WINDOW_FRAMES
+        frames = int(at_480p * (TARGET_MEGAPIXELS / megapixels))
+        return frames - (frames - 1) % 4
 
     @staticmethod
     def scene_lengths(params: dict) -> list[int]:
@@ -400,17 +439,17 @@ class WorkflowTemplate(ABC):
         return chained_frames([length for length, _ in plan])
 
     @staticmethod
-    def segment_lengths(frame_count: int) -> list[int]:
-        """How a clip's frames split into segments of at most
-        :data:`SINGLE_WINDOW_FRAMES`: the first as long as it can be, each
-        later one starting on the frame before it ended, so it renders one
-        frame more than it adds. Every length stays on the models' 4k+1 grid
-        because ``frame_count`` is on it.
+    def segment_lengths(frame_count: int, window: int = SINGLE_WINDOW_FRAMES) -> list[int]:
+        """How a clip's frames split into segments of at most ``window``
+        frames: the first as long as it can be, each later one starting on
+        the frame before it ended, so it renders one frame more than it adds.
+        Every length stays on the models' 4k+1 grid because ``frame_count``
+        and ``window`` are on it.
         """
-        lengths = [min(frame_count, SINGLE_WINDOW_FRAMES)]
+        lengths = [min(frame_count, window)]
         remaining = frame_count - lengths[0]
         while remaining > 0:
-            length = min(SINGLE_WINDOW_FRAMES, remaining + 1)
+            length = min(window, remaining + 1)
             lengths.append(length)
             remaining -= length - 1
         return lengths
@@ -448,25 +487,33 @@ class WorkflowTemplate(ABC):
             segment, frames = render(index, scene, [prefix + "last", 0], length,
                                      index == len(plan) - 1, previous=previous)
             nodes.update(segment)
-            nodes[prefix + "new"] = {
-                "class_type": "ImageFromBatch",
-                "inputs": {"image": frames, "batch_index": 1, "length": length - 1},
-            }
-            nodes[prefix + "join"] = {
-                "class_type": "ImageBatch",
-                "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
-            }
-            joined, previous, previous_length = [prefix + "join", 0], frames, length
+            joined = cls.join_after_the_shared_frame(nodes, prefix, joined, frames, length)
+            previous, previous_length = frames, length
         return nodes, joined, cls.clip_frames(plan)
 
     @staticmethod
-    def image_size_nodes(image_ref, params: dict, megapixels: float = 0.4) -> SizedInput:
+    def join_after_the_shared_frame(nodes: dict, prefix: str, joined, frames, length: int):
+        """Join a stretch of ``length`` frames onto ``joined`` from its second
+        frame on, since its first is the frame the stretch before it ended on;
+        the nodes go in under ``prefix``, and the joined ref comes back."""
+        nodes[prefix + "new"] = {
+            "class_type": "ImageFromBatch",
+            "inputs": {"image": frames, "batch_index": 1, "length": length - 1},
+        }
+        nodes[prefix + "join"] = {
+            "class_type": "ImageBatch",
+            "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
+        }
+        return [prefix + "join", 0]
+
+    @classmethod
+    def image_size_nodes(cls, image_ref, params: dict, megapixels: float | None = None) -> SizedInput:
         """The subgraph that sizes a run off its input image, and the refs the
         downstream nodes read for the scaled image and its width/height.
 
         By default the image is scaled to ``megapixels`` in-graph
-        (``ImageScaleToTotalPixels`` on a /16 stride — 0.4 MP is the video
-        budget; the SDXL still workflow passes its own) and the size read back
+        (``ImageScaleToTotalPixels`` on a /16 stride — the budget the run's
+        Resolution names, or what the SDXL still workflow passes) and the size read back
         off it (``GetImageSize``), so a portrait or widescreen yields a
         proportional output without a hardcoded WxH. When the user has unlocked
         the derived size and set an explicit ``width``/``height`` (see
@@ -474,6 +521,8 @@ class WorkflowTemplate(ABC):
         instead scaled to that exact size (``ImageScale``) and the literal
         width/height drive the consumer, with no second node to read them off.
         """
+        if megapixels is None:
+            megapixels = cls.pixel_budget(params)
         override = override_size(params)
         if override is not None:
             width, height = override

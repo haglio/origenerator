@@ -492,18 +492,6 @@ class EnhancePanel(QWidget):
         widget.valueChanged.connect(self._emit)
         return widget
 
-    def set_applicable(self, applicable: bool, reason: str = "") -> None:
-        """Switch the whole panel on or off, and look it.
-
-        Off, every field is disabled *and* muted, so the panel reads as what it
-        is where it can't apply — settings for an action that isn't on offer —
-        rather than as live settings that quietly do nothing. Back on, each field
-        returns to whatever it was in its own right: a part stays grayed if
-        ComfyUI still hasn't got a detector that finds it.
-        """
-        self.setEnabled(applicable)
-        self.setToolTip("" if applicable else reason)
-
     def show_offer(self, available: bool, tip: str) -> None:
         self._enhance_button.setEnabled(available)
         self._enhance_button.setToolTip(tip)

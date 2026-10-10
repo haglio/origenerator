@@ -406,36 +406,6 @@ def _mean_ink(widget) -> float:
     return total / max(1, image.width() * image.height() * 3)
 
 
-def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
-    # setEnabled alone changed nothing here: the app's sheet colors every label,
-    # picker and spinner outright and names no disabled state, so a panel that
-    # could not apply went on reading exactly as live as one that could.
-    panel, _ = _panel(qtbot)
-    panel.show_settings(EnhanceSettings(auto=True, params={}))
-    panel.resize(360, 150)
-    panel.show()
-    qtbot.waitExposed(panel)
-    live = _mean_ink(panel)
-
-    panel.set_applicable(False, "no video enhancer")
-
-    assert not panel.isEnabled()
-    assert panel.toolTip() == "no video enhancer"
-    assert _mean_ink(panel) < live      # visibly dimmer, not merely inert
-
-    panel.set_applicable(True)
-    assert panel.isEnabled() and panel.toolTip() == ""
-
-
-def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
-    # Switching the panel off and on again must not hand back a setting that was
-    # grayed in its own right: the part still has no model to find it.
-    panel, _ = _panel(qtbot, detectors=())
-    panel.set_applicable(False, "nope")
-    panel.set_applicable(True)
-    assert panel.isEnabled() and not panel._fix_checks["faces"].isEnabled()
-
-
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
     # A folder configured against a checkpoint since removed must come back
     # reading as that checkpoint, not silently snap to whatever sorts first.

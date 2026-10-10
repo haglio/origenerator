@@ -1074,7 +1074,7 @@ def _image_row(db, prompt_id="img1", prompt="a cat", filename="sdxl_img1.png"):
 
 def _video_row(db, prompt_id="vid1", input_image=None):
     """A completed WAN i2v video, optionally built on a named source image."""
-    params = {"positive_prompt": "dance", "seed": 5}
+    params = {"positive_prompt": "dance", "seed": 5, "frame_count": 81}
     if input_image is not None:
         params["input_image"] = input_image
     db.insert_generation(
@@ -1165,12 +1165,16 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_card(saved_pan
     assert panel._versions._host.findChildren(_AddRow)
 
 
-def test_a_video_has_no_version_strip(saved_panel):
-    # The enhancer takes images; a video has no versions and no row to press.
+def test_a_video_offers_the_add_card_before_it_has_any_version(saved_panel):
+    # Its file stays in the block above until an enhancement makes a second
+    # version; the row to press is there from the start.
     panel, db = saved_panel
     video = _video_row(db, "vid1")
     panel.show_saved_generation(video, [])
-    assert panel._versions.isHidden()
+    assert not panel._versions.isHidden()
+    assert _level_rows(panel) == []
+    assert panel._versions._host.findChildren(_AddRow)
+    assert not panel._metadata_block.isHidden()
 
 
 def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):

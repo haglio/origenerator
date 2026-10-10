@@ -11,8 +11,10 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    resolution_param,
     scene_prompts,
 )
+from origenerator.workflows.derived_size import DEFAULT_RESOLUTION
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
     NATIVE_FPS,
@@ -65,7 +67,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan22_i2v"
-    version = "v007"
+    version = "v008"
     display_name = "WAN 2.2 Image-to-Video"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
@@ -95,6 +97,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "lora_strength_high": 1.0,
             "lora_strength_low": 1.0,
             "frame_rate": NATIVE_FPS,
+            "resolution": DEFAULT_RESOLUTION,
             "filename_prefix": "video/wan22_i2v",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -147,6 +150,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             *wan_expert_model_params(defaults),
             ParamDef("unet_s2v", "Speaking Model", ParamType.COMBO, defaults["unet_s2v"], options=speech),
             *wan_expert_lora_params(defaults),
+            resolution_param(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),

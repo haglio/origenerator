@@ -21,7 +21,7 @@ _PACKAGE = ROOT / "origenerator" / "gallery"
 # facade owes its callers.
 PUBLISHED = {
     "ALL_KEY", "ALL_LABEL", "AllGroup", "CustomGroup",
-    "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
+    "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW", "ENHANCE_WORKFLOWS",
     "EnhanceLevel", "EnhanceSettings", "GENAU_COMMAND", "GENERATION_SEED_KEYS",
     "JobKind", "LoraGroup",
     "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
@@ -33,8 +33,9 @@ PUBLISHED = {
     "config_tab_title", "curated_params", "custom_folder_id",
     "custom_folder_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",
-    "displayed_levels", "enhance_levels", "enhance_params_for",
+    "displayed_levels", "enhance_input_of", "enhance_levels", "enhance_params_for",
     "enhance_run_targets_row", "enhance_target_id", "enhance_targets_row",
+    "enhance_workflow_for",
     "enhancement_recency", "find_source_image_id", "fix_params_for",
     "fold_completed_enhancements", "fold_enhancement",
     "folder_id", "folder_key_at_level", "folder_level", "generation_of_file",
@@ -53,6 +54,7 @@ PUBLISHED = {
     "output_file_path", "output_file_reference", "parse_params",
     "produced_output", "prompts_differ_from", "recent_generations", "recently_worked_folders", "recognized_spelling",
     "remove_enhance_levels", "requested_generations", "resolve_preview",
+    "VIDEO_ENHANCE_WORKFLOW",
     "row_output_files", "rows_awaiting_enhancement", "rows_in_settings",
     "rows_of_media_types", "rows_under", "section_headings", "selection_group",
     "settings_folder_key", "settings_signature", "source_image_id_for",

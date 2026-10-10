@@ -3534,11 +3534,11 @@ class GalleryView(QWidget):
             return
         folded = False
         if finished_row is not None \
-                and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+                and finished_row.get("workflow_name") in gallery.ENHANCE_WORKFLOWS:
             # A standalone enhance is an upgrade, not a generation: fold its
-            # output onto the image it enhanced — same row, same folder, same
+            # output onto the item it enhanced — same row, same folder, same
             # star, now wearing the enhanced pixels and badge — and let the
-            # upgraded image be what the front tab shows.
+            # upgraded item be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
                 folded = True
@@ -3835,14 +3835,13 @@ class GalleryView(QWidget):
             menu.addSeparator()
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
-        enhanceable = [row["prompt_id"] for row in rows
-                       if gallery.is_enhanceable_row(row)]
+        enhanceable = [row for row in rows if gallery.is_enhanceable_row(row)]
         enhance_action = None
         if enhanceable:
             n = len(enhanceable)
-            enhance_action = menu.addAction(
-                f"Enhance {n} image{'s' if n != 1 else ''}"
-            )
+            kind = ("image" if all(gallery.media_type_of_row(row) == MediaType.IMAGE
+                                   for row in enhanceable) else "item")
+            enhance_action = menu.addAction(f"Enhance {n} {kind}{'s' if n != 1 else ''}")
         in_flight = self._enhance.jobs_targeting(rows)
         cancel_action = None
         if in_flight:
@@ -3857,7 +3856,7 @@ class GalleryView(QWidget):
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif enhance_action is not None and chosen is enhance_action:
-            self._enhance.enhance_items(enhanceable)
+            self._enhance.enhance_items([row["prompt_id"] for row in enhanceable])
         elif cancel_action is not None and chosen is cancel_action:
             self._enhance.cancel_for(rows)
         elif chosen is delete_action:

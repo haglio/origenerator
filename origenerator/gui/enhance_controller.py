@@ -36,12 +36,10 @@ from origenerator.workflows.detail_parts import name_parts
 
 logger = logging.getLogger(__name__)
 
-# Said the same way by the button and by the settings panel it would run, because
-# both go dark together the moment what's in front of you is a video.
-NO_VIDEO_ENHANCER = "Enhancement is for images — there is no video enhancer"
 ALREADY_AT_THESE_SETTINGS = (
     "Already enhanced at these settings — change one to make another"
 )
+NOTHING_PICKED_TO_ENHANCE = "Nothing picked can be enhanced"
 _WHAT_AN_ENHANCE_DOES = "(upscale + light redraw)"
 
 
@@ -72,9 +70,6 @@ class EnhanceHost(Protocol):
 
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
-
-    def image_rows(self) -> list[dict]:
-        """Every image row the gallery is holding."""
 
     def image_config_index(self) -> dict:
         """The settings-signature index a folder key is derived against."""
@@ -163,28 +158,8 @@ class EnhanceController:
         self._browser.refresh_corners()
 
     def sync_panel(self, offer: Offer) -> None:
-        """Gray the Enhance settings out where nothing they say could ever run,
-        and aim the panel's own Enhance button with the bank button's ``offer``.
-
-        The panel is app-wide and follows you rather than the folder, which is
-        why it shows on the shelves as readily as on a settings folder — but a
-        video is the one place with no enhancement to configure at all, and live
-        settings there advertise an action that isn't on offer. A mixed folder
-        keeps them: the images in it are still enhanceable.
-        """
-        self.panel.set_applicable(not self._showing_only_videos(), NO_VIDEO_ENHANCER)
+        """Aim the panel's own Enhance button with the bank button's ``offer``."""
         self.panel.show_offer(offer.available, offer.tip)
-
-    def _showing_only_videos(self) -> bool:
-        """Whether everything in front of us is video — the picked thumbnails if
-        any are picked, else the folder on screen. Nothing in front (a shelf with
-        no pick) is not "only videos": there is simply nothing to say."""
-        rows = [row for pid in self._host.selected_prompt_ids()
-                if (row := self._host.row_for(pid)) is not None]
-        if not rows and not self._browser.selected_ids:
-            group = self._host.current_group()
-            rows = list(getattr(group, "rows", []) or [])
-        return _all_video(rows)
 
     # --- what it would run on -------------------------------------------------
 
@@ -203,8 +178,8 @@ class EnhanceController:
                 return Offer(True, f"Enhance {len(ids)} item"
                                    f"{'s' if len(ids) != 1 else ''} "
                                    f"{_WHAT_AN_ENHANCE_DOES}")
-            return Offer(False, NO_VIDEO_ENHANCER if self._selection_is_all_video()
-                         else ALREADY_AT_THESE_SETTINGS)
+            return Offer(False, ALREADY_AT_THESE_SETTINGS if self._picked_an_enhanceable()
+                         else NOTHING_PICKED_TO_ENHANCE)
         group = self._host.current_group()
         awaiting = (
             gallery.rows_awaiting_enhancement(group.rows, self._db.list_generations())
@@ -219,14 +194,11 @@ class EnhanceController:
     def enhanceable_selection(self) -> list[str]:
         """The picked thumbnails this button would actually run on.
 
-        Two things are dropped. Videos, because there is no video enhancer — the
-        workflow under all of this refines a still — and they are picked from
-        the same flow and look no different picked, so a picked clip is nothing
-        to run rather than a run that fails.
-
-        And an image that already holds a version made at exactly the settings
-        on the panel: running it again would spend a generation arriving at the
-        picture that is already there. Judged against what the run would *use*
+        Two things are dropped: an item no enhancer can take
+        (:func:`~origenerator.gallery.enhance.is_enhanceable_row`), and one that
+        already holds a version made at exactly the settings on the panel, since
+        running it again would spend a generation arriving at the picture that
+        is already there. Judged against what the run would *use*
         (:func:`~origenerator.gallery.enhance.level_matching_settings`), so a
         source-matched model resolves to this image's own checkpoint before the
         comparison rather than the panel's raw value. Change any setting and the
@@ -242,11 +214,11 @@ class EnhanceController:
                 ids.append(prompt_id)
         return ids
 
-    def _selection_is_all_video(self) -> bool:
-        """Whether every picked thumbnail is a video — which is why Enhance is
-        dark, as opposed to its images being enhanced at these settings already."""
-        return _all_video(row for pid in self._host.selected_prompt_ids()
-                          if (row := self._db.get_generation(pid)) is not None)
+    def _picked_an_enhanceable(self) -> bool:
+        """Whether any picked thumbnail is one an enhancer could take -- which
+        makes a dark button mean "you have this one" rather than "not this"."""
+        return any(gallery.is_enhanceable_row(row) for pid in self._host.selected_prompt_ids()
+                   if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
         """The bank button's action: enhance the picked thumbnails, or every
@@ -290,24 +262,24 @@ class EnhanceController:
         controller took only one job per folder; it takes them all now, so the
         buffer had nothing left to do but hide the work.)
         """
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
         index = self._host.image_config_index()
-        asks: dict[str, list[tuple[dict, dict]]] = {}
+        asks: dict[str, tuple[object, list[tuple[dict, dict]]]] = {}
         for row in rows:
             params = gallery.enhance_params_for(row, self._settings)
             if params is None:
                 logger.warning("Enhance skipped for %s: no output file to enhance",
                                row.get("prompt_id"))
                 continue
-            asks.setdefault(_folder_of(workflow, params, index), []).append((row, params))
-        for key, entries in asks.items():
+            workflow = WORKFLOW_REGISTRY[gallery.enhance_workflow_for(row)]
+            asks.setdefault(_folder_of(workflow, params, index), (workflow, []))[1].append((row, params))
+        for key, (workflow, entries) in asks.items():
             batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
             for (row, params), prompt_id in zip(entries,
                                                 self._jobs.start_batch(key, workflow, batch)):
                 self._note_launch(row, params, key, prompt_id)
 
     def _launch(self, row: dict, params: dict) -> bool:
-        workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
+        workflow = WORKFLOW_REGISTRY[gallery.enhance_workflow_for(row)]
         key = _folder_of(workflow, params, self._host.image_config_index())
         prompt_id = self._jobs.start_prepared(
             key, workflow, randomize_seeds(params, workflow.seed_keys()))
@@ -329,11 +301,11 @@ class EnhanceController:
             self.put_what_is_locked_first()
             self.reconcile()
             logger.info("Enhance launched for %s on %s at %s, under %s",
-                        row.get("prompt_id"), params.get("input_image"),
+                        row.get("prompt_id"), gallery.enhance_input_of(params),
                         gallery.describe_enhance_params(params), key)
             return True
         logger.warning("Enhance of %s dropped: could not launch under %s",
-                       params.get("input_image"), key)
+                       gallery.enhance_input_of(params), key)
         return False
 
     def enhance_when_wanted(self, row: dict | None) -> None:
@@ -368,7 +340,7 @@ class EnhanceController:
         """
         row = self._db.get_generation(prompt_id) if prompt_id else None
         if row is None or not gallery.is_enhanceable_row(row):
-            return None, "🎤 only a finished image can be enhanced", WARNING
+            return None, "🎤 only a finished item can be enhanced", WARNING
         if gallery.is_enhanced_row(row):
             return None, "🎤 this one is enhanced already", WARNING
         params = gallery.enhance_params_for(row, self._settings)
@@ -391,7 +363,8 @@ class EnhanceController:
         where that shows. Refused outright only when none of them can run."""
         asked = name_parts(parts)
         row = self._db.get_generation(prompt_id) if prompt_id else None
-        if row is None or not gallery.is_enhanceable_row(row):
+        if (row is None or not gallery.is_enhanceable_row(row)
+                or gallery.media_type_of_row(row) != MediaType.IMAGE):
             return None, f"🎤 only a finished image can get a {asked} fix", WARNING
         params = gallery.fix_params_for(row, parts, self._settings)
         if params is None:
@@ -428,8 +401,7 @@ class EnhanceController:
         The same ask as a spoken "enhance" over the same picture, so the same
         decision makes it (:meth:`enhance_it`); a lock has no corner line to
         fill, so its answer is dropped. The decision is on this side rather than
-        in the slideshow because it is this side that holds the levels — and a
-        video has none to receive."""
+        in the slideshow because it is this side that holds the levels."""
         if self.enhance_it(prompt_id)[0] is not None:
             return True
         self.put_what_is_locked_first()
@@ -446,7 +418,7 @@ class EnhanceController:
     def _enhances_in_flight(self) -> list:
         """Every standalone enhance in flight, across every folder."""
         return [job for job in self._jobs.all_jobs
-                if job.workflow.name == gallery.ENHANCE_WORKFLOW]
+                if job.workflow.name in gallery.ENHANCE_WORKFLOWS]
 
     def _target_of(self, job) -> str | None:
         """The prompt_id of the image a live enhance ``job`` is of — the stamp
@@ -463,7 +435,7 @@ class EnhanceController:
         question every surface showing a run on its image asks
         (:func:`gallery.enhance_run_targets_row`)."""
         return gallery.enhance_run_targets_row(
-            self._target_of(job), job.params.get("input_image"), row)
+            self._target_of(job), gallery.enhance_input_of(job.params), row)
 
     def _job_for(self, row: dict, running=None):
         """The standalone enhance being made of this row's image, or ``None``.
@@ -576,7 +548,7 @@ class EnhanceController:
         self._targets = {pid: target for pid, target in self._targets.items()
                          if pid in live}
         signature = tuple(sorted(
-            (job.prompt_id, self._target_of(job) or job.params.get("input_image") or "")
+            (job.prompt_id, self._target_of(job) or gallery.enhance_input_of(job.params) or "")
             for job in running
         ))
         if signature != self._signature:
@@ -584,7 +556,7 @@ class EnhanceController:
             self._by_prompt = {
                 row["prompt_id"]: job
                 for job in running
-                for row in self._host.image_rows()
+                for row in self._db.list_generations()
                 if self._of_row(job, row)
             }
         self._browser.show_enhancing({
@@ -640,8 +612,8 @@ class EnhanceController:
         it, so no enhanced file lands with no original to be a version of.
         """
         for job in self.jobs_targeting(rows):
-            logger.info("Canceling the enhance of %s: its image is being deleted",
-                        job.params.get("input_image"))
+            logger.info("Canceling the enhance of %s: its item is being deleted",
+                        gallery.enhance_input_of(job.params))
             self._jobs.cancel_job(job.prompt_id)
 
     def cancel_for(self, rows) -> None:
@@ -661,14 +633,7 @@ class EnhanceController:
         jobs = self.jobs_targeting(rows)
         for job in jobs:
             logger.info("Canceling the enhance of %s: asked to, from its tile",
-                        job.params.get("input_image"))
+                        gallery.enhance_input_of(job.params))
             self._jobs.cancel_job(job.prompt_id)
         if jobs:
             self.reconcile()
-
-
-def _all_video(rows) -> bool:
-    """Whether ``rows`` is a non-empty set of videos — the one case with nothing
-    to enhance at all, as opposed to nothing picked."""
-    rows = list(rows)
-    return bool(rows) and all(gallery.media_type_of_row(row) == MediaType.VIDEO for row in rows)

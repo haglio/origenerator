@@ -16,7 +16,7 @@ from origenerator import gallery
 from origenerator.gui import enhance_controller as module
 from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
-    NO_VIDEO_ENHANCER,
+    NOTHING_PICKED_TO_ENHANCE,
     EnhanceController,
     Offer,
 )
@@ -44,22 +44,20 @@ class FakePanel:
         self.on_changed = on_changed
         self.enhance_requested = FakeSignal()
         self.shown = None
-        self.applicable = None
         self.offer = None
 
     def show_settings(self, settings):
         self.shown = settings
-
-    def set_applicable(self, applicable, why):
-        self.applicable = (applicable, why)
 
     def show_offer(self, available, tip):
         self.offer = (available, tip)
 
 
 class FakeWorkflow:
-    name = ENHANCE
     version = "2"
+
+    def __init__(self, name=ENHANCE):
+        self.name = name
 
     def seed_keys(self):
         return ("seed",)
@@ -200,9 +198,6 @@ class FakeHost:
     def row_for(self, prompt_id):
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
 
-    def image_rows(self):
-        return self.rows
-
     def image_config_index(self):
         return {}
 
@@ -271,19 +266,50 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
     assert offer.tip == "Enhance 2 items (upscale + light redraw)"
 
 
-def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
-                                                                      monkeypatch):
-    # There is no video enhancer, and a picked clip looks no different picked.
-    monkeypatch.setattr(module.gallery, "is_enhanceable_row",
-                        lambda row: row["media_type"] == "image")
-    monkeypatch.setattr(module.gallery, "media_type_of_row",
-                        lambda row: row["media_type"])
+def test_a_picked_video_is_offered_and_launches_the_video_enhancer_on_it(enhance,
+                                                                         monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
+    monkeypatch.setattr(module.gallery, "level_matching_settings",
+                        lambda row, settings: None)
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_video": "video/v1.mp4 [output]", "seed": 1})
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: f"video/{row['workflow_name']}/abc")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, gallery.VIDEO_ENHANCE_WORKFLOW,
+                        FakeWorkflow(gallery.VIDEO_ENHANCE_WORKFLOW))
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    db = FakeDB([_video("v1")])
+    jobs = FakeReroll()
+    controller, _host = enhance(
+        FakeHost(picked=["v1"]), db=db, jobs=jobs, browser=FakeBrowser(["v1"]))
+
+    assert controller.offer() == (True, "Enhance 1 item (upscale + light redraw)")
+
+    controller.enhance_the_selection()
+
+    assert [key for key, _params in jobs.prepared] == ["video/video_enhance/abc"]
+    assert db.targets == [("run-1", "v1")]
+
+
+def test_a_pick_nothing_can_enhance_says_so_rather_than_you_have_this_one(enhance,
+                                                                           monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: False)
     controller, _host = enhance(
         FakeHost(picked=["v1"]), db=FakeDB([_video("v1")]), browser=FakeBrowser(["v1"]))
 
-    offer = controller.offer()
+    assert controller.offer() == (False, NOTHING_PICKED_TO_ENHANCE)
 
-    assert offer == (False, NO_VIDEO_ENHANCER)
+
+def test_a_running_video_enhance_shows_on_the_video_it_is_of(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: row["media_type"])
+    job = FakeJob("run-9", workflow=FakeWorkflow(gallery.VIDEO_ENHANCE_WORKFLOW))
+    job.params = {"input_video": "video/v1.mp4 [output]"}
+    controller, _host = enhance(
+        db=FakeDB([_video("v1"), _image("i1"), {"prompt_id": "run-9", "enhance_of": None}]),
+        jobs=FakeReroll(jobs=[job]))
+
+    assert controller.run_of(_video("v1")) is not None
+    assert controller.run_of(_image("i1")) is None
 
 
 def test_a_picture_already_made_at_these_settings_says_so_rather_than_no(enhance,
@@ -344,6 +370,25 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     assert [key for key, _params in jobs.prepared] == [
         "image/image_enhance/abc", "image/image_enhance/abc"]
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
+
+
+def test_a_pick_of_a_picture_and_a_video_is_two_batches_each_under_its_own_enhancer(enhance,
+                                                                                    monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: ({"input_video": "v1.mp4"} if "v" in row["prompt_id"]
+                                               else {"input_image": "one.png"}))
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: f"{row['workflow_name']}/abc")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, gallery.VIDEO_ENHANCE_WORKFLOW,
+                        FakeWorkflow(gallery.VIDEO_ENHANCE_WORKFLOW))
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1"), _video("v1")]), jobs=jobs)
+
+    controller.enhance_items(["i1", "v1"])
+
+    assert jobs.asks == [("image_enhance/abc", 1), ("video_enhance/abc", 1)]
 
 
 def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
@@ -465,30 +510,6 @@ def test_the_settings_survive_a_restart(enhance):
     assert controller.settings_json() == controller.settings.to_json()
 
 
-def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatch):
-    # A video is the one place with no enhancement to configure at all.
-    monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "video")
-    rows = [_video("v1")]
-    controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
-                                browser=FakeBrowser(["v1"]))
-
-    controller.sync_panel(Offer(False, NO_VIDEO_ENHANCER))
-
-    assert controller.panel.applicable == (False, NO_VIDEO_ENHANCER)
-
-
-def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
-    monkeypatch.setattr(module.gallery, "media_type_of_row",
-                        lambda row: row["media_type"])
-    rows = [_video("v1"), _image("i1")]
-    controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
-                                browser=FakeBrowser(["v1", "i1"]))
-
-    controller.sync_panel(Offer(True, "Enhance 1 item"))
-
-    assert controller.panel.applicable == (True, NO_VIDEO_ENHANCER)
-
-
 def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(enhance):
     controller, _host = enhance()
 
@@ -537,7 +558,7 @@ def test_the_tile_the_version_list_and_the_show_all_learn_of_a_run(enhance,
     tab = FakeConfigPanel(row)
     browser, shows = FakeBrowser(), FakeShows()
     controller, _host = enhance(
-        FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
+        db=FakeDB([row]), jobs=FakeReroll([FakeJob("run-a")]),
         browser=browser, shows=shows, tabs=FakeTabs([tab]))
 
     controller.reconcile()
@@ -619,7 +640,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
     controller, _host = enhance(db=FakeDB([_video("v1")]))
 
     assert controller.enhance_it("v1") == (
-        None, "🎤 only a finished image can be enhanced", WARNING)
+        None, "🎤 only a finished item can be enhanced", WARNING)
 
 
 def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,

@@ -39,6 +39,11 @@ _VIDEO_SHARE = 0.8
 # most wants explored, so they're drawn this much more often than the rest.
 _LORA_DIM_WEIGHT = 4.0
 
+# The form rows an experiment never varies: batch size re-runs the same
+# recipe in bulk, and a bigger frame costs several times the run while saying
+# nothing new about the recipe.
+_NOT_A_DIMENSION = frozenset({"batch_size", "resolution"})
+
 # How often a proposal mutates two dimensions instead of one.
 _SECOND_DIM_CHANCE = 0.3
 # Exploration floor: this often, a mutated value is drawn uniformly instead of
@@ -173,12 +178,11 @@ class ExperimentPolicy:
     @staticmethod
     def _mutable_dims(workflow):
         """The dimensions an experiment may vary: the prompt pair, any bounded
-        numeric, and any multi-option combo — per the workflow's own form.
-        Batch size is exempt: varying it re-runs the same recipe in bulk, which
-        explores nothing and multiplies the GPU bill."""
+        numeric, and any multi-option combo — per the workflow's own form,
+        less the rows :data:`_NOT_A_DIMENSION` names."""
         dims = []
         for pd in workflow.param_definitions():
-            if pd.key == "batch_size":
+            if pd.key in _NOT_A_DIMENSION:
                 continue
             if pd.key == "positive_prompt" or (pd.type in (ParamType.INT, ParamType.FLOAT) and pd.min_val is not None \
                     and pd.max_val is not None and pd.max_val > pd.min_val) or (pd.type == ParamType.COMBO and pd.options and len(pd.options) > 1):

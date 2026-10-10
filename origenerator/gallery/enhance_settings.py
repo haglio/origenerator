@@ -19,9 +19,12 @@ from dataclasses import dataclass, field
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detail_fixes_of
 
-# The standalone workflow one enhancement runs. Machinery rather than a
-# generation of its own: its defaults are where an unconfigured folder starts.
+# The standalone workflows one enhancement runs, a picture's and a video's.
+# Machinery rather than generations of their own: the picture enhancer's
+# defaults are where an unconfigured folder starts.
 ENHANCE_WORKFLOW = "image_enhance"
+VIDEO_ENHANCE_WORKFLOW = "video_enhance"
+ENHANCE_WORKFLOWS = (ENHANCE_WORKFLOW, VIDEO_ENHANCE_WORKFLOW)
 
 # The settings the Enhance subpanel offers, and so the only params a folder's
 # settings may override on an enhance run. Everything else about the job — the

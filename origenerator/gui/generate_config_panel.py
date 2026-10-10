@@ -36,6 +36,7 @@ from origenerator.gallery import (
     describe_enhance_params,
     displayed_levels,
     enhance_params_for,
+    is_enhanceable_row,
     item_label,
     level_matching_settings,
     media_type_of_row,
@@ -1598,9 +1599,8 @@ class GenerateConfigPanel(QWidget):
 
         The preview is already on ``output_files[0]`` — the most-enhanced
         version — so the list leads with that level and offers the rest below
-        it, under the ``+ Enhance`` row. A video has no row to press — the
-        enhancer takes images — and lists versions only once Evolver has
-        upscaled it, none of them binned from here.
+        it, under the ``+ Enhance`` row. A video's versions are never binned
+        from here: they are the video itself and the copy Evolver keeps.
         """
         row = self._displayed_row
         if row is None:
@@ -1609,11 +1609,12 @@ class GenerateConfigPanel(QWidget):
             return
         if media_type_of_row(row) != MediaType.IMAGE:
             self._listed_levels = displayed_levels(row, self._upscale_of(row))
-            # A video file is no picture, so both versions wear its thumbnail.
+            # A video file is no picture, so every version wears its thumbnail.
             self._versions.show_levels(
                 [(level, row.get("thumbnail_path")) for level in self._listed_levels],
-                created_fallback=str(row.get("created_at", "")),
-                held_days=row.get("days_in_trash"), deletable=False,
+                self._pending_enhancement,
+                self._add_card_for(row) if is_enhanceable_row(row) else None,
+                str(row.get("created_at", "")), row.get("days_in_trash"), deletable=False,
             )
             return
         self._listed_levels = displayed_levels(row)

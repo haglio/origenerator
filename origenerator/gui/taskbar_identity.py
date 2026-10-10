@@ -23,6 +23,10 @@ class TaskbarIdentity(QObject):
         self._described = described
         app.installEventFilter(self)
 
+    @property
+    def wearing(self) -> tuple[str, TaskbarApp | None]:
+        return self._wearing
+
     def join(self, app_id: str) -> None:
         self._wearing = (app_id, self._described(app_id))
 

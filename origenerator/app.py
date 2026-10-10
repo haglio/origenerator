@@ -136,11 +136,15 @@ def _bring_to_front(window) -> None:
     """
     window.raise_()
     window.activateWindow()
+    _take_the_foreground(int(window.winId()))
+
+
+def _take_the_foreground(hwnd: int) -> None:
     if sys.platform != "win32":
         return
     try:
         from origenerator.win32 import force_foreground_window
-        force_foreground_window(int(window.winId()))
+        force_foreground_window(hwnd)
     except Exception:
         pass  # cosmetic: a window underneath is still a window
 
@@ -518,15 +522,15 @@ def boot_steps(maintenance) -> tuple[tuple[str, float], ...]:
     )
 
 
-def _open_the_loading(fun_time, app, logger, preview):
+def _open_the_loading(fun_time, app, logger, preview, taskbar):
     from origenerator.gui.loading_screen import Loading, loading_screen
 
     if fun_time is not None:
         return Loading(app, logger, None)
-    screen = loading_screen(CHECKOUT / "icon.ico", preview, boot_steps(MAINTENANCE))
-    screen.show()
-    _bring_to_front(screen)
-    app.processEvents()
+    app_id, button = (None, None) if taskbar is None else taskbar.wearing
+    screen = loading_screen(CHECKOUT / "icon.ico", preview, boot_steps(MAINTENANCE),
+                            app_id=app_id, taskbar=button)
+    screen.shown.connect(_take_the_foreground)
     return Loading(app, logger, screen)
 
 
@@ -745,7 +749,7 @@ def main(argv: list[str] | None = None) -> int:
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 
-    loading = _open_the_loading(fun_time, app, logger, preview)
+    loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the

@@ -711,7 +711,7 @@ def test_flush_hands_comfyui_everything_still_waiting(qtbot, tmp_path):
     assert db.get_generation(second.prompt_id)["status"] == "running"
 
 
-def test_a_submit_refused_as_the_app_closes_is_recorded_but_not_announced(qtbot, tmp_path):
+def test_a_submit_refused_as_the_app_closes_is_reported_like_any_other(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -723,7 +723,7 @@ def test_a_submit_refused_as_the_app_closes_is_recorded_but_not_announced(qtbot,
 
     queue.flush_to_server()
 
-    assert said == []
+    assert said == ["v1"]
     assert db.get_generation(held.prompt_id)["status"] == "error"
 
 

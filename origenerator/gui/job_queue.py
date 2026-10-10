@@ -431,8 +431,8 @@ class JobQueue(QObject):
         (:func:`_off_the_gui_thread`), so a Cancel can arrive while it is out:
         the job is gone from the line by the time the server answers, and a
         server that took it is told to let it go. A refused run of the user's
-        says so through :attr:`failed`, unless the app is ``closing``, with no
-        window left to keep alive or to say it in.
+        says so through :attr:`failed`. The ``closing`` app has no window
+        left to keep alive, so it makes the plain blocking call.
         """
         key = self._key_of(job)
         self._in_flight = job
@@ -445,7 +445,7 @@ class JobQueue(QObject):
             self._db.update_generation(job.prompt_id, status=GenerationStatus.ERROR,
                                        error_message=str(e))
             self._drop(key, job)
-            if not closing and _the_users_own(job.source):
+            if _the_users_own(job.source):
                 self.failed.emit(key, str(e))
             return False
         finally:

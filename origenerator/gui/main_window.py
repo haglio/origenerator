@@ -67,6 +67,8 @@ SESSION_UI_STATE = (
     # of small friction that makes a control feel unfinished.
     ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
     ("slideshows", GalleryView.remembered_shows, GalleryView.remember_shows),
+    ("generations_failed_as_it_closed", GalleryView.generations_failed_as_it_closed,
+     GalleryView.say_generations_failed_as_it_closed),
 )
 
 # The two the view does not own. Geometry is the window's own, and the prompt

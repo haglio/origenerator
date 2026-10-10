@@ -1321,7 +1321,15 @@ class GalleryView(QWidget):
         outlives it and works through the rest alone; the next launch picks up
         whatever finished. Returns how many jobs went.
         """
+        self._generation_failed.hold_for_next_launch()
         return self._jobs.flush_to_server()
+
+    def generations_failed_as_it_closed(self) -> list[str]:
+        return list(self._generation_failed.held)
+
+    def say_generations_failed_as_it_closed(self, reasons: list[str] | None) -> None:
+        if reasons:
+            defer(self, lambda: self._generation_failed.say_each(reasons))
 
     def _launch_base_render(self, workflow, params):
         """The batch's launch adapter: submit one re-render as a normal re-roll

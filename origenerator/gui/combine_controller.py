@@ -34,6 +34,7 @@ from origenerator.config import (
     LOCAL_LLM_BASE_URL,
     LOCAL_LLM_MODEL,
 )
+from origenerator.content import genau_flick_word
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_panel import CombinePanel
@@ -522,8 +523,8 @@ class CombineController(QObject):
         fullscreen surface being spoken to when one is up, and in a dialog
         otherwise. A dialog thrown over a picture someone is looking at is the one
         place this must never appear."""
-        what = ("looping “%s” clip" % category if intent == recipe_match.GENAU
-                else "“%s” video" % category)
+        what = (f"looping “{category}” {genau_flick_word()}" if intent == recipe_match.GENAU
+                else f"“{category}” video")
         if self._shows.showing is not None:
             self._shows.note_voice_run(
                 None, f"🎤 no past {what} to base a recipe on yet", kind=WARNING)
@@ -748,7 +749,7 @@ class CombineController(QObject):
         """
         row = self._db.get_generation(image_id) if image_id else None
         if row is None or gallery.media_type_of_row(row) != MediaType.IMAGE:
-            return None, "🎤 only a picture can become a Genau clip", WARNING
+            return None, f"🎤 only a picture can become a Genau {genau_flick_word()}", WARNING
         if self._already_genaud(row):
             return None, ALREADY_GENAUD, WARNING
         category = recipe_match.category_for_prompt(row.get("positive_prompt") or "")
@@ -759,10 +760,11 @@ class CombineController(QObject):
             self.rebuildable_videos(self._db.list_generations()), recipe_match.GENAU,
         )
         if category not in available:
-            return None, f"🎤 no looping “{category}” clip to base a recipe on yet", WARNING
+            return (None, f"🎤 no looping “{category}” {genau_flick_word()} to base a recipe "
+                          "on yet", WARNING)
         logger.info("genau it: image=%s -> category=%s", image_id, category)
         self.generate_category(image_id, category, recipe_match.GENAU, send=True)
-        return image_id, f"🎤 animating as a “{category}” loop", NOTICE
+        return image_id, f"🎤 animating as a “{category}” {genau_flick_word()}", NOTICE
 
 
 def _the_row_this_run_will_make(video_row: dict, params: dict, workflow) -> dict:

@@ -88,6 +88,7 @@ class TestWhenEvolverIsBeside:
 
         assert len(said) == 1
         assert "example-other-clips" in said[0] and "example-loop-clips" in said[0]
+        assert "the folder Genau flicks are routed by" in said[0]
 
     def test_every_disagreement_is_reported_at_once(self, tmp_path: Path):
         """Told one at a time, four renames are four launches."""

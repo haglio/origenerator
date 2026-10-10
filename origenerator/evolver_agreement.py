@@ -33,6 +33,7 @@ from app_support import overlay
 
 from origenerator import config, evolver_export
 from origenerator.config import project_dir
+from origenerator.content import genau_flicks_word
 
 CONTRACT = "evolver_contract.json"
 
@@ -112,6 +113,7 @@ def disagreements(ours: OurSide, checkout: Path) -> tuple[str, ...]:
                    ours.upscaled_dir, under_library("upscaled_dir")),
         _differing("the mark a half-written copy wears",
                    ours.partial_marker, published.get("partial_marker")),
-        _differing("the folder Genau clips are routed by", ours.genau_source, theirs_genau),
+        _differing(f"the folder Genau {genau_flicks_word()} are routed by",
+                   ours.genau_source, theirs_genau),
     )
     return tuple(line for line in said if line is not None)

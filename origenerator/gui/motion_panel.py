@@ -1,4 +1,4 @@
-"""The OSR2's section of Genau's console, in the foot of the main window.
+"""The OSR2's section of Genau's console, at the top left of the main window.
 
 Nothing on it is drawn here. :class:`player_core.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the
@@ -30,7 +30,7 @@ from origenerator import osr2
 from origenerator.gui.console import (
     REPAINT_MS,
     console_hud,
-    panel_size,
+    panel_room,
     post_device_action,
 )
 from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
@@ -67,9 +67,7 @@ class MotionPanel(QWidget):
         self._ask_device = device_on
         self._painter = ConsolePainter(device_only=True)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(motion, self._osr2_control()))
-        # A show's console is built while its video is already driving, so the
-        # first paint must be the size that console draws at.
+        self.setFixedSize(*panel_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
         # second is the same picture at Pillow's price, and with the panel now
@@ -181,11 +179,8 @@ class MotionPanel(QWidget):
 
     def paintEvent(self, event):
         raw, (width, height) = self.render_console()
-        if (width, height) != (self.width(), self.height()):
-            # The rows change width with what they say — a two-digit dwell, a
-            # longer waveform name — so the widget follows the picture rather
-            # than cropping it.
-            self.setFixedSize(width, height)
+        if width > self.width() or height > self.height():
+            self.setFixedSize(max(width, self.width()), max(height, self.height()))
         painter = QPainter(self)
         painter.drawImage(0, 0, QImage(raw, width, height,
                                        QImage.Format.Format_RGBA8888))

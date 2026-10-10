@@ -62,7 +62,7 @@ class PaneArrangement:
         # horizontal scroll bar back under the form.
         self.folder_panes.setStretchFactor(0, 0)  # the TOC pane holds its width
         self.folder_panes.setStretchFactor(1, 1)  # the browser takes the growth
-        self.folder_panes.setSizes([220, 560])
+        self.folder_panes.setSizes([max(220, self._toc.sizeHint().width()), 560])
         # The strip opens at its own height and stays there: all the growth
         # goes to the folders above it, so a taller window is more gallery
         # rather than more queue.

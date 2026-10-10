@@ -6,12 +6,14 @@ lookalike), and that each command it posts reaches the right thing here.
 """
 from __future__ import annotations
 
+import itertools
 import random
 
 from player_core import drive_layout, wave_stack
 from player_core.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_OFF,
+    OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
 )
@@ -23,7 +25,7 @@ from player_core.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
-from origenerator.gui.console import console_hud, drive_hud
+from origenerator.gui.console import console_hud, drive_hud, panel_room
 from origenerator.gui.motion_panel import MotionPanel
 from tests.motion_doubles import FakeMotion
 
@@ -388,6 +390,28 @@ def test_the_panel_actually_paints(qtbot):
     motion.state.cruise.active = True
 
     assert not panel.grab().isNull()  # and again with every reading lit
+
+
+def test_the_panel_keeps_the_room_its_console_takes_at_its_widest(qtbot):
+    panel, motion = _panel(qtbot)
+    panel.show()
+    panel.grab()  # a paint of the console as it stands, narrower than at its widest
+
+    assert (panel.width(), panel.height()) == panel_room(motion)
+
+
+def test_no_state_draws_the_console_outside_the_room_kept_for_it():
+    motion = FakeMotion()
+    room_width, room_height = panel_room(motion)
+
+    for control, active, device_on, script in itertools.product(
+            (*OSR2_CONTROL_BUTTONS, OSR2_CONTROL_UNANSWERED), (False, True), (False, True),
+            (None, FakeScript())):
+        motion.active = active
+        _raw, (width, height) = ConsolePainter(device_only=True).rgba(
+            console_hud(motion, device_on=device_on, control=control, script=script))
+
+        assert width <= room_width and height <= room_height, (control, active, device_on)
 
 
 def test_the_readout_shows_the_summed_motion_while_cruise_has_it(qtbot):

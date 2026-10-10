@@ -782,7 +782,9 @@ class GalleryView(QWidget):
 
     def _build_toc_pane(self):
         """The left pane: the two folder trees under the voice caption, the
-        search field and the media filter, with the combine panel at their foot.
+        search field and the media filter, with the combine panel at their foot
+        -- and over all of it, in the view's top-left corner beside the button
+        bank, the OSR2 HUD of a window that drives the device.
         """
         # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
         # -> settings; a LoRA-less workflow collapses the LoRA level to one
@@ -839,12 +841,33 @@ class GalleryView(QWidget):
         toc_column.addWidget(media_filter)
         toc_column.addWidget(self._tree, 1)  # the trees take the height; combine sits below
         toc_column.addWidget(self._combine.panel)
-        return toc
+        self._motion_panel = None
+        self._motion_pane = None
+        if self._osr2_motion is None:
+            return toc
+        self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
+        # The one place Esc's panic stop is discoverable, now that the
+        # toolbar switch whose tooltip said so is gone.  Only here: in a
+        # show Esc closes the show rather than stopping the device.
+        self._motion_panel.setToolTip(
+            f"{self._motion_panel.toolTip()} · Esc stops")
+        hud_scroll = QScrollArea()
+        hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        hud_scroll.setWidget(self._motion_panel)
+        hud, hud_column = pane()
+        hud_column.addWidget(hud_scroll)
+        self._motion_pane = hud
+        column = pane_splitter(Qt.Orientation.Vertical)
+        column.addWidget(hud)
+        column.addWidget(toc)
+        column.setStretchFactor(0, 0)
+        column.setStretchFactor(1, 1)
+        return column
 
     def _build_browser_pane(self):
         """The middle pane: the folder's path, the button bank under it, the
-        shelf's own bars, and the flowing contents -- with the two app-wide
-        panels standing at its foot, under a handle of their own.
+        shelf's own bars, and the flowing contents -- with the Enhance settings
+        standing at its foot, under a handle of their own.
         """
         browser, browser_column = pane()
         self._folder_path = FolderPathHeader()
@@ -909,45 +932,19 @@ class GalleryView(QWidget):
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
         browser_column.addWidget(self._scroll, 1)
-        # The foot of the center (browser) pane, under a handle of its own: genau's
-        # readout, copied, on the left, and the Enhance settings beside it, a
-        # handle between them too. Hosted by Fun Time there is no readout — the
-        # real console is on the session's main player — so the Enhance settings
-        # take the foot alone.
-        #
-        # What an enhancement runs at — the Enhance All button, a single image's
+        # The foot of the center (browser) pane, under a handle of its own: what
+        # an enhancement runs at — the Enhance All button, a single image's
         # Enhance, and (with its tick on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
         # moment, not a property of the folder you happen to be standing in, so
         # it shows on the shelves as readily as on a settings folder. Deliberately
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
-        self._motion_panel = None
-        self._motion_pane = None
         enhance, enhance_column = pane()
         enhance_column.addWidget(self._enhance.panel)
-        below = enhance
-        if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
-            # The one place Esc's panic stop is discoverable, now that the
-            # toolbar switch whose tooltip said so is gone.  Only here: in a
-            # show Esc closes the show rather than stopping the device.
-            self._motion_panel.setToolTip(
-                f"{self._motion_panel.toolTip()} · Esc stops")
-            hud_scroll = QScrollArea()
-            hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            hud_scroll.setWidget(self._motion_panel)
-            hud, hud_column = pane()
-            hud_column.addWidget(hud_scroll)
-            self._motion_pane = hud
-            below = pane_splitter(Qt.Orientation.Horizontal)
-            below.addWidget(hud)
-            below.addWidget(enhance)
-            below.setStretchFactor(0, 0)
-            below.setStretchFactor(1, 1)
         browsing = FootSplitter()
         browsing.addWidget(browser)
-        browsing.addWidget(below)
+        browsing.addWidget(enhance)
         browsing.setStretchFactor(0, 1)
         browsing.setStretchFactor(1, 0)
         return browsing

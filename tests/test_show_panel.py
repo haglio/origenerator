@@ -19,6 +19,7 @@ from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.show_panel import show_hud_model
 from origenerator.gui.show_wiring import HudFacts, ShowActions
+from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.slideshow import in_order
 from tests.funestra_fakes import FakePlayer
@@ -191,6 +192,28 @@ class TestTheOnePanelAShowWears:
         show.press("robot_hand_cycle_shape")
 
         assert "shape" in show._motion.calls
+
+    def test_a_press_on_the_clip_seconds_pair_paces_the_show(self, qtbot):
+        show = self._show(qtbot, image_dwell_ms=4000)
+        show.wear_the_hud("portrait")
+
+        show.press("genau_clip_seconds_up")
+        assert show.dwell_s == 4 + STEP_S
+
+        show.press("genau_clip_seconds_down")
+        assert show.dwell_s == 4
+
+    def test_the_clip_seconds_pair_stops_at_its_ends(self, qtbot):
+        show = self._show(qtbot)
+        show.wear_the_hud("portrait")
+
+        show.set_dwell_s(MAX_S)
+        show.press("genau_clip_seconds_up")
+        assert show.dwell_s == MAX_S
+
+        show.set_dwell_s(MIN_S)
+        show.press("genau_clip_seconds_down")
+        assert show.dwell_s == MIN_S
 
     def test_a_hosted_side_verb_still_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
         """The device rows are checked before the session's transport now, so a

@@ -1,6 +1,6 @@
-"""The buttons this app puts on Genau's console, row by row: Genau's transport,
-the pace an unlocked slide moves on at, and the motion's own row.  Only what
-:class:`origenerator.gui.motion_panel.MotionPanel` answers is declared."""
+"""The buttons this app puts on Genau's console, row by row: the pace an
+unlocked slide moves on at, and the motion's own row.  Only what this app
+answers is declared."""
 
 from __future__ import annotations
 
@@ -16,54 +16,18 @@ from player_core.console import (
 from player_core.hud_button import Button
 from player_core.hud_marks import shared_mark
 
-Rows = tuple[tuple[Button, ...], ...]
 
-
-def device_rows(*, control: str, cruise: bool, learned: bool, shape: str,
-                pace_s: int | None = None) -> Rows:
-    """The same console without its transport row.
-
-    What a show wears is one panel, and the side's own prev/next/lock/trash are
-    already on its control band, acting on that very show.  A second set of four
-    beside them is what made the two-panel show read as two half-apps: the same
-    gestures twice, under two status lines that disagreed.
-
-    *pace_s* writes the seconds into the pace row's own cell.  The console's
-    painter fills that cell from the host it is drawing for; the panel a show
-    wears has no host to ask, so the number is written in where the row is
-    declared, and the cell comes out empty without it.
-    """
-    return (
-        _pace_row(pace_s),
-        _motion_row(control=control, cruise=cruise, learned=learned, shape=shape),
-    )
-
-
-def transport_row(*, locked: bool, pace_s: int) -> tuple[Button, ...]:
-    return (
-        Button("genau_prev_clip", "⏮", "Previous clip"),
-        Button("genau_next_clip", "⏭", "Next clip"),
-        Button("main_lock", "🔒",
-               f"Locked — this clip repeats; press to move on every {pace_s}s" if locked
-               else f"Unlocked — moving on every {pace_s}s; press to lock this clip",
-               lit=locked, favorite=True, group_break=True),
-        Button("genau_weird_clip", shared_mark("trash"), "Mark weird — move it out",
-               danger=True, group_break=True),
-    )
-
-
-def _pace_row(pace_s: int | None = None) -> tuple[Button, ...]:
+def pace_row(pace_s: int) -> tuple[Button, ...]:
     return (
         Button("", "Clip seconds", "", width=ROW_LABEL_W),
         Button("genau_clip_seconds_down", "−", "Move on sooner", group_break=True),
-        Button("", "" if pace_s is None else f"{pace_s}s", "", width=VALUE_W,
-               host_value="advance_interval"),
+        Button("", f"{pace_s}s", "", width=VALUE_W),
         Button("genau_clip_seconds_up", "+", "Leave each clip longer"),
     )
 
 
-def _motion_row(*, control: str, cruise: bool, learned: bool,
-                shape: str) -> tuple[Button, ...]:
+def motion_row(*, control: str, cruise: bool, learned: bool,
+               shape: str) -> tuple[Button, ...]:
     """The motion's shape, then the four states of OSR2 control from off to on.
 
     Off only where the app answers control at all (*control* empty is a

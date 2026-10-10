@@ -1,23 +1,17 @@
 """What a show answers to — the interface, written down once.
 
-Three things drive whatever is holding a region or sitting under a console:
-the players' own panel (:mod:`origenerator.gui.show_panel`), the on-video console
-(:mod:`origenerator.gui.motion_panel`), and, inside a session, Fun Time's file
+Three things drive whatever is holding a region: the players' own panel
+(:mod:`origenerator.gui.show_panel`), the console's clip-seconds pair
+(:mod:`origenerator.gui.console`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.fun_time_bridge`). They reached it through
 sixteen ``hasattr``/``getattr`` probes spread over those three modules, each
 re-discovering the interface by guessing at attribute names — and the three did
 not agree: the console called five of the names with no guard at all while the
 other two guarded every one, so nothing in the repo said which was right.
 
-There are three hosts, and this says what each owes.
-:class:`~origenerator.gui.slideshow_view.SlideshowView` and
-:class:`~origenerator.gui.player_show.PlayerShow` have a set and answer all of
-it. :class:`~origenerator.gui.slideshow_pace.PaceOnlyHost` is the main window's
-console with no show under it — a pace to set and nothing to step — so it
-inherits this and takes the answers below for the half it has no set for, which
-are what the probes' defaults used to be.
-
-A caller therefore asks; it does not check first. ``tests/test_show_host.py``
+There are two hosts, :class:`~origenerator.gui.slideshow_view.SlideshowView`
+and :class:`~origenerator.gui.player_show.PlayerShow`, and both answer all of
+it. A caller therefore asks; it does not check first. ``tests/test_show_host.py``
 holds that per driver module at zero, and holds every host to every attribute.
 """
 
@@ -29,13 +23,12 @@ from typing import Protocol
 class ShowHost(Protocol):
     """The surface a console, a HUD or a hosting session drives a show through.
 
-    The first six attributes are the transport, and every host has them for real:
-    they are the four buttons and the pace pair that Genau's console, the
-    players' HUD and Fun Time's own hotkeys all reach for. The rest are about
-    the *set* a show is playing, and carry the answer a host without one gives.
+    The first six attributes are the transport: the four buttons and the pace
+    pair that Genau's console, the players' HUD and Fun Time's own hotkeys all
+    reach for. The rest are about the *set* a show is playing.
     """
 
-    # --- the transport: what every host answers for itself ------------------
+    # --- the transport ------------------------------------------------------
 
     @property
     def locked(self) -> bool:
@@ -65,17 +58,17 @@ class ShowHost(Protocol):
         """Take what is on screen away and move on."""
         ...
 
-    # --- the set: what a host without one answers ---------------------------
+    # --- the set ------------------------------------------------------------
 
     def show_reset(self) -> None:
-        """Put the side back how it started. A host with no set never left."""
+        """Put the side back how it started."""
 
     def show_order(self, *, latest: bool) -> None:
         """Play the side's whole library newest first, or shuffled."""
 
     def show_loop(self, axis: str) -> None:
         """Loop the map's *axis* — "seed" or "action" — around what is on
-        screen, or end the loop for "".  No set, nothing to loop."""
+        screen, or end the loop for ""."""
 
     def show_loop_cycle(self) -> None:
         """The loop key: seeds, then actions, then off — or the lock, with
@@ -93,8 +86,8 @@ class ShowHost(Protocol):
     def clear_modes(self) -> bool:
         """Every narrowing off at once — the favorites, the enhanced ones and
         the act filter — which is what "no filter" means said to a show.
-        ``False`` where nothing moved, a host with no set's answer always."""
-        return False
+        ``False`` where nothing moved."""
+        ...
 
     def show_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one."""
@@ -102,26 +95,25 @@ class ShowHost(Protocol):
     def hud_map(self):
         """The map the HUD draws around what is on screen
         (:class:`~origenerator.gui.show_map.ShowMap`), which says which of its
-        axes is looping — or ``None`` for nothing to map, which is how a host
-        with no set says so, and what
+        axes is looping — or ``None`` for nothing to map, which
         :func:`~origenerator.gui.show_panel.show_hud_model` reads as no map at all.
         """
 
     @property
     def hud_favorites_filter(self) -> bool:
-        """Whether the set is narrowed to the favorites. No set, no mode."""
-        return False
+        """Whether the set is narrowed to the favorites."""
+        ...
 
     @property
     def hud_act_filter(self) -> str:
         """The act(s) the set is narrowed to, as the players' HUD posts them
-        — what lights the map's row buttons.  No set, no filter."""
-        return ""
+        — what lights the map's row buttons."""
+        ...
 
     @property
     def hud_order_label(self) -> str:
         """The order the set is played in, in the players' own words."""
-        return ""
+        ...
 
     @property
     def hud_device(self):
@@ -135,7 +127,7 @@ class ShowHost(Protocol):
         prev/next/lock/trash twice.  One panel now, and this is the half of it
         the host answers for.
         """
-        return None
+        ...
 
     def press_console(self, action: str) -> bool:
         """Do what a press on the console's own rows asks — the pace, the
@@ -145,43 +137,40 @@ class ShowHost(Protocol):
         False for a host with no device to drive, which leaves the panel to
         route the press the way it routes every other.
         """
-        return False
+        ...
 
     @property
     def hud_is_favorite(self) -> bool:
         """Whether the item on screen is favorited — the players' star readout."""
-        return False
+        ...
 
     @property
-    def hud_item_note(self) -> str:
-        return ""
+    def hud_item_note(self) -> str: ...
 
     def toggle_favorites_filter(self) -> None:
         """Narrow the set to the favorites, or widen it back."""
 
-    def set_favorites_filter(self, on: bool) -> bool:
-        return False
+    def set_favorites_filter(self, on: bool) -> bool: ...
 
     @property
     def hud_enhanced_mode(self) -> bool:
         """Whether the set is narrowed to the pictures this app has enhanced —
-        the switch beside F-mode.  No set, no mode."""
-        return False
+        the switch beside F-mode."""
+        ...
 
     def toggle_enhanced_mode(self) -> bool:
         """Flip that switch — the HUD's own button, and the session console's.
 
-        ``False`` where the switch did not move, which is the answer a host with
-        no set always gives and the answer a set with nothing enhanced in it
-        gives to being narrowed.
+        ``False`` where the switch did not move, which is the answer a set with
+        nothing enhanced in it gives to being narrowed.
         """
-        return False
+        ...
 
     def set_enhanced_mode(self, on: bool) -> bool:
         """Put that switch a named way rather than flipping it — what a caller
         moving two regions together needs, since a flip each could leave them
         disagreeing.  ``False`` where it did not move."""
-        return False
+        ...
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named; *lock* keeps it there."""
@@ -190,9 +179,8 @@ class ShowHost(Protocol):
     def hud_queue(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
         app's, for the block the panel hangs at its foot
-        (:mod:`origenerator.gui.hud_queue`).  Nothing at all for a host with no
-        line to report, which draws no block."""
-        return [], 0
+        (:mod:`origenerator.gui.hud_queue`)."""
+        ...
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence this show, or let it be heard."""

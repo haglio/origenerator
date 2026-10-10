@@ -1,7 +1,7 @@
 """The one interface every driver of a show reaches through.
 
-The players' HUD, the on-video console and — inside a session — Fun Time's own
-file channels all drive whatever is holding a region. What they may ask of it
+The players' HUD, the console's clip-seconds pair and — inside a session — Fun
+Time's own file channels all drive whatever is holding a region. What they may ask of it
 used to be written nowhere: each caller re-discovered the interface by probing
 attribute names as strings, sixteen times over three modules, and the three did
 not agree about what a host must provide. These pin the interface itself, both
@@ -21,14 +21,12 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_host import ShowHost
 from origenerator.gui.show_panel import show_hud_model
-from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from tests.funestra_fakes import FakePlayer
 
 # What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
-# the transport every host has; the rest are about a set, and a host with no set
-# under it takes the protocol's own answers for them.
+# the transport; the rest are about a set.
 TRANSPORT = (
     "locked", "dwell_s", "set_dwell_s",
     "show_step", "show_toggle_lock", "show_cull",
@@ -71,7 +69,6 @@ THE_SET = (
 DRIVERS = (
     "origenerator/gui/show_panel.py",
     "origenerator/fun_time_bridge.py",
-    "origenerator/gui/motion_panel.py",
     "origenerator/gui/console.py",
 )
 
@@ -88,11 +85,6 @@ def slideshow(qtbot):
                          shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view
-
-
-@pytest.fixture
-def pace_only():
-    return PaceOnlyHost(SlideshowPace())
 
 
 @pytest.fixture
@@ -116,54 +108,15 @@ def test_a_slideshow_answers_every_attribute_of_the_protocol(slideshow, attribut
 
 @pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
 def test_a_show_on_a_player_answers_every_attribute_of_the_protocol(on_a_player, attribute):
-    # The third host: a show handed to a session's player.  It has a set, so it
+    # The other host: a show handed to a session's player.  It has a set, so it
     # answers all of it itself, the same as the window does.
     assert hasattr(on_a_player, attribute)
 
 
-@pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
-def test_a_pace_only_host_answers_every_attribute_of_the_protocol(pace_only, attribute):
-    # The main window's console with nothing under it: it answers the transport
-    # itself and takes the protocol's answers for the set it does not have.
-    assert hasattr(pace_only, attribute)
+def test_a_show_with_nothing_to_map_has_no_hud_model(slideshow, monkeypatch):
+    monkeypatch.setattr(slideshow, "hud_map", lambda: None)
 
-
-def test_a_host_with_no_set_says_it_has_no_set(pace_only):
-    host = pace_only
-
-    assert host.hud_map() is None
-    assert host.hud_favorites_filter is False
-    assert host.hud_order_label == ""
-    assert host.hud_is_favorite is False
-    assert host.hud_item_note == ""
-
-
-def test_the_verbs_about_a_set_do_nothing_where_there_is_no_set(pace_only):
-    # Not an error and not a silence to be guarded against at every call site:
-    # the one documented answer for a host with nothing to step.
-    host = pace_only
-
-    assert host.show_reset() is None
-    assert host.show_order(latest=True) is None
-    assert host.toggle_favorites_filter() is None
-    assert host.set_favorites_filter(True) is False
-    assert host.show_item("anything", lock=True) is None
-    assert host.show_loop("seed") is None
-    assert host.show_loop_cycle() is None
-    assert host.show_more_seeds() is None
-    assert host.show_nav("right") is None
-    assert host.show_filter("fox") is None
-    assert host.show_filter_to_the_act_on_screen() is None
-    assert host.hud_enhanced_mode is False
-    assert host.toggle_enhanced_mode() is False
-    assert host.set_enhanced_mode(True) is False
-
-
-def test_a_host_with_no_set_draws_no_hud_map(pace_only):
-    # show_hud_model asks rather than probes now, and an empty set is the answer
-    # that means "nothing to map" — the same None the hasattr used to return.
-
-    assert show_hud_model("portrait", pace_only) is None
+    assert show_hud_model("portrait", slideshow) is None
 
 
 def _probes_in(relative_path: str) -> list[str]:

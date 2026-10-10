@@ -28,7 +28,7 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
-from origenerator.slideshow import LIVE, ShowFilters, Slide, in_order
+from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, ShowFilters, Slide, in_order
 from tests.funestra_fakes import FakePlayer
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_support import ahead
@@ -1245,6 +1245,18 @@ def test_the_pace_can_be_wound_back_down_to_nought(qtbot):
     view.set_dwell_s(0)
     assert view.dwell_s == 0
     assert not _will_move_on(view)
+
+
+def test_the_pace_starts_at_the_slideshows_own_default():
+    assert SlideshowPace().seconds == DEFAULT_IMAGE_DWELL_MS // 1000
+
+
+def test_turning_the_pace_up_changes_a_running_slideshow(qtbot):
+    pace = SlideshowPace()
+    view = _view(qtbot, items=[("a.png", "image", "g1"), ("b.png", "image", "g2")], pace=pace)
+    pace.set_seconds(9)
+    assert view._playlist.image_dwell_ms == 9000
+    assert view.dwell_s == 9
 
 
 def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):

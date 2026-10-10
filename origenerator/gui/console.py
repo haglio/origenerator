@@ -1,7 +1,7 @@
 """What this app tells the players' console painter, and what a press on it means.
 
-The console is drawn in two places here — its OSR2 section alone in the foot of
-the main window, and that section with the pace on the panel a show wears — so
+The console is drawn in two places here — its OSR2 section alone at the top left
+of the main window, and that section with the pace on the panel a show wears — so
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
@@ -15,6 +15,7 @@ states the app's one OSR2 switch is in.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from player_core import drive_layout
 from player_core.console import (
@@ -199,9 +200,9 @@ def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
     )
 
 
-def panel_size(motion, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[int, int]:
-    """How big the console draws, which is what the widget has to be."""
-    return ConsolePainter(device_only=True).rgba(console_hud(motion, control=control))[1]
+def panel_room(motion) -> tuple[int, int]:
+    driving = SimpleNamespace(active=True, state=motion.state)
+    return ConsolePainter(device_only=True).rgba(console_hud(driving, control=OSR2_DRIVING))[1]
 
 
 def pace_row(pace_s: int) -> tuple[Button, ...]:

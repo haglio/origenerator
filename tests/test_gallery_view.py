@@ -1138,7 +1138,7 @@ def test_search_stays_applied_across_a_rebuild(qtbot):
 def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    toc = view._arrangement.folder_panes.widget(0)
+    toc = _pane_holding(view._tree)
     assert isinstance(view._search.field, QLineEdit)
     assert toc.isAncestorOf(view._search.field)
     # it leads the pane, above the tree it searches across.
@@ -11283,15 +11283,16 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
                 assert room.contains(child.geometry()), (type(inside).__name__, child)
 
 
-def test_a_draggable_divider_parts_the_hud_from_the_enhance_settings(qtbot, tmp_path):
+def test_the_hud_sits_top_left_over_the_search_with_a_draggable_divider_between(
+        qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    divider = _pane_holding(view._enhance.panel).parentWidget()
+    divider = _pane_holding(view._motion_panel).parentWidget()
 
-    assert isinstance(divider, QSplitter)
-    assert divider.orientation() == Qt.Orientation.Horizontal
+    assert view._arrangement.folder_panes.widget(0) is divider
+    assert divider.orientation() == Qt.Orientation.Vertical
     assert divider.widget(0).isAncestorOf(view._motion_panel)
-    assert divider.widget(1).isAncestorOf(view._enhance.panel)
+    assert divider.widget(1).isAncestorOf(view._search.field)
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
 
@@ -11307,7 +11308,8 @@ def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, t
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
 
-def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tmp_path):
+def test_with_room_to_spare_the_enhance_settings_under_the_thumbnails_open_whole(qtbot,
+                                                                               tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.resize(1500, 1100)
@@ -11315,29 +11317,50 @@ def test_with_room_to_spare_the_panels_under_the_thumbnails_open_whole(qtbot, tm
     for _ in range(4):  # a relayout of the settings posts the pass that fits the foot
         QApplication.processEvents()
     (settings,) = view._enhance.panel.findChildren(QScrollArea)
-    (hud,) = _pane_holding(view._motion_panel).findChildren(QScrollArea)
 
     assert settings.verticalScrollBar().maximum() == 0
+
+
+def test_with_room_to_spare_the_hud_opens_whole_at_the_top_left_even_at_its_widest(
+        qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client(),
+                       osr2_motion=_SignalMotion())
+    qtbot.addWidget(view)
+    view.resize(1500, 1100)
+    view.show()
+    view.osr2_control.setChecked(True)  # the Robot Hand driving, its widest line
+    for _ in range(4):
+        QApplication.processEvents()
+    (hud,) = _pane_holding(view._motion_panel).findChildren(QScrollArea)
+
+    assert hud.horizontalScrollBar().maximum() == 0
     assert hud.verticalScrollBar().maximum() == 0
 
 
-def test_squeezed_smaller_than_the_hud_its_section_scrolls_rather_than_spilling(qtbot,
-                                                                              tmp_path):
+def test_the_enhance_settings_take_the_whole_foot_under_the_thumbnails(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    divider = _pane_holding(view._scroll).parentWidget()
+
+    assert divider.widget(1) is _pane_holding(view._enhance.panel)
+
+
+def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtbot,
+                                                                           tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.resize(1500, 900)
     view.show()
     QApplication.processEvents()
-    beside = _pane_holding(view._enhance.panel).parentWidget()
-    below = _pane_holding(view._scroll).parentWidget()
+    over_the_search = _pane_holding(view._motion_panel).parentWidget()
 
-    beside.moveSplitter(60, 1)
-    below.moveSplitter(below.height() - below.handleWidth() - 90, 1)
+    view._arrangement.folder_panes.moveSplitter(60, 1)
+    over_the_search.moveSplitter(90, 1)
     QApplication.processEvents()
-    (section,) = beside.widget(0).findChildren(QScrollArea)
+    (hud,) = over_the_search.widget(0).findChildren(QScrollArea)
 
-    assert section.horizontalScrollBar().maximum() > 0
-    assert section.verticalScrollBar().maximum() > 0
+    assert hud.horizontalScrollBar().maximum() > 0
+    assert hud.verticalScrollBar().maximum() > 0
 
 
 def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):

@@ -77,9 +77,9 @@ from origenerator.gui.browser_pane import (
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
-from origenerator.gui.editable_header import EditableHeader
 from origenerator.gui.enhance_controller import EnhanceController, Offer
 from origenerator.gui.find_bar import FindBar
+from origenerator.gui.folder_path_header import FolderPathHeader
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.gallery_navigation import NavigationController
@@ -88,6 +88,7 @@ from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
 )
 from origenerator.gui.gallery_tree import (
+    PATH_SEPARATOR,
     GalleryTree,
     SideModel,
 )
@@ -845,14 +846,11 @@ class GalleryView(QWidget):
         shelf's own bars, and the flowing contents -- with the two app-wide
         panels standing at its foot, under a handle of their own.
         """
-        # Browser pane: a header (the folder's path, then a back/forward/undo
-        # toolbar under it) over the flowing contents. Double-clicking the path
-        # renames the folder it ends at.
         browser, browser_column = pane()
-        self._title = EditableHeader()
-        self._title.edit_requested.connect(self._begin_title_rename)
-        self._title.edited.connect(self._commit_title_rename)
-        browser_column.addWidget(self._title)
+        self._folder_path = FolderPathHeader()
+        self._folder_path.edit_requested.connect(self._open_folder_path)
+        self._folder_path.entered.connect(self._go_to_folder_path)
+        browser_column.addWidget(self._folder_path)
         # The button bank over this pane (:mod:`origenerator.gui.toolbar_bank`).
         # It builds and lays out every button and is written from one state; what
         # each button depends on is gathered in :meth:`bank_state`.
@@ -1836,7 +1834,7 @@ class GalleryView(QWidget):
                 self._tree.setCurrentItem(target)  # shows the folder's thumbnails
                 self._reselect_generation(selected_gen)
             else:
-                self._title.set_display("")
+                self._folder_path.set_display("")
                 self._avg_label.setText("")
                 self._browser.show_empty()
                 self._selected_row = None  # nothing selected
@@ -1979,8 +1977,7 @@ class GalleryView(QWidget):
     def name_search_on_screen(self, query: str, scope: str) -> None:
         """Say in the header that a search is what the pane is showing, in place
         of the folder that was there."""
-        self._title.set_display(f"Search: “{query}” in {scope}")
-        self._title.setToolTip("")  # the header is the query now, not a folder
+        self._folder_path.set_display(f"Search: “{query}” in {scope}")
         self._avg_label.setText("")
         self._experiments_bar.hide()
 
@@ -2121,8 +2118,7 @@ class GalleryView(QWidget):
         shelf = folder_shelf(base)
         self._experiments_bar.setVisible(shelf is not None and shelf.shelf == _EXPERIMENTS_KEY)
         if current is None:
-            self._title.set_display("")
-            self._title.setToolTip("")
+            self._folder_path.set_display("")
             self._avg_label.setText("")
             self._browser.show_empty()
             self._re_aim()
@@ -2136,7 +2132,7 @@ class GalleryView(QWidget):
         # return-after-delete trail record.
         here = self._tree_view.selected_folder_key()
         self._note_folder_visit(here if group is not None else None)
-        self._title.set_display(self._tree_view.breadcrumb(current))
+        self._folder_path.set_display(self._tree_view.breadcrumb(current))
         self._update_folder_average(group)
         self._show_group_contents(group, current)
         landed = self._land_on_the_first_item()
@@ -2174,7 +2170,7 @@ class GalleryView(QWidget):
     def _open_shelf(self, shelf: FolderShelf, orientation: str | None, item):
         if shelf.shelf == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._title.set_display(self._shelf_title(shelf, item))
+        self._folder_path.set_display(self._shelf_title(shelf, item))
         self._avg_label.setText("")
         self._clear_metadata()
         self._browser.show_shelf(shelf.key, orientation)
@@ -2184,7 +2180,7 @@ class GalleryView(QWidget):
 
     def _shelf_title(self, shelf: FolderShelf, item) -> str:
         star = "★ " if shelf.shelf == _FAVORITES_KEY else ""
-        return f"{self._tree_view.breadcrumb(item.parent())}  ›  {star}{item.text(0)}"
+        return f"{self._tree_view.breadcrumb(item.parent())}{PATH_SEPARATOR}{star}{item.text(0)}"
 
     def _show_group_contents(self, group, item):
         if isinstance(group, gallery.SettingsGroup):
@@ -2199,16 +2195,30 @@ class GalleryView(QWidget):
         """Go to a folder: select its tree row, which draws it.
 
         The one move under every gesture that names a folder to open — a folder
-        tile's click, a config tab's "Go to folder" — as :meth:`_go_to_generation`
-        is the one under every gesture that names a picture. Each is a decision
-        to go there, so a running search is put away first: a search's results
-        are folder tiles too, and this is how they open; without it the field
-        would still be full while the pane shows the folder it drilled into.
+        tile's click, a config tab's "Go to folder", a pasted path — as
+        :meth:`_go_to_generation` is the one under every gesture that names a
+        picture. Each is a decision to go there, so a running search is put away
+        first: a search's results are folder tiles too, and this is how they
+        open; without it the field would still be full while the pane shows the
+        folder it drilled into.
         """
         item = self._tree_item_for(key)
         if item is not None:
             self._search.leave()
             self._tree.setCurrentItem(item)
+
+    def _open_folder_path(self):
+        here = self._tree.currentItem() if self._selection_group is None else None
+        self._folder_path.begin_edit(self._tree_view.breadcrumb(here))
+
+    def _go_to_folder_path(self, path: str):
+        if not path.strip():
+            return
+        key = self._tree_view.key_at_path(path)
+        if key is None:
+            self.tell("Folder not found", f"No folder is at this path:\n\n{path}")
+        else:
+            self._go_to_folder(key)
 
     # --- several folders at once: the folder they would make ------------------
 
@@ -2243,8 +2253,7 @@ class GalleryView(QWidget):
         the browser pane, and the toolbar offering to save the grouping."""
         group = self._selection_group
         self._experiments_bar.hide()
-        self._title.set_display(group.label)
-        self._title.setToolTip("")  # a count of folders, with no one folder under it
+        self._folder_path.set_display(group.label)
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._re_aim()
@@ -4259,36 +4268,6 @@ class GalleryView(QWidget):
         self._actions.rename_folder(key, name.strip() or None)
         self._re_aim()
         # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
-        defer(self, self.refresh)
-
-    def _begin_title_rename(self):
-        """Double-clicking the title bar edits the selected folder's name — but not
-        while several are picked, where the title is a count of them and the rename
-        would land on whichever one happened to be current, and not over a search,
-        where the title is the query and there is no folder under it to rename.
-
-        Only the folder's own name is edited, not the path on show: the editor is
-        the size of that name, at the head of the path (see
-        :meth:`EditableHeader.begin_edit`)."""
-        if self._selection_group is not None or self._showing_search():
-            return
-        item = self._tree.currentItem()
-        group = item.data(0, _GROUP_ROLE) if item is not None else None
-        if group is not None and gallery.is_renamable(group):
-            self._title.begin_edit(group.label)
-
-    def _commit_title_rename(self, name: str):
-        group = self.current_group()
-        if group is None:
-            return
-        self._actions.rename_folder(group.key, name.strip() or None)
-        self._re_aim()
-        # Rebuild on the next turn of the event loop rather than here. What
-        # usually ends this edit is a click somewhere else in the window, and
-        # "somewhere else" is most often a thumbnail — so refreshing inside the
-        # editor's own focus-out deletes the browser pane that Qt is still
-        # delivering that click to, and the app goes down with an access
-        # violation. The tree's inline rename defers for the same reason.
         defer(self, self.refresh)
 
     def _toggle_favorite(self, key: str):

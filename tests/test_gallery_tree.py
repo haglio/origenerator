@@ -45,15 +45,21 @@ def _folder_of_your_own(folder_id, name):
                                folder_id=folder_id)
 
 
-def _table_of_contents(qtbot, rows, folders_of_your_own=()):
-    """The Landscape half, built from ``rows`` and opened all the way down."""
+def _gallery_tree(qtbot, rows, folders_of_your_own=()):
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
-    GalleryTree(pane).populate(
+    tree = GalleryTree(pane)
+    tree.populate(
         [SideModel(LANDSCAPE, gallery.build_gallery_tree(rows),
                    custom_folders=list(folders_of_your_own), show_recents=True),
          SideModel(PORTRAIT, [])],
         expanded_keys=())
+    return pane, tree
+
+
+def _table_of_contents(qtbot, rows, folders_of_your_own=()):
+    """The Landscape half, built from ``rows`` and opened all the way down."""
+    pane, _tree = _gallery_tree(qtbot, rows, folders_of_your_own)
     pane.resize(500, 1600)
     pane.show()
     qtbot.waitExposed(pane)
@@ -132,3 +138,29 @@ def test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark
 
     assert _wears(images, "photo")
     assert _wears(videos, "play")
+
+
+def test_every_row_is_found_again_by_the_path_it_shows(qtbot):
+    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat"), _video("v1", "style_a")],
+                                [_folder_of_your_own(1, "Keepers")])
+    rows = tree.item_by_key
+
+    assert len({tree.breadcrumb(row) for row in rows.values()}) == len(rows) > 30
+    for key, row in rows.items():
+        assert tree.key_at_path(tree.breadcrumb(row)) == key, tree.breadcrumb(row)
+
+
+def test_a_path_is_found_whatever_its_spacing_or_capitals(qtbot):
+    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat")])
+    latest = tree.key_at_path("Landscape  ›  All  ›  Latest")
+
+    assert latest is not None
+    assert tree.key_at_path(" landscape ›all›   LATEST ") == latest
+
+
+def test_a_path_no_row_has_finds_nothing(qtbot):
+    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat")])
+
+    for path in ("", "Landscape", "Landscape  ›  All  ›  Nowhere",
+                 "Sideways  ›  All", "All  ›  Latest", "Landscape  ›  Latest"):
+        assert tree.key_at_path(path) is None, path

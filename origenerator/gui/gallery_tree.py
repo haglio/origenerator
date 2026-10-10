@@ -25,6 +25,7 @@ bookmarked folders.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from PyQt6.QtCore import Qt
@@ -62,6 +63,22 @@ _SHELF_TIPS = {
     REQUESTS_KEY: "What you asked for out loud — “Request … over”",
     TRASH_KEY: "Deleted items — restorable here until you delete them for good",
 }
+
+
+PATH_SEPARATOR = "  ›  "
+
+
+def _name_of(row) -> str:
+    group = row.data(0, GROUP_ROLE)
+    return group.label if group is not None else row.text(0)
+
+
+def _children(row) -> Iterator[QTreeWidgetItem]:
+    return (row.child(i) for i in range(row.childCount()))
+
+
+def _same_name(typed: str, name: str) -> bool:
+    return " ".join(typed.split()).casefold() == " ".join(name.split()).casefold()
 
 
 def _shown_shelves(side) -> list[str]:
@@ -234,8 +251,7 @@ class GalleryTree:
         return item
 
     def shelves_in(self, item) -> list[str]:
-        children = (item.child(i) for i in range(item.childCount()))
-        return [child.data(0, TREE_KEY_ROLE) for child in children
+        return [child.data(0, TREE_KEY_ROLE) for child in _children(item)
                 if child.data(0, GROUP_ROLE) is None]
 
     def keys_for_folder(self, folder_key: str) -> list[str]:
@@ -287,11 +303,23 @@ class GalleryTree:
         parts = []
         node = item
         while node is not None:
-            group = node.data(0, GROUP_ROLE)
-            # Only a shelf row has no group, and it is named by its own text.
-            parts.append(group.label if group is not None else node.text(0))
+            parts.append(_name_of(node))
             node = node.parent()
         side = orientation_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
         if side is not None:
             parts.append(ORIENTATION_LABELS[side])
-        return "  ›  ".join(reversed(parts))
+        return PATH_SEPARATOR.join(reversed(parts))
+
+    def key_at_path(self, path: str) -> str | None:
+        side_name, *names = path.split(PATH_SEPARATOR.strip())
+        side = next((side for side, label in ORIENTATION_LABELS.items()
+                     if _same_name(side_name, label)), None)
+        if side is None or not names:
+            return None
+        row = self._tree.root_for(side)
+        for name in names:
+            row = next((child for child in _children(row)
+                        if _same_name(name, _name_of(child))), None)
+            if row is None:
+                return None
+        return row.data(0, TREE_KEY_ROLE)

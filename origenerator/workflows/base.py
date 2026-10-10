@@ -341,6 +341,11 @@ class WorkflowTemplate(ABC):
         metronome, which remains the fallback for pixels-only workflows."""
         return None
 
+    def script_source(self, params: dict) -> str | None:
+        """The video whose script this run's output keeps, as the reference the
+        run reads it by, or ``None`` for a run that makes new motion."""
+        return None
+
     @staticmethod
     def lora_model_input(node_id: str, model_ref, lora_name, strength):
         """The optional model-only LoRA node to add to a payload, and the model

@@ -9,10 +9,13 @@ Qt-free so the reconciler can use it without a running UI.
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 
-from origenerator.config import MOTION_DEFAULT_HZ
+from origenerator.config import COMFYUI_INPUT_DIR, COMFYUI_TEMP_DIR, MOTION_DEFAULT_HZ
+from origenerator.file_refs import reference_path
 from origenerator.funscript import (
+    funscript_of,
     funscript_path_for,
     synthesize_funscript,
     write_funscript,
@@ -68,12 +71,28 @@ def _write_video_funscript(workflow, files, output_dir: Path, params: dict | Non
         return
     try:
         authored = workflow.authored_actions(params) if params else None
+        kept = _script_kept_from(workflow, params, output_dir)
         if authored:
             write_funscript(funscript_path_for(source, output_dir=output_dir), authored)
+        elif kept is not None:
+            destination = funscript_path_for(source, output_dir=output_dir)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(kept, destination)
         else:
             synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, output_dir=output_dir)
     except Exception as e:
         logger.warning("Funscript generation failed for %s: %s", source, e)
+
+
+def _script_kept_from(workflow, params: dict | None, output_dir: Path) -> Path | None:
+    """The script of the video this run's output keeps the timing of (an
+    enhancement's source), when that video has one."""
+    reference = workflow.script_source(params) if params else None
+    if not reference:
+        return None
+    video = reference_path(reference, output_dir=output_dir, input_dir=COMFYUI_INPUT_DIR,
+                           temp_dir=COMFYUI_TEMP_DIR)
+    return funscript_of(video, output_dir=output_dir) if video is not None else None
 
 
 def _make_thumbnail(workflow, files, output_dir: Path, thumb_dir: Path, name):

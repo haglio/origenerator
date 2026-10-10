@@ -116,6 +116,9 @@ class VideoEnhanceWorkflow(WorkflowTemplate):
                      options=list_model_files("upscale_models", [defaults["upscale_model"]], accepts=ANY)),
         ]
 
+    def script_source(self, params: dict) -> str | None:
+        return params.get("input_video") or None
+
     def build_api_payload(self, params: dict) -> dict:
         lora, model = self.lora_model_input(
             "lora", ["unet", 0], params["lora_low"], params["lora_strength_low"])

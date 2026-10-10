@@ -1,15 +1,11 @@
-"""Genau's console, in the foot of the main window — the same one Fun Time draws.
+"""The OSR2's section of Genau's console, in the foot of the main window.
 
 Nothing on it is drawn here. :class:`player_core.console_hud.ConsolePainter`
-paints it, and this widget renders that into a bitmap and blits it: the status
-line, the transport, the clip-seconds pace, the hands-free row, the OSR2 line
-and the drive readout under them, all the code Fun Time runs.  What goes on it
-and what a press takes off it are :mod:`origenerator.gui.console`'s, which a
-show's own panel asks the same questions of.
-
-The one row left off is the one naming the three players, and the minimize
-button riding it. This console is inside another app's window, so it is not one
-of those three and has no borderless window of its own to park.
+paints it, and this widget renders that into a bitmap and blits it: the
+hands-free row, the OSR2 line and the drive readout under them, all the code
+Fun Time runs.  What goes on it and what a press takes off it are
+:mod:`origenerator.gui.console`'s, which a show's own panel asks the same
+questions of.
 
 The on/off switch IS on it: the control-state group -- parked, retracted,
 driving, control off -- is the app's one OSR2 switch now, and the toolbar's
@@ -35,30 +31,25 @@ from origenerator.gui.console import (
     REPAINT_MS,
     console_hud,
     panel_size,
-    post_console_action,
+    post_device_action,
 )
 from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
-from origenerator.gui.slideshow_pace import PaceOnlyHost, SlideshowPace
 
 
 class MotionPanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
-    It is always here, motion or no motion. Part of what is on it is not about a
-    running motion at all — the pace an unlocked slide moves on at — and a panel
-    that appeared only once the device was being driven made that reachable
-    only by starting a motion first. With nothing driving, it draws itself
-    exactly as Fun Time's does with the OSR2 off: the OSR2 row reads "Off", the
-    readout greys, and the trace holds still rather than animating a wave
-    nobody is riding.
+    It is always here, motion or no motion. With nothing driving, it draws
+    itself exactly as Fun Time's does with the OSR2 off: the OSR2 row reads
+    "Off", the readout grays, and the trace holds still rather than animating a
+    wave nobody is riding.
     """
 
     # Fun Time insets its HUD from the window's top-left corner by this much, and
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, motion, parent=None, host=None, pace=None, device_on=None,
-                 control=None):
+    def __init__(self, motion, parent=None, device_on=None, control=None):
         super().__init__(parent)
         self._motion = motion
         # The app's one OSR2 switch: the control-state group's four buttons
@@ -74,13 +65,9 @@ class MotionPanel(QWidget):
         # How to ask whether the OSR2 is on the wire, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
-        # Without a slideshow under it the console still has a pace to set: the
-        # one the next slideshow will open at.
-        self._host = host if host is not None else PaceOnlyHost(
-            pace if pace is not None else SlideshowPace(parent=self))
-        self._painter = ConsolePainter()
+        self._painter = ConsolePainter(device_only=True)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
-        self.setFixedSize(*panel_size(motion, self._host, self._osr2_control()))
+        self.setFixedSize(*panel_size(motion, self._osr2_control()))
         # A show's console is built while its video is already driving, so the
         # first paint must be the size that console draws at.
         # The trace scrolls with the phase, so repaint on a beat while it is
@@ -161,8 +148,7 @@ class MotionPanel(QWidget):
     def _post(self, action: str) -> None:
         """Do here what Fun Time would route to whichever player owns it —
         through the one router both of this app's consoles press into."""
-        post_console_action(action, motion=self._motion, host=self._host,
-                            control=self._control)
+        post_device_action(action, motion=self._motion, control=self._control)
         self.update()
 
     # --- painting: the console's own painter, blitted ----------------------
@@ -183,7 +169,7 @@ class MotionPanel(QWidget):
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
         return self._painter.rgba(console_hud(
-            self._motion, self._host, device_on=self._device_on(),
+            self._motion, device_on=self._device_on(),
             control=self._osr2_control(), script=self._script()))
 
     def _device_on(self) -> bool:

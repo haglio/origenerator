@@ -1,9 +1,9 @@
 """What this app tells the players' console painter, and what a press on it means.
 
-The console is drawn in two places here — the foot of the main window, where
-there is no show to step, and a fullscreen show, where the show's own panel
-carries the device half of it — so what goes ON the console and what a press
-takes OFF it are written once, here, rather than once per surface.
+The console is drawn in two places here — its OSR2 section alone in the foot of
+the main window, and that section with the pace on the panel a show wears — so
+what goes ON the console and what a press takes OFF it are written once, here,
+rather than once per surface.
 
 Nothing is drawn here. :class:`player_core.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
@@ -25,7 +25,7 @@ from player_core.console import (
     OSR2_RETRACTED,
     ConsoleModel,
 )
-from player_core.console_hud import ConsoleHud, ConsolePainter, ModeHud
+from player_core.console_hud import ConsoleHud, ConsolePainter
 from player_core.drive_readout import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
@@ -41,7 +41,7 @@ from player_core.robot_hand import (
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
-from origenerator.gui.console_buttons import device_rows, transport_row
+from origenerator.gui.console_buttons import motion_row, pace_row
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which of the console's four control buttons asks for which state, read off
@@ -69,13 +69,13 @@ def _limits(state) -> drive_layout.Limits:
     )
 
 
-def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
+def drive_hud(state, active: bool) -> DriveHud:
     """The live motion as the readout's own view of it.
 
     The bars, where the device is, and the motion sampled forward — the same
     samples it is being sent, so the trace is the motion rather than a drawing
     of it. ``driven`` is what dims the whole readout: nothing reaching the
-    device is a picture of a motion nobody is making, and it goes grey exactly
+    device is a picture of a motion nobody is making, and it goes gray exactly
     as Fun Time's does.
     """
     bars = state.state
@@ -86,7 +86,6 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
         shape=bars.shape.value,
         position=round(POSITION_MAX * motion_engine.position(state) / 100),
         driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
-        advance_interval=dwell_s,
         trace_seconds=_TRACE_SECONDS,
         spd_at_min=limits.spd_at_min, spd_at_max=limits.spd_at_max,
         amp_at_min=limits.amp_at_min, amp_at_max=limits.amp_at_max,
@@ -97,7 +96,7 @@ def drive_hud(state, active: bool, dwell_s: int = 0) -> DriveHud:
     )
 
 
-def script_hud(script, motion, dwell_s: int) -> DriveHud:
+def script_hud(script, motion) -> DriveHud:
     """The readout while a funscript has the device: the script's own line from
     the playhead forward, in the green every scripted thing in this family is
     drawn in.
@@ -112,19 +111,15 @@ def script_hud(script, motion, dwell_s: int) -> DriveHud:
         speed=bars.speed, amplitude=bars.amplitude, center=bars.center,
         shape=bars.shape.value,
         position=round(POSITION_MAX * (heights[0] if heights else 0.0)),
-        driven=DRIVEN_BY_FUNSCRIPT, advance_interval=dwell_s,
-        trace_seconds=_TRACE_SECONDS, waveform=heights)
+        driven=DRIVEN_BY_FUNSCRIPT, trace_seconds=_TRACE_SECONDS, waveform=heights)
 
 
-def console_hud(motion, host, *, device_on: bool = True,
+def console_hud(motion, *, device_on: bool = True,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ConsoleHud:
-    """The whole console as Fun Time's painter takes it.
+    """The console's OSR2 section as Fun Time's painter takes it.
 
     ``mode`` is genau because that is what this is: a self-generated motion over
-    what is on screen, with no Nau playlist under it. The empty
-    :class:`ModeHud` is what leaves the status line saying only whether the
-    slide is locked — there is no compilation, no browse order and no length
-    filter here to report.
+    what is on screen, with no Nau playlist under it.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
@@ -135,26 +130,18 @@ def console_hud(motion, host, *, device_on: bool = True,
     (:func:`origenerator.osr2.device_on`). A motion running with the device off
     is a motion nobody is receiving, and the console says so exactly as Fun
     Time's does: the OSR2 row reads "Off" and the painter takes that as nothing
-    driving, which greys the readout and holds the trace still. The motion goes
+    driving, which grays the readout and holds the trace still. The motion goes
     on — it cannot see the device either way — so this is the only
     thing standing between a switched-off OSR2 and a console animating a blue
     wave nothing is riding.
-
-    Neither filter switch is offered (both ``None``): the console draws those
-    only where the host hands over a set to narrow, and here the show's own HUD
-    carries them instead.
     """
-    device = show_device(motion, host, device_on=device_on, control=control,
-                         script=script)
+    device = show_device(motion, device_on=device_on, control=control, script=script)
     return ConsoleHud(
-        modes=ModeHud(),
         console=ConsoleModel(
-            main_mode=MainMode.GENAU, active=True, locked=host.locked,
+            main_mode=MainMode.GENAU,
             osr2=device.osr2, osr2_control=control,
-            advance_interval=host.dwell_s,
-            rows=(transport_row(locked=host.locked, pace_s=host.dwell_s), *device.rows),
             osr2_rows=device.osr2_rows,
-            max_intensity=motion.state.state.max_intensity,
+            max_intensity=device.max_intensity,
         ),
         drive=device.drive,
     )
@@ -162,18 +149,14 @@ def console_hud(motion, host, *, device_on: bool = True,
 
 @dataclass(frozen=True)
 class ShowDevice:
-    """The device half of this app's console: the pace, the rows that aim the
-    OSR2, who has the device, and the motion being sent.
+    """The device half of this app's console: the rows that aim the OSR2, who
+    has the device, and the motion being sent -- and on a show's panel, the pace.
 
     Handed to the one panel a show wears (:mod:`origenerator.gui.show_panel`) so
     it says all of it without a second panel underneath, and used to build the
-    whole console for the surface that has no show under it at all.
+    console's OSR2 section in the main window.
     """
 
-    # The pace an unlocked slide moves on at -- about the SET, so it rides with
-    # the rows that step it rather than with the device.
-    rows: tuple
-    # And the rows that aim the OSR2, which ride with the device.
     osr2_rows: tuple
     osr2: str
     # Which of the four states the app's one OSR2 switch is in, or empty where
@@ -181,9 +164,12 @@ class ShowDevice:
     osr2_control: str
     drive: DriveHud
     max_intensity: int
+    # The pace an unlocked slide moves on at -- about the SET, so it rides with
+    # the rows that step it rather than with the device.
+    rows: tuple = ()
 
 
-def show_device(motion, host, *, device_on: bool = True,
+def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ShowDevice:
     """What the device is doing, as a panel takes it — see :class:`ShowDevice`.
 
@@ -191,40 +177,49 @@ def show_device(motion, host, *, device_on: bool = True,
     device the readout is the script's line rather than the motion's, and the
     line says FunScript.  ``device_on`` is whether the OSR2 is answering at all;
     with it off nothing here is being received, so the line reads Off, the
-    readout greys and the trace holds still rather than animating a wave nobody
+    readout grays and the trace holds still rather than animating a wave nobody
     is riding.
     """
     scripted = script is not None and script.active and device_on
     driving = motion.active and device_on and not scripted
-    pace, aim = device_rows(control=control, pace_s=host.dwell_s,
-                            cruise=motion.state.cruise.active,
-                            learned=motion.state.learned.active,
-                            shape=motion.state.state.shape.value)
     return ShowDevice(
         osr2_control=control,
-        rows=(pace,),
-        osr2_rows=(aim,),
+        rows=() if pace_s is None else (pace_row(pace_s),),
+        osr2_rows=(motion_row(control=control, cruise=motion.state.cruise.active,
+                              learned=motion.state.learned.active,
+                              shape=motion.state.state.shape.value),),
         osr2=(Osr2State.FUNSCRIPT if scripted
               else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
-        drive=(script_hud(script, motion.state, host.dwell_s) if scripted
-               else drive_hud(motion.state, driving, host.dwell_s)),
+        drive=(script_hud(script, motion.state) if scripted
+               else drive_hud(motion.state, driving)),
         max_intensity=motion.state.state.max_intensity,
     )
 
 
-def panel_size(motion, host, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[int, int]:
+def panel_size(motion, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[int, int]:
     """How big the console draws, which is what the widget has to be."""
-    return ConsolePainter().rgba(console_hud(motion, host, control=control))[1]
+    return ConsolePainter(device_only=True).rgba(console_hud(motion, control=control))[1]
 
 
-def post_console_action(action: str, *, motion, host, control=None) -> bool:
-    """Do what a press on the console asks, wherever the console was drawn.
+_PACE_STEPS = {"genau_clip_seconds_up": DWELL_STEP_S, "genau_clip_seconds_down": -DWELL_STEP_S}
+
+
+def post_pace_action(action: str, host) -> bool:
+    """Step *host*'s pace for a press on the clip-seconds pair, and say whether
+    the press was one of that pair."""
+    if action not in _PACE_STEPS:
+        return False
+    host.set_dwell_s(host.dwell_s + _PACE_STEPS[action])  # the pace clamps its own ends
+    return True
+
+
+def post_device_action(action: str, *, motion, control=None) -> bool:
+    """Do what a press on the console's OSR2 section asks, wherever it was drawn.
 
     The verbs are the console's own — the same strings Fun Time routes to
     whichever player owns them — and this routes them to what this app has: the
-    show (or the pace-only stand-in) for the transport and the pace, the motion
-    for everything about the motion, and the app's one OSR2 switch for the
-    control-state group and the max intensity.
+    motion for everything about the motion, and the app's one OSR2 switch for
+    the control-state group and the max intensity.
 
     *control* is that switch, or None where nobody handed one over — a panel
     outside the gallery, and a test's bare console.  The two holds still reach
@@ -252,8 +247,6 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
         "robot_hand_amplitude_down": (motion.adjust_amplitude, -10),
         "robot_hand_center_up": (motion.adjust_center, 5),
         "robot_hand_center_down": (motion.adjust_center, -5),
-        "genau_prev_clip": (host.show_step, -1),
-        "genau_next_clip": (host.show_step, 1),
     }.get(action)
     if step is not None:
         step[0](step[1])
@@ -267,13 +260,6 @@ def post_console_action(action: str, *, motion, host, control=None) -> bool:
         motion.cycle_shape()
     elif action == "quarter_button":
         motion.quarter_offset()
-    elif action == "main_lock":
-        host.show_toggle_lock()
-    elif action == "genau_weird_clip":
-        host.show_cull()
-    elif action in ("genau_clip_seconds_up", "genau_clip_seconds_down"):
-        delta = DWELL_STEP_S if action.endswith("up") else -DWELL_STEP_S
-        host.set_dwell_s(host.dwell_s + delta)  # the pace clamps its own ends
     else:
         return False
     return True

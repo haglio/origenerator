@@ -1,4 +1,4 @@
-"""Stand-ins for the OSR2 motion and the show a console acts on.
+"""A stand-in for the OSR2 motion a console acts on.
 
 Shared because three surfaces press the same console verbs -- the panel in the
 main window's foot, a show's own panel, and the keys -- and each was growing its
@@ -6,7 +6,6 @@ own half-driver to be pressed against.
 """
 from __future__ import annotations
 
-from origenerator.gui.slideshow_pace import MAX_S, MIN_S
 from origenerator.motion_engine import Motion
 
 
@@ -66,25 +65,3 @@ class FakeMotion:
     def set_max_intensity(self, level):
         self.calls.append(("max_intensity", level))
         self.state.state.max_intensity = level
-
-
-class FakeHost:
-    """Stands in for the slideshow the transport and the pace act on."""
-
-    def __init__(self):
-        self.dwell_s = 4
-        self.locked = True
-        self.calls = []
-
-    def show_step(self, delta):
-        self.calls.append(("step", delta))
-
-    def show_toggle_lock(self):
-        self.calls.append("lock")
-
-    def show_cull(self):
-        self.calls.append("cull")
-
-    def set_dwell_s(self, seconds):
-        self.dwell_s = max(MIN_S, min(MAX_S, seconds))
-        self.calls.append(("dwell", self.dwell_s))

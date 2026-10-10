@@ -42,7 +42,12 @@ from PyQt6.QtWidgets import QVBoxLayout, QWidget
 from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
 from origenerator.console_commands import side_press, spelled_for
-from origenerator.gui.console import REPAINT_MS, post_console_action, show_device
+from origenerator.gui.console import (
+    REPAINT_MS,
+    post_device_action,
+    post_pace_action,
+    show_device,
+)
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane
 from origenerator.gui.hud_queue import QueuePointer, queue_section
@@ -1105,7 +1110,7 @@ class SlideshowView(QWidget):
             return None
         control = self._actions.osr2_control
         return show_device(
-            self._motion, self, device_on=bool(osr2_device.device_on()),
+            self._motion, pace_s=self.dwell_s, device_on=bool(osr2_device.device_on()),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None)
 
@@ -1114,8 +1119,9 @@ class SlideshowView(QWidget):
         motion, the four control states, a level dragged on the readout."""
         if self._motion is None:
             return False
-        return post_console_action(action, motion=self._motion, host=self,
+        return (post_device_action(action, motion=self._motion,
                                    control=self._actions.osr2_control)
+                or post_pace_action(action, self))
 
     def set_audio_muted(self, muted: bool) -> None:
         """Silence (or voice) this show outright — what a hosting session does

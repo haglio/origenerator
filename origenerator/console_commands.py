@@ -3,7 +3,7 @@
 The console painter and the satellite HUD hand their presses back as bare
 strings, and three surfaces here decode them: the console under the main
 window and under a fullscreen show
-(:func:`~origenerator.gui.console.post_console_action`), a show's own panel
+(:func:`~origenerator.gui.console.post_device_action`), a show's own panel
 (:mod:`origenerator.gui.show_panel`), and the channel a Fun Time session drives
 a hosted show through (:mod:`origenerator.fun_time_bridge`).  Each used to
 hold its own slice index and its own way of gluing a side's name onto a verb,
@@ -11,7 +11,7 @@ so the spelling lived in three places and matched by coincidence.
 
 Nothing here knows Qt, and nothing here decides what a press *does* -- that is
 :func:`~origenerator.show_buttons.answer` for a show and
-:func:`~origenerator.gui.console.post_console_action` for the device.  This
+:func:`~origenerator.gui.console.post_device_action` for the device.  This
 says only what a press IS.
 """
 

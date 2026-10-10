@@ -1,11 +1,9 @@
 """How long a slide stays up — one number, app-wide.
 
 Genau's console carries a clip-seconds pair, and here the clips are the slides,
-so that pair sets this. It is app-wide rather than per-slideshow because the
-console is: the same one is on the main window and on whatever show is playing,
-and a pace that meant something different on each would read as several paces.
-Set it in the main window with nothing playing and the next slideshow opens at
-it; set it while one is running and that one changes pace under you.
+so that pair on a show's panel sets this. It is app-wide rather than
+per-slideshow: set it while one is running and that one changes pace under you,
+and the next slideshow opens at it.
 
 Nought is a pace like any other here, and it means never: the slide holds the
 screen until an arrow moves it. Genau's own floor is one second because a
@@ -18,7 +16,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from origenerator.gui.show_host import ShowHost
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS
 
 # The console's pair steps by this, and will not walk past these ends.
@@ -55,38 +52,3 @@ class SlideshowPace(QObject):
     @staticmethod
     def _clamped(seconds: int) -> int:
         return max(MIN_S, min(MAX_S, int(seconds)))
-
-
-class PaceOnlyHost(ShowHost):
-    """What the console acts on where there is no slideshow under it.
-
-    The main window shows the console with nothing to step, so its transport does
-    nothing there — but the pace is app-wide and setting it is worth doing
-    anywhere, because it is what the next slideshow will open at.
-
-    Everything below the transport is about a set, and this host has none: the
-    answers come from :class:`~origenerator.gui.show_host.ShowHost` itself, which
-    is where "a host with nothing to step" is written down once instead of being
-    guessed at by every caller.
-    """
-
-    locked = True
-
-    def __init__(self, pace: SlideshowPace):
-        self._pace = pace
-
-    @property
-    def dwell_s(self) -> int:
-        return self._pace.seconds
-
-    def set_dwell_s(self, seconds: int) -> None:
-        self._pace.set_seconds(seconds)
-
-    def show_step(self, delta: int) -> None: ...
-
-    def show_toggle_lock(self) -> None: ...
-
-    def set_locked(self, locked: bool) -> bool:
-        return False
-
-    def show_cull(self) -> None: ...

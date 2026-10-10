@@ -292,10 +292,8 @@ class GalleryView(QWidget):
         # switch: driving to parked leaves the switch on, and what has to change
         # is which driver is sending and what it is sending.
         self.osr2_control.changed.connect(self.reconcile_osr2)
-        # How long a slide holds the screen, app-wide: Genau's console shows
-        # it as clip seconds and sets it, from whichever window the console
-        # is on — including this one, with nothing playing, where it is what
-        # the next slideshow opens at.
+        # How long a slide holds the screen, app-wide: a show's panel shows it
+        # as clip seconds and sets it, and the next slideshow opens at it.
         self._pace = SlideshowPace(parent=self)
         # Guards the one reconcile that owns both drive sources: starting or
         # stopping the motion is something it does, not something it reacts to.
@@ -931,8 +929,7 @@ class GalleryView(QWidget):
         enhance_column.addWidget(self._enhance.panel)
         below = enhance
         if self._osr2_motion is not None:
-            self._motion_panel = MotionPanel(
-                self._osr2_motion, pace=self._pace, control=self.osr2_control)
+            self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
             # The one place Esc's panic stop is discoverable, now that the
             # toolbar switch whose tooltip said so is gone.  Only here: in a
             # show Esc closes the show rather than stopping the device.

@@ -6,6 +6,7 @@ import json
 
 import numpy as np
 import pytest
+from player_core.hud_corners import CORNER_PLUS_OVERLAY_ID
 from player_core.hud_overlay import HUD_OVERLAY_ID
 from player_core.hud_placement import HudCorner
 from player_core.satellite_hud import MARGIN
@@ -44,7 +45,7 @@ def _show(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")),
 
 def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")),
              side="portrait", **kw):
-    wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "label_for")
+    wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in", "label_for")
             if name in kw}
     show = _show(qtbot, items, **kw)
     show.wear_the_hud(side, **wear)
@@ -333,6 +334,58 @@ class TestWhereTheShowsPanelSits:
         QApplication.sendEvent(show._pane._window, QEvent(QEvent.Type.Leave))
 
         assert np.array_equal(_panel(show)[2], self._a_plus_nobody_has_pointed_at(qtbot))
+
+
+class TestACornerThePanelIsNotIn:
+    """A click in any other corner of the show sends its panel there, the way it
+    does on every player, and the pointer in such a corner shows the plus that
+    says so."""
+
+    @staticmethod
+    def _show(qtbot, **kw):
+        return TestWhereTheShowsPanelSits._show(qtbot, **kw)
+
+    def test_a_click_there_opens_the_panel_there(self, qtbot):
+        opened: list[HudCorner] = []
+        show = self._show(qtbot, open_in=opened.append)
+        _panel(show)
+        width, height = show._pane._device_size()
+
+        show._pane.press(QPointF(width - 3, height - 3))
+        show._pane.release()
+
+        assert opened == [HudCorner.LOWER_RIGHT]
+
+    def test_a_hosted_click_there_goes_out_on_the_sessions_channel(self, qtbot, tmp_path):
+        channel = tmp_path / "dashboard_cmd.txt"
+        show = self._show(qtbot, dashboard_cmd_file=channel)
+
+        show.press("portrait_hud_restore_at|lower_left")
+
+        assert channel.read_text(encoding="utf-8").split() == ["portrait_hud_restore_at|lower_left"]
+
+    def test_the_pointer_there_shows_the_plus(self, qtbot):
+        show = self._show(qtbot)
+        _panel(show)
+        width, height = show._pane._device_size()
+
+        show._pane.motion(QPointF(width - 3, height - 3), held=False)
+        show._pane.tick()
+
+        assert CORNER_PLUS_OVERLAY_ID in show._pane._player.overlays
+
+    def test_the_pointer_leaving_the_window_takes_the_plus_down(self, qtbot):
+        show = self._show(qtbot)
+        show.set_hud_place(HudCorner.LOWER_RIGHT, False)
+        _panel(show)
+        _width, height = show._pane._device_size()
+        show._pane.motion(QPointF(3, height - 3), held=False)
+        show._pane.tick()
+
+        QApplication.sendEvent(show._pane._window, QEvent(QEvent.Type.Leave))
+        show._pane.tick()
+
+        assert CORNER_PLUS_OVERLAY_ID not in show._pane._player.overlays
 
 
 def _middle_of(show, rect) -> QPointF:

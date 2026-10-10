@@ -1795,6 +1795,17 @@ def test_the_next_launch_wears_the_panel_where_the_last_one_left_it(shows):
     assert relaunched.hud_place(PORTRAIT) == (HudCorner.UPPER_LEFT, False)
 
 
+def test_a_panel_opened_in_a_corner_is_there_and_open_on_the_next_launch(shows):
+    director, _host, _made = shows()
+    director.collapse_the_hud(True, side=LANDSCAPE)
+
+    director.open_the_hud_in(HudCorner.LOWER_RIGHT, side=LANDSCAPE)
+
+    relaunched, _host, _made = shows()
+    relaunched.remember(json.loads(json.dumps(director.remembered())))
+    assert relaunched.hud_place(LANDSCAPE) == (HudCorner.LOWER_RIGHT, False)
+
+
 def test_the_favorites_shelf_holds_f_mode_down_without_turning_it_on_for_the_next(shows):
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
     folder = oriented_key("workflow/a", PORTRAIT)

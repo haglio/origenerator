@@ -55,7 +55,7 @@ from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
 from origenerator.gui.show_map import SEED_AXIS
-from origenerator.gui.show_panel import COLLAPSES, THE_SHOWS_OWN, show_hud_model
+from origenerator.gui.show_panel import COLLAPSES, OPENS_IN, THE_SHOWS_OWN, show_hud_model
 from origenerator.gui.show_pass import playlist_item, rotated_onto, slide_item
 from origenerator.gui.show_set import (
     GENERATING,
@@ -145,6 +145,7 @@ class SlideshowView(QWidget):
         self._corner = HudCorner.UPPER_LEFT
         self._minimized = False
         self._collapse = None
+        self._open_in = None
         self._panel_model = None
         self._panel_built_at = float("-inf")
         self._panel_stale = True
@@ -468,7 +469,7 @@ class SlideshowView(QWidget):
 
     def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
-                     collapse=None) -> None:
+                     collapse=None, open_in=None) -> None:
         """Put the players' own panel on this show, drawn by the Funestra.
 
         *side* is whose panel it is, which spells its verbs; *dashboard_cmd_file*
@@ -483,6 +484,7 @@ class SlideshowView(QWidget):
         self._label_for = label_for
         self._corner, self._minimized = corner, minimized
         self._collapse = collapse
+        self._open_in = open_in
         self.refresh_panel()
 
     @property
@@ -552,8 +554,8 @@ class SlideshowView(QWidget):
             self._toggle_pause()
             return True
         action, path = side_press(self._hud_side, verb, payload)
-        if action in COLLAPSES:
-            self._collapse_here_or_out_there(command, COLLAPSES[action])
+        if action in COLLAPSES or action == OPENS_IN:
+            self._place_here_or_out_there(command, action, path)
             return True
         if action in THE_SHOWS_OWN:
             # The two filters, reset, the loops, the expand mark and the map's
@@ -586,12 +588,14 @@ class SlideshowView(QWidget):
         else:
             self._queue_pointer.release(*numbers)
 
-    def _collapse_here_or_out_there(self, command: str, minimized: bool) -> None:
+    def _place_here_or_out_there(self, command: str, action: str, corner: str) -> None:
         if self._dashboard_cmd_file is not None:
             append_command(self._dashboard_cmd_file, command)
-            return
-        if self._collapse is not None:
-            self._collapse(minimized)
+        elif action == OPENS_IN:
+            if self._open_in is not None and corner in HudCorner:
+                self._open_in(HudCorner(corner))
+        elif self._collapse is not None:
+            self._collapse(COLLAPSES[action])
 
     def _act_here(self, action: str) -> bool:
         """A press with no session under it: the show answers it itself.

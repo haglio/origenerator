@@ -16,7 +16,7 @@ this app's channel.
 What it does NOT hold is the doing. A show's own words went to the shows when
 they came out (:mod:`origenerator.gui.show_director`); a bank button's press is
 the button's own click; and the three orders about a picture -- enhance it, fix a
-part of it, make a Genau clip of it -- stay with the seams that run them.
+part of it, make a Genau flick of it -- stay with the seams that run them.
 :class:`VoiceHost` names each of those.
 """
 from __future__ import annotations
@@ -204,7 +204,7 @@ class VoiceHost(Protocol):
         """Queue a targeted detail fix, the same way."""
 
     def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate a picture as a Genau clip, the same way."""
+        """Animate a picture as a Genau flick, the same way."""
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         """Launch a revised generation, record the request under it, and answer
@@ -422,7 +422,7 @@ class VoiceRouter(QObject):
         Whisper renders a command word a dozen ways and the matcher answers to
         all of them, so the transcription of one is a misspelling of a word that
         was understood perfectly well: "gunow it" printed over a caption that
-        then goes and makes a Genau clip. The spelling it was recognized as is
+        then goes and makes a Genau flick. The spelling it was recognized as is
         the truthful thing to show
         (:func:`~origenerator.gallery.voice_commands.recognized_spelling`).
         """
@@ -651,7 +651,7 @@ class VoiceRouter(QObject):
     def _on_picture_command(self, command) -> None:
         """A spoken command about the picture on screen: a targeted "fix <part>"
         (or several parts, or "fix all"), "enhance" for the better version of
-        it, or "genau it" to animate it as a Genau clip.
+        it, or "genau it" to animate it as a Genau flick.
 
         A named side takes that region's show — hosted, two shows run at once
         and neither is the active window, so naming one is the only way to say

@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS generations (
     -- before this was recorded, which falls back to matching the file.
     enhance_of TEXT,
     -- The clip this row is one cycle of, by that clip's prompt_id. Nothing
-    -- writes it any more: cutting a finished clip down was how a Genau clip was
+    -- writes it any more: cutting a finished clip down was how a Genau flick was
     -- made for one afternoon, until the lane learned to ask the sampler for a
     -- loop one cycle long instead (origenerator.gallery.combine.cycle_shaped),
     -- which is the same answer without a second file. The cuts that were made

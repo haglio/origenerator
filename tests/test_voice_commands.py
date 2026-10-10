@@ -116,7 +116,7 @@ def test_a_sentence_that_merely_wants_something_nicer_is_not_the_command():
 
 def test_a_mangled_command_is_said_back_in_the_word_the_app_knows_it_by():
     # The whole complaint: a caption printed "gunow it" and then went and made a
-    # Genau clip, so the spelling on screen was the one thing that had not been
+    # Genau flick, so the spelling on screen was the one thing that had not been
     # understood.
     for heard in ("gunow it", "go now it", "genow it", "Genau it!",
                   "Good now it.", "can now it", "canow it"):

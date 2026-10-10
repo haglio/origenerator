@@ -11,7 +11,7 @@ Either way, two buttons act on the chosen recipe: Generate re-runs it on the dro
 image now, while “Edit…” hands it to a generate tab to change first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
-video (the default), or a Genau clip — one complete cycle, looping. That choice
+video (the default), or a Genau flick — one complete cycle, looping. That choice
 picks which recipes the act is answered from, so the dropdown's usable acts change
 with it: an act only the video lane can answer greys out under Genau, and acts that
 are no kind of cycle at all are not offered there.

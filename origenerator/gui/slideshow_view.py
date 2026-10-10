@@ -918,9 +918,9 @@ class SlideshowView(QWidget):
         self._show_current()
 
     # --- what Genau's console acts on here ---------------------------------
-    # Its transport steps Genau's clips and its clip-seconds pace how long an
-    # unlocked one stays up. Here the clips are the slides, so the same four
-    # buttons step, lock and cull them, and the same pair sets the dwell.
+    # Its transport steps Genau's flicks and its flick-seconds pace how long an
+    # unlocked one stays up. Here the slides take the flicks' place, so the same
+    # four buttons step, lock and cull them, and the same pair sets the dwell.
 
     @property
     def dwell_s(self) -> int:

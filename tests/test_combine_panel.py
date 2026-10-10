@@ -275,7 +275,7 @@ def test_generate_emits_the_picked_act(qtbot):
 
 def test_the_lane_defaults_to_video(qtbot):
     # The long-standing behavior of this panel, and by far the more common ask, so
-    # the Genau clip is the deliberate detour rather than the default.
+    # the Genau flick is the deliberate detour rather than the default.
     panel = _panel(qtbot)
     assert panel.selected_intent() == recipe_match.VIDEO
     assert panel._video_radio.text() == "Video"

@@ -3,7 +3,7 @@
 Three commands share one mic. "fix <part>" aims a targeted detail pass at what's
 on screen — one part, several ("fix hands and mouth"), or the lot ("fix all"),
 with :mod:`~origenerator.workflows.detail_parts` owning the parts and the match;
-"genau it" animates the picture as a Genau clip; "enhance" asks for the better
+"genau it" animates the picture as a Genau flick; "enhance" asks for the better
 version of it. :func:`match_command` is the one matcher the voice surface
 is given, so adding a verb here is all it takes to teach it — and
 :func:`command_phrases` is what the recognizer is asked to hear, which is what makes

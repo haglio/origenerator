@@ -25,7 +25,7 @@ def _video(pid, prompt, created, **params):
 
 def _loop(pid, prompt, created, **params):
     """The same row from a looping workflow — the only kind a Genau recipe can
-    come from, since a Genau clip has to return to the frame it started on."""
+    come from, since a Genau flick has to return to the frame it started on."""
     return {**_video(pid, prompt, created, **params), "workflow_name": "wan22_flf2v_loop"}
 
 

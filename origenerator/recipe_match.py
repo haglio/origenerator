@@ -53,7 +53,7 @@ _CATEGORY_KEYWORDS = {
 }
 
 # What a recipe is being made for. A long-form video for the satellite players,
-# or a Genau clip — one complete cycle, looping end to end, scrubbed against the
+# or a Genau flick — one complete cycle, looping end to end, scrubbed against the
 # device's phase rather than played. Both are "an act on this image", so they share
 # every tier here; what differs is which overlay table is consulted and, for GENAU,
 # that only a looping workflow's videos can be mined.
@@ -92,7 +92,7 @@ def curated_recipe(category: str, intent: str = VIDEO) -> dict | None:
 def _loops(row) -> bool:
     """Whether a looping workflow made ``row`` — its last frame meeting its first.
 
-    A Genau clip has to return to where it started, so only such a video can supply
+    A Genau flick has to return to where it started, so only such a video can supply
     a Genau recipe; mining the long-form ones would hand back a setup that produces
     a clip with a visible jump at the wrap. The registry import is deferred because
     it pulls in the whole workflow package, which this module otherwise never needs.
@@ -204,7 +204,7 @@ def available_categories(video_rows, intent: str = VIDEO) -> set[str]:
     "no recipe yet" is never offered.
 
     Under ``GENAU`` only a looping workflow's videos count toward the mined half:
-    a long-form video of the act is real, but its recipe cannot make a Genau clip.
+    a long-form video of the act is real, but its recipe cannot make a Genau flick.
     """
     loop_only = intent == GENAU
     return {c for c in CATEGORIES

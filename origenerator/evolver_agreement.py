@@ -3,7 +3,7 @@
 A send copies a clip into a folder of Evolver's, and the gallery reads Evolver's
 upscale back out of another.  Four values decide where it lands and whether it is
 picked up: the two folders, the marker a half-written copy wears, and the
-sub-folder Evolver routes this app's Genau clips by.  Every one of them is
+sub-folder Evolver routes this app's Genau flicks by.  Every one of them is
 written down twice, once in each app, and a rename on either side left clips
 arriving nowhere with both apps silent and every suite green.
 

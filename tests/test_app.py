@@ -399,7 +399,7 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -611,7 +611,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -642,7 +642,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
          patch("origenerator.importer.import_comfyui_output",
                side_effect=lambda *a, **k: calls.append("import") or 0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -739,7 +739,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
          patch("origenerator.recovery.reclaim_orphans", return_value=0) as reclaim, \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -765,7 +765,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient") as mock_client, \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -838,7 +838,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -886,7 +886,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.trash.Trash"), \
          patch("origenerator.importer.import_comfyui_output", return_value=0), \
          patch("origenerator.importer.merge_video_sidecar_rows", return_value=0), \
-         patch("origenerator.importer.backfill_unknown_workflows", return_value=0), \
+         patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
@@ -1174,7 +1174,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
-    ("origenerator.importer", "backfill_unknown_workflows"),
+    ("origenerator.importer", "backfill_import_workflows"),
     ("origenerator.importer", "backfill_import_params"),
     ("origenerator.importer", "backfill_imported_video_seeds"),
     ("origenerator.gallery", "fold_completed_enhancements"),

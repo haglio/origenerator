@@ -689,13 +689,13 @@ def test_enhance_with_no_show_up_falls_to_the_bank_button_of_that_name(router):
     assert shows.answers == ["🎤 Enhance 2 images"]
 
 
-def test_a_clip_asked_for_with_no_picture_on_screen_says_so(router):
+def test_a_flick_asked_for_with_no_picture_on_screen_says_so(router):
     voice, host, _shows = router()
 
     voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND, None))
 
     assert host.genaued == []
-    assert voice.status.text() == "🎤 a Genau clip needs a picture on screen"
+    assert voice.status.text() == "🎤 a Genau flick needs a picture on screen"
 
 
 # --- a request said over several breaths ------------------------------------

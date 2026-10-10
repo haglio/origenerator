@@ -174,7 +174,7 @@ class CombineController(QObject):
         All four, because all four are choices the user made and none is
         recoverable from the others — an act says nothing about which lane
         answers it, and a restart that put the picture back and forgot it was for
-        a Genau loop would answer the next Generate out of the wrong recipes.
+        a Genau flick would answer the next Generate out of the wrong recipes.
         """
         return {
             "image": self.panel.image_slot.current_id(),
@@ -357,7 +357,7 @@ class CombineController(QObject):
 
         Under ``GENAU`` the recipe is then re-cut to hold one cycle and smoothed
         back out (:func:`~origenerator.gallery.combine.cycle_shaped`). The lane
-        used to choose only WHICH recipe was mined, and from there a Genau clip
+        used to choose only WHICH recipe was mined, and from there a Genau flick
         was made exactly like any other video; it can't be, because what Genau
         needs of a clip is a property of the clip's own length, and the past clip
         being mined was made before anyone knew that.
@@ -732,7 +732,7 @@ class CombineController(QObject):
         )
 
     def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate an image as a Genau clip: the act read off its own prompt.
+        """Animate an image as a Genau flick: the act read off its own prompt.
 
         Returns the id it launched on (``None`` when it didn't), the line the
         speaking surface should say and its kind — the same shape as ``fix_parts``,

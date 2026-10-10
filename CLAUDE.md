@@ -61,7 +61,8 @@ for one thing cost four. So:
   audit's vocabulary pass above made each thing one word and never held the
   words against the screen, which is how "clip" passed it. Names that belong
   to something else keep theirs: CLIP the text model and its ComfyUI nodes,
-  the clipboard, and Genau's clips, which is what Genau calls them.
+  and the clipboard. Genau's own videos are flicks in the code, and on
+  screen they take the content overlay's word for them, genau_flick_words.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 

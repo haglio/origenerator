@@ -7,7 +7,7 @@ and the next slideshow opens at it.
 
 Nought is a pace like any other here, and it means never: the slide holds the
 screen until an arrow moves it. Genau's own floor is one second because a
-Genau clip is a fraction of one, but a picture is happy to sit there — and a
+Genau flick is a fraction of one, but a picture is happy to sit there — and a
 picture sitting there is the whole of what double-clicking one now opens, so
 nought has to be a number the console can reach.
 """

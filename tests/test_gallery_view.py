@@ -6925,7 +6925,7 @@ def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
     # Whisper renders "genau" a dozen ways and the matcher answers to all of
     # them, so printing the transcription showed a misspelling of a command that
     # was understood perfectly well — "gunow it" over a caption that then went
-    # and made a Genau clip.
+    # and made a Genau flick.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -9846,7 +9846,7 @@ def _loop_recipe(db, prompt_id="loop"):
 
 def test_the_genau_lane_asks_for_a_recipe_one_cycle_long(qtbot, tmp_path):
     """The lane used to choose only WHICH past clip was mined, and from there a
-    Genau clip was made exactly like any other video. It cannot be: what Genau
+    Genau flick was made exactly like any other video. It cannot be: what Genau
     needs of a clip is a property of its LENGTH, and the clip being mined was
     made before anyone knew that."""
     db = _combine_db(tmp_path)

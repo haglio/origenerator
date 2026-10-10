@@ -3303,7 +3303,7 @@ class GalleryView(QWidget):
         self._combine.restore(saved)
 
     def genau_it(self, image_id: str | None) -> tuple[str | None, str, str]:
-        """Animate a picture as a Genau clip — what a spoken "genau it" runs."""
+        """Animate a picture as a Genau flick — what a spoken "genau it" runs."""
         return self._combine.genau_it(image_id)
 
     def reveal_launch(self, key: str):

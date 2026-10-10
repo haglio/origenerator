@@ -146,9 +146,9 @@ _EVOLVER_AI_DIR = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 EVOLVER_INBOX_DIR = _EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
-# A Genau clip goes to the same inbox under its own source name. Evolver routes by
+# A Genau flick goes to the same inbox under its own source name. Evolver routes by
 # that name, so the folder is the whole signal: it upscales the clip on its usual
-# schedule and then delivers the result to Genau's clips folder rather than leaving
+# schedule and then delivers the result to Genau's flicks folder rather than leaving
 # it in the outbox. Sending straight to Genau's folder instead would skip the
 # upscale, and a loop straight out of the graph is visibly softer than the clips
 # already there.

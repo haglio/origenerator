@@ -19,7 +19,7 @@ from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
 
 _CONTENT = load_content()
 
-# How long a Genau clip is generated for, in frames at the native rate. Genau
+# How long a Genau flick is generated for, in frames at the native rate. Genau
 # steers a clip as ONE cycle — see :func:`cycle_shaped` — so the ideal is the
 # shortest clip that holds exactly one, and 13 frames is where the arithmetic
 # lands (a cycle at the app's own cadence is 0.83 s, and 13/16 is 0.81).
@@ -49,7 +49,7 @@ CYCLE_FRAMES = 29
 # speaks in is: this file is public, and the sanitize guard bans that vocabulary
 # from the tracked tree. An overlay with none of this leaves every prompt exactly
 # as its recipe wrote it.
-_CYCLE_WORDS: dict = _CONTENT.get("genau_stroke_prompts") or {}
+_CYCLE_WORDS: dict = _CONTENT.get("genau_flick_prompts") or {}
 
 
 def combined_params(video_row: dict, image_row: dict, workflow) -> dict | None:
@@ -105,7 +105,7 @@ def _run_on(image_row: dict, params: dict, workflow) -> dict | None:
 
 
 def cycle_words(category: str = "") -> tuple[str, str]:
-    """The ``(positive, negative)`` a Genau clip of ``category`` asks for, or the
+    """The ``(positive, negative)`` a Genau flick of ``category`` asks for, or the
     default pair when that act has none of its own -- see :data:`_CYCLE_WORDS`.
 
     Empty strings when the overlay carries nothing at all, which is what leaves

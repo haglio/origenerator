@@ -217,5 +217,5 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
     assert documented == {
         "library_root", "ambient_audio_dir", "speech_python", "genau_source", "recipe_categories",
         "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
-        "detector_labels", "genau_stroke_prompts",
+        "detector_labels", "genau_stroke_prompts", "genau_flick_words",
     }

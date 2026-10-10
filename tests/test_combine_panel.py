@@ -326,7 +326,14 @@ def test_a_greyed_act_explains_itself_in_the_lanes_own_terms(qtbot):
     reason = panel._category.itemData(panel._category.findText("gamma"), TOOLTIP)
     # An act the video lane answers happily can still have no loop under it, so
     # the greyed-out reason has to name which lane it is talking about.
-    assert "looping" in reason.lower()
+    assert reason == "No past looping “gamma” flick to base a Genau recipe on yet"
+
+
+def test_the_genau_lane_names_what_it_makes_in_the_overlays_word(qtbot):
+    panel = _panel(qtbot)
+
+    assert panel._genau_radio.toolTip() == (
+        "Make a Genau flick: one complete cycle, looping, sent to Genau when done.")
 
 
 def test_an_act_the_new_lane_cannot_answer_is_not_left_selected(qtbot):

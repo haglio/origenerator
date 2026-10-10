@@ -372,6 +372,25 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
 
 
+def test_a_pick_of_a_picture_and_a_video_is_two_batches_each_under_its_own_enhancer(enhance,
+                                                                                    monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: ({"input_video": "v1.mp4"} if "v" in row["prompt_id"]
+                                               else {"input_image": "one.png"}))
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: f"{row['workflow_name']}/abc")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, gallery.VIDEO_ENHANCE_WORKFLOW,
+                        FakeWorkflow(gallery.VIDEO_ENHANCE_WORKFLOW))
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1"), _video("v1")]), jobs=jobs)
+
+    controller.enhance_items(["i1", "v1"])
+
+    assert jobs.asks == [("image_enhance/abc", 1), ("video_enhance/abc", 1)]
+
+
 def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": f"{row['prompt_id']}.png"})

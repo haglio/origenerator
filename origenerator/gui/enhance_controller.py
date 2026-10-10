@@ -71,9 +71,6 @@ class EnhanceHost(Protocol):
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
 
-    def item_rows(self) -> list[dict]:
-        """Every image and video row the gallery is holding."""
-
     def image_config_index(self) -> dict:
         """The settings-signature index a folder key is derived against."""
 
@@ -559,7 +556,7 @@ class EnhanceController:
             self._by_prompt = {
                 row["prompt_id"]: job
                 for job in running
-                for row in self._host.item_rows()
+                for row in self._db.list_generations()
                 if self._of_row(job, row)
             }
         self._browser.show_enhancing({

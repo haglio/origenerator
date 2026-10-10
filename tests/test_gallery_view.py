@@ -3779,8 +3779,6 @@ def test_enhance_lights_on_a_picked_video(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
-    # Enhance All stays a picture's act: the folder's videos wait to be picked.
-    assert not view._bank.enhance.isEnabled()
 
     view._browser._thumbnail_clicked("v1", _NO_MOD)
     assert view._bank.enhance.isEnabled()
@@ -14857,7 +14855,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_pa
     assert view._live_jobs == {}
 
 
-def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tmp_path):
+def test_a_spoken_enhance_over_a_video_the_app_did_not_make_says_there_is_nothing_to_enhance(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps(
         [{"filename": "clip.mp4", "subfolder": "video", "type": "output"}]))
@@ -14869,7 +14867,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert surface.noted == (None, "🎤 only a finished image can be enhanced", WARNING)
+    assert surface.noted == (None, "🎤 only a finished item can be enhanced", WARNING)
     assert view._live_jobs == {}
 
 

@@ -1751,7 +1751,6 @@ class GalleryView(QWidget):
         reroll_key = self._selected_reroll_key
         self._pending_key = None
         self._pending_selection = None
-        self._rows = list(rows)
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._image_index = None   # rebuilt on the next ask (image_config_index)
@@ -3287,10 +3286,6 @@ class GalleryView(QWidget):
         """Every image row the gallery is holding, as its last rebuild read them."""
         return self._image_rows
 
-    def item_rows(self) -> list[dict]:
-        """Every row the gallery is holding, images and videos alike."""
-        return self._rows
-
     def queue_changed(self) -> None:
         """Redraw the line — a stand-in row went on it or came off it."""
         self._update_queue()
@@ -3861,7 +3856,7 @@ class GalleryView(QWidget):
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif enhance_action is not None and chosen is enhance_action:
-            self._enhance.enhance_items(enhanceable)
+            self._enhance.enhance_items([row["prompt_id"] for row in enhanceable])
         elif cancel_action is not None and chosen is cancel_action:
             self._enhance.cancel_for(rows)
         elif chosen is delete_action:

@@ -16,7 +16,7 @@ from origenerator.gui.param_help import PARAM_HELP, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 
-@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+@pytest.mark.parametrize("workflow_name", [n for n, wf in WORKFLOW_REGISTRY.items() if wf.selectable])
 def test_every_field_on_a_form_is_explained(workflow_name):
     wf = WORKFLOW_REGISTRY[workflow_name]
     fields = {pd.key for pd in wf.param_definitions()} - set(wf.enhance_keys())

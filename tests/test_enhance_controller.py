@@ -198,9 +198,6 @@ class FakeHost:
     def row_for(self, prompt_id):
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
 
-    def item_rows(self):
-        return self.rows
-
     def image_config_index(self):
         return {}
 
@@ -308,7 +305,6 @@ def test_a_running_video_enhance_shows_on_the_video_it_is_of(enhance, monkeypatc
     job = FakeJob("run-9", workflow=FakeWorkflow(gallery.VIDEO_ENHANCE_WORKFLOW))
     job.params = {"input_video": "video/v1.mp4 [output]"}
     controller, _host = enhance(
-        FakeHost(rows=[_video("v1"), _image("i1")]),
         db=FakeDB([_video("v1"), _image("i1"), {"prompt_id": "run-9", "enhance_of": None}]),
         jobs=FakeReroll(jobs=[job]))
 
@@ -543,7 +539,7 @@ def test_the_tile_the_version_list_and_the_show_all_learn_of_a_run(enhance,
     tab = FakeConfigPanel(row)
     browser, shows = FakeBrowser(), FakeShows()
     controller, _host = enhance(
-        FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
+        db=FakeDB([row]), jobs=FakeReroll([FakeJob("run-a")]),
         browser=browser, shows=shows, tabs=FakeTabs([tab]))
 
     controller.reconcile()

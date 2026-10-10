@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 
 _TICK_MS = 16
 WHEEL_NOTCH = 120
-OFF_THE_WINDOW = (-1, -1)
 
 
 class FunestraPane(QWidget):
@@ -210,7 +209,7 @@ class FunestraPane(QWidget):
 
     def pointer_left(self) -> None:
         if self._funestra is not None:
-            self._funestra.motion(*OFF_THE_WINDOW, held=False, window=self._device_size())
+            self._funestra.leave()
 
     def double_clicked(self) -> None:
         if self._on_double_click is not None:

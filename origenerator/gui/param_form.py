@@ -270,8 +270,7 @@ class ParamForm(QWidget):
             if widget is self._scenes:
                 continue
             edited = self._kind(pd).change_signal(widget)
-            if pd.key == "input_image":
-                edited.connect(self._update_derived_display)
+            edited.connect(self._update_derived_display)
             edited.connect(self.changed)
 
     def _add_row(self, key: str, label: str, field):
@@ -611,10 +610,11 @@ class ParamForm(QWidget):
         self.changed.emit()
 
     def _update_derived_display(self):
-        """Fill the locked width/height with the size the current input image
-        derives — the plain value label and the spinner under it both, so
-        unlocking starts from that value (0 → em dash when none can be measured).
-        A no-op while unlocked, so it never clobbers a value the user is editing."""
+        """Fill the locked width/height with the size the current settings derive
+        (the picture, at the resolution picked) — the plain value label and the
+        spinner under it both, so unlocking starts from that value (0 → em dash
+        when none can be measured). A no-op while unlocked, so it never clobbers
+        a value the user is editing."""
         if self._size_deriver is None or self._dimensions_unlocked():
             return
         size = self._size_deriver(self.get_values())

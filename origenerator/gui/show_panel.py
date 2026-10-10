@@ -29,6 +29,7 @@ THE_SHOWS_OWN = frozenset({
 })
 
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}
+OPENS_IN = "hud_restore_at"
 
 
 def _cell(slide, label: str = "") -> HudCell:

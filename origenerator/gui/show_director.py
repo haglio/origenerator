@@ -767,6 +767,11 @@ class ShowDirector:
         self._hud_minimized[side] = minimized
         self._tell_the_show_wearing_it(side)
 
+    def open_the_hud_in(self, corner: HudCorner, *, side: str) -> None:
+        self._hud_corners[side] = corner
+        self._hud_minimized[side] = False
+        self._tell_the_show_wearing_it(side)
+
     def _tell_the_show_wearing_it(self, side: str) -> None:
         for surface in self.surfaces():
             if getattr(surface, "hud_side", "") == side:
@@ -787,7 +792,8 @@ class ShowDirector:
         corner, minimized = self.hud_place(side)
         view.wear_the_hud(side, dashboard_cmd_file=self._session_channel,
                           label_for=self._item_label, corner=corner, minimized=minimized,
-                          collapse=partial(self.collapse_the_hud, side=side))
+                          collapse=partial(self.collapse_the_hud, side=side),
+                          open_in=partial(self.open_the_hud_in, side=side))
 
     @property
     def _session_channel(self):

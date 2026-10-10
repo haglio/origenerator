@@ -70,6 +70,12 @@ def test_handed_back_its_windows_wear_its_own_identity_again(worn):
     window.close()
 
 
+def test_what_its_windows_wear_can_be_handed_to_a_window_of_another_process(worn):
+    identity, _ = worn
+
+    assert identity.wearing == ("Origenerator.Preview", _OWN)
+
+
 def test_a_window_windows_will_not_dress_still_opens(qapp):
     def refuse(hwnd, app_id, app):
         raise OSError("SHGetPropertyStoreForWindow failed")

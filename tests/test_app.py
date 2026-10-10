@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock, patch
 
 import pytest
+from app_support.win32 import TaskbarApp
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
@@ -30,6 +31,7 @@ from origenerator.app import (
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
     _merge_soundless_copies,
+    _open_the_loading,
     _shown_as,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
@@ -48,6 +50,7 @@ from origenerator.gui.export_lane import GENAU
 from origenerator.gui.loading_screen import LoadingCanceled, loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
+from tests.loading_screens import opened_here
 from tests.media_files import write_mp4_with_a_comment_tag
 
 COMFYUI_DIR = Path("C:/x/ComfyUIApp/ComfyUI")
@@ -383,15 +386,15 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
     events = []
 
     loading = MagicMock()
-    loading.show.side_effect = lambda: events.append("loading.show")
     loading.accept.side_effect = lambda: events.append("loading.accept")
 
     window = MagicMock()
     window.show.side_effect = lambda: events.append("window.show")
 
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
+         patch("origenerator.gui.loading_screen.loading_screen",
+               side_effect=lambda *a, **k: events.append("loading opened") or loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -405,20 +408,51 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
-    # Splash is visible for the whole boot and dismissed once the window shows.
-    assert events == ["loading.show", "window.show", "loading.accept"]
+    assert events == ["loading opened", "window.show", "loading.accept"]
     # The boot phases drive the splash status text.
     statuses = " ".join(str(c.args[0]) for c in loading.say.call_args_list)
     assert "ComfyUI server" in statuses
 
 
-def _real_loading_screens(screens):
-    def a_real_screen(icon, preview, steps):
-        screens.append(loading_screen(icon, preview, steps))
-        return screens[-1]
+def test_the_loading_screen_wears_the_taskbar_button_the_apps_windows_wear(qapp, tmp_path):
+    button = TaskbarApp("Origenerator - preview of the example", tmp_path / "preview.ico",
+                        "example relaunch command")
+    screens = []
 
-    return {"origenerator.gui.loading_screen.loading_screen": a_real_screen,
-            "origenerator.app._bring_to_front": MagicMock()}
+    with patch("origenerator.gui.loading_screen.LoadingProcess.open",
+               side_effect=opened_here(screens)):
+        _open_the_loading(None, qapp, MagicMock(), None,
+                          MagicMock(wearing=("Example.App", button)))
+
+    assert screens[0].wearing == ("Example.App", button)
+
+
+def test_a_loading_screen_with_no_taskbar_identity_to_wear_wears_none(qapp):
+    screens = []
+
+    with patch("origenerator.gui.loading_screen.LoadingProcess.open",
+               side_effect=opened_here(screens)):
+        _open_the_loading(None, qapp, MagicMock(), None, None)
+
+    assert screens[0].wearing == (None, None)
+
+
+def test_a_loading_screen_is_put_in_front_once_its_process_says_it_is_up(qapp):
+    screens = []
+
+    with patch("origenerator.gui.loading_screen.LoadingProcess.open",
+               side_effect=opened_here(screens)), \
+         patch("origenerator.app.sys.platform", "win32"), \
+         patch("origenerator.win32.force_foreground_window") as force:
+        _open_the_loading(None, qapp, MagicMock(), None, None)
+        screens[0].shown.emit(4242)
+
+    force.assert_called_once_with(4242)
+
+
+def _real_loading_screens(screens):
+    return {"origenerator.gui.loading_screen.loading_screen": loading_screen,
+            "origenerator.gui.loading_screen.LoadingProcess.open": opened_here(screens)}
 
 
 def test_a_finished_launch_takes_its_loading_screen_down(qapp):
@@ -599,12 +633,12 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
     window.show.side_effect = lambda: events.append("window.show")
 
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._bring_to_front",
                side_effect=lambda w: events.append(
-                   "front:window" if w is window else "front:loading")), \
+                   "front:window" if w is window else "front:something else")), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
          patch("origenerator.db.Database"), \
@@ -617,12 +651,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
-    assert events == [
-        "front:loading",  # the splash leads the launch too, not just the window
-        "window.show",
-        "loading.accept",
-        "front:window",
-    ]
+    assert events == ["window.show", "loading.accept", "front:window"]
 
 
 def test_main_reconciles_in_flight_before_importing(qapp):
@@ -630,7 +659,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
     so a job finalized from history isn't then re-imported as a duplicate."""
     calls = []
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -729,7 +758,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
     opens. Nothing the bin holds is touched, however old it is."""
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -755,7 +784,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
     # messages at this id). Without it, each launch's fresh id leaves the
     # reconnected job's progress bar spinning forever.
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -828,7 +857,7 @@ def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp
 def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     window = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow",
                return_value=window) as mock_window, \
@@ -877,7 +906,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
     as 'the landscape player is under other windows on startup', and the
     covering window a z-order walk named was exactly this splash."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen") as mock_loading, \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -1017,7 +1046,7 @@ def _boot(library_path, argv=()):
     """Run the launch, patching only the boundary: the splash, the window, and
     ComfyUI. Every maintenance pass runs for real."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
-         patch("origenerator.app._taskbar_identity"), \
+         patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -1198,7 +1227,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
     """
     targets = {
         "origenerator.app._init_windows_taskbar_identity": DEFAULT,
-        "origenerator.app._taskbar_identity": DEFAULT,
+        "origenerator.app._taskbar_identity": None,
         "origenerator.app._ensure_comfyui_server": DEFAULT,
         "origenerator.gui.loading_screen.loading_screen": DEFAULT,
         "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,

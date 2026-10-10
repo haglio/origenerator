@@ -4,8 +4,10 @@ caption, name and icon, and walking the boot's own steps."""
 from __future__ import annotations
 
 import logging
+from unittest.mock import patch
 
 import pytest
+from app_support.win32 import TaskbarApp
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 
@@ -25,12 +27,15 @@ from origenerator.gui.loading_screen import (
     LoadingCanceled,
     loading_screen,
 )
+from tests.loading_screens import LoadingScreenInThisProcess
 
 _STEPS = boot_steps(MAINTENANCE)
 
 
 def _screen():
-    return loading_screen(CHECKOUT / "icon.ico", None, _STEPS)
+    with patch("origenerator.gui.loading_screen.LoadingProcess.open",
+               side_effect=LoadingScreenInThisProcess):
+        return loading_screen(CHECKOUT / "icon.ico", None, _STEPS, app_id=None, taskbar=None)
 
 
 def test_window_title_identifies_app(qtbot):
@@ -66,6 +71,18 @@ def test_every_line_the_boot_says_is_a_step_the_bar_knows():
     assert said[:2] == [STARTING_THE_SERVER, OPENING_THE_LIBRARY]
     assert said[-2:] == [CONNECTING, BUILDING_THE_INTERFACE]
     assert said[2:-2] == [boot_pass.status for boot_pass in MAINTENANCE if boot_pass.status]
+
+
+def test_it_runs_in_a_process_of_its_own_wearing_the_taskbar_button_it_is_handed(tmp_path):
+    button = TaskbarApp("Origenerator - preview of the example", tmp_path / "preview.ico",
+                        "example relaunch command")
+
+    with patch("origenerator.gui.loading_screen.LoadingProcess") as process:
+        loading_screen(CHECKOUT / "icon.ico", None, _STEPS, app_id="Example.App", taskbar=button)
+
+    process.open.assert_called_once_with(
+        caption=CAPTION, wordmark="Origenerator", icon=CHECKOUT / "icon.ico", preview=None,
+        steps=_STEPS, cancel_hint=CANCEL_HINT, app_id="Example.App", taskbar=button)
 
 
 def test_esc_stops_the_boot_at_its_next_step_with_the_screen_saying_so(qtbot, qapp):

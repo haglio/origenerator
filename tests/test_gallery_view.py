@@ -678,8 +678,8 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     # The title carries the full breadcrumb, which the narrow tree truncates.
-    assert "SDXL Text-to-Image" in view._title.display_text()
-    assert "All" in view._title.display_text()
+    assert "SDXL Text-to-Image" in view._folder_path.display_text()
+    assert "All" in view._folder_path.display_text()
 
 
 def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtbot):
@@ -897,7 +897,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["v1"]
-    assert "Image-to-Video" in view._title.display_text()  # the header says where it looked
+    assert "Image-to-Video" in view._folder_path.display_text()  # the header says where it looked
 
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
@@ -959,7 +959,7 @@ def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["i2"]     # the favorited one alone
-    assert "Favorites" in view._title.display_text()
+    assert "Favorites" in view._folder_path.display_text()
 
 
 def test_a_folders_shelf_scopes_the_search_and_names_its_path(qtbot):
@@ -1173,8 +1173,8 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
         _at(_image_workflow(view._tree), 0, 0))["a dog"]
     view._tree.setCurrentItem(leaf)
 
-    view._title.edit_requested.emit()
-    view._title.edited.emit("Beach trip")
+    view._begin_inline_rename(leaf, 0)
+    leaf.setText(0, "Beach trip")
     qtbot.waitUntil(lambda: view._search.field._scope.endswith("Beach trip"))
 
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
@@ -2710,7 +2710,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.visible_prompt_ids() == ["i2", "i1"]
-    assert view._title.display_text() == (
+    assert view._folder_path.display_text() == (
         f"{ORIENTATION_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
 
 
@@ -3451,8 +3451,8 @@ def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
 
 def test_a_folder_named_after_what_it_holds_offers_no_rename(qtbot):
     # A workflow, a model and a LoRA are named by the fact they stand for;
-    # renaming one would only hide which one it is. Neither the tree row, the
-    # header, nor the context menu opens an editor on them.
+    # renaming one would only hide which one it is. Neither the tree row nor
+    # the context menu opens an editor on them.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -3466,54 +3466,104 @@ def test_a_folder_named_after_what_it_holds_offers_no_rename(qtbot):
         view._begin_inline_rename(item, 0)
         assert view._editing_key is None          # nothing opened
 
-        view._tree.setCurrentItem(item)
-        view._title.edit_requested.emit()
-        assert not view._title._editing()
-
     leaf = _first_leaf(view)                      # …the code-named leaf still does
     assert leaf.flags() & Qt.ItemFlag.ItemIsEditable
-    view._tree.setCurrentItem(leaf)
-    view._title.edit_requested.emit()
-    assert view._title._editing()
+    view._begin_inline_rename(leaf, 0)
+    assert view._editing_key == _key(leaf)
 
 
-def test_double_clicking_the_header_renames_the_selected_folder(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-
-    leaf = _first_leaf(view)
-    view._tree.setCurrentItem(leaf)
-    key = _key(leaf)
-
-    view._title.edit_requested.emit()  # double-clicking the header starts editing
-    assert view._title._edit.text() == leaf.text(0)  # prefilled with the folder's name
-    view._title.edited.emit("Favorites")  # commit
-
-    assert db.folder_meta_map()[key]["custom_name"] == "Favorites"
-    qtbot.waitUntil(lambda: _first_leaf(view).text(0) == "Favorites")
-
-
-def test_committing_a_header_rename_rebuilds_after_the_click_that_ended_it(qtbot):
-    # A header edit is usually ended by clicking somewhere else, and somewhere
-    # else is usually a thumbnail. Rebuilding inside the editor's own focus-out
-    # deletes the pane Qt is still delivering that click to, and the app goes
-    # down with it — so the rebuild waits for the next turn of the event loop.
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
+def test_double_clicking_the_path_opens_it_holding_where_you_are(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_first_leaf(view))
 
-    rebuilt = []
-    view.refresh = lambda: rebuilt.append(1)
-    view._title.edit_requested.emit()
-    view._title.edited.emit("Cats")
+    view._folder_path.edit_requested.emit()
 
-    assert db.folder_meta_map()[_key(_first_leaf(view))]["custom_name"] == "Cats"
-    assert rebuilt == []                       # not while the click is in flight
-    qtbot.waitUntil(lambda: rebuilt == [1])    # on the next turn instead
+    assert view._folder_path._editing()
+    assert view._folder_path._edit.text() == view._folder_path.display_text() == (
+        view._tree_view.breadcrumb(_first_leaf(view)))
+
+
+def _enter_folder_path(view, qtbot, path):
+    view._folder_path.edit_requested.emit()
+    view._folder_path._edit.setText(path)
+    qtbot.keyClick(view._folder_path._edit, Qt.Key.Key_Return)
+
+
+def test_entering_a_folders_path_goes_to_that_folder(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    folders = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))
+    view._tree.setCurrentItem(folders["a cat"])
+    dogs = view._tree_view.breadcrumb(folders["a dog"])
+
+    _enter_folder_path(view, qtbot, dogs)
+
+    assert view._tree.currentItem() is folders["a dog"]
+    assert view._folder_path.display_text() == dogs
+    assert view.visible_prompt_ids() == ["i2"]
+
+
+def test_entering_a_path_no_folder_has_says_so_and_stays_put(qtbot, monkeypatch):
+    told = []
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
+                        lambda _parent, title, message: told.append((title, message)))
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    here = _first_leaf(view)
+    view._tree.setCurrentItem(here)
+
+    _enter_folder_path(view, qtbot, "Landscape  ›  All  ›  Nowhere")
+
+    assert view._tree.currentItem() is here
+    assert view._folder_path.display_text() == view._tree_view.breadcrumb(here)
+    assert told == [("Folder not found",
+                     "No folder is at this path:\n\nLandscape  ›  All  ›  Nowhere")]
+
+
+def test_entering_a_path_during_a_search_puts_the_search_away_and_goes_there(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    folders = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, "cat")
+    assert view._showing_search()
+
+    _enter_folder_path(view, qtbot, view._tree_view.breadcrumb(folders["a dog"]))
+
+    assert not view._showing_search()
+    assert view._tree.currentItem() is folders["a dog"]
+    assert view.visible_prompt_ids() == ["i2"]
+
+
+def test_entering_an_empty_path_goes_nowhere_and_says_nothing(qtbot, monkeypatch):
+    told = []
+    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
+                        lambda *args: told.append(args))
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    here = _first_leaf(view)
+    view._tree.setCurrentItem(here)
+
+    _enter_folder_path(view, qtbot, "   ")
+
+    assert view._tree.currentItem() is here
+    assert told == []
+
+
+def test_with_several_folders_picked_the_path_opens_empty(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    _pick(view, cat, dog)
+
+    view._folder_path.edit_requested.emit()
+
+    assert view._folder_path._editing()
+    assert view._folder_path._edit.text() == ""
 
 
 def _source_tile(view):
@@ -13181,7 +13231,7 @@ def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):
     _pick(view, cat, dog)
 
     assert view._browser._visible_keys == [cat, dog]  # both, as tiles
-    assert "2 folders" in view._title.display_text()
+    assert "2 folders" in view._folder_path.display_text()
     assert not view._bank.group.isHidden()  # offering to save the grouping
 
 

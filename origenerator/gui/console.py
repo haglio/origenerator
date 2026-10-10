@@ -23,7 +23,10 @@ from player_core.console import (
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
+    ROW_LABEL_W,
+    VALUE_W,
     ConsoleModel,
+    aim_row,
 )
 from player_core.console_hud import ConsoleHud, ConsolePainter
 from player_core.drive_readout import (
@@ -32,6 +35,7 @@ from player_core.drive_readout import (
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
+from player_core.hud_button import Button
 from player_core.modes import MainMode, Osr2State
 from player_core.robot_hand import (
     PARK_CENTER,
@@ -41,7 +45,6 @@ from player_core.robot_hand import (
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
-from origenerator.gui.console_buttons import motion_row, pace_row
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which of the console's four control buttons asks for which state, read off
@@ -185,9 +188,9 @@ def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
     return ShowDevice(
         osr2_control=control,
         rows=() if pace_s is None else (pace_row(pace_s),),
-        osr2_rows=(motion_row(control=control, cruise=motion.state.cruise.active,
-                              learned=motion.state.learned.active,
-                              shape=motion.state.state.shape.value),),
+        osr2_rows=(aim_row(cruise=motion.state.cruise.active,
+                           learned=motion.state.learned.active,
+                           shape=motion.state.state.shape.value, control=control),),
         osr2=(Osr2State.FUNSCRIPT if scripted
               else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
         drive=(script_hud(script, motion.state) if scripted
@@ -199,6 +202,15 @@ def show_device(motion, *, pace_s: int | None = None, device_on: bool = True,
 def panel_size(motion, control: str = OSR2_CONTROL_UNANSWERED) -> tuple[int, int]:
     """How big the console draws, which is what the widget has to be."""
     return ConsolePainter(device_only=True).rgba(console_hud(motion, control=control))[1]
+
+
+def pace_row(pace_s: int) -> tuple[Button, ...]:
+    return (
+        Button("", "Clip seconds", "", width=ROW_LABEL_W),
+        Button("genau_clip_seconds_down", "−", "Move on sooner", group_break=True),
+        Button("", f"{pace_s}s", "", width=VALUE_W),
+        Button("genau_clip_seconds_up", "+", "Leave each clip longer"),
+    )
 
 
 _PACE_STEPS = {"genau_clip_seconds_up": DWELL_STEP_S, "genau_clip_seconds_down": -DWELL_STEP_S}

@@ -65,6 +65,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
+from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
@@ -3554,6 +3555,20 @@ def test_entering_an_empty_path_goes_nowhere_and_says_nothing(qtbot, monkeypatch
 
     assert view._tree.currentItem() is here
     assert told == []
+
+
+def test_a_folder_keeps_its_name_while_the_kind_beside_it_is_hidden(qtbot):
+    still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
+    clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
+    view = GalleryView(FakeDB([still, clip]))
+    qtbot.addWidget(view)
+    view.refresh()
+    looping = workflow_label("wan22_flf2v_loop")
+    assert {f"{looping} images", f"{looping} videos"} <= set(_alls(view._tree))
+
+    view._image_cb.setChecked(False)
+
+    assert f"{looping} videos" in _alls(view._tree)
 
 
 def test_with_several_folders_picked_the_path_opens_empty(qtbot):

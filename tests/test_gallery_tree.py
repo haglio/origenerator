@@ -140,8 +140,14 @@ def test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark
     assert _wears(videos, "play")
 
 
+def _first_frame(prompt_id):
+    return _row(prompt_id, "wan22_i2v", {"positive_prompt": "a slow turn", "seed": 1},
+                f"renamed_{prompt_id}.png")
+
+
 def test_every_row_is_found_again_by_the_path_it_shows(qtbot):
-    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat"), _video("v1", "style_a")],
+    _pane, tree = _gallery_tree(qtbot, [_image("i1", "a cat"), _video("v1", "style_a"),
+                                        _first_frame("f1")],
                                 [_folder_of_your_own(1, "Keepers")])
     rows = tree.item_by_key
 

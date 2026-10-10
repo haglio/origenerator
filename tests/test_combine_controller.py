@@ -494,7 +494,7 @@ def test_that_hint_lands_in_the_shows_corner_rather_than_a_dialog(combine,
 
     assert host.told == []
     assert shows.runs_said == [
-        (None, "🎤 no past looping “waving” clip to base a recipe on yet", WARNING)]
+        (None, "🎤 no past looping “waving” flick to base a recipe on yet", WARNING)]
 
 
 def test_the_mined_recipe_is_matched_against_its_start_frames_scene(combine,
@@ -586,7 +586,7 @@ def test_genau_it_reads_the_act_off_the_pictures_own_prompt(combine, monkeypatch
     prompt_id, message, kind = controller.genau_it("img")
 
     assert prompt_id == "img"
-    assert message == "🎤 animating as a “waving” loop"
+    assert message == "🎤 animating as a “waving” flick"
     assert kind == NOTICE
 
 
@@ -594,7 +594,7 @@ def test_genau_it_declines_a_video(combine):
     controller, _host = combine(db=FakeDB([_video("clip")]))
 
     assert controller.genau_it("clip") == (
-        None, "🎤 only a picture can become a Genau clip", WARNING)
+        None, "🎤 only a picture can become a Genau flick", WARNING)
 
 
 def test_genau_it_says_so_rather_than_guessing_an_unreadable_prompt(combine,

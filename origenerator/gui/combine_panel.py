@@ -46,6 +46,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
+from origenerator.content import genau_flick_word
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.media import MediaType
 from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
@@ -130,7 +131,8 @@ class CombinePanel(QWidget):
         self._video_radio.setChecked(True)
         self._genau_radio = QRadioButton("Genau")
         self._genau_radio.setToolTip(
-            "Make a Genau clip: one complete cycle, looping, sent to Genau when done."
+            f"Make a Genau {genau_flick_word()}: one complete cycle, looping, sent to "
+            "Genau when done."
         )
         self._intent_group = QButtonGroup(self)
         self._intent_group.addButton(self._video_radio)
@@ -230,7 +232,8 @@ class CombinePanel(QWidget):
         for index in range(1, self._category.count()):
             act = self._category.itemText(index)
             usable = act in available
-            reason = (f"No past looping “{act}” clip to base a Genau recipe on yet" if genau
+            reason = (f"No past looping “{act}” {genau_flick_word()} to base a Genau recipe "
+                      "on yet" if genau
                       else f"No past “{act}” video to base a recipe on yet")
             model.item(index).setEnabled(usable)
             self._category.setItemData(

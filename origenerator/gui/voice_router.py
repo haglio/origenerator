@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+from origenerator.content import genau_flick_word
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -76,11 +77,6 @@ logger = logging.getLogger(__name__)
 # saying: long enough to read one, short enough that it is gone by the next.
 _FLASH_MS = 4000
 
-# What each order about the picture is called in a refusal, where the parts
-# themselves do not already name it.
-_WANTS = {
-    gallery.GENAU_COMMAND: "a Genau clip",
-}
 
 # The shelf each spoken shelf name stands you in. What to call it back is the
 # host's answer, so a row renamed is renamed in one place.
@@ -675,8 +671,8 @@ class VoiceRouter(QObject):
                 # perfectly good thing to do.
                 self._press_bank_button(*self._enhance)
                 return
-            wants = (_WANTS.get(command.command)
-                     or f"a {name_parts(command.command)} fix")
+            wants = (f"a Genau {genau_flick_word()}" if command.command == gallery.GENAU_COMMAND
+                     else f"a {name_parts(command.command)} fix")
             self._show(f"🎤 {wants} needs a picture on screen", transient=True)
             return
         target = show.voice_target()

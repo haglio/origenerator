@@ -96,3 +96,11 @@ def overlay_value(content: dict[str, Any], *keys: str) -> Any:
     ``workflows.detail_parts`` does.
     """
     return _overlay.overlay_value(content, *keys, path=overlay_path())
+
+
+def genau_flick_word() -> str:
+    return overlay_value(load_content(), "genau_flick_words", "one")
+
+
+def genau_flicks_word() -> str:
+    return overlay_value(load_content(), "genau_flick_words", "many")

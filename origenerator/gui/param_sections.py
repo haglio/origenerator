@@ -38,7 +38,7 @@ class Section:
 # them) but the form hides them; see ParamForm's ``hidden_keys``.
 SECTIONS: tuple[Section, ...] = (
     Section("Prompts", ("positive_prompt", "scene_frames", "scene_lines",
-                        "negative_prompt", "input_image"),
+                        "negative_prompt", "input_image", "input_video", "start_image"),
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
     Section("Models & Add-ons", (
@@ -57,7 +57,7 @@ SECTIONS: tuple[Section, ...] = (
         "anchor_x", "anchor_y",
     ), collapsed=True),
     Section("Size", ("width", "height"), collapsed=True),
-    Section("Video", ("frame_count", "frame_rate"), collapsed=True),
+    Section("Video", ("frame_count", "frame_rate", "resolution"), collapsed=True),
     Section("Sound", (
         "audio_prompt", "audio_negative_prompt", "audio_seed",
         "voice", "voice_sample", "voice_sample_text",

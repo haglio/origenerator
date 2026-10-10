@@ -45,7 +45,7 @@ from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
 from origenerator.fun_time_mode import OFFER_NAME
 from origenerator.gui.export_lane import GENAU
-from origenerator.gui.loading_screen import LoadingCanceled, LoadingScreen
+from origenerator.gui.loading_screen import LoadingCanceled, loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.hosted_launch import hosted_launch
 from tests.media_files import write_mp4_with_a_comment_tag
@@ -391,7 +391,7 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
 
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
+         patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -408,16 +408,16 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
     # Splash is visible for the whole boot and dismissed once the window shows.
     assert events == ["loading.show", "window.show", "loading.accept"]
     # The boot phases drive the splash status text.
-    statuses = " ".join(str(c.args[0]) for c in loading.set_status.call_args_list)
+    statuses = " ".join(str(c.args[0]) for c in loading.say.call_args_list)
     assert "ComfyUI server" in statuses
 
 
 def _real_loading_screens(screens):
-    def a_real_screen():
-        screens.append(LoadingScreen())
+    def a_real_screen(icon, preview, steps):
+        screens.append(loading_screen(icon, preview, steps))
         return screens[-1]
 
-    return {"origenerator.gui.loading_screen.LoadingScreen": a_real_screen,
+    return {"origenerator.gui.loading_screen.loading_screen": a_real_screen,
             "origenerator.app._bring_to_front": MagicMock()}
 
 
@@ -600,7 +600,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
 
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen", return_value=loading), \
+         patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
          patch("origenerator.app._bring_to_front",
                side_effect=lambda w: events.append(
@@ -631,7 +631,7 @@ def test_main_reconciles_in_flight_before_importing(qapp):
     calls = []
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -730,7 +730,7 @@ def test_main_reclaims_unreachable_trash_on_startup(qapp):
     trash = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -756,7 +756,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
     # reconnected job's progress bar spinning forever.
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -829,7 +829,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     window = MagicMock()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow",
                return_value=window) as mock_window, \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -878,7 +878,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
     covering window a z-order walk named was exactly this splash."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen") as mock_loading, \
+         patch("origenerator.gui.loading_screen.loading_screen") as mock_loading, \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.app_state.AppState"), \
@@ -1018,7 +1018,7 @@ def _boot(library_path, argv=()):
     ComfyUI. Every maintenance pass runs for real."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
-         patch("origenerator.gui.loading_screen.LoadingScreen"), \
+         patch("origenerator.gui.loading_screen.loading_screen"), \
          patch("origenerator.gui.main_window.OrigeneratorWindow"), \
          patch("origenerator.app._ensure_comfyui_server"), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
@@ -1200,7 +1200,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app._init_windows_taskbar_identity": DEFAULT,
         "origenerator.app._taskbar_identity": DEFAULT,
         "origenerator.app._ensure_comfyui_server": DEFAULT,
-        "origenerator.gui.loading_screen.LoadingScreen": DEFAULT,
+        "origenerator.gui.loading_screen.loading_screen": DEFAULT,
         "origenerator.gui.main_window.OrigeneratorWindow": DEFAULT,
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,

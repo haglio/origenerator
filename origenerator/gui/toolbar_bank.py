@@ -24,8 +24,9 @@ from typing import NamedTuple
 
 from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.mark_button import fill_square_with_mark
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE_HUD
 
+from origenerator import ui_scale
 from origenerator.config import AMBIENT_AUDIO_VOICES
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
@@ -101,8 +102,12 @@ class BankActs(NamedTuple):
     toggle_mic: Callable[[bool], None]
 
 
+def _square_landing_at_the_huds_size(*, hosted: bool) -> int:
+    return round(BUTTON_SIZE_HUD / ui_scale.HOSTED_SCALE) if hosted else BUTTON_SIZE_HUD
+
+
 def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
-    btn = fill_square_with_mark(QToolButton())
+    btn = QToolButton()
     btn.setIcon(icon)
     btn.setToolTip(tooltip)
     btn.setCheckable(checkable)
@@ -229,13 +234,21 @@ class ToolbarBank(QWidget):
                 layout.addWidget(button)
             self._groups.append((gap, buttons))
         self._show_the_gaps()
+        self._fill_the_squares(hosted=hosted)
+
+    def _fill_the_squares(self, *, hosted: bool) -> None:
+        for _gap, buttons in self._groups:
+            for button in buttons:
+                fill_square_with_mark(button, size=_square_landing_at_the_huds_size(hosted=hosted))
 
     def become_hosted(self) -> None:
+        self._fill_the_squares(hosted=True)
         self._room_switches = (self.audio, self.mic)
         self._show_the_room_switches(False)
         self.audio = self.mic = None
 
     def become_standalone(self) -> None:
+        self._fill_the_squares(hosted=False)
         self.audio, self.mic = self._room_switches
         self._show_the_room_switches(True)
 

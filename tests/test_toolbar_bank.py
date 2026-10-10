@@ -13,8 +13,9 @@ import pytest
 from PyQt6.QtCore import QPoint, QRect, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolButton
-from shared_ui.spacing import BUTTON_SIZE
+from shared_ui.spacing import BUTTON_MARK_INSET, BUTTON_SIZE_HUD
 
+from origenerator import ui_scale
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.toolbar_bank import (
     AUTO_ELSEWHERE_TIP,
@@ -229,11 +230,40 @@ def _where_the_mark_lands(button: QToolButton) -> QRect:
     return QRect(QPoint(min(xs), min(ys)), QPoint(max(xs), max(ys)))
 
 
-def test_every_button_on_the_bank_is_the_familys_ordinary_square(bank):
+def test_every_button_on_a_standalone_bank_is_the_huds_square(bank):
     made = _every_button_showing_as_the_app_styles_it(bank)
 
     for button in made.findChildren(QToolButton):
-        assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE), button.toolTip()
+        assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD), button.toolTip()
+
+
+def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_banks_do(bank):
+    hosted = bank(hosted=True)
+
+    for button in hosted.findChildren(QToolButton):
+        drawn = QSize(round(button.width() * ui_scale.HOSTED_SCALE),
+                      round(button.height() * ui_scale.HOSTED_SCALE))
+        assert drawn == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD), button.toolTip()
+
+
+def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_with(bank):
+    taken = bank()
+    built_hosted = bank(hosted=True)
+
+    taken.become_hosted()
+
+    assert {button.size() for button in taken.findChildren(QToolButton)} == {
+        button.size() for button in built_hosted.findChildren(QToolButton)}
+
+
+def test_a_bank_handed_back_from_a_session_wears_the_huds_square_again(bank):
+    taken = bank()
+    taken.become_hosted()
+
+    taken.become_standalone()
+
+    assert {button.size() for button in taken.findChildren(QToolButton)} == {
+        QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)}
 
 
 def test_every_mark_on_the_bank_spans_more_than_half_its_button(bank):
@@ -244,11 +274,10 @@ def test_every_mark_on_the_bank_spans_more_than_half_its_button(bank):
         assert max(mark.width(), mark.height()) > button.height() / 2, button.toolTip()
 
 
-def test_every_mark_on_the_bank_keeps_two_pixels_clear_of_its_border(bank):
+def test_every_mark_on_the_bank_stays_inside_the_familys_inset(bank):
     made = _every_button_showing_as_the_app_styles_it(bank)
-    border, clear = 1, 2
 
     for button in made.findChildren(QToolButton):
-        room = button.rect().adjusted(border + clear, border + clear,
-                                      -(border + clear), -(border + clear))
+        room = button.rect().adjusted(BUTTON_MARK_INSET, BUTTON_MARK_INSET,
+                                      -BUTTON_MARK_INSET, -BUTTON_MARK_INSET)
         assert room.contains(_where_the_mark_lands(button)), button.toolTip()

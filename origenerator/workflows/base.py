@@ -482,16 +482,24 @@ class WorkflowTemplate(ABC):
             segment, frames = render(index, scene, [prefix + "last", 0], length,
                                      index == len(plan) - 1, previous=previous)
             nodes.update(segment)
-            nodes[prefix + "new"] = {
-                "class_type": "ImageFromBatch",
-                "inputs": {"image": frames, "batch_index": 1, "length": length - 1},
-            }
-            nodes[prefix + "join"] = {
-                "class_type": "ImageBatch",
-                "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
-            }
-            joined, previous, previous_length = [prefix + "join", 0], frames, length
+            joined = cls.join_after_the_shared_frame(nodes, prefix, joined, frames, length)
+            previous, previous_length = frames, length
         return nodes, joined, cls.clip_frames(plan)
+
+    @staticmethod
+    def join_after_the_shared_frame(nodes: dict, prefix: str, joined, frames, length: int):
+        """Join a stretch of ``length`` frames onto ``joined`` from its second
+        frame on, since its first is the frame the stretch before it ended on;
+        the nodes go in under ``prefix``, and the joined ref comes back."""
+        nodes[prefix + "new"] = {
+            "class_type": "ImageFromBatch",
+            "inputs": {"image": frames, "batch_index": 1, "length": length - 1},
+        }
+        nodes[prefix + "join"] = {
+            "class_type": "ImageBatch",
+            "inputs": {"image1": joined, "image2": [prefix + "new", 0]},
+        }
+        return [prefix + "join", 0]
 
     @classmethod
     def image_size_nodes(cls, image_ref, params: dict, megapixels: float | None = None) -> SizedInput:

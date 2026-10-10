@@ -172,15 +172,7 @@ class VideoEnhanceWorkflow(WorkflowTemplate):
             if joined is None:
                 joined = redrawn
             else:
-                nodes[f"w{index}_new"] = {
-                    "class_type": "ImageFromBatch",
-                    "inputs": {"image": redrawn, "batch_index": 1, "length": length - 1},
-                }
-                nodes[f"w{index}_join"] = {
-                    "class_type": "ImageBatch",
-                    "inputs": {"image1": joined, "image2": [f"w{index}_new", 0]},
-                }
-                joined = [f"w{index}_join", 0]
+                joined = self.join_after_the_shared_frame(nodes, f"w{index}_", joined, redrawn, length)
             first_frame += length - 1
         smoothed, frames_ref = self.interpolation_nodes("smooth", joined, params)
         return {

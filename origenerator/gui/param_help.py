@@ -212,6 +212,12 @@ PARAM_HELP: dict[str, str] = {
         "Pick a length or type one; it is rounded to the frames the model works "
         "in, and stops where the model stops."
     ),
+    "resolution": (
+        "How big each frame is drawn. 480p is the size every video was made at "
+        "until this choice existed; 720p keeps far more of the start image's "
+        "detail and takes several times as long, and a long clip is made in "
+        "shorter stretches to fit the graphics card."
+    ),
     "frame_rate": (
         "How smooth the motion looks. The model always paces the action at 16 "
         "frames a second; a higher rate fills in the frames between those, so "

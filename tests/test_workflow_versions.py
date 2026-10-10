@@ -146,6 +146,7 @@ _PINNED = {
     "pose_bbox_detector": "a_person_detector.onnx",
     "pose_estimator": "a_pose_estimator.pt",
     "positive_prompt": "a lighthouse at dusk",
+    "resolution": "480p",
     "sampler_name": "dpmpp_2m",
     "scene_frames": [81],
     "scene_lines": [""],
@@ -184,6 +185,7 @@ _VARIATIONS = {
         "frame_rate": 48.0,
     },
     "with both LoRAs bypassed": {"lora_high": "None", "lora_low": "None"},
+    "framed at 720p, chained in that frame's windows": {"resolution": "720p", "frame_count": 161},
     "sized by hand": {"width": 832, "height": 480},
     "posed from a skeleton, through a union ControlNet": {
         "control_mode": "pose",
@@ -200,9 +202,9 @@ GRAPH_FINGERPRINTS = {
     ("image_enhance", "v003"): "228ccee5269454ec",
     ("sdxl_pose_transfer", "v004"): "067f07b0440388d9",
     ("sdxl_t2i", "v004"): "906cfa8824d0524d",
-    ("wan21_ati_i2v", "v007"): "c82a130aa21d7352",
-    ("wan22_flf2v_loop", "v009"): "3cc07d12a40c7995",
-    ("wan22_i2v", "v007"): "ce72e0c5e1342c10",
+    ("wan21_ati_i2v", "v008"): "ae2a195b213892c3",
+    ("wan22_flf2v_loop", "v010"): "e80305f2b270569c",
+    ("wan22_i2v", "v008"): "3a92c06fbd4a21f7",
     ("wan22_t2i", "v002"): "f0794cae55c3e05d",
 }
 

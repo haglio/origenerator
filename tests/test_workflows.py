@@ -970,6 +970,19 @@ def test_derived_display_size_is_none_when_not_derived_or_unmeasurable():
     ) is None
 
 
+def test_the_video_forms_offer_a_resolution_and_derive_their_size_from_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    _write_image(tmp_path / "tall.png", (1080, 1920))
+    for name in ("wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"):
+        wf = WORKFLOW_REGISTRY[name]
+        resolution = next(d for d in wf.param_definitions() if d.key == "resolution")
+        assert resolution.options == ["480p", "720p"], name
+        assert wf.default_params()["resolution"] == "480p", name
+        params = dict(wf.default_params(), input_image="tall.png")
+        assert wf.derived_display_size(params) == (480, 864), name
+        assert wf.derived_display_size(dict(params, resolution="720p")) == (720, 1280), name
+
+
 def test_wan22_build_api_payload_structure():
     wf = Wan22Flf2vLoopWorkflow()
     params = wf.default_params()
@@ -2368,6 +2381,22 @@ def test_segment_lengths_stay_on_the_models_frame_grid():
         parts = lengths(count)
         assert parts[0] + sum(n - 1 for n in parts[1:]) == count
         assert all(n % 4 == 1 and 5 <= n <= 161 for n in parts), count
+
+
+def test_a_720p_video_is_sized_to_its_budget_and_chained_in_the_windows_that_budget_allows():
+    wf = Wan22I2vWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png", resolution="720p"))
+    assert _find_node(payload, "ImageScaleToTotalPixels")["inputs"]["megapixels"] == pytest.approx(0.88)
+    # A window holds the frames the card held at 480p, scaled down by the
+    # budget and kept on the models' 4k+1 grid.
+    assert WorkflowTemplate.single_window_frames(0.4) == SINGLE_WINDOW_FRAMES
+    assert WorkflowTemplate.single_window_frames(0.88) == 73
+    assert WorkflowTemplate.segment_lengths(161, window=73) == [73, 73, 17]
+    long_clip = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png",
+                                          resolution="720p", frame_count=161))
+    lengths = sorted(n["inputs"]["length"] for n in long_clip.values()
+                     if n["class_type"] == "WanImageToVideo")
+    assert lengths == [17, 73, 73]
 
 
 def test_the_last_scene_carries_on_through_the_scenes_after_it():

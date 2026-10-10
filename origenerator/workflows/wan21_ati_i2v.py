@@ -7,8 +7,10 @@ from origenerator.workflows.base import (
     ParamDef,
     ParamType,
     WorkflowTemplate,
+    resolution_param,
 )
 from origenerator.workflows.derived_size import (
+    DEFAULT_RESOLUTION,
     measure_derived_size,
     override_size,
     resolve_input_image_path,
@@ -61,7 +63,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     """
 
     name = "wan21_ati_i2v"
-    version = "v007"
+    version = "v008"
     display_name = "WAN 2.1 Image-to-Video (Motion-Tracked)"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
@@ -83,6 +85,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             "scheduler": "simple",
             "shift": 8.0,
             "frame_rate": NATIVE_FPS,
+            "resolution": DEFAULT_RESOLUTION,
             "motion_hz": 1.2,
             "motion_x": 255,
             "motion_ceiling": 490,
@@ -138,6 +141,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("lora_strength_high", "Add-on Strength (First Pass)", ParamType.FLOAT, defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
             ParamDef("lora_low", "Add-on (Second Pass)", ParamType.COMBO, defaults["lora_low"], options=loras_low),
             ParamDef("lora_strength_low", "Add-on Strength (Second Pass)", ParamType.FLOAT, defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
+            resolution_param(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),
@@ -183,7 +187,8 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
         unreadable — so payload build never crashes on a stale or hand-typed
         filename, it just uses the default. Unlike the WAN 2.2 pair ATI can't defer
         this to the graph: its track's pixel coordinates must be built here."""
-        return measure_derived_size(params.get("input_image", "")) or (
+        return measure_derived_size(params.get("input_image", ""),
+                                    megapixels=self.pixel_budget(params)) or (
             REFERENCE_WIDTH,
             REFERENCE_HEIGHT,
         )

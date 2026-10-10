@@ -26,6 +26,7 @@ class FakeWorkflow(WorkflowTemplate):
             "steps": 20,
             "batch_size": 1,
             "sampler_name": "euler",
+            "resolution": "480p",
         }
 
     def param_definitions(self) -> list:
@@ -37,6 +38,7 @@ class FakeWorkflow(WorkflowTemplate):
             ParamDef("batch_size", "Batch Size", "int", 1, min_val=1, max_val=8),
             ParamDef("sampler_name", "Sampler", "combo", "euler",
                      options=["euler", "dpmpp_2m", "uni_pc"]),
+            ParamDef("resolution", "Resolution", "combo", "480p", options=["480p", "720p"]),
         ]
 
     def build_api_payload(self, params: dict) -> dict:
@@ -191,6 +193,17 @@ def test_batch_size_is_not_an_experiment_dimension():
         proposal = policy.propose([base])
         assert "batch_size" not in proposal.mutated_keys
         assert proposal.params["batch_size"] == 1
+
+
+def test_resolution_is_not_an_experiment_dimension():
+    # A bigger frame costs several times the run and says nothing new about
+    # the recipe, so an experiment keeps the resolution its base was made at.
+    base = make_row("base-1")
+    policy = make_policy(seed=8)
+    for _ in range(300):
+        proposal = policy.propose([base])
+        assert "resolution" not in proposal.mutated_keys
+        assert proposal.params["resolution"] == "480p"
 
 
 def test_a_clearly_damned_value_stops_being_proposed():

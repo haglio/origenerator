@@ -238,7 +238,7 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     # covered the day it is registered.
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v"}
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan21_ati_i2v", "video_enhance"}
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
     # ...and the split is the media, not a list anyone has to remember to add to.
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
@@ -451,7 +451,7 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     # buttons, never offered in the Generate dropdown. Every real workflow is.
     assert wf.selectable is False
     assert all(WORKFLOW_REGISTRY[n].selectable for n in WORKFLOW_REGISTRY
-               if n != "image_enhance")
+               if n not in ("image_enhance", "video_enhance"))
     # It takes an input image, so — like every input-image workflow — its size
     # derives from it: the source's own dimensions at enhance_scale, no budget.
     assert wf.derives_size_from_input is True
@@ -2193,6 +2193,9 @@ READS_AS = {
     # output re-importing as itself).
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
+    # The video enhancer redraws through the same conditioning the i2v
+    # workflow samples with, so its graph reads as that workflow's.
+    "video_enhance": "wan22_i2v",
     # Not recognized at all, which here is the right answer: nothing in the
     # chain matches, so the filename's guess stands, and it is correct.
     "wan21_ati_i2v": None,
@@ -2222,8 +2225,11 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 
 # ---- video length and rate, as the form offers them ----
 
+# The video forms: what makes a video from a picture. The video enhancer makes
+# one from a video, keeps that video's length, rate and soundtrack, and takes
+# its steps from the Enhance panel, so these are not its questions.
 _VIDEO_WORKFLOWS = [
-    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video"
+    n for n, wf in WORKFLOW_REGISTRY.items() if wf.output_type == "video" and wf.selectable
 ]
 
 

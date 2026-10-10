@@ -408,10 +408,13 @@ class WorkflowTemplate(ABC):
                 for length in cls.segment_lengths(count, window)]
 
     @staticmethod
-    def single_window_frames(megapixels: float) -> int:
+    def single_window_frames(megapixels: float, at_480p: int | None = None) -> int:
         """How many frames one window holds at ``megapixels`` per frame: the
-        480p window's frames shrunk by the budget, on the models' 4k+1 grid."""
-        frames = int(SINGLE_WINDOW_FRAMES * (TARGET_MEGAPIXELS / megapixels))
+        frames it holds at 480p (:data:`SINGLE_WINDOW_FRAMES` unless said
+        otherwise) shrunk by the budget, on the models' 4k+1 grid."""
+        if at_480p is None:
+            at_480p = SINGLE_WINDOW_FRAMES
+        frames = int(at_480p * (TARGET_MEGAPIXELS / megapixels))
         return frames - (frames - 1) % 4
 
     @staticmethod

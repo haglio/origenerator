@@ -149,6 +149,18 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
                             "cruise", "learned", "shape", "quarter"]
 
 
+def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
+    panel, _motion = _panel(qtbot)
+    faces = []
+    for _waveform in motion_engine.WaveformShape:
+        panel.render_console()
+        faces.append(next(b.glyph for _r, b in panel._painter.buttons
+                          if b.command == "robot_hand_cycle_shape"))
+        _press(panel, "robot_hand_cycle_shape")
+
+    assert len(set(faces)) == len(motion_engine.WaveformShape)
+
+
 class FakeControl(QObject):
     """The app's OSR2 switch reduced to what the console's group asks of one."""
 

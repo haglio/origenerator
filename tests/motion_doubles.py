@@ -6,6 +6,7 @@ own half-driver to be pressed against.
 """
 from __future__ import annotations
 
+from origenerator import motion_engine
 from origenerator.motion_engine import Motion
 
 
@@ -32,6 +33,7 @@ class FakeMotion:
 
     def cycle_shape(self):
         self.calls.append("shape")
+        motion_engine.cycle_shape(self.state.state)
 
     def quarter_offset(self):
         self.calls.append("quarter")

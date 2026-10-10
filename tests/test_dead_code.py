@@ -322,7 +322,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # loading screen and why the screen never wears the app's own caption are
 # test_main_in_fun_time_mode_shows_no_splash and
 # test_the_splash_never_wears_the_apps_own_caption.
-MAX_PROSE_LINES = 18338
+#
+# 18173 when the row that aims the device moved to player_core, taken down to
+# what the tree measured: the note that a console with no OSR2 switch offers no
+# control-off is player_core's
+# test_a_host_with_no_switch_offers_no_control_off_and_sets_the_holds_apart.
+MAX_PROSE_LINES = 18173
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -56,8 +56,10 @@ from origenerator.gallery import (
     source_image_id_for,
     unreviewed_experiments,
     videos_from_source_image,
+    workflows_of_both_kinds,
 )
 from origenerator.gallery import output as gallery_output
+from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
@@ -1012,6 +1014,47 @@ def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
     assert workflow.key == "image/wan22_flf2v_loop"  # keyed as an image, not a video
     (lora,) = workflow.children[0].children
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
+
+
+def _loop_output(prompt_id, filename):
+    return _row(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+                params_json=json.dumps({"positive_prompt": "a cat", "seed": 2}),
+                output_files=json.dumps([{"filename": filename}]))
+
+
+_LOOP_STILL = _loop_output("still", "flf2v_loop_00001_.png")
+_LOOP_CLIP = _loop_output("clip", "flf2v_loop_00002_.mp4")
+_LOOPING = workflow_label("wan22_flf2v_loop")
+
+
+def _workflow_labels(rows, meta=None, **kwargs):
+    return {workflow.key: workflow.label for workflow in build_gallery_tree(rows, meta, **kwargs)}
+
+
+def test_a_recipe_that_made_both_kinds_names_each_copy_by_what_it_holds():
+    assert _workflow_labels([_LOOP_STILL, _LOOP_CLIP]) == {
+        "image/wan22_flf2v_loop": f"{_LOOPING} images",
+        "video/wan22_flf2v_loop": f"{_LOOPING} videos",
+    }
+
+
+def test_a_copy_keeps_its_name_where_only_its_own_kind_is_on_hand():
+    both_kinds = workflows_of_both_kinds([_LOOP_STILL, _LOOP_CLIP])
+
+    assert _workflow_labels([_LOOP_CLIP], both_kinds=both_kinds) == {
+        "video/wan22_flf2v_loop": f"{_LOOPING} videos"}
+
+
+def test_copies_named_apart_keep_their_names_and_copies_named_alike_say_what_they_hold():
+    def named(still, clip):
+        return {"image/wan22_flf2v_loop": {"custom_name": still},
+                "video/wan22_flf2v_loop": {"custom_name": clip}}
+
+    rows = [_LOOP_STILL, _LOOP_CLIP]
+    assert set(_workflow_labels(rows, named("Loop frames", "Loops")).values()) == {
+        "Loop frames", "Loops"}
+    assert set(_workflow_labels(rows, named("Odds", "Odds")).values()) == {
+        "Odds images", "Odds videos"}
 
 
 def test_folder_key_at_level_settings_resolves_the_frame_through_the_index():

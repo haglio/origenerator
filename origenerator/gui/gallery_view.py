@@ -1765,15 +1765,17 @@ class GalleryView(QWidget):
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`).
         start_frames = gallery.start_frame_index(rows)
+        both_kinds = gallery.workflows_of_both_kinds(rows)
         tree_model = gallery.build_gallery_tree(rows, meta, media_types,
-                                                image_index=start_frames)
+                                                image_index=start_frames,
+                                                both_kinds=both_kinds)
         unreviewed = self._review_queue(listed)
         # The bin holds every kind, so a restore can still resolve a row of a type
         # the ticks are hiding; only what the Trash shelf lists is narrowed.
         self._held_rows = recovery.bin_items(self._bin_records())
         held = gallery.rows_of_media_types(self._held_rows, media_types)
         self._live_ids = {row["prompt_id"] for row in rows}
-        trees = _side_trees(listed, meta, start_frames)
+        trees = _side_trees(listed, meta, start_frames, both_kinds)
         self._custom_folders_by_side = _custom_folders_by_side(
             trees, self._db.list_custom_folders())
         self._custom_folders = [folder for folders in self._custom_folders_by_side.values()
@@ -4471,16 +4473,17 @@ class GalleryView(QWidget):
         self._info_tabs.pin_current_tab()
 
 
-def _side_trees(rows, meta, start_frames) -> dict[str, list]:
+def _side_trees(rows, meta, start_frames, both_kinds) -> dict[str, list]:
     """Each shape's media/workflow/model/LoRA/settings hierarchy.
 
-    ``start_frames`` is the whole library's, not the side's: what a side
-    holds decides which folders it draws, never what they are called (see
-    :func:`gallery.start_frame_index`).
+    ``start_frames`` and ``both_kinds`` are the whole library's, not the
+    side's: what a side holds decides which folders it draws, never what they
+    are called (see :func:`gallery.start_frame_index`).
     """
     dealt = split_rows(rows)
     return {orientation: gallery.build_gallery_tree(dealt[orientation], meta,
-                                                    image_index=start_frames)
+                                                    image_index=start_frames,
+                                                    both_kinds=both_kinds)
             for orientation in _ORIENTATIONS}
 
 

@@ -665,9 +665,32 @@ def start_frame_index(rows: list[dict]) -> dict:
     )
 
 
+_HOLDS = {MediaType.IMAGE: "images", MediaType.VIDEO: "videos"}
+
+
+def workflows_of_both_kinds(rows: list[dict]) -> frozenset[str]:
+    kinds_made: dict[str, set] = {}
+    for row in placeable_rows(rows):
+        kinds_made.setdefault(row.get("workflow_name") or "unknown", set()).add(
+            media_type_of_row(row))
+    return frozenset(name for name, kinds in kinds_made.items() if len(kinds) > 1)
+
+
+def _workflow_folder_label(media_type, wf_name: str, folder_meta: dict,
+                           both_kinds: frozenset[str]) -> tuple[str, bool]:
+    label, favorite = _overlay(workflow_label(wf_name), f"{media_type}/{wf_name}", folder_meta)
+    if wf_name in both_kinds:
+        other_kind = next(kind for kind in _HOLDS if kind != media_type)
+        twin, _ = _overlay(workflow_label(wf_name), f"{other_kind}/{wf_name}", folder_meta)
+        if twin == label:
+            label = f"{label} {_HOLDS[media_type]}"
+    return label, favorite
+
+
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
     media_types: set[str] | None = None, *, image_index: dict | None = None,
+    both_kinds: frozenset[str] | None = None,
 ) -> list[WorkflowGroup]:
     """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
     folders.
@@ -702,6 +725,8 @@ def build_gallery_tree(
     holding pen outside the tree.
     """
     folder_meta = folder_meta or {}
+    if both_kinds is None:
+        both_kinds = workflows_of_both_kinds(rows)
     rows = placeable_rows(rows)
     if image_index is None:
         image_index = start_frame_index(rows)
@@ -712,7 +737,8 @@ def build_gallery_tree(
         if media_types is not None and media_type not in media_types:
             continue
         wf_key = f"{media_type}/{wf_name}"
-        wf_label, wf_favorite = _overlay(workflow_label(wf_name), wf_key, folder_meta)
+        wf_label, wf_favorite = _workflow_folder_label(media_type, wf_name, folder_meta,
+                                                       both_kinds)
         tier = _Tier(media_type, wf_name, folder_meta, image_index)
         tree.append(WorkflowGroup(
             wf_key, wf_name, wf_label,

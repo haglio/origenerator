@@ -176,8 +176,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     one was left, its filters, where each side's panel sits and the pace -- are
     saved with the session too, through that same pair. 272 -> 273: a Fun Time
     session opening while a slideshow is up takes that slideshow into the room,
-    so whether one is up is asked here for the offer the window stands.)"""
+    so whether one is up is asked here for the offer the window stands. 273 -> 275:
+    a generation ComfyUI refuses as the app closes is saved with the session and
+    said at the next launch, through that same pair.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 273
+               for x in _class_def(VIEW, "GalleryView").body) == 275
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

@@ -779,6 +779,29 @@ def test_close_event_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
     flush.assert_called_once_with()
 
 
+def test_a_generation_comfyui_refuses_as_the_app_closes_is_said_once_at_the_next_launch(
+        qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path, AppState(path))
+    refused = "UNETLoader can't find example_high.safetensors"
+
+    def refused_as_it_closes(jobs):
+        jobs.failed.emit("image/wan22_t2i/k", refused)
+        return 0
+
+    with patch.object(type(win._gallery_view._jobs), "flush_to_server", refused_as_it_closes):
+        win.close()
+    assert win._gallery_view.findChildren(QMessageBox) == []
+
+    reopened = _window(qtbot, tmp_path, AppState(path))
+    qtbot.waitUntil(lambda: bool(reopened._gallery_view.findChildren(QMessageBox)))
+
+    (dialog,) = reopened._gallery_view.findChildren(QMessageBox)
+    assert dialog.text() == refused
+    reopened.close()
+    assert AppState(path).get("generations_failed_as_it_closed") == []  # said once
+
+
 def test_close_event_persists_window_geometry(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))

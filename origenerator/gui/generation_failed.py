@@ -14,8 +14,16 @@ class GenerationFailed:
         self._window = window
         self._box: QMessageBox | None = None
         self._reasons: Counter[str] = Counter()
+        self._holding = False
+        self.held: list[str] = []
+
+    def hold_for_next_launch(self) -> None:
+        self._holding = True
 
     def say(self, reason: str) -> None:
+        if self._holding:
+            self.held.append(reason)
+            return
         if self._box is None:
             self._box = QMessageBox(QMessageBox.Icon.Warning, TITLE, "",
                                     QMessageBox.StandardButton.Ok, self._window)
@@ -25,6 +33,10 @@ class GenerationFailed:
         self._reasons[reason] += 1
         self._box.setText(worded(self._reasons))
         self._box.open()
+
+    def say_each(self, reasons: list[str]) -> None:
+        for reason in reasons:
+            self.say(reason)
 
     def _dismissed(self) -> None:
         self._box = None

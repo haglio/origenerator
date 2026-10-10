@@ -12,9 +12,9 @@ import origenerator.importer as imp
 from origenerator.db import Database
 from origenerator.importer import (
     backfill_import_params,
+    backfill_import_workflows,
     backfill_imported_video_seeds,
     backfill_shared_thumbnails,
-    backfill_unknown_workflows,
     import_comfyui_output,
     merge_video_sidecar_rows,
 )
@@ -311,12 +311,36 @@ def test_backfill_relabels_unknown_imports_by_filename(tmp_path):
         workflow_version="v004", params_json="{}", workflow_json="{}",
     )
 
-    updated = backfill_unknown_workflows(db)
+    updated = backfill_import_workflows(db)
 
     assert updated == 1
     assert db.get_generation("bf-i2v")["workflow_name"] == "wan22_i2v"
     assert db.get_generation("bf-mystery")["workflow_name"] == "unknown"
     assert db.get_generation("bf-known")["workflow_name"] == "wan22_flf2v_loop"
+
+
+def _add_import(db, prompt_id, workflow_name, filename):
+    db.insert_generation(
+        prompt_id=prompt_id, workflow_name=workflow_name, workflow_version="imported",
+        params_json="{}", workflow_json="{}", source="imported",
+    )
+    db.update_generation(prompt_id, output_files=json.dumps(
+        [{"filename": filename, "subfolder": "", "type": "output"}]
+    ))
+
+
+def test_backfill_takes_a_video_out_of_a_recipe_that_only_makes_pictures(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _add_import(db, "video", "sdxl_t2i", "renamed_00001.mp4")
+    _add_import(db, "picture", "sdxl_t2i", "renamed_00002.png")
+    _add_import(db, "first-frame", "wan22_flf2v_loop", "renamed_00003.png")
+    _add_import(db, "named-like-a-picture", "unknown", "sdxl_t2i_00004_.mp4")
+
+    assert backfill_import_workflows(db) == 1
+    assert db.get_generation("video")["workflow_name"] == "unknown"
+    assert db.get_generation("picture")["workflow_name"] == "sdxl_t2i"
+    assert db.get_generation("first-frame")["workflow_name"] == "wan22_flf2v_loop"
+    assert db.get_generation("named-like-a-picture")["workflow_name"] == "unknown"
 
 
 def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monkeypatch):
@@ -466,9 +490,9 @@ def test_an_import_of_no_known_recipe_records_its_shape_so_its_folder_has_one(tm
     assert meta["params"] == {"orientation": "portrait"}
 
 
-def test_a_video_import_whose_graph_states_no_size_takes_the_size_of_its_frames(
+def test_a_video_import_of_no_recipe_that_makes_videos_takes_its_shape_from_its_frames(
         tmp_path, monkeypatch):
-    graph = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {}}}
+    graph = _graph_of("CheckpointLoaderSimple", "VHS_VideoCombine")
 
     def fake_run(*args, **kwargs):
         return sp.CompletedProcess(args, 0, stderr="", stdout=json.dumps({
@@ -480,9 +504,10 @@ def test_a_video_import_whose_graph_states_no_size_takes_the_size_of_its_frames(
     monkeypatch.setattr(imp.shutil, "which", lambda n: "ffprobe")
     monkeypatch.setattr(imp.subprocess, "run", fake_run)
 
-    params = imp._extract_metadata(tmp_path / "sdxl_t2i_00001.mp4", ".mp4")["params"]
+    meta = imp._extract_metadata(tmp_path / "sdxl_t2i_00001.mp4", ".mp4")
 
-    assert (params["width"], params["height"]) == (616, 768)
+    assert meta["workflow_name"] == "unknown"
+    assert meta["params"] == {"orientation": "portrait"}
 
 def test_import_skips_already_imported(tmp_path):
     output_dir = tmp_path / "output" / "image"
@@ -527,6 +552,21 @@ def test_import_consolidates_video_with_metadata_png_sidecar(tmp_path):
     assert row["positive_prompt"] == "a dancing cat"        # keeps the PNG metadata
     assert row["seed"] == 777
     assert row["workflow_name"] == "wan22_flf2v_loop"
+
+
+def test_a_video_is_never_filed_under_a_recipe_that_only_makes_pictures(tmp_path):
+    output_dir = tmp_path / "output" / "video"
+    output_dir.mkdir(parents=True)
+    _make_png_with_metadata(output_dir / "renamed_00001.png",
+                            _graph_of("CheckpointLoaderSimple", "VHS_VideoCombine"))
+    (output_dir / "renamed_00001.mp4").write_bytes(b"")
+
+    db = Database(tmp_path / "test.db")
+    import_comfyui_output(output_dir.parent, db, tmp_path / "thumbs")
+
+    (row,) = db.list_generations()
+    assert json.loads(row["output_files"])[0]["filename"] == "renamed_00001.mp4"
+    assert row["workflow_name"] == "unknown"
 
 
 def test_import_same_stem_image_and_video_get_distinct_thumbnails(tmp_path):
@@ -865,7 +905,7 @@ def test_backfill_relabels_unknown_flux_import_by_filename(tmp_path):
     db.update_generation("flux", output_files=json.dumps(
         [{"filename": "flux_t2i_upscaled_00004_.png", "subfolder": "image", "type": "output"}]
     ))
-    assert backfill_unknown_workflows(db) == 1
+    assert backfill_import_workflows(db) == 1
     assert db.get_generation("flux")["workflow_name"] == "flux_t2i_upscaled"
 
 

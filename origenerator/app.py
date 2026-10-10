@@ -305,10 +305,9 @@ def _merge_soundless_copies(library: Library):
 
 
 def _backfill_workflow_labels(library: Library):
-    """Relabel any imports that predate filename-based workflow inference."""
-    from origenerator.importer import backfill_unknown_workflows
+    from origenerator.importer import backfill_import_workflows
 
-    return backfill_unknown_workflows(library.db)
+    return backfill_import_workflows(library.db)
 
 
 def _backfill_import_params(library: Library):
@@ -416,7 +415,7 @@ MAINTENANCE = (
              counted="Folded %d soundless copies into the videos they came from",
              failure="Folding soundless copies failed: %s"),
     BootPass("Updating workflow labels...", _backfill_workflow_labels,
-             counted="Relabeled %d previously-unknown imports",
+             counted="Refiled %d imports under the recipe that could have made them",
              failure="Workflow backfill failed: %s"),
     BootPass("Sorting imports by what made them...", _backfill_import_params,
              counted="Read settings off the graph of %d imports",

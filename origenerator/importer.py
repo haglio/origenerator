@@ -24,7 +24,12 @@ from origenerator.comfy_graph import (
     sound_params,
 )
 from origenerator.db import Database
-from origenerator.gallery import parse_params, row_output_files
+from origenerator.gallery import (
+    media_type_of_row,
+    parse_params,
+    row_output_files,
+    workflow_output_type,
+)
 from origenerator.gallery.sides import orientation_of_size
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
@@ -96,7 +101,8 @@ def import_comfyui_output(output_dir: Path, db: Database, thumb_dir: Path) -> in
             if rel_path in existing:
                 continue
 
-            metadata = _extract_metadata(fpath, fpath.suffix.lower())
+            metadata = _extract_metadata(fpath, fpath.suffix.lower(),
+                                         media_type_from_filename(play_path.name))
             prompt_id = str(uuid.uuid4())
 
             thumb_path = None
@@ -269,28 +275,18 @@ def _render_row_thumbnail(row: dict, output_dir: Path, thumb_dir: Path) -> Path 
         return None
 
 
-def backfill_unknown_workflows(db: Database) -> int:
-    """Relabel rows imported as workflow 'unknown' (before filename inference
-    existed) whose output filename matches a known workflow's prefix.
-
-    Returns the number of rows updated. Rows that match nothing are left as
-    'unknown', and already-identified rows are never touched.
-    """
+def backfill_import_workflows(db: Database) -> int:
     updated = 0
     for row in db.list_generations():
-        if row.get("workflow_name") != "unknown":
+        filed = row.get("workflow_name")
+        kind = media_type_of_row(row)
+        if filed != "unknown" and (source_of(row) != GenerationSource.IMPORTED
+                                   or _could_have_made(filed, kind)):
             continue
-        files_json = row.get("output_files")
-        if not files_json:
-            continue
-        try:
-            files = json.loads(files_json)
-        except json.JSONDecodeError:
-            continue
-        if not files:
-            continue
-        name = infer_workflow_name(files[0].get("filename", ""))
-        if name:
+        files = row_output_files(row)
+        guess = infer_workflow_name(files[0].get("filename", "")) if files else None
+        name = guess if _could_have_made(guess, kind) else "unknown"
+        if name != filed:
             db.set_workflow_name(row["prompt_id"], name)
             updated += 1
     return updated
@@ -574,7 +570,12 @@ def _own_graph_reads_as(name: str) -> str | None:
     return _workflow_from_nodes(workflow.build_api_payload(dict(workflow.default_params())))
 
 
-def _reconciled(filename_guess: str, graph_read: str | None) -> str:
+def _could_have_made(workflow_name: str | None, kind: MediaType | None) -> bool:
+    return workflow_name is not None and not (
+        kind == MediaType.VIDEO and workflow_output_type(workflow_name) == MediaType.IMAGE)
+
+
+def _reconciled(filename_guess: str, graph_read: str | None, kind: MediaType | None) -> str:
     """The workflow name the two witnesses agree on.
 
     The graph overrules the filename -- a file can be renamed and a prefix
@@ -583,14 +584,14 @@ def _reconciled(filename_guess: str, graph_read: str | None) -> str:
     graph, say) both read as one of them, and a filename naming the other is
     then the better witness, not the worse.
     """
-    if graph_read is None:
+    if not _could_have_made(graph_read, kind):
         return filename_guess
     if filename_guess in WORKFLOW_REGISTRY and _own_graph_reads_as(filename_guess) == graph_read:
         return filename_guess
     return graph_read
 
 
-def _extract_metadata(fpath: Path, suffix: str) -> dict:
+def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -> dict:
     """What an output file says about the run that made it.
 
     Its embedded graph first, read by :func:`_graph_params`; the filename's
@@ -599,8 +600,10 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
     prefix reused. Where the graph states no size for a workflow that asks for
     one, the picture itself does (:func:`_size_from_its_own_file`).
     """
+    kind = kind or media_type_from_filename(fpath.name)
+    filename_guess = infer_workflow_name(fpath.name)
     result: dict = {
-        "workflow_name": infer_workflow_name(fpath.name) or "unknown",
+        "workflow_name": filename_guess if _could_have_made(filename_guess, kind) else "unknown",
         "workflow_version": "imported",
         "positive_prompt": None,
         "negative_prompt": None,
@@ -614,7 +617,7 @@ def _extract_metadata(fpath: Path, suffix: str) -> dict:
         result["params"] = _size_from_its_own_file(fpath, result["workflow_name"])
         return result
 
-    workflow_name = _reconciled(result["workflow_name"], _workflow_from_nodes(graph))
+    workflow_name = _reconciled(result["workflow_name"], _workflow_from_nodes(graph), kind)
     params = _graph_params(graph)
     if "width" not in params:
         params = {**_size_from_its_own_file(fpath, workflow_name), **params}

@@ -411,7 +411,7 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 {"positive_prompt": prompt,
                  "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
                  "lora_high": f"{lora}_high.safetensors", "lora_low": f"{lora}_low.safetensors",
-                 "seed": seed},
+                 "seed": seed, "frame_count": 81},
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
@@ -2814,7 +2814,7 @@ def _answer_menu(monkeypatch, label):
 
     By its words rather than its place in the list: a menu grows and shrinks with
     what the row it was raised over can do — "Go to folder" is absent inside the
-    item's own folder, Enhance is absent for a video, "Delete folder…" is absent
+    item's own folder, Enhance is absent for an import, "Delete folder…" is absent
     over a workflow — so an index picks a different entry depending on where it
     is raised.
 
@@ -3774,32 +3774,18 @@ def _video_leaf(view):
     view._tree.setCurrentItem(item)
 
 
-def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
-    # There is no video enhancer — the workflow under all of this refines a
-    # still — so a picked video is nothing to run, not a run that fails.
+def test_enhance_lights_on_a_picked_video(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
-    assert not view._bank.enhance.isEnabled()   # the folder holds only videos
+    # Enhance All stays a picture's act: the folder's videos wait to be picked.
+    assert not view._bank.enhance.isEnabled()
 
     view._browser._thumbnail_clicked("v1", _NO_MOD)
-    assert not view._bank.enhance.isEnabled()
-    assert "no video enhancer" in view._bank.enhance.toolTip()
-
-
-def test_the_enhance_panel_grays_out_on_a_video_too(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    _video_leaf(view)
-    assert not view._enhance.panel.isEnabled()
-    assert "no video enhancer" in view._enhance.panel.toolTip()
-
-    _select_first_leaf(view)   # back on images, and the settings come back
+    assert view._bank.enhance.isEnabled()
+    assert view._bank.enhance.toolTip() == "Enhance 1 item (upscale + light redraw)"
     assert view._enhance.panel.isEnabled()
-    assert view._enhance.panel.toolTip() == ""
 
 
 def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
@@ -4014,13 +4000,13 @@ def test_an_unenhanced_image_offers_its_first_enhancement_in_the_corner(qtbot, t
     assert view._browser._thumb_widgets["g0"].enhance_state() == icons.ENHANCE_OPEN
 
 
-def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
+def test_a_video_tile_offers_its_first_enhancement_in_the_corner(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    assert view._browser._thumb_widgets["v1"].enhance_state() is None
+    assert view._browser._thumb_widgets["v1"].enhance_state() == icons.ENHANCE_OPEN
 
 
 def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp_path):

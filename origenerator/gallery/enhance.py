@@ -38,7 +38,9 @@ from origenerator.gallery.enhance_graph import graph_level_params
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
     ENHANCE_WORKFLOW,
+    ENHANCE_WORKFLOWS,
     MATCH_SOURCE_MODEL,
+    VIDEO_ENHANCE_WORKFLOW,
     EnhanceSettings,
     describe_enhance_params,
     level_settings,
@@ -56,6 +58,8 @@ from origenerator.gallery.source_image import source_image_id_for
 from origenerator.generation_state import GenerationSource
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import WorkflowTemplate
+from origenerator.workflows.derived_size import resolve_input_image_path
 from origenerator.workflows.detail_parts import (
     DEFAULT_FIX_DENOISE,
     detail_fixes_of,
@@ -209,10 +213,10 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
     enhancement yet.
 
     An image's versions are listed even before there are two of them: a place
-    that appears only once you already have versions is a place you never find,
-    and the enhance you just launched replaces the strip's only other content
-    while it runs. A video has no enhancer, so it lists versions only once
-    Evolver has upscaled it — that ``upscale`` over the video itself.
+    that appears only once you already have versions is a place you never find.
+    A video's are listed once it has received one, or once Evolver has upscaled
+    it — that ``upscale`` over whatever it has; until then its file stays in
+    the block beside the ``+ Enhance`` row.
 
     Each version carries its own file, so the file rows live beside the level
     that produced them rather than in one undifferentiated block at the top —
@@ -220,15 +224,18 @@ def displayed_levels(row: dict, upscale: Path | None = None) -> list[EnhanceLeve
     longer has to list.
     """
     files = row_output_files(row)
-    if media_type_of_row(row) != MediaType.IMAGE:
-        if upscale is None or not files:
-            return []
-        return [EnhanceLevel(1, "Evolved", {"filename": upscale.name, "path": str(upscale)}),
-                EnhanceLevel(0, "Original", files[0])]
+    if not files:
+        return []
     levels = enhance_levels(row)
-    if levels:
+    if media_type_of_row(row) != MediaType.IMAGE:
+        if upscale is None and not levels:
+            return []
+        levels = levels or [EnhanceLevel(0, "Original", files[0])]
+        if upscale is not None:
+            levels.insert(0, EnhanceLevel(len(levels), "Evolved",
+                                          {"filename": upscale.name, "path": str(upscale)}))
         return levels
-    return [EnhanceLevel(0, "Original", files[0])] if files else []
+    return levels or [EnhanceLevel(0, "Original", files[0])]
 
 
 def remove_enhance_levels(row: dict, filenames) -> dict:
@@ -270,14 +277,27 @@ def remove_enhance_levels(row: dict, filenames) -> dict:
 
 
 def is_enhanceable_row(row: dict) -> bool:
-    """Whether the standalone enhancer can take this row: a finished image.
+    """Whether an enhancer can take this row: a finished image, or a finished
+    video whose recipe says how many frames it holds, since the redraw goes
+    stretch by stretch along the model's frame grid. An already-enhanced item
+    still qualifies — picking one and choosing Enhance is a deliberate
+    re-enhance; the gestures made without the settings in view filter to the
+    not-yet-enhanced instead (:func:`rows_awaiting_enhancement`)."""
+    if not produced_output(row):
+        return False
+    if media_type_of_row(row) == MediaType.IMAGE:
+        return True
+    return "frame_count" in parse_params(row.get("params_json"))
 
-    An already-enhanced image still qualifies — selecting one and choosing
-    Enhance is a deliberate re-enhance. The gestures made without the settings
-    in view filter to the not-yet-enhanced instead
-    (:func:`rows_awaiting_enhancement`, and :func:`is_enhanced_row` for a
-    fullscreen hold's Down)."""
-    return media_type_of_row(row) == MediaType.IMAGE and produced_output(row)
+
+def enhance_workflow_for(row: dict) -> str:
+    if media_type_of_row(row) == MediaType.VIDEO:
+        return VIDEO_ENHANCE_WORKFLOW
+    return ENHANCE_WORKFLOW
+
+
+def enhance_input_of(params: dict) -> str | None:
+    return params.get("input_video") or params.get("input_image")
 
 
 def enhance_target_id(enhance_row: dict, image_rows) -> str | None:
@@ -299,9 +319,9 @@ def enhance_target_id(enhance_row: dict, image_rows) -> str | None:
     stamped = enhance_row.get("enhance_of")
     if stamped:
         return stamped if any(r.get("prompt_id") == stamped for r in image_rows) else None
-    input_image = parse_params(enhance_row.get("params_json")).get("input_image")
+    read = enhance_input_of(parse_params(enhance_row.get("params_json")))
     candidates = [r for r in image_rows if r.get("prompt_id") != enhance_row.get("prompt_id")]
-    return source_image_id_for(input_image, candidates)
+    return source_image_id_for(read, candidates)
 
 
 def enhance_run_targets_row(enhance_of: str | None, input_image: str | None,
@@ -327,12 +347,12 @@ def _enhances_in_flight(rows) -> tuple[set[str], set[str]]:
     already has one in flight."""
     ids, names = set(), set()
     for row in rows:
-        if (row.get("workflow_name") or "") != ENHANCE_WORKFLOW:
+        if (row.get("workflow_name") or "") not in ENHANCE_WORKFLOWS:
             continue
         if row.get("enhance_of"):
             ids.add(row["enhance_of"])
             continue
-        name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+        name = _frame_name(enhance_input_of(parse_params(row.get("params_json"))))
         if name:
             names.add(name)
     return ids, names
@@ -416,14 +436,12 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
     """
     holders: dict[str, str] = {}
     for row in rows:
-        # Every file an image holds, not just its leading one: a first enhance
-        # runs on the image's output and a re-enhance on the original still
-        # listed under it, and both are the same image — the match
+        # Every file an item holds, not just its leading one: a first enhance
+        # runs on the item's output and a re-enhance on the original still
+        # listed under it, and both are the same item — the match
         # :func:`enhance_targets_row` makes one row at a time, indexed. First
         # match wins over the newest-first rows, which is the row
         # :func:`fold_enhancement` will pick when the run lands.
-        if media_type_of_row(row) != MediaType.IMAGE:
-            continue
         for stored in row_output_files(row):
             name = _frame_name(stored.get("filename"))
             if name:
@@ -443,10 +461,10 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
                                      (moment_of(finished or asked_around(run_id)), run_id))
 
     for row in rows:
-        if (row.get("workflow_name") or "") == ENHANCE_WORKFLOW:
+        if (row.get("workflow_name") or "") in ENHANCE_WORKFLOWS:
             target = row.get("enhance_of")
             if not target:
-                name = _frame_name(parse_params(row.get("params_json")).get("input_image"))
+                name = _frame_name(enhance_input_of(parse_params(row.get("params_json"))))
                 target = holders.get(name) if name else None
             if target is not None and target != row.get("prompt_id"):
                 note(target, row.get("completed_at"), row.get("id"))
@@ -463,6 +481,8 @@ def rows_awaiting_enhancement(folder_rows, all_rows) -> list[dict]:
     in_flight_ids, in_flight_names = _enhances_in_flight(all_rows)
     awaiting = []
     for row in folder_rows:
+        if media_type_of_row(row) != MediaType.IMAGE:
+            continue
         if not is_enhanceable_row(row) or is_enhanced_row(row):
             continue
         if row.get("prompt_id") in in_flight_ids:
@@ -496,6 +516,8 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
     input_ref = output_file_reference(files)
     if input_ref is None:
         return None
+    if media_type_of_row(row) == MediaType.VIDEO:
+        return _video_enhance_params(row, input_ref, settings)
     params = dict(WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params())
     src = parse_params(row.get("params_json"))
     params["input_image"] = input_ref
@@ -510,6 +532,33 @@ def enhance_params_for(row: dict, settings: EnhanceSettings | None = None) -> di
         if key == "checkpoint" and value == MATCH_SOURCE_MODEL:
             continue  # leave the source's own model in place
         params[key] = value
+    return params
+
+
+_VIDEO_RECIPE_KEYS = ("frame_rate", "resolution", "unet_low", "lora_low",
+                      "lora_strength_low", "cfg_low", "shift_low", "sampler_name", "scheduler")
+
+
+def _video_enhance_params(row: dict, input_ref: str, settings: EnhanceSettings | None) -> dict:
+    """The run that enhances ``row``'s video in its own style: its second-pass
+    recipe and prompts, the frames its scenes add up to, its start picture
+    where that is still on disk, and the panel's steps, redraw and upscaler."""
+    params = dict(WORKFLOW_REGISTRY[VIDEO_ENHANCE_WORKFLOW].default_params())
+    src = parse_params(row.get("params_json"))
+    maker = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
+    params["input_video"] = input_ref
+    params["positive_prompt"] = src.get("positive_prompt") or row.get("positive_prompt") or ""
+    params["negative_prompt"] = src.get("negative_prompt") or row.get("negative_prompt") or ""
+    params.update({key: src[key] for key in _VIDEO_RECIPE_KEYS if key in src})
+    params["frame_count"] = (maker or WorkflowTemplate).clip_frames(
+        (maker or WorkflowTemplate).scene_plan(src))
+    start = src.get("input_image") or ""
+    start_path = resolve_input_image_path(start)
+    if start_path is not None and start_path.is_file():
+        params["start_image"] = start
+    for key, value in (settings.params if settings else {}).items():
+        if key in ENHANCE_SETTING_KEYS and key in params and key != "enhance_scale":
+            params[key] = value
     return params
 
 
@@ -562,17 +611,17 @@ def fix_params_for(row: dict, parts, settings: EnhanceSettings | None = None) ->
     return params
 
 
-def enhance_file_stem() -> str:
-    """The stem every file the enhance workflow saves is named with —
-    ``image_enhance`` for ``image/image_enhance_00042_.png``.
+def enhance_file_stems() -> tuple[str, ...]:
+    """The stem each enhancer's files are named with — ``image_enhance`` for
+    ``image/image_enhance_00042_.png``, ``video_enhance`` for the videos.
 
-    Read off the workflow's own ``filename_prefix`` rather than spelled out
-    here, so renaming the output can't leave the recognition below pointed at a
+    Read off each workflow's own ``filename_prefix`` rather than spelled out
+    here, so renaming an output can't leave the recognition below pointed at a
     name nothing writes any more.
     """
-    prefix = WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].default_params().get(
-        "filename_prefix", "")
-    return str(prefix).rsplit("/", 1)[-1]
+    return tuple(
+        str(WORKFLOW_REGISTRY[name].default_params().get("filename_prefix", "")).rsplit("/", 1)[-1]
+        for name in ENHANCE_WORKFLOWS)
 
 
 def is_enhance_product_row(row: dict) -> bool:
@@ -589,7 +638,7 @@ def is_enhance_product_row(row: dict) -> bool:
     recognizes — what the enhance workflow wrote, however the row got here.
 
     So the test is the file, not the workflow name: every output named with
-    :func:`enhance_file_stem`, and nothing already recording enhancements of its
+    one of :func:`enhance_file_stems`, and nothing already recording enhancements of its
     own (``original_files`` / ``enhance_history``), which is what a source row
     that has been folded into carries. A base-render repair is excluded outright
     — it is the opposite errand, and folds by its own route.
@@ -601,8 +650,8 @@ def is_enhance_product_row(row: dict) -> bool:
     files = row_output_files(row)
     if not files:
         return False
-    stem = enhance_file_stem()
-    return all((f.get("filename") or "").startswith(f"{stem}_") for f in files)
+    stems = tuple(f"{stem}_" for stem in enhance_file_stems())
+    return all((f.get("filename") or "").startswith(stems) for f in files)
 
 
 def enhance_level_params(row: dict) -> dict:

@@ -38,14 +38,13 @@ from origenerator.gallery.enhance import (
     enhance_target_id,
     is_enhance_product_row,
 )
-from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, level_settings
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOWS, level_settings
 from origenerator.gallery.output import (
     media_type_of_row,
     parse_file_list,
     row_output_files,
 )
 from origenerator.generation_state import GenerationStatus
-from origenerator.media import MediaType
 
 logger = logging.getLogger(__name__)
 
@@ -91,18 +90,19 @@ def fold_enhancement(db, enhance_row: dict,
     that is comes from the run's own ``enhance_of`` stamp where it has one, and
     from the file it read otherwise (:func:`enhance_target_id`).
 
-    ``image_rows`` is the pool the start frame is matched against, for a caller
-    that already holds one: the startup sweep folds a whole backlog at once, and
-    re-reading every generation (graphs included) per fold is the difference
-    between a launch and a wait.
+    ``image_rows`` is the pool the file it read is matched against, narrowed
+    here to the kind the run made, for a caller that already holds one: the
+    startup sweep folds a whole backlog at once, and re-reading every
+    generation (graphs included) per fold would make a launch a wait.
     """
     enhanced_files = row_output_files(enhance_row)
     if not enhanced_files:
         return None
     if image_rows is None:
         image_rows = db.list_generations()
+    made = media_type_of_row(enhance_row)
     source_id = enhance_target_id(
-        enhance_row, [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
+        enhance_row, [r for r in image_rows if media_type_of_row(r) == made])
     if source_id is None:
         return None
     source = db.get_generation(source_id)
@@ -144,12 +144,12 @@ def fold_completed_enhancements(db) -> int:
     graph in the library through memory for each one.
     """
     rows = sorted(db.list_generations(), key=lambda r: r.get("id") or 0)
-    pool = [r for r in rows if media_type_of_row(r) == MediaType.IMAGE]
+    pool = list(rows)
     folded = 0
     for row in rows:
         if row.get("status") != GenerationStatus.COMPLETED:
             continue
-        if ((row.get("workflow_name") or "") != ENHANCE_WORKFLOW
+        if ((row.get("workflow_name") or "") not in ENHANCE_WORKFLOWS
                 and not is_enhance_product_row(row)):
             continue
         source_id = fold_enhancement(db, row, image_rows=pool)

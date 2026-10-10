@@ -1751,6 +1751,7 @@ class GalleryView(QWidget):
         reroll_key = self._selected_reroll_key
         self._pending_key = None
         self._pending_selection = None
+        self._rows = list(rows)
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._image_index = None   # rebuilt on the next ask (image_config_index)
@@ -3286,6 +3287,10 @@ class GalleryView(QWidget):
         """Every image row the gallery is holding, as its last rebuild read them."""
         return self._image_rows
 
+    def item_rows(self) -> list[dict]:
+        """Every row the gallery is holding, images and videos alike."""
+        return self._rows
+
     def queue_changed(self) -> None:
         """Redraw the line — a stand-in row went on it or came off it."""
         self._update_queue()
@@ -3835,14 +3840,13 @@ class GalleryView(QWidget):
             menu.addSeparator()
         all_favorites = all(row.get("starred") for row in rows)
         favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
-        enhanceable = [row["prompt_id"] for row in rows
-                       if gallery.is_enhanceable_row(row)]
+        enhanceable = [row for row in rows if gallery.is_enhanceable_row(row)]
         enhance_action = None
         if enhanceable:
             n = len(enhanceable)
-            enhance_action = menu.addAction(
-                f"Enhance {n} image{'s' if n != 1 else ''}"
-            )
+            kind = ("image" if all(gallery.media_type_of_row(row) == MediaType.IMAGE
+                                   for row in enhanceable) else "item")
+            enhance_action = menu.addAction(f"Enhance {n} {kind}{'s' if n != 1 else ''}")
         in_flight = self._enhance.jobs_targeting(rows)
         cancel_action = None
         if in_flight:

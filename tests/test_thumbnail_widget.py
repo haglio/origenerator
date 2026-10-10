@@ -288,8 +288,8 @@ def test_an_enhanced_tile_that_could_take_another_offers_one(qtbot):
     assert not plus.isHidden() and plus.isEnabled()
 
 
-def test_a_video_tile_grows_no_plus_at_all(qtbot):
-    # There is no video enhancer, so the corner has nothing to offer or report.
+def test_a_tile_with_nothing_to_offer_grows_no_plus_at_all(qtbot):
+    # An item no enhancer can take: the corner has nothing to offer or report.
     tw = ThumbnailWidget("v1", None, "label", enhance=None)
     qtbot.addWidget(tw)
     _star, _trash, plus = _corners(tw)

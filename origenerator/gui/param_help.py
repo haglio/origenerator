@@ -169,7 +169,9 @@ PARAM_HELP: dict[str, str] = {
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
         "How much bigger the enhanced version is than the render it came from. "
-        "2x is the usual finish; past 3x the pass has to invent a lot."
+        "2x is the usual finish; past 3x the pass has to invent a lot. A video "
+        "is always enhanced at 1.5x, the most the graphics card holds a whole "
+        "stretch of frames at."
     ),
     "enhance_steps": (
         "How many times the enhancement goes over the enlarged picture. Around 20 "

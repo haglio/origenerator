@@ -9,6 +9,7 @@ from origenerator.gallery import (
     ALL_KEY,
     AllGroup,
     CustomGroup,
+    EnhanceSettings,
     LoraGroup,
     ModelGroup,
     SettingsGroup,
@@ -21,6 +22,7 @@ from origenerator.gallery import (
     child_groups,
     config_tab_title,
     enhance_params_for,
+    enhance_workflow_for,
     favorite_folders,
     favorite_generations,
     find_source_image_id,
@@ -62,6 +64,7 @@ from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import derived_size as ds
 from origenerator.workflows.model_files import NO_LORA
 
 
@@ -475,6 +478,48 @@ def test_enhance_params_for_builds_an_image_enhance_config():
                                     "type": "output"}]),
     )
     assert enhance_params_for(folded)["input_image"] == "image/sdxl_t2i_s.png [output]"
+
+
+def test_enhance_params_for_builds_a_video_enhance_config_for_a_video(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds, "COMFYUI_INPUT_DIR", tmp_path)
+    (tmp_path / "start.png").write_bytes(b"png")
+    recipe = {
+        "positive_prompt": "she waves", "negative_prompt": "blurry", "input_image": "start.png",
+        "frame_count": 321, "scene_frames": [81, 241], "frame_rate": 48.0, "resolution": "720p",
+        "unet_low": "low.safetensors", "lora_low": "soft.safetensors", "lora_strength_low": 0.5,
+        "cfg_low": 1.0, "shift_low": 5.0, "sampler_name": "uni_pc", "scheduler": "simple",
+    }
+    src = _row(prompt_id="v", workflow_name="wan22_i2v", params_json=json.dumps(recipe),
+               output_files=json.dumps([{"filename": "wan22_i2v_v.mp4", "subfolder": "video",
+                                         "type": "output"}]))
+    settings = EnhanceSettings(params={"enhance_scale": 3.0, "enhance_steps": 12,
+                                       "enhance_denoise": 0.3, "upscale_model": "RealESRGAN_x4.pth"})
+
+    assert enhance_workflow_for(src) == "video_enhance"
+    params = enhance_params_for(src, settings)
+    assert params["input_video"] == "video/wan22_i2v_v.mp4 [output]"
+    assert params["start_image"] == "start.png"
+    assert (params["positive_prompt"], params["negative_prompt"]) == ("she waves", "blurry")
+    # The video's own length, rate, frame size and second-pass recipe, so the
+    # redraw runs on the model and add-on that made it.
+    assert (params["frame_count"], params["frame_rate"], params["resolution"]) == (321, 48.0, "720p")
+    assert (params["unet_low"], params["lora_low"], params["lora_strength_low"]) ==         ("low.safetensors", "soft.safetensors", 0.5)
+    assert (params["cfg_low"], params["shift_low"], params["sampler_name"], params["scheduler"]) ==         (1.0, 5.0, "uni_pc", "simple")
+    # The panel's steps, redraw and upscaler apply; a video is always 1.5x.
+    assert (params["enhance_steps"], params["enhance_denoise"], params["upscale_model"]) ==         (12, 0.3, "RealESRGAN_x4.pth")
+    assert params["enhance_scale"] == 1.5
+    # A start picture no longer on disk is left out: the run starts on the
+    # video's own first frame rather than failing to load a file.
+    gone = enhance_params_for(_row(**{**src, "params_json": json.dumps(
+        {**recipe, "input_image": "gone.png"})}), settings)
+    assert gone["start_image"] == ""
+    # An already-enhanced video re-enhances from its original file.
+    folded = _row(**{**src, "original_files": src["output_files"],
+                     "output_files": json.dumps([{"filename": "video_enhance_00001.mp4",
+                                                  "subfolder": "video", "type": "output"},
+                                                 {"filename": "wan22_i2v_v.mp4",
+                                                  "subfolder": "video", "type": "output"}])})
+    assert enhance_params_for(folded, settings)["input_video"] == "video/wan22_i2v_v.mp4 [output]"
 
 
 def test_gallery_tree_splits_different_workflow_generations_into_folders():

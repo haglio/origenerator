@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from origenerator.gallery.enhance import enhancement_recency
-from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOWS
 from origenerator.gallery.groups import (
     AllGroup,
     LoraGroup,
@@ -636,7 +636,7 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     return [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
-        and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
+        and not (row.get("workflow_name") in ENHANCE_WORKFLOWS and is_in_progress(row))
         and row.get("source") != GenerationSource.BASE_RENDER
     ]
 

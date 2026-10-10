@@ -3539,11 +3539,11 @@ class GalleryView(QWidget):
             return
         folded = False
         if finished_row is not None \
-                and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+                and finished_row.get("workflow_name") in gallery.ENHANCE_WORKFLOWS:
             # A standalone enhance is an upgrade, not a generation: fold its
-            # output onto the image it enhanced — same row, same folder, same
+            # output onto the item it enhanced — same row, same folder, same
             # star, now wearing the enhanced pixels and badge — and let the
-            # upgraded image be what the front tab shows.
+            # upgraded item be what the front tab shows.
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
                 folded = True

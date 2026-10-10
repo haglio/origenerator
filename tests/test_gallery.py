@@ -122,6 +122,7 @@ def test_an_enhancement_is_its_own_kind_of_job():
     # It outputs an image from an image, so neither "Image" nor "Video" says what
     # it is: a second pass over something already made.
     assert job_kind_label("image_enhance") == "Enhance"
+    assert job_kind_label("video_enhance") == "Enhance"
 
 
 def test_an_unregistered_workflow_claims_no_kind():

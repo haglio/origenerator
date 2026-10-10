@@ -321,6 +321,9 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
     _add_source(db)
     _add_enhance(db, "running", "image/sdxl_t2i_src.png [output]", "x.png",
                  status="running")
+    db.insert_generation(prompt_id="running-video", workflow_name="video_enhance",
+                         workflow_version="v001", params_json="{}", workflow_json="{}")
+    db.update_generation("running-video", status="running")
     tree = gallery.build_gallery_tree(db.list_generations())
     assert [w.workflow_name for w in tree] == ["sdxl_t2i"]
 

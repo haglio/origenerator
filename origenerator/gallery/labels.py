@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
+from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOWS
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.output import row_output_files
 from origenerator.gallery.signatures import (
@@ -155,7 +155,7 @@ def job_kind_label(workflow_name: str | None) -> str:
 
     Three answers, because they are what a queued job costs: an "Image" is
     seconds, a "Video" is minutes, and an "Enhance" is a second pass over
-    something already made. The workflow's own display name is beside this in
+    something already made, a picture's or a video's. The workflow's own display name is beside this in
     the row and answers none of them — "WAN 2.2 Image-to-Video (Looping)" and
     "WAN 2.2 Image-to-Video" are the same kind of ask, at the same price.
 
@@ -163,7 +163,7 @@ def job_kind_label(workflow_name: str | None) -> str:
     say. A row that says nothing about its kind is read as unknown; one that
     guesses "Image" at a video is read, wrongly, as seconds away.
     """
-    if workflow_name == ENHANCE_WORKFLOW:
+    if workflow_name in ENHANCE_WORKFLOWS:
         return JobKind.ENHANCE
     output_type = workflow_output_type(workflow_name)
     if output_type is None:

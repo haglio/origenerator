@@ -9536,6 +9536,27 @@ def test_an_enhancement_carries_the_picture_it_is_a_second_pass_over(qtbot):
     assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
 
 
+def test_a_videos_enhancement_carries_the_video_it_is_a_second_pass_over(qtbot, tmp_path):
+    # Its start frame places it where the video sits, and the video's own
+    # thumbnail stands under its wait: a video file is no picture to show.
+    thumb = tmp_path / "vid_thumb.jpg"
+    thumb.write_bytes(b"jpg")
+    db = FakeDB([])
+    db.add(_row("vid", "wan22_i2v", {"input_image": "kite_00007_.png [output]", "frame_count": 81},
+                "wan22_i2v_vid.mp4", thumbnail_path=str(thumb)))
+    db.add(_row("ve1", "video_enhance",
+                {"input_video": "wan22_i2v_vid.mp4 [output]", "start_image": "kite_00007_.png [output]"},
+                "ve1.mp4", status="running", output_files="[]", enhance_of="vid"))
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    (item,) = view._inflight_items()
+    assert item.job_kind == "Enhance"
+    assert item.source_image == "kite_00007_.png [output]"
+    assert item.source_picture == str(thumb)
+
+
 def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
     # A pose transfer reads a structure image, but what it is making is an image
     # like any other — so its row is placed the way every image's is.

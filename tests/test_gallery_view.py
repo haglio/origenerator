@@ -46,7 +46,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from shared_ui.spacing import BUTTON_SIZE, MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
     evolver_export,
@@ -4178,7 +4178,7 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
     view.show()
     host = view._bank
 
-    host.setFixedWidth(BUTTON_SIZE * 3)  # far narrower than the whole bank
+    host.setFixedWidth(BUTTON_SIZE_HUD * 3)  # far narrower than the whole bank
     host.updateGeometry()
     qtbot.wait(10)
 
@@ -4186,10 +4186,10 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
              if not b.isHidden()]
     assert len(shown) > 3                       # more buttons than fit on one row
     for button in shown:
-        assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE)  # none of them squeezed
+        assert button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)  # none squeezed
     rows = {button.y() for button in shown}
     assert len(rows) > 1                        # so they went onto further rows
-    assert host.heightForWidth(host.width()) >= BUTTON_SIZE * len(rows)
+    assert host.heightForWidth(host.width()) >= BUTTON_SIZE_HUD * len(rows)
 
 
 def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):

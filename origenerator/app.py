@@ -502,12 +502,28 @@ def _arm_the_crash_log(state_dir: Path, logger):
     return stream
 
 
-def _open_the_loading(fun_time, app, logger):
-    from origenerator.gui.loading_screen import Loading, LoadingScreen
+STARTING_THE_SERVER = "Starting ComfyUI server..."
+OPENING_THE_LIBRARY = "Opening the image library..."
+CONNECTING = "Connecting to ComfyUI..."
+BUILDING_THE_INTERFACE = "Building the interface..."
+
+
+def boot_steps(maintenance) -> tuple[tuple[str, float], ...]:
+    return (
+        (STARTING_THE_SERVER, 4.0),
+        (OPENING_THE_LIBRARY, 1.0),
+        *((boot_pass.status, 0.3) for boot_pass in maintenance if boot_pass.status),
+        (CONNECTING, 0.5),
+        (BUILDING_THE_INTERFACE, 3.0),
+    )
+
+
+def _open_the_loading(fun_time, app, logger, preview):
+    from origenerator.gui.loading_screen import Loading, loading_screen
 
     if fun_time is not None:
-        return Loading(app, logger)
-    screen = LoadingScreen()
+        return Loading(app, logger, None)
+    screen = loading_screen(CHECKOUT / "icon.ico", preview, boot_steps(MAINTENANCE))
     screen.show()
     _bring_to_front(screen)
     app.processEvents()
@@ -729,7 +745,7 @@ def main(argv: list[str] | None = None) -> int:
 
     crash_log = _arm_the_crash_log(STATE_DIR, logger)
 
-    loading = _open_the_loading(fun_time, app, logger)
+    loading = _open_the_loading(fun_time, app, logger, preview)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -746,13 +762,13 @@ def main(argv: list[str] | None = None) -> int:
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
-        loading.say("Starting ComfyUI server...")
+        loading.say(STARTING_THE_SERVER)
         _ensure_comfyui_server(
             logger, COMFYUI_HOST, COMFYUI_PORT, COMFYUI_DIR,
             on_status=loading.say, pump_events=app.processEvents,
         )
 
-        loading.say("Opening the image library...")
+        loading.say(OPENING_THE_LIBRARY)
         from origenerator.db import Database
         logger.info("Library: %s", DB_PATH)
         db = Database(DB_PATH)
@@ -765,10 +781,10 @@ def main(argv: list[str] | None = None) -> int:
             MAINTENANCE, loading.say, logger,
         )
 
-        loading.say("Connecting to ComfyUI...")
+        loading.say(CONNECTING)
         client.start()
 
-        loading.say("Building the interface...")
+        loading.say(BUILDING_THE_INTERFACE)
         window = _build_window(client, db, app_state, fun_time, preview, taskbar)
         loading.stop_if_canceled()
     except LoadingCanceled:

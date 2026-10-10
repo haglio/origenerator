@@ -55,7 +55,8 @@
     "release",
     "drag",
     "hover",
-    "scroll"
+    "scroll",
+    "rightclick"
   ],
   "command_case_blind": true,
   "command_lines": [

@@ -194,8 +194,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     Rename... left the folder list's menus too, and with it the dialog that asked
     for the name and the step that saved it. 272 -> 274: a Fun Time session hands
     each Satellite Funestra over on its own, so the session's bridge fills one
-    side's region and gives one side back through two more.)"""
+    side's region and gives one side back through two more. 274 -> 275: the panes
+    fold for the rect a session on the monitors names and sit side by side in a
+    headset room, so which shape they wear is one question, asked at a takeover
+    and at each crossing.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 274
+               for x in _class_def(VIEW, "GalleryView").body) == 275
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 88

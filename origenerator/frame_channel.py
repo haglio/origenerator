@@ -42,6 +42,10 @@ class FrameWriter:
             self._sequence += 1
             _SEQUENCE.pack_into(self._map, 0, self._sequence)
 
+    @property
+    def written(self) -> int:
+        return self._sequence // 2
+
     def write(self, token: int, width: int, height: int, pixels: bytes) -> None:
         if width * height > self._max_pixels or len(pixels) != width * height * _BYTES_PER_PIXEL:
             raise ValueError(f"a {width}x{height} frame does not fit this channel")

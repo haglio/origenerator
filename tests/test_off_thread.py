@@ -5,6 +5,7 @@ import gc
 import threading
 
 from PyQt6 import sip
+from PyQt6.QtCore import QObject
 
 from origenerator.gui.off_thread import _in_flight, _Result, _Task, run_off_thread
 
@@ -80,6 +81,19 @@ def test_an_answer_whose_carrier_the_app_took_on_its_way_out_is_let_go_of(qtbot)
     sip.delete(result)  # what the interpreter's exit does to every carrier still waiting
 
     _Task(lambda: "too late", result).run()
+
+
+def test_an_answer_that_lands_after_its_owner_is_gone_is_dropped(qtbot):
+    owner, release, got = QObject(), threading.Event(), []
+    before = set(_in_flight)
+
+    run_off_thread(lambda: release.wait(5) and "late", got.append, owner=owner)
+    carrier = _in_flight - before
+    sip.delete(owner)
+    release.set()
+    qtbot.waitUntil(lambda: not carrier & _in_flight, timeout=5000)
+
+    assert got == []
 
 
 def test_each_call_carries_its_own_answer(qtbot):

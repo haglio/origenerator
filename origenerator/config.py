@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from app_support import siblings
+from app_support import haglio_settings, siblings
 from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import is_branch_session
-from origenerator.content import load_content, overlay_value
+from origenerator.content import load_content
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 # The checkout's own state directory, unless the process says otherwise.  Only
@@ -28,10 +28,10 @@ _CONTENT = load_content()
 # Public now: the tests assert which paths still hang off the media-library root
 # and which come from the project roots, and that split is the thing worth
 # pinning -- getting it backwards silently repoints a live app at nothing.
-LIBRARY_ROOT = Path(overlay_value(_CONTENT, "library_root"))
+LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 
 
-def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
+def project_roots(settings: dict[str, Any] | None = None) -> tuple[Path, ...]:
     """The folders that hold the suite's own app checkouts, in search order.
 
     A key of its own, because the suite's *own* repos live outside the
@@ -39,32 +39,31 @@ def project_roots(content: dict[str, Any] | None = None) -> tuple[Path, ...]:
     the library, ComfyUI -- keeps reading ``library_root``.
 
     A *list*, because the move runs one repo at a time: with a single path there
-    is a window where a sibling that has not moved yet is unreachable. An
-    overlay that says nothing still means ``library_root/projects``, as before.
+    is a window where a sibling that has not moved yet is unreachable. Settings
+    that say nothing still mean ``library_root/projects``, as before.
     """
-    content = _CONTENT if content is None else content
+    settings = haglio_settings.load() if settings is None else settings
     return siblings.project_roots(
-        content.get("project_roots"),
-        fallback=Path(overlay_value(content, "library_root")) / "projects")
+        settings.get("project_roots"), fallback=Path(settings["library_root"]) / "projects")
 
 
 PROJECT_ROOTS = project_roots()
 
 
-def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
+def ambient_audio_dir(settings: dict[str, Any] | None = None) -> Path | None:
     """The folder the audio switch shuffles clips out of, or ``None`` for none.
 
     *Which* folder of the library it is describes the library, so it comes from
-    the overlay rather than from source. A relative value hangs off
-    ``library_root`` -- where it in fact sits -- and an absolute one is taken as
-    given, so a folder outside the library tree works too.
+    the settings all of Haglio shares rather than from source. A relative value
+    hangs off ``library_root`` -- where it in fact sits -- and an absolute one is
+    taken as given, so a folder outside the library tree works too.
     """
-    content = _CONTENT if content is None else content
-    raw = content.get("ambient_audio_dir")
+    settings = haglio_settings.load() if settings is None else settings
+    raw = settings.get("ambient_audio_dir")
     if not raw:
         return None
     path = Path(raw)
-    return path if path.is_absolute() else Path(content["library_root"]) / path
+    return path if path.is_absolute() else Path(settings["library_root"]) / path
 
 
 AMBIENT_AUDIO_DIR = ambient_audio_dir()
@@ -153,12 +152,11 @@ EVOLVER_UPSCALED_DIR = _EVOLVER_AI_DIR / "2_outbox" / "upscaled_by_orientation"
 # upscale, and a loop straight out of the graph is visibly softer than the clips
 # already there.
 #
-# From the overlay, not from source, because naming a folder in the library makes
-# that name library vocabulary: the sanitize blocklist exists to keep exactly that
-# out of a public commit, so hardcoding one here writes it into the tracked tree.
-# Evolver reads the same key from its own overlay and the two have to agree — the
-# folder is the only thing passing between them.
-GENAU_SOURCE = _CONTENT["genau_source"]
+# From the settings all of Haglio shares, not from source, because naming a folder
+# in the library makes that name library vocabulary: the sanitize blocklist exists
+# to keep exactly that out of a public commit. Evolver reads the same setting --
+# the folder is the only thing passing between them.
+GENAU_SOURCE = haglio_settings.value("genau_source")
 
 # The curated pose references the SDXL Pose Transfer workflow is steered by. Its
 # Structure Image picker opens here rather than in ComfyUI's input folder, which

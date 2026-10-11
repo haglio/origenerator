@@ -10,10 +10,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app_support import haglio_settings
+
 from origenerator import config, osr2
 
 
 class TestProjectRoots:
+    def test_come_from_the_settings_all_of_haglio_shares(self, tmp_path, monkeypatch):
+        settings = tmp_path / "settings.json"
+        settings.write_text('{"library_root": "S:/suite", "project_roots": ["W:/work"]}',
+                            encoding="utf-8")
+        monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
+
+        assert config.project_roots() == (Path("W:/work"),)
+
     def test_defaults_to_the_projects_folder_under_the_library_root(self):
         """An overlay with no project_roots behaves exactly as it always did."""
         assert config.project_roots({"library_root": "S:/suite"}) == (Path("S:/suite/projects"),)

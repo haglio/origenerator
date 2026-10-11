@@ -1,7 +1,8 @@
 """Shared fixtures — the overlay pin, and the state directory of the suite's own.
 
-The suite runs against the committed example overlay, never the developer's
-git-ignored content.local.json, so a run here matches a public checkout.
+The suite runs against the committed example overlay and the example of the
+settings all of Haglio shares, never the developer's git-ignored
+content.local.json or ~/.haglio, so a run here matches a public checkout.
 pytest imports this before any test module, and the app loads its content at
 import, so the pin has to happen here.
 
@@ -36,6 +37,10 @@ for _voice_module in ("onnxruntime", "ctranslate2", "torch"):
         __import__(_voice_module)
     except Exception:
         pass  # no voice extra (or a broken one): the suite still runs
+
+from app_support import haglio_settings as _haglio_settings
+
+os.environ[_haglio_settings.SETTINGS_ENV] = _haglio_settings.THE_EXAMPLE
 
 from origenerator import content as _content
 

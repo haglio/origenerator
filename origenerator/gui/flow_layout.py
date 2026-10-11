@@ -39,6 +39,13 @@ class FlowLayout(QLayout):
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
 
+    def row_spacing(self) -> int:
+        return self._row_spacing
+
+    def set_row_spacing(self, spacing: int) -> None:
+        self._row_spacing = spacing
+        self.invalidate()
+
     def addItem(self, item):
         self._items.append(item)
 

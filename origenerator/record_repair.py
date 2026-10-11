@@ -6,7 +6,7 @@ from pathlib import Path
 
 from origenerator.gallery.output import parse_file_list
 from origenerator.generation_state import GenerationStatus
-from origenerator.importer import graph_from_text, graph_in_file
+from origenerator.importer import graph_in_file, recipe_of
 from origenerator.record_fold import file_key, fold_record_into
 
 _NO_FILES_MOVED = {"moves": [], "subdir": None}
@@ -100,7 +100,7 @@ def _claimants_by_picture(rows) -> dict[tuple[str, str], list[dict]]:
 def _the_one_that_made_it(claimants: list[dict], path: Path) -> dict:
     in_file = graph_in_file(path, path.suffix.lower()) if path.exists() else {}
     wrote_it = [row for row in claimants
-                if in_file and graph_from_text(row.get("workflow_json") or "") == in_file]
+                if in_file and recipe_of(row) == in_file]
     return min(wrote_it or claimants, key=lambda row: row["id"])
 
 

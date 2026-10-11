@@ -35,6 +35,7 @@ from origenerator.app import (
     _shown_as,
     _taskbar_identity,
     _the_preview_on_the_taskbar,
+    _tidy_video_previews,
     _warm_voice_runtimes,
     main,
     resolve_comfyui_client_id,
@@ -1307,6 +1308,33 @@ def test_an_enhancement_of_a_deleted_picture_goes_to_the_trash_at_startup(tmp_pa
     assert db.get_generation("enhancement") is None
     assert db.get_deletion("enhancement") is not None
     assert not (output / "image" / "image_enhance_00001_.png").exists()
+
+
+def test_a_videos_first_frame_filed_in_another_folder_goes_to_the_trash_at_startup(
+        tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    for subfolder, filename in (("video", "scene_one_00001.mp4"), ("image", "scene_one_00001.png")):
+        (output / subfolder).mkdir(parents=True)
+        (output / subfolder / filename).write_bytes(b"one run")
+    monkeypatch.setattr(config, "TRASH_DIR", tmp_path / "trash")
+    db = Database(tmp_path / "t.db")
+    recipe = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
+    for prompt_id, subfolder, filename in (("video", "video", "scene_one_00001.mp4"),
+                                           ("first-frame", "image", "scene_one_00001.png")):
+        db.insert_generation(prompt_id=prompt_id, workflow_name="wan22_flf2v_loop",
+                             workflow_version="imported", params_json="{}",
+                             workflow_json=recipe, source="imported")
+        db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+            [{"filename": filename, "subfolder": subfolder, "type": "output"}]))
+    library = Library(db=db, client=None, output_dir=output, thumb_dir=tmp_path / "thumbs",
+                      log_dir=tmp_path / "logs", inbox=None)
+
+    _tidy_video_previews(library)
+
+    assert db.get_generation("first-frame") is None
+    assert db.get_deletion("first-frame") is not None
+    assert db.get_generation("video") is not None
+    assert (output / "video" / "scene_one_00001.mp4").exists()
 
 
 def test_the_entry_point_hands_the_process_whatever_main_gives_back():

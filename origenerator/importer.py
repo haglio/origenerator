@@ -171,6 +171,23 @@ def merge_video_sidecar_rows(db: Database) -> int:
     return merged
 
 
+def first_frames_filed_apart_from_their_videos(rows: list[dict]) -> list[dict]:
+    recipes_by_video_stem: dict[str, list[dict]] = {}
+    for row in rows:
+        files = row_output_files(row)
+        if files and media_type_from_filename(files[0].get("filename", "")) == MediaType.VIDEO:
+            recipe = recipe_of(row)
+            if recipe:
+                recipes_by_video_stem.setdefault(Path(files[0]["filename"]).stem, []).append(recipe)
+    return [
+        row for row in rows
+        if source_of(row) == GenerationSource.IMPORTED
+        and len(files := row_output_files(row)) == 1
+        and media_type_from_filename(files[0].get("filename", "")) == MediaType.IMAGE
+        and recipe_of(row) in recipes_by_video_stem.get(Path(files[0]["filename"]).stem, [])
+    ]
+
+
 def _sidecar_key(file_entry: dict) -> tuple[str, str]:
     return (file_entry.get("subfolder", ""), Path(file_entry.get("filename", "")).stem)
 
@@ -207,15 +224,12 @@ def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
 
 def fold_sound_versions_into_their_videos(db: Database) -> int:
     rows = db.list_generations()
-    with_recipe_by_file = {
-        file_key(files[0]): row for row in rows
-        if (files := row_output_files(row)) and graph_from_text(row.get("workflow_json") or "")
-    }
+    with_recipe_by_file = {file_key(files[0]): row for row in rows
+                           if (files := row_output_files(row)) and recipe_of(row)}
     folded = 0
     for row in rows:
         files = row_output_files(row)
-        if (source_of(row) != GenerationSource.IMPORTED or len(files) != 1
-                or graph_from_text(row.get("workflow_json") or "")):
+        if source_of(row) != GenerationSource.IMPORTED or len(files) != 1 or recipe_of(row):
             continue
         silent = soundless_copies_of(files)
         video = with_recipe_by_file.get(file_key(silent[0])) if silent else None
@@ -317,7 +331,7 @@ def refile_enhancements_another_recipe_made(db: Database) -> int:
     for row in db.list_generations():
         if row.get("workflow_name") != ENHANCE_WORKFLOW:
             continue
-        graph = graph_from_text(row.get("workflow_json") or "")
+        graph = recipe_of(row)
         name = _reconciled(ENHANCE_WORKFLOW, _workflow_from_nodes(graph) if graph else None,
                            media_type_of_row(row))
         if name != ENHANCE_WORKFLOW:
@@ -347,7 +361,7 @@ def backfill_import_params(db: Database, output_dir: Path) -> int:
         if source_of(row) != GenerationSource.IMPORTED:
             continue
         params = parse_params(row.get("params_json"))
-        stated = _graph_params(graph_from_text(row.get("workflow_json") or ""))
+        stated = _graph_params(recipe_of(row))
         if "width" not in params and "width" not in stated:
             stated.update(_size_from_its_own_file(_first_output_path(row, output_dir),
                                     row.get("workflow_name") or ""))
@@ -365,7 +379,7 @@ def backfill_imported_video_seeds(db: Database) -> int:
         params = parse_params(row.get("params_json"))
         if row.get("source") != GenerationSource.IMPORTED or "noise_seed" not in params:
             continue
-        graph = graph_from_text(row.get("workflow_json") or "")
+        graph = recipe_of(row)
         seed = _sampler_settings(graph)[0] if graph else None
         if seed is None or params["noise_seed"] == seed:
             continue
@@ -397,6 +411,10 @@ def _get_existing_filenames(db: Database) -> set[str]:
             except (json.JSONDecodeError, KeyError):
                 pass
     return result
+
+
+def recipe_of(row: dict) -> dict:
+    return graph_from_text(row.get("workflow_json") or "")
 
 
 def graph_from_text(text: str) -> dict:

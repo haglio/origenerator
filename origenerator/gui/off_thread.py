@@ -6,10 +6,9 @@ run inline it froze the whole window for exactly as long — most visibly on the
 spoken "genau it", where the window is a fullscreen picture and the freeze is all
 there is to look at.
 
-Deliberately tiny: a callable to run and a callable to hand the result to. Qt's
-global pool does the running, and the result crosses back through a queued signal,
-so ``done`` runs on the thread that called this — free to touch widgets, the
-database, and everything else the caller owns.
+Deliberately tiny: Qt's global pool does the running, and the result crosses
+back through a queued signal, so ``done`` runs on the thread that called this —
+free to touch widgets, the database, and everything else the caller owns.
 
 Queued is what makes the carrier's lifetime the whole problem here: between the
 pool thread's emit and the delivery a turn later, anything that frees the
@@ -57,7 +56,7 @@ class _Task(QRunnable):
             logger.info("An off-thread answer came back after the app let go of it")
 
 
-def run_off_thread(work, done, *, owner=None) -> None:
+def run_off_thread(work, done, *, owner: QObject) -> None:
     """Call ``work()`` on the global pool, then ``done(result)`` back on this
     thread -- unless ``owner`` has been deleted by then.
 
@@ -81,7 +80,7 @@ def run_off_thread(work, done, *, owner=None) -> None:
 
     def deliver(value):
         _in_flight.discard(result)  # its last turn; the carrier can go now
-        if owner is not None and sip.isdeleted(owner):
+        if sip.isdeleted(owner):
             logger.info("An off-thread answer came back after the %s that asked "
                         "for it was gone", type(owner).__name__)
             return

@@ -285,7 +285,7 @@ class CombineController(QObject):
         """Run ``work`` on the next turn of the event loop, once what has just
         been laid out has actually reached the screen.
 
-        A seam as much as a call, like :meth:`_run_off_thread`: the suite replaces
+        A seam as much as a call, like the host's ``off_thread``: the suite replaces
         this with a straight-through version, so a test can press and inspect in
         one breath rather than pumping an event loop for every launch.
         """

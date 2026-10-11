@@ -327,7 +327,12 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # what the tree measured: the note that a console with no OSR2 switch offers no
 # control-off is player_core's
 # test_a_host_with_no_switch_offers_no_control_off_and_sets_the_holds_apart.
-MAX_PROSE_LINES = 18173
+#
+# 18089 when bringing a window to the front became the family's, taken down to
+# what the tree measured: why the boot takes the foreground by force is
+# shared_ui's test_qt_asks_first_and_windows_is_then_made_to_put_the_window_in_front
+# and app_support's force_foreground_window tests.
+MAX_PROSE_LINES = 18089
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

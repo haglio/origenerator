@@ -719,15 +719,15 @@ def test_lora_label_joins_cleaned_lora_filenames():
 
 
 def test_lora_label_falls_back_when_no_lora_recorded():
-    # A row that carried no LoRA value (e.g. an older import) reads as "(no add-on)"
+    # A row that carried no LoRA value (e.g. an older import) reads as "(no LoRA)"
     # rather than an empty name.
-    assert lora_label("wan22_i2v", {}) == "(no add-on)"
+    assert lora_label("wan22_i2v", {}) == "(no LoRA)"
 
 
 def test_lora_label_treats_the_none_sentinel_as_no_lora():
     # Picking "None" for a LoRA is not a file: it reads as no LoRA, not a literal
-    # "None" folder. Both off -> "(no add-on)"; one off -> just the real one.
-    assert lora_label("wan22_i2v", {"lora_high": NO_LORA, "lora_low": NO_LORA}) == "(no add-on)"
+    # "None" folder. Both off -> "(no LoRA)"; one off -> just the real one.
+    assert lora_label("wan22_i2v", {"lora_high": NO_LORA, "lora_low": NO_LORA}) == "(no LoRA)"
     label = lora_label("wan22_i2v", {"lora_high": "styleA-high.safetensors", "lora_low": NO_LORA})
     assert label == "styleA-high"
 
@@ -1219,13 +1219,13 @@ def test_legacy_settings_key_differs_from_the_current_normalized_key():
 
 def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
     # SDXL declares no LoRA keys, so its model folder still grows a LoRA level — a
-    # single "(no add-on)" folder wrapping the settings leaves — so every branch of
+    # single "(no LoRA)" folder wrapping the settings leaves — so every branch of
     # the tree nests to the same depth whether or not the pipeline uses a LoRA.
     rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
     (model,) = build_gallery_tree(rows)[0].children
     (lora,) = model.children
     assert isinstance(lora, LoraGroup)
-    assert lora.label == "(no add-on)"
+    assert lora.label == "(no LoRA)"
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
@@ -1256,7 +1256,7 @@ def test_build_gallery_tree_nests_workflow_then_model_then_settings():
     assert set(models) == {"reapony_v80", "dreamshaper"}
 
     reapony = models["reapony_v80"]
-    (reapony_lora,) = reapony.children              # the single "(no add-on)" level
+    (reapony_lora,) = reapony.children              # the single "(no LoRA)" level
     assert len(reapony_lora.children) == 1          # the two seeds collapse
     assert {r["prompt_id"] for r in reapony_lora.children[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in rows_under(models["dreamshaper"])} == {"i3"}
@@ -1383,14 +1383,14 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
     assert set(by_key) == {"image/sdxl_t2i", "video/wan22_i2v"}
 
     (model,) = by_key["image/sdxl_t2i"].children  # no checkpoint -> one model
-    (lora,) = model.children                # the single "(no add-on)" level
+    (lora,) = model.children                # the single "(no LoRA)" level
     settings = lora.children
     assert len(settings) == 2
     assert {r["prompt_id"] for r in settings[0].rows} == {"i1", "i2"}
     assert {r["prompt_id"] for r in settings[1].rows} == {"i3"}
 
     (video_model,) = by_key["video/wan22_i2v"].children
-    (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no add-on)" here)
+    (video_lora,) = video_model.children    # wan22_i2v grows a LoRA level ("(no LoRA)" here)
     (video_source,) = video_lora.children   # then a source-image level ("(no start image)")
     assert len(video_source.children) == 1
 
@@ -1418,7 +1418,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
     assert workflow.key == "image/sdxl_t2i"
     model = workflow.children[0]
     assert model.key.startswith("image/sdxl_t2i/")
-    settings = model.children[0].children[0]     # model -> "(no add-on)" -> settings
+    settings = model.children[0].children[0]     # model -> "(no LoRA)" -> settings
     assert settings.key.startswith("image/sdxl_t2i/")
 
     # The model and settings keys are derived from signatures, so they are
@@ -1432,7 +1432,7 @@ def test_build_gallery_tree_assigns_stable_folder_keys():
 def test_build_gallery_tree_applies_custom_names_and_favorites_in_place():
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     plain_lora = build_gallery_tree(rows)[0] \
-        .children[0].children[0]  # the "(no add-on)" level
+        .children[0].children[0]  # the "(no LoRA)" level
     cat, dog = plain_lora.children  # newest-first: cat, dog
 
     meta = {dog.key: {"custom_name": "Doggos", "starred": True}}
@@ -1516,7 +1516,7 @@ def test_favorite_folders_collects_favorite_across_every_level():
     # returns both, top-down in tree order, regardless of how deep each sits.
     rows = [_img("i1", "a cat", 50, 1), _img("i2", "a dog", 50, 1)]
     workflow = build_gallery_tree(rows)[0]
-    cat_leaf = workflow.children[0].children[0].children[0]  # model -> "(no add-on)" -> settings
+    cat_leaf = workflow.children[0].children[0].children[0]  # model -> "(no LoRA)" -> settings
 
     meta = {
         workflow.key: {"custom_name": None, "starred": True},
@@ -1747,7 +1747,7 @@ def test_child_groups_and_rows_under_walk_the_tree():
 
     assert [w.workflow_name for w in tree] == ["sdxl_t2i"]
     (model,) = child_groups(tree[0])  # no checkpoint recorded -> one model
-    (lora,) = child_groups(model)          # the single "(no add-on)" level
+    (lora,) = child_groups(model)          # the single "(no LoRA)" level
     settings = child_groups(lora)
     assert len(settings) == 2
     assert child_groups(settings[0]) == []  # a leaf has no child folders

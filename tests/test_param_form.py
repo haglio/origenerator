@@ -49,7 +49,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form._sections["Models & Add-ons"].set_collapsed(False)  # its section starts folded
+    form._sections["Models & LoRAs"].set_collapsed(False)  # its section starts folded
     form.show()
     qtbot.waitExposed(form)
 
@@ -1324,7 +1324,7 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
     qtbot.addWidget(form)
     assert form._sections["Prompts"].is_collapsed() is False
     assert form._sections["Seed"].is_collapsed() is False
-    assert form._sections["Models & Add-ons"].is_collapsed() is True
+    assert form._sections["Models & LoRAs"].is_collapsed() is True
     assert form._sections["Drawing"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
     assert form._sections["Sound"].is_collapsed() is True
@@ -1409,7 +1409,7 @@ def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(
     form.set_values({"unet_high": "example_high.safetensors",
                      "unet_low": "example_low.safetensors"})
 
-    assert form._sections["Models & Add-ons"].isHidden() is True
+    assert form._sections["Models & LoRAs"].isHidden() is True
 
 
 def _rate_def(default=24.0):
@@ -1930,11 +1930,11 @@ def test_a_scenes_things_to_avoid_hide_while_prompt_strength_is_one(qtbot):
     assert avoid_parts_hidden() == [(False, False), (False, False)]
 
 
-def test_an_add_ons_strength_shows_only_while_it_has_an_add_on(qtbot):
+def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot):
     form = ParamForm([
-        ParamDef("lora_high", "Add-on (First Pass)", "combo", "None",
+        ParamDef("lora_high", "LoRA (First Pass)", "combo", "None",
                  options=["None", "example_style_high.safetensors"]),
-        ParamDef("lora_strength_high", "Add-on Strength (First Pass)", "float", 1.0,
+        ParamDef("lora_strength_high", "LoRA Strength (First Pass)", "float", 1.0,
                  min_val=0.0, max_val=2.0, step=0.05),
     ])
     qtbot.addWidget(form)

@@ -56,9 +56,15 @@ def test_help_calls_the_picture_a_run_starts_from_what_its_field_is_called():
 
 
 def test_help_speaks_the_forms_words_outside_its_parentheses():
-    jargon = re.compile(r"high-noise|low-noise|\bLoRA\b|ControlNet|ESRGAN|\bCFG\b"
+    jargon = re.compile(r"high-noise|low-noise|ControlNet|ESRGAN|\bCFG\b"
                         r"|\bstages?\b|\baudio\b|\bsampling\b|\bexperts?\b",
                         re.IGNORECASE)
     stale = sorted(key for key, text in PARAM_HELP.items()
                    if jargon.search(re.sub(r"\([^)]*\)", "", text)))
     assert stale == []
+
+
+def test_help_calls_a_lora_a_lora():
+    loras = ("lora_high", "lora_low", "lora_strength_high", "lora_strength_low")
+    assert all("LoRA" in PARAM_HELP[key] for key in loras)
+    assert [key for key, text in PARAM_HELP.items() if "add-on" in text.lower()] == []

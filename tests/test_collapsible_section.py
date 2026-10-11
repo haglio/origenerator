@@ -30,10 +30,10 @@ def test_header_shows_the_title(qtbot):
 
 
 def test_header_escapes_an_ampersand_instead_of_making_it_a_mnemonic(qtbot):
-    # A raw "&" would be eaten as a QPushButton accelerator, showing "Models  Add-ons".
-    section = CollapsibleSection("Models & Add-ons", collapsed=True)
+    # A raw "&" would be eaten as a QPushButton accelerator, showing "Models  LoRAs".
+    section = CollapsibleSection("Models & LoRAs", collapsed=True)
     qtbot.addWidget(section)
-    assert "Models && Add-ons" in section._header.text()
+    assert "Models && LoRAs" in section._header.text()
 
 
 def test_clicking_the_header_toggles_and_emits(qtbot):

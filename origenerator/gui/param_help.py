@@ -99,21 +99,21 @@ PARAM_HELP: dict[str, str] = {
         "rebuilds edges rather than stretching them."
     ),
 
-    # --- add-ons ---
+    # --- LoRAs ---
     "lora_high": (
-        "An add-on (a LoRA) trained for a specific look or subject, applied to "
-        "the first pass. \"None\" leaves the model unmodified."
+        "A LoRA trained for a specific look or subject, applied to the first "
+        "pass. \"None\" leaves the model unmodified."
     ),
     "lora_low": (
-        "An add-on (a LoRA) trained for a specific look or subject, applied to "
-        "the second pass. \"None\" leaves the model unmodified."
+        "A LoRA trained for a specific look or subject, applied to the second "
+        "pass. \"None\" leaves the model unmodified."
     ),
     "lora_strength_high": (
-        "How hard the first pass's add-on pulls. 1.0 is its intended strength; "
+        "How hard the first pass's LoRA pulls. 1.0 is its intended strength; "
         "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
     ),
     "lora_strength_low": (
-        "How hard the second pass's add-on pulls. 1.0 is its intended strength; "
+        "How hard the second pass's LoRA pulls. 1.0 is its intended strength; "
         "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
     ),
 
@@ -129,7 +129,7 @@ PARAM_HELP: dict[str, str] = {
     ),
     "cfg_high": (
         "Prompt strength for the first pass (the CFG scale underneath), where the "
-        "motion is settled. An add-on's author often publishes a different number "
+        "motion is settled. A LoRA's author often publishes a different number "
         "for each pass; where they publish one, put it in both."
     ),
     "cfg_low": (

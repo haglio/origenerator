@@ -9,12 +9,10 @@ from PIL import Image
 
 import origenerator.workflows.derived_size as ds
 import origenerator.workflows.detail_parts as detail_module
-import origenerator.workflows.detail_parts as module
 import origenerator.workflows.flux_t2i_upscaled as flux
 import origenerator.workflows.sdxl_pose_transfer as pose
 import origenerator.workflows.sdxl_t2i as t2i
 import origenerator.workflows.wan21_ati_i2v as ati
-import origenerator.workflows.wan21_ati_i2v as ati_module
 import origenerator.workflows.wan_experts as experts
 from origenerator import config
 from origenerator.comfy_graph import dual_sampler_model_files
@@ -527,7 +525,7 @@ def _enhance_payload(installed=_FOUND_DETECTORS, **params):
     """
     wf = WORKFLOW_REGISTRY["image_enhance"]
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(module, "list_detector_files", lambda: list(installed))
+        mp.setattr(detail_module, "list_detector_files", lambda: list(installed))
         return wf.build_api_payload(dict(wf.default_params(), input_image="pick.png",
                                          **params))
 
@@ -1489,7 +1487,7 @@ def test_wan21_ati_i2v_offers_optional_high_and_low_noise_loras(monkeypatch):
     # ("None" omits its loader; that stage runs the base model unmodified).
 
     options = [NO_LORA, "hand_high.safetensors", "hand_low.safetensors"]
-    monkeypatch.setattr(ati_module, "list_lora_files", lambda fallback, **terms: options)
+    monkeypatch.setattr(experts, "list_lora_files", lambda fallback, **terms: options)
 
     wf = Wan21AtiI2vWorkflow()
     assert wf.lora_keys == ("lora_high", "lora_low")
@@ -2625,13 +2623,24 @@ def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
 # ---- what the form calls a setting ----
 
 # The graph's names for these stay in the tooltips; the label says what the
-# setting does to the picture. The two prompts are the exception the test below
-# pins: "positive prompt" and "negative prompt" are what everyone who makes
-# pictures calls them, so renaming those cost the user the words he uses.
+# setting does to the picture. The prompts and the LoRAs are the exceptions the
+# test below pins: those are what everyone who makes pictures calls them, so
+# renaming them cost the user the words he uses.
 _GRAPH_JARGON = re.compile(
-    r"CFG|Denoise|Stage|Guidance|Input Image|LoRA|ControlNet|Sampler|Scheduler|Shift"
+    r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Sampler|Scheduler|Shift"
     r"|\((High|Low|Speech)\)|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
 )
+
+_NAMES_EVERYONE_USES = {
+    "positive_prompt": "Positive Prompt",
+    "negative_prompt": "Negative Prompt",
+    "audio_prompt": "Positive Prompt",
+    "audio_negative_prompt": "Negative Prompt",
+    "lora_high": "LoRA (First Pass)",
+    "lora_strength_high": "LoRA Strength (First Pass)",
+    "lora_low": "LoRA (Second Pass)",
+    "lora_strength_low": "LoRA Strength (Second Pass)",
+}
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
@@ -2641,14 +2650,10 @@ def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_the_two_prompts_keep_the_names_everyone_already_uses(name):
+def test_the_prompts_and_loras_keep_the_names_everyone_already_uses(name):
     labels = {pd.key: pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()}
-    for key, expected in (("positive_prompt", "Positive Prompt"),
-                          ("negative_prompt", "Negative Prompt"),
-                          ("audio_prompt", "Positive Prompt"),
-                          ("audio_negative_prompt", "Negative Prompt")):
-        if key in labels:
-            assert labels[key] == expected
+    named = {key: labels[key] for key in labels.keys() & _NAMES_EVERYONE_USES.keys()}
+    assert named == {key: _NAMES_EVERYONE_USES[key] for key in named}
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))

@@ -73,12 +73,12 @@ def model_label(workflow_name: str | None, params: dict) -> str:
 def lora_label(workflow_name: str | None, params: dict) -> str:
     """Human-facing folder name for the LoRA(s) a row used.
 
-    Joins each LoRA param's cleaned filename. Falls back to ``"(no add-on)"`` when
+    Joins each LoRA param's cleaned filename. Falls back to ``"(no LoRA)"`` when
     the row recorded no LoRA — none of the values (e.g. an older import that
     didn't carry the LoRA), or the "None" sentinel a run chose to bypass it.
     """
     keys = workflow_lora_keys(workflow_name)
-    return _joined_file_label(keys, _named_loras(keys, params), "(no add-on)")
+    return _joined_file_label(keys, _named_loras(keys, params), "(no LoRA)")
 
 
 def _prompt_headline(params: dict) -> str:

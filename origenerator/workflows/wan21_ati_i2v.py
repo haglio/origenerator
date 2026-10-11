@@ -19,7 +19,7 @@ from origenerator.workflows.frame_rate import (
     playback_rate,
 )
 from origenerator.workflows.model_arch import WAN
-from origenerator.workflows.model_files import NO_LORA, list_lora_files, list_model_files
+from origenerator.workflows.model_files import NO_LORA, list_model_files
 from origenerator.workflows.motion_aim import detect_grip_aim
 from origenerator.workflows.motion_track import (
     REFERENCE_HEIGHT,
@@ -28,6 +28,7 @@ from origenerator.workflows.motion_track import (
     motion_tracks,
     scaled_motion_params,
 )
+from origenerator.workflows.wan_experts import wan_expert_lora_params
 
 
 class Wan21AtiI2vWorkflow(WorkflowTemplate):
@@ -109,8 +110,6 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         defaults = self.default_params()
         models = list_model_files("diffusion_models", [defaults["unet"]], accepts=(WAN,))
-        loras_high = list_lora_files([], accepts=(WAN,), expert="high")
-        loras_low = list_lora_files([], accepts=(WAN,), expert="low")
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
@@ -134,10 +133,7 @@ class Wan21AtiI2vWorkflow(WorkflowTemplate):
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("shift", "Composition Focus", ParamType.FLOAT, defaults["shift"], min_val=0.0, max_val=20.0, step=0.5),
             ParamDef("unet", "Model", ParamType.COMBO, defaults["unet"], options=models),
-            ParamDef("lora_high", "Add-on (First Pass)", ParamType.COMBO, defaults["lora_high"], options=loras_high),
-            ParamDef("lora_strength_high", "Add-on Strength (First Pass)", ParamType.FLOAT, defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
-            ParamDef("lora_low", "Add-on (Second Pass)", ParamType.COMBO, defaults["lora_low"], options=loras_low),
-            ParamDef("lora_strength_low", "Add-on Strength (Second Pass)", ParamType.FLOAT, defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
+            *wan_expert_lora_params(defaults),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),

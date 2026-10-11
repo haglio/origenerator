@@ -118,7 +118,8 @@ def list_lora_files(
     the architecture each LoRA was *trained for* — and drops the occasional full
     checkpoint that ends up filed under ``loras``, which no LoraLoader can take.
     """
-    return [NO_LORA, *_listing("loras", fallback, accepts, expert, want_lora=True)]
+    listing = _listing("loras", fallback, accepts, expert, want_lora=True)
+    return [NO_LORA, *(name for name in listing if not is_no_lora(name))]
 
 
 def list_detector_files() -> list[str]:

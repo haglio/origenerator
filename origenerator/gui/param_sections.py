@@ -41,7 +41,7 @@ SECTIONS: tuple[Section, ...] = (
                         "negative_prompt", "input_image"),
             collapsed=False),
     Section("Seed", ("noise_seed", "seed"), collapsed=False),
-    Section("Models & Add-ons", (
+    Section("Models & LoRAs", (
         "checkpoint", "unet", "unet_high", "unet_low", "unet_s2v",
         "control_mode", "controlnet", "controlnet_strength", "controlnet_end",
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",

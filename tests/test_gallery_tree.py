@@ -32,11 +32,11 @@ def _image(prompt_id, prompt):
                 f"sdxl_t2i_{prompt_id}.png")
 
 
-def _video(prompt_id, add_on):
+def _video(prompt_id, lora):
     return _row(prompt_id, "wan22_i2v",
                 {"positive_prompt": "a slow turn", "seed": 1,
                  "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors",
-                 "lora_high": f"{add_on}_high.safetensors", "lora_low": f"{add_on}_low.safetensors"},
+                 "lora_high": f"{lora}_high.safetensors", "lora_low": f"{lora}_low.safetensors"},
                 f"wan22_i2v_{prompt_id}.mp4")
 
 

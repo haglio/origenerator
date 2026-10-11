@@ -561,10 +561,10 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
 
     workflow_node = _image_workflow(view._tree)
     assert workflow_node.text(0) == "SDXL Text-to-Image"
-    # workflow -> one model -> its "(no add-on)" level -> one settings folder, into
+    # workflow -> one model -> its "(no LoRA)" level -> one settings folder, into
     # which the two seed variants collapse.
     assert len(_subs(workflow_node)) == 1           # one model
-    assert len(_subs(_at(workflow_node, 0))) == 1   # its single "(no add-on)" level
+    assert len(_subs(_at(workflow_node, 0))) == 1   # its single "(no LoRA)" level
     assert len(_subs(_at(workflow_node, 0, 0))) == 1  # the two seeds collapse
 
 
@@ -625,7 +625,7 @@ def test_tree_rows_carry_a_recipe_level_badge(qtbot):
     # the first character of the folder's name — and names itself in the tooltip.
     assert not workflow.icon(0).isNull() and "Workflow" in workflow.toolTip(0)
     assert not model.icon(0).isNull() and "Model" in model.toolTip(0)
-    assert not lora.icon(0).isNull() and "Add-on" in lora.toolTip(0)
+    assert not lora.icon(0).isNull() and lora.toolTip(0).endswith("· LoRA")
     assert not source.icon(0).isNull() and "Source Image" in source.toolTip(0)
     # ...and the settings leaf, where the generations live, names no level at
     # all, so its hover says its own name and nothing more.
@@ -750,7 +750,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     # A branch folder shows its sub-folders as tiles, not loose thumbnails.
     view._tree.setCurrentItem(lora)
     assert len(view._browser._visible_keys) == 2
@@ -798,7 +798,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     view._tree.setCurrentItem(lora)
     a_tile_key = view._browser._visible_keys[0]  # a settings tile under the LoRA folder
 
@@ -1876,7 +1876,7 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     cat_key = _key(_at(lora, 0))
     dog_key = _key(_at(lora, 1))  # cat is first, dog second
     view._toggle_favorite(dog_key)
@@ -1935,7 +1935,7 @@ def test_favorite_shelf_is_pinned_first_and_collects_favorite_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
@@ -2658,7 +2658,7 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
@@ -2701,7 +2701,7 @@ def test_favorite_shelf_shows_both_favorite_items_and_folders(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)  # and a favorited folder
 
@@ -5016,7 +5016,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
-    # SDXL workflow -> model -> "(no add-on)" -> dog settings leaf (cat is sibling 0).
+    # SDXL workflow -> model -> "(no LoRA)" -> dog settings leaf (cat is sibling 0).
     dog_leaf = _at(_image_workflow(saved._tree), 0, 0, 1)
     saved._tree.setCurrentItem(dog_leaf)
     saved_key = saved.selected_folder()
@@ -5353,7 +5353,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
 def _open_leaf(view):
     """Select the first settings-group leaf so its thumbnails are showing."""
     workflow = _image_workflow(view._tree)
-    leaf = _at(workflow, 0, 0, 0)  # workflow -> model -> "(no add-on)" -> settings
+    leaf = _at(workflow, 0, 0, 0)  # workflow -> model -> "(no LoRA)" -> settings
     view._tree.setCurrentItem(leaf)
     return leaf
 
@@ -5775,7 +5775,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
 
     view._delete_selection()  # deletes that settings folder
 
-    # The leaf's parent — the "(no add-on)" folder — survives via its sibling leaf,
+    # The leaf's parent — the "(no LoRA)" folder — survives via its sibling leaf,
     # so the tree falls back onto it rather than jumping up to the top.
     current = view._tree.currentItem().data(0, _GROUP_ROLE)
     assert isinstance(current, gallery.LoraGroup)
@@ -5801,7 +5801,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _at(_image_workflow(view._tree), 0, 0)  # the (no add-on) folder
+    lora = _at(_image_workflow(view._tree), 0, 0)  # the (no LoRA) folder
     first_leaf, second_leaf = _at(lora, 0), _at(lora, 1)
     first_key = first_leaf.data(0, _GROUP_ROLE).key
     view._tree.setCurrentItem(first_leaf)   # visit the first settings folder
@@ -6072,7 +6072,7 @@ def _tile_kinds_in_order(view):
 
 
 def _select_first_leaf(view):
-    # workflow -> model -> "(no add-on)" -> settings (the thumbnail leaf)
+    # workflow -> model -> "(no LoRA)" -> settings (the thumbnail leaf)
     leaf = _at(_image_workflow(view._tree), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
@@ -7635,7 +7635,7 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no add-on)"
+    lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     view._toggle_favorite(_key(_at(lora, 0)))   # ...and a favorited folder (the cat one)
     view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
 
@@ -13396,7 +13396,7 @@ def test_esc_stops_the_audio_bed_on_its_own(qtbot):
 
 def _two_leaf_view(qtbot, extra=(), actions=None):
     """A view whose Images tree holds two settings folders ("a cat", "a dog")
-    under one "(no add-on)" parent, plus whatever ``extra`` rows are handed in.
+    under one "(no LoRA)" parent, plus whatever ``extra`` rows are handed in.
 
     Returns the two folders by *key*: every rebuild throws its tree items away,
     and these tests all rebuild."""

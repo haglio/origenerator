@@ -4,9 +4,9 @@ WAN 2.2 samples in two stages against two halves of one model — a high-noise
 expert and a low-noise one — and a slot must offer only its own half: a file
 whose name claims the other is the one pick that is certainly wrong there.
 That convention is what these rows encode, and it lives here rather than in
-each workflow because both workflows that run the pair have to agree about it,
-and a convention spelled out twice is a convention that can be changed in one
-place only.
+each workflow because every workflow sampling in those two stages, WAN 2.1's
+motion-tracked one included, has to agree about it, and a convention spelled
+out twice is a convention that can be changed in one place only.
 
 Two functions rather than one, because the order the rows come back in is the
 order the Generate form shows and the gallery info pane groups by: the models
@@ -38,14 +38,14 @@ def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
     """The high/low LoRA pickers, each directly above its own strength — the
     same expert filter as the models, over the LoRA folder."""
     return [
-        ParamDef("lora_high", "Add-on (First Pass)", ParamType.COMBO, defaults["lora_high"],
+        ParamDef("lora_high", "LoRA (First Pass)", ParamType.COMBO, defaults["lora_high"],
                  options=list_lora_files([defaults["lora_high"]],
                                          accepts=(WAN,), expert="high")),
-        ParamDef("lora_strength_high", "Add-on Strength (First Pass)", ParamType.FLOAT,
+        ParamDef("lora_strength_high", "LoRA Strength (First Pass)", ParamType.FLOAT,
                  defaults["lora_strength_high"], min_val=0.0, max_val=2.0, step=0.05),
-        ParamDef("lora_low", "Add-on (Second Pass)", ParamType.COMBO, defaults["lora_low"],
+        ParamDef("lora_low", "LoRA (Second Pass)", ParamType.COMBO, defaults["lora_low"],
                  options=list_lora_files([defaults["lora_low"]],
                                          accepts=(WAN,), expert="low")),
-        ParamDef("lora_strength_low", "Add-on Strength (Second Pass)", ParamType.FLOAT,
+        ParamDef("lora_strength_low", "LoRA Strength (Second Pass)", ParamType.FLOAT,
                  defaults["lora_strength_low"], min_val=0.0, max_val=2.0, step=0.05),
     ]

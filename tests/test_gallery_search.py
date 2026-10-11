@@ -269,7 +269,7 @@ def test_the_sort_menu_names_the_recipe_order_the_way_the_forms_do(controller):
 
     orders = [found._sort_combo.itemText(i) for i in range(found._sort_combo.count())]
 
-    assert orders == ["Recent", "Model / Add-on"]
+    assert orders == ["Recent", "Model / LoRA"]
 
 
 def _folder_key(row: dict) -> str:

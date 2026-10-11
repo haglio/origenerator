@@ -789,7 +789,7 @@ class GalleryView(QWidget):
         device, what voice heard, the search field over the folder list, and the
         combine panel."""
         # The folder list: media -> workflow -> model -> LoRA -> [source image]
-        # -> settings, the LoRA level collapsing to one "(no add-on)" folder for a
+        # -> settings, the LoRA level collapsing to one "(no LoRA)" folder for a
         # LoRA-less workflow and the source-image level showing only for an
         # image-conditioned one. Folders expand on the arrow; double-click renames.
         # One tree per side, each under a standing label and each scrolling on

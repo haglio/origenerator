@@ -9,7 +9,7 @@ color it wears it in, and the chips the badges sit on.
 The toolbar-button icons each return a QIcon carrying a normal and a muted
 "disabled" rendering (Qt swaps to the latter when a button is disabled).  The
 recipe-level badges (:func:`level_badge_icon`) are lettered chips marking which
-of workflow/model/add-on a folder is; the media-type badges
+of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
@@ -70,11 +70,11 @@ _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the butto
 # which, so a tree row or a browser tile is self-describing without the reader
 # counting indentation.
 LEVEL_LABELS = {
-    "workflow": "Workflow", "model": "Model", "lora": "Add-on",
+    "workflow": "Workflow", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
 }
 _LEVEL_BADGES = {
-    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("A", AMBER),
+    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", AMBER),
     "source_image": ("I", GREEN),
 }
 

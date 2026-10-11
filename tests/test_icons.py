@@ -54,15 +54,20 @@ def test_tab_close_icon_is_the_mark_the_style_paints_on_a_tab(qtbot):
 
 def test_level_badge_icons_render_for_each_level(qtbot):
     # Every badged level maps to a rendered chip: the four folder levels,
-    # workflow -> model -> add-on -> source image.
+    # workflow -> model -> LoRA -> source image.
     assert set(icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
-    assert icons.LEVEL_LABELS["lora"] == "Add-on"
+    assert icons.LEVEL_LABELS["lora"] == "LoRA"
     assert icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in icons.LEVEL_LABELS:
         icon = icons.level_badge_icon(level)
         assert not icon.isNull()
         assert not icon.pixmap(QSize(16, 16)).isNull()
+
+
+def test_a_lora_folder_wears_an_l(qtbot):
+    drawn = icons.level_badge_icon("lora").pixmap(48, 48).toImage()
+    assert drawn == QIcon(icons._render_badge("L", AMBER)).pixmap(48, 48).toImage()
 
 
 def test_each_level_badge_is_tellable_from_its_siblings(qtbot):

@@ -66,7 +66,7 @@ for one thing cost four. So:
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
-`app_support`, `player_core`, `shared_ui` and `voice_core` are pinned
+`app_support`, `funestra`, `shared_ui` and `voice_core` are pinned
 dependencies installed into `.venv` — never the checkouts beside this one.
 Both launchers run that venv and nothing else, and a Fun Time session starts
 this app through it too. That venv is also every other agent's test runner,
@@ -74,12 +74,12 @@ so a branch never installs into it: to run a sibling version the venv does not
 hold — an unlanded change, or a pin the branch moves — put a checkout of it
 first on `PYTHONPATH` for the suite, and give the preview a launcher of its own
 in the worktree's git-ignored `state/` that sets the same `PYTHONPATH`. A
-player_core checkout used that way needs `vendor/libmpv-2.dll` copied in from
-the primary player_core's `vendor/`, and is one you made: another session's
+funestra checkout used that way needs `vendor/libmpv-2.dll` copied in from
+the primary funestra's `vendor/`, and is one you made: another session's
 goes when that session is done with it, and a suite that lost one partway on
 2026-09-27 failed on `No module named 'player_core.mpv_player'`. Moving a pin is this repo's own commit,
 with its own suite to answer for it, and a new shared_ui release reaches this
-app only beside a player_core release that names the same one: pip refuses an
+app only beside a funestra release that names the same one: pip refuses an
 install that asks for two tags of one sibling. Never reinstall `.venv` while
 Origenerator or a Fun Time session may be running.
 
@@ -313,7 +313,7 @@ launch already does, and never reinstall the shared venv for a preview, since
 other sessions' suites run out of it. Every sibling such a launcher puts on
 `PYTHONPATH` comes from a checkout held at the version the branch needs -- the
 sibling branch's own worktree for the unlanded change, a worktree at the
-pinned tag for any other, with `vendor/libmpv-2.dll` copied into a player_core
+pinned tag for any other, with `vendor/libmpv-2.dll` copied into a funestra
 one -- never from a primary checkout, which every landing pulls forward under
 the launcher until the link dies on import before a window appears. And before
 that link goes out, replay the launch's imports under the launcher's own

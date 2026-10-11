@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from funestra_core import wave_stack
-from funestra_core.robot_hand import RobotHandState
+from funestra import wave_stack
+from funestra.robot_hand import RobotHandState
 
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion

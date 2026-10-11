@@ -20,7 +20,7 @@ from pathlib import Path
 from app_support import ports
 from app_support.file_channel import stamp_age
 from app_support.state_files import OSR2_SERIAL_RX
-from funestra_core.tcode import (
+from funestra.tcode import (
     PARK_COMMAND,
     UdpTCodeSink,
     format_tcode_command,
@@ -86,7 +86,7 @@ def format_position(pos_0_100: float, interval_ms: float) -> str:
     ``pos_0_100`` is a funscript position (0 floor, 100 top); ``interval_ms`` is
     how long the device takes to get there, so streaming each action with the
     time until the next reads as smooth motion.  The scaling and the clamp are
-    player_core's, the same ones every other driver in the family sends with.
+    funestra's, the same ones every other driver in the family sends with.
     """
     return format_tcode_command("L0", to_tcode_position(pos_0_100), int(interval_ms))
 

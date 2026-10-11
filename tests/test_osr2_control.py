@@ -1,13 +1,13 @@
 """The app's one OSR2 switch, and the four states the console's group sets."""
 from __future__ import annotations
 
-from funestra_core.console import (
+from funestra.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER
 
 from origenerator.gui.osr2_control import Osr2Control
 

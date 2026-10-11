@@ -6,12 +6,12 @@ import logging
 import os
 import time
 
-from funestra_core.console import ModeHud
-from funestra_core.funestra import User
-from funestra_core.hud_overlay import HUD_OVERLAY_ID
-from funestra_core.playlist import PlaylistItem
-from funestra_core.pointer import OMNIPAUSE_TOGGLE
-from funestra_core.satellite_hud import HudModel
+from funestra.console import ModeHud
+from funestra.funestra import User
+from funestra.hud_overlay import HUD_OVERLAY_ID
+from funestra.playlist import PlaylistItem
+from funestra.pointer import OMNIPAUSE_TOGGLE
+from funestra.satellite_hud import HudModel
 from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
@@ -234,7 +234,7 @@ def test_an_engine_that_will_not_open_leaves_the_pane_without_one(qtbot, tmp_pat
     pane.show()
     monkeypatch.setattr(QApplication.instance(), "platformName", lambda: "windows")
     monkeypatch.setattr(type(pane._window), "isVisible", lambda self: True)
-    monkeypatch.setattr("funestra_core.mpv_engine.MpvEngine",
+    monkeypatch.setattr("funestra.mpv_engine.MpvEngine",
                         lambda *a, **kw: (_ for _ in ()).throw(OSError("no engine")))
 
     pane.hand_over(_items(tmp_path, "one"))
@@ -315,7 +315,7 @@ def test_the_engine_copy_beside_the_checkouts_goes_in_front(monkeypatch, tmp_pat
     """The engine is one file, fetched once for the machine, with a copy beside
     the checkouts. The machine-wide folder has answered nothing at all to this
     app while answering every other process, so the copy beside goes first."""
-    beside = tmp_path / "player_core" / "vendor"
+    beside = tmp_path / "funestra" / "vendor"
     beside.mkdir(parents=True)
     (beside / "libmpv-2.dll").write_bytes(b"")
     monkeypatch.setattr(funestra_pane, "project_dir", lambda name: tmp_path / name)

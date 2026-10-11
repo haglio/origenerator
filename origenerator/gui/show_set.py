@@ -28,8 +28,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import fields, replace
 
-from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
-from funestra_core.satellite_hud import label_is_filtered
+from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.satellite_hud import label_is_filtered
 
 from origenerator.gui.show_map import (
     ACTION_AXIS,

@@ -9,14 +9,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from funestra_core.console import (
+from funestra.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra_core.pointer import OMNIPAUSE_TOGGLE
-from funestra_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from funestra.pointer import OMNIPAUSE_TOGGLE
+from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PIL import Image
 from PIL import Image as _Image
 from PyQt6 import sip

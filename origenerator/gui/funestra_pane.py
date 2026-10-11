@@ -1,6 +1,6 @@
 """The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the show's window.
 
-The Funestra is player_core's window (:class:`funestra_core.funestra.Funestra`):
+The Funestra is the family's window (:class:`funestra.funestra.Funestra`):
 it plays what it is handed, draws its own panel over the picture, answers the
 presses on it, and moves slowly over a still while it holds the screen.  Here
 it draws into a native window of this pane's, and the Slideshow runs on it the
@@ -22,8 +22,8 @@ import threading
 import time
 from pathlib import Path
 
-from funestra_core.funestra import Channels, Funestra
-from funestra_core.playlist import PlaylistItem
+from funestra.funestra import Channels, Funestra
+from funestra.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
@@ -140,7 +140,7 @@ class FunestraPane(QWidget):
                 or not self._window.isVisible()):
             return None
         offer_the_copy_beside_the_checkouts()
-        from funestra_core.mpv_engine import MpvEngine  # noqa: PLC0415
+        from funestra.mpv_engine import MpvEngine  # noqa: PLC0415
 
         try:
             return MpvEngine(int(self._window.winId()), muted=self._muted,
@@ -220,13 +220,13 @@ def offer_the_copy_beside_the_checkouts() -> None:
     """Put the copy of the engine's file that sits beside the checkouts first.
 
     The engine is one ~117 MB file, fetched once into a folder for the whole
-    machine, and a player_core checkout keeps its own copy beside it.  The
+    machine, and a funestra checkout keeps its own copy beside it.  The
     engine is found by walking the folders in PATH, and the machine-wide one
     has answered "nothing here" to this app while answering for every other
     process on the same machine -- with the file plainly sitting in it.  So the
     copy beside the checkouts goes in front of it.
     """
-    beside = project_dir("player_core") / "vendor"
+    beside = project_dir("funestra") / "vendor"
     try:
         if not (beside / "libmpv-2.dll").is_file():
             return

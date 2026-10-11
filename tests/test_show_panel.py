@@ -6,11 +6,11 @@ import json
 
 import numpy as np
 import pytest
-from funestra_core.hud_corners import CORNER_PLUS_OVERLAY_ID
-from funestra_core.hud_overlay import HUD_OVERLAY_ID
-from funestra_core.hud_placement import HudCorner
-from funestra_core.satellite_hud import MARGIN
-from funestra_core.timeline import TIMELINE_HEIGHT
+from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
+from funestra.hud_overlay import HUD_OVERLAY_ID
+from funestra.hud_placement import HudCorner
+from funestra.satellite_hud import MARGIN
+from funestra.timeline import TIMELINE_HEIGHT
 from PyQt6.QtCore import QEvent, QPointF
 from PyQt6.QtWidgets import QApplication
 

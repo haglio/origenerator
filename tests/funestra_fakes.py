@@ -1,6 +1,6 @@
 """A stand-in for the Funestras' engine, for a Funestra in this app's window to run on.
 
-What :class:`funestra_core.mpv_engine.MpvEngine` offers a Funestra, answered
+What :class:`funestra.mpv_engine.MpvEngine` offers a Funestra, answered
 from memory: the file it was handed, the one staged after it, the pace, the
 freeze, the sound, a still's move, and the overlays the panel and a picture
 are composited with.

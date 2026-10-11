@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from app_support.funscript import read_actions
-from funestra_core.robot_hand import RobotHandState, bpm_for_speed
+from funestra.robot_hand import RobotHandState, bpm_for_speed
 
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (

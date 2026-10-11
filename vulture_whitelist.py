@@ -9,7 +9,7 @@ that actually calls it.
 anything, so nothing may stay here once its subject is gone.
 
 Everything in it is now a caller vulture cannot follow -- Qt's C++ event loop,
-sqlite3, COM, player_core, one string-dispatch table. The section this file
+sqlite3, COM, funestra, one string-dispatch table. The section this file
 opened with, the 38 names the first scan reported and nobody had yet judged, is
 empty: backlog item 24 read each one and either deleted it or gave it a reader.
 An entry added here from now on says which of those five it is, or it does not
@@ -29,7 +29,7 @@ _.wheelEvent  # noqa  # origenerator/gui/funestra_pane.py:263, origenerator/gui/
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions  # noqa  # origenerator/gui/folder_tree.py:219
 
-# --- player_core's Funestra asks these of what runs on it, through its User protocol ---
+# --- funestra's Funestra asks these of what runs on it, through its User protocol ---
 _.apply_command  # noqa  # origenerator/gui/slideshow_view.py:1617
 _.status_fields  # noqa  # origenerator/gui/slideshow_view.py:1623
 _.top_block  # noqa  # origenerator/gui/slideshow_view.py:1626

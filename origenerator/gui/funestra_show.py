@@ -26,8 +26,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from funestra_core.file_channel import append_command, publish_whole
-from funestra_core.funestra_verbs import (
+from funestra.file_channel import append_command, publish_whole
+from funestra.funestra_verbs import (
     CLEAR_FRAME,
     LOCK_OFF,
     LOCK_ON,
@@ -39,9 +39,9 @@ from funestra_core.funestra_verbs import (
     TRASH,
     play_file,
 )
-from funestra_core.playlist import PlaylistItem, write_playlist
-from funestra_core.satellite_hud import hud_text
-from funestra_core.status import parse_status
+from funestra.playlist import PlaylistItem, write_playlist
+from funestra.satellite_hud import hud_text
+from funestra.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles

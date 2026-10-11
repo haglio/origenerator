@@ -17,7 +17,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from funestra_core.file_channel import consume_command_file
+from funestra.file_channel import consume_command_file
 from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
 from PyQt6.QtGui import QImage, QMouseEvent, QPainter, QWheelEvent

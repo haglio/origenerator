@@ -8,7 +8,7 @@ be a second HUD.
 It says what the strip says: the job being made with its live frame and the
 clock across its bar, then each waiting job as a row -- the button that throws
 it away, the picture it is made from, and what it costs.  They go back as the
-panel's own declared buttons (:class:`funestra_core.hud_button.Button`), so it
+panel's own declared buttons (:class:`funestra.hud_button.Button`), so it
 presses and names them exactly as it presses its own.
 """
 from __future__ import annotations
@@ -18,15 +18,15 @@ import os
 from dataclasses import dataclass, field
 from functools import cache
 
-from funestra_core.hud_button import Button
-from funestra_core.hud_panel import (
+from funestra.hud_button import Button
+from funestra.hud_panel import (
     SYMBOL_FONT,
     draw_button,
     fit_text,
     load_font,
     text_width,
 )
-from funestra_core.satellite_hud import BLOCK_GAP, CTRL_BTN, MAP_THUMB_H
+from funestra.satellite_hud import BLOCK_GAP, CTRL_BTN, MAP_THUMB_H
 from PIL import Image, ImageDraw
 from shared_ui.palette import (
     BLUE,

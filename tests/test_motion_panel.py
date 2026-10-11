@@ -1,6 +1,6 @@
 """MotionPanel — Genau's console, shown here, and what a press on it does.
 
-The console is player_core's and tested there. What this covers is the two
+The console is funestra's and tested there. What this covers is the two
 things that are this app's: that the picture really is that console (not a
 lookalike), and that each command it posts reaches the right thing here.
 """
@@ -9,19 +9,19 @@ from __future__ import annotations
 import itertools
 import random
 
-from funestra_core import drive_layout, wave_stack
-from funestra_core.console import (
+from funestra import drive_layout, wave_stack
+from funestra.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_OFF,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
 )
-from funestra_core.console_hud import ConsolePainter
-from funestra_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
-from funestra_core.learned_model import LearnedModel, Phrase, classify
-from funestra_core.modes import Osr2State
-from funestra_core.robot_hand import PARK_CENTER, POSITION_MAX
+from funestra.console_hud import ConsolePainter
+from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
+from funestra.learned_model import LearnedModel, Phrase, classify
+from funestra.modes import Osr2State
+from funestra.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
@@ -82,7 +82,7 @@ def test_the_console_is_up_while_nothing_drives_since_its_switch_is_what_starts_
     assert panel._repaint.isActive()       # the trace scrolls, so now it does
 
 
-def test_the_picture_is_the_console_funestra_core_paints(qtbot):
+def test_the_picture_is_the_console_funestra_paints(qtbot):
     # Not a repaint of the design, and not a third of it: the same painter, the
     # same rows, the same bitmap.
     panel, motion = _panel(qtbot)
@@ -352,7 +352,7 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     # The motion goes on with the device unplugged — it cannot see the
     # wire — so without this the console animated a blue wave nobody was riding.
     # Saying "off" is also what grays the readout and holds its trace still: the
-    # painter reads who has the device off this one value (player_core).
+    # painter reads who has the device off this one value (funestra).
 
     motion = FakeMotion()
     motion.active = True

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from funestra_core.timeline import (
+from funestra.timeline import (
     BAR_BORDER,
     BAR_EDGE,
     BAR_FILL,

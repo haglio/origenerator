@@ -121,7 +121,7 @@ class BarSetting:
 
     ``bar`` is the driver's own word for it — ``speed``, ``amp``, ``center`` —
     and ``value`` is on the 0-100 scale all three share
-    (:mod:`funestra_core.robot_hand` clamps, so "min speed" landing under the
+    (:mod:`funestra.robot_hand` clamps, so "min speed" landing under the
     bar's own floor is the bar's business, not the vocabulary's).
     """
 

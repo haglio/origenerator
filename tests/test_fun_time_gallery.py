@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from funestra_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
+from funestra.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap

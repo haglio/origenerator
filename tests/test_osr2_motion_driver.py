@@ -4,8 +4,8 @@ from __future__ import annotations
 import threading
 import time
 
-from funestra_core.learned_model import LearnedModel, Phrase, classify
-from funestra_core.robot_hand import PARK_CENTER, RETRACT_CENTER, RobotHandState, set_max_intensity
+from funestra.learned_model import LearnedModel, Phrase, classify
+from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER, RobotHandState, set_max_intensity
 
 from origenerator import motion_engine, osr2
 from origenerator.osr2_motion_driver import (

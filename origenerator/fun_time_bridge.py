@@ -1,7 +1,7 @@
 """Fun Time's hands on a hosted Origenerator: the file channels, polled.
 
 Fun Time drives its Satellite Funestras through a command file, a paused flag
-and a status file (``funestra_core.file_channel`` / ``funestra_core.status``); a
+and a status file (``funestra.file_channel`` / ``funestra.status``); a
 hosted Origenerator answers the same idioms so the session reaches the region
 shows the way it reaches the Funestras:
 
@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from funestra_core.file_channel import (
+from funestra.file_channel import (
     append_command,
     consume_command_file,
     publish_whole,

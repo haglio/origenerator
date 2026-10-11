@@ -1,13 +1,13 @@
-"""The press grammar, held against the spellings player_core itself emits.
+"""The press grammar, held against the spellings funestra itself emits.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
 from __future__ import annotations
 
 import pytest
-from funestra_core import drive_layout
-from funestra_core.console import OSR2_CONTROL_BUTTONS
-from funestra_core.drive_readout import CONTROL_TIPS, track_command
+from funestra import drive_layout
+from funestra.console import OSR2_CONTROL_BUTTONS
+from funestra.drive_readout import CONTROL_TIPS, track_command
 
 from origenerator.console_commands import (
     ROBOT_HAND,
@@ -28,7 +28,7 @@ def test_a_level_press_is_read_back_as_the_axis_and_level_it_set(axis):
 
 
 def test_the_level_a_band_posts_is_one_this_side_reads():
-    """The spelling is player_core's, so the press it builds is the input."""
+    """The spelling is funestra's, so the press it builds is the input."""
     track = drive_layout.tracks(0, 0, 50)[0]
     posted = track_command(track, track.rect[0] + 1, track.rect[1] + 1)
     assert level_asked_for(posted) is not None

@@ -30,7 +30,6 @@ from origenerator.gui import corner_controls, icons
 from origenerator.gui import export_lane as export_lane_module
 from origenerator.gui import folder_request as folder_request_module
 from origenerator.gui import generate_config_panel as gcp_module
-from origenerator.gui import generate_config_panel as module
 from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
@@ -1347,7 +1346,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     output_dir = tmp_path / "out"
     (output_dir / "image").mkdir(parents=True)
     (output_dir / "image" / "sdxl_img1.png").write_bytes(b"x")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
 
     image = _image_row(db, "img1")
     panel.show_saved_generation(image, [image])
@@ -1389,7 +1388,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
     (output_dir / "image").mkdir(parents=True)
     for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
         (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(module, "COMFYUI_OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(gcp_module, "COMFYUI_OUTPUT_DIR", output_dir)
 
     image = _enhanced_image_row(db)
     panel.show_saved_generation(image, [image])
@@ -2158,6 +2157,23 @@ def test_editing_the_settings_takes_the_random_seed_caption_back_off(panel, qtbo
 
     qtbot.waitUntil(lambda: panel._generate_btn.text() == "Generate")
     assert panel._generate_btn.toolTip() == ""
+
+
+@pytest.mark.parametrize("key, picked", [("sampler_name", "euler_ancestral"),
+                                         ("scheduler", "karras")])
+def test_a_run_that_lands_after_its_tab_was_changed_leaves_generate_on_the_shown_seed(
+        panel, qtbot, key, picked):
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
+    panel.prefill("sdxl_t2i", params)
+    _completed_generation(panel._db, "sdxl_t2i", params)  # the run this tab's press started
+
+    panel._param_form._widgets[key].setCurrentText(picked)  # while that run was being made
+    panel.show_completed_result(panel._db.get_generation("done"), [])
+
+    qtbot.wait(gcp_module._CAPTION_DELAY_MS * 3)
+    assert panel._generate_btn.text() == "Generate"
+    assert _notice(panel) == "(not yet generated with modifications)"
 
 
 # --- asking for changes to a whole folder ------------------------------------

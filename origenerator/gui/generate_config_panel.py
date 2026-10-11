@@ -1166,7 +1166,7 @@ class GenerateConfigPanel(QWidget):
         """
         if self._folder_request is not None:
             return
-        self._display_result(row, image_rows)
+        self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
         """``row`` has changed under this tab: re-show it if it is what the tab
@@ -1283,7 +1283,8 @@ class GenerateConfigPanel(QWidget):
         self._live_note = None
         self._live_source = None
 
-    def _display_result(self, row: dict, image_rows: list[dict], request=None):
+    def _display_result(self, row: dict, image_rows: list[dict], request=None,
+                        made_with: dict | None = None):
         """Point the preview and footer at ``row`` — the shared tail of showing a
         generation, whether freshly browsed or just completed. The form is left
         untouched; :meth:`show_saved_generation` seeds it first, before this runs."""
@@ -1298,7 +1299,7 @@ class GenerateConfigPanel(QWidget):
         self._show_footer(row, image_rows, preview, request)
         self._arm_preview_actions()
         if arriving:
-            self._note_displayed_config()
+            self._note_displayed_config(made_with)
         else:
             # The same generation, changed under the tab: an enhancement folded
             # in, a version deleted. Nothing about the settings moved, so the mark
@@ -1342,26 +1343,27 @@ class GenerateConfigPanel(QWidget):
         if armed is not None:
             self._arm_preview_actions(armed)
 
-    def _note_displayed_config(self):
-        """Take the settings a generation arriving in this tab is shown
-        under as the mark to measure edits against, and clear any notice left from
-        the last one.
-
-        For a generation *arriving* -- the one the form was just seeded from, or
-        the result this tab's own Generate made. What happens to the generation
-        already on display leaves the mark alone (see :meth:`_display_result`).
+    def _note_displayed_config(self, made_with: dict | None = None):
+        """Take the settings a generation arriving in this tab was made with
+        as the mark to measure edits against, and clear any notice left from the
+        last one: the form's, or ``made_with`` for a result of this tab's own
+        Generate, since the form may have been edited while that run was made.
+        What happens to the generation already on display leaves the mark alone
+        (see :meth:`_display_result`).
         """
         self._displayed_config = (
-            self._item_config() if self._displayed_row is not None else None
+            self._item_config(made_with) if self._displayed_row is not None else None
         )
         self.refresh_modified_notice()
 
-    def _item_config(self) -> ConfigSnapshot:
+    def _item_config(self, made_with: dict | None = None) -> ConfigSnapshot:
         current = self.current_config()
         if self._param_form is None:
             return current
+        params = {key: (made_with or {}).get(key, value)
+                  for key, value in current.params.items()}
         return ConfigSnapshot(current.workflow_name,
-                              {**current.params, **self._param_form.item_seeds()},
+                              {**params, **self._param_form.item_seeds()},
                               seed_is_random=False)
 
     def refresh_modified_notice(self):

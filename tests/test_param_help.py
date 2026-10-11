@@ -78,6 +78,15 @@ def test_the_seed_and_the_handoff_say_which_noise_each_pass_works_on():
     assert "high noise" in PARAM_HELP["split_step"] and "low noise" in PARAM_HELP["split_step"]
 
 
+@pytest.mark.parametrize("key", ["shift", "shift_high", "shift_low"])
+def test_composition_focus_says_what_composition_is(key):
+    assert "layout" in PARAM_HELP[key]
+
+
+def test_the_handoff_says_when_to_move_it_off_halfway():
+    assert "motion" in PARAM_HELP["split_step"] and "detail" in PARAM_HELP["split_step"]
+
+
 def test_help_calls_a_lora_a_lora():
     loras = ("lora_high", "lora_low", "lora_strength_high", "lora_strength_low")
     assert all("LoRA" in PARAM_HELP[key] for key in loras)

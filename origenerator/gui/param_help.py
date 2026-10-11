@@ -140,8 +140,11 @@ PARAM_HELP: dict[str, str] = {
     ),
     "split_step": (
         "The step where the first pass (high noise) hands over to the second (low "
-        "noise; the split step). Earlier leaves more of the work to the second "
-        "pass; 0 hands over at half the steps."
+        "noise; the split step); 0 hands over at half the steps. Leave it there "
+        "unless something looks off: hand over later, a bigger number, when the "
+        "motion comes out weak or the layout wanders, and earlier when the detail "
+        "comes out soft or smeared. Move it with Composition Focus too: lower "
+        "focus wants an earlier handoff, higher a later one."
     ),
     "guidance": (
         "How strictly the model obeys the prompt (Flux's guidance value). It wants "
@@ -162,16 +165,24 @@ PARAM_HELP: dict[str, str] = {
         "re-imagines the rest."
     ),
     "shift": (
-        "Where this model spends its effort — higher favors composition, lower "
-        "favors fine detail."
+        "How the steps split between composition (the layout, the poses and the "
+        "motion) and fine detail. Higher spends more of them while the "
+        "picture is still mostly noise, where composition is decided; lower spends "
+        "more at the end, on texture and detail. 8 is the usual start."
     ),
     "shift_high": (
-        "Where the first pass (high noise) spends its effort: higher favors "
-        "composition."
+        "For the first pass (high noise): how the steps split between composition "
+        "(the layout, the poses and, in a video, the motion) and fine detail. "
+        "Higher spends more of them on composition, lower more on texture "
+        "and detail. Keep it equal to the second pass's: two values hand over at "
+        "mismatched noise, which tends to leave grain or smearing."
     ),
     "shift_low": (
-        "Where the second pass (low noise) spends its effort: lower favors fine "
-        "detail."
+        "For the second pass (low noise): how the steps split between composition "
+        "(the layout, the poses and, in a video, the motion) and fine detail. "
+        "Higher spends more of them on composition, lower more on texture "
+        "and detail. Keep it equal to the first pass's: two values hand over at "
+        "mismatched noise, which tends to leave grain or smearing."
     ),
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---

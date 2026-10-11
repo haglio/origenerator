@@ -42,6 +42,11 @@ _POLL_MS = 15
 #: tooltip or a spinner, and costs a grab of a window nobody is touching.
 _IDLE_LOOK_S = 0.1
 
+#: How often the poll says what it has handled.  His 2026-10-10 session took
+#: one click and then none, and nothing between the crossing and the end of it
+#: said when it had stopped.
+HEARTBEAT_S = 10.0
+
 #: The longest edge a published picture may have.  The rect a session names is
 #: not a promise about the window: Qt gives it the size its own minimums allow,
 #: and it can be resized later.  So the channel is sized to this and anything
@@ -143,6 +148,7 @@ class HeadsetWindow(QObject):
         self._asked = False
         self._taken = 0
         self._threw = False
+        self._said_at: float | None = None
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(_POLL_MS)
@@ -165,12 +171,23 @@ class HeadsetWindow(QObject):
                 self._taken += 1
                 self._heard(line)
             self.publish()
+            self.said_how_it_goes(time.monotonic())
         except Exception:
             # Qt swallows what a slot raises, and a poll that throws every tick
             # leaves a screen in the room that never changes and never answers.
             if not self._threw:
                 self._threw = True
                 logger.exception("This window's headset poll threw; it keeps polling")
+
+    def said_how_it_goes(self, now: float) -> None:
+        if self._said_at is None:
+            self._said_at = now
+            return
+        if now - self._said_at < HEARTBEAT_S:
+            return
+        self._said_at = now
+        logger.info("Still publishing this window for the headset (%d published, "
+                    "%d presses taken)", self._frames.written, self._taken)
 
     def _heard(self, line: str) -> None:
         kind, _, rest = line.strip().partition(" ")

@@ -47,7 +47,7 @@ SECTIONS: tuple[Section, ...] = (
         "lora_high", "lora_strength_high", "lora_low", "lora_strength_low",
         "upscale_model",
     ), collapsed=True),
-    Section("Drawing", (
+    Section("Calibration", (
         "steps", "split_step", "cfg", "cfg_high", "cfg_low",
         "guidance", "sampler_name", "scheduler",
         "shift", "shift_high", "shift_low", "denoise",

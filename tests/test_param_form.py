@@ -1306,7 +1306,7 @@ def test_fields_are_grouped_into_collapsible_sections(qtbot):
     assert isinstance(form._sections["Prompts"], CollapsibleSection)
     assert "positive_prompt" in form._present_keys["Prompts"]
     assert "seed" in form._present_keys["Seed"]
-    assert "steps" in form._present_keys["Drawing"]
+    assert "steps" in form._present_keys["Calibration"]
 
 
 def test_empty_sections_are_hidden(qtbot):
@@ -1325,7 +1325,7 @@ def test_prompts_and_seed_start_open_the_rest_collapsed(qtbot):
     assert form._sections["Prompts"].is_collapsed() is False
     assert form._sections["Seed"].is_collapsed() is False
     assert form._sections["Models & LoRAs"].is_collapsed() is True
-    assert form._sections["Drawing"].is_collapsed() is True
+    assert form._sections["Calibration"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
     assert form._sections["Sound"].is_collapsed() is True
 
@@ -1377,7 +1377,7 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     qtbot.addWidget(form)
     for key, widget in form._widgets.items():
         assert widget.toolTip() == param_help(key), key
-    section = form._sections["Drawing"].content_form()
+    section = form._sections["Calibration"].content_form()
     label = section.labelForField(form._widgets["steps"])
     assert label.toolTip() == param_help("steps")
 

@@ -24,9 +24,9 @@ def test_starts_collapsed_hides_its_content(qtbot):
 
 
 def test_header_shows_the_title(qtbot):
-    section = CollapsibleSection("Drawing", collapsed=True)
+    section = CollapsibleSection("Calibration", collapsed=True)
     qtbot.addWidget(section)
-    assert "Drawing" in section._header.text()
+    assert "Calibration" in section._header.text()
 
 
 def test_header_escapes_an_ampersand_instead_of_making_it_a_mnemonic(qtbot):

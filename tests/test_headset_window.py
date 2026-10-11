@@ -16,6 +16,7 @@ from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.headset_window import (
     _IDLE_LOOK_S,
     CAP_PX,
+    HEARTBEAT_S,
     HeadsetWindow,
     windows_opened_over,
     within_the_cap,
@@ -39,6 +40,32 @@ def _published_color(tmp_path, at: QPoint) -> QColor:
     pixel = 20 + (at.y() * width + at.x()) * 4
     red, green, blue = published[pixel:pixel + 3]
     return QColor(red, green, blue)
+
+
+def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
+        tmp_path, qtbot, caplog):
+    """His 2026-10-10 session took one click and then none: 404 lines of his
+    aiming and clicking sat unread, with nothing in the records between the
+    crossing and the end of the session to say when it had stopped.  A line
+    every HEARTBEAT_S puts the moment it stopped in the log."""
+    window = QWidget()
+    window.resize(200, 100)
+    qtbot.addWidget(window)
+    window.show()
+    headset = HeadsetWindow(window, _hosted(tmp_path))
+    try:
+        with caplog.at_level(logging.INFO):
+            headset.publish(now=1.0)
+            headset.said_how_it_goes(now=1.0)
+            headset.said_how_it_goes(now=1.0 + HEARTBEAT_S / 2)
+            beats = caplog.text.count("Still publishing")
+            headset.said_how_it_goes(now=1.0 + HEARTBEAT_S + 0.01)
+    finally:
+        headset.close()
+
+    assert beats == 0, "it spoke before the first heartbeat was due"
+    assert caplog.text.count("Still publishing") == 1
+    assert "(1 published, 0 presses taken)" in caplog.text
 
 
 def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog):

@@ -439,9 +439,8 @@ class GallerySearch:
         several row lists (the gallery's own, and the trash's held rows) without
         first working out whether they overlap.
 
-        ``folder_names`` is ``{prompt_id: [names]}`` — the names the user gave the
-        folders each row sits in (see
-        :func:`~origenerator.gallery.tree.named_folders_by_row`). It is the one
+        ``folder_names`` is ``{prompt_id: [names]}`` (see
+        :func:`~origenerator.gallery.tree.folder_names_by_row`). It is the one
         part of an entry that isn't a property of the row, so it is taken fresh
         every time rather than carried over with the cached stems.
         """

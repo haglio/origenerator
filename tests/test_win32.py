@@ -1,14 +1,11 @@
-"""Tests for origenerator.win32 taskbar identity and foreground helpers."""
+"""Tests for origenerator.win32 taskbar identity and window helpers."""
 from __future__ import annotations
 
 import time
 from pathlib import Path
-from unittest.mock import call, patch
-
-import pytest
+from unittest.mock import patch
 
 from origenerator.win32 import (
-    force_foreground_window,
     raise_window_without_activating,
     register_notification_identity,
     this_process_creation_time,
@@ -32,90 +29,6 @@ class TestWindowExists:
             assert window_exists(4321) is False
             mock.IsWindow.return_value = 1
             assert window_exists(4321) is True
-
-
-class TestForceForegroundWindow:
-    """The boot takes long enough that the user clicks into something else while
-    it runs, which leaves the last input event with THAT app — and Windows then
-    refuses this process the foreground silently, dropping the window under
-    whatever they moved on to. Attaching to the foreground thread's input queue
-    is what makes the activation go through."""
-
-    @staticmethod
-    def _mock(user32, kernel32, *, ends_up_foreground: int, was_foreground: int = 999):
-        user32.IsWindow.return_value = 1
-        user32.GetForegroundWindow.side_effect = [was_foreground, ends_up_foreground]
-        user32.GetWindowThreadProcessId.return_value = 7001
-        user32.AttachThreadInput.return_value = 1
-        kernel32.GetCurrentThreadId.return_value = 7002
-
-    def test_attaches_the_foreground_queue_activates_then_detaches(self):
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=111)
-
-            assert force_foreground_window(111) is True
-
-        assert user32.AttachThreadInput.call_args_list == [
-            call(7001, 7002, True),
-            call(7001, 7002, False),
-        ]
-        user32.SetForegroundWindow.assert_called_once_with(111)
-        user32.BringWindowToTop.assert_called_once_with(111)
-
-    def test_reports_false_when_the_window_did_not_take_the_foreground(self):
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=999)
-
-            assert force_foreground_window(111) is False
-
-    def test_dead_handle_activates_nothing(self):
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=111)
-            user32.IsWindow.return_value = 0
-
-            assert force_foreground_window(111) is False
-
-        user32.SetForegroundWindow.assert_not_called()
-        user32.AttachThreadInput.assert_not_called()
-
-    def test_no_foreground_window_means_nothing_to_attach_to(self):
-        """An offscreen/headless desktop has no foreground window: the
-        activation still lands, and this still reads False."""
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=0, was_foreground=0)
-
-            assert force_foreground_window(111) is False
-
-        user32.AttachThreadInput.assert_not_called()
-        user32.SetForegroundWindow.assert_called_once_with(111)
-
-    def test_does_not_attach_to_its_own_thread(self):
-        # Already the foreground process: attaching a thread to itself fails and
-        # would leave the detach below unbalanced.
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=111)
-            user32.GetWindowThreadProcessId.return_value = 7002
-
-            assert force_foreground_window(111) is True
-
-        user32.AttachThreadInput.assert_not_called()
-        user32.SetForegroundWindow.assert_called_once_with(111)
-
-    def test_detaches_even_when_the_activation_raises(self):
-        with patch("origenerator.win32._user32") as user32, \
-             patch("origenerator.win32._kernel32") as kernel32:
-            self._mock(user32, kernel32, ends_up_foreground=111)
-            user32.SetForegroundWindow.side_effect = OSError("denied")
-
-            with pytest.raises(OSError):
-                force_foreground_window(111)
-
-        assert user32.AttachThreadInput.call_args_list[-1] == call(7001, 7002, False)
 
 
 class TestRaiseWindowWithoutActivating:

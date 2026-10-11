@@ -118,37 +118,6 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
                 log.warning("Could not stamp AppUserModelID on %s: %s", pin, refusal)
 
 
-def _bring_to_front(window) -> None:
-    """Put a just-opened window in front, the way opening an app is supposed to.
-
-    A launch here is slow — starting ComfyUI's server, scanning its whole output
-    history, the backfills under it — and nobody sits and watches that, so by
-    the time there is a window to show, the last input event went to whatever
-    the user moved on to. Windows hands the foreground to the process that got
-    that input, and refuses it to this one; ``show()`` then puts Origenerator
-    *under* the window they are looking at, flashing the taskbar button as the
-    only sign it opened at all.
-
-    Qt's ``raise_``/``activateWindow`` ask down that same refused path, so they
-    are the polite first try and the native call is what actually lands. Losing
-    the race is cosmetic — the window is open either way — so no failure here may
-    cost the launch.
-    """
-    window.raise_()
-    window.activateWindow()
-    _take_the_foreground(int(window.winId()))
-
-
-def _take_the_foreground(hwnd: int) -> None:
-    if sys.platform != "win32":
-        return
-    try:
-        from origenerator.win32 import force_foreground_window
-        force_foreground_window(hwnd)
-    except Exception:
-        pass  # cosmetic: a window underneath is still a window
-
-
 def _ensure_comfyui_server(logger, host, port, comfyui_dir, on_status=None, pump_events=None):
     import importlib.util
     import socket
@@ -529,7 +498,6 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
     app_id, button = (None, None) if taskbar is None else taskbar.wearing
     screen = loading_screen(CHECKOUT / "icon.ico", preview, boot_steps(MAINTENANCE),
                             app_id=app_id, taskbar=button)
-    screen.shown.connect(_take_the_foreground)
     return Loading(app, logger, screen)
 
 
@@ -808,7 +776,8 @@ def main(argv: list[str] | None = None) -> int:
 
     loading.done()
     if still_offered:
-        _bring_to_front(window)
+        from shared_ui.foreground import bring_to_front
+        bring_to_front(window)
 
     from origenerator.freeze_watch import watch_the_window
     if crash_log is not None:

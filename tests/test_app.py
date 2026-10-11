@@ -26,7 +26,6 @@ from origenerator.app import (
     MAINTENANCE,
     Library,
     _arm_the_crash_log,
-    _bring_to_front,
     _configure_logging,
     _ensure_comfyui_server,
     _init_windows_taskbar_identity,
@@ -282,47 +281,6 @@ def test_init_windows_taskbar_identity_noop_off_windows():
     mock_stamp.assert_not_called()
 
 
-class TestBringToFront:
-    """Opening the app has to put it in front of what the user is looking at.
-    The boot is slow enough that they click elsewhere while it runs, and Windows
-    then refuses this process the foreground — silently — so ``show()`` alone
-    leaves the window under their other windows."""
-
-    def test_raises_activates_and_takes_the_foreground(self):
-        window = MagicMock()
-        window.winId.return_value = 4242
-
-        with patch("origenerator.app.sys.platform", "win32"), \
-             patch("origenerator.win32.force_foreground_window") as force:
-            _bring_to_front(window)
-
-        window.raise_.assert_called_once_with()
-        window.activateWindow.assert_called_once_with()
-        # Qt's own activation asks down the path Windows refuses, so the native
-        # call is the one that actually lands.
-        force.assert_called_once_with(4242)
-
-    def test_noop_off_windows(self):
-        window = MagicMock()
-
-        with patch("origenerator.app.sys.platform", "linux"), \
-             patch("origenerator.win32.force_foreground_window") as force:
-            _bring_to_front(window)
-
-        force.assert_not_called()
-        window.raise_.assert_called_once_with()
-
-    def test_a_refused_foreground_never_costs_the_launch(self):
-        # Being underneath is cosmetic; failing to open is not.
-        window = MagicMock()
-        window.winId.return_value = 4242
-
-        with patch("origenerator.app.sys.platform", "win32"), \
-             patch("origenerator.win32.force_foreground_window",
-                   side_effect=OSError("denied")):
-            _bring_to_front(window)
-
-
 def test_ensure_server_warns_when_port_held_by_non_comfyui():
     logger = MagicMock()
     with patch("origenerator.comfyui_client.comfyui_responding", return_value=False), \
@@ -435,19 +393,6 @@ def test_a_loading_screen_with_no_taskbar_identity_to_wear_wears_none(qapp):
         _open_the_loading(None, qapp, MagicMock(), None, None)
 
     assert screens[0].wearing == (None, None)
-
-
-def test_a_loading_screen_is_put_in_front_once_its_process_says_it_is_up(qapp):
-    screens = []
-
-    with patch("origenerator.gui.loading_screen.LoadingProcess.open",
-               side_effect=opened_here(screens)), \
-         patch("origenerator.app.sys.platform", "win32"), \
-         patch("origenerator.win32.force_foreground_window") as force:
-        _open_the_loading(None, qapp, MagicMock(), None, None)
-        screens[0].shown.emit(4242)
-
-    force.assert_called_once_with(4242)
 
 
 def _real_loading_screens(screens):
@@ -636,7 +581,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen", return_value=loading), \
          patch("origenerator.gui.main_window.OrigeneratorWindow", return_value=window), \
-         patch("origenerator.app._bring_to_front",
+         patch("shared_ui.foreground.bring_to_front",
                side_effect=lambda w: events.append(
                    "front:window" if w is window else "front:something else")), \
          patch("origenerator.app._ensure_comfyui_server"), \
@@ -975,7 +920,7 @@ def test_a_boot_fun_time_launched_leaves_what_is_in_front_to_the_session(qapp):
 
     with _a_faked_boot([], **{
         "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
-        "origenerator.app._bring_to_front": fronted,
+        "shared_ui.foreground.bring_to_front": fronted,
     }):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
@@ -992,7 +937,7 @@ def test_a_window_a_session_took_while_it_was_being_built_is_neither_shown_nor_b
     with _a_faked_boot([], **{
         "origenerator.gui.fun_time_watch.FunTimeWatch": watch,
         "origenerator.gui.main_window.OrigeneratorWindow": MagicMock(return_value=window),
-        "origenerator.app._bring_to_front": fronted,
+        "shared_ui.foreground.bring_to_front": fronted,
     }):
         assert main([]) == 0
 

@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
 from shared_ui.loading_window import LoadingWindow
 
 
 class LoadingScreenInThisProcess(LoadingWindow):
-    shown = pyqtSignal(int)
-
     def __init__(self, *, app_id, taskbar, **window) -> None:
         super().__init__(**window)
         self.wearing = (app_id, taskbar)

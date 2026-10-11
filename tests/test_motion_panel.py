@@ -22,8 +22,8 @@ from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
 from funestra.robot_hand import PARK_CENTER, POSITION_MAX
-from PyQt6.QtCore import QObject, QPoint, pyqtSignal
-from PyQt6.QtGui import QCursor
+from PyQt6.QtCore import QEvent, QObject, QPointF, Qt, pyqtSignal
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import motion_engine
@@ -381,27 +381,54 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     assert answers == []      # and asked again rather than reusing the answer
 
 
+def _first_named_button(panel) -> tuple[int, int, int, int]:
+    panel.grab()  # lays the buttons out
+    return next(rect for rect, button in panel._painter.buttons if button.tooltip)
+
+
+def _ground_lightness(panel, rect) -> int:
+    x, y, _w, h = rect
+    return panel.grab().toImage().pixelColor(x + 2, y + h // 2).lightness()
+
+
+def _move_onto(panel, rect) -> None:
+    x, y, w, h = rect
+    at = QPointF(x + w // 2, y + h // 2)
+    QApplication.sendEvent(panel, QMouseEvent(
+        QEvent.Type.MouseMove, at, QPointF(panel.mapToGlobal(at.toPoint())),
+        Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier))
+
+
+def test_the_panel_hears_the_pointer_move_with_no_button_held(qtbot):
+    # Qt hands a widget a plain move only when it asks for every move; without
+    # that, the panel heard the pointer only while a button was held.
+    panel, _motion = _panel(qtbot)
+
+    assert panel.hasMouseTracking()
+
+
 def test_the_button_under_the_pointer_lights_up(qtbot):
     # The panel over a Slideshow lit the button under the pointer and this one
     # did not, though the same painter draws both: nothing told it where the
     # pointer was.
     panel, _motion = _panel(qtbot)
-    panel.move(200, 200)
-    panel.show()
-    qtbot.waitExposed(panel)
-    panel.grab()  # lays the buttons out
-    x, y, w, h = next(rect for rect, button in panel._painter.buttons if button.tooltip)
-    ground = QPoint(x + 2, y + h // 2)
-    resting = QCursor.pos()
-    QCursor.setPos(QPoint(5, 5))
-    QApplication.processEvents()
-    at_rest = panel.grab().toImage().pixelColor(ground)
-    QCursor.setPos(panel.mapToGlobal(QPoint(x + w // 2, y + h // 2)))
-    QApplication.processEvents()
-    under_the_pointer = panel.grab().toImage().pixelColor(ground)
-    QCursor.setPos(resting)
+    button = _first_named_button(panel)
+    at_rest = _ground_lightness(panel, button)
 
-    assert under_the_pointer.lightness() > at_rest.lightness()
+    _move_onto(panel, button)
+
+    assert _ground_lightness(panel, button) > at_rest
+
+
+def test_the_button_goes_back_once_the_pointer_leaves(qtbot):
+    panel, _motion = _panel(qtbot)
+    button = _first_named_button(panel)
+    at_rest = _ground_lightness(panel, button)
+    _move_onto(panel, button)
+
+    QApplication.sendEvent(panel, QEvent(QEvent.Type.Leave))
+
+    assert _ground_lightness(panel, button) == at_rest
 
 
 def test_the_panel_actually_paints(qtbot):

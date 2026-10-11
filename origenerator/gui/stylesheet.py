@@ -3,7 +3,6 @@ from __future__ import annotations
 from shared_ui.chrome import family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
     BG_BUTTON,
-    BG_KEYCAP,
     BG_SECONDARY,
     BG_TERTIARY,
     BLUE,
@@ -124,7 +123,7 @@ def build_stylesheet() -> str:
     }}
     QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
     QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-        background-color: {_h(BG_KEYCAP)};
+        background-color: {_h(hovered(BG_BUTTON))};
     }}
     QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
     QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{

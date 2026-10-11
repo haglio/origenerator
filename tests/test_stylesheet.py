@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QCursor, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QLabel,
@@ -14,7 +14,15 @@ from PyQt6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
 )
-from shared_ui.colors import BG_BUTTON, BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import (
+    BG_BUTTON,
+    BG_PRIMARY,
+    BLUE,
+    BORDER_SUBTLE,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    hovered,
+)
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 
@@ -229,6 +237,25 @@ def test_the_step_down_buttons_outer_corner_is_rounded_off(qtbot):
 
     assert image.pixelColor(down.bottomRight()) != BG_BUTTON
     assert image.pixelColor(down.bottomRight() - QPoint(5, 5)) == BG_BUTTON
+
+
+def test_a_step_button_sits_one_step_lighter_under_the_pointer(qtbot):
+    spinner = _styled_spinner(qtbot)
+    spinner.move(200, 200)
+    spinner.show()
+    qtbot.waitExposed(spinner)
+    down = _spin_down_rect(spinner)
+    ground = down.bottomRight() - QPoint(5, 5)
+    resting = QCursor.pos()
+    QCursor.setPos(QPoint(5, 5))
+    QApplication.processEvents()
+    at_rest = spinner.grab().toImage().pixelColor(ground)
+    QCursor.setPos(spinner.mapToGlobal(down.center()))
+    QApplication.processEvents()
+    under_the_pointer = spinner.grab().toImage().pixelColor(ground)
+    QCursor.setPos(resting)
+
+    assert under_the_pointer.name() == hovered(at_rest).name()
 
 
 def _tab_bar_image(qtbot):

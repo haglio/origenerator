@@ -340,7 +340,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_watcher_asks_nothing_once_the_app_is_back and
 # test_the_claim_a_running_copy_holds_is_read_without_taking_it. What a click
 # does is tests/test_app_link.py and tests/test_link_listener.py.
-MAX_PROSE_LINES = 17985
+MAX_PROSE_LINES = 17977
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

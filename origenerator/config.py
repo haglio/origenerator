@@ -31,23 +31,7 @@ _CONTENT = load_content()
 LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 
 
-def project_roots(settings: dict[str, Any] | None = None) -> tuple[Path, ...]:
-    """The folders that hold the suite's own app checkouts, in search order.
-
-    A key of its own, because the suite's *own* repos live outside the
-    file-synced tree the media library stays in; everything that does not --
-    the library, ComfyUI -- keeps reading ``library_root``.
-
-    A *list*, because the move runs one repo at a time: with a single path there
-    is a window where a sibling that has not moved yet is unreachable. Settings
-    that say nothing still mean ``library_root/projects``, as before.
-    """
-    settings = haglio_settings.load() if settings is None else settings
-    return siblings.project_roots(
-        settings.get("project_roots"), fallback=Path(settings["library_root"]) / "projects")
-
-
-PROJECT_ROOTS = project_roots()
+PROJECT_ROOTS = haglio_settings.project_roots()
 
 
 def ambient_audio_dir(settings: dict[str, Any] | None = None) -> Path | None:

@@ -1164,6 +1164,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
     ("origenerator.importer", "merge_soundless_copy_rows"),
+    ("origenerator.importer", "fold_sound_versions_into_their_videos"),
     ("origenerator.importer", "backfill_import_workflows"),
     ("origenerator.importer", "refile_enhancements_another_recipe_made"),
     ("origenerator.importer", "backfill_import_params"),

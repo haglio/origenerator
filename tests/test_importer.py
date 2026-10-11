@@ -654,7 +654,7 @@ def _completed(db, prompt_id, filename, subfolder, **fields):
         prompt_id=prompt_id, workflow_name=fields.get("workflow_name", "wan22_flf2v_loop"),
         workflow_version="imported", positive_prompt=fields.get("positive_prompt"),
         seed=fields.get("seed"), params_json=fields.get("params_json", "{}"),
-        workflow_json="{}", source="imported",
+        workflow_json=fields.get("workflow_json", "{}"), source="imported",
     )
     db.update_generation(
         prompt_id, status="completed",
@@ -752,6 +752,22 @@ def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
     assert bookmark["ref_prompt_id"] == "sounded"
 
 
+def test_a_found_sound_version_joins_the_found_video_that_carries_its_recipe(tmp_path):
+    db = Database(tmp_path / "test.db")
+    recipe = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {}}})
+    _completed(db, "silent", "scene_one_00001.mp4", "video", workflow_json=recipe)
+    _completed(db, "with-sound", "scene_one_00001-audio.mp4", "video")
+    db.set_generation_favorite("with-sound", True)
+
+    assert imp.fold_sound_versions_into_their_videos(db) == 1
+
+    assert db.get_generation("with-sound") is None
+    video = db.get_generation("silent")
+    assert [(f["filename"], f.get("role")) for f in json.loads(video["output_files"])] == [
+        ("scene_one_00001-audio.mp4", None), ("scene_one_00001.mp4", "silent")]
+    assert video["starred"] == 1
+
+
 def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_item(tmp_path):
     db = Database(tmp_path / "test.db")
     _completed(db, "found-sounded", "old_clip_00001-audio.mp4", "video")
@@ -759,6 +775,7 @@ def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_it
     _completed(db, "lone", "wan22_i2v_00001_.mp4", "video", workflow_name="wan22_i2v")
 
     assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 0
+    assert imp.fold_sound_versions_into_their_videos(db) == 0
     assert {r["prompt_id"] for r in db.list_generations()} == {"found-sounded", "found-copy", "lone"}
 
 

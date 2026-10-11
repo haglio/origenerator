@@ -35,7 +35,7 @@ from origenerator.gallery.sides import orientation_of_size
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
-from origenerator.record_fold import fold_record_into
+from origenerator.record_fold import file_key, fold_record_into
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import soundless_copies_of
@@ -203,6 +203,29 @@ def merge_soundless_copy_rows(db: Database, *, send_down) -> int:
         _fold_soundless_copy(db, row, video, rows)
         merged += 1
     return merged
+
+
+def fold_sound_versions_into_their_videos(db: Database) -> int:
+    rows = db.list_generations()
+    with_recipe_by_file = {
+        file_key(files[0]): row for row in rows
+        if (files := row_output_files(row)) and graph_from_text(row.get("workflow_json") or "")
+    }
+    folded = 0
+    for row in rows:
+        files = row_output_files(row)
+        if (source_of(row) != GenerationSource.IMPORTED or len(files) != 1
+                or graph_from_text(row.get("workflow_json") or "")):
+            continue
+        silent = soundless_copies_of(files)
+        video = with_recipe_by_file.get(file_key(silent[0])) if silent else None
+        if video is None or len(row_output_files(video)) != 1:
+            continue
+        db.update_generation(video["prompt_id"], output_files=json.dumps(files + silent))
+        fold_record_into(db, rows, row, video)
+        db.delete_generation(row["prompt_id"])
+        folded += 1
+    return folded
 
 
 def _lanes_its_video_is_owed(copy: dict, video: dict) -> list[str]:

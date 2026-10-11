@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+
+def file_key(entry: dict) -> tuple[str, str]:
+    return entry.get("subfolder") or "", entry.get("filename") or ""
+
+
+def fold_record_into(db, rows, folded: dict, keeper: dict) -> None:
+    _carry_over_what_the_user_put_on_it(db, folded, keeper)
+    _repoint_at_the_record_that_stays(db, rows, folded, keeper)
+
+
+def _carry_over_what_the_user_put_on_it(db, folded: dict, keeper: dict) -> None:
+    if folded.get("starred") and not keeper.get("starred"):
+        db.set_generation_favorite(keeper["prompt_id"], True)
+    inherited = {column: folded[column]
+                 for column in ("enhance_history", "original_files", "thumbnail_path")
+                 if folded.get(column) and not keeper.get(column)}
+    if inherited:
+        db.update_generation(keeper["prompt_id"], **inherited)
+
+
+def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> None:
+    gone, stays = folded["prompt_id"], keeper["prompt_id"]
+    for row in rows:
+        if row.get("enhance_of") == gone:
+            db.set_enhance_target(row["prompt_id"], stays)
+        if row.get("recipe_video_id") == gone:
+            db.set_recipe_source(row["prompt_id"], category=row.get("recipe_category"),
+                                 video_prompt_id=stays)
+    for bookmark in db.folder_meta_full():
+        if bookmark.get("ref_prompt_id") == gone:
+            db.upsert_folder_meta(bookmark["folder_key"],
+                                  custom_name=bookmark.get("custom_name"),
+                                  favorite=bool(bookmark.get("starred")),
+                                  level=bookmark.get("level"), ref_prompt_id=stays)
+    for item in db.custom_folder_items_full():
+        if item.get("ref_prompt_id") == gone:
+            db.stamp_custom_folder_item(item["folder_id"], item["folder_key"],
+                                        level=item.get("level"), ref_prompt_id=stays)

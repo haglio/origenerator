@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -56,10 +57,9 @@ class _Task(QRunnable):
             logger.info("An off-thread answer came back after the app let go of it")
 
 
-def run_off_thread(work, done) -> None:
-    """Call ``work()`` on the global pool, then ``done(result)`` back on this thread.
-
-    ``done`` is called exactly once, with ``None`` when ``work`` raised.
+def run_off_thread(work, done, *, owner=None) -> None:
+    """Call ``work()`` on the global pool, then ``done(result)`` back on this
+    thread -- unless ``owner`` has been deleted by then.
 
     The carrier is held in :data:`_in_flight` until it delivers, which is the
     whole of what keeps it and its handler alive. A reference *cycle* is not
@@ -81,6 +81,10 @@ def run_off_thread(work, done) -> None:
 
     def deliver(value):
         _in_flight.discard(result)  # its last turn; the carrier can go now
+        if owner is not None and sip.isdeleted(owner):
+            logger.info("An off-thread answer came back after the %s that asked "
+                        "for it was gone", type(owner).__name__)
+            return
         done(value)
 
     result.ready.connect(deliver)

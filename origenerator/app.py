@@ -252,11 +252,15 @@ def _import_new_files(library: Library):
     return import_comfyui_output(library.output_dir, library.db, library.thumb_dir)
 
 
-def _merge_video_sidecars(library: Library):
-    """Fold each video's metadata-PNG sidecar into one playable gallery entry."""
-    from origenerator.importer import merge_video_sidecar_rows
+def _tidy_video_previews(library: Library):
+    from origenerator.importer import (
+        first_frames_filed_apart_from_their_videos,
+        merge_video_sidecar_rows,
+    )
 
-    return merge_video_sidecar_rows(library.db)
+    merged = merge_video_sidecar_rows(library.db)
+    return merged + _scrap(library, first_frames_filed_apart_from_their_videos(
+        library.db.list_generations()))
 
 
 def _merge_soundless_copies(library: Library):
@@ -402,8 +406,8 @@ MAINTENANCE = (
     BootPass("Scanning for new images...", _import_new_files,
              counted="Imported %d existing files from ComfyUI output",
              failure="Import failed: %s"),
-    BootPass("Tidying up video previews...", _merge_video_sidecars,
-             counted="Consolidated %d video sidecar previews",
+    BootPass("Tidying up video previews...", _tidy_video_previews,
+             counted="Consolidated %d video sidecar previews and first frames",
              failure="Sidecar consolidation failed: %s"),
     BootPass(None, _merge_soundless_copies,
              counted="Folded %d soundless copies into the videos they came from",

@@ -768,6 +768,35 @@ def test_a_found_sound_version_joins_the_found_video_that_carries_its_recipe(tmp
     assert video["starred"] == 1
 
 
+def test_a_videos_first_frame_filed_apart_from_it_is_one_to_scrap(tmp_path):
+    db = Database(tmp_path / "test.db")
+    one = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"length": 81}}})
+    another = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"length": 49}}})
+    _completed(db, "video", "scene_one_00001.mp4", "video", workflow_json=one)
+    _completed(db, "its-first-frame", "scene_one_00001.png", "image", workflow_json=one)
+    _completed(db, "another-video", "scene_two_00001.mp4", "video", workflow_json=one)
+    _completed(db, "a-picture-of-its-own", "scene_two_00001.png", "image", workflow_json=another)
+
+    scrap = imp.first_frames_filed_apart_from_their_videos(db.list_generations())
+
+    assert [row["prompt_id"] for row in scrap] == ["its-first-frame"]
+
+
+def test_the_first_frames_of_two_videos_sharing_a_name_are_both_ones_to_scrap(tmp_path):
+    db = Database(tmp_path / "test.db")
+    one = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"length": 81}}})
+    another = json.dumps({"1": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"length": 49}}})
+    _completed(db, "first-video", "scene_one_00001.mp4", "video", workflow_json=one)
+    _completed(db, "later-video", "scene_one_00001.mp4", "video/later", workflow_json=another)
+    _completed(db, "first-videos-frame", "scene_one_00001.png", "image", workflow_json=one)
+    _completed(db, "later-videos-frame", "scene_one_00001.png", "image/later",
+               workflow_json=another)
+
+    scrap = imp.first_frames_filed_apart_from_their_videos(db.list_generations())
+
+    assert {row["prompt_id"] for row in scrap} == {"first-videos-frame", "later-videos-frame"}
+
+
 def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_item(tmp_path):
     db = Database(tmp_path / "test.db")
     _completed(db, "found-sounded", "old_clip_00001-audio.mp4", "video")

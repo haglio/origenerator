@@ -24,7 +24,7 @@ from typing import NamedTuple
 
 from PyQt6.QtWidgets import QToolButton, QWidget
 from shared_ui.mark_button import fill_square_with_mark
-from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE_HUD
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP, BUTTON_SIZE
 
 from origenerator import ui_scale
 from origenerator.config import AMBIENT_AUDIO_VOICES
@@ -102,8 +102,8 @@ class BankActs(NamedTuple):
     toggle_mic: Callable[[bool], None]
 
 
-def _square_landing_at_the_huds_size(*, hosted: bool) -> int:
-    return round(BUTTON_SIZE_HUD / ui_scale.HOSTED_SCALE) if hosted else BUTTON_SIZE_HUD
+def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
+    return length if hosted else round(length * ui_scale.HOSTED_SCALE)
 
 
 def _tool_button(icon, tooltip: str, handler, *, checkable=False) -> QToolButton:
@@ -124,9 +124,7 @@ def _group_gap() -> QWidget:
     the gap comes and goes with the group under it, and a widget is the thing a
     flow layout can be told to leave out.
     """
-    gap = QWidget()
-    gap.setFixedSize(BUTTON_GROUP_GAP, 1)
-    return gap
+    return QWidget()
 
 
 class ToolbarBank(QWidget):
@@ -216,7 +214,7 @@ class ToolbarBank(QWidget):
         # The family's own gap along a row, and its wider one between wrapped
         # rows -- at the single small gap this used, a bank that wrapped had its
         # two rows all but touching.
-        layout = FlowLayout(self, spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP)
+        layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
         for buttons in (
             (self.back, self.forward),               # where you are
@@ -234,21 +232,26 @@ class ToolbarBank(QWidget):
                 layout.addWidget(button)
             self._groups.append((gap, buttons))
         self._show_the_gaps()
-        self._fill_the_squares(hosted=hosted)
+        self._draw_at_the_huds_scale(hosted=hosted)
 
-    def _fill_the_squares(self, *, hosted: bool) -> None:
-        for _gap, buttons in self._groups:
+    def _draw_at_the_huds_scale(self, *, hosted: bool) -> None:
+        layout = self.layout()
+        layout.setSpacing(_landing_at_the_huds_scale(BUTTON_GAP, hosted=hosted))
+        layout.set_row_spacing(_landing_at_the_huds_scale(BUTTON_ROW_GAP, hosted=hosted))
+        square = _landing_at_the_huds_scale(BUTTON_SIZE, hosted=hosted)
+        for gap, buttons in self._groups:
+            gap.setFixedSize(_landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted), 1)
             for button in buttons:
-                fill_square_with_mark(button, size=_square_landing_at_the_huds_size(hosted=hosted))
+                fill_square_with_mark(button, size=square)
 
     def become_hosted(self) -> None:
-        self._fill_the_squares(hosted=True)
+        self._draw_at_the_huds_scale(hosted=True)
         self._room_switches = (self.audio, self.mic)
         self._show_the_room_switches(False)
         self.audio = self.mic = None
 
     def become_standalone(self) -> None:
-        self._fill_the_squares(hosted=False)
+        self._draw_at_the_huds_scale(hosted=False)
         self.audio, self.mic = self._room_switches
         self._show_the_room_switches(True)
 

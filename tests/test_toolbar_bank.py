@@ -246,6 +246,19 @@ def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_banks_do(ba
         assert drawn == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD), button.toolTip()
 
 
+def _gaps(made: ToolbarBank) -> tuple[int, int, int]:
+    """Between two buttons of a group, between wrapped rows, and between groups."""
+    layout = made.layout()
+    return layout.spacing(), layout.row_spacing(), made._groups[0][0].width()
+
+
+def test_a_standalone_banks_gaps_land_on_screen_the_size_a_hosted_banks_do(bank):
+    standalone, hosted = bank(), bank(hosted=True)
+
+    assert _gaps(standalone) == tuple(
+        round(gap * ui_scale.HOSTED_SCALE) for gap in _gaps(hosted))
+
+
 def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_with(bank):
     taken = bank()
     built_hosted = bank(hosted=True)
@@ -254,6 +267,7 @@ def test_a_bank_taken_into_a_session_wears_the_squares_a_hosted_one_is_built_wit
 
     assert {button.size() for button in taken.findChildren(QToolButton)} == {
         button.size() for button in built_hosted.findChildren(QToolButton)}
+    assert _gaps(taken) == _gaps(built_hosted)
 
 
 def test_a_bank_handed_back_from_a_session_wears_the_huds_square_again(bank):
@@ -264,6 +278,7 @@ def test_a_bank_handed_back_from_a_session_wears_the_huds_square_again(bank):
 
     assert {button.size() for button in taken.findChildren(QToolButton)} == {
         QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)}
+    assert _gaps(taken) == _gaps(bank())
 
 
 def test_every_mark_on_the_bank_spans_more_than_half_its_button(bank):

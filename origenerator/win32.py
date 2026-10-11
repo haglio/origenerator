@@ -11,6 +11,8 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 _user32 = ctypes.windll.user32  # type: ignore[attr-defined]
@@ -127,6 +129,32 @@ def place_window_in_device_pixels(hwnd: int, x: int, y: int,
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
                                      int(x), int(y), int(width), int(height),
                                      _SWP_NOZORDER | _SWP_NOACTIVATE))
+
+
+_dwmapi = ctypes.windll.dwmapi  # type: ignore[attr-defined]
+_dwmapi.DwmSetWindowAttribute.argtypes = [
+    ctypes.wintypes.HWND, ctypes.wintypes.DWORD, ctypes.c_void_p, ctypes.wintypes.DWORD,
+]
+_dwmapi.DwmSetWindowAttribute.restype = ctypes.c_long
+_DWMWA_CLOAK = 13
+
+
+def _cloak(hwnd: int, hidden: bool) -> None:
+    flag = ctypes.wintypes.BOOL(hidden)
+    _dwmapi.DwmSetWindowAttribute(hwnd, _DWMWA_CLOAK, ctypes.pointer(flag),
+                                  ctypes.sizeof(flag))
+
+
+@contextmanager
+def out_of_sight(hwnd: int) -> Iterator[None]:
+    if not window_exists(hwnd):
+        yield
+        return
+    _cloak(hwnd, True)
+    try:
+        yield
+    finally:
+        _cloak(hwnd, False)
 
 
 def raise_window_without_activating(hwnd: int) -> bool:

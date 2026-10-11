@@ -25,7 +25,7 @@ from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
-from origenerator.win32 import place_window_in_device_pixels
+from origenerator.win32 import out_of_sight, place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +280,6 @@ class OrigeneratorWindow(QMainWindow):
     def become_standalone(self) -> None:
         logger.info("Handed back by the Fun Time session; standalone again")
         self._take_the_window_back()
-        geometry, scale, minimized = self._found
         self._bridge.deleteLater()
         self._bridge = None
         self._fun_time = None
@@ -288,18 +287,20 @@ class OrigeneratorWindow(QMainWindow):
             self._taskbar.leave()
         self._gallery_view.become_standalone()
         self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
-        self.setWindowFlags(self.windowFlags()
-                            & ~Qt.WindowType.FramelessWindowHint
-                            & ~Qt.WindowType.WindowStaysOnTopHint)
-        self._device_rect = None
-        self.setWindowState(Qt.WindowState.WindowNoState)
-        ui_scale.draw_at(scale)
-        self.restoreGeometry(geometry)
-        if minimized:
-            self.showMinimized()
-        else:
-            self.show()
+        self._stand_where_found(*self._found)
         self.handed_back.emit()
+
+    def _stand_where_found(self, geometry: QByteArray, scale: float, minimized: bool) -> None:
+        with out_of_sight(int(self.winId())):
+            self.setWindowFlags(self.windowFlags()
+                                & ~Qt.WindowType.FramelessWindowHint
+                                & ~Qt.WindowType.WindowStaysOnTopHint)
+            self._device_rect = None
+            ui_scale.draw_at(scale)
+            self.showNormal()
+            self.restoreGeometry(geometry)
+            if minimized:
+                self.showMinimized()
 
     def _wear_the_session(self, session: FunTimeSession) -> None:
         # A managed window of the hosting session: frameless so the client

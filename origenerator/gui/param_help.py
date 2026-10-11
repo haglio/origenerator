@@ -119,7 +119,7 @@ PARAM_HELP: dict[str, str] = {
         "picture."
     ),
 
-    # --- drawing ---
+    # --- calibration ---
     "steps": (
         "How many times the model goes over the picture, refining it. More steps "
         "means more settled detail and a longer wait, with little gain once the "

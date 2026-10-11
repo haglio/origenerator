@@ -5,7 +5,10 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from origenerator.win32 import (
+    out_of_sight,
     raise_window_without_activating,
     register_link_handler,
     register_notification_identity,
@@ -50,6 +53,46 @@ class TestRaiseWindowWithoutActivating:
             assert raise_window_without_activating(111) is False
 
         user32.SetWindowPos.assert_not_called()
+
+
+class TestOutOfSight:
+    DWMWA_CLOAK = 13
+
+    def _cloaks(self, dwm):
+        return [(hwnd, attribute, value.contents.value, size)
+                for (hwnd, attribute, value, size), _kwargs
+                in dwm.DwmSetWindowAttribute.call_args_list]
+
+    def test_the_window_is_cloaked_for_the_block_and_uncloaked_after_it(self):
+        with patch("origenerator.win32._user32") as user32, \
+                patch("origenerator.win32._dwmapi") as dwm:
+            user32.IsWindow.return_value = 1
+
+            with out_of_sight(111):
+                assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
+
+        assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4),
+                                     (111, self.DWMWA_CLOAK, 0, 4)]
+
+    def test_the_window_comes_back_into_sight_when_the_block_fails(self):
+        with patch("origenerator.win32._user32") as user32, \
+                patch("origenerator.win32._dwmapi") as dwm:
+            user32.IsWindow.return_value = 1
+
+            with pytest.raises(RuntimeError), out_of_sight(111):
+                raise RuntimeError("the hand-back failed")
+
+        assert self._cloaks(dwm)[-1] == (111, self.DWMWA_CLOAK, 0, 4)
+
+    def test_a_dead_handle_is_left_alone(self):
+        with patch("origenerator.win32._user32") as user32, \
+                patch("origenerator.win32._dwmapi") as dwm:
+            user32.IsWindow.return_value = 0
+
+            with out_of_sight(111):
+                pass
+
+        dwm.DwmSetWindowAttribute.assert_not_called()
 
 
 class TestNotificationIdentity:

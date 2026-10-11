@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import winsound
+from contextlib import contextmanager
 from dataclasses import replace
 from unittest.mock import patch
 from xml.etree import ElementTree
@@ -1468,6 +1469,42 @@ def test_a_window_found_minimized_is_minimized_again_once_the_session_hands_it_b
     win.become_standalone()
 
     assert win.isMinimized()
+
+
+def test_a_window_the_session_minimized_is_shown_before_it_is_put_back_where_it_was_found(
+        qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path)
+    win.showMaximized()
+    win.become_hosted(_fun_time_session())
+    shown_when_put_back = []
+    monkeypatch.setattr(win, "restoreGeometry", lambda geometry: shown_when_put_back.append(
+        win.isVisible() and not win.isMinimized()))
+
+    win.become_standalone()
+
+    assert shown_when_put_back == [True]
+
+
+def test_a_window_is_out_of_sight_while_it_is_put_back_where_it_was_found(
+        qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+    seen = []
+
+    @contextmanager
+    def watched(hwnd):
+        seen.append(("out of sight", hwnd))
+        yield
+        seen.append(("in sight", hwnd))
+
+    monkeypatch.setattr(main_window, "out_of_sight", watched)
+    monkeypatch.setattr(win, "restoreGeometry", lambda geometry: seen.append(("put back", None)))
+
+    win.become_standalone()
+
+    hwnd = int(win.winId())
+    assert seen == [("out of sight", hwnd), ("put back", None), ("in sight", hwnd)]
 
 
 def test_a_session_releasing_the_window_it_took_hands_it_back(qtbot, tmp_path):

@@ -37,13 +37,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui import palette
+from shared_ui.chrome import control_ground
 from shared_ui.colors import (
     AMBER,
     BG_PRIMARY,
     BG_SECONDARY,
     BORDER_SUBTLE,
     TEXT_MUTED,
-    hovered,
 )
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
@@ -120,14 +121,10 @@ _DISABLED_CSS = f"""
 
 _ENHANCE_BUTTON_CSS = f"""
     #enhancePanel QPushButton#enhanceButton {{
-        background-color: {AMBER.name()};
         color: {BG_PRIMARY.name()};
         border: 1px solid {AMBER.name()};
         font-weight: bold;
-    }}
-    #enhancePanel QPushButton#enhanceButton:hover {{
-        background-color: {hovered(AMBER).name()};
-    }}
+    }}{control_ground(palette.AMBER, "#enhancePanel QPushButton#enhanceButton")}
     #enhancePanel QPushButton#enhanceButton:disabled {{
         background-color: {BG_SECONDARY.name()};
         color: {TEXT_MUTED.name()};

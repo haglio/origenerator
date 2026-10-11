@@ -1266,7 +1266,7 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
 
 
 # --- the dwell a picture keeps the screen for, and what stops the clock ------
-# A still's move is the engine's own (funestra_core.ken_burns), paced by the dwell
+# A still's move is the engine's own (funestra.ken_burns), paced by the dwell
 # it was given, so the show's part is the dwell it hands over and the freeze it
 # hands with it.
 

@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from funestra_core.file_channel import consume_command_file
-from funestra_core.hud_placement import HudCorner
-from funestra_core.playlist import read_playlist
-from funestra_core.satellite_hud import parse_hud
+from funestra.file_channel import consume_command_file
+from funestra.hud_placement import HudCorner
+from funestra.playlist import read_playlist
+from funestra.satellite_hud import parse_hud
 from PIL import Image
 
 from origenerator import fun_time_mode as contract

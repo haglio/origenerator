@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from funestra_core.playlist import PlaylistItem
+from funestra.playlist import PlaylistItem
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of

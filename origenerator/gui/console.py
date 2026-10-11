@@ -5,7 +5,7 @@ of the main window, and that section with the pace on the panel a show wears —
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
-Nothing is drawn here. :class:`funestra_core.console_hud.ConsolePainter` and the
+Nothing is drawn here. :class:`funestra.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
 the pace an unlocked slide moves on at, the motion's bars sampled forward, the
 funscript's line where a script has the device, and which of the four control
@@ -17,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from funestra_core import drive_layout
-from funestra_core.console import (
+from funestra import drive_layout
+from funestra.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
@@ -29,16 +29,16 @@ from funestra_core.console import (
     ConsoleModel,
     aim_row,
 )
-from funestra_core.console_hud import ConsoleHud, ConsolePainter
-from funestra_core.drive_readout import (
+from funestra.console_hud import ConsoleHud, ConsolePainter
+from funestra.drive_readout import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
-from funestra_core.hud_button import Button
-from funestra_core.modes import MainMode, Osr2State
-from funestra_core.robot_hand import (
+from funestra.hud_button import Button
+from funestra.modes import MainMode, Osr2State
+from funestra.robot_hand import (
     PARK_CENTER,
     POSITION_MAX,
     RETRACT_CENTER,
@@ -49,7 +49,7 @@ from origenerator.console_commands import level_asked_for, max_intensity_asked_f
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
 # Which of the console's four control buttons asks for which state, read off
-# player_core's own mapping so a press cannot drift from the button that lights.
+# funestra's own mapping so a press cannot drift from the button that lights.
 OSR2_CONTROL_BY_COMMAND = {verb: state for state, verb in OSR2_CONTROL_BUTTONS.items()}
 
 _TRACE_SECONDS = 12.0

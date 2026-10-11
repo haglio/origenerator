@@ -16,8 +16,8 @@ import re
 from types import SimpleNamespace
 
 import pytest
-from funestra_core.hud_placement import HudCorner
-from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_placement import HudCorner
+from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
 from PyQt6.QtCore import Qt
 

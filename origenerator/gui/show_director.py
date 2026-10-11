@@ -24,9 +24,9 @@ from dataclasses import asdict, dataclass, replace
 from functools import partial
 from typing import Protocol
 
-from funestra_core.hud_placement import HudCorner
-from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
-from funestra_core.modes import read_mode
+from funestra.hud_placement import HudCorner
+from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.modes import read_mode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 

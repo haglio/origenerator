@@ -7,7 +7,7 @@ portrait or landscape side by its subject's orientation, and everything OSR2 is
 left to Fun Time's Main Funestra.  Fun Time drives the shows through a command
 file and reads back which sides are occupied through a status file — the same
 file-channel idioms its own Satellite Funestras speak
-(``funestra_core.file_channel``).
+(``funestra.file_channel``).
 
 What a side IS depends on what the session hands over.  A session that names
 each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
@@ -233,7 +233,7 @@ class FunestraChannel:
     """One of the session's Funestras, as the Funestra contract reaches it.
 
     The four files a content source and a Funestra trade through
-    (``funestra_core.playlist`` / ``funestra_verbs`` / ``status`` /
+    (``funestra.playlist`` / ``funestra_verbs`` / ``status`` /
     ``satellite_hud``): the list the Funestra plays, the verbs it drains, the
     status it publishes back, and the panel this app publishes for the session
     to draw on it.

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app_support import siblings
-from funestra_core.robot_hand import bpm_for_speed
+from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import is_branch_session
 from origenerator.content import load_content, overlay_value

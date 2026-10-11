@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from funestra_core import drive_layout
+from funestra import drive_layout
 
 #: The prefix every Robot Hand verb carries.  `tests/test_console_commands.py`
-#: holds it against the presses player_core itself builds, so a spelling
+#: holds it against the presses funestra itself builds, so a spelling
 #: changed there turns a test red instead of arriving as an unknown press.
 ROBOT_HAND = "robot_hand_"
 

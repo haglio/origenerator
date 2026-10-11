@@ -11,7 +11,7 @@ constants this repo has accumulated. It also keeps the report readable, since
 vulture reports every one of them.
 
 `vulture_whitelist.py` holds nothing but callers vulture cannot follow — Qt's
-C++ event loop, sqlite3, COM, player_core, one string-dispatch table. It had a
+C++ event loop, sqlite3, COM, funestra, one string-dispatch table. It had a
 second half when the gate went in, the 38 names the first scan reported and
 nobody had yet judged; backlog item 24 emptied it, deleting each name or giving
 it a reader.
@@ -314,7 +314,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 18408 when the Slideshow moved onto a Funestra: the window the show drew for
 # itself, the HUD it painted, the stills either side and the position line went
 # with the paragraphs that explained them; how the Funestra plays a pass, draws
-# the panel and places a press is player_core's to state, and what the show
+# the panel and places a press is funestra's to state, and what the show
 # keeps of the set is tests/test_slideshow_view.py's, each claim a test's name.
 #
 # 18338 when closing the loading screen came to cancel the launch, taken down to
@@ -323,9 +323,9 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_main_in_fun_time_mode_shows_no_splash and
 # test_the_splash_never_wears_the_apps_own_caption.
 #
-# 18173 when the row that aims the device moved to player_core, taken down to
+# 18173 when the row that aims the device moved to funestra, taken down to
 # what the tree measured: the note that a console with no OSR2 switch offers no
-# control-off is player_core's
+# control-off is funestra's
 # test_a_host_with_no_switch_offers_no_control_off_and_sets_the_holds_apart.
 #
 # 18089 when bringing a window to the front became the family's, taken down to

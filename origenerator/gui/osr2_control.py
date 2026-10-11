@@ -20,14 +20,14 @@ from __future__ import annotations
 
 import logging
 
-from funestra_core.console import (
+from funestra.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
-from funestra_core.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
+from funestra.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
+from funestra.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
 from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)

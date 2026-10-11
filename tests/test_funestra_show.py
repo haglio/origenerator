@@ -10,12 +10,12 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from funestra_core.file_channel import consume_command_file
-from funestra_core.funestra_verbs import play_file
-from funestra_core.hud_status import LATEST_LABEL
-from funestra_core.playlist import PlaylistItem, read_playlist
-from funestra_core.satellite_hud import parse_hud
-from funestra_core.status import FunestraStatus, status_fields
+from funestra.file_channel import consume_command_file
+from funestra.funestra_verbs import play_file
+from funestra.hud_status import LATEST_LABEL
+from funestra.playlist import PlaylistItem, read_playlist
+from funestra.satellite_hud import parse_hud
+from funestra.status import FunestraStatus, status_fields
 
 from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import funscript_path_for

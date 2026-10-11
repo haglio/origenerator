@@ -4,7 +4,7 @@ One memory-mapped file, its header carrying a sequence number that is odd while
 a frame is being written, so a reader that looks mid-write is told to come back
 rather than handed half a picture.  The reader is the session's own
 (``app_support.frame_channel``); the two cannot share a module until the
-family's app_support pin moves, which shared_ui and player_core hold in step.
+family's app_support pin moves, which shared_ui and funestra hold in step.
 """
 from __future__ import annotations
 

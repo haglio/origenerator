@@ -2,7 +2,7 @@
 
 A show wears the Funestras' own panel (:mod:`origenerator.gui.show_panel`), and a
 panel's buttons are its source's to declare: rows of
-:class:`funestra_core.hud_button.Button`, each carrying the verb a press posts.
+:class:`funestra.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that side; standalone,
 the show answers the same verb itself.
@@ -19,9 +19,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from funestra_core.hud_button import FIT_THE_WORD, Button
-from funestra_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
-from funestra_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_button import FIT_THE_WORD, Button
+from funestra.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
+from funestra.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER
 

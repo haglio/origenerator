@@ -27,14 +27,14 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from funestra_core.console import ModeHud
-from funestra_core.file_channel import append_command
-from funestra_core.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from funestra_core.hud_placement import HudCorner
-from funestra_core.modes import Osr2State
-from funestra_core.playback_rate import RATE_STEP
-from funestra_core.playlist import PlaylistItem
-from funestra_core.pointer import OMNIPAUSE_TOGGLE
+from funestra.console import ModeHud
+from funestra.file_channel import append_command
+from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
+from funestra.hud_placement import HudCorner
+from funestra.modes import Osr2State
+from funestra.playback_rate import RATE_STEP
+from funestra.playlist import PlaylistItem
+from funestra.pointer import OMNIPAUSE_TOGGLE
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget

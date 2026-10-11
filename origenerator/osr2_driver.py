@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 
 from app_support.funscript import read_actions
-from funestra_core.funscript import Funscript
-from funestra_core.robot_hand import FULL_INTENSITY
+from funestra.funscript import Funscript
+from funestra.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import COMFYUI_OUTPUT_DIR

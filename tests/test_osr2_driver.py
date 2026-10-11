@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from funestra_core.funscript import Funscript
+from funestra.funscript import Funscript
 
 from origenerator import osr2
 from origenerator.osr2_driver import Osr2Driver

@@ -10,8 +10,8 @@ Funestra hands it over in process, and the Funestra draws it.
 
 from __future__ import annotations
 
-from funestra_core.hud_status import looping_label, status_line
-from funestra_core.satellite_hud import HudCell, HudModel
+from funestra.hud_status import looping_label, status_line
+from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import thumb_of

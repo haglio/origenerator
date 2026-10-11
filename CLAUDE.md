@@ -62,7 +62,8 @@ for one thing cost four. So:
   words against the screen, which is how "clip" passed it. Names that belong
   to something else keep theirs: CLIP the text model and its ComfyUI nodes,
   and the clipboard. Genau's own videos are flicks in the code, and on
-  screen they take the content overlay's word for them, genau_flick_words.
+  screen they take the word the settings all of Haglio share give them,
+  genau_flick_words.
 
 ## The shared packages come from the install, at the versions `pyproject.toml` names
 
@@ -297,12 +298,10 @@ earlier met exactly that on 2026-09-26 -- `recipe_categories` went from a
 list to a table of keywords on the machine 23 minutes after the copy, and the
 preview died at import with a loading screen that never lifted.
 
-The overlay is where `project_roots` lives, and the
-primary's library is found through it — a worktree carrying a copy taken weeks
-ago, from before a root moved, resolves a primary that isn't there, and the
-launch dies opening a database under a path that doesn't exist. The launcher
-log's `Library: …` line names the path it tried; if a preview will not open,
-diff the two `content.local.json` files before looking anywhere else.
+Where the checkouts and the library are (`project_roots`, `library_root`) is
+read from `~/.haglio/settings.json` by every copy, previews included, so no
+overlay copy can send a preview looking for a primary that isn't there. The
+launcher log's `Library: …` line names the path it tried.
 
 A branch that leans on a sibling change that has not landed cannot be judged
 through `launch_preview_branch.vbs` alone: that launcher runs the pinned venv,

@@ -1,23 +1,19 @@
 """What this app and Evolver have agreed about the hand-off, and whether they still agree.
 
 A send copies a clip into a folder of Evolver's, and the gallery reads Evolver's
-upscale back out of another.  Four values decide where it lands and whether it is
-picked up: the two folders, the marker a half-written copy wears, and the
-sub-folder Evolver routes this app's Genau flicks by.  Every one of them is
-written down twice, once in each app, and a rename on either side left clips
-arriving nowhere with both apps silent and every suite green.
+upscale back out of another.  Three values decide where it lands and whether it
+is picked up: the two folders and the marker a half-written copy wears.  Each is
+written down in each app, and a rename on either side left clips arriving
+nowhere with both apps silent and every suite green.  The sub-folder Evolver
+routes this app's Genau flicks by has nothing to disagree with: it is one of the
+settings all of Haglio shares.
 
-Two of the four are published -- Evolver writes ``evolver_contract.json`` at its
+Evolver publishes the three -- it writes ``evolver_contract.json`` at its
 checkout root -- and ``tests/test_evolver_pipeline_contract.py`` holds this
 repo's copies against them.  That check skips where no Evolver sits beside the
 checkout, which is every run of this repo's gate, so on the one machine that has
 both apps installed nothing compared anything.  This is that check's runtime
 twin: the app asks at startup and says what disagrees.
-
-The other two cannot be published at all.  A folder inside the library is
-library vocabulary, which the sanitize guard keeps out of a public commit, so
-``genau_source`` lives in a git-ignored overlay on each side and a comparison is
-the only thing that can hold the two together.
 
 Nothing to compare against is not a disagreement: a fresh clone, and every gate
 run, has no Evolver beside it and is answered with nothing.
@@ -29,11 +25,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from app_support import overlay
-
 from origenerator import config, evolver_export
 from origenerator.config import project_dir
-from origenerator.content import genau_flicks_word
 
 CONTRACT = "evolver_contract.json"
 
@@ -46,7 +39,6 @@ class OurSide:
     inbox_dir: Path
     upscaled_dir: Path
     partial_marker: str
-    genau_source: str
 
 
 def our_side() -> OurSide:
@@ -56,7 +48,6 @@ def our_side() -> OurSide:
         inbox_dir=config.EVOLVER_INBOX_DIR,
         upscaled_dir=config.EVOLVER_UPSCALED_DIR,
         partial_marker=evolver_export.PARTIAL_MARKER,
-        genau_source=config.GENAU_SOURCE,
     )
 
 
@@ -70,14 +61,6 @@ def _published(checkout: Path) -> dict | None:
     if not document.is_file():
         return None
     return json.loads(document.read_text(encoding="utf-8"))
-
-
-def _their_genau_source(checkout: Path) -> str | None:
-    """The lane folder from Evolver's own overlay, local first as it loads it."""
-    local, example = checkout / "content.local.json", checkout / "content.example.json"
-    if not local.exists() and not example.exists():
-        return None
-    return overlay.read_overlay(local, example).get("genau_source")
 
 
 def _differing(what: str, ours, theirs) -> str | None:
@@ -95,7 +78,6 @@ def disagreements(ours: OurSide, checkout: Path) -> tuple[str, ...]:
     """
     try:
         published = _published(checkout)
-        theirs_genau = _their_genau_source(checkout)
     except (OSError, ValueError) as unreadable:
         return (f"{checkout / CONTRACT} could not be read: {unreadable}",)
     if published is None:
@@ -113,7 +95,5 @@ def disagreements(ours: OurSide, checkout: Path) -> tuple[str, ...]:
                    ours.upscaled_dir, under_library("upscaled_dir")),
         _differing("the mark a half-written copy wears",
                    ours.partial_marker, published.get("partial_marker")),
-        _differing(f"the folder Genau {genau_flicks_word()} are routed by",
-                   ours.genau_source, theirs_genau),
     )
     return tuple(line for line in said if line is not None)

@@ -161,11 +161,11 @@ def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
     complete = json.loads((REPO_ROOT / "content.example.json").read_text())
     local = tmp_path / "content.local.json"
     local.write_text(json.dumps(
-        {k: v for k, v in complete.items() if k not in ("genau_source", "library_root")}),
+        {k: v for k, v in complete.items() if k not in ("detector_labels", "speech_python")}),
         encoding="utf-8")
 
     assert content.missing_overlay_keys(local, REPO_ROOT / "content.example.json") == (
-        "genau_source", "library_root")
+        "detector_labels", "speech_python")
 
 
 def test_a_complete_overlay_is_missing_nothing(tmp_path):
@@ -215,7 +215,6 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         (REPO_ROOT / "content.example.json").read_text()) if k != "_comment"}
 
     assert documented == {
-        "library_root", "ambient_audio_dir", "speech_python", "genau_source", "recipe_categories",
-        "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
-        "detector_labels", "genau_flick_prompts", "genau_flick_words",
+        "speech_python", "recipe_categories", "combine_recipes", "search_synonyms",
+        "genau_recipes", "detail_fix_parts", "detector_labels", "genau_flick_prompts",
     }

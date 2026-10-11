@@ -1,8 +1,8 @@
 """Content overlay — the values that must not be published, loaded at runtime.
 
-The act vocabulary the recipe matcher scores prompts against, the detector's
-class labels, and the library root all describe the library this tool serves, so
-they live in ``content.local.json`` (git-ignored) rather than in source.  A
+The act vocabulary the recipe matcher scores prompts against and the detector's
+class labels describe the library this tool serves, so they live in
+``content.local.json`` (git-ignored) rather than in source.  A
 committed ``content.example.json`` documents the shape and is what a fresh or
 public checkout loads; every consumer reads them through here, so the matcher,
 the workflows and the tests behave the same whichever is present.
@@ -28,6 +28,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
+from app_support import haglio_settings
 from app_support import overlay as _overlay
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
@@ -99,8 +100,4 @@ def overlay_value(content: dict[str, Any], *keys: str) -> Any:
 
 
 def genau_flick_word() -> str:
-    return overlay_value(load_content(), "genau_flick_words", "one")
-
-
-def genau_flicks_word() -> str:
-    return overlay_value(load_content(), "genau_flick_words", "many")
+    return haglio_settings.value("genau_flick_words", "one")

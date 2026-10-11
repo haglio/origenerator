@@ -297,33 +297,21 @@ def favorite_folders(tree: list[WorkflowGroup]) -> list:
     return found
 
 
-def named_folders_by_row(
+def folder_names_by_row(
     tree: list, folder_meta: dict[str, dict] | None = None, custom_folders=()
 ) -> dict[str, list[str]]:
-    """Each generation's prompt_id → the names the user gave the folders holding
-    it, at any depth.
-
-    A name typed onto a folder is typed so the folder can be found again, so the
-    search indexes it against everything inside (see :mod:`origenerator.search`).
-    Only names the user actually gave: every other folder name is either a code,
-    which is no one's search term, or a fact — a model, a LoRA, a workflow — that
-    a query already reaches through the row itself.
-
-    ``custom_folders`` are the groupings the user composed, whose whole name is
-    theirs by definition. The All row is left out on purpose: it holds
-    everything, so a name on it would be a word every row in the library carries,
-    and a word that matches everything narrows nothing.
-    """
-    named: dict[str, list[str]] = {}
+    names: dict[str, list[str]] = {}
     folder_meta = folder_meta or {}
 
     def credit(group, name: str):
         for row in rows_under(group):
-            named.setdefault(row["prompt_id"], []).append(name)
+            names.setdefault(row["prompt_id"], []).append(name)
 
     def walk(groups):
         for group in groups:
             name = folder_meta.get(group.key, {}).get("custom_name")
+            if not name and isinstance(group, (SettingsGroup, SourceImageGroup)):
+                name = group.label
             if name:
                 credit(group, name)
             walk(child_groups(group))
@@ -331,7 +319,7 @@ def named_folders_by_row(
     walk(tree)
     for folder in custom_folders:
         credit(folder, folder.label)
-    return named
+    return names
 
 
 def recent_generations(rows: list[dict]) -> list[dict]:

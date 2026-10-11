@@ -1779,7 +1779,7 @@ class GalleryView(QWidget):
         # a deleted row is out of ``list_generations`` and lives only in the bin.
         # They are reachable only from that shelf: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
-        self._search.index.update(listed + held, gallery.named_folders_by_row(
+        self._search.index.update(listed + held, gallery.folder_names_by_row(
             tree_model, meta, self._custom_folders))
         requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
         self._browser.set_model(

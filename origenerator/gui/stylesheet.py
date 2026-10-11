@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from shared_ui.chrome import family_stylesheet
+from shared_ui.chrome import family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
     BG_BUTTON,
-    BG_BUTTON_ACTIVE,
     BG_KEYCAP,
     BG_SECONDARY,
     BG_TERTIARY,
@@ -95,13 +94,7 @@ def build_stylesheet() -> str:
     QLabel#dimensionsHint {{
         color: {_h(TEXT_MUTED)};
     }}
-    QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox {{
-        background-color: {_h(BG_SECONDARY)};
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 3px;
-        padding: 4px;
-    }}
+{field_rules()}
     QSpinBox, QDoubleSpinBox {{
         /* Room for the step buttons, so the value never runs under them. */
         padding-right: 18px;
@@ -138,9 +131,6 @@ def build_stylesheet() -> str:
         background-color: {_h(BLUE)};
     }}
 {_drawn_arrow_rules()}
-    QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
-        border: 1px solid {_h(BLUE)};
-    }}
     QComboBox {{
         background-color: {_h(BG_SECONDARY)};
         color: {_h(TEXT_PRIMARY)};
@@ -239,34 +229,7 @@ def build_stylesheet() -> str:
     QPushButton#foldingSectionHeader:pressed {{
         background-color: {_h(BG_SECONDARY)};
     }}
-    QToolButton {{
-        background-color: {_h(BG_BUTTON)};
-        color: {_h(TEXT_PRIMARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
-        border-radius: 4px;
-        padding: 2px 10px;
-        font-weight: bold;
-    }}
-    /* Under the pointer a control goes one step LIGHTER than the ground it
-       already has -- the family's one hover rule.  This asked for the overlay
-       tier, which is darker than a button at rest, so every button in the app
-       dimmed at the moment it was reached for. */
-    QToolButton:hover {{
-        background-color: {_h(hovered(BG_BUTTON))};
-    }}
-    /* A control that is ON sits on a lighter ground than one at rest -- one rule
-       across the family, so a toggled button reads the same whichever app it is
-       in. The blue below is the one exception, for a state that means more than
-       "engaged". */
-    QToolButton:checked {{
-        background-color: {_h(BG_BUTTON_ACTIVE)};
-    }}
-    QToolButton:checked:hover {{
-        background-color: {_h(hovered(BG_BUTTON_ACTIVE))};
-    }}
-    QToolButton#iconButton {{
-        padding: 4px;
-    }}
+{tool_button_rules()}
     /* The derived-size padlock: a compact toggle floating between the width and
        height rows. It lights blue while unlocked (the fields are overridable). */
     QToolButton#dimensionUnlock {{
@@ -277,10 +240,6 @@ def build_stylesheet() -> str:
     }}
     QToolButton#dimensionUnlock:checked:hover {{
         background-color: {_h(hovered(BLUE))};
-    }}
-    QToolButton:disabled {{
-        background-color: {_h(BG_SECONDARY)};
-        border: 1px solid {_h(BORDER_SUBTLE)};
     }}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};

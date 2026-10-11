@@ -46,6 +46,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QWidget,
 )
+from shared_ui.colors import AMBER
 from shared_ui.spacing import BUTTON_SIZE_HUD, MARGIN_STANDARD
 
 from origenerator import (
@@ -97,7 +98,6 @@ from origenerator.gui.media_badge import MediaBadge
 from origenerator.gui.motion_panel import MotionPanel
 from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
-from origenerator.gui.prompt_find import _CURRENT_BG
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.show_panel import show_hud_model
@@ -420,8 +420,22 @@ def _amber_matches(field) -> int:
     """How many of ``field``'s find highlights are the current-match amber. The
     find re-lays every field's highlights on each step, so across the fields
     exactly one of them is ever amber."""
-    return sum(sel.format.background().color() == _CURRENT_BG
+    return sum(sel.format.background().color() == AMBER
                for sel in field.extraSelections())
+
+
+def _find_query(view) -> QLineEdit:
+    return view._find_bar.findChild(QLineEdit)
+
+
+def _find_count(view) -> str:
+    return view._find_bar.findChild(QLabel, "findCount").text()
+
+
+def _find_next(view):
+    (step,) = [button for button in view._find_bar.findChildren(QToolButton)
+               if button.toolTip().startswith("Next match")]
+    step.click()
 
 
 def _side(tree, orientation=LANDSCAPE):
@@ -1501,13 +1515,16 @@ def _tab_with_prompts(view, key="sdxl_t2i"):
 
 def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    _tab_with_prompts(view)
+    positive, negative = _tab_with_prompts(view).prompt_fields()
+    positive.setPlainText("a cat")
+    negative.setPlainText("no cat")
     assert not view._find_bar.isVisible()
 
     assert _press_ctrl_f(view, monkeypatch) is True
 
     assert view._find_bar.isVisible()
-    assert view._find._fields == view._info_tabs.current_config_panel().prompt_fields()
+    _find_query(view).setText("cat")
+    assert _find_count(view) == "1 of 2"
 
 
 def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, monkeypatch):
@@ -1529,10 +1546,9 @@ def test_the_find_locates_a_word_inside_the_open_tabs_prompt(qtbot, tmp_path, mo
     positive.setPlainText("a cat on a windowsill, watching sparrows and more sparrows")
     _press_ctrl_f(view, monkeypatch)
 
-    view._find_bar._query.setText("sparrows")
+    _find_query(view).setText("sparrows")
 
-    assert view._find.count() == 2
-    assert view._find.position() == 1
+    assert _find_count(view) == "1 of 2"
     assert positive.textCursor().position() == positive.toPlainText().find("sparrows")
 
 
@@ -1542,16 +1558,16 @@ def test_stepping_the_find_walks_the_matches_and_wraps(qtbot, tmp_path, monkeypa
     positive.setPlainText("a cat")
     negative.setPlainText("no cat")
     _press_ctrl_f(view, monkeypatch)
-    view._find_bar._query.setText("cat")
-    assert (view._find.position(), view._find.count()) == (1, 2)
+    _find_query(view).setText("cat")
+    assert _find_count(view) == "1 of 2"
 
-    view._find_bar.step_requested.emit(1)
-    assert view._find.position() == 2
+    _find_next(view)
+    assert _find_count(view) == "2 of 2"
     # The amber highlight moved with it, on into the next field.
     assert _amber_matches(negative) == 1 and _amber_matches(positive) == 0
 
-    view._find_bar.step_requested.emit(1)
-    assert view._find.position() == 1              # and around again
+    _find_next(view)
+    assert _find_count(view) == "1 of 2"           # and around again
     assert _amber_matches(positive) == 1 and _amber_matches(negative) == 0
 
 
@@ -1560,7 +1576,7 @@ def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypat
     positive, _negative = _tab_with_prompts(view).prompt_fields()
     positive.setPlainText("a cat")
     _press_ctrl_f(view, monkeypatch)
-    view._find_bar._query.setText("cat")
+    _find_query(view).setText("cat")
     assert positive.extraSelections()
 
     handled = view.eventFilter(
@@ -1589,15 +1605,15 @@ def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, 
     first.prompt_fields()[0].setPlainText("a cat")
     view._info_tabs._add_subtab()          # a second tab, its prompts still empty
     second = _tab_with_prompts(view)
+    second.prompt_fields()[0].setPlainText("a cat and a cat")
     view._info_tabs.setCurrentWidget(first)
     _press_ctrl_f(view, monkeypatch)
-    view._find_bar._query.setText("cat")
-    assert view._find.count() == 1
+    _find_query(view).setText("cat")
+    assert _find_count(view) == "1 of 1"
 
     view._info_tabs.setCurrentWidget(second)
 
-    assert view._find._fields == second.prompt_fields()
-    assert view._find.count() == 0
+    assert _find_count(view) == "1 of 2"
     assert not first.prompt_fields()[0].extraSelections()  # the old tab's paint is gone
 
 
@@ -1624,10 +1640,12 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
     in_front = _tab_with_prompts(view)
+    in_front.prompt_fields()[0].setPlainText("a cat")
 
     assert _press_ctrl_f(view, monkeypatch) is True
 
-    assert view._find._fields == in_front.prompt_fields()
+    _find_query(view).setText("cat")
+    assert _find_count(view) == "1 of 1"
 
 
 def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_path, monkeypatch):
@@ -1638,9 +1656,12 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
     panel = _tab_with_prompts(view, "flux_t2i_upscaled")
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(sip.isdeleted(field) for field in searched)
+    panel.prompt_fields()[0].setPlainText("a cat and a cat")
 
-    assert view._find._fields == panel.prompt_fields()
-    view._find_bar.step_requested.emit(1)
+    _find_query(view).setText("cat")
+    _find_next(view)
+
+    assert _find_count(view) == "2 of 2"
     assert _press_ctrl_f(view, monkeypatch) is True
 
 

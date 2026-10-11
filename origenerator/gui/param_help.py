@@ -72,8 +72,8 @@ PARAM_HELP: dict[str, str] = {
         "same image exactly; Random draws a fresh one on every Generate."
     ),
     "noise_seed": (
-        "The starting noise for the first pass, which settles the composition. "
-        "Random draws a fresh one on every Generate."
+        "The starting noise for the first pass (high noise), which settles the "
+        "composition. Random draws a fresh one on every Generate."
     ),
     "audio_seed": (
         "The starting noise for the generated sound, separate from the picture's "
@@ -102,19 +102,21 @@ PARAM_HELP: dict[str, str] = {
     # --- LoRAs ---
     "lora_high": (
         "A LoRA trained for a specific look or subject, applied to the first "
-        "pass. \"None\" leaves the model unmodified."
+        "pass (high noise). \"None\" leaves the model unmodified."
     ),
     "lora_low": (
         "A LoRA trained for a specific look or subject, applied to the second "
-        "pass. \"None\" leaves the model unmodified."
+        "pass (low noise). \"None\" leaves the model unmodified."
     ),
     "lora_strength_high": (
-        "How hard the first pass's LoRA pulls. 1.0 is its intended strength; "
-        "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
+        "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
+        "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
+        "picture."
     ),
     "lora_strength_low": (
-        "How hard the second pass's LoRA pulls. 1.0 is its intended strength; "
-        "below 0.5 it barely shows, above 1.2 it tends to take over the picture."
+        "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
+        "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
+        "picture."
     ),
 
     # --- drawing ---
@@ -128,18 +130,18 @@ PARAM_HELP: dict[str, str] = {
         "low drifts off it; too high burns contrast and flattens detail."
     ),
     "cfg_high": (
-        "Prompt strength for the first pass (the CFG scale underneath), where the "
-        "motion is settled. A LoRA's author often publishes a different number "
-        "for each pass; where they publish one, put it in both."
+        "Prompt strength for the first pass (high noise; the CFG scale underneath), "
+        "where the motion is settled. A LoRA's author often publishes a different "
+        "number for each pass; where they publish one, put it in both."
     ),
     "cfg_low": (
-        "Prompt strength for the second pass (the CFG scale underneath), where "
-        "the texture is settled."
+        "Prompt strength for the second pass (low noise; the CFG scale underneath), "
+        "where the texture is settled."
     ),
     "split_step": (
-        "The step where the first pass hands over to the second (the split step). "
-        "Earlier leaves more of the work to the second pass; 0 hands over at half "
-        "the steps."
+        "The step where the first pass (high noise) hands over to the second (low "
+        "noise; the split step). Earlier leaves more of the work to the second "
+        "pass; 0 hands over at half the steps."
     ),
     "guidance": (
         "How strictly the model obeys the prompt (Flux's guidance value). It wants "
@@ -163,8 +165,14 @@ PARAM_HELP: dict[str, str] = {
         "Where this model spends its effort — higher favors composition, lower "
         "favors fine detail."
     ),
-    "shift_high": "Where the first pass spends its effort: higher favors composition.",
-    "shift_low": "Where the second pass spends its effort: lower favors fine detail.",
+    "shift_high": (
+        "Where the first pass (high noise) spends its effort: higher favors "
+        "composition."
+    ),
+    "shift_low": (
+        "Where the second pass (low noise) spends its effort: lower favors fine "
+        "detail."
+    ),
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (

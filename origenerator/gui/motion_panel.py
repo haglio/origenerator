@@ -66,6 +66,7 @@ class MotionPanel(QWidget):
         # Injectable so a test never reaches the machine's own broker stamps.
         self._ask_device = device_on
         self._painter = ConsolePainter(device_only=True)
+        self.setMouseTracking(True)
         self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
         self.setFixedSize(*panel_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
@@ -128,11 +129,19 @@ class MotionPanel(QWidget):
         self._post(self._painter.press_at(*self._window(event)))
 
     def mouseMoveEvent(self, event):
+        self._painter.motion(*self._window(event))
         if self._painter.holding:
             self._post(self._painter.drag_to(*self._window(event)))
+        else:
+            self.update()
 
     def mouseReleaseEvent(self, event):
         self._painter.release()
+
+    def leaveEvent(self, event):
+        self._painter.leave()
+        self.update()
+        super().leaveEvent(event)
 
     def _window(self, event) -> tuple[int, int]:
         """This widget's coordinates as the window ones the painter expects.

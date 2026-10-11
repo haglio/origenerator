@@ -22,7 +22,9 @@ from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
 from funestra.robot_hand import PARK_CENTER, POSITION_MAX
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, pyqtSignal
+from PyQt6.QtGui import QCursor
+from PyQt6.QtWidgets import QApplication
 
 from origenerator import motion_engine
 from origenerator.gui.console import console_hud, drive_hud, panel_room
@@ -377,6 +379,29 @@ def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     assert answers == [True]  # it asked
     panel.render_console()
     assert answers == []      # and asked again rather than reusing the answer
+
+
+def test_the_button_under_the_pointer_lights_up(qtbot):
+    # The panel over a Slideshow lit the button under the pointer and this one
+    # did not, though the same painter draws both: nothing told it where the
+    # pointer was.
+    panel, _motion = _panel(qtbot)
+    panel.move(200, 200)
+    panel.show()
+    qtbot.waitExposed(panel)
+    panel.grab()  # lays the buttons out
+    x, y, w, h = next(rect for rect, button in panel._painter.buttons if button.tooltip)
+    ground = QPoint(x + 2, y + h // 2)
+    resting = QCursor.pos()
+    QCursor.setPos(QPoint(5, 5))
+    QApplication.processEvents()
+    at_rest = panel.grab().toImage().pixelColor(ground)
+    QCursor.setPos(panel.mapToGlobal(QPoint(x + w // 2, y + h // 2)))
+    QApplication.processEvents()
+    under_the_pointer = panel.grab().toImage().pixelColor(ground)
+    QCursor.setPos(resting)
+
+    assert under_the_pointer.lightness() > at_rest.lightness()
 
 
 def test_the_panel_actually_paints(qtbot):

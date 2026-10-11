@@ -64,6 +64,20 @@ def test_help_speaks_the_forms_words_outside_its_parentheses():
     assert stale == []
 
 
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_a_field_for_one_pass_says_which_noise_that_pass_works_on(workflow_name):
+    halves = {"(First Pass)": "high noise", "(Second Pass)": "low noise"}
+    unsaid = [pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+              for suffix, half in halves.items()
+              if pd.label.endswith(suffix) and half not in param_help(pd.key).replace("-", " ")]
+    assert unsaid == []
+
+
+def test_the_seed_and_the_handoff_say_which_noise_each_pass_works_on():
+    assert "high noise" in PARAM_HELP["noise_seed"]
+    assert "high noise" in PARAM_HELP["split_step"] and "low noise" in PARAM_HELP["split_step"]
+
+
 def test_help_calls_a_lora_a_lora():
     loras = ("lora_high", "lora_low", "lora_strength_high", "lora_strength_low")
     assert all("LoRA" in PARAM_HELP[key] for key in loras)

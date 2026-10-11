@@ -8,7 +8,7 @@ JPEG = b"\xff\xd8\xff\xe0 a fabricated frame"
 PNG = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 
-def test_a_frame_is_written_where_a_player_can_open_it(tmp_path):
+def test_a_frame_is_written_where_a_funestra_can_open_it(tmp_path):
     frames = FrameFiles(tmp_path / "frames")
 
     path = frames.write("run-1", JPEG)
@@ -38,7 +38,7 @@ def test_a_runs_first_frame_stays_and_only_the_newest_two_after_it(tmp_path):
     assert [path.exists() for path in written] == [True, False, False, True, True]
 
 
-def test_a_forgotten_runs_files_go_once_the_player_lets_go_of_them(tmp_path, monkeypatch):
+def test_a_forgotten_runs_files_go_once_the_funestra_lets_go_of_them(tmp_path, monkeypatch):
     frames = FrameFiles(tmp_path / "frames")
     held = frames.write("run-1", PNG)
     newer = frames.write("run-1", PNG + b" one step further")
@@ -47,7 +47,7 @@ def test_a_forgotten_runs_files_go_once_the_player_lets_go_of_them(tmp_path, mon
 
     def unlink_unless_open(path, missing_ok=False):
         if path in still_open:
-            raise PermissionError("a player has it open")
+            raise PermissionError("a Funestra has it open")
         unlink(path, missing_ok=missing_ok)
 
     monkeypatch.setattr(Path, "unlink", unlink_unless_open)

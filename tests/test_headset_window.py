@@ -239,7 +239,7 @@ class TestTheRoomsPressesReachTheWindow:
         """Pointing at the window is not a change to it, and the room sends a
         hover every time the laser moves a pixel: taken as a reason to look, each
         one costs a grab of the whole window at the poll's rate.  In the headset
-        that halved the room's frame rate, and the players stopped showing new
+        that halved the room's frame rate, and the Funestras stopped showing new
         frames while he pointed at the gallery."""
         window = self._window(qtbot)
         window.show()

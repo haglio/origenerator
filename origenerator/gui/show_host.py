@@ -1,6 +1,6 @@
 """What a show answers to — the interface, written down once.
 
-Three things drive whatever is holding a region: the players' own panel
+Three things drive whatever is holding a region: the Funestras' own panel
 (:mod:`origenerator.gui.show_panel`), the console's clip-seconds pair
 (:mod:`origenerator.gui.console`), and, inside a session, Fun Time's file
 channels (:mod:`origenerator.fun_time_bridge`). They reached it through
@@ -10,7 +10,7 @@ not agree: the console called five of the names with no guard at all while the
 other two guarded every one, so nothing in the repo said which was right.
 
 There are two hosts, :class:`~origenerator.gui.slideshow_view.SlideshowView`
-and :class:`~origenerator.gui.player_show.PlayerShow`, and both answer all of
+and :class:`~origenerator.gui.funestra_show.FunestraShow`, and both answer all of
 it. A caller therefore asks; it does not check first. ``tests/test_show_host.py``
 holds that per driver module at zero, and holds every host to every attribute.
 """
@@ -24,7 +24,7 @@ class ShowHost(Protocol):
     """The surface a console, a HUD or a hosting session drives a show through.
 
     The first six attributes are the transport: the four buttons and the pace
-    pair that Genau's console, the players' HUD and Fun Time's own hotkeys all
+    pair that Genau's console, the Funestras' HUD and Fun Time's own hotkeys all
     reach for. The rest are about the *set* a show is playing.
     """
 
@@ -106,13 +106,13 @@ class ShowHost(Protocol):
 
     @property
     def hud_act_filter(self) -> str:
-        """The act(s) the set is narrowed to, as the players' HUD posts them
+        """The act(s) the set is narrowed to, as the Funestras' HUD posts them
         — what lights the map's row buttons."""
         ...
 
     @property
     def hud_order_label(self) -> str:
-        """The order the set is played in, in the players' own words."""
+        """The order the set is played in, in the Funestras' own words."""
         ...
 
     @property
@@ -122,7 +122,7 @@ class ShowHost(Protocol):
         this app is not the one driving.
 
         The show is one host doing two things: browsing a set and driving the
-        device.  It wore two panels for that, the players' HUD over the set and
+        device.  It wore two panels for that, the Funestras' HUD over the set and
         Genau's whole console under it, which said the status twice and drew
         prev/next/lock/trash twice.  One panel now, and this is the half of it
         the host answers for.
@@ -141,7 +141,7 @@ class ShowHost(Protocol):
 
     @property
     def hud_is_favorite(self) -> bool:
-        """Whether the item on screen is favorited — the players' star readout."""
+        """Whether the item on screen is favorited — the Funestras' star readout."""
         ...
 
     @property

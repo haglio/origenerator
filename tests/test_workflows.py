@@ -1059,7 +1059,7 @@ def test_wan21_ati_i2v_honors_an_unlocked_size_override():
 def test_wan22_flf2v_payload_generates_synced_foley_audio():
     # The loop workflow gets the same HunyuanVideo-Foley pass as the one-shot
     # i2v, but its writer is VHS_VideoCombine, so the audio rides its ``audio``
-    # input. (The track won't loop seamlessly the way the frames do — players
+    # input. (The track won't loop seamlessly the way the frames do — Funestras
     # restart it each cycle — but the clip itself is scored to its motion.)
     wf = Wan22Flf2vLoopWorkflow()
     params = dict(wf.default_params(), audio_prompt="wet rhythmic slapping", audio_seed=3)

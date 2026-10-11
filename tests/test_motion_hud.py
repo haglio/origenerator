@@ -63,7 +63,7 @@ def test_a_key_the_cluster_does_not_answer_falls_through_untouched():
 
 
 def test_no_driver_means_every_key_falls_through():
-    # Inside a Fun Time session the OSR2 is the main player's alone and this app
+    # Inside a Fun Time session the OSR2 is the Main Funestra's alone and this app
     # holds no driver at all, so none of these keys may be swallowed here.
     assert apply_motion_key(None, Qt.Key.Key_Space) is False
 

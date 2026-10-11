@@ -1,13 +1,13 @@
 """The app's one OSR2 switch, and the four states the console's group sets."""
 from __future__ import annotations
 
-from player_core.console import (
+from funestra_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from funestra_core.robot_hand import PARK_CENTER, RETRACT_CENTER
 
 from origenerator.gui.osr2_control import Osr2Control
 
@@ -118,7 +118,7 @@ def test_anything_that_changes_which_button_lights_says_so():
 
 
 def test_a_session_that_may_not_drive_cannot_be_switched_on():
-    """Hosted by Fun Time the OSR2 is the session's main player's for the whole
+    """Hosted by Fun Time the OSR2 is the session's Main Funestra's for the whole
     session, so nothing here may take it."""
     control = Osr2Control(None)
 

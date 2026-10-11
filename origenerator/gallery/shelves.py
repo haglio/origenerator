@@ -15,11 +15,11 @@ from origenerator.gallery.tree import ALL_KEY
 
 RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated items
 RECENTS_LABEL = "Latest"
-# "Latest" rather than "Recents" because that is the word the players use
+# "Latest" rather than "Recents" because that is the word the Funestras use
 # for the same ordering — a Fun Time session's browse says Latest, and this
 # shelf is that same newest-first listing of what the app has made.
 FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited folder
-# Its row label: the same concept as a Fun Time player's favorites (the star
+# Its row label: the same concept as a Fun Time Funestra's favorites (the star
 # there IS the favorite mark), so it wears that name.  The key stays
 # "__starred__" so saved expansions and history survive the rename.
 FAVORITES_LABEL = "Favorites"

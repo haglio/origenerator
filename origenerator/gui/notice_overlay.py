@@ -1,13 +1,13 @@
 """What a show has to say, in the overlay Fun Time says it in.
 
 Fun Time flashes its notices — "Clip saved", "No other seeds", "Next seed" — at
-the top center of the player they are about, in one shape everywhere: the panel
+the top center of the Funestra they are about, in one shape everywhere: the panel
 gray, a hairline of the text's own color, a bold heading face, rounded corners
 (``fun_time.notice_overlay.NoticeOverlay``). This is that overlay, worn by
 Origenerator's own notices: the request being spoken, and what a press or a
 spoken word just did. A plate of its own down at the foot of the show would be
 a second dialect for the same job, said in the same room, on a surface that
-already wears the players' own HUD.
+already wears the Funestras' own HUD.
 
 Matched through the tokens rather than by eye. The color and the face come out
 of :mod:`shared_ui`, which is where Fun Time takes them from too, so a palette
@@ -16,7 +16,7 @@ geometry is spelled out here, because that is all Fun Time's own overlay spells
 out: the padding, the corner radius, and the gap from the top edge.
 
 A child of the surface rather than a window of its own — Fun Time's is a
-top-level because it flashes over a *foreign* player's window, and here the
+top-level because it flashes over a *foreign* Funestra's window, and here the
 surface it belongs to is ours.
 """
 
@@ -31,7 +31,7 @@ from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
 # The gap from the top edge of the surface, matching
 # ``fun_time.notice_overlay.NOTICE_TOP_MARGIN`` — the two land on the same line
-# when a Fun Time player and a show are side by side.
+# when a Fun Time Funestra and a show are side by side.
 TOP_MARGIN = 28
 
 NOTICE = "notice"

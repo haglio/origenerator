@@ -2,7 +2,7 @@
 face, its tooltip and the state it draws."""
 from __future__ import annotations
 
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.show_buttons import answer, show_rows
 
@@ -15,7 +15,7 @@ def _names(buttons) -> list[str]:
     return [button.command.removeprefix("portrait_") for button in buttons]
 
 
-def test_the_band_is_the_controls_a_show_answers_in_the_players_order():
+def test_the_band_is_the_controls_a_show_answers_in_the_funestras_order():
     assert _names(_band()) == [
         "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
         "shuffle", "latest", "cycle_version", "minimize"]
@@ -34,7 +34,7 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
     """A run of evenly spaced squares reads as one undifferentiated strip; the
-    wider gap opens at the seams the players' own band opens them at."""
+    wider gap opens at the seams the Funestras' own band opens them at."""
     assert [name for name, button in zip(_names(_band()), _band()) if button.group_break] == [
         "lock", "enhanced", "shuffle", "cycle_version", "minimize"]
 
@@ -63,9 +63,9 @@ def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
 
 
 def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
-    """Hosted, this show covers a satellite player and has no window of its own
+    """Hosted, this show covers a Satellite Funestra and has no window of its own
     to park, so the mode pair leads the panel with this mode lit — and the
-    minimize a player's band ends with is not declared at all."""
+    minimize a Funestra's band ends with is not declared at all."""
     rows = show_rows("portrait", hosted=True)
     mode_row = [button.command for button in rows[0]]
 
@@ -76,7 +76,7 @@ def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
 
 
 def test_a_show_on_its_own_has_a_window_to_park_and_no_session_to_switch():
-    """Standalone there is no player under it and no mode to leave, so the pair
+    """Standalone there is no Funestra under it and no mode to leave, so the pair
     is not drawn — a lit button nothing answers would be a picture of one."""
     rows = show_rows("portrait")
 
@@ -84,8 +84,8 @@ def test_a_show_on_its_own_has_a_window_to_park_and_no_session_to_switch():
     assert "minimize" in _names(rows[-1])
 
 
-def test_a_show_handed_to_a_player_declares_its_band_and_nothing_around_it():
-    """The player's window is the session's, so minimize is the session's; and
+def test_a_show_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
+    """The Funestra's window is the session's, so minimize is the session's; and
     the mode pair is on the panel the session draws around this band, not in
     it.  What is left is exactly what the show itself answers."""
     rows = show_rows("portrait", hosted=True, own_window=False)
@@ -171,7 +171,7 @@ def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
 
 
 def test_filter_said_of_a_side_narrows_to_the_act_on_screen():
-    """The players' "filter" with no act named, as a satellite takes it: the
+    """The Funestras' "filter" with no act named, as a satellite takes it: the
     act read off what is showing."""
     host = _Host()
 
@@ -223,8 +223,8 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it():
 
 def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     """The two loop buttons, the loop key, the expand mark, the map's keys
-    and the button at the head of each row — each in the players' spelling,
-    each meaning on a show what it means on a player.  Lifting the filter is
+    and the button at the head of each row — each in the Funestras' spelling,
+    each meaning on a show what it means on a Funestra.  Lifting the filter is
     the one that means more: said to a show, "no filter" is the way out of
     every narrowing, so the press is too."""
     host = _Host()
@@ -254,7 +254,7 @@ def test_a_press_a_show_has_no_answer_to_says_so():
 
 def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
     """Hosted it is the region's base state — that side's whole library, the
-    way a player's reset leaves it browsing its own; standalone there is no
+    way a Funestra's reset leaves it browsing its own; standalone there is no
     such state and it is this set from the top."""
     hosted = next(b for b in _band(hosted=True) if b.command == "portrait_reset")
     alone = next(b for b in _band() if b.command == "portrait_reset")

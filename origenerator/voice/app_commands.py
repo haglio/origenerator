@@ -1,6 +1,6 @@
 """What a bare spoken word asks of the app — a shelf, a button, the picture.
 
-Fun Time's players answer single words: "weird" condemns the clip, "lock" holds
+Fun Time's Funestras answer single words: "weird" condemns the clip, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
 the toolbar does and the names of the shelves that lead the tree — so
 "experiments" stands you in the Experiments shelf exactly as clicking its row
@@ -121,7 +121,7 @@ class BarSetting:
 
     ``bar`` is the driver's own word for it — ``speed``, ``amp``, ``center`` —
     and ``value`` is on the 0-100 scale all three share
-    (:mod:`player_core.robot_hand` clamps, so "min speed" landing under the
+    (:mod:`funestra_core.robot_hand` clamps, so "min speed" landing under the
     bar's own floor is the bar's business, not the vocabulary's).
     """
 

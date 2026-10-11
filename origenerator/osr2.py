@@ -20,7 +20,7 @@ from pathlib import Path
 from app_support import ports
 from app_support.file_channel import stamp_age
 from app_support.state_files import OSR2_SERIAL_RX
-from player_core.tcode import (
+from funestra_core.tcode import (
     PARK_COMMAND,
     UdpTCodeSink,
     format_tcode_command,

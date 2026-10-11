@@ -1,17 +1,17 @@
-"""What a show tells the players' panel to draw, and which of its presses the show answers itself.
+"""What a show tells the Funestras' panel to draw, and which of its presses the show answers itself.
 
-Every show wears the players' own panel: the set and its map
+Every show wears the Funestras' own panel: the set and its map
 (:mod:`origenerator.gui.show_map`), the device on a host driving one
 (:attr:`~origenerator.gui.show_host.ShowHost.hud_device`), and at its foot the
 generation queue (:mod:`origenerator.gui.hud_queue`).  A show on a session's
-player publishes the model for the session to draw; a show on this app's own
+Funestra publishes the model for the session to draw; a show on this app's own
 Funestra hands it over in process, and the Funestra draws it.
 """
 
 from __future__ import annotations
 
-from player_core.hud_status import looping_label, status_line
-from player_core.satellite_hud import HudCell, HudModel
+from funestra_core.hud_status import looping_label, status_line
+from funestra_core.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.show_map import SEED_AXIS
 from origenerator.gui.show_set import thumb_of
@@ -39,7 +39,7 @@ def _cell(slide, label: str = "") -> HudCell:
 
 def show_hud_model(side: str, host, *, hosted: bool = True,
                    own_window: bool = True, device=None, foot=None) -> HudModel | None:
-    """The host show's state as the players' HUD model, or ``None`` for a show
+    """The host show's state as the Funestras' HUD model, or ``None`` for a show
     with nothing to map (``hud_map`` unanswered).
 
     *hosted* and *own_window* decide which buttons the panel declares
@@ -47,7 +47,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     both default to what a region show wants.  *foot* is the generation queue
     (:mod:`origenerator.gui.hud_queue`) and *device* what this window is doing
     to the OSR2 (:class:`~origenerator.gui.console.ShowDevice`) -- each None
-    where there is none, which is what a show on a session's player answers.
+    where there is none, which is what a show on a session's Funestra answers.
     """
     shown = host.hud_map()
     if shown is None:
@@ -58,7 +58,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
     order_label = host.hud_order_label
     act_filter = host.hud_act_filter
     return HudModel(
-        player=side,
+        funestra=side,
         locked=locked,
         # The line says what the map's light says, in the words a satellite
         # says it in -- the two HUDs are one HUD in two places.  Nothing
@@ -71,7 +71,7 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
                                locked=locked, order=order_label,
                                f_mode=favorites_filter, enhanced=enhanced,
                                filter_label=act_filter),
-        # The players' favorite star, over the same collection the Favorites
+        # The Funestras' favorite star, over the same collection the Favorites
         # shelf lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
         item_note=host.hud_item_note,

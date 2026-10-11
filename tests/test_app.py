@@ -97,7 +97,7 @@ def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
 
 
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
-    """The launcher keeps the app's stdout and stderr in its log, and Qt's player
+    """The launcher keeps the app's stdout and stderr in its log, and Qt's Funestra
     had FFmpeg print a readout of every video it opened there, each of its tags
     included -- a generated video's embedded prompt among them. Run in a child,
     since FFmpeg writes to the process's own stderr."""
@@ -113,13 +113,13 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
         from origenerator.app import _configure_logging
         app = QApplication(sys.argv[:1])
         _configure_logging(Path({str(state)!r}))
-        player = QMediaPlayer()
+        Funestra = QMediaPlayer()
         opened = (QMediaPlayer.MediaStatus.LoadedMedia, QMediaPlayer.MediaStatus.InvalidMedia)
-        player.mediaStatusChanged.connect(lambda status: status in opened and app.quit())
-        player.setSource(QUrl.fromLocalFile({str(video)!r}))
+        Funestra.mediaStatusChanged.connect(lambda status: status in opened and app.quit())
+        Funestra.setSource(QUrl.fromLocalFile({str(video)!r}))
         QTimer.singleShot(60_000, app.quit)
         app.exec()
-        print("finished with", player.mediaStatus().name, flush=True)
+        print("finished with", Funestra.mediaStatus().name, flush=True)
     """)
     rules_of_its_own = {"QT_LOGGING_RULES", "QT_LOGGING_CONF", "QT_FFMPEG_DEBUG"}
     env = {k: v for k, v in os.environ.items() if k not in rules_of_its_own} | {
@@ -574,7 +574,7 @@ def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
         from PyQt6.QtWidgets import QApplication
         from origenerator.app import _run_the_loop_only_to_quit
         app = QApplication(sys.argv[:1])
-        app.aboutToQuit.connect(lambda: print("the player let go", flush=True))
+        app.aboutToQuit.connect(lambda: print("the Funestra let go", flush=True))
         _run_the_loop_only_to_quit(app)
         print("the loop returned", flush=True)
     """)
@@ -583,7 +583,7 @@ def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
                          capture_output=True, encoding="utf-8", errors="replace",
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
-    assert ran.stdout.splitlines() == ["the player let go", "the loop returned"], ran.stderr
+    assert ran.stdout.splitlines() == ["the Funestra let go", "the loop returned"], ran.stderr
 
 
 def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
@@ -873,8 +873,8 @@ def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
 def test_main_in_fun_time_mode_shows_no_splash(qapp):
     """Hosted, the app boots with no splash at all: the session's own loading
     screen owns the boot's feedback, and an always-on-top splash of ours can
-    outlive the session's reveal and sit over one of its players — reported
-    as 'the landscape player is under other windows on startup', and the
+    outlive the session's reveal and sit over one of its Funestras — reported
+    as 'the Landscape Funestra is under other windows on startup', and the
     covering window a z-order walk named was exactly this splash."""
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity"), \
@@ -1400,7 +1400,7 @@ class TestAnOverlayShortOfAKey:
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
         """Parked under a Fun Time session there is nobody at this window to
-        dismiss a modal, and it would sit over one of the session's players —
+        dismiss a modal, and it would sit over one of the session's Funestras —
         the same reason the splash is suppressed there. It goes to the console
         the launcher redirects into its log instead."""
         told = MagicMock()
@@ -1460,7 +1460,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp):
         """The same reason the incomplete-overlay refusal draws none: nobody is
-        at this window to dismiss a modal, and it would sit over a player."""
+        at this window to dismiss a modal, and it would sit over a Funestra."""
         told = MagicMock()
 
         with _a_faked_boot([], **{

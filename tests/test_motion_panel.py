@@ -9,19 +9,19 @@ from __future__ import annotations
 import itertools
 import random
 
-from player_core import drive_layout, wave_stack
-from player_core.console import (
+from funestra_core import drive_layout, wave_stack
+from funestra_core.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_OFF,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
 )
-from player_core.console_hud import ConsolePainter
-from player_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
-from player_core.learned_model import LearnedModel, Phrase, classify
-from player_core.modes import Osr2State
-from player_core.robot_hand import PARK_CENTER, POSITION_MAX
+from funestra_core.console_hud import ConsolePainter
+from funestra_core.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
+from funestra_core.learned_model import LearnedModel, Phrase, classify
+from funestra_core.modes import Osr2State
+from funestra_core.robot_hand import PARK_CENTER, POSITION_MAX
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
@@ -58,7 +58,7 @@ def _slide(panel, along: float) -> None:
 
 
 def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
-    # Over a show the two switches saying what it may play are on the players'
+    # Over a show the two switches saying what it may play are on the Funestras'
     # HUD this panel sits under, and a second pair here would be two switches
     # for one thing — so the console offers neither, the way Genau's own does.
     panel, _motion = _panel(qtbot)
@@ -82,7 +82,7 @@ def test_the_console_is_up_while_nothing_drives_since_its_switch_is_what_starts_
     assert panel._repaint.isActive()       # the trace scrolls, so now it does
 
 
-def test_the_picture_is_the_console_player_core_paints(qtbot):
+def test_the_picture_is_the_console_funestra_core_paints(qtbot):
     # Not a repaint of the design, and not a third of it: the same painter, the
     # same rows, the same bitmap.
     panel, motion = _panel(qtbot)
@@ -108,7 +108,7 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
 
 
 def test_the_console_declares_the_buttons_this_app_answers(qtbot):
-    """The motion's own row -- declared here rather than left to the players'
+    """The motion's own row -- declared here rather than left to the Funestras'
     stock set, which offers verbs this app has no answer for."""
     _panel_, motion = _panel(qtbot)
 

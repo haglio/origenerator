@@ -591,7 +591,7 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     to the console the launcher redirects into ``state/origenerator_launcher.log``,
     and to a dialog when there is a screen to put one on. Hosted by Fun Time
     there is not: nobody is at this window to dismiss a modal and it would sit
-    over one of the session's players, which is why the splash is suppressed
+    over one of the session's Funestras, which is why the splash is suppressed
     there too.
     """
     from origenerator.content import EXAMPLE_CONTENT, LOCAL_CONTENT
@@ -623,7 +623,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
     Said, not refused: nothing else about this app is wrong, and a launch
     declined over a folder name would cost far more than the one lane it
     protects. No dialog under a Fun Time session, for the reason the refusal
-    above draws none -- nobody is at this window, and it would sit over a player.
+    above draws none -- nobody is at this window, and it would sit over a Funestra.
     """
     from origenerator import evolver_agreement
 

@@ -1,6 +1,6 @@
 """The OSR2's section of Genau's console, at the top left of the main window.
 
-Nothing on it is drawn here. :class:`player_core.console_hud.ConsolePainter`
+Nothing on it is drawn here. :class:`funestra_core.console_hud.ConsolePainter`
 paints it, and this widget renders that into a bitmap and blits it: the
 hands-free row, the OSR2 line and the drive readout under them, all the code
 Fun Time runs.  What goes on it and what a press takes off it are
@@ -20,8 +20,8 @@ each.
 
 from __future__ import annotations
 
-from player_core.console import OSR2_CONTROL_UNANSWERED
-from player_core.console_hud import ConsolePainter, hud_xy
+from funestra_core.console import OSR2_CONTROL_UNANSWERED
+from funestra_core.console_hud import ConsolePainter, hud_xy
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtWidgets import QWidget
@@ -144,7 +144,7 @@ class MotionPanel(QWidget):
                 int(event.position().y()) + self.MARGIN)
 
     def _post(self, action: str) -> None:
-        """Do here what Fun Time would route to whichever player owns it —
+        """Do here what Fun Time would route to whichever Funestra owns it —
         through the one router both of this app's consoles press into."""
         post_device_action(action, motion=self._motion, control=self._control)
         self.update()

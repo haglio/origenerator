@@ -61,7 +61,7 @@ _BAND_FILL = BLUE_LIGHT
 
 
 # How tall the bar is drawn wherever it is laid along a picture's foot: a line of
-# its own font with room to read as a bar around it, and the height a player's
+# its own font with room to read as a bar around it, and the height a Funestra's
 # own bar has, so work in flight and a clip being watched measure the same.
 BAR_HEIGHT = 26
 

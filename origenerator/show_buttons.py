@@ -1,8 +1,8 @@
 """The buttons Origenerator declares on a show's HUD.
 
-A show wears the players' own panel (:mod:`origenerator.gui.show_panel`), and a
+A show wears the Funestras' own panel (:mod:`origenerator.gui.show_panel`), and a
 panel's buttons are its source's to declare: rows of
-:class:`player_core.hud_button.Button`, each carrying the verb a press posts.
+:class:`funestra_core.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that side; standalone,
 the show answers the same verb itself.
@@ -10,7 +10,7 @@ the show answers the same verb itself.
 Only what a show answers is declared, which depends on what is drawing the
 panel: minimize parks a window of this app's, so it is offered only where the
 show has one, and the session's mode pair is drawn by a show covering a
-region — but not by one handed to a player, whose panel the session puts its
+region — but not by one handed to a Funestra, whose panel the session puts its
 own row on.  A button drawn for sameness whose press is swallowed says a
 feature is there when it is not.
 """
@@ -19,13 +19,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from player_core.hud_button import FIT_THE_WORD, Button
-from player_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
-from player_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+from funestra_core.hud_button import FIT_THE_WORD, Button
+from funestra_core.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
+from funestra_core.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.console_commands import FILTER
 
-# The band, in the order the players put the same controls in.  The tuples are
+# The band, in the order the Funestras put the same controls in.  The tuples are
 # the groups the wider gap opens between.
 CONTROL_GROUPS = (
     ("prev", "next"),
@@ -38,16 +38,16 @@ CONTROL_GROUPS = (
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
 
 # The mode pair, which is about the SESSION rather than about this show: the way
-# back to the players' own videos, and this mode lit beside it.  Its verbs are
+# back to the Funestras' own videos, and this mode lit beside it.  Its verbs are
 # the session's dashboard commands, posted verbatim.
 MODE_BUTTONS = (
     ("satellites_kino_activate", "Kino", False),
     ("origenerator_activate", "Origenerator", True),
 )
 MODE_TOOLTIPS = {
-    "satellites_kino_activate": "Kino mode — the satellite players and the Random Favs Browser",
+    "satellites_kino_activate": "Kino mode — the Satellite Funestras and the Random Favs Browser",
     "origenerator_activate":
-        "Origenerator mode — Origenerator over the browser, its shows over the players",
+        "Origenerator mode — Origenerator over the browser, its shows over the Funestras",
 }
 
 CONTROL_FACES = {
@@ -62,7 +62,7 @@ CONTROL_FACES = {
 # what is missing rather than looking broken.
 _NO_OTHER_VERSION = " (none for this one)"
 
-# What each one is, in this app's words rather than a player's: these act on the
+# What each one is, in this app's words rather than a Funestra's: these act on the
 # generations this app made, so the bin is the toolbar's Delete and the lock is
 # the whole of what locking a slide means here.
 CONTROL_TOOLTIPS = {
@@ -80,7 +80,7 @@ CONTROL_TOOLTIPS = {
 }
 # Reset means what the side goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
-# player's reset leaves it browsing its own — and standalone there is no such
+# Funestra's reset leaves it browsing its own — and standalone there is no such
 # state, so it is this show's own set from the top.
 RESET_TOOLTIPS = {
     True: "Reset — this side's whole library back, with both filters off",
@@ -96,7 +96,7 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
 
     *own_window* is whether this show has a window of this app's — which is
     what minimize parks, and so what decides whether it is offered at all.
-    Handed to one of a session's players there is none, and the mode pair is
+    Handed to one of a session's Funestras there is none, and the mode pair is
     the session's own to put on its panel; in a window over a session's region
     the show draws that pair itself.
     """
@@ -117,7 +117,7 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
 
 # What each press asks of a show, by the name its verb carries after the side:
 # the band's buttons, the map's own chrome and the session's own keys, all in
-# the players' spelling.
+# the Funestras' spelling.
 _PRESSES: dict[str, Callable[[Any], object]] = {
     "prev": lambda show: show.show_step(-1),
     "next": lambda show: show.show_step(1),
@@ -167,10 +167,10 @@ def answer(host, action: str, argument: str = "") -> bool:
     show had an answer.
 
     One table for every way a press reaches a show — its own window's panel,
-    a session routing a player's panel back here, and the session's own keys
+    a session routing a Funestra's panel back here, and the session's own keys
     — so a button means the same thing whichever of them drew it.  ``False``
     for minimize, which is a window's rather than a show's, and for the
-    players' chrome about acts, which a show has no counterpart for.
+    Funestras' chrome about acts, which a show has no counterpart for.
     """
     if action in _PRESSES:
         _PRESSES[action](host)

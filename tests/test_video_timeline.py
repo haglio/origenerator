@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from player_core.timeline import BAR_BORDER, BAR_INSET_Y, BORDER_W, CURSOR_W
+from funestra_core.timeline import BAR_BORDER, BAR_INSET_Y, BORDER_W, CURSOR_W
 from PyQt6.QtGui import QColor
 
 from origenerator.funscript import synthesize_actions
@@ -57,7 +57,7 @@ def test_an_unscripted_video_carries_the_cursor_too(qtbot):
     assert abs(_cursor_x(timeline) - 50) <= 3
 
 
-def test_the_cursor_is_the_one_the_family_players_draw(qtbot):
+def test_the_cursor_is_the_one_the_family_funestras_draw(qtbot):
     timeline = VideoTimeline()
     qtbot.addWidget(timeline)
     timeline.resize(100, timeline.height())
@@ -73,7 +73,7 @@ def test_the_cursor_is_the_one_the_family_players_draw(qtbot):
                for row in (BAR_INSET_Y, timeline.height() - BAR_INSET_Y - 1))
 
 
-def test_the_track_is_framed_the_way_the_players_frame_theirs(qtbot):
+def test_the_track_is_framed_the_way_the_funestras_frame_theirs(qtbot):
     timeline = VideoTimeline()
     qtbot.addWidget(timeline)
     timeline.resize(100, timeline.height())

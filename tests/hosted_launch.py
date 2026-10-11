@@ -10,8 +10,8 @@ from __future__ import annotations
 from origenerator.fun_time_mode import (
     MODE_FLAG,
     SIDES,
+    funestra_flags,
     headset_flags,
-    player_flags,
     required_flags,
 )
 
@@ -20,20 +20,20 @@ _ANYTHING = "0"
 
 
 def hosted_launch(
-    *, players: bool = False, headset: bool = False, **named: str,
+    *, funestras: bool = False, headset: bool = False, **named: str,
 ) -> list[str]:
     """Every required flag, with *named* overriding the ones a test cares about.
 
-    *players* also hands both satellite players over, the way a session does,
+    *Funestras* also hands both Satellite Funestras over, the way a session does,
     and *headset* names the pair a room in the headset hands its window over by.
     """
     argv = [MODE_FLAG]
     for flag in required_flags():
         if flag != MODE_FLAG:
             argv += [flag, named.get(flag, _ANYTHING)]
-    if players:
+    if funestras:
         for side in SIDES:
-            for flag in player_flags(side):
+            for flag in funestra_flags(side):
                 argv += [flag, named.get(flag, _ANYTHING)]
     if headset:
         for flag in headset_flags():

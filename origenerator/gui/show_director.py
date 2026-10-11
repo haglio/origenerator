@@ -24,9 +24,9 @@ from dataclasses import asdict, dataclass, replace
 from functools import partial
 from typing import Protocol
 
-from player_core.hud_placement import HudCorner
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
-from player_core.modes import read_mode
+from funestra_core.hud_placement import HudCorner
+from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra_core.modes import read_mode
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -49,8 +49,8 @@ from origenerator.gallery.shelves import (
 from origenerator.gallery.shelves import folder_shelf
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.funestra_show import FunestraShow
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
-from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
@@ -323,7 +323,7 @@ class ShowDirector:
         items = self.items_of(rows)
         if not items:
             return
-        # Recents is Latest, exactly as on a Fun Time player: the shelf lists
+        # Recents is Latest, exactly as on a Fun Time Funestra: the shelf lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the show's HUD status line says which.  Latest
         # opens on the newest rather than where the last Latest show stopped:
@@ -413,9 +413,9 @@ class ShowDirector:
         # set's own shape belongs on.  Standalone it names nothing but the
         # panel's own verbs, since the monitor is the whole screen.
         where = side or region_for_items(items or folder_items or [])
-        # And what that side IS: one of the session's players, where the session
+        # And what that side IS: one of the session's Funestras, where the session
         # handed them over, or a window of this app's over the region.
-        channel = self._fun_time.player(where) if self._fun_time is not None else None
+        channel = self._fun_time.funestra(where) if self._fun_time is not None else None
         if channel is not None and not items:
             if not folder_items:
                 return None
@@ -431,7 +431,7 @@ class ShowDirector:
         actions = self._show_actions(where)
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
-            show = self._hand_to_the_player(items, where, channel, actions=actions,
+            show = self._hand_to_the_funestra(items, where, channel, actions=actions,
                                             hud=hud, levels=levels, **kwargs)
         else:
             show = self._open_a_window(items, where, actions=actions, hud=hud,
@@ -506,9 +506,9 @@ class ShowDirector:
         if self._window_up() is not None:
             self._host.set_room_paused(not self._room_paused)
 
-    def _hand_to_the_player(self, items, side: str, channel, *, actions, hud,
+    def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
-        """A show on one of the session's players: the set goes to the player
+        """A show on one of the session's Funestras: the set goes to the Funestra
         and the panel this app publishes goes with it — no window of ours."""
         kwargs.pop("frame", None)
         occupant = self.region_show(side)
@@ -516,7 +516,7 @@ class ShowDirector:
             occupant.play(items, hud=hud, **kwargs)
             occupant.set_levels(levels)
             return occupant
-        show = PlayerShow(items, side=side, channel=channel,
+        show = FunestraShow(items, side=side, channel=channel,
                           frames=FrameFiles(FRAMES_BEING_MADE_DIR / side),
                           actions=actions, pace=self._pace, hud=hud,
                           say=self._host.say, **kwargs)
@@ -535,8 +535,8 @@ class ShowDirector:
 
         Standalone the monitor holds one show and only one, so a second set
         asked for while one is up re-points the window that is there rather
-        than stacking another over it -- the same reuse a region's player gets
-        (:meth:`_hand_to_the_player`).  Inside a session the regions do their
+        than stacking another over it -- the same reuse a region's Funestra gets
+        (:meth:`_hand_to_the_funestra`).  Inside a session the regions do their
         own replacing (:meth:`_present_surface`).
         """
         view = self._window_up() if self._fun_time is None else None
@@ -606,7 +606,7 @@ class ShowDirector:
 
     def _library_of(self, side: str) -> list[dict]:
         """The generations a show on *side* is mapped against: the whole
-        library of that side's shape — what the satellite players map their
+        library of that side's shape — what the Satellite Funestras map their
         clips against too, each over its own sources.  Every generation of
         that shape, whatever the gallery's two ticks are showing: the ticks
         narrow what is browsed, and a map is drawn against what exists."""
@@ -697,10 +697,10 @@ class ShowDirector:
         replacing whatever show currently holds it.
 
         A region show is frameless (the region IS the window, like every
-        managed player) and topmost, since the satellite player it covers is
+        managed Funestra) and topmost, since the Satellite Funestra it covers is
         topmost itself; Fun Time restacks the band as its modes change.
 
-        Either way it ends up wearing the players' HUD (:meth:`_wear_the_hud`):
+        Either way it ends up wearing the Funestras' HUD (:meth:`_wear_the_hud`):
         the panel is about the show, and a show is a show wherever it is.
         """
         if self._fun_time is None:
@@ -716,7 +716,7 @@ class ShowDirector:
             | Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
         )
-        # Silent like every satellite: the session's main player owns the
+        # Silent like every satellite: the session's Main Funestra owns the
         # room's audio, and this surface is landing on a satellite's region.
         # Standalone the same view is the deliberate foreground and plays sound.
         view.set_audio_muted(True)
@@ -736,7 +736,7 @@ class ShowDirector:
         # view's paging), so it takes the keyboard the moment it opens —
         # left unfocused, those keys land in the main window and the view
         # reads as dead.  raise_() first: activation alone does not lift a
-        # window over the topmost players it shares the region with.
+        # window over the topmost Funestras it shares the region with.
         view.raise_()
         view.activateWindow()
         self._region_shows[side] = view
@@ -778,12 +778,12 @@ class ShowDirector:
                 surface.set_hud_place(*self.hud_place(side))
 
     def _wear_the_hud(self, view, side: str) -> None:
-        """Put the players' own HUD on *view* — the same panel, rendered by the
+        """Put the Funestras' own HUD on *view* — the same panel, rendered by the
         same shared code: the status line, this side's transport, and the nav
         map speaking the set as a seed family.  The view's own furnishings come
         off with it, because the map says all of it.
 
-        Hosted, the show covers a satellite player's HUD and has to BE that
+        Hosted, the show covers a Satellite Funestra's HUD and has to BE that
         HUD: its session commands go out on the session's channel and the mode
         pair leads the panel.  Standalone the panel is the same panel minus
         those two — no channel to post on, so the transport lands on the show
@@ -858,7 +858,7 @@ class ShowDirector:
         if side is not None:
             # Whatever ended it -- the loop button pressed off, an Escape, a set
             # culled empty -- the region goes back to browsing its library.  The
-            # player under it is blacked for the whole mode, so an empty region
+            # Funestra under it is blacked for the whole mode, so an empty region
             # is a black rectangle, which is the one thing the base state is for.
             self._region_shows[side] = None
             self._refill_region(side)
@@ -964,7 +964,7 @@ class ShowDirector:
         library, narrowed to that region's shape.
 
         The base state of origenerator mode, and what its reset goes back to.
-        It is what the satellite players do in kino mode — each shuffles the
+        It is what the Satellite Funestras do in kino mode — each shuffles the
         whole library of its own orientation — and this side is meant to read
         the same way.
         """
@@ -975,7 +975,7 @@ class ShowDirector:
         on, on its side, and elsewhere the whole library, shuffled, one shape each.
 
         What entering origenerator mode means — the session's own mode opens
-        with both players playing, so this one opens with both regions playing
+        with both Funestras playing, so this one opens with both regions playing
         rather than with two empty rectangles and a mode that has to be started
         by hand.  A region already holding a show is left alone: the switch is
         no reason to interrupt something already up.
@@ -1027,7 +1027,7 @@ class ShowDirector:
 
         What a region does when the show covering it ends -- the loop button
         pressed off, an Escape, a set culled empty.  In origenerator mode the
-        player underneath is blacked for the whole mode, so a region left empty
+        Funestra underneath is blacked for the whole mode, so a region left empty
         is a black rectangle rather than a fallback.
         """
         if not self._regions_wanted or self.region_show(side) is not None:
@@ -1043,7 +1043,7 @@ class ShowDirector:
         """A region's reset: back to the base state, not to the top of whatever
         that region happens to be playing.
 
-        The players' own meaning of the button — reset drops the narrowing and
+        The Funestras' own meaning of the button — reset drops the narrowing and
         leaves the satellite shuffling its whole library again — so a show
         started on one folder goes back to the library of its shape.  A region
         with nothing to play there, and a show holding no region at all, fall
@@ -1333,8 +1333,8 @@ class ShowDirector:
     def play_shelf(self, command) -> None:
         """A spoken shelf name, on the named side.
 
-        "Favorites" is the exception, and it is the players' own meaning: on a
-        player that word is F-mode — narrow what is playing to the favorites —
+        "Favorites" is the exception, and it is the Funestras' own meaning: on a
+        Funestra that word is F-mode — narrow what is playing to the favorites —
         so on a show it is the same switch, the one its HUD draws.  Opening the
         shelf as a fresh show instead would answer a word the HUD already has a
         button for with something else entirely.
@@ -1365,7 +1365,7 @@ class ShowDirector:
         """The spoken "favorites": the show's own F-mode switch, flipped.
 
         The same thing its HUD button does and the same thing the word does on
-        a player, so the readout — the lit button and the status line — says so
+        a Funestra, so the readout — the lit button and the status line — says so
         without anything here having to draw it."""
         show = self.surface_for(side)
         if show is None:
@@ -1443,7 +1443,7 @@ class ShowDirector:
     def _favorite_prompt_ids(self) -> set[str]:
         """Which generations are favorites, for the shows' HUD: the star readout
         on the current item, and the favorites narrowing — the same concepts the
-        players' HUD wears, over the same collection the Favorites shelf lists.
+        Funestras' HUD wears, over the same collection the Favorites shelf lists.
 
         That collection, and not merely the marked rows: a folder bookmarked
         there stands for everything under it, so a show narrowed to the

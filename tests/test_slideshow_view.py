@@ -1,4 +1,4 @@
-"""SlideshowView — the one fullscreen player: show, advance, lock, neighbors, keys.
+"""SlideshowView — the one fullscreen Funestra: show, advance, lock, neighbors, keys.
 
 Also everything the retired second full-screen viewer used to do on its own, which
 this view now covers because a double-clicked picture opens it at a pace of
@@ -29,7 +29,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, ShowFilters, Slide, in_order
-from tests.funestra_fakes import FakePlayer
+from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_support import ahead
 
@@ -58,14 +58,14 @@ class _Clock:
 
 def _view(qtbot, items=_ITEMS, **kw):
     kw.setdefault("shuffle", lambda order: None)  # deterministic order for these tests
-    view = SlideshowView(items, player=FakePlayer(), clock=_Clock(), **_wired(kw))
+    view = SlideshowView(items, engine=FakeEngine(), clock=_Clock(), **_wired(kw))
     qtbot.addWidget(view)
     return view
 
 
 def _engine(view):
-    """The players' engine the show's Funestra runs on."""
-    return view._pane._player
+    """The Funestras' engine the show's Funestra runs on."""
+    return view._pane._engine
 
 
 def _media_on_screen(view) -> str:
@@ -356,7 +356,7 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
 
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, player=FakePlayer(), shuffle=lambda order: None,
+    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None,
                          actions=ShowActions(delete=lambda prompt_id: None))
     qtbot.addWidget(view)
     _press(view, Qt.Key.Key_Down)
@@ -369,7 +369,7 @@ def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     # Space belongs to the app-global OSR2 motion everywhere; locking the
     # slideshow is Down. The device rides on the show's one panel.
     motion = FakeMotion()
-    view = SlideshowView(_ITEMS, player=FakePlayer(), shuffle=lambda order: None,
+    view = SlideshowView(_ITEMS, engine=FakeEngine(), shuffle=lambda order: None,
                          motion=motion)
     qtbot.addWidget(view)
     assert view.hud_device is not None  # the device half of the panel is there
@@ -389,7 +389,7 @@ def test_up_deletes_the_current_item_and_advances(qtbot):
     deleted = []
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
-    view = SlideshowView(items, player=FakePlayer(), shuffle=lambda order: None,
+    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None,
                          actions=ShowActions(delete=deleted.append))
     qtbot.addWidget(view)
     assert view._playlist.current()[2] == "id-a"
@@ -409,7 +409,7 @@ def test_down_locks_the_slideshow(qtbot):
 
 def test_enter_leaves_for_the_shown_items_folder(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, player=FakePlayer(), shuffle=lambda order: None)
+    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
     view.show()
     opened = []
@@ -424,7 +424,7 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
 def _shelf_view(qtbot):
     """A two-item show whose handovers are recorded — the ways out of a show."""
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, player=FakePlayer(), shuffle=lambda order: None)
+    view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
     qtbot.addWidget(view)
     view.show()
     opened = []
@@ -483,7 +483,7 @@ def test_culling_the_last_slide_hands_nothing_over(qtbot):
     # The show empties and closes itself, and the item it ended on is in the bin —
     # nowhere to land.
     deleted = []
-    view = SlideshowView([("a.png", "image", "id-a")], player=FakePlayer(),
+    view = SlideshowView([("a.png", "image", "id-a")], engine=FakeEngine(),
                          shuffle=lambda order: None, actions=ShowActions(delete=deleted.append))
     qtbot.addWidget(view)
     view.show()
@@ -771,7 +771,7 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
     assert shown == ["id-b", "id-a", "id-c"]
 
 
-def test_entering_a_loop_lets_go_of_a_locked_slide_as_a_player_does(qtbot):
+def test_entering_a_loop_lets_go_of_a_locked_slide_as_a_funestra_does(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
     _press(view, Qt.Key.Key_Down)                 # lock the slide on screen
     assert view.locked
@@ -824,7 +824,7 @@ def test_the_loop_key_off_a_folder_show_leaves_the_folder_in_one_press(qtbot):
 
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_picture(qtbot):
-    # The players' "weird": a favorite loses its star and the show moves on;
+    # The Funestras' "weird": a favorite loses its star and the show moves on;
     # only a picture wearing no star is condemned — so locking a slide, which
     # stars it, takes two presses of Up to undo all the way.
     unfavorited, deleted = [], []
@@ -1266,7 +1266,7 @@ def test_a_show_opens_on_the_item_it_was_asked_for(qtbot):
 
 
 # --- the dwell a picture keeps the screen for, and what stops the clock ------
-# A still's move is the engine's own (player_core.ken_burns), paced by the dwell
+# A still's move is the engine's own (funestra_core.ken_burns), paced by the dwell
 # it was given, so the show's part is the dwell it hands over and the freeze it
 # hands with it.
 
@@ -1700,7 +1700,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
                     synthesize_actions(2.0, hz=1.0))
-    view = SlideshowView([(str(vid), "video")], player=FakePlayer(),
+    view = SlideshowView([(str(vid), "video")], engine=FakeEngine(),
                          shuffle=lambda order: None)
     qtbot.addWidget(view)
 
@@ -1709,7 +1709,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert target is not None
     path, tgt_player, actions = target
     # The pane itself is what the drive follows: it is what knows where the
-    # clip has got to, the way the config panel's media player is there.
+    # clip has got to, the way the config panel's media Funestra is there.
     assert path == str(vid) and tgt_player is view._pane and actions
 
 
@@ -2154,11 +2154,11 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
 
 class TestMovingTheShowsPanel:
     """Ctrl and the arrow keys move this show's panel round the corners, the same
-    keys a Fun Time session gives the player this show covers."""
+    keys a Fun Time session gives the Funestra this show covers."""
 
     @staticmethod
     def _show(qtbot, moves):
-        show = SlideshowView([("scene one.png", "image")], player=FakePlayer(),
+        show = SlideshowView([("scene one.png", "image")], engine=FakeEngine(),
                              shuffle=in_order,
                              actions=ShowActions(move_hud=moves.append))
         qtbot.addWidget(show)
@@ -2447,12 +2447,12 @@ def test_a_version_stepped_to_while_the_picture_is_enhanced_stays_up(qtbot, tmp_
 def test_a_closing_show_is_off_the_screen_before_its_engine_lets_go(qtbot):
     seen = {}
 
-    class RecordingEngine(FakePlayer):
+    class RecordingEngine(FakeEngine):
         def close(self) -> None:
             super().close()
             seen["show visible"] = view.isVisible()
 
-    view = SlideshowView(_ITEMS, player=RecordingEngine(), shuffle=in_order)
+    view = SlideshowView(_ITEMS, engine=RecordingEngine(), shuffle=in_order)
     qtbot.addWidget(view)
     view.show()
 
@@ -2547,8 +2547,8 @@ def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbo
     view = SlideshowView(_ITEMS, image_dwell_ms=4000, shuffle=lambda order: None, clock=_Clock())
     qtbot.addWidget(view)
     assert _engine(view) is None
-    engine = FakePlayer()
-    view._pane._player_for = lambda wid: engine
+    engine = FakeEngine()
+    view._pane._engine_for = lambda wid: engine
 
     view._pane._open_if_ready()
 

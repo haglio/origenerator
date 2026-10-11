@@ -1,11 +1,11 @@
-"""What this app tells the players' console painter, and what a press on it means.
+"""What this app tells the Funestras' console painter, and what a press on it means.
 
 The console is drawn in two places here — its OSR2 section alone at the top left
 of the main window, and that section with the pace on the panel a show wears — so
 what goes ON the console and what a press takes OFF it are written once, here,
 rather than once per surface.
 
-Nothing is drawn here. :class:`player_core.console_hud.ConsolePainter` and the
+Nothing is drawn here. :class:`funestra_core.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
 the pace an unlocked slide moves on at, the motion's bars sampled forward, the
 funscript's line where a script has the device, and which of the four control
@@ -17,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from player_core import drive_layout
-from player_core.console import (
+from funestra_core import drive_layout
+from funestra_core.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
@@ -29,16 +29,16 @@ from player_core.console import (
     ConsoleModel,
     aim_row,
 )
-from player_core.console_hud import ConsoleHud, ConsolePainter
-from player_core.drive_readout import (
+from funestra_core.console_hud import ConsoleHud, ConsolePainter
+from funestra_core.drive_readout import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
     DRIVEN_BY_ROBOT_HAND,
     DriveHud,
 )
-from player_core.hud_button import Button
-from player_core.modes import MainMode, Osr2State
-from player_core.robot_hand import (
+from funestra_core.hud_button import Button
+from funestra_core.modes import MainMode, Osr2State
+from funestra_core.robot_hand import (
     PARK_CENTER,
     POSITION_MAX,
     RETRACT_CENTER,
@@ -230,7 +230,7 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
     """Do what a press on the console's OSR2 section asks, wherever it was drawn.
 
     The verbs are the console's own — the same strings Fun Time routes to
-    whichever player owns them — and this routes them to what this app has: the
+    whichever Funestra owns them — and this routes them to what this app has: the
     motion for everything about the motion, and the app's one OSR2 switch for
     the control-state group and the max intensity.
 

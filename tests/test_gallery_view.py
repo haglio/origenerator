@@ -9,16 +9,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PIL import Image
-from PIL import Image as _Image
-from player_core.console import (
+from funestra_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from player_core.pointer import OMNIPAUSE_TOGGLE
-from player_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from funestra_core.pointer import OMNIPAUSE_TOGGLE
+from funestra_core.robot_hand import PARK_CENTER, RETRACT_CENTER
+from PIL import Image
+from PIL import Image as _Image
 from PyQt6 import sip
 from PyQt6.QtCore import (
     QCoreApplication,
@@ -1792,7 +1792,7 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
 
 def test_each_tick_puts_what_a_show_is_locked_on_first(qtbot, monkeypatch):
     # However the lock came about: a picture locked from the map, a show put
-    # back the way it was left, a player locking itself.
+    # back the way it was left, a Funestra locking itself.
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []
     monkeypatch.setattr(view._enhance, "put_what_is_locked_first", lambda: ticks.append(1))
@@ -7084,7 +7084,7 @@ def _standalone_show(qtbot, monkeypatch):
 MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
-def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
+def test_a_standalone_show_wears_the_funestras_own_hud(qtbot, monkeypatch):
     # Nothing about a show is different for not being inside a session: it is
     # the same set played the same way, so it wears the same panel a region
     # show wears — and the view's own furnishings come off, because the map
@@ -7097,8 +7097,8 @@ def test_a_standalone_show_wears_the_players_own_hud(qtbot, monkeypatch):
 
 
 def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
-    # The mode pair hands a region back to the player under it.  There is no
-    # player under a standalone show and no session to tell, so the row is not
+    # The mode pair hands a region back to the Funestra under it.  There is no
+    # Funestra under a standalone show and no session to tell, so the row is not
     # drawn rather than drawn dead.  The window IS this show's, though, so the
     # minimize a hosted one leaves off is on it.
 
@@ -7429,7 +7429,7 @@ def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
 
 
 def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
-    # A show used to float two: the players' HUD over the set, and Genau's whole
+    # A show used to float two: the Funestras' HUD over the set, and Genau's whole
     # console under it for the device.  Between them the status was said twice
     # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
     # now -- the HUD, carrying the device's line, the readout and the two rows
@@ -9955,7 +9955,7 @@ def test_the_act_chooses_which_cycle_words_the_lane_adds(qtbot, tmp_path):
 
 
 def test_the_video_lane_takes_the_mined_recipe_as_it_stands(qtbot, tmp_path):
-    # A clip for a player is watched at its own rate and wants the recipe that
+    # A clip for a Funestra is watched at its own rate and wants the recipe that
     # made the one it was mined from.
     db = _combine_db(tmp_path)
     wf = _loop_recipe(db)
@@ -12833,7 +12833,7 @@ def test_the_shows_video_overrides_the_toggle_target_then_hands_back(qtbot):
 
 def test_a_show_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
     # The surface in front answers for the device alone: a show opening on a
-    # picture hands the OSR2 to the motion, the way a player hands back to it
+    # picture hands the OSR2 to the motion, the way a Funestra hands back to it
     # between scripted clips.  Falling through to the front tab left that tab's
     # funscript driving under a show it has nothing to do with, until the show
     # happened to reach a scripted video of its own.

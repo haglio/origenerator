@@ -3202,7 +3202,7 @@ class GalleryView(QWidget):
         recipe match are both slow for the same reason — something on the other
         end of a socket thinks for seconds — and both answer through here.
         """
-        run_off_thread(work, done)
+        run_off_thread(work, done, owner=self)
 
     def enhance_offer_changed(self) -> None:
         """Re-aim the Enhance button: what the act would run on has changed."""

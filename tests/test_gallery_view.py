@@ -77,7 +77,14 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import combine_controller, corner_controls, diff_text, icons, omnipause
+from origenerator.gui import (
+    combine_controller,
+    corner_controls,
+    diff_text,
+    icons,
+    off_thread,
+    omnipause,
+)
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui import generate_config_panel as gcp_module
 from origenerator.gui import generating_tile as generating_tile_module
@@ -3438,6 +3445,33 @@ def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
     qtbot.waitExposed(view)
 
     assert view._poll_timer.isActive()
+
+
+@pytest.mark.real_thread_hop
+def test_a_poll_answer_that_lands_after_its_gallery_is_gone_is_dropped(qtbot, monkeypatch):
+    release = threading.Event()
+
+    def facts_once_released(_client, _targets):
+        release.wait(5)
+        return gallery_view_module._PollFacts({}, {}, None)
+
+    monkeypatch.setattr(gallery_view_module, "_fetch_poll_facts", facts_once_released)
+    db = FakeDB([_image("old", "a cat", 50, 1)])
+    view = GalleryView(db)
+    view.refresh()
+    before = set(off_thread._in_flight)
+    view._poll()
+    db.add(_image("new", "a dog", 50, 2))
+    view.close()
+    sip.delete(view)
+    library_reads, list_generations = [], db.list_generations
+    monkeypatch.setattr(db, "list_generations",
+                        lambda: library_reads.append(1) or list_generations())
+
+    release.set()
+    qtbot.waitUntil(lambda: not off_thread._in_flight - before, timeout=5000)
+
+    assert library_reads == []
 
 
 def test_folders_start_collapsed(qtbot):
@@ -15123,9 +15157,8 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
 
 @pytest.mark.real_thread_hop
 def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypatch):
-    # The one test that puts the pool hop back: everything else runs it inline so a
-    # launch is observable in one call. What must hold is that a match taking real
-    # time does not hold the UI thread while it takes it.
+    # What must hold is that a match taking real time does not hold the UI thread
+    # while it takes it.
 
     # The override is off by the marker, not by undoing every monkeypatch the
     # fixtures made -- which took the mic and OSR2 guards with it, so this one

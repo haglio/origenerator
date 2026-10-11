@@ -498,11 +498,11 @@ def _recipe_match_runs_inline(request, monkeypatch):
 
     The recipe match is asked on a pool thread in the app, because the model it
     asks thinks for several seconds and the window must stay alive. A test wants
-    the opposite: launch and inspect in one call, with no event loop to pump. The
-    one test that exercises the real hop (test_gallery_view) marks itself
-    ``real_thread_hop`` and this stays out of its way -- it used to put the hop
-    back with ``monkeypatch.undo()``, which undid every fixture's patches with
-    it and left that test on a real microphone and a real device.
+    the opposite: launch and inspect in one call, with no event loop to pump. A
+    test that exercises the real hop marks itself ``real_thread_hop`` and this
+    stays out of its way -- it used to put the hop back with
+    ``monkeypatch.undo()``, which undid every fixture's patches with it and left
+    that test on a real microphone and a real device.
     """
     if request.node.get_closest_marker("real_thread_hop"):
         return

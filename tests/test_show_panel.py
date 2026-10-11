@@ -10,7 +10,7 @@ from funestra_core.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra_core.hud_overlay import HUD_OVERLAY_ID
 from funestra_core.hud_placement import HudCorner
 from funestra_core.satellite_hud import MARGIN
-from funestra_core.timeline import TIMELINE_HEIGHT, bar_track_x
+from funestra_core.timeline import TIMELINE_HEIGHT
 from PyQt6.QtCore import QEvent, QPointF
 from PyQt6.QtWidgets import QApplication
 
@@ -494,8 +494,9 @@ class TestTheRowOnTheOnePanel:
 
     def test_pressing_the_middle_of_the_track_runs_the_video_to_its_middle(self, qtbot):
         show = self._show(qtbot, [("scene one.mp4", "video")])
-        x, y, width, height = panel_targets(show).row
-        track_x0, track_x1 = bar_track_x(width)
+        row = panel_targets(show).row
+        x, y, _width, height = row.rect
+        track_x0, track_x1 = row.track
         left, top, _bgra = _panel(show)
 
         show._pane.press(QPointF(left + x + (track_x0 + track_x1) // 2,
@@ -513,8 +514,9 @@ class TestTheRowOnTheOnePanel:
 
     def _track_fill(self, show, fraction: float):
         """The color of the track *fraction* of the way along it."""
-        x, y, width, height = panel_targets(show).row
-        track_x0, track_x1 = bar_track_x(width)
+        row = panel_targets(show).row
+        x, y, _width, height = row.rect
+        track_x0, track_x1 = row.track
         bgra = _panel(show)[2]
         return tuple(bgra[y + height - TIMELINE_HEIGHT // 2,
                           x + round(track_x0 + (track_x1 - track_x0 - 1) * fraction)])

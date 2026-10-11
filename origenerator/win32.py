@@ -124,11 +124,64 @@ def place_window_in_device_pixels(hwnd: int, x: int, y: int,
     """
     if not window_exists(hwnd):
         return False
+    if _user32.IsIconic(hwnd):
+        return _place_where_it_comes_back(hwnd, x, y, width, height)
     # Banding and focus belong to whoever asked for them, and a move must not
     # quietly take either.
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
                                      int(x), int(y), int(width), int(height),
                                      _SWP_NOZORDER | _SWP_NOACTIVATE))
+
+
+class _WindowPlacement(ctypes.Structure):
+    _fields_ = [("length", ctypes.wintypes.UINT), ("flags", ctypes.wintypes.UINT),
+                ("showCmd", ctypes.wintypes.UINT), ("ptMinPosition", ctypes.wintypes.POINT),
+                ("ptMaxPosition", ctypes.wintypes.POINT),
+                ("rcNormalPosition", ctypes.wintypes.RECT)]
+
+
+_user32.IsIconic.argtypes = [ctypes.wintypes.HWND]
+_user32.IsIconic.restype = ctypes.wintypes.BOOL
+for _placement_call in (_user32.GetWindowPlacement, _user32.SetWindowPlacement):
+    _placement_call.argtypes = [ctypes.wintypes.HWND, ctypes.POINTER(_WindowPlacement)]
+    _placement_call.restype = ctypes.wintypes.BOOL
+_SW_SHOWMINNOACTIVE = 7
+_WPF_RESTORETOMAXIMIZED = 0x0002
+
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = [("cbSize", ctypes.wintypes.DWORD), ("rcMonitor", ctypes.wintypes.RECT),
+                ("rcWork", ctypes.wintypes.RECT), ("dwFlags", ctypes.wintypes.DWORD)]
+
+
+_user32.MonitorFromPoint.argtypes = [ctypes.wintypes.POINT, ctypes.wintypes.DWORD]
+_user32.MonitorFromPoint.restype = ctypes.wintypes.HMONITOR
+_user32.GetMonitorInfoW.argtypes = [ctypes.wintypes.HMONITOR, ctypes.POINTER(_MonitorInfo)]
+_user32.GetMonitorInfoW.restype = ctypes.wintypes.BOOL
+_MONITOR_DEFAULTTONEAREST = 2
+
+
+def _work_area_inset(x: int, y: int) -> tuple[int, int]:
+    info = _MonitorInfo(cbSize=ctypes.sizeof(_MonitorInfo))
+    monitor = _user32.MonitorFromPoint(ctypes.wintypes.POINT(int(x), int(y)),
+                                       _MONITOR_DEFAULTTONEAREST)
+    if not _user32.GetMonitorInfoW(monitor, ctypes.pointer(info)):
+        return 0, 0
+    return info.rcWork.left - info.rcMonitor.left, info.rcWork.top - info.rcMonitor.top
+
+
+def _place_where_it_comes_back(hwnd: int, x: int, y: int, width: int, height: int) -> bool:
+    found = _WindowPlacement(length=ctypes.sizeof(_WindowPlacement))
+    if not _user32.GetWindowPlacement(hwnd, ctypes.pointer(found)):
+        return False
+    inset_x, inset_y = _work_area_inset(x, y)
+    left, top = int(x) - inset_x, int(y) - inset_y
+    placement = _WindowPlacement(
+        length=found.length, flags=found.flags & ~_WPF_RESTORETOMAXIMIZED,
+        showCmd=_SW_SHOWMINNOACTIVE, ptMinPosition=found.ptMinPosition,
+        ptMaxPosition=found.ptMaxPosition,
+        rcNormalPosition=ctypes.wintypes.RECT(left, top, left + int(width), top + int(height)))
+    return bool(_user32.SetWindowPlacement(hwnd, ctypes.pointer(placement)))
 
 
 _dwmapi = ctypes.windll.dwmapi  # type: ignore[attr-defined]

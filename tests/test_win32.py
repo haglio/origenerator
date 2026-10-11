@@ -1,6 +1,9 @@
 """Tests for origenerator.win32 taskbar identity and window helpers."""
 from __future__ import annotations
 
+import ctypes
+import ctypes.wintypes
+import struct
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +12,7 @@ import pytest
 
 from origenerator.win32 import (
     out_of_sight,
+    place_window_in_device_pixels,
     raise_window_without_activating,
     register_link_handler,
     register_notification_identity,
@@ -53,6 +57,70 @@ class TestRaiseWindowWithoutActivating:
             assert raise_window_without_activating(111) is False
 
         user32.SetWindowPos.assert_not_called()
+
+
+def _edges(rect: ctypes.wintypes.RECT) -> tuple[int, int, int, int]:
+    return struct.unpack("<4i", bytes(rect))
+
+
+class TestPlaceWindowInDevicePixels:
+    def test_a_window_on_screen_is_moved_onto_the_rect_without_activating_or_reordering_it(self):
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 1
+            user32.IsIconic.return_value = 0
+
+            assert place_window_in_device_pixels(111, 0, 203, 716, 1237) is True
+
+        (hwnd, insert_after, *rect, flags), _kwargs = user32.SetWindowPos.call_args
+        assert (hwnd.value, insert_after, rect) == (111, None, [0, 203, 716, 1237])
+        assert flags == 0x0004 | 0x0010  # SWP_NOZORDER | SWP_NOACTIVATE
+
+    def test_a_minimized_window_stays_minimized_and_comes_back_onto_the_rect(self):
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 1
+            user32.IsIconic.return_value = 1
+            user32.GetWindowPlacement.return_value = 1
+            user32.SetWindowPlacement.return_value = 1
+
+            assert place_window_in_device_pixels(111, 0, 203, 716, 1237) is True
+
+        user32.SetWindowPos.assert_not_called()
+        (hwnd, placement), _kwargs = user32.SetWindowPlacement.call_args
+        assert hwnd == 111
+        assert _edges(placement.contents.rcNormalPosition) == (0, 203, 716, 1440)
+        assert placement.contents.showCmd == 7  # SW_SHOWMINNOACTIVE
+
+    def test_a_minimized_window_that_would_come_back_maximized_comes_back_onto_the_rect(self):
+        def restores_maximized(hwnd, placement):
+            placement.contents.flags = 0x0002  # WPF_RESTORETOMAXIMIZED
+            return 1
+
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 1
+            user32.IsIconic.return_value = 1
+            user32.GetWindowPlacement.side_effect = restores_maximized
+
+            place_window_in_device_pixels(111, 0, 203, 716, 1237)
+
+        (_hwnd, placement), _kwargs = user32.SetWindowPlacement.call_args
+        assert not placement.contents.flags & 0x0002
+
+    def test_the_rect_a_minimized_window_comes_back_onto_is_counted_from_its_work_area(self):
+        def taskbar_along_the_top(monitor, info):
+            info.contents.rcMonitor = ctypes.wintypes.RECT(0, 0, 2560, 1440)
+            info.contents.rcWork = ctypes.wintypes.RECT(0, 40, 2560, 1440)
+            return 1
+
+        with patch("origenerator.win32._user32") as user32:
+            user32.IsWindow.return_value = 1
+            user32.IsIconic.return_value = 1
+            user32.GetWindowPlacement.return_value = 1
+            user32.GetMonitorInfoW.side_effect = taskbar_along_the_top
+
+            place_window_in_device_pixels(111, 0, 203, 716, 1237)
+
+        (_hwnd, placement), _kwargs = user32.SetWindowPlacement.call_args
+        assert _edges(placement.contents.rcNormalPosition) == (0, 163, 716, 1400)
 
 
 class TestOutOfSight:

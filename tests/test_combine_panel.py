@@ -1,11 +1,15 @@
 """CombinePanel: two drop slots + a Generate button for the image+video combine."""
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout
+import pytest
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QColor, QCursor
+from PyQt6.QtWidgets import QApplication, QHBoxLayout
+from shared_ui.colors import hovered
 
 from origenerator import recipe_match
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest
+from origenerator.gui.stylesheet import build_stylesheet
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
@@ -101,6 +105,33 @@ def test_open_in_generator_button_tracks_the_same_enablement_as_generate(qtbot):
 
     panel.video_slot.set_item("vid1")
     assert panel._open_btn.isEnabled()       # both filled: ready to open
+
+
+def _ground(button) -> str:
+    drawn = button.grab().toImage()
+    return drawn.pixelColor(3, drawn.height() // 2).name()
+
+
+@pytest.mark.parametrize("name", ["_generate_btn", "_open_btn"], ids=["Generate", "Edit"])
+def test_a_ready_button_sits_one_step_lighter_under_the_pointer(qtbot, name):
+    panel = _panel(qtbot)
+    panel.image_slot.set_item("img1")
+    panel.video_slot.set_item("vid1")
+    panel.setStyleSheet(build_stylesheet())
+    panel.move(200, 200)
+    panel.show()
+    qtbot.waitExposed(panel)
+    button = getattr(panel, name)
+    resting = QCursor.pos()
+    QCursor.setPos(QPoint(5, 5))
+    QApplication.processEvents()
+    at_rest = _ground(button)
+    QCursor.setPos(button.mapToGlobal(button.rect().center()))
+    QApplication.processEvents()
+    under_the_pointer = _ground(button)
+    QCursor.setPos(resting)
+
+    assert under_the_pointer == hovered(QColor(at_rest)).name()
 
 
 def test_clicking_open_emits_the_dropped_recipe_for_the_generator(qtbot):

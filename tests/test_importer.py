@@ -739,6 +739,19 @@ def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_recipe(tmp
     assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "sounded")
 
 
+def test_a_starred_folder_keyed_from_a_folded_copy_keeps_its_star(tmp_path):
+    db = Database(tmp_path / "test.db")
+    _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
+    _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
+    db.upsert_folder_meta("wan22_flf2v_loop/example/abc123", custom_name="Kept for later",
+                          favorite=True, level="settings", ref_prompt_id="copy")
+
+    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+
+    (bookmark,) = db.folder_meta_full()
+    assert bookmark["ref_prompt_id"] == "sounded"
+
+
 def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_item(tmp_path):
     db = Database(tmp_path / "test.db")
     _completed(db, "found-sounded", "old_clip_00001-audio.mp4", "video")

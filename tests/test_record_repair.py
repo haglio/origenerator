@@ -139,6 +139,21 @@ def test_a_starred_folder_keyed_from_the_folded_record_keeps_its_star(tmp_path):
     assert bookmark["ref_prompt_id"] == "first"
 
 
+def test_a_combine_made_from_the_folded_record_names_the_record_that_stays(tmp_path):
+    output_dir = tmp_path / "output"
+    _picture(output_dir, "sdxl_t2i_00008_.png")
+    db = Database(tmp_path / "test.db")
+    _row(db, "first", filename="sdxl_t2i_00008_.png")
+    _row(db, "repeat", filename="sdxl_t2i_00008_.png")
+    _row(db, "combined", status="running")
+    db.set_recipe_source("combined", category="alpha", video_prompt_id="repeat")
+
+    repair_records(db, output_dir)
+
+    combined = db.get_generation("combined")
+    assert (combined["recipe_category"], combined["recipe_video_id"]) == ("alpha", "first")
+
+
 def test_a_run_that_finished_with_no_picture_is_dropped(tmp_path):
     output_dir = tmp_path / "output"
     _picture(output_dir, "sdxl_t2i_00008_.png")

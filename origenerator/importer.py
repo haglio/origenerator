@@ -35,6 +35,7 @@ from origenerator.gallery.sides import orientation_of_size
 from origenerator.gallery_contract import LANES
 from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.record_fold import fold_record_into
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import soundless_copies_of
@@ -215,12 +216,7 @@ def _fold_soundless_copy(db: Database, copy: dict, video: dict, rows: list[dict]
     listed_names = {f.get("filename") for f in listed}
     unlisted = [c for c in soundless_copies_of(listed[:1]) if c["filename"] not in listed_names]
     db.update_generation(video["prompt_id"], output_files=json.dumps(listed + unlisted))
-    if copy.get("starred") and not video.get("starred"):
-        db.set_generation_favorite(video["prompt_id"], True)
-    for combined in rows:
-        if combined.get("recipe_video_id") == copy["prompt_id"]:
-            db.set_recipe_source(combined["prompt_id"], category=combined.get("recipe_category"),
-                                 video_prompt_id=video["prompt_id"])
+    fold_record_into(db, rows, copy, video)
     db.delete_generation(copy["prompt_id"])
 
 

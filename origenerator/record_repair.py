@@ -7,6 +7,7 @@ from pathlib import Path
 from origenerator.gallery.output import parse_file_list
 from origenerator.generation_state import GenerationStatus
 from origenerator.importer import graph_from_text, graph_in_file
+from origenerator.record_fold import file_key, fold_record_into
 
 _NO_FILES_MOVED = {"moves": [], "subdir": None}
 
@@ -23,7 +24,7 @@ def _list_each_picture_once(db, rows) -> int:
     tidied = 0
     for row in rows:
         listed = parse_file_list(row.get("output_files"))
-        once = list({_file_key(entry): entry for entry in listed}.values())
+        once = list({file_key(entry): entry for entry in listed}.values())
         if len(once) == len(listed):
             continue
         db.update_generation(row["prompt_id"], output_files=json.dumps(once))
@@ -44,8 +45,7 @@ def _leave_one_record_per_picture(db, rows, output_dir: Path) -> int:
             if parse_file_list(row.get("output_files")):
                 folded += 1
                 continue
-            _carry_over_what_the_user_put_on_it(db, row, keeper)
-            _repoint_at_the_record_that_stays(db, rows, row, keeper)
+            fold_record_into(db, rows, row, keeper)
             _drop_the_record_only(db, row)
             folded += 1
     return folded
@@ -53,36 +53,9 @@ def _leave_one_record_per_picture(db, rows, output_dir: Path) -> int:
 
 def _stop_claiming(db, row: dict, picture: tuple[str, str]) -> None:
     left = [entry for entry in parse_file_list(row.get("output_files"))
-            if _file_key(entry) != picture]
+            if file_key(entry) != picture]
     row["output_files"] = json.dumps(left)
     db.update_generation(row["prompt_id"], output_files=row["output_files"])
-
-
-def _carry_over_what_the_user_put_on_it(db, folded: dict, keeper: dict) -> None:
-    if folded.get("starred") and not keeper.get("starred"):
-        db.set_generation_favorite(keeper["prompt_id"], True)
-    inherited = {column: folded[column]
-                 for column in ("enhance_history", "original_files", "thumbnail_path")
-                 if folded.get(column) and not keeper.get(column)}
-    if inherited:
-        db.update_generation(keeper["prompt_id"], **inherited)
-
-
-def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> None:
-    gone, stays = folded["prompt_id"], keeper["prompt_id"]
-    for row in rows:
-        if row.get("enhance_of") == gone:
-            db.set_enhance_target(row["prompt_id"], stays)
-    for bookmark in db.folder_meta_full():
-        if bookmark.get("ref_prompt_id") == gone:
-            db.upsert_folder_meta(bookmark["folder_key"],
-                                  custom_name=bookmark.get("custom_name"),
-                                  favorite=bool(bookmark.get("starred")),
-                                  level=bookmark.get("level"), ref_prompt_id=stays)
-    for item in db.custom_folder_items_full():
-        if item.get("ref_prompt_id") == gone:
-            db.stamp_custom_folder_item(item["folder_id"], item["folder_key"],
-                                        level=item.get("level"), ref_prompt_id=stays)
 
 
 def _drop_records_of_no_picture(db, rows, output_dir: Path) -> int:
@@ -102,7 +75,7 @@ def _drop_records_of_no_picture(db, rows, output_dir: Path) -> int:
 def _has_no_picture(row: dict, output_dir: Path) -> bool:
     listed = parse_file_list(row.get("output_files"))
     paths = [output_dir / subfolder / filename
-             for subfolder, filename in map(_file_key, listed)]
+             for subfolder, filename in map(file_key, listed)]
     if not paths:
         return True
     if any(path.exists() for path in paths):
@@ -118,14 +91,10 @@ def _claimants_by_picture(rows) -> dict[tuple[str, str], list[dict]]:
     claimants: dict[tuple[str, str], dict[str, dict]] = defaultdict(dict)
     for row in rows:
         for entry in parse_file_list(row.get("output_files")):
-            key = _file_key(entry)
+            key = file_key(entry)
             if key[1]:
                 claimants[key][row["prompt_id"]] = row
     return {key: list(by_id.values()) for key, by_id in claimants.items()}
-
-
-def _file_key(entry: dict) -> tuple[str, str]:
-    return entry.get("subfolder") or "", entry.get("filename") or ""
 
 
 def _the_one_that_made_it(claimants: list[dict], path: Path) -> dict:

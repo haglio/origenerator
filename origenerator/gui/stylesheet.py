@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from shared_ui.chrome import family_stylesheet, field_rules, tool_button_rules
+from shared_ui import palette
+from shared_ui.chrome import control_ground, family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
-    BG_BUTTON,
     BG_SECONDARY,
     BG_TERTIARY,
     BLUE,
@@ -12,7 +12,6 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     family_palette,
-    hovered,
 )
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
@@ -24,6 +23,10 @@ from origenerator.spin_arrows import arrow_paths
 
 def _h(color) -> str:
     return color.name()
+
+
+_STEP_BUTTONS = ("QSpinBox::up-button", "QDoubleSpinBox::up-button",
+                 "QSpinBox::down-button", "QDoubleSpinBox::down-button")
 
 
 def _drawn_arrow_rules() -> str:
@@ -102,11 +105,9 @@ def build_stylesheet() -> str:
        included — and the default it falls back to for them has no size, so the
        arrows render as dead slivers you cannot hit. Give them a real size and a
        drawn arrow and they work again. */
-    QSpinBox::up-button, QDoubleSpinBox::up-button,
-    QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    {", ".join(_STEP_BUTTONS)} {{
         subcontrol-origin: border;
         width: 16px;
-        background-color: {_h(BG_BUTTON)};
         border-left: 1px solid {_h(BORDER_SUBTLE)};
     }}
     QSpinBox::up-button, QDoubleSpinBox::up-button {{
@@ -121,10 +122,7 @@ def build_stylesheet() -> str:
         border-top: 1px solid {_h(BORDER_SUBTLE)};
         border-radius: 3px;
     }}
-    QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-    QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-        background-color: {_h(hovered(BG_BUTTON))};
-    }}
+{control_ground(palette.BG_BUTTON, *_STEP_BUTTONS)}
     QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
     QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
         background-color: {_h(BLUE)};
@@ -233,12 +231,7 @@ def build_stylesheet() -> str:
     QToolButton#dimensionUnlock {{
         padding: 2px 4px;
     }}
-    QToolButton#dimensionUnlock:checked {{
-        background-color: {_h(BLUE)};
-    }}
-    QToolButton#dimensionUnlock:checked:hover {{
-        background-color: {_h(hovered(BLUE))};
-    }}
+{control_ground(palette.BLUE, "QToolButton#dimensionUnlock:checked")}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};

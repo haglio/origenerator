@@ -179,8 +179,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     so whether one is up is asked here for the offer the window stands. 273 -> 275:
     a generation ComfyUI refuses as the app closes is saved with the session and
     said at the next launch, through that same pair. 275 -> 277: how many a press
-    of Generate makes is saved with the session the same way.)"""
+    of Generate makes is saved with the session the same way. 277 -> 272: the
+    find strip went to shared_ui, where it wires its own find, so the five
+    methods that wired the two together here went with it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 277
+               for x in _class_def(VIEW, "GalleryView").body) == 272
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

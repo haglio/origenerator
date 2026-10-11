@@ -57,11 +57,19 @@ import pytest
 from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
 from pytestqt.qtbot import QtBot
+from shared_ui.testing import Pointer
 
 from origenerator import config, osr2_driver, osr2_motion_driver
 from origenerator.gui import desktop_notices, motion_panel, omnipause, voice_router
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
+
+
+@pytest.fixture
+def pointer():
+    pointer = Pointer()
+    yield pointer
+    pointer.put_back()
 
 
 @pytest.fixture(autouse=True)

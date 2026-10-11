@@ -17,8 +17,15 @@ import time
 from PyQt6.QtCore import QObject, QUrl
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 
-from origenerator.ambient_audio import AmbientRotation, find_clips
-from origenerator.config import AMBIENT_AUDIO_DIR, AMBIENT_AUDIO_VOICES
+from origenerator.ambient_audio import AmbientFolder, AmbientRotation
+from origenerator.config import (
+    AMBIENT_AUDIO_DIR,
+    AMBIENT_AUDIO_FOLDER_MEMORY,
+    AMBIENT_AUDIO_VOICES,
+    LIBRARY_OVERLAY_PATH,
+    LIBRARY_ROOT,
+    repoint_ambient_audio_dir,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +44,13 @@ class AmbientAudio(QObject):
 
     def __init__(self, parent=None, *, clips_dir=AMBIENT_AUDIO_DIR,
                  voices: int = AMBIENT_AUDIO_VOICES, make_player=None,
-                 now=time.monotonic):
+                 now=time.monotonic, memory=AMBIENT_AUDIO_FOLDER_MEMORY,
+                 within=LIBRARY_ROOT, repoint=None):
         super().__init__(parent)
-        self._clips_dir = clips_dir
+        self._folder = AmbientFolder(
+            clips_dir, memory=memory, within=within,
+            repoint=repoint or (lambda folder: repoint_ambient_audio_dir(
+                folder, LIBRARY_OVERLAY_PATH)))
         self._voices = voices
         self._now = now
         # Per voice: when its clip started, and how many in a row have been
@@ -71,10 +82,10 @@ class AmbientAudio(QObject):
         """
         if self._players:
             return
-        clips = find_clips(self._clips_dir)
+        clips = self._folder.clips()
         if not clips:
             logger.info(
-                "Ambient audio: no clips under %s — staying silent", self._clips_dir)
+                "Ambient audio: no clips under %s — staying silent", self._folder.path)
             return
         self._rotation = AmbientRotation(clips, self._voices)
         self._started = [0.0] * self._voices

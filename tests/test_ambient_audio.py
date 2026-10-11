@@ -1,14 +1,15 @@
 """The audio bed — which clip each voice takes, and the players that run them."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from PyQt6.QtMultimedia import QMediaPlayer
 
-from origenerator.ambient_audio import AmbientRotation, find_clips
+from origenerator.ambient_audio import AmbientFolder, AmbientRotation, find_clips
 from origenerator.ambient_audio_players import AmbientAudio
-from origenerator.config import ambient_audio_dir
+from origenerator.config import ambient_audio_dir, repoint_ambient_audio_dir
 
 
 def _clips(*names):
@@ -66,6 +67,115 @@ def test_an_absolute_ambient_folder_is_taken_as_given():
 
 def test_an_overlay_naming_no_ambient_folder_gives_none():
     assert ambient_audio_dir({"library_root": "C:/root"}) is None
+
+
+@pytest.mark.parametrize("was, now", [
+    ("videos/lagoon/bites", "videos/lagoon/clips"),
+    ("videos\\lagoon\\bites", "videos\\lagoon\\clips"),
+    ("C:/library/videos/lagoon/bites", "C:/library/videos/lagoon/clips"),
+])
+def test_a_renamed_folder_is_named_in_the_overlay_the_way_the_old_one_was(tmp_path, was, now):
+    local = tmp_path / "content.local.json"
+    local.write_text(json.dumps({"library_root": "C:/library", "ambient_audio_dir": was}),
+                     encoding="utf-8")
+
+    assert repoint_ambient_audio_dir(Path("C:/library/videos/lagoon/clips"), local)
+    assert json.loads(local.read_text(encoding="utf-8"))["ambient_audio_dir"] == now
+
+
+# --- the folder, when the library renames it -------------------------------
+
+def _video(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    return path
+
+
+def _bites_folder(tmp_path, names=("one.mp4", "two.mp4")):
+    bites = tmp_path / "library" / "lagoon" / "bites"
+    for name in names:
+        _video(bites / "processed" / name)
+    return bites
+
+
+def _following(tmp_path, folder, accepts=True):
+    repointed = []
+
+    def repoint(to):
+        repointed.append(to)
+        return accepts
+
+    return AmbientFolder(folder, memory=tmp_path / "folder.json",
+                         within=tmp_path / "library", repoint=repoint), repointed
+
+
+def test_a_renamed_folder_is_found_again_by_the_clips_it_held(tmp_path):
+    bites = _bites_folder(tmp_path)
+    folder, repointed = _following(tmp_path, bites)
+    folder.clips()
+
+    bites.rename(bites.with_name("clips"))
+
+    assert [clip.name for clip in folder.clips()] == ["one.mp4", "two.mp4"]
+    assert repointed == [bites.with_name("clips")]
+
+
+def test_a_folder_whose_clips_went_several_ways_is_not_followed(tmp_path):
+    bites = _bites_folder(tmp_path)
+    folder, repointed = _following(tmp_path, bites)
+    folder.clips()
+
+    for name, to in (("one.mp4", "north"), ("two.mp4", "south")):
+        moved_to = bites.parent / to / "processed" / name
+        moved_to.parent.mkdir(parents=True)
+        (bites / "processed" / name).rename(moved_to)
+    (bites / "processed").rmdir()
+    bites.rmdir()
+
+    assert (folder.clips(), repointed) == ([], [])
+
+
+def test_a_folder_gone_before_its_clips_were_ever_read_is_not_followed(tmp_path):
+    bites = _bites_folder(tmp_path)
+    folder, repointed = _following(tmp_path, bites)
+
+    bites.rename(bites.with_name("clips"))
+
+    assert (folder.clips(), repointed) == ([], [])
+
+
+def test_a_renamed_folder_the_overlay_cannot_be_told_about_stays_silent(tmp_path):
+    bites = _bites_folder(tmp_path)
+    folder, repointed = _following(tmp_path, bites, accepts=False)
+    folder.clips()
+
+    bites.rename(bites.with_name("clips"))
+
+    assert folder.clips() == []
+    assert repointed == [bites.with_name("clips")]
+
+
+def test_what_another_folder_held_is_no_guide_to_this_one(tmp_path):
+    """The overlay was pointed somewhere else by hand since the last read."""
+    bites = _bites_folder(tmp_path)
+    folder, _ = _following(tmp_path, bites)
+    folder.clips()
+    elsewhere, repointed = _following(tmp_path, tmp_path / "library" / "lagoon" / "gone")
+
+    bites.rename(bites.with_name("clips"))
+
+    assert (elsewhere.clips(), repointed) == ([], [])
+
+
+def test_the_search_for_a_renamed_folder_stays_inside_the_library(tmp_path):
+    bites = _bites_folder(tmp_path)
+    folder = AmbientFolder(bites, memory=tmp_path / "folder.json",
+                           within=bites.parent, repoint=lambda to: True)
+    folder.clips()
+
+    bites.rename(bites.parent.parent / "bites")
+
+    assert folder.clips() == []
 
 
 # --- the rotation ----------------------------------------------------------
@@ -287,6 +397,22 @@ def test_the_bed_can_restart_after_being_stopped(qtbot, tmp_path):
 
     assert len(players) == 6  # a fresh set of three
     assert [p.play_count for p in players[3:]] == [1, 1, 1]
+
+
+def test_the_bed_plays_on_from_a_folder_the_library_renamed(qtbot, tmp_path):
+    bites = _bites_folder(tmp_path, names=("a.mp4", "b.mp4", "c.mp4"))
+    players = []
+    bed = AmbientAudio(clips_dir=bites, make_player=lambda: players.append(FakePlayer()) or players[-1],
+                       memory=tmp_path / "folder.json", within=tmp_path / "library",
+                       repoint=lambda to: True)
+    bed.start()
+    bed.stop()
+
+    bites.rename(bites.with_name("clips"))
+    bed.start()
+
+    assert {Path(player.sources[-1]).parent.parent for player in players[3:]} == {
+        bites.with_name("clips")}
 
 
 # --- a voice with nothing to play to ---------------------------------------

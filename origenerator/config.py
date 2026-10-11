@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from app_support import siblings
 from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import is_branch_session
-from origenerator.content import load_content, overlay_value
+from origenerator.content import load_content, overlay_value, replace_value
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 # The checkout's own state directory, unless the process says otherwise.  Only
@@ -67,6 +67,18 @@ def ambient_audio_dir(content: dict[str, Any] | None = None) -> Path | None:
     return path if path.is_absolute() else Path(content["library_root"]) / path
 
 
+def repoint_ambient_audio_dir(folder: Path, local_path: Path | None = None) -> bool:
+    content = load_content(local_path)
+    named = content.get("ambient_audio_dir")
+    if not named:
+        return False
+    root = Path(content["library_root"])
+    form = (folder.relative_to(root)
+            if not Path(named).is_absolute() and folder.is_relative_to(root) else folder)
+    written = str(PureWindowsPath(form)) if "\\" in named else form.as_posix()
+    return replace_value("ambient_audio_dir", written, local_path)
+
+
 AMBIENT_AUDIO_DIR = ambient_audio_dir()
 
 
@@ -111,6 +123,7 @@ DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 THUMB_DIR = LIBRARY_STATE_DIR / "thumbnails"
 TRASH_DIR = LIBRARY_STATE_DIR / "trash"
 LIBRARY_OVERLAY_PATH = LIBRARY_STATE_DIR.parent / "content.local.json"
+AMBIENT_AUDIO_FOLDER_MEMORY = LIBRARY_STATE_DIR / "ambient_audio_folder.json"
 
 
 # The media library and the third-party apps live outside this repo; their

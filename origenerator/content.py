@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from app_support import overlay as _overlay
+from app_support.file_channel import write_whole
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 LOCAL_CONTENT = PROJECT_DIR / "content.local.json"
@@ -58,6 +59,23 @@ def load_content(
 
 
 load_content.cache_clear = _text.cache_clear
+
+
+def replace_value(key: str, value: str, local_path: Path | None = None) -> bool:
+    local = LOCAL_CONTENT if local_path is None else local_path
+    if local == EXAMPLE_CONTENT or not local.is_file():
+        return False
+    text = local.read_text(encoding="utf-8", newline="")
+    was = json.loads(text).get(key)
+    if not isinstance(was, str) or text.count(_literal(was)) != 1:
+        return False
+    write_whole(local, text.replace(_literal(was), _literal(value)), newline="")
+    load_content.cache_clear()
+    return True
+
+
+def _literal(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
 
 
 def missing_overlay_keys(

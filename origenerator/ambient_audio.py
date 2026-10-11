@@ -1,17 +1,25 @@
 """Which clip each voice of the audio bed plays next.
 
 Qt-free, so the choosing can be unit-tested without a media backend or a clock:
-:func:`find_clips` reads the folder and :class:`AmbientRotation` owns every
-voice's endless walk through it.  The half that actually makes sound — the
-players — is :mod:`origenerator.ambient_audio_players`.
+:func:`find_clips` reads the folder, :class:`AmbientFolder` follows it when it is
+renamed, and :class:`AmbientRotation` owns every voice's walk through it.  The
+players that make the sound are :mod:`origenerator.ambient_audio_players`.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import random
-from pathlib import Path
+from collections import Counter
+from collections.abc import Callable
+from pathlib import Path, PurePath
+
+from app_support.file_channel import write_whole
 
 from origenerator.media import VIDEO_EXTS
+
+logger = logging.getLogger(__name__)
 
 
 def find_clips(folder) -> list[Path]:
@@ -31,6 +39,80 @@ def find_clips(folder) -> list[Path]:
         path for path in folder.rglob("*")
         if path.suffix.lower() in VIDEO_EXTS and path.is_file()
     )
+
+
+class AmbientFolder:
+    def __init__(self, folder: Path | None, *, memory: Path, within: Path,
+                 repoint: Callable[[Path], bool]):
+        self._folder = folder
+        self._memory = memory
+        self._within = within
+        self._repoint = repoint
+
+    @property
+    def path(self) -> Path | None:
+        return self._folder
+
+    def clips(self) -> list[Path]:
+        if self._folder is None:
+            return []
+        if not self._folder.is_dir():
+            moved_to = self._where_it_went()
+            if moved_to is None or not self._repoint(moved_to):
+                return []
+            logger.info("Ambient audio: %s was renamed %s; the overlay names it now",
+                        self._folder, moved_to)
+            self._folder = moved_to
+        clips = find_clips(self._folder)
+        self._remember(clips)
+        return clips
+
+    def _remember(self, clips: list[Path]) -> None:
+        held = {"folder": str(self._folder),
+                "clips": [str(clip.relative_to(self._folder)) for clip in clips]}
+        if _read(self._memory) != held:
+            self._memory.parent.mkdir(parents=True, exist_ok=True)
+            write_whole(self._memory, json.dumps(held, indent=1) + "\n")
+
+    def _where_it_went(self) -> Path | None:
+        remembered = _read(self._memory)
+        if Path(remembered.get("folder") or ".") != self._folder:
+            return None
+        held = [PurePath(clip) for clip in remembered.get("clips") or ()]
+        searched = self._folder.parent
+        while held and searched.is_relative_to(self._within) and searched != self._within:
+            if searched.is_dir() and (home := _home_of(held, searched)) is not None:
+                return home
+            searched = searched.parent
+        return None
+
+
+def _home_of(held: list[PurePath], searched: Path) -> Path | None:
+    by_name: dict[str, list[Path]] = {}
+    for clip in find_clips(searched):
+        by_name.setdefault(clip.name.casefold(), []).append(clip)
+    homes: Counter[Path] = Counter()
+    for clip in held:
+        depth = len(clip.parts)
+        for found in by_name.get(clip.name.casefold(), ()):
+            if _folded(found.parts[-depth:]) == _folded(clip.parts):
+                homes[Path(*found.parts[:-depth])] += 1
+    if not homes:
+        return None
+    home, clips = homes.most_common(1)[0]
+    return home if 2 * clips > len(held) else None
+
+
+def _folded(parts: tuple[str, ...]) -> list[str]:
+    return [part.casefold() for part in parts]
+
+
+def _read(memory: Path) -> dict:
+    try:
+        held = json.loads(memory.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return held if isinstance(held, dict) else {}
 
 
 class AmbientRotation:

@@ -219,3 +219,55 @@ def test_this_repos_own_example_is_what_a_local_overlay_is_measured_against():
         "combine_recipes", "search_synonyms", "genau_recipes", "detail_fix_parts",
         "detector_labels", "genau_flick_prompts", "genau_flick_words",
     }
+
+
+# --- changing one value ----------------------------------------------------
+
+def _hand_written(path: Path, folder_line: str) -> str:
+    text = ('{\r\n    "library_root": "C:/library",\r\n'
+            f'    {folder_line},\r\n'
+            '    "recipe_categories": {"alpha": ["scene one"]}\r\n}\r\n')
+    path.write_bytes(text.encode("utf-8"))
+    return text
+
+
+def test_a_value_is_replaced_where_it_stands_and_every_other_byte_kept(tmp_path):
+    """The local overlay is written by hand: its spacing and line endings are his."""
+    local = tmp_path / "content.local.json"
+    before = _hand_written(local, '"ambient_audio_dir":   "videos/lagoon/bites"')
+
+    replaced = content.replace_value("ambient_audio_dir", "videos/lagoon/clips", local)
+
+    assert replaced
+    assert local.read_bytes() == before.replace("lagoon/bites", "lagoon/clips").encode("utf-8")
+
+
+def test_the_next_read_has_the_new_value(tmp_path):
+    local = tmp_path / "content.local.json"
+    _hand_written(local, '"ambient_audio_dir": "videos/lagoon/bites"')
+    example = tmp_path / "content.example.json"
+    content.load_content(local, example)
+
+    content.replace_value("ambient_audio_dir", "videos/lagoon/clips", local)
+
+    assert content.load_content(local, example)["ambient_audio_dir"] == "videos/lagoon/clips"
+
+
+def test_a_value_written_more_than_once_is_left_alone(tmp_path):
+    """Two places spelling the same text cannot be told apart by it."""
+    local = tmp_path / "content.local.json"
+    before = _hand_written(
+        local, '"ambient_audio_dir": "videos/lagoon/bites", "genau_source": "videos/lagoon/bites"')
+
+    assert not content.replace_value("ambient_audio_dir", "videos/lagoon/clips", local)
+    assert local.read_bytes() == before.encode("utf-8")
+
+
+def test_nothing_is_written_without_a_local_overlay(tmp_path, monkeypatch):
+    example = tmp_path / "content.example.json"
+    before = _hand_written(example, '"ambient_audio_dir": "videos/example"')
+    monkeypatch.setattr(content, "EXAMPLE_CONTENT", example)
+
+    assert not content.replace_value("ambient_audio_dir", "videos/other", example)
+    assert not content.replace_value("ambient_audio_dir", "videos/other", tmp_path / "absent.json")
+    assert example.read_bytes() == before.encode("utf-8")

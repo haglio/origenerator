@@ -262,7 +262,10 @@ def _merge_video_sidecars(library: Library):
 def _merge_soundless_copies(library: Library):
     from origenerator.gallery import resolve_preview
     from origenerator.gui.export_lane import EXPORT_LANES
-    from origenerator.importer import merge_soundless_copy_rows
+    from origenerator.importer import (
+        fold_sound_versions_into_their_videos,
+        merge_soundless_copy_rows,
+    )
     from origenerator.media import MediaType
 
     lanes = {lane.source_key: lane for lane in EXPORT_LANES}
@@ -274,7 +277,8 @@ def _merge_soundless_copies(library: Library):
         lanes[lane_key].send(shown[0], video["prompt_id"], db=library.db,
                              inbox=library.inbox, output_dir=library.output_dir)
 
-    return merge_soundless_copy_rows(library.db, send_down=send_down)
+    return (merge_soundless_copy_rows(library.db, send_down=send_down)
+            + fold_sound_versions_into_their_videos(library.db))
 
 
 def _backfill_workflow_labels(library: Library):

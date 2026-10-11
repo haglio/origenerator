@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.funestra_fakes import FakePlayer
+from tests.funestra_fakes import FakeEngine
 
 
 def funestra_of(show):
@@ -8,14 +8,14 @@ def funestra_of(show):
     platform has no window for the pane to open the real one in."""
     pane = show._pane
     if pane._funestra is None:
-        pane._player_for = lambda wid: FakePlayer()
+        pane._engine_for = lambda wid: FakeEngine()
         pane._open_if_ready()
     return pane._funestra
 
 
-def engine_of(show) -> FakePlayer:
+def engine_of(show) -> FakeEngine:
     funestra_of(show)
-    return show._pane._player
+    return show._pane._engine
 
 
 def panel_targets(show):

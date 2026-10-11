@@ -1,6 +1,6 @@
 """The set a show plays, apart from whatever is putting its slides on screen.
 
-What the two surfaces share is here; that a window redraws and a player is
+What the two surfaces share is here; that a window redraws and a Funestra is
 handed a new playlist is theirs.  So what this covers is the seam between them:
 when a fresh pass is dealt, and whether the slide that was on screen survived
 into it.
@@ -10,7 +10,7 @@ from __future__ import annotations
 import random
 
 import pytest
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
 from origenerator.gui.show_set import ShowSet, item_note, narrow_to_the_act_on_screen
 from origenerator.gui.show_wiring import HudFacts
@@ -404,7 +404,7 @@ def test_a_forward_step_in_a_loop_with_somewhere_to_go_stays_in_the_loop():
 
 
 def test_a_step_back_in_a_loop_down_to_one_slide_leaves_it_looping():
-    """Only the forward step is the way out, as on a player: back is the loop's
+    """Only the forward step is the way out, as on a Funestra: back is the loop's
     own step the other way, and what it finds in a row of one is that slide."""
     show_set, _dealt = _mapped()
     show_set.start_loop("seed")

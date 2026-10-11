@@ -138,9 +138,9 @@ class ToolbarBank(QWidget):
     unreadable: a row of smudges. Wrapped, a button is always its own size.
 
     ``hosted`` builds no audio bed and no microphone: inside a Fun Time session
-    the main player owns the room's sound and the session owns the mic, so a
+    the Main Funestra owns the room's sound and the session owns the mic, so a
     second switch for either would be a switch over something this window does
-    not hold. There is no OSR2 switch here at all any more: the players' console
+    not hold. There is no OSR2 switch here at all any more: the Funestras' console
     carries a control-state group — parked, retracted, driving, control off —
     and that group is where the device is switched now, on every surface.
     """

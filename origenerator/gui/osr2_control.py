@@ -1,6 +1,6 @@
 """The app's one OSR2 switch, and which of the four control states it is in.
 
-It was a button in the toolbar until the players' console grew a control-state
+It was a button in the toolbar until the Funestras' console grew a control-state
 group of its own -- control off, parked, retracted, driving -- and a second
 switch for one device is exactly what that group replaces. What is left is the
 switch itself, with no widget: the console sets it, and so do Space, Esc, a
@@ -20,14 +20,14 @@ from __future__ import annotations
 
 import logging
 
-from player_core.console import (
+from funestra_core.console import (
     OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from player_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
-from player_core.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
+from funestra_core.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
+from funestra_core.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
 from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ class Osr2Control(QObject):
         """Whether this app may drive the device at all.
 
         False where the OSR2 is not its: hosted by Fun Time, the session's main
-        player owns the device for the session's whole length -- and so it does
+        Funestra owns the device for the session's whole length -- and so it does
         beside a standalone window the session never took over, which is one
         device driven by two apps until this says otherwise.
         """

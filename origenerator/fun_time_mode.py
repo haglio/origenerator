@@ -4,14 +4,14 @@ Launched with ``--fun-time``, Origenerator stops being a free-floating desktop
 app and becomes one of the session's managed windows: the main window occupies
 the rect Fun Time names (the Random Favs Browser's), each show goes to the
 portrait or landscape side by its subject's orientation, and everything OSR2 is
-left to Fun Time's main player.  Fun Time drives the shows through a command
+left to Fun Time's Main Funestra.  Fun Time drives the shows through a command
 file and reads back which sides are occupied through a status file — the same
-file-channel idioms its own satellite players speak
-(``player_core.file_channel``).
+file-channel idioms its own Satellite Funestras speak
+(``funestra_core.file_channel``).
 
 What a side IS depends on what the session hands over.  A session that names
-each player's own channel (:class:`PlayerChannel`) is handing this app its
-players: a show is then a playlist written for one, a few verbs, and the panel
+each Funestra's own channel (:class:`FunestraChannel`) is handing this app its
+Funestras: a show is then a playlist written for one, a few verbs, and the panel
 this app publishes for it.  One that names none is an older session, whose
 shows open a window of this app's over each region instead.
 
@@ -56,7 +56,7 @@ MODE_FLAG = "--fun-time"
 
 #: The main window's rect -- the Random Favs Browser's, which it covers -- and
 #: the two satellite regions a show of this app's opens over when the session
-#: hands no player for that side.
+#: hands no Funestra for that side.
 RECT_FIELDS = ("x", "y", "width", "height")
 MAIN_RECT_PREFIX = ""
 REGION_RECT_PREFIXES = {side: f"{side}-" for side in ("portrait", "landscape")}
@@ -64,12 +64,12 @@ REGION_RECT_PREFIXES = {side: f"{side}-" for side in ("portrait", "landscape")}
 #: The session's own channel to this app: how it drives it and reads it back.
 SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-file")
 
-#: The two satellite players a session hands over, and the four files each
-#: player contract trades through (see :class:`PlayerChannel`).  All four of a
+#: The two Satellite Funestras a session hands over, and the four files each
+#: Funestra contract trades through (see :class:`FunestraChannel`).  All four of a
 #: side or none of it: a session that names none for a side still wants a
 #: window of this app's over that region instead.
 SIDES = ("portrait", "landscape")
-PLAYER_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
+FUNESTRA_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
 
 #: Where a session in the headset asks for this window's PICTURE instead: the
 #: memory-mapped file to write it into (``app_support.frame_channel``) and the
@@ -111,7 +111,7 @@ CHECK_LAUNCH_FLAG = "--check-launch"
 WINDOW_TITLE = "Origenerator"
 
 # The captions a host resolves the shows by (with the process pid), the way it
-# resolves its own satellites by "Portrait AI Player"/"Landscape AI Player".
+# resolves its own satellites by "Portrait AI Funestra"/"Landscape AI Funestra".
 # Per REGION, not per view class: whatever view occupies a region carries that
 # region's caption.
 PORTRAIT_SHOW_TITLE = "Origenerator Portrait"
@@ -149,15 +149,15 @@ def required_flags() -> tuple[str, ...]:
 def region_flags(side: str) -> tuple[str, ...]:
     """One region's rect, for the show this app opens over it itself.
 
-    Not required: a host that names a player for the side opens no window of
+    Not required: a host that names a Funestra for the side opens no window of
     ours there at all, so the rect it would take is beside the point.
     """
     return _rect_flags(REGION_RECT_PREFIXES[side])
 
 
-def player_flags(side: str) -> tuple[str, ...]:
-    """One side's player channel: all four of them, or none of them."""
-    return tuple(f"--{side}-{name}" for name in PLAYER_FILES)
+def funestra_flags(side: str) -> tuple[str, ...]:
+    """One side's Funestra channel: all four of them, or none of them."""
+    return tuple(f"--{side}-{name}" for name in FUNESTRA_FILES)
 
 
 def headset_flags() -> tuple[str, ...]:
@@ -197,7 +197,7 @@ def declaration() -> dict:
         "check_launch_flag": CHECK_LAUNCH_FLAG,
         "required_flags": list(required_flags()),
         "region_flags": {side: list(region_flags(side)) for side in SIDES},
-        "player_flags": {side: list(player_flags(side)) for side in SIDES},
+        "player_flags": {side: list(funestra_flags(side)) for side in SIDES},
         "headset_flags": list(headset_flags()),
         "headset_words": list(HEADSET_WORDS),
         "command_case_blind": True,
@@ -229,12 +229,12 @@ class Rect:
 
 
 @dataclass(frozen=True)
-class PlayerChannel:
-    """One of the session's players, as the player contract reaches it.
+class FunestraChannel:
+    """One of the session's Funestras, as the Funestra contract reaches it.
 
-    The four files a content source and a player trade through
-    (``player_core.playlist`` / ``player_verbs`` / ``status`` /
-    ``satellite_hud``): the list the player plays, the verbs it drains, the
+    The four files a content source and a Funestra trade through
+    (``funestra_core.playlist`` / ``funestra_verbs`` / ``status`` /
+    ``satellite_hud``): the list the Funestra plays, the verbs it drains, the
     status it publishes back, and the panel this app publishes for the session
     to draw on it.
     """
@@ -256,11 +256,11 @@ class FunTimeSession:
     paused_file: Path | None
     status_file: Path | None
     dashboard_cmd_file: Path | None
-    # Each satellite player's own channel, where the session hands its players
+    # Each Satellite Funestra's own channel, where the session hands its Funestras
     # over — ``None`` for a side it named none for, which is a session that
     # still wants a window of this app's over that region instead.
-    portrait_player: PlayerChannel | None = None
-    landscape_player: PlayerChannel | None = None
+    portrait_funestra: FunestraChannel | None = None
+    landscape_funestra: FunestraChannel | None = None
     # Where this window's picture goes when the room is in the headset, and
     # where the pointer's presses on it come back through.
     frames_file: Path | None = None
@@ -275,9 +275,9 @@ class FunTimeSession:
     def region_rect(self, side: str) -> Rect:
         return self.portrait_rect if side == "portrait" else self.landscape_rect
 
-    def player(self, side: str) -> PlayerChannel | None:
-        """The player holding *side*, or ``None`` where the session named none."""
-        return self.portrait_player if side == "portrait" else self.landscape_player
+    def funestra(self, side: str) -> FunestraChannel | None:
+        """The Funestra holding *side*, or ``None`` where the session named none."""
+        return self.portrait_funestra if side == "portrait" else self.landscape_funestra
 
 
 @dataclass(frozen=True)
@@ -310,7 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in (*SESSION_FILES, *HEADSET_FILES):
         parser.add_argument(f"--{name}", type=Path, default=None)
     for side in SIDES:
-        for name in PLAYER_FILES:
+        for name in FUNESTRA_FILES:
             parser.add_argument(f"--{side}-{name}", type=Path, default=None)
     parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
     # Boot far enough to prove this launch works, then exit 0 without opening
@@ -404,16 +404,16 @@ def region_for_items(items) -> str:
     return side
 
 
-def _player(args: argparse.Namespace, side: str) -> PlayerChannel | None:
-    """*side*'s player channel, or ``None`` where the session named no player.
+def _funestra(args: argparse.Namespace, side: str) -> FunestraChannel | None:
+    """*side*'s Funestra channel, or ``None`` where the session named no Funestra.
 
-    All four files or none: half a channel is a player this app could write a
+    All four files or none: half a channel is a Funestra this app could write a
     list for and never hear back from, which is worse than the window it would
     otherwise open.
     """
     files = [getattr(args, flag.removeprefix("--").replace("-", "_"))
-             for flag in player_flags(side)]
-    return PlayerChannel(*files) if all(files) else None
+             for flag in funestra_flags(side)]
+    return FunestraChannel(*files) if all(files) else None
 
 
 def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
@@ -427,8 +427,8 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
         paused_file=args.paused_file,
         status_file=args.status_file,
         dashboard_cmd_file=args.dashboard_cmd_file,
-        portrait_player=_player(args, "portrait"),
-        landscape_player=_player(args, "landscape"),
+        portrait_funestra=_funestra(args, "portrait"),
+        landscape_funestra=_funestra(args, "landscape"),
         frames_file=args.frames_file,
         input_file=args.input_file,
         taskbar_identity=args.taskbar_identity,

@@ -60,24 +60,24 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
     assert session.taskbar_identity == "FunTime.App"
 
 
-def test_a_session_hands_over_each_players_own_channel():
-    """Inside a session the players are what shows the slides, so the launch
+def test_a_session_hands_over_each_funestras_own_channel():
+    """Inside a session the Funestras are what shows the slides, so the launch
     names each one's channel: the list it plays, the verbs it answers, the
     status it publishes, and the panel this app publishes for it."""
-    args = parse_app_args(hosted_launch(players=True, **{
+    args = parse_app_args(hosted_launch(funestras=True, **{
         "--portrait-playlist": "st/portrait.tsv",
         "--portrait-cmd-file": "st/portrait_cmd.txt",
         "--portrait-status-file": "st/portrait_status.txt",
         "--portrait-hud-file": "st/origenerator_portrait_hud.json",
         "--landscape-playlist": "st/landscape.tsv",
     }))
-    portrait = args.fun_time.player("portrait")
+    portrait = args.fun_time.funestra("portrait")
 
     assert portrait.playlist == Path("st/portrait.tsv")
     assert portrait.command_file == Path("st/portrait_cmd.txt")
     assert portrait.status_file == Path("st/portrait_status.txt")
     assert portrait.hud_file == Path("st/origenerator_portrait_hud.json")
-    assert args.fun_time.player("landscape").playlist == Path("st/landscape.tsv")
+    assert args.fun_time.funestra("landscape").playlist == Path("st/landscape.tsv")
 
 
 def test_a_session_in_a_headset_names_where_to_hand_its_window_over():
@@ -104,14 +104,14 @@ def test_a_session_on_the_monitors_asks_for_no_picture():
     assert args.fun_time.in_a_headset is False
 
 
-def test_a_session_that_names_no_player_hands_over_none():
+def test_a_session_that_names_no_funestra_hands_over_none():
     """A session too old to name them is one whose shows still open windows of
-    their own, so the answer has to be "there is no player here" rather than a
+    their own, so the answer has to be "there is no Funestra here" rather than a
     channel of empty paths."""
     args = parse_app_args(hosted_launch())
 
-    assert args.fun_time.player("portrait") is None
-    assert args.fun_time.player("landscape") is None
+    assert args.fun_time.funestra("portrait") is None
+    assert args.fun_time.funestra("landscape") is None
 _SESSION_ARGS = ["--fun-time", "--x", "0", "--y", "206", "--width", "853",
                  "--height", "1234", "--command-file", "st/origenerator_cmd.txt"]
 

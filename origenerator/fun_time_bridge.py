@@ -1,12 +1,12 @@
 """Fun Time's hands on a hosted Origenerator: the file channels, polled.
 
-Fun Time drives its satellite players through a command file, a paused flag
-and a status file (``player_core.file_channel`` / ``player_core.status``); a
+Fun Time drives its Satellite Funestras through a command file, a paused flag
+and a status file (``funestra_core.file_channel`` / ``funestra_core.status``); a
 hosted Origenerator answers the same idioms so the session reaches the region
-shows the way it reaches the players:
+shows the way it reaches the Funestras:
 
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
-  steps the portrait player — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
+  steps the Portrait Funestra — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
   and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
   switching INTO origenerator mode) and ``CLOSE_SHOWS`` clears them again;
   ``FILTER_ENHANCED`` flips the enhanced-only switch a show's HUD and the
@@ -14,13 +14,13 @@ shows the way it reaches the players:
   generation a file is a copy of, and ``RELEASE`` gives a window the session
   took over back to standalone.  Every line it answers is declared in
   :mod:`origenerator.fun_time_mode`, which publishes them for the session.
-* The paused flag freezes the shows the way it freezes the players, so
+* The paused flag freezes the shows the way it freezes the Funestras, so
   OmniPause is one write here too — held by the gallery, not just edged onto
   the open shows, so a show opened mid-pause opens frozen.
 * The status file says which regions are occupied (and by what) — a readout
   for the hosting session's diagnostics.
 * A click on a show asks the room for OmniPause (:func:`ask_for_omnipause`) on
-  the dashboard channel, where a player's click on its picture asks for it.
+  the dashboard channel, where a Funestra's click on its picture asks for it.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from player_core.file_channel import (
+from funestra_core.file_channel import (
     append_command,
     consume_command_file,
     publish_whole,
@@ -113,7 +113,7 @@ class FunTimeBridge(QObject):
     def _drain_commands(self) -> None:
         """Take the queued verbs, keeping the case of what a verb carries.
 
-        The players fold the whole payload, which suits verbs that carry no
+        The Funestras fold the whole payload, which suits verbs that carry no
         argument; one here does — a spoken phrase, which is words rather than a
         keyword — so the keyword alone is folded (see :meth:`_apply`).
         """
@@ -182,7 +182,7 @@ class FunTimeBridge(QObject):
 
         The same answers a show's own panel gets
         (:func:`~origenerator.show_buttons.answer`): the session routes a
-        player's presses back here verbatim, and its own hotkeys spell the
+        Funestra's presses back here verbatim, and its own hotkeys spell the
         transport the same way, so one table says what every one of them means.
         """
         show = self._gallery.region_show(side)

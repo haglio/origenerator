@@ -75,7 +75,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # you owe.
 #
 # 19327 on 2026-09-21, measured on the merged tree, when the ceiling went in with
-# the two longest module preambles already under it: the fullscreen player's 90
+# the two longest module preambles already under it: the fullscreen Funestra's 90
 # lines and the info pane's 71 are 30 and 31, which is what took the tree from
 # 19416 to here. What they keep is what a test cannot say -- where the creep into
 # a picture lives, why a run joins a show on its first frame and not before, why
@@ -97,7 +97,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # nothing is test_a_pane_with_nothing_wired_opens_nothing.
 #
 # 19310 when the pass Esc keeps became the playlist's, for a show on a
-# session's player as for a window: what the window's note said is
+# session's Funestra as for a window: what the window's note said is
 # test_esc_again_puts_back_everything_it_took_off and
 # test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder.
 #
@@ -179,7 +179,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_the_launch_check_is_no_launch_in_the_crash_log.
 #
 # 19124 when the launch stopped asking Qt Quick for a render thread: nothing has
-# drawn with Qt Quick since the show moved onto the players' engine, and the
+# drawn with Qt Quick since the show moved onto the Funestras' engine, and the
 # module's note on why it asked went with it.
 #
 # 19121 when a picture the tab puts up itself started going through the very tail
@@ -247,25 +247,25 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 18795 when what a show says about the picture on screen moved off the notice
 # across the top and onto the HUD after the picture's name: the fullscreen
-# player's paragraphs on what that corner said and when are
+# Funestra's paragraphs on what that corner said and when are
 # test_the_hud_says_which_version_is_on_screen,
 # test_a_run_of_an_item_this_show_never_asked_about_is_named_all_the_same and
 # test_a_status_arriving_mid_sentence_does_not_wipe_a_spoken_answer, and the
 # director's on telling only the show in front is
 # test_how_the_enhancements_are_going_reaches_every_show_that_is_up.
 #
-# 18775 when a session's players took in the pictures still being made: the
-# player show's lines on why it could not are gone, and the fullscreen show's
+# 18775 when a session's Funestras took in the pictures still being made: the
+# Funestra show's lines on why it could not are gone, and the fullscreen show's
 # on taking a run in once is
-# test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame.
+# test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame.
 #
 # 18771 when a run that lands was queued next: the playlist's paragraph on a
 # landed run being the same slide is test_a_live_slide_becomes_the_file_it_lands_as.
 #
-# 18768 when a double-click on a run opened its folder on a player: the
-# director's lines on why a player could take no frame are gone, and what it
+# 18768 when a double-click on a run opened its folder on a Funestra: the
+# director's lines on why a Funestra could take no frame are gone, and what it
 # takes instead is
-# test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it.
+# test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leading_with_it.
 #
 # 18767 when a show's arrivals began coming up in the order they arrived: what
 # the playlist said about putting each one straight after the picture on
@@ -279,11 +279,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 18754 when a picked thing took the family's blue: the line on a picked tile's
 # picture lightening its frame is test_a_picked_tiles_picture_wears_a_white_frame.
 #
-# 18731 when every video a tab plays gained the players' own timeline,
+# 18731 when every video a tab plays gained the Funestras' own timeline,
 # taken down to what the tree measured: the notes on how the track is framed,
 # where the cursor rides, that a video with no script carries one too, and that
 # a pane with no room for a track draws nothing are
-# test_the_track_is_framed_the_way_the_players_frame_theirs,
+# test_the_track_is_framed_the_way_the_funestras_frame_theirs,
 # test_the_cursor_rides_the_videos_own_length,
 # test_an_unscripted_video_carries_the_cursor_too and
 # test_a_pane_with_no_room_for_a_track_draws_nothing.

@@ -1,6 +1,6 @@
 """The one interface every driver of a show reaches through.
 
-The players' HUD, the console's clip-seconds pair and — inside a session — Fun
+The Funestras' HUD, the console's clip-seconds pair and — inside a session — Fun
 Time's own file channels all drive whatever is holding a region. What they may ask of it
 used to be written nowhere: each caller re-discovered the interface by probing
 attribute names as strings, sixteen times over three modules, and the three did
@@ -16,13 +16,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import pytest
 
-from origenerator.fun_time_mode import PlayerChannel
+from origenerator.fun_time_mode import FunestraChannel
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.player_show import PlayerShow
+from origenerator.gui.funestra_show import FunestraShow
 from origenerator.gui.show_host import ShowHost
 from origenerator.gui.show_panel import show_hud_model
 from origenerator.gui.slideshow_view import SlideshowView
-from tests.funestra_fakes import FakePlayer
+from tests.funestra_fakes import FakeEngine
 
 # What a show answers to, written out so an attribute added to the protocol without
 # a reason recorded here is a failure rather than a surprise. The first six are
@@ -81,15 +81,15 @@ def test_the_protocol_is_exactly_the_attributes_written_down_here():
 
 @pytest.fixture
 def slideshow(qtbot):
-    view = SlideshowView([("a.png", "image")], player=FakePlayer(),
+    view = SlideshowView([("a.png", "image")], engine=FakeEngine(),
                          shuffle=lambda order: None)
     qtbot.addWidget(view)
     return view
 
 
 @pytest.fixture
-def on_a_player(qtbot, tmp_path):
-    show = PlayerShow([("a.png", "image")], side="portrait", channel=PlayerChannel(
+def on_a_funestra(qtbot, tmp_path):
+    show = FunestraShow([("a.png", "image")], side="portrait", channel=FunestraChannel(
         playlist=tmp_path / "portrait.tsv", command_file=tmp_path / "portrait_cmd.txt",
         status_file=tmp_path / "portrait_status.txt",
         hud_file=tmp_path / "origenerator_portrait_hud.json"),
@@ -107,10 +107,10 @@ def test_a_slideshow_answers_every_attribute_of_the_protocol(slideshow, attribut
 
 
 @pytest.mark.parametrize("attribute", TRANSPORT + THE_SET)
-def test_a_show_on_a_player_answers_every_attribute_of_the_protocol(on_a_player, attribute):
-    # The other host: a show handed to a session's player.  It has a set, so it
+def test_a_show_on_a_funestra_answers_every_attribute_of_the_protocol(on_a_funestra, attribute):
+    # The other host: a show handed to a session's Funestra.  It has a set, so it
     # answers all of it itself, the same as the window does.
-    assert hasattr(on_a_player, attribute)
+    assert hasattr(on_a_funestra, attribute)
 
 
 def test_a_show_with_nothing_to_map_has_no_hud_model(slideshow, monkeypatch):

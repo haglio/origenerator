@@ -126,7 +126,7 @@ class CombinePanel(QWidget):
         # directly beneath the dropdown it changes.
         self._video_radio = QRadioButton("Video")
         self._video_radio.setToolTip(
-            "Make a full-length video for the satellite players."
+            "Make a full-length video for the Satellite Funestras."
         )
         self._video_radio.setChecked(True)
         self._genau_radio = QRadioButton("Genau")

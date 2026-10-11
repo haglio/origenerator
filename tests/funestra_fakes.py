@@ -1,6 +1,6 @@
-"""A stand-in for the players' engine, for a Funestra in this app's window to run on.
+"""A stand-in for the Funestras' engine, for a Funestra in this app's window to run on.
 
-What :class:`player_core.mpv_player.MpvPlayer` offers a Funestra, answered
+What :class:`funestra_core.mpv_engine.MpvEngine` offers a Funestra, answered
 from memory: the file it was handed, the one staged after it, the pace, the
 freeze, the sound, a still's move, and the overlays the panel and a picture
 are composited with.
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-class FakePlayer:
+class FakeEngine:
     def __init__(self, *, duration_ms: float = 5_000.0) -> None:
         self.opened: list[Path] = []
         self.playlist: list[Path] = []

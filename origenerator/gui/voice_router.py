@@ -314,7 +314,7 @@ class VoiceRouter(QObject):
         spoken word that simply did nothing.
 
         Hosted by a session, three of the switches are never built at all and
-        the OSR2 driver is not either — the session's main player owns the
+        the OSR2 driver is not either — the session's Main Funestra owns the
         device for its whole length. Those arrive as ``None``, so
         :meth:`_flip_switch` can still answer that the session owns them, and
         the motion words find nothing to move rather than a driver that is absent.

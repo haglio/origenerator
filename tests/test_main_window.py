@@ -7,9 +7,9 @@ from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
-from player_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
-from player_core.file_channel import append_command
-from player_core.hud_placement import HudCorner
+from funestra_core.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
+from funestra_core.file_channel import append_command
+from funestra_core.hud_placement import HudCorner
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon

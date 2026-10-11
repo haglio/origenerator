@@ -1,4 +1,4 @@
-"""Real videos, fabricated, for the tests that need a decoder or a player to open one."""
+"""Real videos, fabricated, for the tests that need a decoder or a Funestra to open one."""
 from __future__ import annotations
 
 import struct
@@ -32,7 +32,7 @@ def _top_level_boxes(data: bytes):
 
 
 def write_mp4_with_a_comment_tag(path: Path, comment: str) -> Path:
-    """A video carrying *comment* as a container tag, which a player's FFmpeg reads
+    """A video carrying *comment* as a container tag, which a Funestra's FFmpeg reads
     as it reads a generated video's embedded prompt.  cv2 writes ``moov`` last, so
     the tag is appended there without moving any offset the frames depend on."""
     data = bytearray(write_mp4(path).read_bytes())

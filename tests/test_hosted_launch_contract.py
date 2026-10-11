@@ -114,7 +114,7 @@ def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
 
 
 def test_a_region_rect_is_not_required_of_a_launch():
-    """A session that hands a player over opens no window of ours on that side,
+    """A session that hands a Funestra over opens no window of ours on that side,
     so the rect it would take is beside the point -- and a session too old to
     send them must go on launching."""
     full = [word

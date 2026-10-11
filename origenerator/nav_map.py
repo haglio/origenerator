@@ -1,4 +1,4 @@
-"""The map around one generation, as the players' HUD draws it.
+"""The map around one generation, as the Funestras' HUD draws it.
 
 A Fun Time satellite maps the clip on screen against its library: the same
 act under other seeds runs right as the seed row, and the same subject's

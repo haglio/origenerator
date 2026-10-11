@@ -20,7 +20,7 @@ on a dropped image via the gallery's combine launch.
 - :func:`category_for_prompt` runs the same act test over a single prompt, so an
   image can say what it depicts without the user picking from the dropdown.
 
-Every tier is asked for one *intent* — the long-form video the satellite players
+Every tier is asked for one *intent* — the long-form video the Satellite Funestras
 show (:data:`VIDEO`), or the short single-cycle loop Genau scrubs against the
 device's phase (:data:`GENAU`). The same act wants a different recipe for each, so
 the intent chooses both the overlay table consulted and, for ``GENAU``, narrows
@@ -52,7 +52,7 @@ _CATEGORY_KEYWORDS = {
     name: tuple(words) for name, words in _CONTENT["recipe_categories"].items()
 }
 
-# What a recipe is being made for. A long-form video for the satellite players,
+# What a recipe is being made for. A long-form video for the Satellite Funestras,
 # or a Genau flick — one complete cycle, looping end to end, scrubbed against the
 # device's phase rather than played. Both are "an act on this image", so they share
 # every tier here; what differs is which overlay table is consulted and, for GENAU,

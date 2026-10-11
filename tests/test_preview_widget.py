@@ -11,7 +11,7 @@ from PyQt6.QtGui import QColor, QImage, QMouseEvent, QResizeEvent
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PyQt6.QtWidgets import QApplication, QWidget
 
-from origenerator.fun_time_mode import PlayerChannel
+from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import (
     funscript_path_for,
     synthesize_actions,
@@ -21,8 +21,8 @@ from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_wid
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.funestra_show import FunestraShow
 from origenerator.gui.generation_drag import GENERATION_MIME
-from origenerator.gui.player_show import PlayerShow
 from origenerator.gui.preview_widget import PreviewWidget
 
 
@@ -386,7 +386,7 @@ def test_a_plain_message_opens_nothing(make_preview):
 
 class _FakeShow:
     """Stands in for the show a double-click opens, which is a window of this
-    app's or one of a session's players -- so nothing of a window is on it."""
+    app's or one of a session's Funestras -- so nothing of a window is on it."""
 
     def __init__(self, media, *, frame=None, generation=None):
         self.media = media
@@ -507,9 +507,9 @@ def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
     assert win.frames == [_png_bytes()]  # the view still shows what it landed on
 
 
-def _show_on_a_sessions_player(tmp_path):
-    show = PlayerShow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
-                      channel=PlayerChannel(
+def _show_on_a_sessions_funestra(tmp_path):
+    show = FunestraShow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
+                      channel=FunestraChannel(
                           playlist=tmp_path / "landscape.tsv",
                           command_file=tmp_path / "landscape_cmd.txt",
                           status_file=tmp_path / "landscape_status.txt",
@@ -519,9 +519,9 @@ def _show_on_a_sessions_player(tmp_path):
     return show
 
 
-def test_a_pane_whose_picture_went_to_a_sessions_player_goes_on_taking_runs_and_files(
+def test_a_pane_whose_picture_went_to_a_sessions_funestra_goes_on_taking_runs_and_files(
         make_preview, tmp_path):
-    show = _show_on_a_sessions_player(tmp_path)
+    show = _show_on_a_sessions_funestra(tmp_path)
     preview = make_preview()
     preview.set_fullscreen_factory(lambda media, frame, generation: show)
     preview.show_image(_make_png(tmp_path / "a.png"))

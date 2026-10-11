@@ -5,9 +5,9 @@ Fixture values are fabricated throughout (see CLAUDE.md).
 from __future__ import annotations
 
 import pytest
-from player_core import drive_layout
-from player_core.console import OSR2_CONTROL_BUTTONS
-from player_core.drive_readout import CONTROL_TIPS, track_command
+from funestra_core import drive_layout
+from funestra_core.console import OSR2_CONTROL_BUTTONS
+from funestra_core.drive_readout import CONTROL_TIPS, track_command
 
 from origenerator.console_commands import (
     ROBOT_HAND,

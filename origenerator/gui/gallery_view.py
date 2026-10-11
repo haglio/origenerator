@@ -276,14 +276,14 @@ class GalleryView(QWidget):
         # drives it through the shared motion keys, and while it holds the device
         # the funscript reconcile stands down. Injectable so tests never touch
         # the broker. Built before _build_ui, which wires its window feedback.
-        # None inside a Fun Time session: the OSR2 there is the main player's
+        # None inside a Fun Time session: the OSR2 there is the Main Funestra's
         # alone, so no surface of this app may reach the device.
         if fun_time is not None:
             self._osr2_motion = None
         else:
             self._osr2_motion = osr2_motion if osr2_motion is not None else Osr2MotionDriver(parent=self)
             omnipause.holds(self._osr2_motion)
-        # The app's one OSR2 switch, and now its only one: the players' console
+        # The app's one OSR2 switch, and now its only one: the Funestras' console
         # carries the control-state group that sets it, on every surface.  Public
         # because a show is handed it whole -- see ShowActions.
         self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
@@ -971,7 +971,7 @@ class GalleryView(QWidget):
         # driven, so a redundant reconcile doesn't churn the device. Built before the
         # panels are wired, since wiring connects their displayed_changed here.
         # None where this app may not touch the device at all (hosted by Fun
-        # Time, whose main player owns the OSR2).
+        # Time, whose Main Funestra owns the OSR2).
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)
@@ -1101,7 +1101,7 @@ class GalleryView(QWidget):
         streaming alongside whatever the switch already had going.
 
         A no-op with no switch to flip: hosted by Fun Time the device belongs
-        to the session's main player, so nothing here may start it."""
+        to the session's Main Funestra, so nothing here may start it."""
         self.osr2_control.setChecked(not self.osr2_control.isChecked())
 
     def reconcile_osr2(self):
@@ -1123,7 +1123,7 @@ class GalleryView(QWidget):
         here mid-flight.
         """
         if self._osr2_driver is None:
-            return  # hosted by Fun Time — the device is the main player's
+            return  # hosted by Fun Time — the device is the Main Funestra's
         if self._reconciling_osr2:
             return
         self._reconciling_osr2 = True
@@ -1224,7 +1224,7 @@ class GalleryView(QWidget):
 
     def set_audio_enabled(self, enabled):
         """Restore the audio bed's switch from a saved session.  With no switch
-        (hosted by Fun Time, whose main player owns the room's sound) a stale
+        (hosted by Fun Time, whose Main Funestra owns the room's sound) a stale
         saved value has nothing to restore."""
         if self._bank.audio is not None:
             self._bank.audio.setChecked(bool(enabled))  # drives _on_audio_toggle → start
@@ -3202,7 +3202,7 @@ class GalleryView(QWidget):
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
         """Bookmark a generation from a fullscreen show (its Down key) — the same
         star the gallery's own control sets — or take the bookmark back (its Up
-        key over a favorite, the players' "weird" on one)."""
+        key over a favorite, the Funestras' "weird" on one)."""
         self.set_items_favorite([prompt_id], favorite)
 
     def trash_generation(self, prompt_id: str):

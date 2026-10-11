@@ -3,7 +3,7 @@
 The slideshow shows images, and an image gives the device nothing to follow, so
 this supplies the motion instead. The waveform itself is not written here: the
 shapes, the Speed bar's exponential map and the amplitude and center arithmetic
-are :mod:`player_core.robot_hand` — the Robot Hand, genau's own, shared so both
+are :mod:`funestra_core.robot_hand` — the Robot Hand, genau's own, shared so both
 apps move the same way rather than two ways that look alike until they don't.
 
 What genau keeps elsewhere and this has to carry is the phase. Genau's engine
@@ -11,13 +11,13 @@ advances it against the clip's beats; here there is no clip, so the motion
 free-runs on the driver's clock and the phase rides along with the bars, in
 :class:`Motion`.
 
-Hands-free is player_core's too: :mod:`player_core.cruise_control` hands the
+Hands-free is player_core's too: :mod:`funestra_core.cruise_control` hands the
 device a motion that is several waves summed, each with its own travel, center
 and speed, and each of those always on its way somewhere else
-(:mod:`player_core.wave_stack` is the arithmetic under it). While it is engaged
+(:mod:`funestra_core.wave_stack` is the arithmetic under it). While it is engaged
 the stack is what the device follows and the bars only report what the sum came
 to; the rest of the time the motion is the single hand-driven wave it has always
-been. :mod:`player_core.learned_motion` is the other takeover: phrases of real
+been. :mod:`funestra_core.learned_motion` is the other takeover: phrases of real
 scripting in place of the waveform, played inside the bars' range and at the
 Speed bar's pace, and never on together with cruise control.
 """
@@ -25,10 +25,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from player_core import cruise_control, learned_motion, wave_stack
-from player_core.cruise_control import CruiseControlState
-from player_core.learned_motion import LearnedMotionState, load_default_model
-from player_core.robot_hand import (
+from funestra_core import cruise_control, learned_motion, wave_stack
+from funestra_core.cruise_control import CruiseControlState
+from funestra_core.learned_motion import LearnedMotionState, load_default_model
+from funestra_core.robot_hand import (
     MAX_SPEED,
     MAX_TICK_SECONDS,
     MIN_SPEED,
@@ -46,7 +46,7 @@ from player_core.robot_hand import (
     set_max_intensity,
     set_speed,
 )
-from player_core.robot_hand import trace_window as wave_trace_window
+from funestra_core.robot_hand import trace_window as wave_trace_window
 
 __all__ = [
     "MAX_SPEED",

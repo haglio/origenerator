@@ -1,6 +1,6 @@
 """The gallery inside a Fun Time session: no OSR2 anywhere, vertical layout.
 
-Fun Time's main player owns the OSR2 for the whole session, so a hosted
+Fun Time's Main Funestra owns the OSR2 for the whole session, so a hosted
 Origenerator must offer no way to reach the device — no toggle, no motion, no
 console — and its layout folds to fit the Random Favs Browser's upright rect.
 """
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 
+from funestra_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PIL import Image
-from player_core.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
@@ -85,7 +85,7 @@ def _lit(model, action: str) -> bool:
 
 def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
     """The room's audio and its microphone are the session's, not this app's:
-    the main player owns the sound and Fun Time owns the mic (it hears this
+    the Main Funestra owns the sound and Fun Time owns the mic (it hears this
     app's spoken commands too and posts them on the channel), so a second
     switch for either would be a switch over something this window does not
     hold."""
@@ -300,7 +300,7 @@ def test_a_preview_double_click_lands_its_show_on_the_matching_region(qtbot, tmp
 
 def test_a_region_show_is_muted_like_every_satellite(qtbot, tmp_path):
     # Standalone, the show is the deliberate foreground and plays sound; on a
-    # satellite region the session's main player owns the room's audio, and the
+    # satellite region the session's Main Funestra owns the room's audio, and the
     # satellites are silent by design — so the hosted show is too.
     view = _fun_time_view(qtbot)
     wide = tmp_path / "wide.png"
@@ -325,7 +325,7 @@ def test_a_presented_show_takes_the_keyboard(qtbot):
     stub.raise_ = lambda: calls.append("raise")
     stub.activateWindow = lambda: calls.append("activate")
     # Presenting mutes and, mid-freeze, holds the surface, and dresses it in the
-    # players' HUD: a real one is a SlideshowView, which answers all of that —
+    # Funestras' HUD: a real one is a SlideshowView, which answers all of that —
     # the last through ShowHost — and the view calls them outright.
     stub.set_audio_muted = lambda muted: None
     stub.set_paused = lambda paused: None
@@ -359,8 +359,8 @@ def test_a_preview_double_click_opens_the_show_on_a_region(qtbot, tmp_path):
     qtbot.addWidget(show)
 
 
-def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch):
-    """The show covers the satellite player's HUD, so it wears the players'
+def test_a_presented_show_wears_the_funestras_own_hud(qtbot, tmp_path, monkeypatch):
+    """The show covers the Satellite Funestra's HUD, so it wears the Funestras'
     own — the same panel from the same shared code: mode pair, transport, and
     the nav map speaking the set as a seed family.  The view's own furnishings
     come off; the map says all of it."""
@@ -374,13 +374,13 @@ def test_a_presented_show_wears_the_players_own_hud(qtbot, tmp_path, monkeypatch
     # The mode pair is on it — the way back to kino mode from atop a show.
     assert [n for n in names if n in MODE_VERBS] == [
         "satellites_kino_activate", "origenerator_activate"]
-    # The transport controls are the players' own set.
+    # The transport controls are the Funestras' own set.
     assert {"prev", "next", "lock", "trash"} <= set(names)
-    # The window a player's minimize parks is not this show's, so the panel
+    # The window a Funestra's minimize parks is not this show's, so the panel
     # declares no such button rather than drawing one whose press goes nowhere.
     assert "minimize" not in names
 
-    # A transport press posts on the session's channel, exactly as a player's
+    # A transport press posts on the session's channel, exactly as a Funestra's
     # HUD posts it.
     show.press("portrait_next")
     posted = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
@@ -451,7 +451,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     running right; its own seed under another configuration running down,
     named by that folder, and then the video animated from it, named for its
     act, with the picture's own row named as that video's source; the corner
-    lit and no loop — the players' map, drawn against this app's library of
+    lit and no loop — the Funestras' map, drawn against this app's library of
     that side's shape."""
     rows = _fox_library(tmp_path)
     view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
@@ -471,7 +471,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     assert model.playing == ("corner", 0) and model.active_loop == ""
     assert model.lock_label == "Unlocked · Shuffle"
     # And the mode pair leads the panel, with this mode lit: the way back to
-    # the player under the show.
+    # the Funestra under the show.
     assert [(button.command, button.lit) for button in model.rows[0]] == [
         ("satellites_kino_activate", False), ("origenerator_activate", True)]
     assert model.locked is False
@@ -516,7 +516,7 @@ def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, t
 
 
 def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatch):
-    """A thumbnail click switches a player to that clip; on a show it jumps the
+    """A thumbnail click switches a Funestra to that clip; on a show it jumps the
     set to that item — and the double-click's lock holds it there."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -541,7 +541,7 @@ def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatc
 
 
 def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypatch):
-    """Recents is the players' Latest: the shelf lists newest first and its
+    """Recents is the Funestras' Latest: the shelf lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
     show's HUD status line says which."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -556,7 +556,7 @@ def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypa
 
 
 def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
-    """The players' F-mode, meaning on a show what it means on a player:
+    """The Funestras' F-mode, meaning on a show what it means on a Funestra:
     narrow to the favorites — the favorited items, the same collection the
     Favorites shelf lists — and widen back on the second press."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -731,7 +731,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
 
 
 def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypatch):
-    """The player under a region is blacked for the whole mode, so a region left
+    """The Funestra under a region is blacked for the whole mode, so a region left
     empty is a black rectangle — not a fallback.  Two ways it can be left empty
     and both are answered: the show covering it ends, and the base state was
     asked for before the tree it reads had been built (the session's OPEN_SHOWS
@@ -765,7 +765,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 
 
 def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch):
-    """On a player "favorites" is F-mode — narrow what is playing to them — so
+    """On a Funestra "favorites" is F-mode — narrow what is playing to them — so
     on a show it is the same switch, the one its HUD already draws.  Opening
     the shelf as a fresh show would answer a word the HUD has a button for with
     something else entirely."""
@@ -878,7 +878,7 @@ def test_closing_the_gallery_closes_the_show_it_opened(qtbot, tmp_path, monkeypa
 
 
 def test_reset_on_a_show_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
-    """The players' reset, on a show: F-mode drops, a held lock releases, and
+    """The Funestras' reset, on a show: F-mode drops, a held lock releases, and
     the first item comes back on screen — the side's defaults, not a dead
     button drawn for sameness."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
@@ -917,7 +917,7 @@ def _a_library_of_each_shape(view, tmp_path, monkeypatch) -> dict:
 def test_the_regions_open_on_the_whole_library_of_their_own_shape(
         qtbot, tmp_path, monkeypatch):
     """The base state of origenerator mode: each region shuffling every item of
-    its own orientation, the way each satellite player shuffles the whole
+    its own orientation, the way each Satellite Funestra shuffles the whole
     library of its own.
 
     It opened on the Latest shelf before this — a recent slice rather than the
@@ -985,7 +985,7 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
 
 def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
         qtbot, tmp_path, monkeypatch):
-    """Reset means on a show what it means on a player: the narrowing comes off
+    """Reset means on a show what it means on a Funestra: the narrowing comes off
     and the side goes back to browsing its whole library.  A show started on
     one folder therefore leaves that folder — restarting it would be the one
     thing reset is not."""

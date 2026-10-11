@@ -48,7 +48,7 @@ def test_the_requests_shelf_answers_only_to_the_plural():
 
 # --- Fun Time's own words over a show ---------------------------------------
 
-def test_the_words_fun_times_players_answer_to_mean_the_same_here():
+def test_the_words_fun_times_funestras_answer_to_mean_the_same_here():
     assert match_app_command("weird") is AppCommand.CULL
     assert match_app_command("lock") is AppCommand.LOCK
     assert match_app_command("unlock") is AppCommand.UNLOCK

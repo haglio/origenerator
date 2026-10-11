@@ -1,7 +1,7 @@
 """The map a show's HUD draws around the slide on screen, and the loop that
 holds it still.
 
-The players' map is a gamma: the clip on screen in the corner, its seed row
+The Funestras' map is a gamma: the clip on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
 show draws the same gamma over its own generations — the seed row is the same
 act under other seeds, the column what else was made of the same picture
@@ -132,7 +132,7 @@ def build_map(current: Slide, loop: Loop | None,
 
 def acts_posted(query: str) -> str:
     """The act(s) a row's filter button posted, put back into words: the
-    players' HUD lower-cases the row's label and writes its spaces as
+    Funestras' HUD lower-cases the row's label and writes its spaces as
     underscores, and a spoken act arrives the same way."""
     return " ".join(str(query or "").replace("_", " ").split()).lower()
 

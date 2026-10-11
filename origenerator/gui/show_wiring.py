@@ -3,7 +3,7 @@ its HUD reads off the set.
 
 :class:`~origenerator.gui.slideshow_view.SlideshowView` took nineteen
 constructor arguments. Six were callbacks back into the gallery and three were
-the players' HUD's description of the set, and neither group ever travelled
+the Funestras' HUD's description of the set, and neither group ever travelled
 alone: the six are passed at exactly one place and always all six, and the three
 go together at every caller that passes any of them. Written out one argument at
 a time they read as nine unrelated settings, and a caller could set the order
@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 
-from player_core.hud_status import SHUFFLE_LABEL
+from funestra_core.hud_status import SHUFFLE_LABEL
 
 from origenerator.slideshow import ShowFilters
 
@@ -86,12 +86,12 @@ class ShowActions:
 class HudFacts:
     """What this show's own HUD says about the set it is playing.
 
-    All of it is the players' vocabulary, because the panel is the players'
+    All of it is the Funestras' vocabulary, because the panel is the Funestras'
     panel: ``order_label`` is how the set is ordered — "Latest" for Recents and
     for a folder opened on one of its pictures, both of which play newest
     first, and "Shuffle" for everything else; ``favorite_ids`` is which of
     the items are favorites, so the star readout and the F-mode narrowing mean
-    here what they mean on a player.  Whether the show is LOOPING is not a
+    here what they mean on a Funestra.  Whether the show is LOOPING is not a
     fact about the set at all: a loop is one axis of the map played round and
     round, started and ended from the show, and the set is what it browses
     between loops.

@@ -16,9 +16,9 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from funestra_core.hud_placement import HudCorner
+from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PIL import Image
-from player_core.hud_placement import HudCorner
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from PyQt6.QtCore import Qt
 
 from origenerator import gallery
@@ -287,20 +287,20 @@ class FakeRect:
 class FakeSession:
     """A hosting Fun Time session reduced to the three things a show asks of one.
 
-    *players* is which sides it hands over as players, by the channel it names
+    *Funestras* is which sides it hands over as Funestras, by the channel it names
     for each; a side it names none for is one a window of this app's covers.
     """
 
     dashboard_cmd_file = None
 
-    def __init__(self, players=None):
-        self.players = players or {}
+    def __init__(self, funestras=None):
+        self.funestras = funestras or {}
 
     def region_rect(self, side):
         return FakeRect(0 if side == LANDSCAPE else 1920, 0, 960, 540)
 
-    def player(self, side):
-        return self.players.get(side)
+    def funestra(self, side):
+        return self.funestras.get(side)
 
 
 class FakeJobQueue:
@@ -476,7 +476,7 @@ def shows(monkeypatch):
         return show
 
     monkeypatch.setattr(module, "SlideshowView", build_show)
-    monkeypatch.setattr(module, "PlayerShow", build_show)
+    monkeypatch.setattr(module, "FunestraShow", build_show)
     monkeypatch.setattr(module.ShowDirector, "_wear_the_hud", lambda self, view, side: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
@@ -656,7 +656,7 @@ def test_a_director_shows_a_slideshow_while_one_it_could_hand_a_session_is_up(sh
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
-    """A show on a player opens on its side's whole library, which the browser
+    """A show on a Funestra opens on its side's whole library, which the browser
     is not listing — so versions read off the browser's rows named none of the
     pictures on screen, and every versions button on the band was drawn faded
     however many enhancements that library held (2026-09-19)."""
@@ -1038,7 +1038,7 @@ def test_a_show_asks_this_director_for_the_way_out_of_a_loop(shows):
 
 
 def test_a_region_show_ending_comes_back_on_the_base_state(shows):
-    # In origenerator mode the player underneath is blacked for the whole mode,
+    # In origenerator mode the Funestra underneath is blacked for the whole mode,
     # so a region left empty is a black rectangle rather than a fallback.
     browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
@@ -1223,7 +1223,7 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(shows):
 
 
 def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
-    # On a player that word is F-mode, and a show is meant to read the same way.
+    # On a Funestra that word is F-mode, and a show is meant to read the same way.
 
     class Spoken:
         shelf_key = FAVORITES_KEY
@@ -1299,8 +1299,8 @@ def test_leaving_a_show_picks_its_slide_where_the_show_was_playing(shows):
 
 
 def test_a_region_show_is_placed_muted_frameless_and_on_top(shows):
-    # The satellite player it covers is topmost itself, and the session's main
-    # player owns the room's audio.
+    # The Satellite Funestra it covers is topmost itself, and the session's main
+    # Funestra owns the room's audio.
     director, _host, made = shows(fun_time=FakeSession())
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
@@ -1321,11 +1321,11 @@ def test_a_standalone_show_takes_the_whole_monitor(shows):
     assert made[0].window_title is None
 
 
-def test_a_session_that_hands_over_its_players_gets_the_show_on_one(shows):
-    # The player IS the surface: the show is handed that side's channel, and no
+def test_a_session_that_hands_over_its_funestras_gets_the_show_on_one(shows):
+    # The Funestra IS the surface: the show is handed that side's channel, and no
     # window of this app's is placed, shown or raised over the region.
     channel = object()
-    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: channel}))
+    director, _host, made = shows(fun_time=FakeSession(funestras={PORTRAIT: channel}))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
@@ -1335,29 +1335,29 @@ def test_a_session_that_hands_over_its_players_gets_the_show_on_one(shows):
     assert director.region_show(PORTRAIT) is made[0]
 
 
-def test_a_show_on_a_player_says_its_lines_in_the_gallerys_caption(shows):
-    # A player has no corner to flash a line in, and the gallery's own caption
-    # is on screen beside the players in a session.
-    director, host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+def test_a_show_on_a_funestra_says_its_lines_in_the_gallerys_caption(shows):
+    # A Funestra has no corner to flash a line in, and the gallery's own caption
+    # is on screen beside the Funestras in a session.
+    director, host, made = shows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
     assert made[0].opened_with["say"] == host.say
 
 
-def test_a_show_on_a_player_takes_runs_from_what_is_in_flight_not_a_double_clicks_frame(
+def test_a_show_on_a_funestra_takes_runs_from_what_is_in_flight_not_a_double_clicks_frame(
         shows):
-    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+    director, _host, made = shows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT, frame=b"frame")
 
     assert "frame" not in made[0].opened_with
 
 
-def test_a_side_the_session_named_no_player_for_still_gets_a_window(shows):
-    # An older session names no players, and its regions want a window of this
+def test_a_side_the_session_named_no_funestra_for_still_gets_a_window(shows):
+    # An older session names no Funestras, and its regions want a window of this
     # app's over them exactly as before.
-    director, _host, made = shows(fun_time=FakeSession(players={PORTRAIT: object()}))
+    director, _host, made = shows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
 
     director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
 
@@ -1622,7 +1622,7 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(shows):
 
 def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
     """What a show asks the gallery on its own behalf now includes what the
-    library says about an item — and the star's undoing, for the players'
+    library says about an item — and the star's undoing, for the Funestras'
     "weird" over a favorite."""
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a red fox", seed=2)]
     director, host, made = shows(FakeHost(rows=rows), db=FakeDB(rows))
@@ -1987,10 +1987,10 @@ def test_a_latest_show_turns_down_a_run_asked_for_in_the_other_shape(shows):
     assert made[0].generating == []
 
 
-def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_player_leading_with_it(shows):
+def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_leading_with_it(shows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     director, host, made = shows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(
-        players={PORTRAIT: object(), LANDSCAPE: object()}))
+        funestras={PORTRAIT: object(), LANDSCAPE: object()}))
     host.queue = ([_being_made("g-run")], 0)
 
     director.open([], folder_items=[("a.png", "image", "g1", None)], start=0,

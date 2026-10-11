@@ -1,8 +1,8 @@
-"""A show handed to one of a session's players rather than drawn in a window.
+"""A show handed to one of a session's Funestras rather than drawn in a window.
 
-What this covers is the channel between the two: the list the player is handed,
+What this covers is the channel between the two: the list the Funestra is handed,
 the verbs a press sends it, the panel this app publishes for it, and the slide
-on screen — which is the player's answer, read back, not this app's own.
+on screen — which is the Funestra's answer, read back, not this app's own.
 """
 from __future__ import annotations
 
@@ -10,18 +10,18 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from player_core.file_channel import consume_command_file
-from player_core.hud_status import LATEST_LABEL
-from player_core.player_verbs import play_file
-from player_core.playlist import PlaylistItem, read_playlist
-from player_core.satellite_hud import parse_hud
-from player_core.status import PlayerStatus, status_fields
+from funestra_core.file_channel import consume_command_file
+from funestra_core.funestra_verbs import play_file
+from funestra_core.hud_status import LATEST_LABEL
+from funestra_core.playlist import PlaylistItem, read_playlist
+from funestra_core.satellite_hud import parse_hud
+from funestra_core.status import FunestraStatus, status_fields
 
-from origenerator.fun_time_mode import PlayerChannel
+from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import funscript_path_for
 from origenerator.gui import show_pass
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.player_show import PlayerShow
+from origenerator.gui.funestra_show import FunestraShow
 from origenerator.gui.show_map import MapNeighbors, MapRow
 from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_view import SlideshowView
@@ -32,15 +32,15 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
 FRAME = b"\x89PNG\r\n\x1a\n a fabricated frame"
 
 # A window has a picture of its own to put a run's frames on and a panel it
-# wears -- which it is told where to wear; a player has neither, and the
+# wears -- which it is told where to wear; a Funestra has neither, and the
 # session draws its panel wherever its own keys have put it.
 ONLY_A_WINDOW = {"wear_the_hud", "hud_side", "set_hud_place", "set_playlist",
                  "show_frame", "show_landed", "press", "follow_the_funestra",
                  "item_label", "refresh_panel"}
 
 
-def _channel(tmp_path: Path) -> PlayerChannel:
-    return PlayerChannel(
+def _channel(tmp_path: Path) -> FunestraChannel:
+    return FunestraChannel(
         playlist=tmp_path / "portrait.tsv",
         command_file=tmp_path / "portrait_cmd.txt",
         status_file=tmp_path / "portrait_status.txt",
@@ -48,36 +48,36 @@ def _channel(tmp_path: Path) -> PlayerChannel:
     )
 
 
-def _show(qtbot, tmp_path, items=_ITEMS, **fields) -> PlayerShow:
-    """A show driving a player whose files are this test's own.
+def _show(qtbot, tmp_path, items=_ITEMS, **fields) -> FunestraShow:
+    """A show driving a Funestra whose files are this test's own.
 
-    Its poll timer is stopped and :meth:`PlayerShow.tick` called by hand, so a
-    test says when the player is next read rather than racing it.
+    Its poll timer is stopped and :meth:`FunestraShow.tick` called by hand, so a
+    test says when the Funestra is next read rather than racing it.
     """
-    show = PlayerShow(items, side="portrait", channel=_channel(tmp_path),
+    show = FunestraShow(items, side="portrait", channel=_channel(tmp_path),
                       frames=FrameFiles(tmp_path / "frames"), shuffle=in_order, **fields)
     show._timer.stop()
     return show
 
 
-def _sent(show: PlayerShow) -> list[str]:
-    """The verbs waiting on the player's command file, drained as it drains
+def _sent(show: FunestraShow) -> list[str]:
+    """The verbs waiting on the Funestra's command file, drained as it drains
     them — its own reader, so a spelling this app got wrong cannot pass."""
     return consume_command_file(show.channel.command_file, uppercase=False)
 
 
-def _says(show: PlayerShow, **fields) -> None:
-    """The player publishing what it is showing, as its status writer does."""
-    _player_says(show.channel, **fields)
+def _says(show: FunestraShow, **fields) -> None:
+    """The Funestra publishing what it is showing, as its status writer does."""
+    _funestra_says(show.channel, **fields)
 
 
-def _player_says(channel: PlayerChannel, **fields) -> None:
-    lines = status_fields(PlayerStatus(**fields))
+def _funestra_says(channel: FunestraChannel, **fields) -> None:
+    lines = status_fields(FunestraStatus(**fields))
     channel.status_file.write_text(
         "".join(f"{key}={value}\n" for key, value in lines.items()), encoding="utf-8")
 
 
-def _show_with_the_player_on(qtbot, tmp_path, **status) -> PlayerShow:
+def _show_with_the_funestra_on(qtbot, tmp_path, **status) -> FunestraShow:
     show = _show(qtbot, tmp_path)
     _says(show, **status)
     show.tick()
@@ -96,16 +96,16 @@ def _held_open_for(path: Path, seconds: float):
         release.join()
 
 
-def test_a_show_on_a_player_answers_whatever_a_window_show_is_asked_but_a_windows_own():
+def test_a_show_on_a_funestra_answers_whatever_a_window_show_is_asked_but_a_windows_own():
     asked = {name for name in vars(SlideshowView)
              if not name.startswith("_") and not name.endswith("Event")}
 
-    assert asked - set(dir(PlayerShow)) == ONLY_A_WINDOW
+    assert asked - set(dir(FunestraShow)) == ONLY_A_WINDOW
 
 
-def test_a_show_hands_the_player_the_pass_it_is_to_play(qtbot, tmp_path):
-    """The set, in the order this show plays it, is the player's playlist —
-    read back through the very reader the player reads it with."""
+def test_a_show_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):
+    """The set, in the order this show plays it, is the Funestra's playlist —
+    read back through the very reader the Funestra reads it with."""
     show = _show(qtbot, tmp_path)
 
     played = [str(item.path) for item in read_playlist(show.channel.playlist)]
@@ -124,7 +124,7 @@ def _scripted(monkeypatch, tmp_path, *clips: str) -> dict[str, Path]:
     return scripts
 
 
-def test_a_clip_is_handed_over_with_the_script_the_player_drives_the_osr2_by(
+def test_a_clip_is_handed_over_with_the_script_the_funestra_drives_the_osr2_by(
         qtbot, tmp_path, monkeypatch):
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
     items = [("one.png", "image", "id-1"), ("clip.mp4", "video", "id-2"),
@@ -136,19 +136,19 @@ def test_a_clip_is_handed_over_with_the_script_the_player_drives_the_osr2_by(
     assert handed == [None, scripts["clip.mp4"], None]
 
 
-def test_the_player_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
+def test_the_funestra_is_told_to_read_the_list_and_how_long_a_picture_holds(qtbot, tmp_path):
     """Two verbs make the hand-over: read this list, and hold each picture for
-    the pace this app's console sets — the player owning the advance from
+    the pace this app's console sets — the Funestra owning the advance from
     there, as it does for its own clips."""
     show = _show(qtbot, tmp_path, image_dwell_ms=6000)
 
     assert _sent(show) == ["RELOAD_PLAYLIST", "SET_PACE 6"]
 
 
-def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
-    """The player walks the list by itself — a picture's pace runs out, a clip
+def test_the_show_follows_the_funestra_onto_whatever_it_moved_to(qtbot, tmp_path):
+    """The Funestra walks the list by itself — a picture's pace runs out, a clip
     ends — so which item the map lights, the star answers about and a spoken
-    "this one" means is the player's answer, read back."""
+    "this one" means is the Funestra's answer, read back."""
     show = _show(qtbot, tmp_path)
 
     _says(show, video="two.png")
@@ -158,8 +158,8 @@ def test_the_show_follows_the_player_onto_whatever_it_moved_to(qtbot, tmp_path):
     assert show.hud_map().corner.prompt_id == "id-2"
 
 
-def test_the_shows_lock_is_the_players_own(qtbot, tmp_path):
-    """A padlock on this panel is the player's repeat-one: it is told, and what
+def test_the_shows_lock_is_the_funestras_own(qtbot, tmp_path):
+    """A padlock on this panel is the Funestra's repeat-one: it is told, and what
     it says back is what the panel draws."""
     show = _show(qtbot, tmp_path)
     _sent(show)
@@ -168,14 +168,14 @@ def test_the_shows_lock_is_the_players_own(qtbot, tmp_path):
     assert _sent(show) == ["LOCK_ON"]
     assert show.locked is True
 
-    _says(show, video="one.png", locked=False)   # the player says otherwise
+    _says(show, video="one.png", locked=False)   # the Funestra says otherwise
     show.tick()
     assert show.locked is False
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
-    """Moving off a locked slide releases the lock, the way the players' own
-    prev/next cancel a lock — else the player would repeat the next one too."""
+    """Moving off a locked slide releases the lock, the way the Funestras' own
+    prev/next cancel a lock — else the Funestra would repeat the next one too."""
     show = _show(qtbot, tmp_path)
     show.show_toggle_lock()
     _sent(show)
@@ -186,7 +186,7 @@ def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
 
 
 def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):
-    """Locking is the whole gesture it is in a window: the player repeats it,
+    """Locking is the whole gesture it is in a window: the Funestra repeats it,
     and the show favorites it, asks for the better version, and hands it to the
     gallery to open."""
     asked = []
@@ -212,9 +212,9 @@ def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_firs
     assert asked == ["id-1"]
 
 
-def test_culling_tells_the_player_to_drop_it_before_deleting_it(qtbot, tmp_path):
-    """The player is playing that very file, and Windows will not move a file a
-    process still has open — so the player is told to drop it before the
+def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_path):
+    """The Funestra is playing that very file, and Windows will not move a file a
+    process still has open — so the Funestra is told to drop it before the
     generation is condemned."""
     queued_at_delete, deleted = [], []
 
@@ -235,7 +235,7 @@ def test_culling_tells_the_player_to_drop_it_before_deleting_it(qtbot, tmp_path)
 
 def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
     """The recovery bin asks every surface to let go of the files it moves; the
-    player is already letting go of this one, so asking again would move it on
+    Funestra is already letting go of this one, so asking again would move it on
     past the item after it as well."""
     released = []
 
@@ -252,8 +252,8 @@ def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
     assert "NEXT" not in released
 
 
-def test_a_file_the_player_will_not_let_go_of_is_said_rather_than_raised(qtbot, tmp_path):
-    """A player with nothing else to move on to keeps its file open for good —
+def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot, tmp_path):
+    """A Funestra with nothing else to move on to keeps its file open for good —
     a delete refused, said where the speaker can see it, not an error only the
     log ever hears of."""
     said = []
@@ -269,8 +269,8 @@ def test_a_file_the_player_will_not_let_go_of_is_said_rather_than_raised(qtbot, 
     assert said and "couldn't delete" in said[-1]
 
 
-def test_narrowing_hands_the_player_what_is_left(qtbot, tmp_path):
-    """A switch is a narrowing of what the player may reach, so the list it is
+def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
+    """A switch is a narrowing of what the Funestra may reach, so the list it is
     playing is written again with what survives."""
     show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
     _sent(show)
@@ -282,7 +282,7 @@ def test_narrowing_hands_the_player_what_is_left(qtbot, tmp_path):
     assert "RELOAD_PLAYLIST" in _sent(show)
 
 
-def test_narrowing_reaches_a_player_partway_through_reading_the_last_list(qtbot, tmp_path):
+def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
 
     with _held_open_for(show.channel.playlist, 0.1):
@@ -293,14 +293,14 @@ def test_narrowing_reaches_a_player_partway_through_reading_the_last_list(qtbot,
 
 
 def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
-    """The session draws the panel on the player, so this app publishes the
+    """The session draws the panel on the Funestra, so this app publishes the
     model for it: the show's map, its status line and the buttons it answers —
     and not the mode pair, which is the session's own to add."""
     show = _show(qtbot, tmp_path)
 
     model = parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
 
-    assert model.player == "portrait"
+    assert model.funestra == "portrait"
     assert model.corner.path == "one.png"
     assert model.seed_count == 1     # a set with no library under it maps the slide alone
     assert [button.command for row in model.rows for button in row] == [
@@ -310,7 +310,7 @@ def test_the_panel_this_app_publishes_is_the_shows_own_band(qtbot, tmp_path):
 
 
 def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path):
-    """The same jump a click makes on a player's own map, and the same lock its
+    """The same jump a click makes on a Funestra's own map, and the same lock its
     double-click takes."""
     show = _show(qtbot, tmp_path)
     _sent(show)
@@ -320,8 +320,8 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it(qtbot, tmp_path
     assert _sent(show) == ["PLAY_FILE three.png", "LOCK_ON"]
 
 
-def test_a_new_pace_reaches_the_player(qtbot, tmp_path):
-    """The pace is the player's to keep — it holds a picture that long and then
+def test_a_new_pace_reaches_the_funestra(qtbot, tmp_path):
+    """The pace is the Funestra's to keep — it holds a picture that long and then
     ends the file, which is how a slide moves on at all."""
     show = _show(qtbot, tmp_path)
     _sent(show)
@@ -333,7 +333,7 @@ def test_a_new_pace_reaches_the_player(qtbot, tmp_path):
 
 def test_a_show_that_is_over_gives_the_side_back(qtbot, tmp_path):
     """The panel goes with it, so the session draws its own again on that
-    player rather than leaving this app's last one up."""
+    Funestra rather than leaving this app's last one up."""
     show = _show(qtbot, tmp_path)
 
     show.close()
@@ -342,7 +342,7 @@ def test_a_show_that_is_over_gives_the_side_back(qtbot, tmp_path):
     assert show.channel.hud_file.read_text(encoding="utf-8") == ""
 
 
-def test_a_show_that_is_over_takes_its_panel_down_though_the_player_is_reading_it(
+def test_a_show_that_is_over_takes_its_panel_down_though_the_funestra_is_reading_it(
         qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
 
@@ -352,7 +352,7 @@ def test_a_show_that_is_over_takes_its_panel_down_though_the_player_is_reading_i
     assert show.channel.hud_file.read_text(encoding="utf-8") == ""
 
 
-def test_a_show_on_the_players_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
+def test_a_show_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
     # The same promise as the full-screen slideshow: whichever way a show ends,
     # the picture it was on is the one to find in the gallery afterwards.
     show = _show(qtbot, tmp_path)
@@ -366,24 +366,24 @@ def test_a_show_on_the_players_hands_its_slide_over_as_it_closes(qtbot, tmp_path
     assert handed == [on_screen]
 
 
-def test_a_new_set_lands_the_player_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_a_new_set_lands_the_funestra_on_its_slide_over_another_item_of_it(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
 
     assert _sent(show) == ["PLAY_FILE three.png", "RELOAD_PLAYLIST", "SET_PACE 0"]
 
 
-def test_a_new_set_does_not_reload_a_player_already_on_its_slide(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="three.png")
+def test_a_new_set_does_not_reload_a_funestra_already_on_its_slide(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="three.png")
 
     show.play(_ITEMS, start=2, shuffle=in_order, image_dwell_ms=0)
 
     assert _sent(show) == ["RELOAD_PLAYLIST", "SET_PACE 0"]
 
 
-def test_the_show_names_the_generation_the_player_says_it_is_locked_on(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+def test_the_show_names_the_generation_the_funestra_says_it_is_locked_on(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     assert show.locked_on is None
 
     _says(show, video="two.png", locked=True)
@@ -393,7 +393,7 @@ def test_the_show_names_the_generation_the_player_says_it_is_locked_on(qtbot, tm
 
 
 def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png", locked=True)
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png", locked=True)
 
     show.play(_ITEMS, start=1, shuffle=in_order)
 
@@ -401,8 +401,8 @@ def test_a_new_set_lets_go_of_the_lock_the_last_one_had(qtbot, tmp_path):
     assert show.locked is False
 
 
-def test_a_side_reset_lands_the_player_on_the_top_of_its_base_set(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+def test_a_side_reset_lands_the_funestra_on_the_top_of_its_base_set(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
     show.retune([("four.png", "image", "id-4"), ("five.png", "image", "id-5")])
 
@@ -411,8 +411,8 @@ def test_a_side_reset_lands_the_player_on_the_top_of_its_base_set(qtbot, tmp_pat
     assert show.hud_prompt_id == top.prompt_id
 
 
-def test_a_reset_with_no_base_set_lands_the_player_on_the_top_of_its_own(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+def test_a_reset_with_no_base_set_lands_the_funestra_on_the_top_of_its_own(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
     show.reset_in_place()
 
@@ -420,17 +420,17 @@ def test_a_reset_with_no_base_set_lands_the_player_on_the_top_of_its_own(qtbot, 
     assert show.hud_prompt_id == "id-1"
 
 
-def test_a_show_picked_back_up_lands_the_player_where_the_last_one_left_off(
+def test_a_show_picked_back_up_lands_the_funestra_where_the_last_one_left_off(
         qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     assert show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-3"))
 
     assert _sent(show)[0] == "PLAY_FILE three.png"
 
 
-def test_a_show_picked_back_up_locked_locks_the_player_on_its_slide(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_a_show_picked_back_up_locked_locks_the_funestra_on_its_slide(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-3", locked=True))
 
@@ -457,7 +457,7 @@ _ONE_LISTED_AT_ITS_NEWEST = {"one.png": [("one.png", "image", "Enhance 2"),
 
 def test_a_show_picked_back_up_on_another_version_plays_that_version_locked(
         qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     show.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
 
     show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-1",
@@ -467,9 +467,9 @@ def test_a_show_picked_back_up_on_another_version_plays_that_version_locked(
     assert show.state().level_index == 1
 
 
-def test_the_player_reaching_the_slide_a_show_resumed_on_keeps_its_version(
+def test_the_funestra_reaching_the_slide_a_show_resumed_on_keeps_its_version(
         qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
     show.set_levels(_ONE_LISTED_AT_ITS_NEWEST)
     show.resume(ShowState(order=("id-1", "id-2", "id-3"), current="id-1", level_index=1))
 
@@ -479,7 +479,7 @@ def test_the_player_reaching_the_slide_a_show_resumed_on_keeps_its_version(
     assert show.state().level_index == 1
 
 
-def test_a_show_on_a_player_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
+def test_a_show_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
 
     show.take_up(ShowFilters(enhanced=True))
@@ -489,15 +489,15 @@ def test_a_show_on_a_player_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
         "two.png", "three.png"]
 
 
-def test_what_esc_keeps_is_the_whole_set_standing_where_the_player_is(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+def test_what_esc_keeps_is_the_whole_set_standing_where_the_funestra_is(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
     assert [str(item.path) for item in show.whole_set()] == ["one.png", "two.png", "three.png"]
     assert show.state().current == "id-2"
 
 
-def test_a_show_opened_on_a_slide_lands_the_player_on_it(qtbot, tmp_path):
-    _player_says(_channel(tmp_path), video="one.png")
+def test_a_show_opened_on_a_slide_lands_the_funestra_on_it(qtbot, tmp_path):
+    _funestra_says(_channel(tmp_path), video="one.png")
 
     show = _show(qtbot, tmp_path, start=2)
 
@@ -506,9 +506,9 @@ def test_a_show_opened_on_a_slide_lands_the_player_on_it(qtbot, tmp_path):
 
 
 def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
-    """The player holds the file open, so the way to let go is to move on —
+    """The Funestra holds the file open, so the way to let go is to move on —
     what the gallery asks of every surface before it moves files."""
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.release_media(["one.png"])
 
@@ -526,7 +526,7 @@ def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_p
     assert asked == [(show, True), (show, False)]
 
 
-def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot, tmp_path):
+def test_a_reorder_lets_go_and_hands_the_funestra_the_new_list_from_its_top(qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
     show.show_toggle_lock()
     _sent(show)
@@ -541,7 +541,7 @@ def test_a_reorder_lets_go_and_hands_the_player_the_new_list_from_its_top(qtbot,
     assert show.hud_order_label == LATEST_LABEL
 
 
-def test_a_reorder_keeping_the_slide_leaves_the_player_on_the_picture_it_has(qtbot, tmp_path):
+def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_picture_it_has(qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
     _sent(show)
 
@@ -554,7 +554,7 @@ def test_a_reorder_keeping_the_slide_leaves_the_player_on_the_picture_it_has(qtb
 
 
 def test_a_reorder_of_a_show_not_locked_sends_no_unlock(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
     show.reorder(_ITEMS, latest=True)
 
@@ -577,11 +577,11 @@ _LEVELS = {"one.png": [("one_enhanced.png", "image", "Enhance 2"),
 
 
 class TestVersions:
-    """Stepping an item's own copies on the player, the axis the shifted keys
+    """Stepping an item's own copies on the Funestra, the axis the shifted keys
     and the band's versions button share with a show in a window."""
 
     def test_a_step_plays_the_other_copy_of_the_item_on_screen(self, qtbot, tmp_path):
-        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         show.set_levels(_LEVELS)
 
         show.show_step_version(1)
@@ -603,7 +603,7 @@ class TestVersions:
         assert _sent(show) == [f"PLAY_FILE clip.mp4	{scripts['clip.mp4']}"]
 
     def test_stepping_on_and_back_walks_the_copies_in_order(self, qtbot, tmp_path):
-        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         show.set_levels(_LEVELS)
 
         show.show_step_version(1)
@@ -616,7 +616,7 @@ class TestVersions:
             self, qtbot, tmp_path):
         """Nothing to compare it against, and the shift was the whole point of
         the press — so it does nothing rather than walking to the neighbor."""
-        show = _show_with_the_player_on(qtbot, tmp_path, video="two.png")
+        show = _show_with_the_funestra_on(qtbot, tmp_path, video="two.png")
         show.set_levels(_LEVELS)
 
         show.show_step_version(1)
@@ -625,7 +625,7 @@ class TestVersions:
 
     def test_the_band_lights_its_versions_button_only_where_there_are_some(
             self, qtbot, tmp_path):
-        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         assert show.has_other_versions is False
 
         show.set_levels(_LEVELS)
@@ -636,7 +636,7 @@ class TestVersions:
             self, qtbot, tmp_path):
         """A step on the new item must offer its own newest copy, not carry the
         place the last item was stepped to."""
-        show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+        show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
         show.set_levels({**_LEVELS,
                          "two.png": [("two_enhanced.png", "image", "Enhance 1"),
                                      ("two.png", "image", "Original")]})
@@ -674,8 +674,8 @@ def test_the_panel_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
     assert (model.current_action, model.seed_count, model.action_count) == ("fox", 2, 2)
 
 
-def test_a_loop_hands_the_player_the_row_to_play_and_its_ending_hands_back_the_set(qtbot, tmp_path):
-    """The row becomes the player's list, the item on screen first so it keeps
+def test_a_loop_hands_the_funestra_the_row_to_play_and_its_ending_hands_back_the_set(qtbot, tmp_path):
+    """The row becomes the Funestra's list, the item on screen first so it keeps
     playing; the loop key ends it and the set comes back the same way."""
     said = []
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around), say=said.append)
@@ -714,7 +714,7 @@ def test_a_show_closed_looping_a_row_reopens_looping_it(qtbot, tmp_path):
 def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
     """A row worn down to one picture plays that picture over and over, which
     is the lock — so the cull that wore it down ends the loop and tells the
-    player to lock what is left.  Only the lock: none of what a pressed lock
+    Funestra to lock what is left.  Only the lock: none of what a pressed lock
     also does, since nobody pressed one."""
     asked, starred, opened = [], [], []
     show = _show(qtbot, tmp_path,
@@ -733,7 +733,7 @@ def test_a_cull_that_leaves_one_picture_in_the_row_locks_it(qtbot, tmp_path):
 
 def test_a_forward_step_in_a_row_down_to_one_picture_hands_the_set_back(qtbot, tmp_path):
     """A cull can leave the row holding only the picture on screen, and a
-    player stepping round a list of one plays that picture again — so the step
+    Funestra stepping round a list of one plays that picture again — so the step
     ends the loop first, and what it steps into is the set coming back."""
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
     show.show_loop("seed")                      # the row: one.png and one-b.png
@@ -771,7 +771,7 @@ def _acts(prompt_ids):
     return {prompt_id: _NAMED_FOR.get(prompt_id, "") for prompt_id in prompt_ids}
 
 
-def test_a_rows_button_narrows_the_show_to_that_act_and_hands_the_player_what_is_left(
+def test_a_rows_button_narrows_the_show_to_that_act_and_hands_the_funestra_what_is_left(
         qtbot, tmp_path):
     said = []
     show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts), say=said.append)
@@ -837,7 +837,7 @@ def test_a_configuration_rows_button_plays_it_and_loops_its_seeds(qtbot, tmp_pat
     assert said == ["Looping seeds: 2"]
 
 
-def test_a_filter_past_the_item_on_screen_sends_the_player_to_what_is_left(qtbot, tmp_path):
+def test_a_filter_past_the_item_on_screen_sends_the_funestra_to_what_is_left(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, actions=ShowActions(acts=_acts))
     _sent(show)
 
@@ -865,7 +865,7 @@ def test_clearing_the_filters_lifts_the_act_filter_with_the_other_two(qtbot, tmp
     assert show.pass_size() == 3
 
 
-def test_the_pass_is_as_long_as_what_the_player_was_handed(qtbot, tmp_path):
+def test_the_pass_is_as_long_as_what_the_funestra_was_handed(qtbot, tmp_path):
     assert _show(qtbot, tmp_path).pass_size() == 3
 
 
@@ -882,7 +882,7 @@ def test_ending_a_loop_says_so_and_ending_none_says_nothing(qtbot, tmp_path):
 
 def test_a_loop_button_for_a_row_of_one_picture_locks_it_instead(qtbot, tmp_path):
     """A row holding only the picture on screen cannot be looped, and the press
-    still means "this one" — so the player is told to lock it, the way its own
+    still means "this one" — so the Funestra is told to lock it, the way its own
     loop button locks a clip whose group holds only that clip."""
     said = []
     show = _show(qtbot, tmp_path, say=said.append)
@@ -906,7 +906,7 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     assert said == ["Locked", "Unlocked"]
 
 
-def test_more_seeds_hands_the_player_the_wider_row(qtbot, tmp_path):
+def test_more_seeds_hands_the_funestra_the_wider_row(qtbot, tmp_path):
     said = []
     beyond = (Slide("far.png", "image", "id-far"),)
     show = _show(qtbot, tmp_path, say=said.append, actions=ShowActions(
@@ -960,7 +960,7 @@ def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
 
 
 def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
-    """The players' own "weird": a favorite loses its star and the player is
+    """The Funestras' own "weird": a favorite loses its star and the Funestra is
     told to move on — nothing is dropped and nothing deleted."""
     unfavorited, deleted = [], []
     show = _show(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),
@@ -975,7 +975,7 @@ def test_weird_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     assert played == ["one.png", "two.png", "three.png"]   # still in the list
 
 
-def test_entering_a_loop_lets_go_of_a_locked_item_as_a_player_does(qtbot, tmp_path):
+def test_entering_a_loop_lets_go_of_a_locked_item_as_a_funestra_does(qtbot, tmp_path):
     show = _show(qtbot, tmp_path, actions=ShowActions(neighbors=_around))
     show.show_toggle_lock()
     _sent(show)
@@ -998,7 +998,7 @@ def test_the_loop_key_lets_go_of_a_locked_item_when_it_finds_a_row_to_loop(qtbot
     assert (show.locked, show.hud_map().loop) == (False, "seed")
 
 
-def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path):
+def test_a_folder_handed_to_a_funestra_publishes_its_seed_loop_lit(qtbot, tmp_path):
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
     show = _show(qtbot, tmp_path, items=folder, actions=ShowActions(neighbors=_around))
 
@@ -1009,12 +1009,12 @@ def test_a_folder_handed_to_a_player_publishes_its_seed_loop_lit(qtbot, tmp_path
 
 # --- what is being made of the item on screen ---------------------------------
 
-def _panel(show: PlayerShow):
+def _panel(show: FunestraShow):
     return parse_hud(show.channel.hud_file.read_text(encoding="utf-8"))
 
 
 def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.set_levels(_LEVELS)
 
@@ -1022,7 +1022,7 @@ def test_the_panel_names_the_version_of_the_item_on_screen(qtbot, tmp_path):
 
 
 def test_the_panel_says_whether_a_better_version_is_being_made_or_waiting(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.note_enhancing({"id-1": "queued"})
     assert _panel(show).item_note == "Enhancement queued"
@@ -1039,7 +1039,7 @@ def test_a_lock_that_asks_for_a_better_version_says_so_on_the_panel(qtbot, tmp_p
 
 
 def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_panel(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_enhancing({"id-1": "running"})
 
     show.note_enhanced("id-1", "one_enhanced.png")
@@ -1067,7 +1067,7 @@ def test_a_show_picked_back_up_plays_what_is_being_made_before_where_it_left_off
     assert "PLAY_FILE three.png" in _sent(show)
 
 
-def _clocked_show(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> PlayerShow:
+def _clocked_show(qtbot, tmp_path, now, image_dwell_ms=4000, **fields) -> FunestraShow:
     show = _show(qtbot, tmp_path, image_dwell_ms=image_dwell_ms, clock=lambda: now[0],
                  **fields)
     _says(show, video="one.png")
@@ -1088,7 +1088,7 @@ def test_an_item_being_enhanced_is_moved_on_after_half_the_pace(qtbot, tmp_path)
     assert _sent(show) == ["NEXT"]
 
 
-def test_the_time_a_frozen_player_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
+def test_the_time_a_frozen_funestra_holds_an_item_being_made_does_not_count(qtbot, tmp_path):
     now = [0.0]
     show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
 
@@ -1102,7 +1102,7 @@ def test_the_time_a_frozen_player_holds_an_item_being_made_does_not_count(qtbot,
     assert _sent(show) == []
 
 
-def test_an_item_being_made_that_the_player_holds_is_not_moved_on(qtbot, tmp_path):
+def test_an_item_being_made_that_the_funestra_holds_is_not_moved_on(qtbot, tmp_path):
     now = [0.0]
     show = _clocked_show(qtbot, tmp_path, now, hud=HudFacts(enhancing={"id-1": "running"}))
 
@@ -1139,7 +1139,7 @@ def test_an_item_being_made_is_not_moved_on_while_a_request_is_spoken_over_it(
     assert "NEXT" not in _sent(show)
 
 
-def test_a_show_told_to_lead_with_what_is_being_made_sends_the_player_there(qtbot, tmp_path):
+def test_a_show_told_to_lead_with_what_is_being_made_sends_the_funestra_there(qtbot, tmp_path):
     show = _show(qtbot, tmp_path)
     show.note_enhancing({"id-3": "running"})
     _sent(show)
@@ -1160,8 +1160,8 @@ def test_an_item_whose_enhancement_starts_while_it_is_up_keeps_its_whole_time(qt
     assert "NEXT" not in _sent(show)
 
 
-def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_player(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_funestra(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_enhanced("id-1", "one_enhanced.png")
     _says(show, video="one_enhanced.png")
     show.tick()
@@ -1174,8 +1174,8 @@ def test_a_picture_enhanced_during_the_show_steps_its_versions_on_the_player(qtb
     assert _sent(show) == ["PLAY_FILE one.png"]
 
 
-def test_a_run_being_made_joins_the_players_list_on_its_first_frame(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_a_run_being_made_joins_the_funestras_list_on_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.note_generating("id-run", FRAME)
 
@@ -1186,8 +1186,8 @@ def test_a_run_being_made_joins_the_players_list_on_its_first_frame(qtbot, tmp_p
     assert "RELOAD_PLAYLIST" in _sent(show)
 
 
-def test_the_player_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_the_funestra_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_generating("id-run", FRAME)
     _sent(show)
 
@@ -1199,16 +1199,16 @@ def test_the_player_is_sent_to_a_run_being_made_as_its_first_frame(qtbot, tmp_pa
 
 
 def _frame_shown(sent: list[str]) -> bytes | None:
-    """What the last SHOW_FRAME among *sent* has the player paint, read off
+    """What the last SHOW_FRAME among *sent* has the Funestra paint, read off
     the file it names."""
     shown = [line.removeprefix("SHOW_FRAME ") for line in sent
              if line.startswith("SHOW_FRAME ")]
     return Path(shown[-1]).read_bytes() if shown else None
 
 
-def test_a_player_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbot,
+def test_a_funestra_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbot,
                                                                           tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_generating("id-run", FRAME)
     first_frame = read_playlist(show.channel.playlist)[1].path
     _sent(show)
@@ -1220,8 +1220,8 @@ def test_a_player_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbot,
     assert _frame_shown(_sent(show)) == FRAME
 
 
-def _show_with_the_player_on_a_run(qtbot, tmp_path) -> PlayerShow:
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def _show_with_the_funestra_on_a_run(qtbot, tmp_path) -> FunestraShow:
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_generating("id-run", FRAME)
     _says(show, video=str(read_playlist(show.channel.playlist)[1].path))
     show.tick()
@@ -1229,16 +1229,16 @@ def _show_with_the_player_on_a_run(qtbot, tmp_path) -> PlayerShow:
     return show
 
 
-def test_a_newer_frame_of_the_run_on_the_player_goes_to_it_at_once(qtbot, tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+def test_a_newer_frame_of_the_run_on_the_funestra_goes_to_it_at_once(qtbot, tmp_path):
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
 
     show.note_generating("id-run", FRAME + b" one step further")
 
     assert _frame_shown(_sent(show)) == FRAME + b" one step further"
 
 
-def test_a_run_that_lands_is_its_file_on_the_player_from_then_on(qtbot, tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+def test_a_run_that_lands_is_its_file_on_the_funestra_from_then_on(qtbot, tmp_path):
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
     first_frame = read_playlist(show.channel.playlist)[1].path
 
     show.note_added("run.png", "image", "id-run")
@@ -1249,8 +1249,8 @@ def test_a_run_that_lands_is_its_file_on_the_player_from_then_on(qtbot, tmp_path
     assert not first_frame.exists()
 
 
-def test_a_run_that_stops_being_made_leaves_the_players_list(qtbot, tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+def test_a_run_that_stops_being_made_leaves_the_funestras_list(qtbot, tmp_path):
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
     first_frame = read_playlist(show.channel.playlist)[1].path
 
     show.note_in_flight(set())
@@ -1272,25 +1272,25 @@ def test_a_show_left_with_nothing_once_its_run_stops_is_over(qtbot, tmp_path):
 
 
 def test_a_show_that_closes_takes_its_frames_with_it(qtbot, tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
 
     show.close()
 
     assert list((tmp_path / "frames").iterdir()) == []
 
 
-def test_a_picture_being_enhanced_on_the_player_shows_the_enhancement_coming_in(
+def test_a_picture_being_enhanced_on_the_funestra_shows_the_enhancement_coming_in(
         qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
     show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
 
     assert _frame_shown(_sent(show)) == FRAME
 
 
-def test_a_better_version_landing_on_the_players_picture_goes_up_on_its_move(qtbot,
+def test_a_better_version_landing_on_the_funestras_picture_goes_up_on_its_move(qtbot,
                                                                           tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
     _sent(show)
 
@@ -1303,8 +1303,8 @@ def test_a_better_version_landing_on_the_players_picture_goes_up_on_its_move(qtb
     assert _sent(show) == []
 
 
-def test_an_enhancement_that_stops_takes_its_frame_off_the_player(qtbot, tmp_path):
-    show = _show_with_the_player_on(qtbot, tmp_path, video="one.png")
+def test_an_enhancement_that_stops_takes_its_frame_off_the_funestra(qtbot, tmp_path):
+    show = _show_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     show.note_enhancing({"id-1": "running"}, {"id-1": FRAME})
     _sent(show)
 
@@ -1313,9 +1313,9 @@ def test_an_enhancement_that_stops_takes_its_frame_off_the_player(qtbot, tmp_pat
     assert _sent(show) == ["CLEAR_FRAME"]
 
 
-def test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame(qtbot,
+def test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame(qtbot,
                                                                           tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
     show.show_cull()
 
     show.note_generating("id-run", FRAME + b" one step further")
@@ -1324,9 +1324,9 @@ def test_a_run_culled_from_the_player_does_not_come_back_on_its_next_frame(qtbot
     assert list((tmp_path / "frames").iterdir()) == []
 
 
-def test_a_run_that_lands_after_the_player_moved_on_is_the_players_next_item(qtbot,
+def test_a_run_that_lands_after_the_funestra_moved_on_is_the_funestras_next_item(qtbot,
                                                                              tmp_path):
-    show = _show_with_the_player_on_a_run(qtbot, tmp_path)
+    show = _show_with_the_funestra_on_a_run(qtbot, tmp_path)
     _says(show, video="two.png")
     show.tick()
 
@@ -1343,7 +1343,7 @@ def _row_only(prompt_id):
             if prompt_id == "id-1" else MapNeighbors())
 
 
-def test_taking_the_loop_off_a_folder_on_a_player_asks_for_the_regions_library(
+def test_taking_the_loop_off_a_folder_on_a_funestra_asks_for_the_regions_library(
         qtbot, tmp_path):
     said, widened = [], []
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
@@ -1355,7 +1355,7 @@ def test_taking_the_loop_off_a_folder_on_a_player_asks_for_the_regions_library(
     assert (widened, said) == ([show], ["Loop off"])
 
 
-def test_the_loop_key_off_a_folder_on_a_player_leaves_it_in_one_press(qtbot, tmp_path):
+def test_the_loop_key_off_a_folder_on_a_funestra_leaves_it_in_one_press(qtbot, tmp_path):
     said, widened = [], []
     folder = [("one.png", "image", "id-1"), ("one-b.png", "image", "id-1b")]
     show = _show(qtbot, tmp_path, items=folder, say=said.append, actions=ShowActions(

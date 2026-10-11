@@ -1,6 +1,6 @@
 """The one Funestra a standalone Origenerator activates for a Slideshow, in a pane of the show's window.
 
-The Funestra is player_core's window (:class:`player_core.funestra.Funestra`):
+The Funestra is player_core's window (:class:`funestra_core.funestra.Funestra`):
 it plays what it is handed, draws its own panel over the picture, answers the
 presses on it, and moves slowly over a still while it holds the screen.  Here
 it draws into a native window of this pane's, and the Slideshow runs on it the
@@ -10,7 +10,7 @@ every press, given a pass of its own each frame.
 The engine is handed a window, so it cannot exist before there is one to hand
 it; a pass handed over before then is kept and opened on the moment the pane
 is first shown.  A platform with no windows in it -- the suite's -- never
-shows one, and a test hands the pane a player of its own instead.  What has
+shows one, and a test hands the pane an engine of its own instead.  What has
 nothing to open yet -- the wait before a run's first frame -- is a line on a
 label, which the picture replaces.
 """
@@ -22,8 +22,8 @@ import threading
 import time
 from pathlib import Path
 
-from player_core.funestra import Channels, Funestra
-from player_core.playlist import PlaylistItem
+from funestra_core.funestra import Channels, Funestra
+from funestra_core.playlist import PlaylistItem
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
@@ -44,14 +44,14 @@ WHEEL_NOTCH = 120
 
 class FunestraPane(QWidget):
     def __init__(self, parent=None, *, user, panel, on_double_click=None, on_open=None,
-                 player_for=None):
+                 engine_for=None):
         super().__init__(parent)
         self._user = user
         self._panel = panel
         self._on_double_click = on_double_click
         self._on_open = on_open
-        self._player_for = player_for
-        self._player = None
+        self._engine_for = engine_for
+        self._engine = None
         self._funestra: Funestra | None = None
         self._owed: tuple[list[PlaylistItem], Path | None] | None = None
         self._muted = False
@@ -112,14 +112,14 @@ class FunestraPane(QWidget):
     def _open_if_ready(self) -> None:
         if self._funestra is not None or self._owed is None:
             return
-        player = self._player_for(int(self._window.winId())) if self._player_for else self._engine()
-        if player is None:
+        engine = self._engine_for(int(self._window.winId())) if self._engine_for else self._open_engine()
+        if engine is None:
             return
         items, land = self._owed
         self._owed = None
-        self._player = player
+        self._engine = engine
         self._funestra = Funestra(
-            player, channels=Channels(), playlist=items, audible=True, muted=self._muted,
+            engine, channels=Channels(), playlist=items, audible=True, muted=self._muted,
             users={"slideshow": self._user}, panel=self._panel)
         self._funestra.set_muted(self._muted)
         if land is not None and self._funestra.playback.current_video != land:
@@ -132,7 +132,7 @@ class FunestraPane(QWidget):
         if self._on_open is not None:
             self._on_open()
 
-    def _engine(self):
+    def _open_engine(self):
         """The engine on this pane's window, or None where there is no window
         to draw into or the engine will not open."""
         application = QApplication.instance()
@@ -140,13 +140,13 @@ class FunestraPane(QWidget):
                 or not self._window.isVisible()):
             return None
         offer_the_copy_beside_the_checkouts()
-        from player_core.mpv_player import MpvPlayer  # noqa: PLC0415
+        from funestra_core.mpv_engine import MpvEngine  # noqa: PLC0415
 
         try:
-            return MpvPlayer(int(self._window.winId()), muted=self._muted,
+            return MpvEngine(int(self._window.winId()), muted=self._muted,
                              loop_file=False, prefetch=True)
         except Exception:
-            logger.exception("A show could not open the players' engine")
+            logger.exception("A show could not open the Funestras' engine")
             return None
 
     def tick(self) -> None:
@@ -165,7 +165,7 @@ class FunestraPane(QWidget):
         try:
             while not self._stop_moving.is_set():
                 time.sleep(_TICK_MS / 1000)
-                self._player.push_still()
+                self._engine.push_still()
         except Exception:
             logger.exception("A show's picture stopped moving")
 

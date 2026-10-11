@@ -1,4 +1,4 @@
-"""The fullscreen player -- the one way this app fills the screen with a picture.
+"""The full-screen slideshow -- the one way this app fills the screen with a picture.
 
 It plays a set of generations: a folder's, a shelf's, or the one folder a
 double-clicked picture came from, which is why there is no second fullscreen
@@ -12,8 +12,8 @@ end and rolls onto the next, repeats what it is locked onto, draws the one
 panel the show wears over the picture and places the presses on it.  What
 this view answers for is the set, the pass dealt from it and the slide on
 screen: it hands the pass over, follows the Funestra as it walks the pass,
-and answers every press and key.  A show on one of a session's players
-(:mod:`origenerator.gui.player_show`) keeps the same set and drives its
+and answers every press and key.  A show on one of a session's Funestras
+(:mod:`origenerator.gui.funestra_show`) keeps the same set and drives its
 Funestra through files instead.
 
 What every key does, what the lock takes with it, what a filter narrows and
@@ -27,14 +27,14 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from player_core.console import ModeHud
-from player_core.file_channel import append_command
-from player_core.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from player_core.hud_placement import HudCorner
-from player_core.modes import Osr2State
-from player_core.playback_rate import RATE_STEP
-from player_core.playlist import PlaylistItem
-from player_core.pointer import OMNIPAUSE_TOGGLE
+from funestra_core.console import ModeHud
+from funestra_core.file_channel import append_command
+from funestra_core.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
+from funestra_core.hud_placement import HudCorner
+from funestra_core.modes import Osr2State
+from funestra_core.playback_rate import RATE_STEP
+from funestra_core.playlist import PlaylistItem
+from funestra_core.pointer import OMNIPAUSE_TOGGLE
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -76,7 +76,7 @@ from origenerator.slideshow import ShowFilters, ShowState, Slide, in_order
 
 logger = logging.getLogger(__name__)
 
-# What the map's chrome says when it does what it says, in the players' own
+# What the map's chrome says when it does what it says, in the Funestras' own
 # words, and the three ways it can have nothing to do.
 _MORE_SEEDS = "More seeds"
 _WIDENING_FAILED = "Widening net failed"
@@ -110,7 +110,7 @@ class SlideshowView(QWidget):
     media_changed = pyqtSignal()
 
     def __init__(self, items, *, frame=None, start=None, image_dwell_ms=None,
-                 shuffle=None, actions=None, hud=None, player=None, motion=None,
+                 shuffle=None, actions=None, hud=None, engine=None, motion=None,
                  pace=None, frames=None, clock=time.monotonic, parent=None):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
@@ -133,7 +133,7 @@ class SlideshowView(QWidget):
         # one of its versions, or nothing while a run's frames are up.
         self._showing: Path | None = None
         self._showing_media: tuple | None = None
-        self._frame_on_player: Path | None = None
+        self._frame_on_funestra: Path | None = None
         self._frames_on_screen = False
         self._loads_seen: int | None = None
         self._refusal_checked = True
@@ -170,15 +170,15 @@ class SlideshowView(QWidget):
         self._pane = FunestraPane(
             self, user=self._as_the_funestra_sees_it, panel=self._hud_model,
             on_double_click=self.close, on_open=self._the_funestra_opened,
-            player_for=None if player is None else (lambda _window_id: player))
+            engine_for=None if engine is None else (lambda _window_id: engine))
         layout.addWidget(self._pane, 1)
 
         # A note about the item on screen: which of its versions this is, that an
         # enhancement of it is being made, and for a beat whatever a switch or a
         # spoken fix just did — the only way to tell, in a view with no panels,
         # that a press did anything. It is a Fun Time notice, at the top center
-        # where Fun Time flashes the same kind of line over a player, because
-        # this surface wears the players' own HUD and had no business saying
+        # where Fun Time flashes the same kind of line over a Funestra, because
+        # this surface wears the Funestras' own HUD and had no business saying
         # things in a second dialect at the other end of the screen.
         self._note = NoticeOverlay(self)
         # What the corner reads while a spoken request pauses the show; empty
@@ -210,7 +210,7 @@ class SlideshowView(QWidget):
         Standalone the monitor holds one show, so a second set asked for while
         this one is up arrives here rather than in a window of its own (see
         :meth:`~origenerator.gui.show_director.ShowDirector._open_a_window`) —
-        the same re-pointing a region's player gets when the set it is showing
+        the same re-pointing a region's Funestra gets when the set it is showing
         changes.  It takes the set exactly as construction does, so a window
         re-pointed cannot drift from one freshly opened.
         """
@@ -238,7 +238,7 @@ class SlideshowView(QWidget):
         self._dwell_s = image_dwell_ms // 1000
         # The set this show plays, the pass dealt from it, and what its two
         # switches keep of it — all of it the same whether a window or one of
-        # a session's players is showing the slides (see ShowSet).  What this
+        # a session's Funestras is showing the slides (see ShowSet).  What this
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
         self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
@@ -294,12 +294,12 @@ class SlideshowView(QWidget):
         around the slide already up leaves it playing."""
         current = self._playlist.current()
         rotated = rotated_onto(self._playlist.in_play_order(), current)
-        items = [self._player_item(slide) for slide in rotated]
+        items = [self._funestra_item(slide) for slide in rotated]
         if land and current is not None:
             self._showing = self._file_of(current)
             self._showing_media = None if current.is_live else (current.path, current.media_type)
             self._frames_on_screen = False
-            self._frame_on_player = None
+            self._frame_on_funestra = None
         self._pane.hand_over(items, land=self._showing if land else None)
         self._settle()
 
@@ -325,7 +325,7 @@ class SlideshowView(QWidget):
         self._show_what_is_being_made()
         self._apply_freeze()
 
-    def _player_item(self, slide) -> PlaylistItem:
+    def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(self._file_of(slide))
         return slide_item(slide)
@@ -371,7 +371,7 @@ class SlideshowView(QWidget):
                 self._playlist.jump_to(index)
                 self._levels.restart()
                 self._frames_on_screen = False
-                self._frame_on_player = None
+                self._frame_on_funestra = None
                 self._showing_media = None if item.is_live else (item.path, item.media_type)
                 self._show_what_is_being_made()
                 self._move_on_early_from(item)
@@ -470,7 +470,7 @@ class SlideshowView(QWidget):
     def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
                      collapse=None, open_in=None) -> None:
-        """Put the players' own panel on this show, drawn by the Funestra.
+        """Put the Funestras' own panel on this show, drawn by the Funestra.
 
         *side* is whose panel it is, which spells its verbs; *dashboard_cmd_file*
         is the session's command channel, or ``None`` standalone -- which is also
@@ -559,7 +559,7 @@ class SlideshowView(QWidget):
             return True
         if action in THE_SHOWS_OWN:
             # The two filters, reset, the loops, the expand mark and the map's
-            # own clicks mean on a show what they mean on a player, and the
+            # own clicks mean on a show what they mean on a Funestra, and the
             # show owns what each is — so they land here, hosted or not.
             answer(self, action, path)
             self.refresh_panel()
@@ -604,7 +604,7 @@ class SlideshowView(QWidget):
         press takes, so the press lands on the show through the same answers
         that round trip would have ended at.  Minimize is the one button only a
         show on its own has, the show being the window here; the rate is the
-        Funestra's own, as on every player.
+        Funestra's own, as on every Funestra.
         """
         if action == "minimize":
             self.window().showMinimized()
@@ -747,9 +747,9 @@ class SlideshowView(QWidget):
 
     def _put_a_frame_up(self, path) -> None:
         playback = self._pane.playback
-        if path is None or playback is None or path == self._frame_on_player:
+        if path is None or playback is None or path == self._frame_on_funestra:
             return
-        self._frame_on_player = path
+        self._frame_on_funestra = path
         playback.show_frame(path)
 
     def note_in_flight(self, prompt_ids) -> None:
@@ -791,7 +791,7 @@ class SlideshowView(QWidget):
         self._showing_media = None
 
     def _delete_current(self):
-        """Up, the players' "weird": a favorite loses its star and the show
+        """Up, the Funestras' "weird": a favorite loses its star and the show
         moves on; anything else is deleted (if a deleter is wired) and the show
         moves on.
 
@@ -875,7 +875,7 @@ class SlideshowView(QWidget):
         item = playlist_item(path, media_type)
         self._showing = item.path
         self._showing_media = (path, media_type)
-        self._frame_on_player = None
+        self._frame_on_funestra = None
         playback = self._pane.playback
         if playback is not None:
             playback.play_file(item.path, item.funscript)
@@ -957,11 +957,11 @@ class SlideshowView(QWidget):
         self._delete_current()
 
     def show_reset(self) -> None:
-        """Put the side back how it started, the players' own reset: both
+        """Put the side back how it started, the Funestras' own reset: both
         switches dropped, the lock released, and the base set on screen again.
 
         Hosted, "how it started" is the REGION's base state, not this show's
-        own: a player's reset drops its filter and leaves it browsing its whole
+        own: a Funestra's reset drops its filter and leaves it browsing its whole
         library again, so a show started on one folder goes back to the library
         too rather than restarting that folder.  The gallery owns that set, so
         it comes in as a hook.  Standalone there is no such state and a show's
@@ -1006,7 +1006,7 @@ class SlideshowView(QWidget):
 
     @property
     def hud_order_label(self) -> str:
-        """How the set is ordered, in the players' words — read off this view
+        """How the set is ordered, in the Funestras' words — read off this view
         by the show's own panel (see
         :class:`~origenerator.gui.show_host.ShowHost`)."""
         return self._set.order_label
@@ -1038,7 +1038,7 @@ class SlideshowView(QWidget):
 
     def _lock_instead_of_looping(self) -> None:
         """Lock the slide on screen: the answer a loop asked of a row of one
-        gets on a player, where the loop button of a group holding one clip
+        gets on a Funestra, where the loop button of a group holding one clip
         locks that clip.  A row that size is the slide itself, so the press
         means "this one" rather than nothing; and a lock is not a loop, so a
         loop that was running is dropped."""
@@ -1052,7 +1052,7 @@ class SlideshowView(QWidget):
         return bool(self._actions.browse_all(self))
 
     def show_loop_cycle(self) -> None:
-        """The loop key, as on a player: seeds, then actions, then off — and
+        """The loop key, as on a Funestra: seeds, then actions, then off — and
         the lock when there is nothing on either axis to loop, which is Down's
         whole gesture here."""
         stepped = self._set.step_loop(self._browse_it_all)
@@ -1184,7 +1184,7 @@ class SlideshowView(QWidget):
         """Whether this show is on screen — what says a region is occupied."""
         return self.isVisible()
 
-    # --- what this show's HUD says, in the players' vocabulary -------------
+    # --- what this show's HUD says, in the Funestras' vocabulary -------------
 
     @property
     def hud_prompt_id(self) -> str:
@@ -1199,7 +1199,7 @@ class SlideshowView(QWidget):
 
     @property
     def hud_is_favorite(self) -> bool:
-        """Whether the item on screen is a favorite (favorited) — the players'
+        """Whether the item on screen is a favorite (favorited) — the Funestras'
         star readout, over the same collection the Favorites shelf lists."""
         return self._set.is_favorite
 
@@ -1214,7 +1214,7 @@ class SlideshowView(QWidget):
         return self._set.filters.enhanced
 
     def toggle_favorites_filter(self) -> bool:
-        """Narrow the set to the favorites, or widen it back — the players' own
+        """Narrow the set to the favorites, or widen it back — the Funestras' own
         F-mode, over the favorited items.  ``True`` when the switch moved."""
         return self.set_favorites_filter(not self._set.filters.favorites)
 
@@ -1239,7 +1239,7 @@ class SlideshowView(QWidget):
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
         jump a satellite's map makes; *lock* keeps it there (the double-click),
-        exactly as it locks a player's clip."""
+        exactly as it locks a Funestra's clip."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
@@ -1443,7 +1443,7 @@ class SlideshowView(QWidget):
             self._put_a_frame_up(self._frames.write(current.prompt_id, frame))
         elif self._frames_on_screen:
             self._frames_on_screen = False
-            self._frame_on_player = None
+            self._frame_on_funestra = None
             self._frames.forget(current.prompt_id)
             playback.clear_frame()
             self._move_on_early_from(current)

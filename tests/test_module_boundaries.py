@@ -94,7 +94,7 @@ def test_the_modules_that_do_need_qt_are_only_these(module):
     all, and the boundary would be decorative."""
     assert _qt_after_importing(module) is True
 # The app's own machinery, which the widget package used to hold: the session's
-# file channels, the two device drivers, the ambient players, the orientation
+# file channels, the two device drivers, the ambient Funestras, the orientation
 # key scheme, the spin-arrow PNGs and the shared press vocabulary. Held as an
 # equality so a driver cannot drift back in beside the widgets -- the reason
 # each left is that importing a `gui` module dragged device I/O and filesystem

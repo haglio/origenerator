@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from player_core.timeline import (
+from funestra_core.timeline import (
     BAR_BORDER,
     BAR_EDGE,
     BAR_FILL,
@@ -18,8 +18,8 @@ from PyQt6.QtWidgets import QWidget
 from origenerator.funscript import heatmap_colors
 
 
-def _at_full_strength(player_color) -> QColor:
-    return QColor(*player_color[:3])
+def _at_full_strength(funestra_color) -> QColor:
+    return QColor(*funestra_color[:3])
 
 
 _FILL = _at_full_strength(BAR_FILL)

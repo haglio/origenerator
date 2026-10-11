@@ -1,6 +1,6 @@
 """The hosted app's file channels: Fun Time's verbs in, occupancy out.
 
-Fun Time speaks to its satellite players through a command file, a paused
+Fun Time speaks to its Satellite Funestras through a command file, a paused
 flag and a status file; a hosted Origenerator answers the same idioms so the
 session's hotkeys reach the region shows and its choreography can see them.
 """
@@ -8,15 +8,15 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from funestra_core.file_channel import consume_command_file
+from funestra_core.hud_placement import HudCorner
+from funestra_core.playlist import read_playlist
+from funestra_core.satellite_hud import parse_hud
 from PIL import Image
-from player_core.file_channel import consume_command_file
-from player_core.hud_placement import HudCorner
-from player_core.playlist import read_playlist
-from player_core.satellite_hud import parse_hud
 
 from origenerator import fun_time_mode as contract
 from origenerator.fun_time_bridge import FunTimeBridge
-from origenerator.fun_time_mode import FunTimeSession, PlayerChannel, Rect
+from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.shelves import FAVORITES_KEY
 from origenerator.gui import omnipause, show_director
 from origenerator.gui.gallery_view import GalleryView
@@ -193,7 +193,7 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
 
 def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
     """Entering the mode opens it PLAYING, the way entering kino mode leaves
-    two players playing — two empty rectangles asked the user to start the mode
+    two Funestras playing — two empty rectangles asked the user to start the mode
     they had just asked for."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     filled = []
@@ -477,13 +477,13 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
 
 
 def _press(bridge, tmp_path, line: str) -> None:
-    """A press the session routed back here, as a player's panel posted it."""
+    """A press the session routed back here, as a Funestra's panel posted it."""
     (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
     bridge._tick()
 
 
-def test_a_players_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, monkeypatch):
-    """A session hands a player's presses back verbatim, spelled the way the
+def test_a_funestras_filter_presses_reach_the_show_on_that_side(qtbot, tmp_path, monkeypatch):
+    """A session hands a Funestra's presses back verbatim, spelled the way the
     panel posted them — so the show's own two switches answer them here."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id1"})
@@ -518,9 +518,9 @@ def test_a_press_no_show_answers_is_dropped_on_the_log(qtbot, tmp_path, monkeypa
     assert not (tmp_path / "origenerator_cmd.txt").exists()
 
 
-def _players_session(tmp_path):
+def _funestras_session(tmp_path):
     def channel(side):
-        return PlayerChannel(
+        return FunestraChannel(
             playlist=tmp_path / f"{side}.tsv",
             command_file=tmp_path / f"{side}_cmd.txt",
             status_file=tmp_path / f"{side}_status.txt",
@@ -532,19 +532,19 @@ def _players_session(tmp_path):
         landscape_rect=session.landscape_rect, command_file=session.command_file,
         paused_file=session.paused_file, status_file=session.status_file,
         dashboard_cmd_file=session.dashboard_cmd_file,
-        portrait_player=channel("portrait"), landscape_player=channel("landscape"),
+        portrait_funestra=channel("portrait"), landscape_funestra=channel("landscape"),
     )
 
 
-def test_a_session_that_hands_over_its_players_gets_both_sides_on_them(
+def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
         qtbot, tmp_path, monkeypatch):
-    """Entering the mode with the players handed over: each player is given the
+    """Entering the mode with the Funestras handed over: each Funestra is given the
     list of its own side's shape, and no window of this app's opens at all."""
     def no_window(*args, **kwargs):
         raise AssertionError("a window of this app's opened over a region")
 
     monkeypatch.setattr(show_director, "SlideshowView", no_window)
-    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
+    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
@@ -587,8 +587,8 @@ def _items_of(rows) -> list:
             for row in rows]
 
 
-def _players_playing_their_libraries(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_players_session(tmp_path))
+def _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     library = {"__all__::landscape": _stills(tmp_path, "library-wide", 3, (200, 100)),
@@ -606,9 +606,9 @@ def _told(tmp_path, side):
     return consume_command_file(tmp_path / f"{side}_cmd.txt", uppercase=False)
 
 
-def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
+def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
         qtbot, tmp_path, monkeypatch):
-    view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
+    view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     folder = _stills(tmp_path, "scene-wide", 2, (200, 100))
     clicked = folder[1]
     monkeypatch.setattr(view, "visible_prompt_ids", lambda: [item[2] for item in folder])
@@ -630,9 +630,9 @@ def test_a_preview_double_click_takes_over_the_player_of_its_shape_for_good(
     assert _told(tmp_path, "portrait") == []
 
 
-def test_a_double_click_over_a_run_still_being_made_leaves_the_players_alone(
+def test_a_double_click_over_a_run_still_being_made_leaves_the_funestras_alone(
         qtbot, tmp_path, monkeypatch):
-    view = _players_playing_their_libraries(qtbot, tmp_path, monkeypatch)
+    view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
 
     assert view._shows.open_on_preview(None, b"a frame of the run", None) is None
@@ -658,7 +658,7 @@ def test_the_sessions_loop_key_reaches_the_show_on_that_side(qtbot, tmp_path, mo
 
 
 def test_the_maps_own_verbs_all_reach_the_show(qtbot, tmp_path, monkeypatch):
-    """Every press the players' map posts — the two loop buttons, the expand
+    """Every press the Funestras' map posts — the two loop buttons, the expand
     mark, a map key — has an answer here, so none is dropped on the log."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)

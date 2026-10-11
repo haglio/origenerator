@@ -5,18 +5,18 @@ A show is handed a set of generations and deals a pass from it — shuffled, or
 in the browser's own order — narrows it to the favorites or to the pictures it
 has enhanced, and grows it as generations land in the folder it is playing.
 None of that is about a window: a show drawn full screen by this app and a show
-handed to one of a Fun Time session's players keep exactly this set and differ
+handed to one of a Fun Time session's Funestras keep exactly this set and differ
 only in what puts the slide on screen.  So it lives here, Qt-free, and each
 surface holds one.
 
 The pass itself is :class:`~origenerator.slideshow.SlideshowPlaylist`; this is
 the set around it.  Re-dealing the pass — a switch coming on, a reset, a fresh
 set, a loop starting or ending — is what a surface has to answer for (a window
-re-renders; a player is handed a new playlist), so it arrives as
+re-renders; a Funestra is handed a new playlist), so it arrives as
 ``on_pass_change(kept)``: whether the slide that was on screen survived into
 the new pass.
 
-The map is the players' own (:mod:`origenerator.gui.show_map`): the slide's
+The map is the Funestras' own (:mod:`origenerator.gui.show_map`): the slide's
 act under other seeds runs right, what else was made of its picture runs
 down, and a
 loop along either axis deals THAT row or column as the pass, the way a
@@ -28,8 +28,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import fields, replace
 
-from player_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
-from player_core.satellite_hud import label_is_filtered
+from funestra_core.hud_status import LATEST_LABEL, SHUFFLE_LABEL
+from funestra_core.satellite_hud import label_is_filtered
 
 from origenerator.gui.show_map import (
     ACTION_AXIS,
@@ -602,7 +602,7 @@ class ShowSet:
 
     def unfavorite_current(self, unfavorite) -> bool:
         """Take the star off the item on screen, through *unfavorite* — the
-        players' "weird" on a favorite, which demotes it rather than condemning
+        Funestras' "weird" on a favorite, which demotes it rather than condemning
         it.  ``False`` when it wears no star, or nothing was wired to take one
         off: then the press means the other thing."""
         prompt_id = self.current_prompt_id()

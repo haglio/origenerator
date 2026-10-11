@@ -1,4 +1,4 @@
-"""How a press on the players' console or a show's panel is spelled.
+"""How a press on the Funestras' console or a show's panel is spelled.
 
 The console painter and the satellite HUD hand their presses back as bare
 strings, and three surfaces here decode them: the console under the main
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from player_core import drive_layout
+from funestra_core import drive_layout
 
 #: The prefix every Robot Hand verb carries.  `tests/test_console_commands.py`
 #: holds it against the presses player_core itself builds, so a spelling

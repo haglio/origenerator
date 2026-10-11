@@ -6,11 +6,11 @@ import json
 
 import numpy as np
 import pytest
-from player_core.hud_corners import CORNER_PLUS_OVERLAY_ID
-from player_core.hud_overlay import HUD_OVERLAY_ID
-from player_core.hud_placement import HudCorner
-from player_core.satellite_hud import MARGIN
-from player_core.timeline import TIMELINE_HEIGHT, bar_track_x
+from funestra_core.hud_corners import CORNER_PLUS_OVERLAY_ID
+from funestra_core.hud_overlay import HUD_OVERLAY_ID
+from funestra_core.hud_placement import HudCorner
+from funestra_core.satellite_hud import MARGIN
+from funestra_core.timeline import TIMELINE_HEIGHT, bar_track_x
 from PyQt6.QtCore import QEvent, QPointF
 from PyQt6.QtWidgets import QApplication
 
@@ -23,7 +23,7 @@ from origenerator.gui.show_wiring import HudFacts, ShowActions
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.slideshow import in_order
-from tests.funestra_fakes import FakePlayer
+from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
 from tests.show_hud_support import panel_targets
 
@@ -37,7 +37,7 @@ def _inflight(key="j1", status="queued", cancel=None, **kw):
 
 
 def _show(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")), **kw):
-    kw.setdefault("player", FakePlayer())
+    kw.setdefault("engine", FakeEngine())
     show = SlideshowView(list(items), shuffle=in_order, **kw)
     qtbot.addWidget(show)
     return show
@@ -55,7 +55,7 @@ def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image"
 def _panel(show):
     """The panel as the Funestra composited it: where, and the pixels."""
     show._pane.tick()
-    return show._pane._player.overlays[HUD_OVERLAY_ID]
+    return show._pane._engine.overlays[HUD_OVERLAY_ID]
 
 
 def _lit_order(model) -> list[str]:
@@ -93,7 +93,7 @@ def test_an_undressed_show_wears_nothing(qtbot):
 
     show._pane.tick()
 
-    assert HUD_OVERLAY_ID not in show._pane._player.overlays
+    assert HUD_OVERLAY_ID not in show._pane._engine.overlays
 
 
 def test_a_show_whose_funestra_is_not_open_yet_still_has_its_panel_ready(qtbot):
@@ -113,12 +113,12 @@ def test_the_panel_names_the_item_the_way_this_app_names_it(qtbot):
 
 
 class TestTheOnePanelAShowWears:
-    """A show used to wear TWO panels: the players' HUD for the set, and Genau's
+    """A show used to wear TWO panels: the Funestras' HUD for the set, and Genau's
     whole console seated under it for the device.  Between them the status was
     said twice and disagreed -- "Looping seeds · Shuffle" over "Unlocked · 4s" --
     and prev, next, lock and trash were drawn on both.
 
-    One panel now: the players' HUD, carrying the device's line and the drive
+    One panel now: the Funestras' HUD, carrying the device's line and the drive
     readout out of the console's own code.
     """
 
@@ -338,7 +338,7 @@ class TestWhereTheShowsPanelSits:
 
 class TestACornerThePanelIsNotIn:
     """A click in any other corner of the show sends its panel there, the way it
-    does on every player, and the pointer in such a corner shows the plus that
+    does on every Funestra, and the pointer in such a corner shows the plus that
     says so."""
 
     @staticmethod
@@ -372,7 +372,7 @@ class TestACornerThePanelIsNotIn:
         show._pane.motion(QPointF(width - 3, height - 3), held=False)
         show._pane.tick()
 
-        assert CORNER_PLUS_OVERLAY_ID in show._pane._player.overlays
+        assert CORNER_PLUS_OVERLAY_ID in show._pane._engine.overlays
 
     def test_the_pointer_leaving_the_window_takes_the_plus_down(self, qtbot):
         show = self._show(qtbot)
@@ -385,7 +385,7 @@ class TestACornerThePanelIsNotIn:
         QApplication.sendEvent(show._pane._window, QEvent(QEvent.Type.Leave))
         show._pane.tick()
 
-        assert CORNER_PLUS_OVERLAY_ID not in show._pane._player.overlays
+        assert CORNER_PLUS_OVERLAY_ID not in show._pane._engine.overlays
 
 
 def _middle_of(show, rect) -> QPointF:
@@ -479,7 +479,7 @@ class TestTheRowOnTheOnePanel:
     and they are the Funestra's own."""
 
     def _show(self, qtbot, items, **kw):
-        return _dressed(qtbot, items, player=FakePlayer(duration_ms=60_000), **kw)
+        return _dressed(qtbot, items, engine=FakeEngine(duration_ms=60_000), **kw)
 
     def test_a_show_of_a_video_draws_the_scrubber_on_the_panel(self, qtbot):
         show = self._show(qtbot, [("scene one.mp4", "video")])
@@ -488,7 +488,7 @@ class TestTheRowOnTheOnePanel:
 
     def test_a_show_of_a_picture_draws_no_scrubber(self, qtbot):
         show = self._show(qtbot, [("scene one.png", "image")])
-        show._pane._player.showing_picture = True
+        show._pane._engine.showing_picture = True
 
         assert panel_targets(show).row is None
 
@@ -501,13 +501,13 @@ class TestTheRowOnTheOnePanel:
         show._pane.press(QPointF(left + x + (track_x0 + track_x1) // 2,
                                  top + y + height - TIMELINE_HEIGHT // 2))
 
-        assert show._pane._player.position_ms == pytest.approx(30_000, abs=200)
+        assert show._pane._engine.position_ms == pytest.approx(30_000, abs=200)
 
     def test_the_panel_follows_the_video_along_the_track(self, qtbot):
         show = self._show(qtbot, [("scene one.mp4", "video")])
         before = _panel(show)[2]
 
-        show._pane._player.position_ms = 30_000
+        show._pane._engine.position_ms = 30_000
 
         assert _panel(show)[2] is not before
 
@@ -525,7 +525,7 @@ class TestTheRowOnTheOnePanel:
         if actions is not None:
             video.with_suffix(".funscript").write_text(
                 json.dumps({"actions": actions}), encoding="utf-8")
-        return _dressed(qtbot, [(str(video), "video")], player=FakePlayer(duration_ms=4_000))
+        return _dressed(qtbot, [(str(video), "video")], engine=FakeEngine(duration_ms=4_000))
 
     def test_the_track_is_colored_by_the_funscript_of_the_video_on_screen(
             self, qtbot, tmp_path):

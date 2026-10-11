@@ -1,10 +1,10 @@
-"""One show, handed to a session's player instead of drawn in a window.
+"""One show, handed to a session's Funestra instead of drawn in a window.
 
-Inside a Fun Time session the satellite players are what shows the pictures.
-The session hands this app each player's channel — the list it plays, the verbs
+Inside a Fun Time session the Satellite Funestras are what shows the pictures.
+The session hands this app each Funestra's channel — the list it plays, the verbs
 it drains, the status it publishes, the panel it draws — and a show on that
-side becomes exactly that: a playlist written for the player, a few verbs, and
-the panel this app publishes for the session to put on it.  The player owns
+side becomes exactly that: a playlist written for the Funestra, a few verbs, and
+the panel this app publishes for the session to put on it.  The Funestra owns
 what is on screen from there: it holds a picture for the pace, plays a clip to
 its end and rolls onto the next, repeats the one it is locked onto, and freezes
 with the room.
@@ -13,9 +13,9 @@ So this is a show with no surface of its own.  The set, the pass and the two
 switches are the same ones a window show keeps
 (:class:`~origenerator.gui.show_set.ShowSet`), it answers every word and button
 the way the window does (:class:`~origenerator.gui.show_host.ShowHost`), and
-what is on screen is read back from the player rather than rendered here.
+what is on screen is read back from the Funestra rather than rendered here.
 
-Two things a window show has are the player's to learn next: the queue plate
+Two things a window show has are the Funestra's to learn next: the queue plate
 in the corner, and the lines this app flashes over a show — which go to the
 gallery's own caption instead, where the speaker can still see them.
 """
@@ -26,8 +26,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from player_core.file_channel import append_command, publish_whole
-from player_core.player_verbs import (
+from funestra_core.file_channel import append_command, publish_whole
+from funestra_core.funestra_verbs import (
     CLEAR_FRAME,
     LOCK_OFF,
     LOCK_ON,
@@ -39,9 +39,9 @@ from player_core.player_verbs import (
     TRASH,
     play_file,
 )
-from player_core.playlist import PlaylistItem, write_playlist
-from player_core.satellite_hud import hud_text
-from player_core.status import parse_status
+from funestra_core.playlist import PlaylistItem, write_playlist
+from funestra_core.satellite_hud import hud_text
+from funestra_core.status import parse_status
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.gui.frame_files import FrameFiles
@@ -66,7 +66,7 @@ from origenerator.slideshow import ShowFilters, ShowState, Slide
 
 logger = logging.getLogger(__name__)
 
-# How often the player is asked what it is showing.  It publishes its status
+# How often the Funestra is asked what it is showing.  It publishes its status
 # five times a second; this is near enough that the map follows the slide
 # rather than trailing it, and idle ticks cost a read and a comparison.
 _POLL_MS = 200
@@ -75,11 +75,11 @@ READER_HOLD_BUDGET_S = 1.0
 _RETRY_SPACING_S = 0.005
 
 
-class PlayerShow(QObject):
-    """A show driving one of the session's players."""
+class FunestraShow(QObject):
+    """A show driving one of the session's Funestras."""
 
     # Enter on an item, and a lock: the gallery lands on that generation.  Only
-    # the lock reaches it here — a player has no Enter to press.
+    # the lock reaches it here — a Funestra has no Enter to press.
     open_requested = pyqtSignal(str)
     # The show is over: the side has nothing of this app's on it now.
     closed = pyqtSignal()
@@ -98,21 +98,21 @@ class PlayerShow(QObject):
         self._held_s = 0.0
         self._moves_on_early = False
         self._request_holds_it = False
-        self._frame_on_player: Path | None = None
+        self._frame_on_funestra: Path | None = None
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
         self._actions = actions if actions is not None else ShowActions()
         # Where a line about this show goes.  A window show flashes it in its
         # own corner; this one has none, so it goes to the gallery's caption,
-        # which is on screen beside the players in a session.
+        # which is on screen beside the Funestras in a session.
         self._say = say
         self._pace = pace if pace is not None else SlideshowPace(parent=self)
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(items, image_dwell_ms=image_dwell_ms, start=start,
                        shuffle=shuffle, hud=hud)
         self._open = True
-        # What the player last said it was showing, and whether it has locked
-        # it: the player's answer, not this app's — a picture that has moved on
+        # What the Funestra last said it was showing, and whether it has locked
+        # it: the Funestra's answer, not this app's — a picture that has moved on
         # by itself is news that arrives this way and no other.
         self._showing = ""
         self._locked = False
@@ -120,7 +120,7 @@ class PlayerShow(QObject):
         self._levels = LevelStepper()
         opened_on_a_slide = start is not None
         if opened_on_a_slide:
-            self._showing = self._player_status().video
+            self._showing = self._funestra_status().video
         self._hand_over(land=opened_on_a_slide)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
@@ -128,7 +128,7 @@ class PlayerShow(QObject):
         self._timer.start()
         self.tick()
 
-    # --- handing the player what to play ------------------------------------
+    # --- handing the Funestra what to play ------------------------------------
 
     def _take_set(self, items, *, image_dwell_ms, start, shuffle, hud) -> None:
         if image_dwell_ms is None:
@@ -149,16 +149,16 @@ class PlayerShow(QObject):
         self._publish()
 
     def _hand_over(self, *, land: bool = False) -> None:
-        """Give the player this pass to play, written rotated onto the slide
-        this show stands on: a player showing nothing of it opens there, and a
-        reload keeps the item a player is on wherever that item survived."""
+        """Give the Funestra this pass to play, written rotated onto the slide
+        this show stands on: a Funestra showing nothing of it opens there, and a
+        reload keeps the item a Funestra is on wherever that item survived."""
         current = self._set.playlist.current()
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
         write_playlist(self.channel.playlist,
-                       [self._player_item(item) for item in rotated])
+                       [self._funestra_item(item) for item in rotated])
         if land and current is not None and self._file_of(current) != self._showing:
             # Before the reload, which then keeps it: after, it would load twice.
-            self._send(play_file(self._player_item(current)))
+            self._send(play_file(self._funestra_item(current)))
         self._send(RELOAD_PLAYLIST)
         self._send(f"{SET_PACE} {self._dwell_s}")
 
@@ -167,21 +167,21 @@ class PlayerShow(QObject):
             return str(self._frames.first_of(slide.prompt_id))
         return str(slide.path)
 
-    def _player_item(self, slide) -> PlaylistItem:
+    def _funestra_item(self, slide) -> PlaylistItem:
         if slide.is_live:
             return PlaylistItem(Path(self._file_of(slide)))
         return slide_item(slide)
 
     def _send(self, verb: str) -> None:
         if not append_command(self.channel.command_file, verb):
-            logger.warning("Dropped %s for the %s player (command file locked)",
+            logger.warning("Dropped %s for the %s Funestra (command file locked)",
                            verb, self._side)
 
     # --- the pace ----------------------------------------------------------
 
     @property
     def dwell_s(self) -> int:
-        """The seconds an unlocked picture holds the player's screen."""
+        """The seconds an unlocked picture holds the Funestra's screen."""
         return self._dwell_s
 
     def set_dwell_s(self, seconds: int) -> None:
@@ -194,9 +194,9 @@ class PlayerShow(QObject):
         self._apply_dwell(seconds)
 
     def _apply_dwell(self, seconds: int) -> None:
-        """Tell the player how long to hold a picture, when the number moved.
+        """Tell the Funestra how long to hold a picture, when the number moved.
 
-        The pace is the player's to keep from there: it holds the frame that
+        The pace is the Funestra's to keep from there: it holds the frame that
         long and then ends the file, which is how a picture moves on at all.
         """
         seconds = max(0, int(seconds))
@@ -207,7 +207,7 @@ class PlayerShow(QObject):
         self._send(f"{SET_PACE} {seconds}")
 
     def _pass_changed(self, kept: bool) -> None:
-        """A fresh pass was dealt: the player is playing the old one, so it is
+        """A fresh pass was dealt: the Funestra is playing the old one, so it is
         handed the new one — keeping the slide on screen when the pass kept it,
         and sent to this show's own when it did not.  The panel follows at
         once, so a loop lights its button on the press rather than a tick
@@ -217,11 +217,11 @@ class PlayerShow(QObject):
         self._hand_over(land=not kept)
         self._publish()
 
-    # --- what the player says it is showing ---------------------------------
+    # --- what the Funestra says it is showing ---------------------------------
 
     def tick(self) -> None:
-        """Read the player's status, follow it, and publish the panel."""
-        status = self._player_status()
+        """Read the Funestra's status, follow it, and publish the panel."""
+        status = self._funestra_status()
         self._locked = status.locked
         now = self._clock()
         if status.video and status.video != self._showing:
@@ -230,7 +230,7 @@ class PlayerShow(QObject):
             self._held_s = 0.0
             current = self._set.playlist.current()
             self._moves_on_early = current is not None and self._set.being_made(current)
-            self._frame_on_player = None
+            self._frame_on_funestra = None
             self._show_what_is_being_made()
         elif not (status.paused or status.locked or self._request_holds_it):
             self._held_s += now - self._last_tick
@@ -244,9 +244,9 @@ class PlayerShow(QObject):
         if current is not None and self._file_of(current) == self._showing:
             frame = self._set.frame_being_made_of(current)
         path = None if frame is None else self._frames.write(current.prompt_id, frame)
-        if path == self._frame_on_player:
+        if path == self._frame_on_funestra:
             return
-        self._frame_on_player = path
+        self._frame_on_funestra = path
         self._send(CLEAR_FRAME if path is None else f"{SHOW_FRAME} {path}")
 
     def _move_on_early_from_what_is_being_made(self) -> None:
@@ -256,7 +256,7 @@ class PlayerShow(QObject):
             self._moves_on_early = False
             self._send(NEXT)
 
-    def _player_status(self):
+    def _funestra_status(self):
         return parse_status(_read_fields(self.channel.status_file))
 
     def set_levels(self, levels_by_path: dict) -> None:
@@ -284,9 +284,9 @@ class PlayerShow(QObject):
         levels, or a video's Evolver upscale and the video itself.
 
         An item filed once is left alone rather than paged, since the shift was
-        the whole point of the press.  The player is told which file to play
+        the whole point of the press.  The Funestra is told which file to play
         rather than asked to step its own way through them, because the place
-        within the versions is held here, ahead of the status the player is
+        within the versions is held here, ahead of the status the Funestra is
         still publishing.
         """
         level = self._levels.step(delta, base=self._current_base())
@@ -302,9 +302,9 @@ class PlayerShow(QObject):
         return "" if item is None else self._file_of(item)
 
     def _follow(self, video: str) -> None:
-        """Stand the pass on the item the player just moved to.
+        """Stand the pass on the item the Funestra just moved to.
 
-        The player walks the list by itself — a picture's pace runs out, a clip
+        The Funestra walks the list by itself — a picture's pace runs out, a clip
         ends — so this is how the map, the star and every word about "this one"
         find out which item that is.
         """
@@ -317,7 +317,7 @@ class PlayerShow(QObject):
                 return
 
     def _publish(self) -> None:
-        """Publish this side's panel for the session to draw on the player."""
+        """Publish this side's panel for the session to draw on the Funestra."""
         model = show_hud_model(self._side, self, hosted=True, own_window=False)
         text = hud_text(model) if model is not None else ""
         if text != self._published and publish_whole(self.channel.hud_file, text):
@@ -327,7 +327,7 @@ class PlayerShow(QObject):
 
     @property
     def locked(self) -> bool:
-        """Whether the player has locked what is on screen — its own answer,
+        """Whether the Funestra has locked what is on screen — its own answer,
         which is what the panel's padlock and its lock ring are drawn from."""
         return self._locked
 
@@ -336,9 +336,9 @@ class PlayerShow(QObject):
         return self._set.current_prompt_id() if self._locked else None
 
     def show_step(self, delta: int) -> None:
-        """Step the player either way.  Moving off a locked slide releases the
-        lock, the way the players' own prev/next cancel a lock — and a loop
-        down to the picture on screen is ended first, so what the player is
+        """Step the Funestra either way.  Moving off a locked slide releases the
+        lock, the way the Funestras' own prev/next cancel a lock — and a loop
+        down to the picture on screen is ended first, so what the Funestra is
         handed to step into is the set rather than a list of one."""
         self._unlock()
         if delta > 0:
@@ -359,7 +359,7 @@ class PlayerShow(QObject):
         """Lock the item on screen or let it go, saying which way rather than
         flipping; ``True`` when that moved it.
 
-        Locking is the whole gesture it is in a window: the player repeats the
+        Locking is the whole gesture it is in a window: the Funestra repeats the
         item, and the show favorites it, asks for a better version of it, and — in
         a session — hands it to the gallery to open.
         """
@@ -377,7 +377,7 @@ class PlayerShow(QObject):
 
     def _lock(self, on: bool) -> None:
         # Held here as well as sent, so the panel lights on the press rather
-        # than a tick later; the player's own status settles it either way.
+        # than a tick later; the Funestra's own status settles it either way.
         self._locked = on
         self._send(LOCK_ON if on else LOCK_OFF)
         self._publish()
@@ -387,13 +387,13 @@ class PlayerShow(QObject):
             self._lock(False)
 
     def show_cull(self) -> None:
-        """The players' "weird": a favorite loses its star and the player moves
-        on; anything else is taken away and the player moves on.
+        """The Funestras' "weird": a favorite loses its star and the Funestra moves
+        on; anything else is taken away and the Funestra moves on.
 
-        The player is told to drop a condemned item before the generation is:
+        The Funestra is told to drop a condemned item before the generation is:
         it is playing that very file, and Windows will not move a file a
         process still has open — the recovery bin's own retries cover the
-        moment the player takes to let go.
+        moment the Funestra takes to let go.
         """
         item = self._set.playlist.current()
         if item is None:
@@ -412,7 +412,7 @@ class PlayerShow(QObject):
         self._frames.forget(item.prompt_id)
         if self._set.playlist.is_empty():
             # A show culled empty is over, and the side goes back to its base
-            # state — which hands the player another list to move on to.
+            # state — which hands the Funestra another list to move on to.
             self.close()
         elif self._set.end_a_loop_of_one():
             self._lock_what_the_cull_left()  # its pass change hands the set over
@@ -424,7 +424,7 @@ class PlayerShow(QObject):
     def _lock_what_the_cull_left(self) -> None:
         """A row worn down to one picture plays that picture over and over,
         which is the lock — so the cull that wore it down ends the loop and
-        tells the player to lock what is left.  The lock is the state and
+        tells the Funestra to lock what is left.  The lock is the state and
         nothing else: none of what a pressed lock also does — the star, the
         better version, the gallery — happened, because nobody pressed one."""
         self._lock(True)
@@ -433,15 +433,15 @@ class PlayerShow(QObject):
     def _condemn(self, prompt_id: str) -> None:
         """Delete the generation, saying so where it could not be.
 
-        A player is another process, and one with nothing else to move on to
+        A Funestra is another process, and one with nothing else to move on to
         keeps the file open for good; that is a delete refused, not a fault to
         take the app down over.
         """
         try:
             self._actions.delete(prompt_id)
         except OSError:
-            logger.exception("The %s player kept a condemned generation open", self._side)
-            self._note("🗑 couldn't delete that one — the player still has it open",
+            logger.exception("The %s Funestra kept a condemned generation open", self._side)
+            self._note("🗑 couldn't delete that one — the Funestra still has it open",
                        kind=WARNING)
 
     def cull(self) -> None:
@@ -474,7 +474,7 @@ class PlayerShow(QObject):
         the set it is already playing started over."""
         self._lock(False)
         if self._set.drop_the_filters():
-            return  # the player has the fresh pass already (see _pass_changed)
+            return  # the Funestra has the fresh pass already (see _pass_changed)
         self._set.playlist.restart()
         self._hand_over(land=True)
 
@@ -492,7 +492,7 @@ class PlayerShow(QObject):
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Play the item the HUD map named — a thumbnail click, the same jump
-        it makes on a player's own map; *lock* keeps it there."""
+        it makes on a Funestra's own map; *lock* keeps it there."""
         slide = self._set.slide_for_path(path)
         if slide is None:
             return
@@ -500,16 +500,16 @@ class PlayerShow(QObject):
         self._lock(lock)
 
     def _jump_to(self, slide) -> None:
-        """Stand the pass on *slide* and send the player there.
+        """Stand the pass on *slide* and send the Funestra there.
 
-        One verb either way: the player jumps to a file already in its list
+        One verb either way: the Funestra jumps to a file already in its list
         and splices one that is not in after what it is showing — which is
         exactly where the pass put a cell it never held.  A jump that ends a
-        loop re-deals the pass, and that hands the player the browse first
+        loop re-deals the pass, and that hands the Funestra the browse first
         (see :meth:`_pass_changed`).
         """
         self._set.jump_to(slide)
-        self._send(play_file(self._player_item(slide)))
+        self._send(play_file(self._funestra_item(slide)))
         self._publish()
 
     # --- the map, and the loops along it -----------------------------------
@@ -522,7 +522,7 @@ class PlayerShow(QObject):
 
     def show_loop(self, axis: str) -> None:
         """Loop the map's *axis* around the item on screen, or end the loop
-        for "".  The player is handed the row or the column to play, and the
+        for "".  The Funestra is handed the row or the column to play, and the
         set it was browsing when the loop ends (see :meth:`_pass_changed`)."""
         if not axis:
             if self._set.end_loop(self._browse_it_all):
@@ -534,8 +534,8 @@ class PlayerShow(QObject):
             self._lock_instead_of_looping()
 
     def _lock_instead_of_looping(self) -> None:
-        """Tell the player to lock what it is showing: the answer a loop asked
-        of a row of one gets on a player of its own, where the loop button of a
+        """Tell the Funestra to lock what it is showing: the answer a loop asked
+        of a row of one gets on a Funestra of its own, where the loop button of a
         group holding one clip locks that clip.  A row that size is the picture
         itself, so the press means "this one" rather than nothing; and a lock is
         not a loop, so a loop that was running is dropped."""
@@ -629,7 +629,7 @@ class PlayerShow(QObject):
     @property
     def hud_device(self):
         """Nothing: the panel this show publishes is drawn on a session's own
-        player, and the device half of it is on that session's main console."""
+        Funestra, and the device half of it is on that session's main console."""
         return None
 
     def press_console(self, _action: str) -> bool:
@@ -662,7 +662,7 @@ class PlayerShow(QObject):
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
                    favorite: bool = False, enhanced: bool = False) -> None:
         """A generation that belongs to what this show plays has landed: it
-        joins the set, queued to come up next, and the player is handed the
+        joins the set, queued to come up next, and the Funestra is handed the
         list again so it can reach it."""
         if favorite:
             self._set.favorite_ids.add(prompt_id)
@@ -684,7 +684,7 @@ class PlayerShow(QObject):
         upgraded = self._set.upgrade(prompt_id, path, media_type, still)
         if self._set.playlist.replace_item(prompt_id, path, media_type, still):
             if self._set.current_prompt_id() == prompt_id:
-                self._frame_on_player = None
+                self._frame_on_funestra = None
                 self._send(f"{SHOW_FRAME} {path}")
             self._hand_over()
         elif upgraded is not None and self._set.passes(upgraded) and self._set.playlist.add(upgraded):
@@ -740,19 +740,19 @@ class PlayerShow(QObject):
             self._hand_over(land=True)
             self._publish()
 
-    # --- what a player cannot do yet ----------------------------------------
+    # --- what a Funestra cannot do yet ----------------------------------------
     # Each of these is a window show's, and the last step of this move is what
-    # gives them to a player.  Answered rather than left off, because a show is
+    # gives them to a Funestra.  Answered rather than left off, because a show is
     # a show to everything that drives one.
 
     def is_live(self) -> bool:
         """Whether this show is following one generation still being made, alone.
-        Never: a player plays a run among the rest of its set."""
+        Never: a Funestra plays a run among the rest of its set."""
         return False
 
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         """What is in flight, for the block a window's own panel hangs at its
-        foot.  Nothing to do with it here: a player draws the panel it is
+        foot.  Nothing to do with it here: a Funestra draws the panel it is
         published, and a published panel carries no block of a host's own."""
 
     @property
@@ -771,19 +771,19 @@ class PlayerShow(QObject):
 
     def osr2_drive_target(self):
         """What the one device switch would follow here.  Nothing: inside a
-        session the OSR2 is the main player's alone, and the clip is the
+        session the OSR2 is the Main Funestra's alone, and the clip is the
         satellite's to play."""
 
     # --- the session's own hands on the show --------------------------------
 
     def set_paused(self, paused: bool) -> None:
-        """The room's OmniPause.  The session freezes its own players through
-        their paused flag, so there is nothing to do here — a frozen player
+        """The room's OmniPause.  The session freezes its own Funestras through
+        their paused flag, so there is nothing to do here — a frozen Funestra
         holds the picture, and nothing advances until it is let go."""
 
     def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Stop the advance while a request is being spoken: the pace goes to
-        nought, which is how anything is kept still on a player, and back after.
+        nought, which is how anything is kept still on a Funestra, and back after.
 
         A request is about what is on screen, and a set that pages on every few
         seconds would hand the words to whatever came up next.
@@ -808,14 +808,14 @@ class PlayerShow(QObject):
     def _note(self, message: str, *, kind: str = NOTICE) -> None:
         """Say a line where the speaker can see it.  A window show flashes it
         over the picture; this one has no corner of its own, so it goes to the
-        gallery's caption — which is on screen beside the players."""
+        gallery's caption — which is on screen beside the Funestras."""
         if self._say is not None:
             self._say(message)
 
     def release_media(self, paths) -> None:
         """Let go of any of *paths* on screen — a file about to be moved.
 
-        The player is what holds it open, so the way to let go is to move on;
+        The Funestra is what holds it open, so the way to let go is to move on;
         it lands back on the file only if it is the last one this show has.
         """
         if self._showing and any(str(path) == self._showing for path in paths):
@@ -865,7 +865,7 @@ class PlayerShow(QObject):
     def close(self) -> None:
         """Give the side back, handing the gallery the slide that was on it.
 
-        The panel goes with it, so the session draws its own again; the player
+        The panel goes with it, so the session draws its own again; the Funestra
         keeps playing this list until the session hands it its own, which is
         what leaving origenerator mode does.
         """
@@ -884,7 +884,7 @@ class PlayerShow(QObject):
 
 
 def _read_fields(path: Path) -> dict[str, str]:
-    """A player's status file as its ``key=value`` pairs — empty while it has
+    """A Funestra's status file as its ``key=value`` pairs — empty while it has
     published none, or while a read loses the race with its own rewrite."""
     try:
         text = path.read_text(encoding="utf-8")

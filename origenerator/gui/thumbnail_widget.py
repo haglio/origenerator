@@ -71,6 +71,9 @@ class ThumbnailWidget(QWidget):
                  corner_actions: list[CornerAction] | None = None):
         super().__init__(parent)
         self.prompt_id = prompt_id
+        self.look = self.look_of(prompt_id, thumb_path, label_text, media_type=media_type,
+                                 movie_path=movie_path, controls=controls,
+                                 corner_actions=corner_actions)
         self._selected = False
         self._favorite = favorite
         self._enhance = enhance       # what the enhance corner has to say, if anything
@@ -176,6 +179,17 @@ class ThumbnailWidget(QWidget):
         # An i2v folder's tiles carry top-left hover controls to re-roll one seed
         # on its own; other tiles pass none and grow no buttons.
         self._build_corner_actions(corner_actions or [])
+
+    @staticmethod
+    def look_of(prompt_id: str, thumb_path: str | None, label_text: str, *,
+                media_type: str | None = None, movie_path: str | None = None,
+                controls: bool = True,
+                corner_actions: list[CornerAction] | None = None, **_mutable) -> tuple:
+        """What a tile cannot be changed into once built -- so a pane redrawn
+        over this one can take the tile back for a row that still looks like
+        this, and set on it the star, the plus and the run that can."""
+        return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
+                tuple(action.action_id for action in corner_actions or ()))
 
     def is_selected(self) -> bool:
         return self._selected

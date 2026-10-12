@@ -571,6 +571,60 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
     assert len(dealt) == once
 
 
+def test_a_redraw_of_the_latest_shelf_keeps_the_tiles_it_already_drew(qtbot):
+    # Every landing redraws the shelf from a fresh model, and every tile the
+    # user had scrolled into view was built again from its picture.
+    rows = [_row("a", 1), _row("b", 2)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+    drawn = dict(pane._thumb_widgets)
+
+    _open_recents(pane, [dict(row) for row in rows])
+
+    assert pane._thumb_widgets == drawn
+    assert all(not sip.isdeleted(tile) and tile.parent() is not None for tile in drawn.values())
+
+
+def test_a_kept_tile_takes_the_star_its_row_now_wears(qtbot):
+    rows = [_row("a", 1)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+    tile = pane._thumb_widgets["a"]
+
+    _open_recents(pane, [{**rows[0], "starred": 1}])
+
+    assert pane._thumb_widgets["a"] is tile
+    assert tile._favorite is True
+
+
+def test_a_tile_whose_picture_changed_is_drawn_afresh(qtbot):
+    rows = [_row("a", 1)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_recents(pane, rows)
+    tile = pane._thumb_widgets["a"]
+
+    _open_recents(pane, [{**rows[0], "thumbnail_path": "elsewhere.jpg"}])
+
+    assert pane._thumb_widgets["a"] is not tile
+
+
+def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_shelf(qtbot):
+    # A folder's tile and a shelf's answer a double-click differently, so one is
+    # never wired for the other.
+    rows = [_made_with("a1", "alpha.safetensors")]
+    tree = gallery.build_gallery_tree(rows)
+    (lora,) = gallery.child_groups(_models(tree)["alpha"])
+    (leaf,) = gallery.child_groups(lora)
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
+    pane.show_thumbnails(leaf)
+    in_folder = pane._thumb_widgets["a1"]
+
+    pane.show_shelf(RECENTS_KEY, LANDSCAPE)
+
+    assert pane._thumb_widgets["a1"] is not in_folder
+
+
 def test_each_folders_shelf_counts_what_that_shelf_lists(qtbot):
     rows = [_made_with("a1", "alpha.safetensors", starred=1),
             _made_with("a2", "alpha.safetensors", prompt="scene two"),

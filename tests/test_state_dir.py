@@ -52,7 +52,7 @@ def test_a_process_told_where_its_state_is_keeps_every_path_there(tmp_path):
 
 
 def test_a_branch_session_shares_the_live_installs_library_and_keeps_its_own_window_state():
-    # The library -- its database, thumbnails and trash -- is the live install's
+    # The library -- its database, thumbnails and trash -- is the production app's
     # wherever the app runs from, so every instance shows every generation, made
     # in a preview or not. What is about this window alone (its saved geometry
     # and tabs, its logs) stays in the checkout that runs it.

@@ -1,10 +1,10 @@
-"""Builds and queries the gallery's folder trees — the left TOC pane.
+"""Builds and queries the gallery's folder list — the left pane.
 
-The pane is two trees, one per shape, each under a standing label and each
-scrolling on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`).
-Each carries the whole table of contents, built from that shape's rows alone.
-Standing anywhere means standing on one shape, so a slideshow started there has
-one region to go to (see :mod:`origenerator.orientation`).
+The pane draws one tree per side, each under a standing label and each scrolling
+on its own (:class:`~origenerator.gui.split_folder_tree.SplitFolderTree`), and
+each carries the whole table of contents over the rows that side holds. Standing
+anywhere is standing on one side, so a slideshow started there knows what to
+play (see :mod:`origenerator.orientation`).
 
 A row's key in the tree is therefore its folder's own key with the side
 appended, and the two maps kept here — key→item and prompt-id→item — are keyed
@@ -15,7 +15,7 @@ the rows drawing it, which is how a navigation that knows only a folder key
 
 Pure rendering and lookups over the pane the GalleryView owns and lays out; it
 has no database or refresh concerns — folder rename/star/delete live in the
-view, which rebuilds both halves through :meth:`populate`.
+view, which rebuilds every side through :meth:`populate`.
 
 The folders the user composed by hand are drawn flat: a custom folder's items
 can sit anywhere in the hierarchy, so nesting them under it would draw the same
@@ -45,7 +45,12 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gui import icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
-from origenerator.orientation import ORIENTATION_LABELS, orientation_of, oriented_key, split_key
+from origenerator.orientation import (
+    SIDE_LABELS,
+    oriented_key,
+    side_of,
+    split_key,
+)
 
 # A search does not narrow this tree: a narrowed list of folder names is a poor
 # answer to "where is the one with the two of them on the couch", because a
@@ -89,10 +94,10 @@ def _shown_shelves(side) -> list[str]:
 
 @dataclass
 class SideModel:
-    """One side of the tree: everything the Portrait (or Landscape) root draws."""
+    """One side of the list: everything that side's section draws."""
 
-    orientation: str
-    tree_model: list                       # this shape's media roots
+    side: str
+    tree_model: list                       # the media roots this side holds
     custom_folders: list = field(default_factory=list)
     show_recents: bool = False             # anything at all to list yet
     shelf_counts: dict[str, int] = field(default_factory=dict)
@@ -117,10 +122,10 @@ class GalleryTree:
 
     def populate(self, sides, expanded_keys, *, folder_meta=None,
                  recently_worked=()):
-        """Rebuild the tree from ``sides``, restoring the folders in ``expanded_keys``.
+        """Rebuild the list from ``sides``, restoring the folders in ``expanded_keys``.
 
-        ``sides`` are the :class:`SideModel`s to fill the halves with, one per
-        shape. ``folder_meta`` is the same label/star overlay the tree models
+        ``sides`` are the :class:`SideModel`s of the sections the pane is
+        drawing. ``folder_meta`` is the same label/star overlay the tree models
         were built with, so the All row each side wraps around its model can be
         renamed and favorited like any folder under it.
 
@@ -137,7 +142,7 @@ class GalleryTree:
         self.leaf_by_id = {}
         self.keys_by_folder = {}
         for side in sides:
-            self._add_side(self._tree.root_for(side.orientation), side, folder_meta)
+            self._add_side(self._tree.root_for(side.side), side, folder_meta)
         # Folders default to collapsed; only restore folders the user had open.
         for key in expanded_keys:
             item = self.item_by_key.get(key)
@@ -148,16 +153,15 @@ class GalleryTree:
         self._built = True
 
     def _add_side(self, root, side, folder_meta) -> None:
-        """One shape's whole table of contents, filling that shape's half.
+        """One side's whole table of contents, filling that side's section.
 
-        Both halves are always drawn, even for a side with nothing in it yet:
-        the split is what tells a slideshow which screen it is for, so the side
-        you have not generated for yet is still somewhere you can stand and
-        somewhere its first generation can appear. Its label says so even while
-        the rows under it are only empty shelves.
+        Drawn even for a side with nothing in it yet: the split is what tells a
+        slideshow which screen it is for, so the shape you have not generated
+        for is still somewhere you can stand and somewhere its first generation
+        can appear.
         """
         for custom in side.custom_folders:
-            self._add_custom_folder(root, custom, side.orientation)
+            self._add_custom_folder(root, custom, side.side)
         all_row = self._add_node(gallery.all_group(side.tree_model, folder_meta), root, side)
         all_row.setIcon(0, icons.all_icon())
 
@@ -170,7 +174,7 @@ class GalleryTree:
             item.setToolTip(0, _SHELF_TIPS[shelf])
             if shelf == FAVORITES_KEY:
                 item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
-            self._register(item, oriented_key(key, side.orientation), folder_item,
+            self._register(item, oriented_key(key, side.side), folder_item,
                            folder_key=key)
 
     def _register(self, item, key: str, parent_item,
@@ -239,7 +243,7 @@ class GalleryTree:
             item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
         else:
             item.setToolTip(0, group.label)
-        self._register(item, oriented_key(group.key, side.orientation), parent_item,
+        self._register(item, oriented_key(group.key, side.side), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):
             self._add_shelves(item, side, group.key)
@@ -305,14 +309,14 @@ class GalleryTree:
         while node is not None:
             parts.append(_name_of(node))
             node = node.parent()
-        side = orientation_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
+        side = side_of(item.data(0, TREE_KEY_ROLE)) if item is not None else None
         if side is not None:
-            parts.append(ORIENTATION_LABELS[side])
+            parts.append(SIDE_LABELS[side])
         return PATH_SEPARATOR.join(reversed(parts))
 
     def key_at_path(self, path: str) -> str | None:
         side_name, *names = path.split(PATH_SEPARATOR.strip())
-        side = next((side for side, label in ORIENTATION_LABELS.items()
+        side = next((side for side, label in SIDE_LABELS.items()
                      if _same_name(side_name, label)), None)
         if side is None or not names:
             return None

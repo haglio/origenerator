@@ -1,70 +1,83 @@
-"""The TOC pane's two halves: one folder tree per shape, each under a standing label.
+"""The folder list's sections: one tree per side, each under a standing label.
 
-The gallery's table of contents exists twice over, once per shape (see
-:mod:`origenerator.orientation`), and this is how the pane shows both at
-once: a :class:`~origenerator.gui.folder_tree.FolderTree` per side, stacked
-under a label that never scrolls away, on a splitter so either half can be
-given the room.
-
-Two halves rather than two rows in one tree.  Nesting a whole table of contents
-under a top-level row costs every folder in it a level of indentation in the
-narrowest column of the window, hides which side you are in the moment that row
-scrolls off, and makes the two libraries share one scrollbar — so reaching a
-settings folder deep in Landscape scrolls the whole of Portrait away first.
-Each half scrolling on its own keeps both readable, and the labels are the
-answer to "which one am I in" without looking up — each one led by a small
-frame of its own shape, upright or lying down, which answers it a beat before
-the word does.
-
-The two are mutually exclusive: a row picked in one half clears the other's
-selection, so "the folder on screen" is always one folder, and a set picked
-across both — which is how a mixed-shape grouping would be composed — cannot
-be expressed at all.  Everything above this widget goes on talking to one tree:
-the signals a ``FolderTree`` emits are re-emitted here from whichever half
-fired them, and the handful of methods the view calls resolve to the half that
-owns the row.
+The marks over them are the radio: Portrait and Landscape apart, or one list of
+both shapes (:mod:`origenerator.orientation` says what a side is). Sections
+rather than rows in one tree, so each scrolls alone and its label never scrolls
+away; one selection across them all, so the folder on screen is one folder.
 """
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QSplitter,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.mark_button import fill_square_with_mark
+from shared_ui.spacing import (
+    BUTTON_GAP,
+    BUTTON_GROUP_GAP,
+    BUTTON_MARK,
+    BUTTON_ROW_GAP,
+)
 
-from origenerator.gallery.sides import ORIENTATION_LABELS, ORIENTATIONS
+from origenerator.gallery.sides import BOTH, ORIENTATIONS, SIDE_LABELS, SIDES
 from origenerator.gui import icons
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
+from origenerator.gui.panes import pane_splitter
+from origenerator.gui.stylesheet import CHOSEN
 
-# Neither half is allowed to shrink to nothing: a half with no rows visible is
-# a side of the library that looks like it isn't there.
-_MIN_HALF_HEIGHT = 90
+_MIN_SECTION_HEIGHT = 90
+
+_TIPS = {
+    side: (f"Everything {side}-shaped — its own shelves, folders and library. "
+           f"A slideshow started here plays {side} pictures alone.")
+    for side in ORIENTATIONS
+} | {
+    BOTH: ("Everything, both shapes together — its own shelves, folders and "
+           "library. A slideshow started here mixes portrait and landscape "
+           "pictures in the one show."),
+}
+_SEPARATE = "Separate"
+_TOGETHER = "Together"
+_EACH_SHAPE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
+                   "slideshow started in one plays that shape alone")
+_BOTH_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
+             "landscape pictures")
 
 
-def _heading(orientation: str) -> QFrame:
-    """One half's standing label: the shape's proportion mark, then its name.
+class _Choice(QFrame):
+    """One of the radio's two choices: a square mark, then the word for it."""
 
-    The mark is there because the two halves differ by a shape, and a shape is
-    read faster as one — the eye lands on an upright frame or a lying-down one
-    and is already in the right library before the word is spelled out.
+    def __init__(self, word: str, mark, tip: str):
+        super().__init__()
+        self.setToolTip(tip)
+        self.button = fill_square_with_mark(QPushButton())
+        self.button.setObjectName("sidesChoice")
+        self.button.setProperty(CHOSEN, True)
+        self.button.setIcon(QIcon(mark))
+        self.button.setCheckable(True)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(BUTTON_GAP)
+        row.addWidget(self.button)
+        row.addWidget(QLabel(word))
 
-    A frame carrying two labels rather than one label carrying a word, so the
-    mark sits beside the name inside the rule the stylesheet draws under the
-    whole heading. Only the frame gets the tooltip: Qt hands a tooltip event up
-    from a child that has none of its own, so one description covers the
-    heading wherever in it the cursor stops.
-    """
+    def mousePressEvent(self, _event) -> None:
+        self.button.click()
+
+
+def _heading(side: str) -> QFrame:
+    """One section's standing label: its shape's mark, then its name."""
     heading = QFrame()
     heading.setObjectName("treeSectionLabel")
-    heading.setToolTip(
-        f"Everything {orientation}-shaped — its own shelves, folders and "
-        "library. A slideshow started here plays on the "
-        f"{orientation} screen."
-    )
+    heading.setToolTip(_TIPS[side])
 
     row = QHBoxLayout(heading)
     row.setContentsMargins(0, 0, 0, 0)  # the stylesheet's padding insets this
@@ -72,27 +85,29 @@ def _heading(orientation: str) -> QFrame:
 
     mark = QLabel()
     mark.setObjectName("treeSectionMark")
-    mark.setPixmap(icons.orientation_mark(orientation))
+    mark.setPixmap(icons.side_mark(side))
     row.addWidget(mark)
 
-    name = QLabel(ORIENTATION_LABELS[orientation])
+    name = QLabel(SIDE_LABELS[side])
     name.setObjectName("treeSectionName")
     row.addWidget(name)
-    row.addStretch(1)  # the pair reads as a heading, not as a centered caption
+    row.addStretch(1)
     return heading
 
 
 class SplitFolderTree(QWidget):
-    """Two folder trees, one per shape, each labelled and each scrolling alone.
+    """A folder tree per side, under the radio that says which sides there are.
 
     Presents the surface of the single ``FolderTree`` it replaced — the same
     signals, and the methods the gallery view calls on a tree — so its callers
-    need not know which half a row is in.  The one deliberate difference is the
-    context menu: a right-click arrives as :attr:`context_menu_requested` with
-    the row, a screen position and the half it landed in, since the pane's
-    coordinates are no longer any one tree's and empty space has no row to ask.
+    need not know which section a row is in.  The one deliberate difference is
+    the context menu: a right-click arrives as :attr:`context_menu_requested`
+    with the row, a screen position and the section it landed in, since the
+    pane's coordinates are no longer any one tree's and empty space has no row
+    to ask.
     """
 
+    sides_changed = pyqtSignal()
     currentItemChanged = pyqtSignal(object, object)
     itemSelectionChanged = pyqtSignal()
     itemDoubleClicked = pyqtSignal(object, int)
@@ -104,51 +119,97 @@ class SplitFolderTree(QWidget):
 
     def __init__(self, group_role, parent=None):
         super().__init__(parent)
-        self._halves: dict[str, FolderTree] = {}
-        # Which half the current row is in. Only one ever holds a selection, so
-        # this is what "the tree's selection" means to everything above.
+        self._trees: dict[str, FolderTree] = {}
+        self._sections: dict[str, QWidget] = {}   # each tree under its heading
+        self._sides = ORIENTATIONS
         self._active = ORIENTATIONS[0]
 
-        self._splitter = QSplitter(Qt.Orientation.Vertical)
-        self._splitter.setChildrenCollapsible(False)
-        self._splitter.setHandleWidth(6)
-        for orientation in ORIENTATIONS:
-            self._splitter.addWidget(self._build_half(group_role, orientation))
-            self._splitter.setStretchFactor(len(self._halves) - 1, 1)
-        # Equal halves to start, and equal shares of anything the pane gains or
-        # loses. Neither library is the main one, and the sizes are the user's
-        # to drag from there.
-        self._splitter.setSizes([1] * len(ORIENTATIONS))
+        self._splitter = pane_splitter(Qt.Orientation.Vertical)
+        for side in SIDES:
+            self._splitter.addWidget(self._build_section(group_role, side))
+            self._splitter.setStretchFactor(len(self._trees) - 1, 1)
+        # Equal sections, and equal shares of anything the pane gains or loses:
+        # no side is the main one, and the sizes are the user's to drag.
+        self._splitter.setSizes([1] * len(SIDES))
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
-        column.addWidget(self._splitter)
+        column.setSpacing(2)
+        column.addWidget(self._build_radio())
+        column.addWidget(self._splitter, 1)
+        self.set_sides(ORIENTATIONS)
 
-    def _build_half(self, group_role, orientation: str) -> QWidget:
-        """One side: its label, then its tree.
+    def _build_radio(self) -> QWidget:
+        """The two choices over the sections: a list per shape, or one of both."""
+        each_shape = _Choice(_SEPARATE, icons.each_shape_mark(BUTTON_MARK),
+                             _EACH_SHAPE_TIP)
+        self._both_choice = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK),
+                                    _BOTH_TIP)
+        self.each_shape_button = each_shape.button
+        self.both_button = self._both_choice.button
+        self._radio = QButtonGroup(self)
+        self._radio.setExclusive(True)
+        choices = QWidget()
+        FlowLayout(choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
+        for choice, sides in ((each_shape, ORIENTATIONS),
+                              (self._both_choice, (BOTH,))):
+            choice.button.clicked.connect(lambda _checked, s=sides: self._pick_sides(s))
+            self._radio.addButton(choice.button)
+            choices.layout().addWidget(choice)
+        self.each_shape_button.setChecked(True)
+        return choices
 
-        The label is outside the tree rather than a row in it, which is the
-        whole point — a row scrolls away, and then nothing on screen says which
-        library you are reading.
+    # --- which sides the pane draws -----------------------------------------
+
+    @property
+    def sides(self) -> tuple[str, ...]:
+        return self._sides
+
+    def set_sides(self, sides) -> None:
+        """Draw a section for each of *sides* and hide the rest."""
+        self._sides = tuple(sides)
+        for side, section in self._sections.items():
+            section.setVisible(side in self._sides)
+        if self._active not in self._sides:
+            self._active = self._sides[0]
+        self.each_shape_button.setChecked(self._sides != (BOTH,))
+        self.both_button.setChecked(self._sides == (BOTH,))
+
+    def offer_both(self, offered: bool) -> None:
+        """Whether one list of both shapes is on offer at all.
+
+        Hosted by a Fun Time session it is not: the room plays a shape on each
+        of its two screens, so a mixed show would have nowhere to land.
         """
-        half = QWidget()
-        column = QVBoxLayout(half)
+        self._both_choice.setVisible(offered)
+        if not offered:
+            self._pick_sides(ORIENTATIONS)
+
+    def _pick_sides(self, sides) -> None:
+        if tuple(sides) == self._sides:
+            return
+        self.set_sides(sides)
+        self.sides_changed.emit()
+
+    def _build_section(self, group_role, side: str) -> QWidget:
+        section = QWidget()
+        column = QVBoxLayout(section)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(2)
-        column.addWidget(_heading(orientation))
+        column.addWidget(_heading(side))
 
         tree = FolderTree(group_role)
         tree.setHeaderHidden(True)
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        tree.setMinimumHeight(_MIN_HALF_HEIGHT)
+        tree.setMinimumHeight(_MIN_SECTION_HEIGHT)
         tree.customContextMenuRequested.connect(
-            lambda pos, t=tree, o=orientation: self._on_context_menu(t, pos, o))
+            lambda pos, t=tree, s=side: self._on_context_menu(t, pos, s))
         tree.currentItemChanged.connect(
-            lambda current, previous, o=orientation: self._on_current(o, current, previous))
+            lambda current, previous, s=side: self._on_current(s, current, previous))
         tree.itemSelectionChanged.connect(self.itemSelectionChanged)
         # Re-emitted through lambdas rather than wired signal-to-signal: Qt's own
         # carry a QTreeWidgetItem*, and these carry it as a plain object so a
-        # half's rows reach handlers that never learn which half they came from.
+        # section's rows reach handlers that never learn which one they came from.
         tree.itemDoubleClicked.connect(
             lambda item, column: self.itemDoubleClicked.emit(item, column))
         tree.itemChanged.connect(
@@ -158,38 +219,36 @@ class SplitFolderTree(QWidget):
         tree.folders_dropped.connect(self.folders_dropped)
         column.addWidget(tree, 1)
 
-        self._halves[orientation] = tree
-        return half
+        self._trees[side] = tree
+        self._sections[side] = section
+        return section
 
-    # --- the halves ---------------------------------------------------------
+    # --- the sections -------------------------------------------------------
 
-    def root_for(self, orientation: str):
+    def root_for(self, side: str):
         """Where one side's rows attach — what the tree builder fills."""
-        return self._halves[orientation].invisibleRootItem()
+        return self._trees[side].invisibleRootItem()
 
-    def orientation_of_item(self, item) -> str | None:
-        """Which side a row is in, by the tree holding it."""
+    def side_of_item(self, item) -> str | None:
         holder = item.treeWidget() if item is not None else None
-        return next((side for side, tree in self._halves.items() if tree is holder), None)
+        return next((side for side, tree in self._trees.items() if tree is holder), None)
 
-    # --- one selection across the two ---------------------------------------
+    # --- one selection across them all --------------------------------------
 
-    def _on_current(self, orientation: str, current, previous) -> None:
-        """A row became current: that half is now the selected one, and the
-        other lets go — so what is picked is always one folder in one library."""
-        if current is not None and orientation != self._active:
-            self._active = orientation
-            self._release_all_but(orientation)
+    def _on_current(self, side: str, current, previous) -> None:
+        if current is not None and side != self._active:
+            self._active = side
+            self._release_all_but(side)
         self.currentItemChanged.emit(current, previous)
 
-    def _release_all_but(self, orientation: str) -> None:
-        for side, tree in self._halves.items():
-            if side != orientation:
+    def _release_all_but(self, side: str) -> None:
+        for other, tree in self._trees.items():
+            if other != side:
                 self._release(tree)
 
     def _release(self, tree) -> None:
-        """Drop a half's selection without telling anyone: this is the other
-        half's pick taking effect, not a selection change of its own."""
+        """Drop a section's selection without telling anyone: this is another
+        section's pick taking effect, not a selection change of its own."""
         blocked = tree.signalsBlocked()
         tree.blockSignals(True)
         try:
@@ -198,75 +257,65 @@ class SplitFolderTree(QWidget):
         finally:
             tree.blockSignals(blocked)
 
-    def _on_context_menu(self, tree, pos, orientation: str) -> None:
+    def _on_context_menu(self, tree, pos, side: str) -> None:
         self.context_menu_requested.emit(tree.itemAt(pos), tree.viewport().mapToGlobal(pos),
-                                         orientation)
+                                         side)
 
     # --- the surface the gallery view calls on a tree ------------------------
 
     def currentItem(self):
-        """The picked row — the active half's, else whichever half has one."""
-        current = self._halves[self._active].currentItem()
+        """The picked row — the active section's, else whichever has one."""
+        current = self._trees[self._active].currentItem()
         if current is not None:
             return current
-        return next((tree.currentItem() for tree in self._halves.values()
+        return next((tree.currentItem() for tree in self._trees.values()
                      if tree.currentItem() is not None), None)
 
     def is_current(self, item) -> bool:
-        """Whether a row is already the current one of its own half — where
+        """Whether a row is already the current one of its own section — where
         setting it again fires no signal, so a caller who needs the pane drawn
-        from it has to draw it itself.
-
-        Asked of the row's half rather than of the pane: each half keeps its own
-        current row, so a row can be its half's current one while the other half
-        is the active one, and setting it then moves the selection across without
-        the row itself changing.
-        """
-        orientation = self.orientation_of_item(item)
-        return (orientation is not None
-                and self._halves[orientation].currentItem() is item)
+        from it has to draw it itself."""
+        side = self.side_of_item(item)
+        return side is not None and self._trees[side].currentItem() is item
 
     def setCurrentItem(self, item, column=0, command=None) -> None:
-        """Go to a row, wherever it lives, and let the other half go."""
-        orientation = self.orientation_of_item(item)
-        if orientation is None:
+        side = self.side_of_item(item)
+        if side is None:
             return
-        self._release_all_but(orientation)
-        self._active = orientation
-        self._halves[orientation].setCurrentItem(item, column, command)
+        self._release_all_but(side)
+        self._active = side
+        self._trees[side].setCurrentItem(item, column, command)
 
     def selected_folder_keys(self) -> list[str]:
-        """The tree keys of the picked rows. One half holds them all — the other
-        was released the moment this one was picked in."""
-        return [key for tree in self._halves.values() for key in tree.selected_folder_keys()]
+        return [key for tree in self._trees.values() for key in tree.selected_folder_keys()]
 
     def selectedItems(self) -> list:
-        return [item for tree in self._halves.values() for item in tree.selectedItems()]
+        return [item for tree in self._trees.values() for item in tree.selectedItems()]
 
     def clearSelection(self) -> None:
-        for tree in self._halves.values():
+        for tree in self._trees.values():
             tree.clearSelection()
 
     def clear(self) -> None:
-        for tree in self._halves.values():
+        for tree in self._trees.values():
             tree.clear()
 
     def editItem(self, item, column=0) -> None:
-        orientation = self.orientation_of_item(item)
-        if orientation is not None:
-            self._halves[orientation].editItem(item, column)
+        side = self.side_of_item(item)
+        if side is not None:
+            self._trees[side].editItem(item, column)
 
     def blockSignals(self, block: bool) -> bool:
-        """Silence the halves along with this widget — a rebuild clears and
+        """Silence the sections along with this widget — a rebuild clears and
         refills them, and it is their signals that would fire."""
-        for tree in self._halves.values():
+        for tree in self._trees.values():
             tree.blockSignals(block)
         return super().blockSignals(block)
 
     def setEditTriggers(self, triggers) -> None:
-        for tree in self._halves.values():
+        for tree in self._trees.values():
             tree.setEditTriggers(triggers)
 
     def setExpandsOnDoubleClick(self, expands: bool) -> None:
-        for tree in self._halves.values():
+        for tree in self._trees.values():
             tree.setExpandsOnDoubleClick(expands)

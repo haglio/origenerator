@@ -111,8 +111,8 @@ def test_preview_leads_the_column_over_the_form_and_generate(panel):
     # Preview-over-form: the preview sits on top of the settings, with the
     # Generate button under them, all in the panel's own column.
     split = panel._media_split
-    assert split.indexOf(panel._preview) == 0
-    assert split.indexOf(panel._preview) < split.indexOf(panel._scroll)
+    assert split.indexOf(panel._preview_pane) == 0
+    assert split.indexOf(panel._preview_pane) < split.indexOf(panel._scroll)
     assert panel.layout().indexOf(split) == 0
     assert _is_descendant(panel._generate_btn, panel)
 
@@ -240,20 +240,51 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
 
 def test_the_pane_keeps_a_margin_round_its_contents(panel):
     # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the settings down either side, not the button bank at the foot. The width
-    # is written out rather than read from _PANE_MARGIN: taken from the constant
-    # that sets it, this test passes at any margin at all.
+    # the form down either side, not the button bank at the foot. The width is
+    # written out rather than read from the constant that sets it, so this test
+    # passes at any margin at all.
     panel.show()
     panel.resize(700, 800)
 
     top_left = panel._preview.mapTo(panel, panel._preview.rect().topLeft())
     assert top_left.x() == 8
     assert top_left.y() == 8
-    scroll_right = panel._scroll.mapTo(panel, panel._scroll.rect().topRight()).x()
-    assert panel.width() - scroll_right - 1 == 8
+    form = panel._form_host
+    assert form.mapTo(panel, form.rect().topLeft()).x() == 8
+    # On the right the gap is measured to the scroll's own edge, which is where
+    # its bar sits: the fields stop short of the bar rather than under it.
+    viewport = panel._scroll.viewport()
+    bar_side = viewport.mapTo(panel, viewport.rect().topRight()).x()
+    assert bar_side - form.mapTo(panel, form.rect().topRight()).x() == 8
     generate = panel._generate_btn.parentWidget()
     lower = generate.mapTo(panel, generate.rect().bottomLeft()).y()
     assert panel.height() - lower - 1 == 8
+
+
+def test_the_top_setting_keeps_clear_of_the_line_above_it(panel):
+    """The thick line over the settings is a pane edge like any other, and the
+    first field sat right against it."""
+    panel.show()
+    panel.resize(700, 800)
+
+    handle = panel._media_split.handle(1)
+    below_the_line = handle.mapTo(panel, handle.rect().bottomLeft()).y()
+    form = panel._form_host
+    assert form.mapTo(panel, form.rect().topLeft()).y() - below_the_line >= 8
+
+
+def test_the_settings_handle_reaches_the_panes_own_border(panel):
+    """The thick line over the settings runs the whole width of the tab, so it
+    meets the border of the pane the tab is in instead of stopping short of it
+    — which is how every other section of this app is parted from the next."""
+    panel.show()
+    panel.resize(700, 800)
+
+    handle = panel._media_split.handle(1)
+    left = handle.mapTo(panel, handle.rect().topLeft()).x()
+    right = handle.mapTo(panel, handle.rect().topRight()).x()
+    assert left == 0
+    assert right == panel.width() - 1
 
 
 def _layout_containing(root, widget):

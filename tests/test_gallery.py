@@ -54,6 +54,7 @@ from origenerator.gallery import (
     settings_signature,
     signatures,
     source_image_id_for,
+    start_frame_index,
     unreviewed_experiments,
     videos_from_source_image,
     workflows_of_both_kinds,
@@ -184,6 +185,22 @@ def test_animated_preview_path_is_none_when_the_video_yields_no_frames(tmp_path,
                         lambda *a, **k: None)
 
     assert animated_preview_path(row, tmp_path, tmp_path / "thumbs") is None
+
+
+def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):
+    """One redraw asks every row its kind several times over -- 38,000 asks of a
+    5,700-row library -- and each answer parsed the row's file list afresh."""
+    parsed = []
+    real = gallery_output.parse_file_list
+    monkeypatch.setattr(gallery_output, "parse_file_list",
+                        lambda value: parsed.append(1) or real(value))
+    row = {"output_files": '[{"filename": "kind_read_once_00042_.png"}]',
+           "workflow_name": "sdxl_t2i"}
+
+    assert media_type_of_row(row) == "image"
+    assert media_type_of_row(dict(row)) == "image"
+
+    assert len(parsed) == 1
 
 
 def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
@@ -1378,27 +1395,18 @@ def test_build_gallery_tree_files_each_media_type_under_its_own_workflow_folder(
     assert len(video_source.children) == 1
 
 
-def test_build_gallery_tree_keeps_only_the_checked_media_types():
-    # The gallery's two ticks decide which folders exist at all, so an unchecked
-    # kind takes its whole branch with it — and unchecking both leaves no tree.
-    rows = [_img("i1", "a cat", 50, 1), _i2v("v1", "styleA", seed=1)]
-    assert {w.key for w in build_gallery_tree(rows, {}, {"image", "video"})} \
-        == {"image/sdxl_t2i", "video/wan22_i2v"}
-    assert [w.key for w in build_gallery_tree(rows, {}, {"image"})] == ["image/sdxl_t2i"]
-    assert [w.key for w in build_gallery_tree(rows, {}, {"video"})] == ["video/wan22_i2v"]
-    assert build_gallery_tree(rows, {}, set()) == []
-
-
-def test_hiding_images_leaves_a_videos_source_image_folders_untouched():
-    # The filter narrows the folders, never the index under them: the frame a
-    # video animates is still looked up among every finished image, so a gallery
-    # showing videos alone keys and names its source-image folders exactly as a
-    # gallery showing both does.
+def test_a_tree_of_videos_alone_keys_its_source_image_folders_the_same():
+    # A caller that narrows the rows itself hands in the whole library's index,
+    # so the frame a video animates is still looked up among every finished
+    # image: a tree of videos alone keys and names its source-image folders
+    # exactly as a tree of both does.
     face = _img("face", "a smiling face", 30, 1)
-    rows = [_i2v_frame("vf", "sdxl_t2i_face.png"), face]
-    unfiltered = {w.key: w for w in build_gallery_tree(rows)}["video/wan22_i2v"]
-    both = unfiltered.children[0].children[0].children
-    videos_only = build_gallery_tree(rows, {}, {"video"})[0] \
+    video = _i2v_frame("vf", "sdxl_t2i_face.png")
+    rows = [video, face]
+    both = {w.key: w for w in build_gallery_tree(rows)}["video/wan22_i2v"] \
+        .children[0].children[0].children
+    videos_only = build_gallery_tree(
+        [video], {}, image_index=start_frame_index(rows))[0] \
         .children[0].children[0].children
 
     assert [(f.key, f.label) for f in videos_only] == [(f.key, f.label) for f in both]

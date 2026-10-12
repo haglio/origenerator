@@ -5,7 +5,8 @@ import logging
 import random
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QRadioButton,
     QScrollArea,
     QTextEdit,
     QVBoxLayout,
@@ -65,7 +67,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_controls, omnipause
+from origenerator.gui import corner_controls, icons, omnipause
 from origenerator.gui.auto_generate_controller import AutoGenerateController
 from origenerator.gui.browser_pane import (
     REROLL_VIDEO,
@@ -75,6 +77,7 @@ from origenerator.gui.browser_pane import (
     PaneHost,
     TreeNavigation,
 )
+from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.deferred import defer
@@ -128,21 +131,24 @@ from origenerator.gui.toolbar_bank import (
 from origenerator.gui.voice_router import VoiceRouter
 from origenerator.media import MediaType
 from origenerator.orientation import (
-    LANDSCAPE as _LANDSCAPE,
+    BOTH as _BOTH,
 )
 from origenerator.orientation import (
-    ORIENTATIONS as _ORIENTATIONS,
+    LANDSCAPE as _LANDSCAPE,
 )
 from origenerator.orientation import (
     base_of as _base_of,
 )
 from origenerator.orientation import (
-    orientation_of as _orientation_of,
-)
-from origenerator.orientation import (
+    filter_rows,
     oriented_key,
     requested_orientation,
-    split_rows,
+)
+from origenerator.orientation import (
+    side_holds as _side_holds,
+)
+from origenerator.orientation import (
+    side_of as _side_of,
 )
 from origenerator.orientation import (
     split_key as _split_shelf_key,
@@ -481,6 +487,11 @@ class GalleryView(QWidget):
         # treat them exactly as they treat a derived folder.
         self._custom_folders: list = []
         self._custom_folders_by_side: dict[str, list] = {}
+        self._lists_built_from = None
+        self._lists_by_side: dict[str, list] = {}
+        self._both_kind_workflows: frozenset[str] = frozenset()
+        self._start_frames: dict = {}
+        self._whole_list: list = []
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         # What the trail allows right now, as it last told us: the bank is written
@@ -774,20 +785,21 @@ class GalleryView(QWidget):
                          else self._arrangement.standalone(), 1)
 
     def _build_toc_pane(self):
-        """The left pane: the two folder trees under the voice caption, the
-        search field and the media filter, with the combine panel at their foot
-        -- and over all of it, in the view's top-left corner beside the button
-        bank, the OSR2 HUD of a window that drives the device.
-        """
-        # TOC pane: folder tree (media -> workflow -> model -> LoRA -> [source image]
-        # -> settings; a LoRA-less workflow collapses the LoRA level to one
-        # "(no add-on)" folder, and the source-image level shows only for
-        # image-conditioned workflows). Folders start collapsed and only expand on
-        # the disclosure arrow; double-click renames.
-        # One tree per shape, each under a standing label and each scrolling on
-        # its own: the table of contents exists twice over, and which half you
+        """The left pane's sections: the OSR2 HUD of a window that drives the
+        device, what voice heard, the search field over the folder list, and the
+        combine panel."""
+        # The folder list: media -> workflow -> model -> LoRA -> [source image]
+        # -> settings, the LoRA level collapsing to one "(no add-on)" folder for a
+        # LoRA-less workflow and the source-image level showing only for an
+        # image-conditioned one. Folders expand on the arrow; double-click renames.
+        # One tree per side, each under a standing label and each scrolling on
+        # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
         self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
+        # A mixed show has no region to land on inside a session, which plays a
+        # shape on each of its two screens, so Both is standalone's alone.
+        self._tree.offer_both(self._fun_time is None)
+        self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._tree.setExpandsOnDoubleClick(False)
@@ -802,60 +814,49 @@ class GalleryView(QWidget):
         self._tree.favorite_clicked.connect(self._toggle_favorite)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.folders_dropped.connect(self._on_folders_dropped)
-        toc, toc_column = pane()
+        # What voice heard, the search field over the folder list, and the
+        # combine panel: three sections under handles of their own, the same
+        # handle the folder list's own sections are parted by — so the sections
+        # outside the list read as sections too rather than as loose rows above
+        # and below it.
+        listening, listening_column = pane()
         # Voice's caption sits above everything else in this pane — the top-left
-        # corner of the view, where it obscures no control while it's up.
-        toc_column.addWidget(self._voice.status)
+        # corner of the view, where it obscures no control while it's up. Its
+        # section comes and goes with it, rather than standing empty while the
+        # mic is shut.
+        listening_column.addWidget(self._voice.status)
+        listening.setVisible(not self._voice.status.isHidden())
+        self._voice.caption_shown.connect(listening.setVisible)
+        finding, toc_column = pane()
         # The gallery search: its field over the tree, its results bar over the
         # browser pane below (:mod:`origenerator.gui.gallery_search`).
         toc_column.addWidget(self._search.field)
-        # The gallery's image/video filter: two ticks saying which kinds of
-        # generation the gallery is made of at all, both on so it opens showing
-        # everything. It sits between the search field and the tree because it
-        # prunes the tree: a gallery with videos switched off has no video folders
-        # in it, and no video tiles in the pane beside them either. (It replaces a
-        # pair that filtered the Recents shelf alone, which could only ever answer
-        # "which of these do I want to look at" for one shelf.)
-        self._image_cb = TickControl("Images")
-        self._video_cb = TickControl("Videos")
-        for tick in (self._image_cb, self._video_cb):
-            tick.setChecked(True)
-            tick.setToolTip(
-                "Which kinds of generation the gallery lists — the folders below "
-                "as well as the items in the pane beside them"
-            )
-            tick.toggled.connect(self._on_media_filter_changed)
-        media_filter = QWidget()
-        media_row = QHBoxLayout(media_filter)
-        media_row.setContentsMargins(0, 0, 0, 0)
-        media_row.addWidget(self._image_cb)
-        media_row.addWidget(self._video_cb)
-        media_row.addStretch(1)
-        toc_column.addWidget(media_filter)
-        toc_column.addWidget(self._tree, 1)  # the trees take the height; combine sits below
-        toc_column.addWidget(self._combine.panel)
+        toc_column.addWidget(self._tree, 1)  # the trees take this section's height
+        combining, combining_column = pane()
+        combining_column.addWidget(self._combine.panel)
+        # With no ComfyUI there is nothing to combine, and the panel says so by
+        # hiding; its section says the same rather than framing the gap.
+        combining.setVisible(not self._combine.panel.isHidden())
+        sections = [listening, finding, combining]
         self._motion_panel = None
         self._motion_pane = None
-        if self._osr2_motion is None:
-            return toc
-        self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
-        # The one place Esc's panic stop is discoverable, now that the
-        # toolbar switch whose tooltip said so is gone.  Only here: in a
-        # show Esc closes the show rather than stopping the device.
-        self._motion_panel.setToolTip(
-            f"{self._motion_panel.toolTip()} · Esc stops")
-        hud_scroll = QScrollArea()
-        hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        hud_scroll.setWidget(self._motion_panel)
-        hud, hud_column = pane()
-        hud_column.addWidget(hud_scroll)
-        self._motion_pane = hud
-        column = pane_splitter(Qt.Orientation.Vertical)
-        column.addWidget(hud)
-        column.addWidget(toc)
-        column.setStretchFactor(0, 0)
-        column.setStretchFactor(1, 1)
-        return column
+        if self._osr2_motion is not None:
+            self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
+            # The one place Esc's panic stop is discoverable, now that the
+            # toolbar switch whose tooltip said so is gone.  Only here: in a
+            # show Esc closes the show rather than stopping the device.
+            self._motion_panel.setToolTip(f"{self._motion_panel.toolTip()} · Esc stops")
+            hud_scroll = QScrollArea()
+            hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            hud_scroll.setWidget(self._motion_panel)
+            self._motion_pane, hud_column = pane()
+            hud_column.addWidget(hud_scroll)
+            sections.insert(0, self._motion_pane)
+        toc = pane_splitter(Qt.Orientation.Vertical)
+        for section in sections:
+            toc.addWidget(section)
+        toc.setStretchFactor(sections.index(finding), 1)  # the folder list takes the height
+        return toc
 
     def _build_browser_pane(self):
         """The middle pane: the folder's path, the button bank under it, the
@@ -894,7 +895,7 @@ class GalleryView(QWidget):
         # while that shelf is open.
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
-        # Scheduling an absence is the live install's alone, so a branch session
+        # Scheduling an absence is the production app's alone, so a branch session
         # can't reach the switch (see queue_experiments_for_absence).
         self._experiments_cb.setEnabled(not is_branch_session())
         self._experiments_status = QLabel("")
@@ -908,6 +909,32 @@ class GalleryView(QWidget):
         self._experiments_bar.hide()  # shown only on the Experiments shelf
         self._sync_experiments_bar()
         browser_column.addWidget(self._experiments_bar)
+        # Which kinds a shelf lists. Here rather than over the folder list,
+        # because a folder under image/… holds images and one under video/…
+        # holds videos: only a shelf gathers both, so only a shelf has the
+        # question to answer, and asking it here leaves every folder in the
+        # list reachable whichever kind is chosen.
+        self._images_only = QRadioButton("Images")
+        self._videos_only = QRadioButton("Videos")
+        self._both_kinds = QRadioButton("Both")
+        self._both_kinds.setChecked(True)
+        self._kinds_bar = QWidget()
+        kinds_row = QHBoxLayout(self._kinds_bar)
+        kinds_row.setContentsMargins(0, 0, 0, 0)
+        marks = (icons.media_type_icon(MediaType.IMAGE),
+                 icons.media_type_icon(MediaType.VIDEO),
+                 QIcon(icons.both_kinds_mark()))
+        word = icons.MARK_BESIDE_A_WORD
+        for kind, mark in zip((self._images_only, self._videos_only, self._both_kinds),
+                              marks):
+            kind.setToolTip("Which kinds this shelf lists")
+            kind.setIcon(mark)
+            kind.setIconSize(QSize(word, word))
+            kind.toggled.connect(self._on_media_filter_changed)
+            kinds_row.addWidget(kind)
+        kinds_row.addStretch(1)
+        self._kinds_bar.hide()  # shown on the shelves, which are what gather both
+        browser_column.addWidget(self._kinds_bar)
         browser_column.addWidget(self._search.bar)
         self._avg_label = QLabel("")
         self._avg_label.setObjectName("estimateLabel")
@@ -1010,6 +1037,9 @@ class GalleryView(QWidget):
         if self._osr2_motion is not None:
             self._osr2_motion.stop()
         self._fun_time = session
+        # The room plays a shape on each of its two screens, so a mixed show has
+        # nowhere to land and the list goes back to the two shapes.
+        self._tree.offer_both(False)
         self._shows.become_hosted(session)
         self._info_tabs.become_hosted(session)
         self._voice.become_hosted()
@@ -1027,6 +1057,7 @@ class GalleryView(QWidget):
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
+        self._tree.offer_both(True)   # one screen again, so a mixed show can play
         self._shows.become_standalone(self._osr2_motion)
         self._info_tabs.become_standalone()
         self._bank.become_standalone()
@@ -1249,7 +1280,7 @@ class GalleryView(QWidget):
     def set_experiments_enabled(self, enabled):
         """Restore the background experimenter's switch from a saved session —
         off in a branch session whatever was saved, since a branch session's
-        state is seeded from the live install's, switch position included."""
+        state is seeded from the production app's, switch position included."""
         self._experiments_cb.setChecked(bool(enabled) and not is_branch_session())
 
     def queue_experiments_for_absence(self) -> int:
@@ -1260,7 +1291,7 @@ class GalleryView(QWidget):
         launch finalizes what finished onto the Experiments shelf. A no-op with
         the switch off. Returns how many were queued.
 
-        Only the live install schedules an absence. A branch preview shares the
+        Only the production app schedules an absence. A branch preview shares the
         one ComfyUI, and its batch outlives it there as work no app can account
         for: the live session cancels only the experiments its own database
         records, so a preview's survive every launch, and each Generate after
@@ -1269,7 +1300,7 @@ class GalleryView(QWidget):
         that is actually closed.
         """
         if is_branch_session():
-            logger.info("Branch session: experiments left to the live app")
+            logger.info("Branch session: experiments left to the production app")
             return 0
         if not self.experiments_enabled():
             return 0
@@ -1292,7 +1323,7 @@ class GalleryView(QWidget):
         account for, and the repairs belong to the live library anyway.
         """
         if is_branch_session():
-            logger.info("Branch session: base re-renders left to the live app")
+            logger.info("Branch session: base re-renders left to the production app")
             return 0
         return queue_base_renders(self._db.list_generations(), self._launch_base_render)
 
@@ -1336,7 +1367,8 @@ class GalleryView(QWidget):
         """Say what the switch's current position means, under the switch."""
         if is_branch_session():
             self._experiments_status.setText(
-                "Off — a branch preview never queues experiments; that's the live app's")
+                "Off — a branch preview never queues experiments; "
+                "that's the production app's")
             return
         self._experiments_status.setText(
             "On — variations run after you close the app and land here for review"
@@ -1737,29 +1769,22 @@ class GalleryView(QWidget):
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._image_index = None   # rebuilt on the next ask (image_config_index)
         self._combine.offer_the_acts(rows)
-        # The Images/Videos ticks narrow everything the gallery shows: which
-        # folders the tree grows, which items each shelf lists, and what a search
-        # can turn up. The tree takes the filter itself rather than pre-filtered
-        # rows, because the start-frame index under a video's source-image
-        # folders has to see every image whichever way the ticks stand.
-        media_types = self.media_types()
-        listed = gallery.rows_of_media_types(rows, media_types)
+        # Every kind, in the tree and in the index: which kinds a shelf lists is
+        # the shelf's own question, answered by the Images / Videos / Both
+        # buttons over the folder's contents, so a folder of the kind those
+        # buttons are not asking for is still a folder you can open and navigate
+        # to (:meth:`media_types`).
+        listed = rows
         self._listed_rows = listed
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
         # themselves (see :func:`gallery.start_frame_index`).
-        start_frames = gallery.start_frame_index(rows)
-        both_kinds = gallery.workflows_of_both_kinds(rows)
-        tree_model = gallery.build_gallery_tree(rows, meta, media_types,
-                                                image_index=start_frames,
-                                                both_kinds=both_kinds)
+        start_frames, tree_model, trees = self._lists_for(
+            rows, meta, self._tree.sides)
         unreviewed = self._review_queue(listed)
-        # The bin holds every kind, so a restore can still resolve a row of a type
-        # the ticks are hiding; only what the Trash shelf lists is narrowed.
         self._held_rows = recovery.bin_items(self._bin_records())
-        held = gallery.rows_of_media_types(self._held_rows, media_types)
+        held = self._held_rows
         self._live_ids = {row["prompt_id"] for row in rows}
-        trees = _side_trees(listed, meta, start_frames, both_kinds)
         self._custom_folders_by_side = _custom_folders_by_side(
             trees, self._db.list_custom_folders())
         self._custom_folders = [folder for folders in self._custom_folders_by_side.values()
@@ -1848,24 +1873,63 @@ class GalleryView(QWidget):
         for panel in self._info_tabs.config_panels():
             panel.refresh_generate_caption()
 
-    def _build_sides(self, trees):
-        """The two sides of the tree.
+    def _lists_for(self, rows, meta, sides):
+        """The start frames, the whole library's table of contents and one for
+        each of *sides*, kept against the library they were built from."""
+        library = _fingerprint(rows, meta)
+        if library != self._lists_built_from:
+            self._lists_built_from = library
+            self._start_frames = gallery.start_frame_index(rows)
+            self._both_kind_workflows = gallery.workflows_of_both_kinds(rows)
+            self._whole_list = gallery.build_gallery_tree(
+                rows, meta, image_index=self._start_frames,
+                both_kinds=self._both_kind_workflows)
+            self._lists_by_side = {}
+        for side in sides:
+            if side not in self._lists_by_side:
+                self._lists_by_side[side] = _side_list(
+                    rows, meta, self._start_frames, self._both_kind_workflows,
+                    self._whole_list, side)
+        return (self._start_frames, self._whole_list,
+                {side: self._lists_by_side[side] for side in sides})
 
-        A side is the whole table of contents over one shape's rows: its own
+    def _build_sides(self, trees):
+        """The sides the pane is drawing, in the order it draws them.
+
+        A side is the whole table of contents over the rows it holds: its own
         hierarchy, its own copies of the folders the user composed, and shelves
-        whose counts are its own — a number covering both sides would send you
-        to a shelf that then showed you nothing.
+        whose counts are its own — a number covering more than the side draws
+        would send you to a shelf that then showed you nothing.
+
+        Only the drawn sides are built. The radio's other answer is a section
+        nobody can see, and filling it would cost every rebuild a table of
+        contents for nothing.
         """
         inflight = self._browser.inflight_orientations()
         return [SideModel(
-            orientation=orientation,
-            tree_model=tree,
-            custom_folders=self._custom_folders_by_side[orientation],
+            side=side,
+            tree_model=trees[side],
+            custom_folders=self._custom_folders_by_side[side],
             # Recents keeps a side up with no folders yet, so a first-ever
             # generation of that shape is visible while it runs.
-            show_recents=bool(tree) or orientation in inflight,
-            shelf_counts=self._browser.shelf_counts(orientation),
-        ) for orientation, tree in trees.items()]
+            show_recents=bool(trees[side]) or any(_side_holds(side, shape)
+                                                  for shape in inflight),
+            shelf_counts=self._browser.shelf_counts(side),
+        ) for side in self._tree.sides]
+
+    def _on_sides_changed(self):
+        """The radio over the list moved: draw the list again on the new sides.
+
+        A full rebuild rather than a redraw, because each side's table of
+        contents is built from the rows that side holds — the one list of both
+        shapes is a different hierarchy, not the two stacked.
+        """
+        with working():
+            self.refresh()
+        # The row that was selected is on a side nobody draws now, so the
+        # folder-selected signal that normally re-syncs the show button never
+        # fires for the row the rebuild landed on instead.
+        self._re_aim()
 
     def _reselect_generation(self, prompt_id: str | None):
         """Re-select a generation after a rebuild, if it's still on screen.
@@ -1929,6 +1993,7 @@ class GalleryView(QWidget):
         self._folder_path.set_display(f"Search: “{query}” in {scope}")
         self._avg_label.setText("")
         self._experiments_bar.hide()
+        self._offer_the_kinds(False)
 
     def show_search_results(self, tiles, **terms) -> None:
         self._browser.show_search_results(tiles, **terms)
@@ -2066,6 +2131,7 @@ class GalleryView(QWidget):
         base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
         shelf = folder_shelf(base)
         self._experiments_bar.setVisible(shelf is not None and shelf.shelf == _EXPERIMENTS_KEY)
+        self._offer_the_kinds(shelf is not None)
         if current is None:
             self._folder_path.set_display("")
             self._avg_label.setText("")
@@ -2202,7 +2268,9 @@ class GalleryView(QWidget):
         the browser pane, and the toolbar offering to save the grouping."""
         group = self._selection_group
         self._experiments_bar.hide()
+        self._offer_the_kinds(False)
         self._folder_path.set_display(group.label)
+        self._folder_path.setToolTip("")  # a count of folders, with no one folder under it
         self._update_folder_average(group)
         self._browser.show_custom_folder(group)
         self._re_aim()
@@ -2379,14 +2447,17 @@ class GalleryView(QWidget):
         return self._tree_view.selected_folder_key()
 
     def side_in_view(self) -> str:
-        """Which of the two sides the tree is standing on.
+        """Which side of the list the tree is standing on.
 
         Every row lives under one, so this is only ever a fallback: nothing
         selected at all (a fresh window, a rebuild that found no target) reads
         as Landscape, the roomier side and the one an unmeasurable item files
-        under everywhere else.
+        under everywhere else — or, where the list has collapsed to the one of
+        both shapes, that one, being the only side drawn.
         """
-        return _orientation_of(self.selected_folder_key()) or _LANDSCAPE
+        drawn = self._tree.sides
+        return _side_of(self.selected_folder_key()) or (
+            _LANDSCAPE if _LANDSCAPE in drawn else drawn[0])
 
     def _tree_item_for(self, key: str):
         """The tree row for ``key`` — a tree key resolves to its own row, and a
@@ -2398,18 +2469,24 @@ class GalleryView(QWidget):
         doesn't teleport the user across the tree; a folder only the other side
         holds is followed there rather than dropped.
 
-        A key that already names a side is answered by that side alone. Falling
-        back across the split would hand a portrait region a landscape library
-        the moment the portrait one happened to be empty, which is the whole of
-        what the split exists to prevent.
+        A key naming a side the pane draws is answered by that side alone.
+        Falling back across the split would hand a portrait region a landscape
+        library the moment the portrait one happened to be empty, which is the
+        whole of what the split exists to prevent. A key naming a side the pane
+        is *not* drawing — the radio has moved, or a window reopened in the
+        other arrangement — has no row of its own anywhere, so its folder is
+        looked for among the sides that are drawn.
         """
         item = self._item_by_key.get(key)
-        if item is not None or _orientation_of(key):
+        if item is not None:
             return item
-        drawn = self._tree_view.keys_for_folder(key)
+        if _side_of(key) in self._tree.sides:
+            return None
+        folder = _base_of(key)
+        drawn = self._tree_view.keys_for_folder(folder)
         if not drawn:
             return None
-        here = oriented_key(key, self.side_in_view())
+        here = oriented_key(folder, self.side_in_view())
         return self._item_by_key[here if here in drawn else drawn[0]]
 
     def _shelf_item(self, shelf_key: str, orientation: str | None = None):
@@ -3278,7 +3355,7 @@ class GalleryView(QWidget):
         """
         job = self._jobs.job_for(key)
         asked = requested_orientation(job.params) if job is not None else None
-        return asked or self.side_in_view()
+        return asked if asked in self._tree.sides else self.side_in_view()
 
     # --- re-roll as the info-pane source ----------------------------------
 
@@ -3587,24 +3664,36 @@ class GalleryView(QWidget):
         the folder tree, every shelf, the in-flight cards and the search index are
         all built from. Both on (the default) means every type; both off means
         none."""
-        types = set()
-        if self._image_cb.isChecked():
-            types.add(MediaType.IMAGE)
-        if self._video_cb.isChecked():
-            types.add(MediaType.VIDEO)
-        return types
+        if self._images_only.isChecked():
+            return {MediaType.IMAGE}
+        if self._videos_only.isChecked():
+            return {MediaType.VIDEO}
+        return {MediaType.IMAGE, MediaType.VIDEO}
 
-    def _on_media_filter_changed(self, _checked=False):
-        """A media-type tick toggled: rebuild the gallery under the new filter.
-
-        A full rebuild rather than a re-list, because the ticks decide which
-        *folders* exist as well as which items do — the tree, the shelves and the
-        search index are all built from the same narrowed set."""
-        self.refresh(new_listing=True)  # a new filter is a new listing
-        # A filter that empties the gallery leaves the tree with no row to
-        # select, so the folder-selected signal that normally re-syncs this
-        # button never fires — and it went on offering a show of nothing.
+    def _on_media_filter_changed(self, checked=True):
+        """Another kind was chosen: list the shelf again under it."""
+        if not checked:
+            return
+        with working():
+            self._browser.restart_recents_listing()  # a new choice is a new listing
+            self._recount_the_shelves()
+            base, orientation = _split_shelf_key(self.selected_folder_key())
+            shelf = folder_shelf(base)
+            if shelf is not None:
+                self._browser.show_shelf(shelf.key, orientation)
+        # A shelf the choice empties has no item to select, so the signal that
+        # normally re-syncs the show button never fires — and it went on
+        # offering a show of nothing.
         self._re_aim()
+
+    def _offer_the_kinds(self, offered: bool) -> None:
+        """Offer the Images / Videos / Both choice, or take it away.
+
+        Away on anything but a shelf: a folder holds one kind, so all three
+        buttons there are three ways of asking the same question, and a search
+        and a set of folders shown together are answered by what was asked for
+        rather than by this."""
+        self._kinds_bar.setVisible(offered)
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
@@ -3658,7 +3747,7 @@ class GalleryView(QWidget):
 
         The shared server accumulates jobs no window here can account for — a
         branch preview's absence experiments outlive the preview that queued
-        them, and the live app cancels only the experiments its own database
+        them, and the production app cancels only the experiments its own database
         records — so until now they could only be waited out. Only theirs go: the
         user's own queue is what they asked for, and each of those has its own ✕.
         """
@@ -3856,9 +3945,12 @@ class GalleryView(QWidget):
         if ids & self._browser.selected_ids:
             self._re_aim()
 
+    def _recount_the_shelves(self) -> None:
+        for side in self._tree.sides:
+            self._tree_view.set_shelf_counts(side, self._browser.shelf_counts(side))
+
     def _redrew_the_favorites_shelf(self) -> bool:
-        for orientation in _ORIENTATIONS:
-            self._tree_view.set_shelf_counts(orientation, self._browser.shelf_counts(orientation))
+        self._recount_the_shelves()
         base, orientation = _split_shelf_key(self.selected_folder_key())
         shelf = folder_shelf(base)
         if shelf is None or shelf.shelf != _FAVORITES_KEY:
@@ -4151,7 +4243,7 @@ class GalleryView(QWidget):
         to what a drag onto its row does, for when dragging is awkward (a long tree,
         a folder scrolled out of sight). Returns ``{action: custom folder key}``,
         empty when there are no folders of the user's own yet."""
-        side = _orientation_of(key) or self.side_in_view()
+        side = _side_of(key) or self.side_in_view()
         targets = [f for f in self._custom_folders_by_side.get(side, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
@@ -4413,24 +4505,21 @@ class GalleryView(QWidget):
         self._info_tabs.pin_current_tab()
 
 
-def _side_trees(rows, meta, start_frames, both_kinds) -> dict[str, list]:
-    """Each shape's media/workflow/model/LoRA/settings hierarchy.
-
-    ``start_frames`` and ``both_kinds`` are the whole library's, not the
-    side's: what a side holds decides which folders it draws, never what they
-    are called (see :func:`gallery.start_frame_index`).
-    """
-    dealt = split_rows(rows)
-    return {orientation: gallery.build_gallery_tree(dealt[orientation], meta,
-                                                    image_index=start_frames,
-                                                    both_kinds=both_kinds)
-            for orientation in _ORIENTATIONS}
+def _side_list(rows, meta, start_frames, both_kinds, whole, side):
+    """One side's hierarchy — for Both the whole library's, already built."""
+    if side == _BOTH:
+        return whole
+    return gallery.build_gallery_tree(filter_rows(rows, side), meta,
+                                      image_index=start_frames,
+                                      both_kinds=both_kinds)
 
 
 def _custom_folders_by_side(trees, records) -> dict[str, list]:
+    """Each side's copies of the folders the user composed: the ones saved on
+    that side, and on Both every one of them."""
     return {side: gallery.build_custom_folders(
                 tree, [record for record in records
-                       if (record["side"] or _LANDSCAPE) == side])
+                       if _side_holds(side, record["side"] or _LANDSCAPE)])
             for side, tree in trees.items()}
 
 

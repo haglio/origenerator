@@ -25,7 +25,7 @@ import logging
 from functools import partial
 from typing import Protocol
 
-from PyQt6.QtCore import QObject, QThreadPool, QTimer
+from PyQt6.QtCore import QObject, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, prompt_edit
@@ -214,6 +214,8 @@ class VoiceHost(Protocol):
 class VoiceRouter(QObject):
     """The microphone, the caption, and where each spoken word lands."""
 
+    caption_shown = pyqtSignal(bool)   # the caption has a line to show, or none
+
     def __init__(self, host: VoiceHost, *, parent: QObject, db, shows, client,
                  motion):
         super().__init__(parent)
@@ -355,7 +357,7 @@ class VoiceRouter(QObject):
             self.listener.stop()           # both halves, so the listener closes
             self.listener.stop_commands()
             self._flash_timer.stop()
-            self.status.hide()
+            self._set_caption(None)
             return
         self.listener.start_commands(self.on_command)
         if self._steering is not None:
@@ -394,9 +396,21 @@ class VoiceRouter(QObject):
         up to put it in the corner of."""
         self._show(message, transient=True)
 
+    def _set_caption(self, text: str | None) -> None:
+        """Put *text* on the caption, or take the caption away with ``None``.
+
+        The section the caption rides in comes and goes with it, so every
+        appearance and disappearance is announced rather than only drawn.
+        """
+        if text is None:
+            self.status.hide()
+        else:
+            self.status.setText(text)
+            self.status.show()
+        self.caption_shown.emit(text is not None)
+
     def _show(self, text: str, *, transient: bool) -> None:
-        self.status.setText(text)
-        self.status.show()
+        self._set_caption(text)
         if transient:
             self._flash_timer.start(_FLASH_MS)  # then revert to the idle caption
         else:
@@ -413,7 +427,7 @@ class VoiceRouter(QObject):
         elif self.listening():  # still listening
             self._show("🎤 Listening…", transient=False)
         else:
-            self.status.hide()
+            self._set_caption(None)
 
     def _on_heard(self, text: str) -> None:
         """Say what the mic heard — a command in the words the app knows it by,

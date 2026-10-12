@@ -14,11 +14,10 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSplitter,
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, MARGIN_STANDARD
 
 from origenerator import evolver_export
 from origenerator.comfyui_client import ComfyUIClient
@@ -69,6 +68,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
+from origenerator.gui.panes import pane, pane_splitter
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
@@ -91,7 +91,6 @@ _RANDOM_SEED_TIP = (
 # Breathing room round the tab's contents, and between the form and the scroll
 # bar beside it — enough that nothing reads as jammed into a corner, small
 # enough that a narrow pane still spends its width on the fields.
-_PANE_MARGIN = 8
 # How far the "never narrower than its contents" floor below is allowed to go.
 # One thing in the tab is wider than a tiling-narrow window can give the info pane
 # — an image's list of versions, a picture beside a file's facts and buttons — and
@@ -272,9 +271,11 @@ class GenerateConfigPanel(QWidget):
         out below the picker exists.
         """
         layout = QVBoxLayout(self)
-        # A margin round the whole tab, so nothing in it — the preview, the form's
-        # headings, the button bank — sits flush against the pane's edge.
-        layout.setContentsMargins(_PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN, _PANE_MARGIN)
+        # Top and foot only: the splitter below spans the tab, so its handle
+        # meets the pane's own border instead of stopping short of it, and the
+        # margin that keeps the preview, the form and the bank off the pane's
+        # sides is inside each of them.
+        layout.setContentsMargins(0, MARGIN_STANDARD, 0, MARGIN_STANDARD)
         layout.setSpacing(8)
         self._build_preview()
         body = self._build_body_scroll()
@@ -291,7 +292,9 @@ class GenerateConfigPanel(QWidget):
         self._media_split.setStretchFactor(1, 4)
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
-        layout.addLayout(self._build_button_bank())
+        bank = self._build_button_bank()
+        bank.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        layout.addLayout(bank)
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
         # Generate with nothing to run — and everything below the picker once a
         # workflow is chosen. Last, because everything it lays out has to exist.
@@ -315,10 +318,13 @@ class GenerateConfigPanel(QWidget):
         # between them is a drag handle like every other pane boundary in this
         # app: a tall picture can be given the room it wants without the form
         # being pinned to a ratio someone else chose.
-        self._media_split = QSplitter(Qt.Orientation.Vertical)
-        self._media_split.setChildrenCollapsible(False)
-        self._media_split.setHandleWidth(6)
-        self._media_split.addWidget(self._preview)
+        self._media_split = pane_splitter(Qt.Orientation.Vertical)
+        # The picture keeps its margin inside this, so the splitter itself can
+        # span the tab (see _build_ui).
+        self._preview_pane, preview_column = pane()
+        preview_column.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        preview_column.addWidget(self._preview)
+        self._media_split.addWidget(self._preview_pane)
         self._preview.media_resized.connect(self._reflow_for_the_media)
         return self._preview
 
@@ -333,11 +339,18 @@ class GenerateConfigPanel(QWidget):
         """
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
+        # Said here rather than left to the stylesheet's `border: none`, so the
+        # margin below is the whole of what stands between the fields and the
+        # pane's edge however this is styled.
+        self._scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         body_host = QWidget()
         body = QVBoxLayout(body_host)
-        # A gap on the right so the fields stop short of the scroll bar rather than
-        # running under it; the pane's own margin covers the other three sides.
-        body.setContentsMargins(0, 0, _PANE_MARGIN, 0)
+        # The scroll spans the tab, so the margin keeping the fields off the
+        # pane's sides and off the line above them is here; on the right it also
+        # stops them running under the scroll bar. The tab's own margin covers
+        # the foot.
+        body.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
+                                MARGIN_STANDARD, 0)
         body.setSpacing(8)
         self._scroll.setWidget(body_host)
         return body
@@ -485,7 +498,7 @@ class GenerateConfigPanel(QWidget):
         return (body.minimumSizeHint().width()
                 + self._scroll.verticalScrollBar().sizeHint().width()
                 + 2 * self._scroll.frameWidth()
-                + 2 * _PANE_MARGIN)
+                + 2 * MARGIN_STANDARD)
 
     def _can_generate(self) -> bool:
         return (self._client is not None
@@ -912,7 +925,7 @@ class GenerateConfigPanel(QWidget):
             self._media_split.setStretchFactor(1, 4)
         else:
             self._media_split.setOrientation(Qt.Orientation.Vertical)
-            self._media_split.insertWidget(0, self._preview)
+            self._media_split.insertWidget(0, self._preview_pane)
             self._media_split.setStretchFactor(0, 3)
             self._media_split.setStretchFactor(1, 4)
         if sum(sizes) > 0:

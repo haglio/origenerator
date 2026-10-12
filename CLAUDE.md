@@ -76,7 +76,7 @@ hold — an unlanded change, or a pin the branch moves — put a checkout of it
 first on `PYTHONPATH` for the suite, and give the preview a launcher of its own
 in the worktree's git-ignored `state/` that sets the same `PYTHONPATH`. A
 funestra checkout used that way needs `vendor/libmpv-2.dll` copied in from
-the primary funestra's `vendor/`, and is one you made: another session's
+the production funestra checkout's `vendor/`, and is one you made: another session's
 goes when that session is done with it, and a suite that lost one partway on
 2026-09-27 failed on `No module named 'player_core.mpv_player'`. Moving a pin is this repo's own commit,
 with its own suite to answer for it, and a new shared_ui release reaches this
@@ -177,7 +177,7 @@ files a standalone window meets a session through (`fun_time_mode.py` here,
 quietly launches a second copy beside the one already open, and the copy it
 missed goes on driving the OSR2 the session is driving too. The claim is also
 a matter of where: a preview keeps a `state/` of its own, so it reads the
-claim in the everyday copy's `state/` as well, which is where every session
+claim in the production copy's `state/` as well, which is where every session
 writes one; a preview that read only its own went on driving beside Fun Time
 (2026-09-26).
 
@@ -264,7 +264,7 @@ back: it rewrites every script that is one of the app's own metronomes at
 another pace, writes one for any video with none, and leaves alone every script
 that follows its own video — ATI's, a measured one, a hand-made one — which it
 tells apart by shape, since most of the library's scripts predate the creator
-stamp. Run it once when such a change lands, from the primary checkout, as
+stamp. Run it once when such a change lands, from the production checkout, as
 `python -c "from origenerator.funscript_backfill import main; main()"`: spelled
 with `-m` it names the package first, and the hook that keeps the app's window
 off his screen refuses it.
@@ -272,21 +272,21 @@ off his screen refuses it.
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
-runs THAT worktree's code as its own app instance: the primary checkout's venv,
-and `ORIGENERATOR_BRANCH_SESSION=1`. Under that flag the app opens the **live
-install's own library** — the primary checkout's database, thumbnails and trash
-(`config.LIBRARY_STATE_DIR`) — so every instance, live or preview, shows every
-generation whichever of them made it, and a delete in one is a delete in all;
-only the window's own state and logs stay in the worktree's `state/`. What a
-preview still leaves to the live app is ComfyUI's absence work — background
-experiments and base re-renders, which would outlive it in a queue only the app
-that queued them can cancel (see `origenerator/branch_session.py`). Before
-handing one over, **re-copy the primary's `content.local.json` into the worktree
-root and its `state/ui_state.json` into the worktree's `state/`, every time**.
-The overlay is how the library is found at all; the window state is what was
-open in the gallery, so without it a preview opens on nothing and reads as a
-dummy -- which is what a Fun Time session handed him on 2026-09-20, and why
-fun_time's `--shortcut` now refuses a hosted checkout that has neither.
+runs THAT worktree's code as its own app instance: the production checkout's
+venv, and `ORIGENERATOR_BRANCH_SESSION=1`. Under that flag the app opens the
+**production app's own library** — the production checkout's database,
+thumbnails and trash (`config.LIBRARY_STATE_DIR`) — so every instance, production
+or preview, shows every generation whichever of them made it, and a delete in
+one is a delete in all; only the window's own state and logs stay in the
+worktree's `state/`. What a preview still leaves to the production app is
+ComfyUI's absence work — background experiments and base re-renders, which
+would outlive it in a queue only the app that queued them can cancel (see
+`origenerator/branch_session.py`). Before handing one over, **copy the
+production checkout's `state/ui_state.json` into the worktree's `state/`, every
+time**: that is what was open in the gallery, and without it a preview opens on
+nothing and reads as a dummy -- which is what a Fun Time session handed him on
+2026-09-20, and why fun_time's `--shortcut` now refuses a hosted checkout that
+has neither.
 
 Re-copy as the LAST step before the link goes out, and then import the window
 chain against that copy (`from origenerator.gui.main_window import
@@ -319,9 +319,9 @@ that link goes out, replay the launch's imports under the launcher's own
 environment: `tests/test_launch_smoke.py` strips `PYTHONPATH` on purpose, so a
 green run of it cannot see what such a launcher loads.
 
-**A preview replaces his everyday Origenerator; it never runs beside it.** One
+**A preview replaces his production Origenerator; it never runs beside it.** One
 copy runs on a library at a time, the way Fun Time runs one session (his call,
-2026-09-25): a copy started while another holds the library -- the everyday one,
+2026-09-25): a copy started while another holds the library -- the production one,
 another preview, or the one a Fun Time session opened -- says "Another copy of
 Origenerator is already running." and stops before its splash
 (`origenerator/single_instance.py`). A preview he reports as not opening has
@@ -350,8 +350,9 @@ path in its git-ignored `state/origenerator_dir.txt`, and run
 fun_time worktree, at the path it prints, is the second launch link. Bring that
 worktree up to fun_time's
 `main` again right before every handoff, though it carries no commits: the
-launcher writes the session's config with the fun_time primary's current code,
-so a worktree still on an older `main` dies reading that config before a window
+launcher writes the session's config with the production fun_time checkout's
+current code, so a worktree still on an older `main` dies reading that config
+before a window
 opens. A key renamed on fun_time's `main` hours earlier did exactly that
 (2026-09-13).
 
@@ -369,8 +370,8 @@ forced this flow into existence (2026-08-12):
 - **NEVER launch the preview yourself. Hand the link and stop.** Running the vbs
   — `cscript`, `wscript`, `Start-Process`, or a bare `python -m origenerator` —
   puts an app window over whatever he is doing and takes his focus: something
-  popping up unannounced, which he closes in irritation, and his live app goes
-  with it (both instances I launched and his running app were gone inside two
+  popping up unannounced, which he closes in irritation, and his production app
+  goes with it (both instances I launched and his running app were gone inside two
   minutes, 2026-08-15; he asked for this law by name). Launching is HIS act, on
   his schedule. This overrides the older "launch it once yourself to confirm it
   comes up clean" rule, which is what produced the failure. The pre-handoff
@@ -380,15 +381,15 @@ forced this flow into existence (2026-08-12):
   dead icon fails at — and a launcher that breaks past that, he tells you about
   in one line.
   `~/.claude/hooks/block-visible-origenerator.py` blocks the visible launch
-  mechanically, so this one does not rest on prose. Same reason his live app
-  must never be closed by you — every Origenerator window is a `python` process
+  mechanically, so this one does not rest on prose. Same reason his production
+  app must never be closed by you — every Origenerator window is a `python` process
   titled "Origenerator", so a title-matched close shuts his app too
   (2026-08-13). The near miss that still counts: launching it "just for a few
   seconds" to read `state\origenerator_launcher.log` — those seconds are the
   window on his screen, and that is the whole failure.
 - Hand a launcher link to the vbs FILE itself — never its folder,
   never a shell command, and never any launcher sharing a filename with the
-  live app's. The user was once handed the worktree's `launch_origenerator.vbs`
+  production app's. The user was once handed the worktree's `launch_origenerator.vbs`
   by that name; he clicked the identically named launcher he runs daily, and a
   whole "still doesn't work" review cycle ran against the OLD app while the fix
   sat unlaunched. `launch_preview_branch.vbs` is named distinctly exactly so
@@ -431,7 +432,7 @@ the same start.
 ## Landing — GitHub merge queue, not local ff-merge
 
 This repo is public at `github.com/haglio/origenerator` with a merge-queue ruleset on
-`main`, so the global "ff-merge into the primary checkout under
+`main`, so the global "ff-merge into the production checkout under
 `.git/agent-merge.lock`" flow does NOT apply here:
 
 - **His verdict on the preview opens the PR — nothing else does.** Opening a
@@ -446,7 +447,7 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   && git rebase origin/main`, `git push -u origin <branch>`, then
   `gh pr create --fill`. Auto-merge arms itself; the queue rebases your PR onto
   `main`, runs the required check, and merges it when green. Don't ff-merge into
-  the primary checkout, don't push `main` directly, and never force-push `main`.
+  the production checkout, don't push `main` directly, and never force-push `main`.
 - **Never merge `main` into your branch. Rebase — and if that hurts, squash
   first.** The queue's merge method is REBASE, so a branch carrying merge
   commits is replayed as its *original* commits onto a `main` they were never
@@ -472,7 +473,7 @@ This repo is public at `github.com/haglio/origenerator` with a merge-queue rules
   is still yours to remove: `git push origin --delete <branch>`.
 - **The `.git/agent-merge.lock` is retired here** — the GitHub queue serializes.
 - **Sync local checkouts by pulling.** `main` advances only on origin (via the
-  queue), so the primary checkout and worktrees update with
+  queue), so the production checkout and worktrees update with
   `git pull --ff-only origin main`; the running app self-updates the same way.
   The primary is only ever fast-forwarded — never reset or merged-into.
 - **A red required check** (`.github/workflows/merge-gate.yml`) can't land.

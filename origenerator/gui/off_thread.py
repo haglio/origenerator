@@ -71,7 +71,7 @@ def run_off_thread(work, done, *, owner: QObject) -> None:
     violation inside the interpreter's own frame setup, no traceback, the
     process simply gone -- and once the 1.5 s poll started running two of these
     per tick it was a crash every few minutes (2026-09-03/04, seven of them
-    across the live app and four branch previews, all faulting on the same
+    across the production app and four branch previews, all faulting on the same
     instruction: the free-variable copy at the entry of a closure, reached
     through a queued Qt metacall).
     """

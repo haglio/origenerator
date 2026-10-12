@@ -112,8 +112,8 @@ from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import (
     LANDSCAPE,
-    ORIENTATION_LABELS,
     PORTRAIT,
+    SIDE_LABELS,
     base_of,
     key_holds,
     oriented_key,
@@ -446,10 +446,10 @@ def _find_next(view):
 
 
 def _side(tree, orientation=LANDSCAPE):
-    """One half of the TOC pane — the Portrait tree or the Landscape one. The
-    table of contents exists twice over, once per shape (see
+    """One section of the TOC pane — the Portrait tree, the Landscape one, or
+    the one list of both shapes the radio over them collapses to (see
     :mod:`origenerator.orientation`)."""
-    return tree._halves[orientation]
+    return tree._trees[orientation]
 
 
 def _top_level(tree, orientation=LANDSCAPE):
@@ -595,7 +595,15 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     monkeypatch.setattr(gallery, "recently_worked_folders", fake)
     view.refresh()
 
-    assert asked == [([LANDSCAPE, "portrait"], ["i1"])]  # both sides, the listed rows
+    # The sides drawn, and the listed rows. The marks belong to the one list of
+    # both shapes as much as to each shape's own, so choosing Together asks for
+    # them again -- for that list, which is the only one on screen then.
+    assert asked == [([LANDSCAPE, "portrait"], ["i1"])]
+
+    view._tree.both_button.click()
+
+    assert asked[-1] == (["both"], ["i1"])
+    view._tree.each_shape_button.click()
     workflow = _image_workflow(view._tree)
     assert workflow.data(0, RECENT_ROLE)
     assert "worked in recently" in workflow.toolTip(0)   # so the mark says what it means
@@ -999,7 +1007,7 @@ def test_a_folders_shelf_scopes_the_search_and_names_its_path(qtbot):
 
     assert view.visible_prompt_ids() == ["i1"]
     assert view._search.field.placeholderText() == (
-        f"Search {ORIENTATION_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest…")
+        f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest…")
 
 
 def _shelf_row(folder, label):
@@ -1162,9 +1170,9 @@ def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     toc = _pane_holding(view._tree)
     assert isinstance(view._search.field, QLineEdit)
     assert toc.isAncestorOf(view._search.field)
-    # it leads the pane, above the tree it searches across.
-    layout = toc.layout()
-    assert layout.indexOf(view._search.field) < layout.indexOf(view._tree)
+    # it leads its own section of the pane, above the tree it searches across.
+    section = view._search.field.parentWidget().layout()
+    assert section.indexOf(view._search.field) < section.indexOf(view._tree)
 
 
 def test_search_matches_a_generation_by_its_seed(qtbot):
@@ -2098,9 +2106,9 @@ def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
 
 
 def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
-    # Scheduling an absence is the live install's alone. A preview instance
+    # Scheduling an absence is the production app's alone. A preview instance
     # shares the same ComfyUI, so a batch queued as it closes outlives it as
-    # work the live app can neither see nor cancel — and the user's next
+    # work the production app can neither see nor cancel — and the user's next
     # Generate waits on jobs "from another app" that were his own preview's.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -2112,7 +2120,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
 
     assert view.experiments_enabled() is False   # forced off, however it was saved
     assert not view._experiments_cb.isEnabled()  # greyed, with the reason beneath
-    assert "live app" in view._experiments_status.text()
+    assert "production app" in view._experiments_status.text()
 
     view._experiments_cb.setChecked(True)  # and the gate holds even forced on
 
@@ -2149,7 +2157,7 @@ def test_the_absence_batch_can_be_handed_a_policy_of_its_own(qtbot):
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
-    # The shelf reads the live install's own rows, so a verdict given in a
+    # The shelf reads the production app's own rows, so a verdict given in a
     # preview is the verdict: the same items come up for review, and its count
     # shows on the tree.
     monkeypatch.setenv(ENV_FLAG, "1")
@@ -2160,7 +2168,7 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
     assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
     view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
     assert sorted(view.visible_prompt_ids()) == ["e1", "e2"]
-    assert "live app" not in view._browser._experiments_empty_hint()
+    assert "production app" not in view._browser._experiments_empty_hint()
 
 
 # --- the Trash shelf: deleted items, still recoverable ----------------------
@@ -2752,7 +2760,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     assert view.visible_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{ORIENTATION_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
+        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_a_folders_shelf_names_itself_by_its_path_to_the_slideshow_button(qtbot):
@@ -2764,7 +2772,7 @@ def test_a_folders_shelf_names_itself_by_its_path_to_the_slideshow_button(qtbot)
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.slideshow_subject() == (
-        f"{ORIENTATION_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
+        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
@@ -3011,9 +3019,9 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
 
 
-def test_hiding_a_kind_takes_away_the_folder_its_go_to_folder_pointed_at(qtbot):
-    # The ticks prune the tree, so a tab left showing a hidden kind is showing a
-    # picture whose folder is no longer anywhere to go.
+def test_a_kind_left_off_a_shelf_still_has_its_folder_to_go_to(qtbot):
+    # The choice narrows the shelf, not the folder list, so a tab showing a
+    # picture of the kind the shelf is not listing still has somewhere to go.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3022,9 +3030,11 @@ def test_hiding_a_kind_takes_away_the_folder_its_go_to_folder_pointed_at(qtbot):
     view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
     assert _folder_buttons(view)
 
-    view._image_cb.setChecked(False)
+    view._videos_only.setChecked(True)
 
-    assert _folder_buttons(view) == []
+    (button,) = _folder_buttons(view)
+    button.click()
+    assert view._tree.currentItem() is view._leaf_by_id["i1"]
 
 
 def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qtbot):
@@ -3171,98 +3181,148 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
     assert view.visible_prompt_ids()[0] == "fresh"    # ...led by the new arrival
 
 
-def test_the_media_filter_sits_between_the_search_field_and_the_tree(qtbot):
-    # Where the ticks are is the point: they prune the tree, so they belong to it
-    # rather than to whichever shelf happens to be open below.
+def test_the_kinds_are_chosen_over_the_folders_contents_not_over_the_list(qtbot):
+    # The choice narrows what a shelf lists, so it belongs to the pane the shelf
+    # is drawn in — not over the folder list, which keeps every folder whichever
+    # kind is chosen.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
-    column = view._search.field.parentWidget().layout()
-    order = [column.itemAt(i).widget() for i in range(column.count())]
-    assert (order.index(view._search.field)
-            < order.index(view._image_cb.parentWidget())
-            < order.index(view._tree))
-    assert view._image_cb.parentWidget() is view._video_cb.parentWidget()
+    assert view._both_kinds.parentWidget() is view._kinds_bar
+    assert view._images_only.parentWidget() is view._kinds_bar
+    assert view._videos_only.parentWidget() is view._kinds_bar
+    assert view._kinds_bar not in _descendants(view._tree.parentWidget())
 
 
-def test_media_filter_ticks_default_on_and_stay_up_wherever_you_stand(qtbot):
+def _descendants(widget):
+    return widget.findChildren(QWidget) if widget is not None else []
+
+
+def test_each_kind_wears_a_mark_beside_its_word(qtbot):
+    # Three bare words; each now carries the mark for what it lists.
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    marks = [kind.icon() for kind in
+             (view._images_only, view._videos_only, view._both_kinds)]
+
+    assert [mark.isNull() for mark in marks] == [False, False, False]
+    assert len({mark.cacheKey() for mark in marks}) == 3
+
+
+def test_the_kinds_open_on_both_and_are_offered_on_a_shelf_alone(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    # Both ticks start checked, so the gallery opens holding every media type.
-    assert view._image_cb.isChecked()
-    assert view._video_cb.isChecked()
+    # Both to start, so the gallery opens listing every kind.
+    assert view._both_kinds.isChecked()
 
-    # They belong to the gallery, not to one shelf, so they are reachable from
-    # a folder as well as from the shelf — which is what lets an unchecked tick
-    # be checked again from wherever it emptied the pane.
+    # A folder holds one kind by construction, so there is nothing to choose
+    # there; a shelf gathers both, which is where the question belongs.
     view._tree.setCurrentItem(_image_workflow(view._tree))
-    assert not view._image_cb.isHidden() and not view._video_cb.isHidden()
+    assert view._kinds_bar.isHidden()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert not view._image_cb.isHidden() and not view._video_cb.isHidden()
+    assert not view._kinds_bar.isHidden()
 
 
-def test_media_filter_hides_the_unchecked_media_type_on_a_shelf(qtbot):
+def test_both_radios_wear_the_waiting_cursor_while_they_redraw(qtbot, monkeypatch):
+    # A redraw holds the window thread, so without this the window reads as dead
+    # for as long as it takes rather than as working.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # both by default
+    while_drawing = []
+    for owner, name in ((view, "_recount_the_shelves"), (view, "refresh")):
+        real = getattr(owner, name)
+        monkeypatch.setattr(owner, name, lambda *a, _real=real: (
+            while_drawing.append(QApplication.overrideCursor()), _real(*a))[1])
 
-    view._video_cb.setChecked(False)          # hide videos
+    view._videos_only.setChecked(True)
+    view._tree.both_button.click()
+
+    assert [cursor and cursor.shape() for cursor in while_drawing] == [
+        Qt.CursorShape.WaitCursor, Qt.CursorShape.WaitCursor]
+    assert QApplication.overrideCursor() is None
+
+
+def test_choosing_one_kind_lists_the_shelf_again_and_leaves_the_list_alone(
+        qtbot, monkeypatch):
+    # Every choice used to re-read the library and build the whole table of
+    # contents again -- twice over, since the button going off reports as well
+    # as the one coming on -- which took seconds on a full library and could
+    # not change a single folder (test_choosing_one_kind_leaves_every_folder_
+    # in_the_list says why).
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    built = []
+    monkeypatch.setattr(gallery, "build_gallery_tree",
+                        lambda *a, **k: built.append(1) or [])
+
+    view._videos_only.setChecked(True)
+
+    assert view.visible_prompt_ids() == ["v1"]
+    assert built == []
+
+
+def test_choosing_one_kind_lists_only_that_kind_on_a_shelf(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    assert set(view.visible_prompt_ids()) == {"i1", "v1"}  # Both, to start
+
+    view._images_only.setChecked(True)
     assert view.visible_prompt_ids() == ["i1"]
 
-    view._video_cb.setChecked(True)
-    view._image_cb.setChecked(False)          # hide images instead
+    view._videos_only.setChecked(True)
     assert view.visible_prompt_ids() == ["v1"]
 
-    view._video_cb.setChecked(False)          # both off: nothing to show
-    assert view.visible_prompt_ids() == []
+    view._both_kinds.setChecked(True)
+    assert set(view.visible_prompt_ids()) == {"i1", "v1"}
 
 
-def test_media_filter_prunes_the_folder_tree_as_well_as_the_pane(qtbot):
-    # The point of moving the ticks over the tree: an unchecked kind takes its
-    # folders with it, so a gallery of images alone has no video folder to open.
+def test_choosing_one_kind_leaves_every_folder_in_the_list(qtbot):
+    # What the move fixes: clicking an image in a video's "from source image"
+    # section can navigate to that image's folder even while the shelves are
+    # listing videos, because the list still holds every folder.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
-    assert len(_workflow_rows(view._tree)) == 2
+    both = list(_workflow_rows(view._tree))
+    assert len(both) == 2
 
-    view._video_cb.setChecked(False)
+    view._videos_only.setChecked(True)
+    assert list(_workflow_rows(view._tree)) == both
 
-    assert list(_workflow_rows(view._tree)) == ["SDXL Text-to-Image"]
-
-    view._video_cb.setChecked(True)
-    view._image_cb.setChecked(False)
-
-    assert list(_workflow_rows(view._tree)) == ["WAN 2.2 Image-to-Video"]
-
-    view._video_cb.setChecked(False)   # both off: no folders at all
-
-    assert not _workflow_rows(view._tree)
+    view._images_only.setChecked(True)
+    assert list(_workflow_rows(view._tree)) == both
 
 
-def test_unticking_videos_empties_both_halves_of_their_folders(qtbot, tmp_path):
-    rows = []
-    for prompt_id, seed, size in (("v1", 5, (100, 200)), ("v2", 6, (200, 100))):
-        thumb = tmp_path / f"{prompt_id}.png"
-        Image.new("RGB", size).save(thumb)
-        rows.append(_row(prompt_id, "wan22_i2v",
-                         {"positive_prompt": "dance", "seed": seed},
-                         f"wan22_i2v_{prompt_id}_.mp4", thumbnail_path=str(thumb)))
+def test_choosing_one_kind_leaves_every_sides_folders_standing(qtbot):
+    # One picture of each shape, so both sides have a folder to lose.
+    rows = [_row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": 5,
+                                    "width": 100, "height": 200}, "sdxl_t2i_i1.png"),
+            _row("i2", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": 6,
+                                    "width": 200, "height": 100}, "sdxl_t2i_i2.png")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     assert all(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
 
-    view._video_cb.setChecked(False)
+    view._videos_only.setChecked(True)
 
-    assert not any(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
+    assert all(_subs(_top_level(view._tree, side)["All"]) for side in (PORTRAIT, LANDSCAPE))
 
 
 def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
@@ -3277,7 +3337,7 @@ def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
     bar.setValue(bar.maximum())
     assert len(view.visible_prompt_ids()) == 100
 
-    view._video_cb.setChecked(False)  # images only — still all 120 of them
+    view._images_only.setChecked(True)  # images only — still all 120 of them
 
     assert len(view.visible_prompt_ids()) == 50
     assert view.visible_prompt_ids()[0] == "i119"
@@ -3294,7 +3354,7 @@ def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert "rr1" in view._browser._inflight_cards               # shown by default
 
-    view._video_cb.setChecked(False)           # hide videos
+    view._images_only.setChecked(True)         # videos left off the shelf
     assert "rr1" not in view._browser._inflight_cards
 
 
@@ -3624,7 +3684,7 @@ def test_entering_an_empty_path_goes_nowhere_and_says_nothing(qtbot, monkeypatch
     assert told == []
 
 
-def test_a_folder_keeps_its_name_while_the_kind_beside_it_is_hidden(qtbot):
+def test_a_folder_of_each_kind_keeps_its_name_whichever_kind_is_chosen(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
     clip = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
     view = GalleryView(FakeDB([still, clip]))
@@ -3633,9 +3693,9 @@ def test_a_folder_keeps_its_name_while_the_kind_beside_it_is_hidden(qtbot):
     looping = workflow_label("wan22_flf2v_loop")
     assert {f"{looping} images", f"{looping} videos"} <= set(_alls(view._tree))
 
-    view._image_cb.setChecked(False)
+    view._videos_only.setChecked(True)
 
-    assert f"{looping} videos" in _alls(view._tree)
+    assert {f"{looping} images", f"{looping} videos"} <= set(_alls(view._tree))
 
 
 def test_with_several_folders_picked_the_path_opens_empty(qtbot):
@@ -5322,7 +5382,7 @@ def test_delete_key_deletes_the_selected_thumbnail(qtbot):
 
 def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_path):
     # The composition, not just the rule: a preview's gallery builds its actions
-    # around the live install's trash, the same one its rows and files belong
+    # around the production app's trash, the same one its rows and files belong
     # to, so a delete in a preview is a delete -- recoverable from the Trash
     # shelf of whichever instance looks next.
     monkeypatch.setenv(ENV_FLAG, "1")
@@ -7337,7 +7397,7 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
-    view._video_cb.setChecked(False)  # the shelf now lists images only
+    view._images_only.setChecked(True)  # the shelf now lists images only
 
     view._shows.start()
 
@@ -7345,9 +7405,6 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     # It plays what the shelf shows, not everything recent.
     assert [item[2] for item in view._shows.showing._playlist._items] == ["i1"]
     view._shows.showing.close()
-
-    view._image_cb.setChecked(False)  # nothing left on the shelf to play
-    assert view._bank.slideshow.isHidden()
 
 
 def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, monkeypatch):
@@ -11375,7 +11432,8 @@ def test_the_hud_sits_top_left_over_the_search_with_a_draggable_divider_between(
     assert view._arrangement.folder_panes.widget(0) is divider
     assert divider.orientation() == Qt.Orientation.Vertical
     assert divider.widget(0).isAncestorOf(view._motion_panel)
-    assert divider.widget(1).isAncestorOf(view._search.field)
+    assert any(divider.widget(n).isAncestorOf(view._search.field)
+               for n in range(1, divider.count()))
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
 
@@ -13448,7 +13506,7 @@ def test_a_folder_saved_before_folders_had_a_side_stays_put_when_the_ticks_hide_
 
     before = sides_showing_it()
 
-    view._video_cb.setChecked(False)
+    view._images_only.setChecked(True)
 
     assert sides_showing_it() == before
 

@@ -107,7 +107,7 @@ class ShowHost(Protocol):
         """The folder ``key`` names, as the side it is looked at from holds it."""
 
     def media_types(self) -> set[str]:
-        """The media types the gallery's two ticks currently include."""
+        """The kinds the shelves are listing — Images, Videos or both."""
 
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
@@ -296,7 +296,7 @@ class ShowDirector:
 
     def anything_to_play(self) -> bool:
         """Whether the view on screen holds media a show could play at all."""
-        return bool(self.items_of(self._host.rows_to_play()))
+        return next(self._playable(self._host.rows_to_play()), None) is not None
 
     # --- opening one --------------------------------------------------------
 
@@ -572,16 +572,19 @@ class ShowDirector:
         being made: a slide with nothing to look at is a gap between pictures,
         and one still in flight joins the running show the moment it lands (see
         :meth:`note_finished`)."""
+        return list(self._playable(rows))
+
+    def _playable(self, rows):
+        """:meth:`items_of`'s slides as they are worked out, so a caller that
+        only needs to know there is one stops at the first."""
         upscales = EvolverUpscales.scan(EVOLVER_UPSCALED_DIR, EVOLVER_SOURCE)
-        items = []
         for row in rows:
             resolved = gallery.resolve_preview(row, COMFYUI_OUTPUT_DIR)
             if resolved is None:
                 continue  # nothing to look at yet, or ever
             path, media_type = resolved
-            items.append((upscales.upscale_of(path) or path, media_type, row["prompt_id"],
-                          row.get("thumbnail_path")))
-        return items
+            yield (upscales.upscale_of(path) or path, media_type, row["prompt_id"],
+                   row.get("thumbnail_path"))
 
     def versions_of(self, rows) -> dict:
         """Each of ``rows``' versions, newest first, keyed by the file its slide

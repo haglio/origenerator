@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.tick_control import TickControl
 
 from origenerator.config import COMFYUI_INPUT_DIR
-from origenerator.gallery.sides import ORIENTATION_LABELS, orientation_of_size
+from origenerator.gallery.sides import SIDE_LABELS, orientation_of_size
 from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
@@ -29,6 +29,7 @@ from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
+from origenerator.gui.stylesheet import CHOSEN
 from origenerator.seed_history import SeedHistory
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
@@ -200,10 +201,10 @@ class ParamForm(QWidget):
             self._sections["Size"].set_mark(None, "")
             return
         orientation = orientation_of_size(*size)
-        tip = ORIENTATION_LABELS[orientation]
+        tip = SIDE_LABELS[orientation]
         if size[0] == size[1]:
             tip = f"Square, so it goes under {tip}"
-        self._sections["Size"].set_mark(icons.orientation_mark(orientation), tip)
+        self._sections["Size"].set_mark(icons.side_mark(orientation), tip)
 
     def _wire_rows_shown_while(self):
         self.changed.connect(self._refresh_rows_shown_while)
@@ -560,6 +561,7 @@ class ParamForm(QWidget):
         content = self._sections["Size"].content()
         btn = QToolButton(content)
         btn.setObjectName("dimensionUnlock")
+        btn.setProperty(CHOSEN, True)
         btn.setCheckable(True)
         btn.setText(_LOCK_CLOSED)
         btn.setToolTip(self._unlock_tip(unlocked=False))

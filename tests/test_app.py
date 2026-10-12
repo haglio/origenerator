@@ -873,7 +873,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
 
 def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
         qapp, monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "everyday" / "state")
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "production" / "state")
     window = MagicMock()
     watch = MagicMock()
     with _a_faked_boot([], **{
@@ -885,14 +885,14 @@ def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(
     watch.assert_called_once_with(STATE_DIR, take_over=window.become_hosted,
                                   device_claimed=window.the_session_has_the_device,
                                   showing=window.shows_a_slideshow,
-                                  library_state_dir=tmp_path / "everyday" / "state")
+                                  library_state_dir=tmp_path / "production" / "state")
     watch.return_value.withdraw.assert_called_once_with()
 
 
 def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(
         qapp, monkeypatch, tmp_path):
-    everyday = tmp_path / "everyday" / "state"
-    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", everyday)
+    production = tmp_path / "production" / "state"
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", production)
     events = []
 
     with _a_faked_boot([], **{
@@ -903,7 +903,7 @@ def test_a_standalone_boot_offers_its_window_to_fun_time_before_building_it(
     }):
         assert main([]) == 0
 
-    assert events == [("offered", (STATE_DIR, everyday)), "built"]
+    assert events == [("offered", (STATE_DIR, production)), "built"]
 
 
 def test_a_boot_fun_time_launched_offers_its_window_to_nobody(qapp):
@@ -1248,10 +1248,10 @@ def test_a_failing_maintenance_pass_never_costs_the_launch(qapp):
 
 
 def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qapp):
-    """A preview runs on the live install's own library (config.LIBRARY_STATE_DIR),
-    so it keeps it the way the live app does: the same passes, in the same order,
+    """A preview runs on the production app's own library (config.LIBRARY_STATE_DIR),
+    so it keeps it the way the production app does: the same passes, in the same order,
     the orphaned-trash sweep included. A copy of its own would have hidden a
-    branch's generations from the live app and the live app's from the branch."""
+    branch's generations from the production app and the production app's from the branch."""
     ran = []
 
     with _a_faked_boot(ran) as _, \
@@ -1568,16 +1568,16 @@ class TestASecondCopy:
         window.assert_called_once()
 
 
-def test_the_claim_is_on_the_library_a_preview_shares_with_the_everyday_copy(
+def test_the_claim_is_on_the_library_a_preview_shares_with_the_production_copy(
         qapp, monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "everyday" / "state")
+    monkeypatch.setattr(config, "LIBRARY_STATE_DIR", tmp_path / "production" / "state")
     claimed = MagicMock(return_value=1)
     monkeypatch.setattr("origenerator.single_instance.claim_the_library", claimed)
 
     with _a_faked_boot([]):
         assert main([]) == 0
 
-    claimed.assert_called_once_with(tmp_path / "everyday" / "state")
+    claimed.assert_called_once_with(tmp_path / "production" / "state")
 
 
 def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(

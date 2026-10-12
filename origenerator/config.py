@@ -15,7 +15,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 # the suite says otherwise: it points every run at a fresh temporary directory
 # before this module is imported, so three thousand tests stop writing a log,
 # the spinner arrows, thumbnails, trash and a diagnostic recording into the
-# live app's state/ -- where what a previous run left decided what the
+# production app's state/ -- where what a previous run left decided what the
 # next one drew.  Every path below hangs off it, and every module that binds
 # one of them at import gets the same answer, which a test's monkeypatch of
 # this module never could.
@@ -27,7 +27,7 @@ _BRANCH_SESSION = is_branch_session()
 _CONTENT = load_content()
 # Public now: the tests assert which paths still hang off the media-library root
 # and which come from the project roots, and that split is the thing worth
-# pinning -- getting it backwards silently repoints a live app at nothing.
+# pinning -- getting it backwards silently repoints a production app at nothing.
 LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 
 
@@ -84,11 +84,10 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
-# The library's own state -- the database, the thumbnails it draws, the trash
-# its deletes go to -- is the live install's wherever this app runs from: a
-# branch session reads and writes the primary checkout's, so every instance
-# shows every generation, whichever of them made it. Only what is about this
-# window alone (UI_STATE_PATH, the logs) stays in the checkout that runs it.
+# The library's own state -- the database, the thumbnails, the trash -- is the
+# production app's wherever this app runs from, so every instance shows every
+# generation. Only what is about this window alone (UI_STATE_PATH, the logs)
+# stays in the checkout that runs it.
 LIBRARY_STATE_DIR = project_dir("origenerator") / "state" if _BRANCH_SESSION else STATE_DIR
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 THUMB_DIR = LIBRARY_STATE_DIR / "thumbnails"

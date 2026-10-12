@@ -8,7 +8,6 @@ from typing import NamedTuple
 from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
-    QAbstractItemView,
     QAbstractSpinBox,
     QApplication,
     QHBoxLayout,
@@ -480,7 +479,6 @@ class GalleryView(QWidget):
         # A combine's brand-new folder doesn't exist until its job finishes; hold
         # its key so _on_reroll_finished can drill in once the tree has the folder.
         self._pending_combine_key: str | None = None
-        self._editing_key: str | None = None  # folder being renamed inline
         # The user's own folders, resolved against the live tree on each rebuild,
         # and the throwaway one a multi-selection stands up (None with 0 or 1 row
         # picked). Both are CustomGroups, so the pane, breadcrumb, and slideshow
@@ -559,10 +557,10 @@ class GalleryView(QWidget):
                 self._find_bar.close_find()
                 return True
             # Ctrl+F opens the find from wherever focus happens to be — including
-            # the prompt field it will search, and the tree's rename editor, both
-            # of which the gallery otherwise hands its keys to. Searching is what
-            # the chord means everywhere else and nothing in this window competes
-            # for it, so it is answered before that yielding happens.
+            # the prompt field it will search, which the gallery otherwise hands
+            # its keys to. Searching is what the chord means everywhere else and
+            # nothing in this window competes for it, so it is answered before
+            # that yielding happens.
             if (event.key() == Qt.Key.Key_F
                     and event.modifiers() & Qt.KeyboardModifier.ControlModifier
                     and self.isVisible() and not self._other_window_owns_keys()):
@@ -636,10 +634,10 @@ class GalleryView(QWidget):
 
     def _escape_cancels_something(self) -> bool:
         """Whether Esc means "not that" to something on screen: an open find, or a
-        text field being typed in — a folder being renamed, a prompt being
-        written. Both are keystrokes away from the key's other meaning, and
-        starting the whole room up out of one that meant "cancel this" is the one
-        way this could be worse than the key doing nothing at all."""
+        text field being typed in, such as a prompt being written. Both are
+        keystrokes away from the key's other meaning, and starting the whole room
+        up out of one that meant "cancel this" is the one way this could be worse
+        than the key doing nothing at all."""
         if self._find_bar.isVisible():
             return True
         focus = QApplication.focusWidget()
@@ -741,9 +739,9 @@ class GalleryView(QWidget):
 
         Only while the view is on screen, nothing else owns the keystroke (no
         dialog/popup and no other active window), the focus isn't in a text field
-        (so renaming and any editor keep their keys), and the focus isn't inside the
-        info-pane config tabs — a config form's combos and buttons aren't text
-        fields, so editing one must not let Delete wipe a thumbnail.
+        (which keeps its own keys), and the focus isn't inside the info-pane
+        config tabs — a config form's combos and buttons aren't text fields, so
+        editing one must not let Delete wipe a thumbnail.
         """
         if not self.isVisible():
             return False
@@ -790,7 +788,7 @@ class GalleryView(QWidget):
         # The folder list: media -> workflow -> model -> LoRA -> [source image]
         # -> settings, the LoRA level collapsing to one "(no LoRA)" folder for a
         # LoRA-less workflow and the source-image level showing only for an
-        # image-conditioned one. Folders expand on the arrow; double-click renames.
+        # image-conditioned one.
         # One tree per side, each under a standing label and each scrolling on
         # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
@@ -800,16 +798,12 @@ class GalleryView(QWidget):
         self._tree.offer_both(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
-        self._tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._tree.setExpandsOnDoubleClick(False)
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         # Picking several folders (Shift/Ctrl) shows them together, as the folder
         # they would make; this fires after currentItemChanged, so it has the last
         # word on what the panes show.
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
-        self._tree.itemDoubleClicked.connect(self._begin_inline_rename)
-        self._tree.itemChanged.connect(self._commit_inline_rename)
         self._tree.favorite_clicked.connect(self._toggle_favorite)          # hover-row action
         self._tree.delete_clicked.connect(self._delete_folder_by_key)
         self._tree.folders_dropped.connect(self._on_folders_dropped)
@@ -4279,27 +4273,6 @@ class GalleryView(QWidget):
         self._actions.rename_folder(_base_of(key), name.strip() or None)
         self.refresh()
         self._re_aim()
-
-    def _begin_inline_rename(self, item, _column):
-        """Double-clicking a tree folder edits its name in place — a folder named
-        after what it holds (see :func:`gallery.is_renamable`) has no name of its
-        own to edit, and its row carries no editable flag either."""
-        group = item.data(0, _GROUP_ROLE)
-        if group is None or not gallery.is_renamable(group):
-            return
-        self._editing_key = group.key
-        self._tree.editItem(item, 0)
-
-    def _commit_inline_rename(self, item, _column):
-        if self._editing_key is None:
-            return
-        key = self._editing_key
-        self._editing_key = None
-        name = item.text(0)
-        self._actions.rename_folder(key, name.strip() or None)
-        self._re_aim()
-        # Rebuild after the editor has fully closed to avoid deleting it mid-edit.
-        defer(self, self.refresh)
 
     def _toggle_favorite(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,

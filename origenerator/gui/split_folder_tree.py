@@ -110,8 +110,6 @@ class SplitFolderTree(QWidget):
     sides_changed = pyqtSignal()
     currentItemChanged = pyqtSignal(object, object)
     itemSelectionChanged = pyqtSignal()
-    itemDoubleClicked = pyqtSignal(object, int)
-    itemChanged = pyqtSignal(object, int)
     favorite_clicked = pyqtSignal(object)      # folder key
     delete_clicked = pyqtSignal(object)    # folder key
     folders_dropped = pyqtSignal(str, list)  # collecting row's key, dropped tree keys
@@ -207,13 +205,6 @@ class SplitFolderTree(QWidget):
         tree.currentItemChanged.connect(
             lambda current, previous, s=side: self._on_current(s, current, previous))
         tree.itemSelectionChanged.connect(self.itemSelectionChanged)
-        # Re-emitted through lambdas rather than wired signal-to-signal: Qt's own
-        # carry a QTreeWidgetItem*, and these carry it as a plain object so a
-        # section's rows reach handlers that never learn which one they came from.
-        tree.itemDoubleClicked.connect(
-            lambda item, column: self.itemDoubleClicked.emit(item, column))
-        tree.itemChanged.connect(
-            lambda item, column: self.itemChanged.emit(item, column))
         tree.favorite_clicked.connect(self.favorite_clicked)
         tree.delete_clicked.connect(self.delete_clicked)
         tree.folders_dropped.connect(self.folders_dropped)
@@ -300,22 +291,9 @@ class SplitFolderTree(QWidget):
         for tree in self._trees.values():
             tree.clear()
 
-    def editItem(self, item, column=0) -> None:
-        side = self.side_of_item(item)
-        if side is not None:
-            self._trees[side].editItem(item, column)
-
     def blockSignals(self, block: bool) -> bool:
         """Silence the sections along with this widget — a rebuild clears and
         refills them, and it is their signals that would fire."""
         for tree in self._trees.values():
             tree.blockSignals(block)
         return super().blockSignals(block)
-
-    def setEditTriggers(self, triggers) -> None:
-        for tree in self._trees.values():
-            tree.setEditTriggers(triggers)
-
-    def setExpandsOnDoubleClick(self, expands: bool) -> None:
-        for tree in self._trees.values():
-            tree.setExpandsOnDoubleClick(expands)

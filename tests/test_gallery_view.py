@@ -34,6 +34,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QDrag, QKeyEvent, QMovie
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QLabel,
     QLineEdit,
@@ -1198,19 +1199,14 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
 
 
 def test_a_folder_you_named_is_found_by_that_name(qtbot):
-    # A name is typed onto a folder to be remembered, so the search has to know
-    # it — end to end: rename the folder, then find its generations by the name.
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     leaf = _children_by_prompt(
         _at(_image_workflow(view._tree), 0, 0))["a dog"]
-    view._tree.setCurrentItem(leaf)
-
-    view._begin_inline_rename(leaf, 0)
-    leaf.setText(0, "Beach trip")
-    qtbot.waitUntil(lambda: view._search.field._scope.endswith("Beach trip"))
+    db.rename_folder(_key(leaf), "Beach trip")
+    view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
@@ -3607,6 +3603,65 @@ def test_folders_start_collapsed(qtbot):
     assert _at(workflow, 0).isExpanded() is False
 
 
+def _double_click_the_name_of(qtbot, row):
+    tree = row.treeWidget()
+    tree.scrollToItem(row)
+    name = tree.visualItemRect(row).center()
+    # QTest's double-click is the double-click event alone, where a mouse sends a
+    # press and a release first; the tree only takes a double-click on the row
+    # that press landed on.
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=name)
+    qtbot.mouseDClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=name)
+
+
+def test_double_clicking_a_folder_of_folders_opens_it_and_expands_or_collapses_it(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    _on_screen(qtbot, view, 1200, 800)
+    workflow = _image_workflow(view._tree)
+
+    _double_click_the_name_of(qtbot, workflow)
+
+    assert _selected_folder(view) == _key(workflow)
+    assert workflow.isExpanded()
+
+    _double_click_the_name_of(qtbot, workflow)
+
+    assert _selected_folder(view) == _key(workflow)
+    assert not workflow.isExpanded()
+
+
+def _editing(row) -> bool:
+    return row.treeWidget().state() == QAbstractItemView.State.EditingState
+
+
+def test_double_clicking_all_collapses_it_like_the_folders_under_it(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    _on_screen(qtbot, view, 1200, 800)
+    all_row = _top_level(view._tree)["All"]
+    assert all_row.isExpanded()
+
+    _double_click_the_name_of(qtbot, all_row)
+
+    assert _selected_folder(view) == _key(all_row)
+    assert not all_row.isExpanded()
+    assert not _editing(all_row)
+
+
+def test_double_clicking_a_settings_folder_opens_it_and_renames_nothing(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    _on_screen(qtbot, view, 1200, 800)
+    leaf = _first_leaf(view)
+    above = leaf.parent()
+    while above is not None:
+        above.setExpanded(True)
+        above = above.parent()
+
+    _double_click_the_name_of(qtbot, leaf)
+
+    assert _selected_folder(view) == _key(leaf)
+    assert not _editing(leaf)
+
+
 def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
     # A branch folder shows folders, not generations, so it has no first item to
     # land on the way a settings folder does
@@ -3621,46 +3676,6 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
     assert view._browser._visible_keys      # its child folders, as tiles
     assert view.visible_prompt_ids() == []
     assert view._selected is None
-
-
-def test_double_clicking_a_tree_folder_renames_it_in_place(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-
-    leaf = _first_leaf(view)
-    key = _key(leaf)
-
-    view._begin_inline_rename(leaf, 0)   # double-click opens the editor
-    leaf.setText(0, "Cats")              # committing fires itemChanged
-
-    assert db.folder_meta_map()[key]["custom_name"] == "Cats"
-    view.refresh()
-    assert _first_leaf(view).text(0) == "Cats"
-
-
-def test_a_folder_named_after_what_it_holds_offers_no_rename(qtbot):
-    # A workflow, a model and a LoRA are named by the fact they stand for;
-    # renaming one would only hide which one it is. Neither the tree row nor
-    # the context menu opens an editor on them.
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-
-    workflow = _image_workflow(view._tree)
-    model = _at(workflow, 0)
-    lora = _at(model, 0)
-    for item in (workflow, model, lora):
-        assert not item.flags() & Qt.ItemFlag.ItemIsEditable
-        view._begin_inline_rename(item, 0)
-        assert view._editing_key is None          # nothing opened
-
-    leaf = _first_leaf(view)                      # …the code-named leaf still does
-    assert leaf.flags() & Qt.ItemFlag.ItemIsEditable
-    view._begin_inline_rename(leaf, 0)
-    assert view._editing_key == _key(leaf)
 
 
 def test_double_clicking_the_path_opens_it_holding_where_you_are(qtbot):
@@ -4146,20 +4161,6 @@ def test_the_favorites_count_follows_a_favorite_without_rebuilding_the_gallery(q
     view.set_items_favorite(["i1"], False)
     assert _shown(_alls(view._tree)["Favorites"]) == "Favorites"
     assert rebuilds == []
-
-
-def test_a_favorite_landing_during_an_inline_rename_leaves_the_rename_alone(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-    leaf = _first_leaf(view)
-    key = _key(leaf)
-
-    view._begin_inline_rename(leaf, 0)
-    view.favorite_generation("i1")
-
-    assert db.folder_meta_map().get(key, {}).get("custom_name") is None
 
 
 def test_unfavoriting_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
@@ -6008,21 +6009,6 @@ def test_renaming_goes_through_the_undoable_actions(qtbot):
 
     assert actions.renamed == [(key, "Best Models")]
     assert view._bank.undo.isEnabled()  # the rename is now undoable
-
-
-def test_inline_rename_is_undoable(qtbot):
-    actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
-    qtbot.addWidget(view)
-    view.refresh()
-    workflow = _image_workflow(view._tree)
-    key = _key(workflow)
-
-    view._editing_key = key            # an in-place edit is underway
-    workflow.setText(0, "Renamed")     # committing it routes through actions
-
-    assert actions.renamed == [(key, "Renamed")]
-    assert view._bank.undo.isEnabled()
 
 
 def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):

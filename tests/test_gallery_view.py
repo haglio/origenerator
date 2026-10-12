@@ -12350,6 +12350,9 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
     in_flight = {}
 
     def drag_loop_through_a_grid_redraw(drag, _action):
+        # A redraw keeps a tile whose row still looks the same; this one's picture
+        # moves, so the redraw is the kind that takes the tile away under the drag.
+        view._db.update_generation("vid", thumbnail_path="moved.jpg")
         view.refresh()
         in_flight["slot lit"] = slot.property("dragActive")
         in_flight["drag alive"] = not sip.isdeleted(drag)

@@ -24,6 +24,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from PyQt6 import sip
 from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
@@ -178,6 +179,31 @@ class _Listing:
             self._dealt[dealt] = gallery.rows_of_media_types(
                 filter_rows(self.rows, side), kinds)
         return self._dealt[dealt]
+
+
+class _KeptTiles:
+    """The tiles of the pane being replaced, for the pane replacing it to take
+    back instead of building again from the picture."""
+
+    def __init__(self, tiles=None, wiring=None):
+        self._tiles = dict(tiles or {})
+        self._wiring = dict(wiring or {})
+
+    def take(self, prompt_id: str, look: tuple, wiring: str):
+        tile = self._tiles.pop(prompt_id, None)
+        if (tile is None or sip.isdeleted(tile) or tile.look != look
+                or self._wiring.get(prompt_id) != wiring):
+            return None
+        tile.set_selected(False)
+        return tile
+
+
+# How a tile is wired: what its double-click, its corners and its menu reach.
+_SHELF_TILE = "shelf"
+_REVIEW_TILE = "shelf with a verdict"
+_FOLDER_TILE = "folder"
+_SEEDS_TILE = "folder with re-rolls"
+_TRASH_TILE = "trash"
 
 
 def _inflight_signature(items) -> tuple:
@@ -354,6 +380,8 @@ class BrowserPane(QObject):
         self._selection = ThumbnailSelection()
         self._visible_keys: list[str] = []  # folders on screen (tile overview)
         self._thumb_widgets: dict[str, ThumbnailWidget] = {}
+        self._wired: dict[str, str] = {}      # how each drawn tile is wired
+        self._kept = _KeptTiles()             # the last pane's tiles, while a new one draws
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
@@ -431,6 +459,7 @@ class BrowserPane(QObject):
     # --- folder-tile overview ----------------------------------------------
 
     def show_widget(self, widget: QWidget):
+        self._kept = _KeptTiles()  # what the new pane did not take goes with the old
         self._scroll.setWidget(widget)  # replaces & deletes the previous widget
 
     def show_empty(self):
@@ -462,6 +491,7 @@ class BrowserPane(QObject):
         """A fresh container whose tiles flow to fill the pane's width."""
         container = QWidget()
         flow = FlowLayout(container, spacing=_TILE_SPACING)
+        self._kept = _KeptTiles(self._thumb_widgets, self._wired)
         self._reset_pane_state()
         return container, flow
 
@@ -775,11 +805,22 @@ class BrowserPane(QObject):
         """Build one finished-item tile for a shelf (Recents/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
         to a combine slot, and right-click it for the same star / enhance / delete
-        menu a tile inside a folder offers. Returns the tile so a caller can add a
-        shelf-specific action; ``corner_actions`` become the tile's hover controls
-        (a review's keep/reject)."""
-        tw = ThumbnailWidget(
-            row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
+        menu a tile inside a folder offers; ``corner_actions`` become the tile's
+        hover controls (a review's keep/reject, wired to the verdict)."""
+        def wire(tw):
+            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
+            tw.double_clicked.connect(self._shelf_double_clicked)  # or open its folder
+            # Every shelf gets the folder menu — an item is no less actionable for
+            # being listed by when it was made or by its bookmark rather than by its
+            # settings.
+            tw.context_requested.connect(self._thumbnail_context_menu)
+            tw.control_triggered.connect(self._on_tile_control)
+            if corner_actions:
+                tw.corner_action_triggered.connect(self.experiment_verdict)
+            self._wire_drag(tw)
+
+        return self._draw_tile(
+            flow, row, _REVIEW_TILE if corner_actions else _SHELF_TILE, wire,
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
@@ -787,17 +828,31 @@ class BrowserPane(QObject):
             enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
             corner_actions=corner_actions,
         )
-        tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
-        tw.double_clicked.connect(self._shelf_double_clicked)  # or open its folder
-        # Every shelf gets the folder menu — an item is no less actionable for being
-        # listed by when it was made or by its bookmark rather than by its settings.
-        tw.context_requested.connect(self._thumbnail_context_menu)
-        tw.control_triggered.connect(self._on_tile_control)
-        self._wire_drag(tw)
-        flow.addWidget(tw)
-        self._selection.note_shown(row["prompt_id"])
-        self._thumb_widgets[row["prompt_id"]] = tw
-        return tw
+
+    def _draw_tile(self, flow, row, wiring: str, wire, **appearance) -> ThumbnailWidget:
+        """Put *row*'s tile in *flow*: the last pane's, when it would be built
+        again the same and was wired the same way, else a new one *wire* connects.
+
+        A kept tile is given the star, the plus and the run its row now carries,
+        which are the three things about a tile that can change under it.
+        """
+        prompt_id = row["prompt_id"]
+        thumb_path, caption = row.get("thumbnail_path"), self._thumbnail_caption(row)
+        tile = self._kept.take(
+            prompt_id, ThumbnailWidget.look_of(prompt_id, thumb_path, caption, **appearance),
+            wiring)
+        if tile is None:
+            tile = ThumbnailWidget(prompt_id, thumb_path, caption, **appearance)
+            wire(tile)
+        else:
+            tile.set_favorite(appearance.get("favorite", False))
+            tile.set_enhance(appearance.get("enhance"))
+            tile.set_enhancing(appearance.get("enhancing"))
+        flow.addWidget(tile)
+        self._selection.note_shown(prompt_id)
+        self._thumb_widgets[prompt_id] = tile
+        self._wired[prompt_id] = wiring
+        return tile
 
     def _visible_inflight_items(self, rows=None, requests=None) -> list:
         """The in-flight items the shelf draws: what the gallery's media-type
@@ -954,8 +1009,7 @@ class BrowserPane(QObject):
         rows = self._open_shelf_rows(EXPERIMENTS_KEY)
 
         def draw(row):
-            tile = self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
-            tile.corner_action_triggered.connect(self.experiment_verdict)
+            self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
 
         headings = gallery.section_headings(rows)
         _open_sections(flow, headings)
@@ -1035,8 +1089,7 @@ class BrowserPane(QObject):
         ]
         rows = self._open_shelf_rows(TRASH_KEY)
         for row in rows:
-            tile = self._add_trash_thumbnail(flow, row, list(actions))
-            tile.corner_action_triggered.connect(self.trash_action_triggered)
+            self._add_trash_thumbnail(flow, row, list(actions))
         self.show_widget(container if rows
                          else self._empty_state(self._trash_empty_hint()))
 
@@ -1058,21 +1111,20 @@ class BrowserPane(QObject):
         folder, not ours. In their place the corners and the menu offer the two
         actions that do apply: restore, or end it for good.
         """
-        tile = ThumbnailWidget(
-            row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
+        def wire(tile):
+            tile.clicked.connect(self._thumbnail_clicked)          # preview it here
+            tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
+            tile.context_requested.connect(self._trash_context_menu)
+            tile.corner_action_triggered.connect(self.trash_action_triggered)
+
+        return self._draw_tile(
+            flow, row, _TRASH_TILE, wire,
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
             controls=False,       # its two acts are restore and purge, in the corners
             corner_actions=corner_actions,
         )
-        tile.clicked.connect(self._thumbnail_clicked)          # preview it here
-        tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
-        tile.context_requested.connect(self._trash_context_menu)
-        flow.addWidget(tile)
-        self._selection.note_shown(row["prompt_id"])
-        self._thumb_widgets[row["prompt_id"]] = tile
-        return tile
 
     def _trash_context_menu(self, prompt_id: str, global_pos):
         """Right-click a deleted tile: restore or permanently delete the picked
@@ -1220,15 +1272,7 @@ class BrowserPane(QObject):
         i2v = bool(group.rows) \
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
-        def draw(row):
-            tw = ThumbnailWidget(
-                row["prompt_id"], row.get("thumbnail_path"), self._thumbnail_caption(row),
-                movie_path=self._host.animated_preview(row),  # videos loop; images stay still
-                favorite=bool(row.get("starred")),
-                enhance=self._enhance_state(row),           # the plus in the picture's corner
-                enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
-                corner_actions=self._seed_reroll_actions(row) if i2v else None,
-            )
+        def wire(tw):
             tw.clicked.connect(self._thumbnail_clicked)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
@@ -1236,9 +1280,16 @@ class BrowserPane(QObject):
             if i2v:
                 tw.corner_action_triggered.connect(self.seed_reroll_requested)
             self._wire_drag(tw)
-            flow.addWidget(tw)
-            self._selection.note_shown(row["prompt_id"])
-            self._thumb_widgets[row["prompt_id"]] = tw
+
+        def draw(row):
+            self._draw_tile(
+                flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
+                movie_path=self._host.animated_preview(row),  # videos loop; images stay still
+                favorite=bool(row.get("starred")),
+                enhance=self._enhance_state(row),           # the plus in the picture's corner
+                enhancing=self._host.enhancing_run(row),       # scrim + bar while one cooks
+                corner_actions=self._seed_reroll_actions(row) if i2v else None,
+            )
 
         # The re-roll tile leads the flow so it sits beside the newest item
         # (thumbnails are sorted newest-first). The run in front of this folder's
@@ -1419,6 +1470,7 @@ class BrowserPane(QObject):
     def clear_selection(self):
         self._selection.clear()
         self._thumb_widgets = {}
+        self._wired = {}
         self.selection_changed.emit()
 
     def clear_thumbnail_selection(self):

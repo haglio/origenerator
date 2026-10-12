@@ -98,6 +98,12 @@ _PANEL_MOVES = {
     Qt.Key.Key_Up: "up",
     Qt.Key.Key_Down: "down",
 }
+_WASD_AS_ARROWS = {
+    Qt.Key.Key_W: Qt.Key.Key_Up,
+    Qt.Key.Key_A: Qt.Key.Key_Left,
+    Qt.Key.Key_S: Qt.Key.Key_Down,
+    Qt.Key.Key_D: Qt.Key.Key_Right,
+}
 
 
 class SlideshowView(QWidget):
@@ -1551,7 +1557,7 @@ class SlideshowView(QWidget):
     # --- Qt events ---------------------------------------------------------
 
     def keyPressEvent(self, event):
-        key = event.key()
+        key = _WASD_AS_ARROWS.get(event.key(), event.key())
         shifted = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._move_the_panel(key)

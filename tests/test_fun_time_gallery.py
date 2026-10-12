@@ -1153,7 +1153,7 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
     panel._reflow_for_the_media()
 
     assert panel._media_split.orientation() == Qt.Orientation.Horizontal
-    assert panel._media_split.indexOf(panel._scroll) == 0    # settings lead
+    assert panel._media_split.indexOf(panel._settings_pane) == 0    # settings lead
     assert panel._media_split.indexOf(panel._preview_pane) == 1
 
 
@@ -1179,7 +1179,7 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_for
     panel.become_hosted(_session())
 
     assert panel._media_split.orientation() == Qt.Orientation.Horizontal
-    assert panel._media_split.indexOf(panel._scroll) == 0
+    assert panel._media_split.indexOf(panel._settings_pane) == 0
 
 
 def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the_form(qtbot):

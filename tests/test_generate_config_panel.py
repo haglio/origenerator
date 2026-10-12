@@ -106,14 +106,39 @@ def test_the_panel_is_one_column_with_no_side_pane(panel):
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
 
 
-def test_preview_leads_the_column_over_the_form_and_generate(panel):
-    # Preview-over-form: the preview sits on top of the settings, with the
-    # Generate button under them, all in the panel's own column.
+def test_the_column_reads_preview_then_generate_then_settings(panel):
+    """Generate heads the settings under the line below the picture, rather
+    than trailing them in the lower right corner, where Windows pops up its
+    notices over whatever is there."""
+    panel.show()
+    panel.resize(700, 800)
+    QApplication.processEvents()
+
+    def span(widget):
+        top = widget.mapTo(panel, QPoint(0, 0)).y()
+        return top, top + widget.height()
+
+    _, preview_foot = span(panel._preview)
+    line_top, line_foot = span(panel._media_split.handle(1))
+    generate_top, generate_foot = span(panel._generate_btn.parentWidget())
+    settings_top, _ = span(panel._scroll)
+    assert preview_foot <= line_top
+    assert line_foot <= generate_top
+    assert generate_foot <= settings_top
+
+
+def test_the_picture_and_the_settings_share_the_column_by_what_each_asks_for(panel):
+    """Generate rides on top of the settings, so weighing them at four parts to
+    the picture's three, as when the button sat under them, took a tenth of
+    the picture's height away."""
+    panel.show()
+    panel.resize(700, 1000)
+    QApplication.processEvents()
+
     split = panel._media_split
-    assert split.indexOf(panel._preview_pane) == 0
-    assert split.indexOf(panel._preview_pane) < split.indexOf(panel._scroll)
-    assert panel.layout().indexOf(split) == 0
-    assert _is_descendant(panel._generate_btn, panel)
+    asked = [split.widget(i).sizeHint().height() for i in range(2)]
+    given = split.sizes()
+    assert given[0] / sum(given) == pytest.approx(asked[0] / sum(asked), abs=0.01)
 
 
 def test_the_line_between_the_preview_and_the_settings_is_a_drag_handle(panel):
@@ -239,9 +264,9 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(panel):
 
 def test_the_pane_keeps_a_margin_round_its_contents(panel):
     # Nothing sits flush against the tab's edge — not the preview at the top, not
-    # the form down either side, not the button bank at the foot. The width is
-    # written out rather than read from the constant that sets it, so this test
-    # passes at any margin at all.
+    # the form down either side, not Generate on the right, not the settings at
+    # the foot. The width is written out: read from the constant that sets it,
+    # this test would pass at any margin at all.
     panel.show()
     panel.resize(700, 800)
 
@@ -256,20 +281,25 @@ def test_the_pane_keeps_a_margin_round_its_contents(panel):
     bar_side = viewport.mapTo(panel, viewport.rect().topRight()).x()
     assert bar_side - form.mapTo(panel, form.rect().topRight()).x() == 8
     generate = panel._generate_btn.parentWidget()
-    lower = generate.mapTo(panel, generate.rect().bottomLeft()).y()
+    assert panel.width() - generate.mapTo(panel, generate.rect().topRight()).x() - 1 == 8
+    lower = viewport.mapTo(panel, viewport.rect().bottomLeft()).y()
     assert panel.height() - lower - 1 == 8
 
 
-def test_the_top_setting_keeps_clear_of_the_line_above_it(panel):
-    """The thick line over the settings is a pane edge like any other, and the
-    first field sat right against it."""
+def test_generate_and_the_top_setting_keep_clear_of_what_is_above_them(panel):
+    """The thick line under the picture is a pane edge like any other, and the
+    first field once sat right against it; Generate is the next thing down from
+    it now, and the first field the next thing down from Generate."""
     panel.show()
     panel.resize(700, 800)
 
     handle = panel._media_split.handle(1)
     below_the_line = handle.mapTo(panel, handle.rect().bottomLeft()).y()
-    form = panel._form_host
-    assert form.mapTo(panel, form.rect().topLeft()).y() - below_the_line >= 8
+    generate = panel._generate_btn.parentWidget()
+    assert generate.mapTo(panel, generate.rect().topLeft()).y() - below_the_line >= 8
+    below_generate = generate.mapTo(panel, generate.rect().bottomLeft()).y()
+    picker = panel._workflow_combo
+    assert picker.mapTo(panel, picker.rect().topLeft()).y() - below_generate >= 8
 
 
 def test_the_settings_handle_reaches_the_panes_own_border(panel):
@@ -309,7 +339,7 @@ def test_info_and_form_share_one_scroll(panel):
 
 def test_file_info_above_form_related_media_below(panel):
     # File/Created sits above the form; the source-image tile and animated-in strip
-    # sit below it, at the foot of the scroll just above the buttons.
+    # sit below it, at the foot of the scroll.
     body = panel._scroll.widget().layout()
     form_at = body.indexOf(panel._form_host)
     assert body.indexOf(panel._metadata_block) < form_at
@@ -323,7 +353,7 @@ def test_file_info_above_form_related_media_below(panel):
 def test_evolver_shares_the_button_bank_with_generate_and_cancel(panel):
     # One button bank: Send-to-Evolver isn't a stray footer button — it sits in the
     # same row as Cancel and Generate.
-    bank = _layout_containing(panel.layout(), panel._generate_btn.parentWidget())
+    bank = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
     assert bank is not None
     assert bank.indexOf(_lane_button(panel)) != -1
     assert bank.indexOf(panel._cancel_btn) != -1
@@ -1856,7 +1886,7 @@ def test_folding_a_form_section_does_not_open_a_gap_below_it(saved_panel):
 
 
 def test_send_to_genau_shares_the_one_button_bank(panel):
-    bank = _layout_containing(panel.layout(), panel._generate_btn.parentWidget())
+    bank = _layout_containing(panel._settings_pane.layout(), panel._generate_btn.parentWidget())
     assert bank.indexOf(_lane_button(panel, "Genau")) != -1
 
 

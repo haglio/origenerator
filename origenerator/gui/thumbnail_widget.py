@@ -185,9 +185,7 @@ class ThumbnailWidget(QWidget):
                 media_type: str | None = None, movie_path: str | None = None,
                 controls: bool = True,
                 corner_actions: list[CornerAction] | None = None, **_mutable) -> tuple:
-        """What a tile cannot be changed into once built -- so a pane redrawn
-        over this one can take the tile back for a row that still looks like
-        this, and set on it the star, the plus and the run that can."""
+        """What a tile cannot be changed into once built."""
         return (prompt_id, thumb_path, label_text, media_type, movie_path, controls,
                 tuple(action.action_id for action in corner_actions or ()))
 

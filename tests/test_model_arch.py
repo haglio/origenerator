@@ -78,6 +78,22 @@ def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch
     assert len(reads) == 1
 
 
+def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeypatch):
+    # Reading a header opens a model file of gigabytes, and a launch opened fifty
+    # of them -- a third of a second, every launch, for files unchanged since the
+    # last one.
+    monkeypatch.setattr(model_arch, "_HEADERS_PATH", tmp_path / "headers.json")
+    monkeypatch.setattr(model_arch, "_described", None)
+    path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
+    assert model_arch.describe(path).arch == SDXL
+    reads = []
+    monkeypatch.setattr(model_arch, "_tensor_names", lambda p: reads.append(p))
+    monkeypatch.setattr(model_arch, "_described", None)  # the next launch
+
+    assert model_arch.describe(path).arch == SDXL
+    assert reads == []
+
+
 def test_a_model_file_written_over_is_read_again(tmp_path):
     path = _write(tmp_path / "m.safetensors", ARCH_CASES[0][1])
     assert model_arch.describe(path).arch == SDXL

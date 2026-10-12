@@ -26,8 +26,10 @@ from __future__ import annotations
 import json
 import re
 import struct
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from origenerator import config
 
 SDXL = "sdxl"
 SD15 = "sd15"
@@ -92,7 +94,10 @@ class ModelFile:
     is_shard: bool
 
 
-_described: dict[tuple[str, int, int], ModelFile] = {}
+# What each model file turned out to be, kept between launches: a header is a
+# file of gigabytes opened, and a file unchanged in size and time reads the same.
+_HEADERS_PATH = config.STATE_DIR / "model_headers.json"
+_described: dict[tuple[str, int, int], ModelFile] | None = None
 
 
 def describe(path: Path) -> ModelFile:
@@ -102,9 +107,46 @@ def describe(path: Path) -> ModelFile:
     except OSError:
         return _describe(path)
     key = (str(path), stat.st_size, stat.st_mtime_ns)
-    if key not in _described:
-        _described[key] = _describe(path)
-    return _described[key]
+    remembered = _remembered()
+    if key not in remembered:
+        remembered[key] = _describe(path)
+        _remember(remembered)
+    return remembered[key]
+
+
+def _remembered() -> dict[tuple[str, int, int], ModelFile]:
+    global _described
+    if _described is None:
+        _described = _read_remembered(_HEADERS_PATH)
+    return _described
+
+
+def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    remembered = {}
+    for entry in entries if isinstance(entries, list) else ():
+        try:
+            remembered[(entry["path"], entry["size"], entry["mtime_ns"])] = ModelFile(
+                arch=entry["arch"], is_lora=entry["is_lora"], expert=entry["expert"],
+                is_shard=entry["is_shard"])
+        except (KeyError, TypeError):
+            continue
+    return remembered
+
+
+def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
+    entries = [{"path": path, "size": size, "mtime_ns": mtime_ns, **asdict(file)}
+               for (path, size, mtime_ns), file in described.items()]
+    try:
+        _HEADERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        written = _HEADERS_PATH.with_name(_HEADERS_PATH.name + ".tmp")
+        written.write_text(json.dumps(entries), encoding="utf-8")
+        written.replace(_HEADERS_PATH)
+    except OSError:
+        return  # a launch that cannot write its state reads the headers again
 
 
 def _describe(path: Path) -> ModelFile:

@@ -1877,9 +1877,7 @@ class GalleryView(QWidget):
 
     def _lists_for(self, rows, meta, sides):
         """The start frames and a table of contents for each of *sides*, kept
-        against the library they were built from. Only the drawn sides are
-        built: the folder names the search index reads come off those, so no
-        list of the whole library is needed until Both is the side drawn."""
+        against the library they were built from; only the drawn sides are built."""
         library = _fingerprint(rows, meta)
         if library != self._lists_built_from:
             self._lists_built_from = library

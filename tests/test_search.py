@@ -67,6 +67,36 @@ def test_a_written_number_and_its_digit_are_one_key():
     assert _hits(_index([_row("g2", "3 lamps")]), "three lamps") == ["g2"]
 
 
+def test_a_prompt_several_generations_share_is_not_taken_apart_per_generation(monkeypatch):
+    # Every seed of a settings folder carries the folder's prompt, and the index
+    # is rebuilt with the gallery, so taking one text apart once per row that
+    # says it was most of what a large library's first draw spent its time on.
+    taken_apart = []
+    words = search._words
+    monkeypatch.setattr(search, "_words",
+                        lambda text: taken_apart.append(text) or words(text))
+    prompt = "a vermilion kite on a quay"
+    _index([_row(f"g{n}", prompt) for n in range(3)])
+    assert taken_apart.count(prompt) <= 1
+
+
+class _Asked(dict):
+    def __init__(self, table):
+        super().__init__(table)
+        self.about = {}
+
+    def get(self, word, default=None):
+        self.about[word] = self.about.get(word, 0) + 1
+        return super().get(word, default)
+
+
+def test_a_word_two_prompts_share_is_not_stemmed_twice(monkeypatch):
+    stemmed = _Asked(search._IRREGULAR_PLURALS)
+    monkeypatch.setattr(search, "_IRREGULAR_PLURALS", stemmed)
+    _index([_row("g1", "a vermilion kite"), _row("g2", "a vermilion hat")])
+    assert stemmed.about.get("vermilion", 0) <= 1
+
+
 # --- what counts as a match -------------------------------------------------
 
 

@@ -46,9 +46,11 @@ import logging
 import re
 import urllib.request
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 
 from origenerator import gallery
 from origenerator.content import load_content
+from origenerator.gallery.signatures import READINGS_KEPT
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +159,7 @@ def _words(text) -> list[str]:
     return _WORD_RE.findall(str(text or "").lower())
 
 
+@lru_cache(maxsize=READINGS_KEPT)
 def _stem(word: str) -> str:
     """A word reduced to what it shares with its other forms.
 
@@ -179,8 +182,9 @@ def _stem(word: str) -> str:
     return word
 
 
-def _stems(text) -> set[str]:
-    return {_stem(word) for word in _words(text)}
+@lru_cache(maxsize=READINGS_KEPT)
+def _stems(text: str) -> frozenset[str]:
+    return frozenset(_stem(word) for word in _words(text))
 
 
 def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
@@ -373,24 +377,13 @@ def _recipe_stems(row: dict, params: dict) -> set[str]:
             if not stem.replace(".", "").isdigit()}
 
 
-def _folder_stems(names, memo: dict) -> frozenset[str]:
-    """The searchable words of the folder names holding one row.
-
-    ``memo`` caches per name rather than per row: one name usually covers a whole
-    folder's worth of rows, so the tokenizing happens once however many rows sit
-    under it.
-    """
-    stems: set[str] = set()
-    for name in names:
-        cached = memo.get(name)
-        if cached is None:
-            cached = memo[name] = frozenset(_stems(name))
-        stems |= cached
-    return frozenset(stems)
+def _folder_stems(names) -> frozenset[str]:
+    """The searchable words of the folder names holding one row."""
+    return frozenset().union(*(_stems(name) for name in names))
 
 
 def _positive_stems(row: dict, params: dict) -> frozenset[str]:
-    return frozenset(_stems(_prompt_text(row, params, "positive_prompt")))
+    return _stems(_prompt_text(row, params, "positive_prompt"))
 
 
 def content_stems(row: dict) -> frozenset[str]:
@@ -447,13 +440,12 @@ class GallerySearch:
         entries: dict[str, _Entry] = {}
         order: list[str] = []
         folder_names = folder_names or {}
-        memo: dict[str, frozenset[str]] = {}
         for row in rows:
             prompt_id = row.get("prompt_id")
             if not prompt_id or prompt_id in entries \
                     or not gallery.produced_output(row):
                 continue
-            folders = _folder_stems(folder_names.get(prompt_id, ()), memo)
+            folders = _folder_stems(folder_names.get(prompt_id, ()))
             known = self._entries.get(prompt_id)
             entries[prompt_id] = replace(
                 known if known is not None else _build_entry(row),

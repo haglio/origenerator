@@ -17,6 +17,7 @@ prevent. :data:`ANY` is the way to say a category genuinely takes anything.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from origenerator import config
@@ -59,8 +60,35 @@ def _model_paths(directory: Path) -> list[Path]:
     )
 
 
-def _offer(path: Path, accepts, expert: str | None, want_lora: bool) -> bool:
-    """Whether *path* belongs in a picker with these terms.
+# Each models folder as it was last walked: what changed it (the stamp) and
+# what it held, each file already read. See _folder_stamp.
+_catalogued: dict[str, tuple[tuple, list[tuple[str, model_arch.ModelFile]]]] = {}
+
+
+def _folder_stamp(directory: Path) -> tuple:
+    """What a model added, removed or renamed anywhere under *directory*
+    changes: when each folder under it was last written, and how many entries
+    it holds. Read from the folders alone, never from a stat of every model.
+    """
+    return tuple((root, os.stat(root).st_mtime_ns, len(dirs) + len(files))
+                 for root, dirs, files in os.walk(directory))
+
+
+def _catalogue(directory: Path) -> list[tuple[str, model_arch.ModelFile]]:
+    """Every model under *directory* with what it is, by the name a picker shows,
+    walked and read again only once something in the folder has changed."""
+    stamp = _folder_stamp(directory)
+    kept = _catalogued.get(str(directory))
+    if kept is None or kept[0] != stamp:
+        kept = (stamp, [(str(path.relative_to(directory)), model_arch.describe(path))
+                        for path in _model_paths(directory)])
+        _catalogued[str(directory)] = kept
+    return kept[1]
+
+
+def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
+           want_lora: bool) -> bool:
+    """Whether a file read as *described* belongs in a picker with these terms.
 
     Each test drops a file only on a positive finding — an architecture that is
     recognized and wrong, a name that names the other expert. A file we could not
@@ -68,7 +96,6 @@ def _offer(path: Path, accepts, expert: str | None, want_lora: bool) -> bool:
     where a working model silently missing from the dropdown has no symptom the
     user can act on at all.
     """
-    described = model_arch.describe(path)
     if described.is_shard:
         return False
     if described.is_lora != want_lora:
@@ -80,10 +107,8 @@ def _offer(path: Path, accepts, expert: str | None, want_lora: bool) -> bool:
 
 def _listing(category: str, fallback: list[str], accepts, expert, want_lora) -> list[str]:
     directory = config.COMFYUI_DIR / "models" / category
-    found = [
-        str(path.relative_to(directory)) for path in _model_paths(directory)
-        if _offer(path, accepts, expert, want_lora)
-    ]
+    found = [name for name, described in _catalogue(directory)
+             if _offer(described, accepts, expert, want_lora)]
     return found or list(fallback)
 
 

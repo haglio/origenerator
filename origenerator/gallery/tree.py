@@ -322,7 +322,7 @@ def folder_names_by_row(
     return names
 
 
-def recent_generations(rows: list[dict]) -> list[dict]:
+def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     """Every row with a result, newest first — the whole of the Recents shelf's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
@@ -359,7 +359,8 @@ def recent_generations(rows: list[dict]) -> list[dict]:
         if source_of(row) != GenerationSource.EXPERIMENT
         and produced_output(row)
     ]
-    bumped = enhancement_recency(rows)
+    if bumped is None:
+        bumped = enhancement_recency(rows)
     return sorted(listed, reverse=True, key=lambda row: row_recency(row, bumped))
 
 
@@ -390,7 +391,8 @@ RECENTLY_WORKED_COUNT = 20
 
 
 def recently_worked_folders(
-    trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT
+    trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT,
+    *, bumped=None,
 ) -> set[tuple[str, str]]:
     """The ``(side, folder key)`` pairs of the folders worked in most recently.
 
@@ -410,7 +412,8 @@ def recently_worked_folders(
     shape: portrait work must not light the landscape copy of a folder nothing
     portrait-shaped ever touched.
     """
-    bumped = enhancement_recency(rows)
+    if bumped is None:
+        bumped = enhancement_recency(rows)
     ranked: list[tuple[tuple[datetime, int], tuple[str, str]]] = []
 
     def walk(group, side: str) -> None:

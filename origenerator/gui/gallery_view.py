@@ -491,7 +491,6 @@ class GalleryView(QWidget):
         self._lists_by_side: dict[str, list] = {}
         self._both_kind_workflows: frozenset[str] = frozenset()
         self._start_frames: dict = {}
-        self._whole_list: list = []
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         # What the trail allows right now, as it last told us: the bank is written
@@ -1767,7 +1766,6 @@ class GalleryView(QWidget):
         self._pending_selection = None
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
-        self._image_index = None   # rebuilt on the next ask (image_config_index)
         self._combine.offer_the_acts(rows)
         # Every kind, in the tree and in the index: which kinds a shelf lists is
         # the shelf's own question, answered by the Images / Videos / Both
@@ -1778,9 +1776,10 @@ class GalleryView(QWidget):
         self._listed_rows = listed
         # Built once here off the whole library and handed to every tree below —
         # the split trees included, which are the ones that cannot build it for
-        # themselves (see :func:`gallery.start_frame_index`).
-        start_frames, tree_model, trees = self._lists_for(
-            rows, meta, self._tree.sides)
+        # themselves (see :func:`gallery.start_frame_index`) — and kept as the
+        # index every folder key is derived against until the next rebuild.
+        start_frames, trees = self._lists_for(rows, meta, self._tree.sides)
+        self._image_index = start_frames
         unreviewed = self._review_queue(listed)
         self._held_rows = recovery.bin_items(self._bin_records())
         held = self._held_rows
@@ -1805,10 +1804,13 @@ class GalleryView(QWidget):
         # They are reachable only from that shelf: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(listed + held, gallery.folder_names_by_row(
-            tree_model, meta, self._custom_folders))
-        requested = gallery.requested_generations(self._db.list_requests(), listed)  # the Requests shelf
+            [folder for tree in trees.values() for folder in tree], meta,
+            self._custom_folders))
+        requests = self._db.list_requests()
+        requested = gallery.requested_generations(requests, listed)  # the Requests shelf
+        bumped = gallery.enhancement_recency(listed)
         self._browser.set_model(
-            gallery.recent_generations(listed),
+            gallery.recent_generations(listed, bumped=bumped),
             trees,
             listed,
             unreviewed,
@@ -1817,10 +1819,10 @@ class GalleryView(QWidget):
             image_index=start_frames,
         )
         self._tree_view.populate(
-            self._build_sides(trees), expanded, folder_meta=meta,
+            self._build_sides(trees, rows), expanded, folder_meta=meta,
             # Where the work has lately been. The tree keeps the order the
             # recipes were tried in, so nothing else in it says so.
-            recently_worked=gallery.recently_worked_folders(trees, listed),
+            recently_worked=gallery.recently_worked_folders(trees, listed, bumped=bumped),
         )
         # The rows the old selection group pointed at are gone with the rebuild;
         # _restore_multi_selection below stands a fresh one up from multi_keys.
@@ -1861,7 +1863,7 @@ class GalleryView(QWidget):
             self._search.run()
         if standing is not None and self._tree_view.selected_folder_key() == standing:
             self._browser.return_to(place)
-        self._update_queue()
+        self._update_queue(self._inflight_items(rows=rows, requests=requests))
         # Re-assert the front tab's Generate-as-progress state against the live jobs.
         # Keying off the freshly rebuilt image rows is what lets a reconnected re-roll
         # light its tab's button after a restart: at reconnect time the view's image
@@ -1874,26 +1876,23 @@ class GalleryView(QWidget):
             panel.refresh_generate_caption()
 
     def _lists_for(self, rows, meta, sides):
-        """The start frames, the whole library's table of contents and one for
-        each of *sides*, kept against the library they were built from."""
+        """The start frames and a table of contents for each of *sides*, kept
+        against the library they were built from. Only the drawn sides are
+        built: the folder names the search index reads come off those, so no
+        list of the whole library is needed until Both is the side drawn."""
         library = _fingerprint(rows, meta)
         if library != self._lists_built_from:
             self._lists_built_from = library
             self._start_frames = gallery.start_frame_index(rows)
             self._both_kind_workflows = gallery.workflows_of_both_kinds(rows)
-            self._whole_list = gallery.build_gallery_tree(
-                rows, meta, image_index=self._start_frames,
-                both_kinds=self._both_kind_workflows)
             self._lists_by_side = {}
         for side in sides:
             if side not in self._lists_by_side:
                 self._lists_by_side[side] = _side_list(
-                    rows, meta, self._start_frames, self._both_kind_workflows,
-                    self._whole_list, side)
-        return (self._start_frames, self._whole_list,
-                {side: self._lists_by_side[side] for side in sides})
+                    rows, meta, self._start_frames, self._both_kind_workflows, side)
+        return self._start_frames, {side: self._lists_by_side[side] for side in sides}
 
-    def _build_sides(self, trees):
+    def _build_sides(self, trees, rows):
         """The sides the pane is drawing, in the order it draws them.
 
         A side is the whole table of contents over the rows it holds: its own
@@ -1905,7 +1904,7 @@ class GalleryView(QWidget):
         nobody can see, and filling it would cost every rebuild a table of
         contents for nothing.
         """
-        inflight = self._browser.inflight_orientations()
+        inflight = self._browser.inflight_orientations(rows)
         return [SideModel(
             side=side,
             tree_model=trees[side],
@@ -4505,11 +4504,9 @@ class GalleryView(QWidget):
         self._info_tabs.pin_current_tab()
 
 
-def _side_list(rows, meta, start_frames, both_kinds, whole, side):
-    """One side's hierarchy — for Both the whole library's, already built."""
-    if side == _BOTH:
-        return whole
-    return gallery.build_gallery_tree(filter_rows(rows, side), meta,
+def _side_list(rows, meta, start_frames, both_kinds, side):
+    """One side's hierarchy — for Both the whole library's."""
+    return gallery.build_gallery_tree(rows if side == _BOTH else filter_rows(rows, side), meta,
                                       image_index=start_frames,
                                       both_kinds=both_kinds)
 

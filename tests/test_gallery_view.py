@@ -66,6 +66,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.db import Database
+from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery.shelves import (
@@ -3532,6 +3533,72 @@ def test_a_poll_answer_that_lands_after_its_gallery_is_gone_is_dropped(qtbot, mo
     qtbot.waitUntil(lambda: not off_thread._in_flight - before, timeout=5000)
 
     assert library_reads == []
+
+
+def _counted(monkeypatch, owner, name, calls):
+    original = getattr(owner, name)
+    monkeypatch.setattr(owner, name,
+                        lambda *args, **kwargs: calls.append(name) or original(*args, **kwargs))
+
+
+def test_a_rebuild_reads_the_library_and_the_requests_once(qtbot, monkeypatch):
+    # The in-flight cards were built three times over per rebuild, and each
+    # build read both tables again, with the listing already in hand.
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    reads = []
+    _counted(monkeypatch, db, "list_generations", reads)
+    _counted(monkeypatch, db, "list_requests", reads)
+
+    view.refresh()
+
+    assert sorted(reads) == ["list_generations", "list_requests"]
+
+
+def test_a_rebuild_works_out_when_each_picture_was_last_enhanced_once(qtbot, monkeypatch):
+    worked_out = []
+    _counted(monkeypatch, gallery, "enhancement_recency", worked_out)
+    _counted(monkeypatch, gallery_tree_module, "enhancement_recency", worked_out)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+
+    view.refresh()
+
+    assert len(worked_out) == 1
+
+
+def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
+        qtbot, monkeypatch):
+    # The tree keyed its folders against one index of the pictures, and the
+    # folder keys asked of the view were derived against a second, built from
+    # scratch on the first ask after every rebuild.
+    built = []
+    _counted(monkeypatch, gallery, "build_image_config_index", built)
+    _counted(monkeypatch, gallery_tree_module, "build_image_config_index", built)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+
+    view.refresh()
+    indexed = len(built)
+
+    view.image_config_index()
+    view.folder_key_of(view.row_for("v1"))
+
+    assert len(built) == indexed
+
+
+def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypatch):
+    # A third tree of the whole library was built only to read folder names
+    # off it for the search index, which the two sides' trees already carry.
+    built = []
+    _counted(monkeypatch, gallery, "build_gallery_tree", built)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+
+    view.refresh()
+
+    assert len(built) == len((LANDSCAPE, PORTRAIT))
 
 
 def test_folders_start_collapsed(qtbot):

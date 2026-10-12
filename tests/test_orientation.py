@@ -256,7 +256,9 @@ def _counting_builds(monkeypatch):
 def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypatch):
     """Each shape's list, and the list of both shapes, costs a pass over the
     whole library. The radio moves between lists the gallery has already built,
-    and every click used to build all three again from nothing."""
+    and every click used to build all three again from nothing. The list of
+    both shapes is built the first time Both is drawn, never before and never
+    again: a landing redraws Separate far more often than the radio moves."""
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
@@ -266,8 +268,9 @@ def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypa
 
     view._tree.both_button.click()
     view._tree.each_shape_button.click()
+    view._tree.both_button.click()
 
-    assert built == []
+    assert built == [1]
 
 
 def test_a_library_that_has_changed_builds_its_lists_again(qtbot, tmp_path, monkeypatch):

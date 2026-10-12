@@ -1579,9 +1579,7 @@ class SlideshowView(QWidget):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
-            # Space belongs to the motion cluster now, everywhere — locking the
-            # slideshow is Down, matching the auto-generate view's lock.  The
-            # panel redraws on its own beat, and this is the one moment the
+            # The panel redraws on its own beat, and this is the one moment the
             # answer can have changed under a driver that emits no signal.
             self.refresh_panel()
         else:

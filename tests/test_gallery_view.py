@@ -7263,6 +7263,18 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
     show.close()
 
 
+def test_wasd_reach_a_standalone_show_past_the_gallerys_own_key_filter(qtbot, monkeypatch):
+    show = _standalone_show(qtbot, monkeypatch)
+    opened = show._playlist.current()
+
+    qtbot.keyClick(show, Qt.Key.Key_D)
+    assert show._playlist.current() != opened
+
+    qtbot.keyClick(show, Qt.Key.Key_A)
+    assert show._playlist.current() == opened
+    show.close()
+
+
 def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monkeypatch):
     show = _standalone_show(qtbot, monkeypatch)
     played = []

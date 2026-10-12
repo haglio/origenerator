@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from typing import NamedTuple
 
+import pytest
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
@@ -255,6 +257,19 @@ def _shift(view, key):
                                  Qt.KeyboardModifier.ShiftModifier))
 
 
+class _Arrows(NamedTuple):
+    up: Qt.Key
+    left: Qt.Key
+    down: Qt.Key
+    right: Qt.Key
+
+
+_ARROW_KEYS_OR_WASD = pytest.mark.parametrize("arrows", [
+    _Arrows(up=Qt.Key.Key_Up, left=Qt.Key.Key_Left, down=Qt.Key.Key_Down, right=Qt.Key.Key_Right),
+    _Arrows(up=Qt.Key.Key_W, left=Qt.Key.Key_A, down=Qt.Key.Key_S, right=Qt.Key.Key_D),
+], ids=["arrow keys", "WASD"])
+
+
 def _fade(view):
     """What a flash's own timer does when it fires: it is a single shot, so it is
     no longer running by the time the note falls back to whatever the show would
@@ -269,12 +284,13 @@ def test_opens_on_the_first_item(qtbot):
     assert view._showing_a_video() is False
 
 
-def test_right_and_left_navigate(qtbot):
+@_ARROW_KEYS_OR_WASD
+def test_right_and_left_navigate(qtbot, arrows):
     view = _view(qtbot)
-    _press(view, Qt.Key.Key_Right)
+    _press(view, arrows.right)
     assert view._playlist.current() == Slide("b.mp4", "video")
     assert view._showing_a_video() is True
-    _press(view, Qt.Key.Key_Left)
+    _press(view, arrows.left)
     assert view._playlist.current() == Slide("a.png", "image")
 
 
@@ -294,12 +310,13 @@ def test_a_locked_video_replays_instead_of_advancing(qtbot):
     assert view._playlist.locked
 
 
-def test_down_toggles_the_lock(qtbot):
+@_ARROW_KEYS_OR_WASD
+def test_down_toggles_the_lock(qtbot, arrows):
     view = _view(qtbot)
-    _press(view, Qt.Key.Key_Down)
+    _press(view, arrows.down)
     assert view._playlist.locked
     assert _engine(view).loop_file is True
-    _press(view, Qt.Key.Key_Down)
+    _press(view, arrows.down)
     assert not view._playlist.locked
     assert _engine(view).loop_file is False
 
@@ -385,7 +402,8 @@ def test_escape_closes_the_view(qtbot):
     assert not view.isVisible()
 
 
-def test_up_deletes_the_current_item_and_advances(qtbot):
+@_ARROW_KEYS_OR_WASD
+def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
     deleted = []
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
@@ -394,17 +412,11 @@ def test_up_deletes_the_current_item_and_advances(qtbot):
     qtbot.addWidget(view)
     assert view._playlist.current()[2] == "id-a"
 
-    _press(view, Qt.Key.Key_Up)
+    _press(view, arrows.up)
 
     assert deleted == ["id-a"]                     # culled via the delete act
     assert len(view._playlist) == 2
     assert view._playlist.current()[2] == "id-b"   # advanced to the next
-
-
-def test_down_locks_the_slideshow(qtbot):
-    view = _view(qtbot)
-    _press(view, Qt.Key.Key_Down)
-    assert view._playlist.locked
 
 
 def test_enter_leaves_for_the_shown_items_folder(qtbot):
@@ -1473,6 +1485,19 @@ def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
     assert _media_on_screen(view) == enhanced
 
 
+@_ARROW_KEYS_OR_WASD
+def test_shift_left_steps_back_the_way_shift_right_came(qtbot, tmp_path, arrows):
+    newest, middle, original = (_png(tmp_path / n) for n in ("e2.png", "e1.png", "src.png"))
+    view = _view(qtbot, [(newest, "image", "id-a")])
+    view.set_levels({newest: [(newest, "image"), (middle, "image"), (original, "image")]})
+
+    _shift(view, arrows.right)
+    _shift(view, arrows.right)
+    _shift(view, arrows.left)
+
+    assert _media_on_screen(view) == middle
+
+
 def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
     lone = _png(tmp_path / "only.png")
     view = _view(qtbot, [(lone, "image", "id-a")])
@@ -2153,8 +2178,9 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
 
 
 class TestMovingTheShowsPanel:
-    """Ctrl and the arrow keys move this show's panel round the corners, the same
-    keys a Fun Time session gives the Funestra this show covers."""
+    """Ctrl and the arrow keys or WASD move this show's panel round the corners:
+    the keys a Fun Time session gives its portrait Funestra and its landscape
+    one, since a show on its own can be either shape."""
 
     @staticmethod
     def _show(qtbot, moves):
@@ -2164,24 +2190,28 @@ class TestMovingTheShowsPanel:
         qtbot.addWidget(show)
         return show
 
-    def test_each_ctrl_arrow_asks_for_that_direction(self, qtbot):
+    @_ARROW_KEYS_OR_WASD
+    def test_each_ctrl_arrow_asks_for_that_direction(self, qtbot, arrows):
         moves: list[str] = []
         show = self._show(qtbot, moves)
 
-        for key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+        for key in (arrows.left, arrows.right, arrows.up, arrows.down):
             show.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, key,
                                          Qt.KeyboardModifier.ControlModifier))
 
         assert moves == ["left", "right", "up", "down"]
 
-    def test_an_arrow_with_no_ctrl_asks_for_no_move(self, qtbot):
+    @_ARROW_KEYS_OR_WASD
+    def test_an_arrow_with_no_ctrl_asks_for_no_move(self, qtbot, arrows):
         moves: list[str] = []
         show = self._show(qtbot, moves)
 
-        show.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right,
+        show.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, arrows.right,
                                      Qt.KeyboardModifier.NoModifier))
 
         assert moves == []
+
+
 # --- a picture that something is being made of -------------------------------
 
 def test_a_show_opened_while_a_picture_of_it_is_being_enhanced_opens_on_it(qtbot):

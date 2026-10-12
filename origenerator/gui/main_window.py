@@ -349,7 +349,6 @@ class OrigeneratorWindow(QMainWindow):
         self._fill_the_pictures_cap()
 
     def _fill_the_pictures_cap(self) -> None:
-        """As big as the published picture's longest edge can carry."""
         width, height = self.width(), self.height()
         if width <= 0 or height <= 0:
             return

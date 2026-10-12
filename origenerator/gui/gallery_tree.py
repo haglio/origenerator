@@ -215,8 +215,8 @@ class GalleryTree:
     def _add_custom_folder(self, side_item, group, orientation) -> QTreeWidgetItem:
         """Add a row for one of the user's own folders: a shelf-shaped row carrying
         its group (so the view's folder machinery — breadcrumb, tiles, slideshow —
-        treats it like any other folder), editable for an inline rename, and
-        collecting the folders dropped onto it."""
+        treats it like any other folder), and collecting the folders dropped onto
+        it."""
         count = len(gallery.rows_under(group))
         item = QTreeWidgetItem([group.label])
         item.setIcon(0, icons.custom_folder_icon())
@@ -225,14 +225,11 @@ class GalleryTree:
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)
         item.setData(0, DROP_KEY_ROLE, group.key)  # the folder gathers, not the side
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         return self._register(item, oriented_key(group.key, orientation), side_item,
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, side) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])
-        if gallery.is_renamable(group):
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)  # for inline rename
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
         badge = icons.folder_badge(group)

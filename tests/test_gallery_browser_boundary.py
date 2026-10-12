@@ -188,8 +188,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     it was built from, and re-counts the shelves on their own. And the pane
     87 -> 88: a pane drawn over another takes back the tiles it would build again
     the same, so the three places that built a tile hand their row to the one
-    method that takes it back or builds it.)"""
+    method that takes it back or builds it. 276 -> 274: a double-click on a
+    folder in the list opens or closes it and renames nothing, so the two methods
+    that opened its name for typing and saved what was typed went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 276
+               for x in _class_def(VIEW, "GalleryView").body) == 274
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 88

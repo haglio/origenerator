@@ -7,6 +7,7 @@ import struct
 import pytest
 
 from origenerator import config
+from origenerator.workflows import model_files
 from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN
 from origenerator.workflows.model_files import (
     ANY,
@@ -55,6 +56,44 @@ def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
     assert list_model_files("diffusion_models", ["fb.safetensors"], accepts=ANY) == [
         os.path.join("split_files", "deep.safetensors"), "top.safetensors",
     ]
+
+
+def test_a_models_folder_nothing_has_changed_in_is_not_walked_again(installed_models, monkeypatch):
+    # Every picker of every form listed its folder afresh -- a walk of the whole
+    # folder and a stat of every model in it -- which the first draw of a window
+    # paid some thirty times over for folders that change once a month.
+    installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
+    walks = []
+    walk = model_files._model_paths
+    monkeypatch.setattr(model_files, "_model_paths",
+                        lambda directory: walks.append(directory) or walk(directory))
+
+    first = model_files.list_model_files("checkpoints", [], accepts=SDXL)
+    again = model_files.list_model_files("checkpoints", [], accepts=SDXL)
+    other_picker = model_files.list_model_files("checkpoints", [], accepts=ANY)
+
+    assert first == again == other_picker == ["a.safetensors"]
+    assert len(walks) == 1
+
+
+def test_a_model_added_to_its_folder_is_listed_without_a_restart(installed_models):
+    installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
+    assert model_files.list_model_files("checkpoints", [], accepts=SDXL) == ["a.safetensors"]
+
+    installed_models.add("checkpoints", "b.safetensors", arch=SDXL)
+
+    assert model_files.list_model_files("checkpoints", [], accepts=SDXL) == [
+        "a.safetensors", "b.safetensors"]
+
+
+def test_a_model_taken_out_of_its_folder_is_no_longer_listed(installed_models):
+    kept = installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
+    gone = installed_models.add("checkpoints", "b.safetensors", arch=SDXL)
+    assert len(model_files.list_model_files("checkpoints", [], accepts=SDXL)) == 2
+
+    gone.unlink()
+
+    assert model_files.list_model_files("checkpoints", [], accepts=SDXL) == [kept.name]
 
 
 def test_falls_back_when_the_category_dir_is_absent(tmp_path, monkeypatch):

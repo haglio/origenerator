@@ -28,6 +28,7 @@ from origenerator.gallery.shelves import (
     TRASH_KEY,
     FolderShelf,
 )
+from origenerator.gui import browser_pane
 from origenerator.gui.browser_pane import (
     BrowserPane,
     BrowserScrollArea,
@@ -546,6 +547,28 @@ def _folders_of_folders(tree):
 
     walk(tree)
     return found
+
+
+def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeypatch):
+    # Every shelf of a side asks for its rows on each rebuild, and each ask
+    # dealt the whole listing out to the side afresh: thirteen passes over the
+    # library per rebuild for five shelves.
+    dealt = []
+    filter_rows = browser_pane.filter_rows
+    monkeypatch.setattr(browser_pane, "filter_rows",
+                        lambda rows, side: dealt.append(side) or filter_rows(rows, side))
+    rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
+    pane, _scroll = _pane(qtbot, rows)
+    pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
+    latest = oriented_key(FolderShelf(RECENTS_KEY, gallery.ALL_KEY).key, LANDSCAPE)
+
+    pane.shelf_counts(LANDSCAPE)
+    pane.rows_for_shelf(latest)
+    once = len(dealt)
+    pane.shelf_counts(LANDSCAPE)
+    pane.rows_for_shelf(latest)
+
+    assert len(dealt) == once
 
 
 def test_each_folders_shelf_counts_what_that_shelf_lists(qtbot):

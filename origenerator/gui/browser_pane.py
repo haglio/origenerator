@@ -70,7 +70,7 @@ from origenerator.gui.pane_place import (
 from origenerator.gui.thumbnail_selection import ThumbnailSelection
 from origenerator.gui.thumbnail_widget import CornerAction, ThumbnailWidget
 from origenerator.media import MediaType
-from origenerator.orientation import filter_rows, key_holds, split_key
+from origenerator.orientation import filter_rows, key_holds, row_orientation, split_key
 
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
@@ -162,6 +162,22 @@ def _thumbnails_of(rows) -> list[str]:
             if len(paths) >= _PREVIEW_COUNT:
                 break
     return paths
+
+
+class _Listing:
+    """Rows as a shelf lists them, dealt to a side and a choice of kinds once
+    however often asked."""
+
+    def __init__(self, rows=()):
+        self.rows = list(rows)
+        self._dealt: dict[tuple, list[dict]] = {}
+
+    def on(self, side: str | None, kinds) -> list[dict]:
+        dealt = (side, frozenset(kinds))
+        if dealt not in self._dealt:
+            self._dealt[dealt] = gallery.rows_of_media_types(
+                filter_rows(self.rows, side), kinds)
+        return self._dealt[dealt]
 
 
 def _inflight_signature(items) -> tuple:
@@ -326,8 +342,7 @@ class BrowserPane(QObject):
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
             REQUESTS_KEY: Shelf(
-                rows=lambda side, folder: self._in_folder(
-                    [item["row"] for item in self._request_items], side, folder),
+                rows=lambda side, folder: self._in_folder(self._requested_rows, side, folder),
                 render=self._render_requests),
             TRASH_KEY: Shelf(
                 rows=lambda side, folder: self._in_folder(self._trash_rows, side, folder),
@@ -342,15 +357,15 @@ class BrowserPane(QObject):
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
         self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
-        self._recent_rows: list[dict] = []  # every generated row, newest first
+        self._recent_rows = _Listing()      # every generated row, newest first
         self._recents_flow = None           # the open shelf's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
-        self._listed_rows: list[dict] = []
-        self._experiment_rows: list[dict] = []  # unreviewed experiments, newest first
-        self._trash_rows: list[dict] = []   # held deletions, newest first
+        self._listed = _Listing()
+        self._experiment_rows = _Listing()  # unreviewed experiments, newest first
+        self._trash_rows = _Listing()       # held deletions, newest first
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
-        self._request_items: list[dict] = []  # spoken requests + what they made
+        self._requested_rows = _Listing()   # what spoken requests made
         # Which side's shelf is open ("portrait" / "landscape"), or None off the
         # shelves — set by each show_*_overview, read by the renderers and
         # shelf_rows. Every shelf belongs to one side, so on one it is never None.
@@ -372,11 +387,11 @@ class BrowserPane(QObject):
         collects the copies of the bookmarks its own side has.
         """
         self._models_taken += 1
-        self._recent_rows = recent_rows
-        self._listed_rows = listed_rows
-        self._experiment_rows = experiment_rows
-        self._trash_rows = trash_rows
-        self._request_items = list(request_items)
+        self._recent_rows = _Listing(recent_rows)
+        self._listed = _Listing(listed_rows)
+        self._experiment_rows = _Listing(experiment_rows)
+        self._trash_rows = _Listing(trash_rows)
+        self._requested_rows = _Listing(item["row"] for item in request_items)
         self._image_index = image_index or {}
         self._placements = {side: Placement(gallery.all_group(tree), self._image_index)
                             for side, tree in side_trees.items()}
@@ -384,16 +399,15 @@ class BrowserPane(QObject):
     def _open_shelf_rows(self, shelf: str) -> list[dict]:
         return self._shelves[shelf].rows(self._shelf_orientation, self._shelf_folder)
 
-    def _in_folder(self, rows, side: str | None, folder: str) -> list[dict]:
-        """What *folder* holds of *rows* on *side*, of the kinds now chosen.
+    def _in_folder(self, listing: _Listing, side: str | None, folder: str) -> list[dict]:
+        """What *folder* holds of *listing* on *side*, of the kinds now chosen.
 
         Every shelf's rows come through here, which is why the Images / Videos /
         Both choice is applied here and nowhere else: a shelf gathers both kinds,
         and nothing else in the gallery does.
         """
         return self._placement(side).held_by(
-            folder, gallery.rows_of_media_types(filter_rows(rows, side),
-                                                self._host.media_types()))
+            folder, listing.on(side, self._host.media_types()))
 
     def _placement(self, side: str | None) -> Placement:
         placement = self._placements.get(side)
@@ -812,11 +826,11 @@ class BrowserPane(QObject):
         return [item for item in self._visible_inflight_items(rows, requests)
                 if placement.holds(self._shelf_folder, item.key)]
 
-    def inflight_orientations(self) -> set[str]:
+    def inflight_orientations(self, rows) -> set[str]:
         """Which sides have work in flight — what keeps a Recents shelf up on a
         side with no folders yet, so a first-ever generation of that shape is
         visible while it runs."""
-        return {item.orientation for item in self.inflight_items()}
+        return {row_orientation(row) for row in rows if gallery.is_in_progress(row)}
 
     def _recents_empty_hint(self) -> str:
         """The teaching hint for an empty shelf, worded for the kinds it is
@@ -1083,7 +1097,8 @@ class BrowserPane(QObject):
     # --- the Favorites shelf: every bookmark — items and folders — in one place ---
 
     def _favorite_items(self, side: str | None, folder: str) -> list[dict]:
-        return self._in_folder(gallery.favorite_generations(self._listed_rows), side, folder)
+        return self._placement(side).held_by(folder, gallery.favorite_generations(
+            self._listed.on(side, self._host.media_types())))
 
     def _favorite_folders(self, side: str | None, folder: str) -> list:
         group = self._placement(side).folder(folder)
@@ -1158,8 +1173,8 @@ class BrowserPane(QObject):
         placement = self._placement(side)
         tallies = {shelf: placement.tally(self._shelves[shelf].rows(side, gallery.ALL_KEY))
                    for shelf in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
-        tallies[FAVORITES_KEY] = placement.tally_favorites(gallery.rows_of_media_types(
-            filter_rows(self._listed_rows, side), self._host.media_types()))
+        tallies[FAVORITES_KEY] = placement.tally_favorites(
+            self._listed.on(side, self._host.media_types()))
         return {FolderShelf(shelf, folder).key: count
                 for shelf, tally in tallies.items() for folder, count in tally.items()}
 

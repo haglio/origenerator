@@ -1568,9 +1568,9 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Right:
             self._step_level(1) if shifted else self._step(1)
         elif key == Qt.Key.Key_Up:
-            self._delete_current()  # cull this one and move on
+            self.show_nav("up") if shifted else self._delete_current()
         elif key == Qt.Key.Key_Down:
-            self._lock_current()    # lock it, favorite it, and enhance it
+            self.show_nav("down") if shifted else self._lock_current()
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
             # satellites: seeds, then actions, then off.

@@ -783,6 +783,29 @@ def test_a_walk_along_the_map_puts_the_next_cell_up(qtbot):
     assert shown == ["id-b", "id-a", "id-c"]
 
 
+def _a_column_of_two(prompt_id):
+    if prompt_id != "id-a":
+        return MapNeighbors()
+    dawn, dusk = Slide("c.png", "image", "id-c"), Slide("d.png", "image", "id-d")
+    return MapNeighbors(column=(MapRow(dawn, "dawn"), MapRow(dusk, "dusk")), label="fox",
+                        group=(dawn, dusk))
+
+
+@_ARROW_KEYS_OR_WASD
+def test_shift_down_and_up_walk_the_maps_column_as_a_sessions_map_keys_do(qtbot, arrows):
+    deleted = []
+    view = _view(qtbot, _KEYED,
+                 actions=ShowActions(neighbors=_a_column_of_two, delete=deleted.append))
+    shown = _put_up(view)
+
+    _shift(view, arrows.down)
+    view.show_item("a.png")
+    _shift(view, arrows.up)
+
+    assert shown == ["id-c", "id-a", "id-d"]
+    assert (deleted, view.locked) == ([], False)
+
+
 def test_entering_a_loop_lets_go_of_a_locked_slide_as_a_funestra_does(qtbot):
     view = _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around))
     _press(view, Qt.Key.Key_Down)                 # lock the slide on screen

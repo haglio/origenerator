@@ -542,6 +542,14 @@ def _video_workflow(tree):
     return row
 
 
+def _on_screen(qtbot, view, width, height):
+    qtbot.addWidget(view)
+    view.resize(width, height)
+    view.show()
+    qtbot.waitExposed(view)
+    view.refresh()
+
+
 def test_refresh_builds_workflow_model_settings_tree(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
@@ -669,11 +677,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # alone would step unevenly wherever a chipped row meets an unchipped one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
-    qtbot.addWidget(view)
-    view.resize(1200, 800)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1200, 800)
     tree = _side(view._tree)  # one half; both are the same widget class
     step = tree.indentation()
     assert step <= 16   # a caret's width, not the platform's roomy default
@@ -1764,11 +1768,7 @@ def _long_list_view(qtbot):
     """A view holding more folders than its list can show at once, on screen so
     the list really scrolls. Returns it with that side's folder rows, top-down."""
     view = GalleryView(FakeDB([_image(f"i{n}", f"prompt {n}", 50, n) for n in range(30)]))
-    qtbot.addWidget(view)
-    view.resize(700, 500)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 700, 500)
     lora = _at(_image_workflow(view._tree), 0, 0)
     for item in (lora.parent().parent(), lora.parent(), lora):
         item.setExpanded(True)
@@ -1901,11 +1901,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.resize(600, 600)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 600, 600)
 
     tree = view._tree
     _top_level(tree)["All"].setExpanded(True)
@@ -4444,11 +4440,7 @@ def _linked_view(qtbot, source="i7", count=12):
                   "input_image": f"sdxl_t2i_{source}.png"},
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(FakeDB([video] + images))
-    qtbot.addWidget(view)
-    view.resize(1100, 800)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1100, 800)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     view._browser._thumbnail_clicked("vid1", _NO_MOD)               # viewing the video
     return view
@@ -6315,11 +6307,7 @@ def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_p
     # and the second press landed on the + the run's tile had turned back into.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
-    qtbot.addWidget(view)
-    view.resize(1200, 800)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1200, 800)
     key = _select_first_leaf(view)
     _reroll_tile(view).add_requested.emit()
     cancel = _generating_tile(view)._cancel
@@ -7213,11 +7201,7 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
     # header toolbar the user was trying to click. It now takes its own room at
     # the top of the left pane, so it covers nothing however long the message.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.resize(1200, 800)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1200, 800)
     _select_first_leaf(view)
 
     view._bank.mic.setChecked(True)
@@ -7782,11 +7766,7 @@ def test_a_show_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
 def _laid_out_folder(qtbot, count=60):
     db = FakeDB([_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)])
     view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.resize(1800, 1300)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     qtbot.wait(1)
     return view, db
@@ -7799,11 +7779,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n)
                                for n in reversed(range(120))]))
-    qtbot.addWidget(view)
-    view.resize(1800, 1300)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._shows.start()
     slideshow = view._shows.showing
@@ -7864,11 +7840,7 @@ def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_fro
     # inside it, so a slide that came out of one has no picture of its own there.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
-    qtbot.addWidget(view)
-    view.resize(1800, 1300)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     lora = _at(_image_workflow(view._tree), 0, 0)
     bookmarked = _key(_at(lora, 0))
     view._toggle_favorite(bookmarked)
@@ -7946,11 +7918,7 @@ def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
 def test_taking_a_favorite_off_the_favorites_shelf_leaves_it_where_it_was(qtbot):
     view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n) | {"starred": 1}
                                for n in range(1, 61)]))
-    qtbot.addWidget(view)
-    view.resize(1800, 1300)
-    view.show()
-    qtbot.waitExposed(view)
-    view.refresh()
+    _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
     qtbot.wait(1)
     far = view.visible_prompt_ids()[-3]

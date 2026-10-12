@@ -724,7 +724,7 @@ def _dimension_defs():
 
 def _size_heading_wears(form, orientation) -> bool:
     mark = form._sections["Size"]._header._mark
-    return mark is not None and mark.toImage() == icons.orientation_mark(orientation).toImage()
+    return mark is not None and mark.toImage() == icons.side_mark(orientation).toImage()
 
 
 def test_the_size_heading_wears_the_frame_of_the_shape_the_size_makes(qtbot):

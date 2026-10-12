@@ -7,7 +7,9 @@ from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
+from shared_ui.spacing import BUTTON_MARK
 
+from origenerator.gallery.shelves import RECENTS_KEY
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
@@ -84,13 +86,13 @@ def test_media_type_badges_render_for_image_and_video(qtbot):
     assert image_badge.toImage() != video_badge.toImage()
 
 
-def test_the_orientation_marks_are_one_frame_and_its_quarter_turn(qtbot):
+def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
     # The pair over the table of contents' two halves says which shape each half
     # holds, and it says it by BEING that shape: an upright frame and a
     # lying-down one, each the other transposed. Both are drawn on one square
     # canvas, so the words beside them start at the same x.
-    portrait = icons.orientation_mark("portrait")
-    landscape = icons.orientation_mark("landscape")
+    portrait = icons.side_mark("portrait")
+    landscape = icons.side_mark("landscape")
     assert portrait.size() == landscape.size()
     assert portrait.width() == portrait.height()
 
@@ -100,15 +102,52 @@ def test_the_orientation_marks_are_one_frame_and_its_quarter_turn(qtbot):
     assert tall == wide[::-1]
 
 
-def test_an_orientation_mark_is_a_frame_and_not_a_filled_block(qtbot):
+def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
     # A frame, like the family's screen and photo marks -- what it stands for is
     # a region a picture goes in. Filled, it would read as a swatch, and the
     # rounded corners that say "screen" would be lost against the heading's word.
 
-    image = icons.orientation_mark("portrait").toImage()
+    image = icons.side_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
     assert middle.alpha() == 0                       # hollow through the center
-    assert _dominant_color(icons.orientation_mark("portrait")) == TEXT_PRIMARY.rgb()
+    assert _dominant_color(icons.side_mark("portrait")) == TEXT_PRIMARY.rgb()
+
+
+def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
+    # Laid out at numbers of its own, the pair came out wider than its canvas:
+    # the upright frame's left edge and the lying-down one's right edge were cut
+    # off at the sides of the button.
+    assert not _ink_at_the_edges(icons.each_shape_mark(BUTTON_MARK))
+
+
+def test_a_shelf_mark_is_drawn_once():
+    """One redraw of the folder list asked for these 1,280 times -- five shelves
+    for every folder of folders, on every side -- and drew each one afresh."""
+    assert icons.shelf_icon(RECENTS_KEY) is icons.shelf_icon(RECENTS_KEY)
+
+
+def test_the_both_kinds_mark_draws_a_picture_beside_a_play():
+    """What Both holds IS the other two choices, so its mark is the two the app
+    already draws for an image and for a video, side by side."""
+    mark = icons.both_kinds_mark(48)
+    image = mark.toImage()
+    halves = [any(image.pixelColor(x, y).alpha() > 40
+                  for y in range(image.height()) for x in side)
+              for side in (range(20), range(28, 48))]
+
+    assert halves == [True, True]
+    assert not _ink_at_the_edges(mark)
+
+
+def _ink_at_the_edges(pixmap) -> bool:
+    """Whether anything drawn runs into the pixmap's own border."""
+    image = pixmap.toImage()
+    last_x, last_y = image.width() - 1, image.height() - 1
+    border = ([(x, 0) for x in range(image.width())]
+              + [(x, last_y) for x in range(image.width())]
+              + [(0, y) for y in range(image.height())]
+              + [(last_x, y) for y in range(image.height())])
+    return any(image.pixelColor(x, y).alpha() > 40 for x, y in border)
 
 
 def _ink_bounds(pixmap) -> tuple[int, int]:

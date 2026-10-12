@@ -63,7 +63,7 @@ def _table_of_contents(qtbot, rows, folders_of_your_own=()):
     pane.resize(500, 1600)
     pane.show()
     qtbot.waitExposed(pane)
-    half = pane._halves[LANDSCAPE]
+    half = pane._trees[LANDSCAPE]
     half.expandAll()
     return half
 

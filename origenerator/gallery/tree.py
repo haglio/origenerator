@@ -677,24 +677,16 @@ def _workflow_folder_label(media_type, wf_name: str, folder_meta: dict,
 
 def build_gallery_tree(
     rows: list[dict], folder_meta: dict[str, dict] | None = None,
-    media_types: set[str] | None = None, *, image_index: dict | None = None,
+    *, image_index: dict | None = None,
     both_kinds: frozenset[str] | None = None,
 ) -> list[WorkflowGroup]:
     """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
     folders.
 
-    ``media_types`` is the gallery's image/video filter: the
-    :func:`media_type_of_row` values whose folders to build. ``None`` (the
-    default) builds every type; an empty set builds nothing. It narrows the
-    *folders*, never the index under them — the start-frame configurations that
-    key a video's source-image folders are read from every finished image
-    whichever way the filter stands, so hiding images can't re-key, and so
-    re-shuffle, the video folders that name them.
-
-    ``image_index`` is that index, for a caller who narrowed ``rows`` itself
-    rather than through ``media_types`` — see :func:`start_frame_index`, which is
-    what it must be built with. Left out, it is read from ``rows``, which is the
-    right answer only where ``rows`` is the whole library.
+    ``image_index`` is the start-frame index the source-image folders are keyed
+    by, for a caller who narrowed ``rows`` — see :func:`start_frame_index`, which
+    is what it must be built with. Left out, it is read from ``rows``, which is
+    the right answer only where ``rows`` is the whole library.
 
     Every model folder holds a LoRA level; a workflow with no LoRA keys collapses
     it to a single "(no add-on)" folder. The source-image level appears only under
@@ -722,8 +714,6 @@ def build_gallery_tree(
     for (media_type, wf_name), wf_rows in _group_by_creation(
         rows, lambda r: (media_type_of_row(r), r.get("workflow_name") or "unknown")
     ):
-        if media_types is not None and media_type not in media_types:
-            continue
         wf_key = f"{media_type}/{wf_name}"
         wf_label, wf_favorite = _workflow_folder_label(media_type, wf_name, folder_meta,
                                                        both_kinds)

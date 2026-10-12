@@ -497,14 +497,14 @@ def test_closing_with_the_switch_off_queues_nothing(qtbot, tmp_path):
 def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
     # A preview's batch would outlive it in the shared ComfyUI as work the live
     # app can neither see nor cancel — every Generate after it waits on jobs
-    # "from another app" that were the user's own preview. Only the live install
+    # "from another app" that were the user's own preview. Only the production app
     # schedules an absence.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = Database(tmp_path / "t.db")
     _completed_image(db)
     client = _QueueSpyClient()
     state = AppState(tmp_path / "ui.json")
-    state.set("experiments_enabled", True)  # seeded on from the live install
+    state.set("experiments_enabled", True)  # seeded on from the production app
     win = OrigeneratorWindow(client, db, state)
     qtbot.addWidget(win)
 
@@ -536,8 +536,8 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
 
 
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
-    # The other half of leaving experiments to the live install: the rows a
-    # preview would "clear" are the live app's own experiments, running in the
+    # The other half of leaving experiments to the production app: the rows a
+    # preview would "clear" are the production app's own experiments, running in the
     # ComfyUI they share — dropping them (and interrupting the one mid-render)
     # destroys the absence's work.
     monkeypatch.setenv(ENV_FLAG, "1")

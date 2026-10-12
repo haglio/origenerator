@@ -580,8 +580,8 @@ def is_enhance_product_row(row: dict) -> bool:
     An enhancement belongs inside the image it upgraded, so a row of its own is
     always something to fold away — but the row does not always say
     ``image_enhance``. A branch-session enhance folds in the worktree database,
-    which the live app never adopts (adoption carries rows the branch *created*,
-    and a fold creates none), so the enhanced file reaches the live install as a
+    which the production app never adopts (adoption carries rows the branch *created*,
+    and a fold creates none), so the enhanced file reaches the production app as a
     bare file on disk and the import scan reconstructs it from the embedded
     graph: a standalone image, workflow read as ``sdxl_t2i``, with a start-frame
     tile pointing at the very picture it is a version of. That is the shape this

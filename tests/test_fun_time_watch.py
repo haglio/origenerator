@@ -93,49 +93,49 @@ def test_a_session_starting_beside_an_open_window_takes_the_device_from_it(qtbot
     watch.withdraw()
 
 
-def _preview_and_everyday(tmp_path):
-    preview, everyday = tmp_path / "preview", tmp_path / "everyday"
+def _preview_and_production(tmp_path):
+    preview, production = tmp_path / "preview", tmp_path / "production"
     preview.mkdir()
-    everyday.mkdir()
-    return preview, everyday
+    production.mkdir()
+    return preview, production
 
 
-def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_everyday_copy(
+def test_a_preview_is_told_the_device_is_taken_by_a_claim_on_the_production_copy(
         qtbot, tmp_path):
-    preview, everyday = _preview_and_everyday(tmp_path)
+    preview, production = _preview_and_production(tmp_path)
     said = []
     watch = FunTimeWatch(preview, take_over=lambda session: None,
-                         device_claimed=said.append, library_state_dir=everyday)
+                         device_claimed=said.append, library_state_dir=production)
 
-    _claim(everyday, pid=os.getpid())
+    _claim(production, pid=os.getpid())
     qtbot.waitUntil(lambda: said[-1] is True)
 
     watch.withdraw()
 
 
-def test_a_preview_offers_itself_in_the_everyday_copy_s_state_where_every_session_looks(
+def test_a_preview_offers_itself_in_the_production_copy_s_state_where_every_session_looks(
         tmp_path):
-    preview, everyday = _preview_and_everyday(tmp_path)
+    preview, production = _preview_and_production(tmp_path)
 
-    watch = FunTimeWatch(preview, take_over=lambda session: None, library_state_dir=everyday)
+    watch = FunTimeWatch(preview, take_over=lambda session: None, library_state_dir=production)
 
-    assert (everyday / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
+    assert (production / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
         str(os.getpid()), str(this_process_creation_time())]
     watch.withdraw()
 
 
-def test_a_session_that_found_the_offer_in_the_everyday_copy_s_state_takes_the_preview(
+def test_a_session_that_found_the_offer_in_the_production_copy_s_state_takes_the_preview(
         qtbot, tmp_path):
-    preview, everyday = _preview_and_everyday(tmp_path)
+    preview, production = _preview_and_production(tmp_path)
     taken = []
-    watch = FunTimeWatch(preview, take_over=taken.append, library_state_dir=everyday)
+    watch = FunTimeWatch(preview, take_over=taken.append, library_state_dir=production)
 
-    _takeover(everyday, pid=os.getpid())
+    _takeover(production, pid=os.getpid())
     qtbot.waitUntil(lambda: bool(taken))
 
     assert [session.main_rect for session in taken] == [Rect(0, 206, 853, 1234)]
     assert not (preview / "fun_time_offer.txt").exists()
-    assert not (everyday / "fun_time_offer.txt").exists()
+    assert not (production / "fun_time_offer.txt").exists()
     del watch
 
 
@@ -275,7 +275,7 @@ def test_a_window_taken_over_takes_its_slideshow_mark_down_with_its_offer(qtbot,
 
 
 def test_a_preview_marks_its_slideshow_in_the_everyday_copy_s_state_too(tmp_path):
-    preview, everyday = _preview_and_everyday(tmp_path)
+    preview, everyday = _preview_and_production(tmp_path)
 
     watch = FunTimeWatch(preview, take_over=lambda session: None, showing=lambda: True,
                          library_state_dir=everyday)

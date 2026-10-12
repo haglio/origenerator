@@ -14,10 +14,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFrame, QLabel, QSplitter
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtWidgets import QFrame, QLabel
 
 from origenerator import gallery
+from origenerator import orientation as orientation_module
 from origenerator.gallery.shelves import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -27,16 +28,19 @@ from origenerator.gallery.shelves import (
     TRASH_LABEL,
 )
 from origenerator.gallery.sides import LANDSCAPE, PORTRAIT, orientation_of_size
+from origenerator.gui.gallery_tree import GROUP_ROLE
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.split_folder_tree import SplitFolderTree
+from origenerator.gui.stylesheet import CHOSEN
 from origenerator.orientation import (
-    ORIENTATION_LABELS,
+    BOTH,
+    SIDE_LABELS,
     base_of,
     filter_rows,
-    orientation_of,
     oriented_key,
     row_orientation,
+    side_of,
     split_key,
-    split_rows,
 )
 from tests.test_folder_tree import _shown
 from tests.test_gallery_view import FakeDB, _image, _row, _side_rows
@@ -66,7 +70,7 @@ def test_keys_split_and_join():
     assert split_key(None) == (None, None)
     assert split_key("__recents__::sideways") == ("__recents__::sideways", None)
     assert base_of("image/sdxl_t2i/m0011::portrait") == "image/sdxl_t2i/m0011"
-    assert orientation_of("image/sdxl_t2i/m0011::portrait") == "portrait"
+    assert side_of("image/sdxl_t2i/m0011::portrait") == "portrait"
 
 
 def test_a_size_is_portrait_only_when_it_is_taller_than_it_is_wide():
@@ -83,7 +87,6 @@ def test_rows_are_dealt_to_the_side_their_folders_shape_names(tmp_path):
     assert filter_rows([tall, wide], "portrait") == [tall]
     assert filter_rows([tall, wide], "landscape") == [wide]
     assert filter_rows([tall, wide], None) == [tall, wide]
-    assert split_rows([tall, wide]) == {"portrait": [tall], "landscape": [wide]}
 
 
 def test_a_picture_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_path):
@@ -184,14 +187,14 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
     assert view.selected_folder_key() == oriented_key(folder, "portrait")
 
 
-def _rows(tree, orientation) -> list[str]:
-    """The top-level rows of one half of the pane."""
-    half = tree._halves[orientation]
-    return [half.topLevelItem(i).text(0) for i in range(half.topLevelItemCount())]
+def _rows(pane, side) -> list[str]:
+    """The top-level rows of one section of the pane."""
+    tree = pane._trees[side]
+    return [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]
 
 
-def _under_all(tree, orientation) -> list[str]:
-    all_row = tree._halves[orientation].topLevelItem(0)
+def _under_all(pane, side) -> list[str]:
+    all_row = pane._trees[side].topLevelItem(0)
     return [all_row.child(i).text(0) for i in range(all_row.childCount())]
 
 
@@ -210,6 +213,148 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
         ]
 
 
+def test_the_pane_puts_both_shapes_in_one_list_when_asked(qtbot, tmp_path):
+    """The two marks over the list are its radio: a list per shape, or one list
+    of everything — which is what a slideshow mixing the shapes is started
+    from."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    view = GalleryView(FakeDB([tall, wide]))
+    qtbot.addWidget(view)
+    view.refresh()
+    assert view._tree.sides == ("portrait", "landscape")
+
+    view._tree.both_button.click()
+
+    assert view._tree.sides == (BOTH,)
+    assert _rows(view._tree, BOTH) == ["All"]
+    assert _side_rows(view, BOTH) == ["t1", "w1"]
+
+
+def test_a_rows_shape_is_worked_out_once_however_often_it_is_asked():
+    """One click on the folder list asks thousands of rows for their shape
+    several times over, so the answer is kept against the stored fields it is
+    read from rather than worked out per ask."""
+    orientation_module._asked_shape.cache_clear()
+    row = {"workflow_name": "sdxl_t2i",
+           "params_json": '{"width": 101, "height": 202}'}
+
+    assert row_orientation(row) == "portrait"
+    assert row_orientation(dict(row)) == "portrait"
+
+    assert orientation_module._asked_shape.cache_info().misses == 1
+
+
+def _counting_builds(monkeypatch):
+    built = []
+    real = gallery.build_gallery_tree
+    monkeypatch.setattr(gallery, "build_gallery_tree",
+                        lambda *args, **kwargs: built.append(1) or real(*args, **kwargs))
+    return built
+
+
+def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypatch):
+    """Each shape's list, and the list of both shapes, costs a pass over the
+    whole library. The radio moves between lists the gallery has already built,
+    and every click used to build all three again from nothing."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
+    view = GalleryView(FakeDB([tall, wide]))
+    qtbot.addWidget(view)
+    view.refresh()
+    built = _counting_builds(monkeypatch)
+
+    view._tree.both_button.click()
+    view._tree.each_shape_button.click()
+
+    assert built == []
+
+
+def test_a_library_that_has_changed_builds_its_lists_again(qtbot, tmp_path, monkeypatch):
+    """What the lists are kept against: the rows and the folder names they were
+    built from. A generation landing is a different library."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    db = FakeDB([tall])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    built = _counting_builds(monkeypatch)
+
+    db._rows.append(_thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90))
+    view.refresh()
+
+    assert built
+
+
+def _word_beside(button):
+    return button.parent().findChild(QLabel).text()
+
+
+def test_the_radio_over_the_list_wears_each_word_beside_its_button(qtbot, tmp_path):
+    """Two marks alone left him reading the shapes to work out which was which,
+    so each has its word to the side of it -- on the button the pair of them
+    took two rows of the narrowest column -- and the one in force wears the
+    blue of any other selection."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert _word_beside(view._tree.each_shape_button) == "Separate"
+    assert _word_beside(view._tree.both_button) == "Together"
+    assert view._tree.each_shape_button.isChecked()
+    assert not view._tree.both_button.isChecked()
+    for button in (view._tree.each_shape_button, view._tree.both_button):
+        assert button.text() == ""
+        assert button.property(CHOSEN) is True
+        assert not button.icon().isNull()
+
+
+def _choice_rows(tree):
+    buttons = (tree.each_shape_button, tree.both_button)
+    for button in buttons:
+        word = button.parent().findChild(QLabel)
+        assert button.width() == button.height()
+        assert word.width() >= word.sizeHint().width()
+    return {button.mapTo(tree, QPoint()).y() for button in buttons}
+
+
+def _laid_out(qtbot, width):
+    tree = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(tree)
+    tree.resize(width, 600)
+    tree.show()
+    tree.layout().activate()
+    return tree
+
+
+def test_the_two_choices_and_their_words_share_one_row(qtbot):
+    """Both choices on one row, each a square mark with every letter of its
+    word beside it, wherever the column is wide enough to hold them."""
+    assert len(_choice_rows(_laid_out(qtbot, 400))) == 1
+
+
+def test_a_column_too_narrow_for_both_choices_gives_each_its_own_row(qtbot):
+    """Squeezed, a word is never clipped down to a stub: the second choice
+    drops to a row of its own instead."""
+    assert len(_choice_rows(_laid_out(qtbot, 120))) == 2
+
+
+def test_clicking_a_choice_s_word_picks_it(qtbot, tmp_path):
+    """The word is as much the control as the mark is, the way the word beside
+    any other radio in the app is."""
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    view = GalleryView(FakeDB([tall]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    word = view._tree.both_button.parent().findChild(QLabel)
+    qtbot.mouseClick(word, Qt.MouseButton.LeftButton)
+
+    assert view._tree.both_button.isChecked()
+    assert view._tree.sides == (BOTH,)
+
+
 def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_path):
     """The whole point of two panes: which library you are reading is on screen
     however far down its own rows you have scrolled."""
@@ -218,11 +363,11 @@ def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_pat
     qtbot.addWidget(view)
     view.refresh()
 
-    assert [_heading_name(half).text() for half in _halves(view)] == [
-        ORIENTATION_LABELS["portrait"], ORIENTATION_LABELS["landscape"]]
+    assert [_heading_name(section).text() for section in _sections(view)] == [
+        SIDE_LABELS["portrait"], SIDE_LABELS["landscape"]]
     # And the label belongs to the pane, not to the scrolling list under it.
     for orientation in ("portrait", "landscape"):
-        assert view._tree._halves[orientation].findChildren(QLabel) == []
+        assert view._tree._trees[orientation].findChildren(QLabel) == []
 
 
 def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
@@ -234,7 +379,7 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    marks = [_heading_mark(half).pixmap() for half in _halves(view)]
+    marks = [_heading_mark(section).pixmap() for section in _sections(view)]
     assert [mark.isNull() for mark in marks] == [False, False]
     portrait, landscape = (_ink_bounds(mark) for mark in marks)
     assert portrait[1] > portrait[0]          # the upright one is taller than wide
@@ -250,33 +395,33 @@ def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
 
-    for half, orientation in zip(_halves(view), ("portrait", "landscape")):
-        heading = _heading(half)
+    for section, orientation in zip(_sections(view), ("portrait", "landscape")):
+        heading = _heading(section)
         assert orientation in heading.toolTip()
         # Neither child claims one of its own, which is what lets the frame's
         # reach the cursor over either of them.
         assert [child.toolTip() for child in heading.findChildren(QLabel)] == ["", ""]
 
 
-def _halves(view):
-    splitter = view._tree.findChild(QSplitter)
-    return [splitter.widget(i) for i in range(splitter.count())]
+def _sections(view):
+    """The sections the pane is drawing, in the order it draws them."""
+    return [view._tree._sections[side] for side in view._tree.sides]
 
 
-def _heading(half) -> QFrame:
-    return next(child for child in half.findChildren(QFrame)
+def _heading(section) -> QFrame:
+    return next(child for child in section.findChildren(QFrame)
                 if child.objectName() == "treeSectionLabel")
 
 
-def _heading_mark(half) -> QLabel:
-    return _heading(half).findChild(QLabel, "treeSectionMark")
+def _heading_mark(section) -> QLabel:
+    return _heading(section).findChild(QLabel, "treeSectionMark")
 
 
-def _heading_name(half) -> QLabel:
-    return _heading(half).findChild(QLabel, "treeSectionName")
+def _heading_name(section) -> QLabel:
+    return _heading(section).findChild(QLabel, "treeSectionName")
 
 
-def test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it(qtbot, tmp_path):
+def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     """The split is what tells a slideshow which screen it is for, so the side
     you have not generated for yet is still somewhere you can stand."""
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
@@ -309,7 +454,7 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
 
     assert view.selected_folder_key() == oriented_key("__all__", "landscape")
     assert view._tree.selected_folder_keys() == [oriented_key("__all__", "landscape")]
-    assert view._tree._halves["portrait"].selectedItems() == []
+    assert view._tree._trees["portrait"].selectedItems() == []
 
 
 def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
@@ -402,7 +547,7 @@ def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    bars = [view._tree._halves[o].verticalScrollBar() for o in ("portrait", "landscape")]
+    bars = [view._tree._trees[o].verticalScrollBar() for o in ("portrait", "landscape")]
     assert bars[0] is not bars[1]
 
 

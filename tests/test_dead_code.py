@@ -164,7 +164,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 #
 # 19159 when each folder of your own came to live on one side: the note that
 # every side is built from the rows the media ticks keep is
-# test_unticking_videos_empties_both_halves_of_their_folders.
+# test_choosing_one_kind_leaves_every_sides_folders_standing.
 #
 # 19155 when a folder of your own saved before folders had a side was given one
 # at startup: the note on the order the bookmark passes run in is

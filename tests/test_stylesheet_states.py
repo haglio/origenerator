@@ -9,7 +9,7 @@ from __future__ import annotations
 from PyQt6.QtGui import QColor
 from shared_ui.colors import BG_BUTTON, BG_BUTTON_ACTIVE, BLUE
 
-from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.stylesheet import CHOSEN, build_stylesheet
 
 
 def _lightness(color: QColor) -> float:
@@ -30,10 +30,13 @@ def test_the_on_ground_is_lighter_than_the_resting_one(qtbot):
     assert _lightness(BG_BUTTON_ACTIVE) > _lightness(BG_BUTTON)
 
 
-def test_the_derived_size_padlock_keeps_its_own_blue(qtbot):
-    # The one exception: unlocked means the size fields are overridable, which
-    # says more than "this control is engaged", so it keeps a state color.
+def test_a_button_whose_on_state_is_a_choice_goes_blue(qtbot):
+    # The one exception, and one rule for every control that takes it: unlocked
+    # means the size fields are overridable, Separate means the folder list is
+    # kept apart by shape -- each says more than "this control is engaged", so
+    # each wears the blue of any other selection. Keyed off the property, so a
+    # third such control needs no rule of its own.
     sheet = build_stylesheet()
 
-    assert "QToolButton#dimensionUnlock:checked" in sheet
+    assert f'QAbstractButton[{CHOSEN}="true"]:checked' in sheet
     assert BLUE.name() in sheet

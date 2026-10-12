@@ -13,9 +13,10 @@ of workflow/model/add-on a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
-:func:`orientation_mark` is the pair over the table of contents' two halves: a
-frame of the proportions each half holds, drawn here because what it says is the
-difference between the two rather than any one named mark.  :func:`recent_mark_icon`
+:func:`side_mark` and :func:`each_shape_mark` are the marks over the table of
+contents and on the radio that chooses how it is drawn: a frame of the
+proportions each side holds, drawn here because what they say is the difference
+between them rather than any one named mark.  :func:`recent_mark_icon`
 is the dot at the end of the row of a folder lately worked in, drawn here for the
 same reason: it is a color saying one thing, not a mark anyone reads.
 
@@ -59,7 +60,7 @@ from origenerator.gallery.shelves import (
     SHELF_LABELS,
     TRASH_KEY,
 )
-from origenerator.gallery.sides import PORTRAIT
+from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)  # drawn at the shared canvas, then scaled down on the button
@@ -291,54 +292,85 @@ def media_type_icon(media_type: str) -> QIcon:
     return glyph_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-# --- the shape a half of the table of contents holds -----------------------
+# --- the shape a side of the table of contents holds ------------------------
 
-# The mark over each half of the TOC pane: a frame of the very proportions that
-# half holds, so which library a heading names is answered by its shape before
-# the word beside it is read.
-#
-# Drawn here rather than added to the family's glyph list, which is where a
-# named mark belongs: this is not one mark but a pair whose whole content is the
-# difference between them -- one drawing and its transpose -- and it says
-# something only this app has to say, since no other window in the family shows
-# the two libraries side by side. A shared "portrait" glyph would be a rectangle
-# that means nothing on its own, and the drift the shared list exists to prevent
-# needs two apps drawing one mark.
-#
-# A 2:3 frame, which is near enough what both sides actually come out at, on the
-# shared square canvas: same square either way, so the two headings' words start at
-# the same x and the pair reads as one control turned a quarter.
+# A frame of the very proportions each side holds, on the shared square canvas
+# so the headings' words start at the same x. Drawn here rather than added to
+# the family's glyph list because these are not one mark but a set whose whole
+# content is the difference between them, and no other window in the family
+# shows the libraries side by side.
+_KIND_PAIR_SHARE = 0.56  # each mark's share of the canvas, leaving them a gap
 _PROPORTION_LONG = 42.0
 _PROPORTION_SHORT = 28.0
 _PROPORTION_RADIUS = 5.0
-_PROPORTION_DISPLAY = 15  # on-screen size, to sit level with the heading's word
+MARK_BESIDE_A_WORD = 15  # on-screen size, for a mark that sits level with a word
+_UPRIGHT = (_PROPORTION_SHORT, _PROPORTION_LONG)
+_LYING_DOWN = (_PROPORTION_LONG, _PROPORTION_SHORT)
+# Both is the two frames crossed rather than a third drawing: what that side
+# holds IS the other two.
+_SIDE_FRAMES = {PORTRAIT: (_UPRIGHT,), LANDSCAPE: (_LYING_DOWN,),
+                BOTH: (_UPRIGHT, _LYING_DOWN)}
+# The same pair uncrossed and side by side: two lists rather than one, measured
+# off the canvas so the pair cannot come out wider than the square it is on.
+_PAIR_GAP = 4.0
+_PAIR_SHORT = ((_SIZE - 2 * PEN_WIDTH - _PAIR_GAP)
+               / (1 + _PROPORTION_LONG / _PROPORTION_SHORT))
+_PAIR_LONG = _PAIR_SHORT * _PROPORTION_LONG / _PROPORTION_SHORT
+
+
+def _frame_pen(painter: QPainter) -> None:
+    pen = QPen(TEXT_PRIMARY)
+    pen.setWidthF(PEN_WIDTH)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+
+
+def _rounded(painter: QPainter, x: float, y: float, width: float, height: float) -> None:
+    painter.drawRoundedRect(QRectF(x, y, width, height),
+                            _PROPORTION_RADIUS, _PROPORTION_RADIUS)
 
 
 @cache
-def orientation_mark(orientation: str) -> QPixmap:
-    """An upright or a lying-down frame -- the shape one half of the TOC holds.
+def side_mark(side: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
+    """The frame -- or, for Both, the crossed pair -- one side of the list holds.
 
-    Stated in canvas units, so its pen is the family's weight rather than a
-    hairline of its own -- but painted straight onto the pixmap the heading
-    shows, where the badges render large and resample down. At this size that
-    route costs the mark its edges: a line a pixel and a half wide, drawn at
-    the canvas and then resampled, arrives as a gray smear of one.
+    Painted at the size it is shown rather than rendered large and resampled,
+    which at this size costs a pen a pixel and a half wide its edges.
     """
-    tall = orientation == PORTRAIT
-    width = _PROPORTION_SHORT if tall else _PROPORTION_LONG
-    height = _PROPORTION_LONG if tall else _PROPORTION_SHORT
-
     def draw(painter: QPainter):
-        painter.scale(_PROPORTION_DISPLAY / _SIZE, _PROPORTION_DISPLAY / _SIZE)
-        pen = QPen(TEXT_PRIMARY)
-        pen.setWidthF(PEN_WIDTH)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(
-            QRectF((_SIZE - width) / 2, (_SIZE - height) / 2, width, height),
-            _PROPORTION_RADIUS, _PROPORTION_RADIUS)
+        painter.scale(size / _SIZE, size / _SIZE)
+        _frame_pen(painter)
+        for width, height in _SIDE_FRAMES[side]:
+            _rounded(painter, (_SIZE - width) / 2, (_SIZE - height) / 2, width, height)
 
-    return _painted(draw, _PROPORTION_DISPLAY)
+    return _painted(draw, size)
+
+
+@cache
+def both_kinds_mark(size: int = MARK_BESIDE_A_WORD) -> QPixmap:
+    """A picture and a play mark side by side: a list holding both kinds."""
+    def draw(painter: QPainter):
+        each = round(size * _KIND_PAIR_SHARE)
+        top = (size - each) // 2
+        painter.drawPixmap(0, top, glyph_pixmap("photo", each, TEXT_PRIMARY))
+        painter.drawPixmap(size - each, top, glyph_pixmap("play", each, TEXT_PRIMARY))
+
+    return _painted(draw, size)
+
+
+@cache
+def each_shape_mark(size: int) -> QPixmap:
+    """The two frames side by side: a list of each shape rather than one of
+    both. Sized by its caller, the radio over the list being the only one."""
+    def draw(painter: QPainter):
+        painter.scale(size / _SIZE, size / _SIZE)
+        _frame_pen(painter)
+        left = (_SIZE - (_PAIR_SHORT + _PAIR_GAP + _PAIR_LONG)) / 2
+        _rounded(painter, left, (_SIZE - _PAIR_LONG) / 2, _PAIR_SHORT, _PAIR_LONG)
+        _rounded(painter, left + _PAIR_SHORT + _PAIR_GAP, (_SIZE - _PAIR_SHORT) / 2,
+                 _PAIR_LONG, _PAIR_SHORT)
+
+    return _painted(draw, size)
 
 
 # --- the controls a picture wears in its corners --------------------------

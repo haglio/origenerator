@@ -320,7 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
     # under the launch interpreter, a bad argv contract — is caught by a test
     # instead of by a session coming up with a window missing.  It stops short
     # of the database, ComfyUI and any window, so a run costs the machine
-    # nothing and contends with no live app.
+    # nothing and contends with no production app.
     parser.add_argument(CHECK_LAUNCH_FLAG, action="store_true")
     return parser
 

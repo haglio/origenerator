@@ -331,7 +331,7 @@ def test_each_version_carries_its_own_file_row(tmp_path):
     assert basic_section(row) is None
 
 
-# --- an enhancement the live app never recorded, arriving as a bare file -----
+# --- an enhancement the production app never recorded, arriving as a bare file -----
 
 def _enhance_graph(*, scale_by=0.5, steps=20, denoise=0.15,
                    checkpoint="example_xl_v1.safetensors",
@@ -417,7 +417,7 @@ def test_a_reconstructed_enhance_is_recognized_by_its_file(tmp_path):
 def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):
     # A branch session's enhance folds in the worktree database, which adoption
     # never carries home (a fold creates no row to adopt), so the enhanced file
-    # reaches the live install bare and the scan rebuilds it as a standalone
+    # reaches the production app bare and the scan rebuilds it as a standalone
     # image — pointing a start-frame tile at the very picture it is a version of.
     db = Database(tmp_path / "t.db")
     _add_source(db, favorite=True)

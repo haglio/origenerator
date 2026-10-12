@@ -168,12 +168,12 @@ def test_a_window_still_being_built_offers_itself_as_starting(tmp_path):
         str(os.getpid()), str(this_process_creation_time()), "starting"]
 
 
-def test_a_preview_still_being_built_offers_itself_in_the_everyday_copy_s_state_too(tmp_path):
-    preview, everyday = tmp_path / "preview", tmp_path / "everyday"
+def test_a_preview_still_being_built_offers_itself_in_the_production_copy_s_state_too(tmp_path):
+    preview, production = tmp_path / "preview", tmp_path / "production"
 
-    offer_the_window_while_it_is_built(preview, everyday)
+    offer_the_window_while_it_is_built(preview, production)
 
-    for state_dir in (preview, everyday):
+    for state_dir in (preview, production):
         assert (state_dir / "fun_time_offer.txt").read_text(encoding="utf-8").split() == [
             str(os.getpid()), str(this_process_creation_time()), "starting"]
 

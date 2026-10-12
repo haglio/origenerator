@@ -1154,7 +1154,7 @@ def test_a_portrait_picture_stands_beside_the_form_when_hosted(qtbot):
 
     assert panel._media_split.orientation() == Qt.Orientation.Horizontal
     assert panel._media_split.indexOf(panel._scroll) == 0    # settings lead
-    assert panel._media_split.indexOf(panel._preview) == 1
+    assert panel._media_split.indexOf(panel._preview_pane) == 1
 
 
 def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
@@ -1167,7 +1167,7 @@ def test_a_landscape_picture_stays_stacked_when_hosted(qtbot):
     panel._reflow_for_the_media()
 
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
-    assert panel._media_split.indexOf(panel._preview) == 0
+    assert panel._media_split.indexOf(panel._preview_pane) == 0
 
 
 def test_a_panel_taken_into_a_session_stands_its_portrait_picture_beside_the_form(qtbot):
@@ -1192,7 +1192,7 @@ def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the
     panel.refresh_media_layout()
 
     assert panel._media_split.orientation() == Qt.Orientation.Vertical
-    assert panel._media_split.indexOf(panel._preview) == 0
+    assert panel._media_split.indexOf(panel._preview_pane) == 0
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):

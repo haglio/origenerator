@@ -46,11 +46,14 @@ from PIL import Image
 from origenerator import gallery
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.gallery.sides import (  # noqa: F401
+    BOTH,
     LANDSCAPE,
-    ORIENTATION_LABELS,
     ORIENTATIONS,
     PORTRAIT,
+    SIDE_LABELS,
+    SIDES,
     orientation_of_size,
+    side_holds,
 )
 from origenerator.gallery.signatures import READINGS_KEPT, canonical_settings
 from origenerator.media import MediaType
@@ -94,11 +97,11 @@ def key_holds(outer: str, inner: str) -> bool:
 
 
 def split_key(key: str | None) -> tuple[str | None, str | None]:
-    """``(base_key, orientation)`` — orientation ``None`` for a plain key."""
+    """``(base_key, side)`` — side ``None`` for a plain key."""
     if not key:
         return key, None
-    base, _, orientation = key.partition(_SEPARATOR)
-    return (base, orientation) if orientation in ORIENTATIONS else (key, None)
+    base, _, side = key.partition(_SEPARATOR)
+    return (base, side) if side in SIDES else (key, None)
 
 
 def base_of(key: str | None) -> str | None:
@@ -107,7 +110,7 @@ def base_of(key: str | None) -> str | None:
     return split_key(key)[0]
 
 
-def orientation_of(key: str | None) -> str | None:
+def side_of(key: str | None) -> str | None:
     """Which side a tree key is on (``None`` for a key naming no side)."""
     return split_key(key)[1]
 
@@ -182,20 +185,9 @@ def requested_orientation(params: dict) -> str | None:
     return orientation_of_size(width, height)
 
 
-def filter_rows(rows, orientation: str | None) -> list[dict]:
-    """*rows* narrowed to *orientation* — or as given, for no orientation."""
-    if orientation is None:
+def filter_rows(rows, side: str | None) -> list[dict]:
+    """*rows* narrowed to the shape *side* holds — or as given, for the Both
+    side and for no side at all, which each hold every shape."""
+    if side is None or side == BOTH:
         return list(rows)
-    return [row for row in rows if row_orientation(row) == orientation]
-
-
-def split_rows(rows) -> dict[str, list[dict]]:
-    """*rows* dealt out to the two sides, each row measured once.
-
-    What the two trees are built from. Two :func:`filter_rows` passes would
-    measure every row twice, and the rebuild that calls this runs on every poll.
-    """
-    dealt: dict[str, list[dict]] = {orientation: [] for orientation in ORIENTATIONS}
-    for row in rows:
-        dealt[row_orientation(row)].append(row)
-    return dealt
+    return [row for row in rows if row_orientation(row) == side]

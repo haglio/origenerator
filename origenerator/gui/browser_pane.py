@@ -385,7 +385,15 @@ class BrowserPane(QObject):
         return self._shelves[shelf].rows(self._shelf_orientation, self._shelf_folder)
 
     def _in_folder(self, rows, side: str | None, folder: str) -> list[dict]:
-        return self._placement(side).held_by(folder, filter_rows(rows, side))
+        """What *folder* holds of *rows* on *side*, of the kinds now chosen.
+
+        Every shelf's rows come through here, which is why the Images / Videos /
+        Both choice is applied here and nowhere else: a shelf gathers both kinds,
+        and nothing else in the gallery does.
+        """
+        return self._placement(side).held_by(
+            folder, gallery.rows_of_media_types(filter_rows(rows, side),
+                                                self._host.media_types()))
 
     def _placement(self, side: str | None) -> Placement:
         placement = self._placements.get(side)
@@ -811,12 +819,9 @@ class BrowserPane(QObject):
         return {item.orientation for item in self.inflight_items()}
 
     def _recents_empty_hint(self) -> str:
-        """The teaching hint for an empty shelf, worded for the current filter —
-        which media types (if any) it's looking for."""
+        """The teaching hint for an empty shelf, worded for the kinds it is
+        listing."""
         media_types = self._host.media_types()
-        if not media_types:
-            return ("No media types selected.\n\nCheck Images or Videos over the "
-                    "folder list to bring your recent generations back.")
         noun = "generations" if len(media_types) == 2 else (
             "images" if MediaType.IMAGE in media_types else "videos")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
@@ -1153,7 +1158,8 @@ class BrowserPane(QObject):
         placement = self._placement(side)
         tallies = {shelf: placement.tally(self._shelves[shelf].rows(side, gallery.ALL_KEY))
                    for shelf in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
-        tallies[FAVORITES_KEY] = placement.tally_favorites(filter_rows(self._listed_rows, side))
+        tallies[FAVORITES_KEY] = placement.tally_favorites(gallery.rows_of_media_types(
+            filter_rows(self._listed_rows, side), self._host.media_types()))
         return {FolderShelf(shelf, folder).key: count
                 for shelf, tally in tallies.items() for folder, count in tally.items()}
 

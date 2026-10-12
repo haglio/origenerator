@@ -181,8 +181,12 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     said at the next launch, through that same pair. 275 -> 277: how many a press
     of Generate makes is saved with the session the same way. 277 -> 272: the
     find strip went to shared_ui, where it wires its own find, so the five
-    methods that wired the two together here went with it.)"""
+    methods that wired the two together here went with it. 272 -> 276: the folder
+    list gained its Portrait / Landscape / Both radio and the Images / Videos /
+    Both choice moved to the pane that lists the items, so the view answers the
+    radio, offers or hides the kinds, keeps each side's list against the library
+    it was built from, and re-counts the shelves on their own.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 272
+               for x in _class_def(VIEW, "GalleryView").body) == 276
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 87

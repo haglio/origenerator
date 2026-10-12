@@ -20,6 +20,11 @@ from shared_ui.spacing import BUTTON_RADIUS
 from origenerator.config import PROJECT_DIR
 from origenerator.spin_arrows import arrow_paths
 
+# Set on a button whose ON state says a choice has been made rather than that
+# the control is engaged, which is what the blue below is for.
+CHOSEN = "chosen"
+CHOSEN_CONTROL = f'QAbstractButton[{CHOSEN}="true"]:checked'
+
 
 def _h(color) -> str:
     return color.name()
@@ -227,11 +232,14 @@ def build_stylesheet() -> str:
     }}
 {tool_button_rules()}
     /* The derived-size padlock: a compact toggle floating between the width and
-       height rows. It lights blue while unlocked (the fields are overridable). */
+       height rows. Its own blue comes from the rule below. */
     QToolButton#dimensionUnlock {{
         padding: 2px 4px;
     }}
-{control_ground(palette.BLUE, "QToolButton#dimensionUnlock:checked")}
+    /* The one exception to the on-ground rule above: a control whose ON state
+       means a choice has been made wears the blue every other selection does,
+       keyed off the property rather than each control's name. */
+{control_ground(palette.BLUE, CHOSEN_CONTROL)}
     QProgressBar {{
         background-color: {_h(BG_SECONDARY)};
         border: 1px solid {_h(BORDER_SUBTLE)};
@@ -243,6 +251,13 @@ def build_stylesheet() -> str:
         background-color: {_h(BLUE)};
     }}
     QScrollArea {{
+        border: none;
+    }}
+    /* No frame round a tab's contents: the panes on either side of the info
+       pane are parted from it by a splitter handle, and a hairline inside that
+       is a second boundary saying the same thing — one that also held the
+       settings' own handle a couple of pixels short of the pane's edge. */
+    QTabWidget::pane {{
         border: none;
     }}
     QSplitter::handle {{

@@ -451,6 +451,24 @@ class FakeHost:
         self.said.append(message)
 
 
+def test_asking_whether_anything_can_play_stops_at_the_first_item(shows, monkeypatch):
+    """The slideshow button only needs to know that something can play. Reading
+    every row's files to answer it is what made one click on the folder list
+    redraw for seconds: five of these go into a single redraw."""
+    director, _host, _made = shows(FakeHost(rows=[_row(f"g{n}") for n in range(50)]))
+    del director.items_of  # the fixture's stand-in, so the real one answers
+    read = []
+
+    def resolve(row, _output_dir):
+        read.append(row["prompt_id"])
+        return (f"{row['prompt_id']}.png", "image")
+
+    monkeypatch.setattr(module.gallery, "resolve_preview", resolve)
+
+    assert director.anything_to_play()
+    assert read == ["g0"]
+
+
 def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
          files=("one.png",)):
     return {

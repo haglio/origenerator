@@ -60,23 +60,19 @@ def _model_paths(directory: Path) -> list[Path]:
     )
 
 
-# Each models folder as it was last walked: what changed it (the stamp) and
-# what it held, each file already read. See _folder_stamp.
 _catalogued: dict[str, tuple[tuple, list[tuple[str, model_arch.ModelFile]]]] = {}
 
 
 def _folder_stamp(directory: Path) -> tuple:
-    """What a model added, removed or renamed anywhere under *directory*
-    changes: when each folder under it was last written, and how many entries
-    it holds. Read from the folders alone, never from a stat of every model.
-    """
+    """When each folder under *directory* was last written and how many entries it
+    holds -- what a model added, removed or renamed anywhere under it changes."""
     return tuple((root, os.stat(root).st_mtime_ns, len(dirs) + len(files))
                  for root, dirs, files in os.walk(directory))
 
 
 def _catalogue(directory: Path) -> list[tuple[str, model_arch.ModelFile]]:
-    """Every model under *directory* with what it is, by the name a picker shows,
-    walked and read again only once something in the folder has changed."""
+    """Every model under *directory* and what it is, walked again only once
+    something in the folder has changed."""
     stamp = _folder_stamp(directory)
     kept = _catalogued.get(str(directory))
     if kept is None or kept[0] != stamp:

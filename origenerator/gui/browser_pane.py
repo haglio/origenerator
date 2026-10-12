@@ -166,9 +166,6 @@ def _thumbnails_of(rows) -> list[str]:
 
 
 class _Listing:
-    """Rows as a shelf lists them, dealt to a side and a choice of kinds once
-    however often asked."""
-
     def __init__(self, rows=()):
         self.rows = list(rows)
         self._dealt: dict[tuple, list[dict]] = {}
@@ -182,9 +179,6 @@ class _Listing:
 
 
 class _KeptTiles:
-    """The tiles of the pane being replaced, for the pane replacing it to take
-    back instead of building again from the picture."""
-
     def __init__(self, tiles=None, wiring=None):
         self._tiles = dict(tiles or {})
         self._wiring = dict(wiring or {})
@@ -198,7 +192,6 @@ class _KeptTiles:
         return tile
 
 
-# How a tile is wired: what its double-click, its corners and its menu reach.
 _SHELF_TILE = "shelf"
 _REVIEW_TILE = "shelf with a verdict"
 _FOLDER_TILE = "folder"
@@ -830,12 +823,8 @@ class BrowserPane(QObject):
         )
 
     def _draw_tile(self, flow, row, wiring: str, wire, **appearance) -> ThumbnailWidget:
-        """Put *row*'s tile in *flow*: the last pane's, when it would be built
-        again the same and was wired the same way, else a new one *wire* connects.
-
-        A kept tile is given the star, the plus and the run its row now carries,
-        which are the three things about a tile that can change under it.
-        """
+        """The last pane's tile for *row*, when it would be built again the same and
+        wired the same way, else a new one *wire* connects."""
         prompt_id = row["prompt_id"]
         thumb_path, caption = row.get("thumbnail_path"), self._thumbnail_caption(row)
         tile = self._kept.take(

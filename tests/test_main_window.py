@@ -1196,16 +1196,12 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
 
 
 def _picture_published(frames_file) -> tuple[int, int]:
-    """The width and height in the picture channel's header, (0, 0) until one is."""
     _sequence, _token, width, height = _HEADER.unpack_from(
         frames_file.read_bytes(), 0)
     return width, height
 
 
 def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
-    """The window a desktop session launches is folded into the upright column
-    its rect asks for; the headset room it crosses into has no such rect.  His
-    2026-10-08 session got the folded one in the room."""
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     assert win._gallery_view._arrangement.stack is not None, "it did not open folded"
 
@@ -1216,9 +1212,6 @@ def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
 
 
 def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
-    """The room appends a press per aim and the window drains them on its poll.
-    On 2026-10-08 it drained none: 813 lines of his aims, 11 of them presses,
-    were still waiting in the file when the session ended."""
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     presses = tmp_path / "input.txt"
 
@@ -1249,7 +1242,6 @@ def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_
 
 def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(
         qtbot, tmp_path):
-    """A window launched hosted is a different constructor from a taken-over one."""
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     qtbot.addWidget(win)
     assert win.hands_its_window_over is None

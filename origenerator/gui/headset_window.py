@@ -42,9 +42,6 @@ _POLL_MS = 15
 #: tooltip or a spinner, and costs a grab of a window nobody is touching.
 _IDLE_LOOK_S = 0.1
 
-#: How often the poll says what it has handled.  His 2026-10-10 session took
-#: one click and then none, and nothing between the crossing and the end of it
-#: said when it had stopped.
 HEARTBEAT_S = 10.0
 
 #: The longest edge a published picture may have.  The rect a session names is
@@ -173,8 +170,6 @@ class HeadsetWindow(QObject):
             self.publish()
             self.said_how_it_goes(time.monotonic())
         except Exception:
-            # Qt swallows what a slot raises, and a poll that throws every tick
-            # leaves a screen in the room that never changes and never answers.
             if not self._threw:
                 self._threw = True
                 logger.exception("This window's headset poll threw; it keeps polling")
@@ -258,7 +253,6 @@ class HeadsetWindow(QObject):
                 Qt.KeyboardModifier.NoModifier))
 
     def _ask_for_the_menu(self, target: QWidget | None) -> None:
-        """Qt's own context-menu event: a mouse press does not produce one."""
         if target is None or sip.isdeleted(target) or _held_off(target):
             return
         at = self._window.mapToGlobal(self._pointer)

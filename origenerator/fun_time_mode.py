@@ -95,6 +95,10 @@ RELEASE = "RELEASE"
 HAND_OVER = "HAND_OVER"
 TAKE_BACK = "TAKE_BACK"
 SESSION_VERBS = (OPEN_SHOWS, CLOSE_SHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
+#: OPEN_SHOWS and CLOSE_SHOWS for one side's Funestra alone.
+OPEN_SHOW = "open_show"
+CLOSE_SHOW = "close_show"
+SIDE_VERBS = (OPEN_SHOW, CLOSE_SHOW)
 GO_TO = "GO_TO"
 SAY = "say"
 
@@ -179,6 +183,7 @@ def command_lines() -> tuple[str, ...]:
 
 def _lines_said_to(side: str) -> tuple[str, ...]:
     return (
+        *(spelled_for(side, verb) for verb in SIDE_VERBS),
         *(spelled_for(side, press) for press in PRESSES),
         *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
         *(f"{spelled_for(side, place)}|{payload}"

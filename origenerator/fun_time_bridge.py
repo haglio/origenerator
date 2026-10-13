@@ -38,10 +38,12 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from origenerator.console_commands import side_press, side_spoken_to
 from origenerator.fun_time_mode import (
+    CLOSE_SHOW,
     CLOSE_SHOWS,
     FILTER_ENHANCED,
     GO_TO,
     HAND_OVER,
+    OPEN_SHOW,
     OPEN_SHOWS,
     RELEASE,
     SAY,
@@ -49,7 +51,12 @@ from origenerator.fun_time_mode import (
     TAKE_BACK,
     FunTimeSession,
 )
-from origenerator.show_buttons import ORIGENERATOR_MODE, PANEL_PLACES, answer
+from origenerator.show_buttons import (
+    ORIGENERATOR_MODE,
+    PANEL_PLACES,
+    answer,
+    origenerator_mode_on,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +65,10 @@ _POLL_MS = 150
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
+
+
+def ask_for_the_funestra(dashboard_cmd_file, side: str) -> None:
+    append_command(dashboard_cmd_file, origenerator_mode_on(side))
 
 
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
@@ -106,6 +117,10 @@ class FunTimeBridge(QObject):
             FILTER_ENHANCED: self._filter_enhanced,
             RELEASE: self._release,
             TAKE_BACK: self.take_back_asked.emit,
+        }
+        self._side_verbs = {
+            OPEN_SHOW: lambda side: self._gallery.fill_the_region(side),
+            CLOSE_SHOW: lambda side: self._gallery.close_the_show(side),
         }
         self._released = False
         self._timer = QTimer(self)
@@ -157,6 +172,9 @@ class FunTimeBridge(QObject):
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
         action, argument = side_press(side, keyword.lower(), argument)
+        if not marker and action in self._side_verbs:
+            self._side_verbs[action](side)
+            return
         if action in PANEL_PLACES:
             self._gallery.place_a_panel(side, action, argument)
             return

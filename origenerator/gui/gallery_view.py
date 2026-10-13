@@ -1636,13 +1636,12 @@ class GalleryView(QWidget):
         self._fingerprint = fingerprint
         if moved or not only_if_moved:
             self._rebuild(rows, meta, new_listing=new_listing)
-        if self._shows.regions_wanted:
-            # The tree a rebuild makes is what the base state is read from, and
-            # the session's OPEN_SHOWS can land before the first one (its
-            # launch races this app's boot).  Filling here costs nothing when
-            # both regions are already playing, and is the only thing that
-            # rescues a session that opened into the mode a moment too early.
-            self.fill_the_regions()
+        # The tree a rebuild makes is what the base state is read from, and
+        # the session's open can land before the first one (its launch races
+        # this app's boot).  Filling here costs nothing when the regions are
+        # already playing, and is the only thing that rescues a session that
+        # opened into the mode a moment too early.
+        self._shows.fill_the_wanted_regions()
 
     def _poll(self):
         """One tick: fetch every blocking read away from the GUI, apply here.
@@ -3119,6 +3118,12 @@ class GalleryView(QWidget):
         this view going away with shows still up.
         """
         self._shows.close_the_shows()
+
+    def fill_the_region(self, side: str) -> None:
+        self._shows.fill_the_region(side)
+
+    def close_the_show(self, side: str) -> None:
+        self._shows.close_the_show(side)
 
     # --- a spoken request's own generation -----------------------------------
 

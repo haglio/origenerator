@@ -500,6 +500,7 @@ def _arm_the_crash_log(state_dir: Path, logger):
     return stream
 
 
+WAITING_FOR_THE_OTHER_COPY = "Waiting for the other copy to finish closing..."
 STARTING_THE_SERVER = "Starting ComfyUI server..."
 OPENING_THE_LIBRARY = "Opening the image library..."
 CONNECTING = "Connecting to ComfyUI..."
@@ -730,12 +731,23 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Launch check passed (%s)", sys.executable)
         return 0
 
-    from origenerator.single_instance import claim_the_library, say_another_copy_is_running
-    holding_the_library = claim_the_library(LIBRARY_STATE_DIR)
-    if holding_the_library is None and fun_time is None:
+    from origenerator.single_instance import Copies, say_another_copy_is_running
+    copies = Copies(LIBRARY_STATE_DIR)
+    claim = copies.claim_the_library()
+    loading = None
+    if claim is None and fun_time is None and copies.one_is_closing():
+        logger.info("Another copy is closing; waiting for it to let go of the library")
+        loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
+        loading.say(WAITING_FOR_THE_OTHER_COPY)
+        claim = copies.claim_the_library_once_the_closing_one_lets_go()
+    if claim is None and fun_time is None:
+        if loading is not None:
+            loading.done()
         logger.warning("Another copy of Origenerator is already running; not starting")
         say_another_copy_is_running()
         return 1
+    if claim is not None:
+        claim.closes_with(app)
     if fun_time is None:
         from origenerator.fun_time_mode import offer_the_window_while_it_is_built
         offer_the_window_while_it_is_built(STATE_DIR, LIBRARY_STATE_DIR)
@@ -748,7 +760,8 @@ def main(argv: list[str] | None = None) -> int:
     from origenerator.gui.link_listener import LinkListener
     clicked_notices = LinkListener(parent=app)
 
-    loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
+    if loading is None:
+        loading = _open_the_loading(fun_time, app, logger, preview, taskbar)
 
     # One AppState for the whole app: it holds the persisted ComfyUI client id the
     # client reconnects under, and is handed to the window for the rest of the
@@ -797,6 +810,8 @@ def main(argv: list[str] | None = None) -> int:
         _disconnect(client)
         from origenerator.fun_time_mode import withdraw_the_offer
         withdraw_the_offer(STATE_DIR, LIBRARY_STATE_DIR)
+        if claim is not None:
+            claim.let_go()
         loading.done()
         return 0
 
@@ -821,6 +836,8 @@ def main(argv: list[str] | None = None) -> int:
     if watch is not None:
         watch.withdraw()
     _disconnect(client)
+    if claim is not None:
+        claim.let_go()
     # Whatever ComfyUI is still making outlives this window, and this app is the
     # only thing watching it, so the waiting goes to a process of its own
     # (origenerator.landed_while_away).

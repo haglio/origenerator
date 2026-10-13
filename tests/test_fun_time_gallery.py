@@ -1465,6 +1465,7 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
     qtbot.addWidget(watched)
     portrait_monitor = SimpleNamespace(geometry=lambda: QRect(2560, 0, 1440, 2560))
     monkeypatch.setattr(watched, "screen", lambda: portrait_monitor)
+    assert view.slideshow_showing_on() == "portrait"
 
     view.become_hosted(_session())
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [])

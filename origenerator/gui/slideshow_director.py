@@ -907,8 +907,9 @@ class SlideshowDirector:
         slideshow = self._slideshow
         return None if slideshow is None or slideshow.is_live() else slideshow
 
-    def shows_a_slideshow(self) -> bool:
-        return self._slideshow_to_hold() is not None
+    def slideshow_showing_on(self) -> str | None:
+        slideshow = self._slideshow_to_hold()
+        return None if slideshow is None else _orientation_of_the_monitor(slideshow)
 
     def held_slideshow(self) -> HeldSlideshow | None:
         slideshow = self._slideshow_to_hold()
@@ -925,7 +926,7 @@ class SlideshowDirector:
         held = self.held_slideshow()
         if held is None:
             return None
-        return replace(held, side=_orientation_of_the_monitor(self._slideshow))
+        return replace(held, side=self.slideshow_showing_on())
 
     def put_back(self, held: HeldSlideshow):
         ids = (item.prompt_id for item in held.items if item.prompt_id is not None)

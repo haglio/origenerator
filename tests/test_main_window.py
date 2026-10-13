@@ -1500,14 +1500,15 @@ def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path
     assert not win._gallery_view.osr2_control.isEnabled()
 
 
-def test_a_window_slideshows_a_slideshow_while_its_gallery_has_one_to_hand_a_session(
+def test_a_window_names_the_side_its_gallerys_slideshow_is_showing_on(
         qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
-    assert not win.shows_a_slideshow()
+    assert win.slideshow_showing_on() is None
 
-    monkeypatch.setattr(win._gallery_view._slideshows, "shows_a_slideshow", lambda: True)
+    monkeypatch.setattr(win._gallery_view._slideshows, "slideshow_showing_on",
+                        lambda: "portrait")
 
-    assert win.shows_a_slideshow()
+    assert win.slideshow_showing_on() == "portrait"
 
 
 def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names(qtbot, tmp_path):

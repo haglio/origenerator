@@ -689,18 +689,21 @@ def test_a_window_handed_back_before_its_regions_opened_lets_go_of_the_slideshow
     assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == ["g4"]
 
 
-def test_a_director_shows_a_slideshow_while_one_it_could_hand_a_session_is_up(slideshows):
+def test_a_director_names_the_monitor_a_slideshow_it_could_hand_a_session_is_showing_on(
+        slideshows):
     director, _host, made = slideshows()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
     director.open([("a.png", "image", "g1", None)])
-    assert director.shows_a_slideshow()
+    assert director.slideshow_showing_on() == LANDSCAPE
+    made[0].monitor = PORTRAIT_MONITOR
+    assert director.slideshow_showing_on() == PORTRAIT
 
     made[0].live = True
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
     made[0].close()
-    assert not director.shows_a_slideshow()
+    assert director.slideshow_showing_on() is None
 
 
 def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slideshows):

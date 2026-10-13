@@ -19,6 +19,7 @@ from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.config import PROJECT_DIR
 from origenerator.gui.panes import BORDER_NAME
+from origenerator.gui.tooltip_shape import shape_long_tooltips
 from origenerator.spin_arrows import arrow_paths
 
 # Set on a button whose ON state says a choice has been made rather than that
@@ -411,3 +412,4 @@ def dress_application(app, preview: Preview | None) -> None:
     app.setPalette(family_palette(app.palette()))
     app.setStyleSheet(build_stylesheet())
     app.setWindowIcon(app_icon(PROJECT_DIR / "icon.ico", preview))
+    shape_long_tooltips(app)

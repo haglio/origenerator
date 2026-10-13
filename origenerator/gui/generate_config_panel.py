@@ -65,6 +65,7 @@ from origenerator.gui.inflight import (
     discard_run_text,
     discard_run_tooltip,
 )
+from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
@@ -72,6 +73,7 @@ from origenerator.gui.param_form import ParamForm
 from origenerator.gui.picture_state_picker import PictureStatePicker
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
+from origenerator.gui.warning_mark import WarningMark
 from origenerator.item_names import ItemNames
 from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
@@ -417,10 +419,13 @@ class GenerateConfigPanel(QWidget):
         # Picking a workflow is an edit as much as typing in a field is, and on a
         # form with nothing to carry over it is the only signal there is.
         self._workflow_combo.currentIndexChanged.connect(self._note_user_edit)
+        self._workflow_warning = WarningMark()
+        self._workflow_warning.pressed.connect(self._resolve_every_warning)
         # It shrinks to a short floor when the pane is narrow rather than holding
         # the width of the longest workflow name — see NoWheelComboBox, which every
         # picker in the app inherits that from. It still expands to fill the row.
-        header.addRow(ElidingLabel("Workflow"), self._workflow_combo)
+        header.addRow(LabelCell(self._workflow_warning, ElidingLabel("Workflow"), LabelColumn()),
+                      self._workflow_combo)
         body.addLayout(header)
         self._estimate_label = QLabel()
         self._estimate_label.setObjectName("estimateLabel")
@@ -644,11 +649,16 @@ class GenerateConfigPanel(QWidget):
             self._param_form.set_values(following)
 
     def _show_advice(self):
-        if self._param_form is not None:
-            values = self._param_form.get_values()
-            self._param_form.set_warnings(setting_advice(values, self._param_form.definitions()))
-            self._param_form.mark_recommended(recommended_choices(values))
-            self._param_form.explain(recommendations(values))
+        form = self._param_form
+        if form is not None:
+            values = form.get_values()
+            form.set_warnings(setting_advice(values, form.definitions()))
+            form.mark_recommended(recommended_choices(values))
+            form.explain(recommendations(values))
+        self._workflow_warning.warn(form.every_warning() if form is not None else "")
+
+    def _resolve_every_warning(self):
+        self._param_form.resolve_every_warning()
 
     def _detach_form(self):
         """Take the installed form off the panel, if there is one.

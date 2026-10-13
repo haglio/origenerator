@@ -2983,6 +2983,35 @@ def test_clicking_a_sections_warning_leaves_no_warning_in_it(qtbot, blank_panel,
     assert _drawing_settings(blank_panel)[:3] == ("euler_ancestral", "normal", 40)
 
 
+def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
+        qtbot, blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    warning = blank_panel._workflow_warning
+    assert warning.isHidden()
+
+    form.set_values({"steps": 80, "cfg": 9.0})
+    assert warning.toolTip() == (
+        "Steps: Default Model's page recommends 20–40 steps. Click to use 40.\n"
+        "Prompt Strength: Default Model's page recommends 3–6. Click to use 6.")
+    qtbot.mouseClick(warning, Qt.MouseButton.LeftButton)
+
+    assert warning.isHidden()
+    assert _drawing_settings(blank_panel)[2:] == (40, 6.0)
+
+
+def test_the_workflows_warning_heads_the_column_the_sections_warnings_sit_in(qtbot, blank_panel):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_i2v"))
+    panel = _on_screen(qtbot, blank_panel)
+
+    def left(widget):
+        return widget.mapTo(panel, QPoint(0, 0)).x()
+
+    shown = [section for section in panel._param_form._sections.values() if not section.isHidden()]
+    assert len(shown) > 4
+    assert {left(section.warning) for section in shown} == {left(panel._workflow_warning)}
+
+
 def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 

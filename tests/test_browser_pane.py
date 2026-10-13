@@ -184,8 +184,8 @@ def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot):
     qtbot.addWidget(elsewhere)
     qtbot.keyClick(elsewhere, Qt.Key.Key_Z, _CTRL)  # Qt Test leaves Ctrl down app-wide
 
-    pane._thumb_widgets["g1"].clicked.emit("g1", _NO_MOD)
-    pane._thumb_widgets["g2"].clicked.emit("g2", _NO_MOD)
+    qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
+    qtbot.mouseClick(pane._thumb_widgets["g2"], Qt.MouseButton.LeftButton, _NO_MOD)
 
     assert pane.selected_prompt_ids() == ["g2"]
 

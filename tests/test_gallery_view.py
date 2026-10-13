@@ -93,6 +93,7 @@ from origenerator.gui import generating_tile as generating_tile_module
 from origenerator.gui import voice_router as voice_router_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.combine_panel import CombineRequest
+from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
@@ -2548,7 +2549,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    view._browser._thumbnail_clicked("d1", _NO_MOD)
+    _click_tile(view, "d1")
 
     assert view._selected_row["prompt_id"] == "d1"
     shown = view._info_tabs.current_config_panel().displayed_row()
@@ -2786,6 +2787,39 @@ def test_recents_collection_lists_imported_files_too(qtbot):
     assert sorted(view.visible_prompt_ids()) == ["gen", "imp"]
 
 
+def _click_tile(view, prompt_id):
+    QTest.mouseClick(view._browser._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
+
+
+def _two_pictures_on_screen(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
+    _on_screen(qtbot, view, 1200, 900)
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    return view, view._browser._thumb_widgets["i2"]
+
+
+def test_pressing_a_picture_lights_it_up_and_leaves_the_tab_as_it_was(qtbot):
+    view, tile = _two_pictures_on_screen(qtbot)
+
+    gestures.press(tile, tile.rect().center())
+
+    assert view.selected_prompt_ids() == ["i2"]
+    assert view.selected_generation() is None
+
+
+def test_dragging_a_picture_out_leaves_the_tab_as_it_was(qtbot, monkeypatch):
+    monkeypatch.setattr(DragOut, "start", lambda self, *args, **kwargs: None)
+    view, tile = _two_pictures_on_screen(qtbot)
+    at = tile.rect().center()
+    away = at + QPoint(40, 0)
+
+    gestures.press(tile, at)
+    gestures.move(tile, away)
+    gestures.release(tile, away)
+
+    assert view.selected_generation() is None
+
+
 def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
@@ -2793,7 +2827,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)  # click the recent tile for the dog
+    _click_tile(view, "i2")  # click the recent tile for the dog
     # Its details fill the info pane, but the collection stays put — no navigation, so
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
@@ -2827,7 +2861,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)  # a plain click borrows the italic tab
+    _click_tile(view, "i2")  # a plain click borrows the italic tab
     assert view._info_tabs._preview_panel is not None
 
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")
@@ -2956,7 +2990,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)
+    _click_tile(view, "i2")
     (button,) = _folder_buttons(view)
     button.show()   # an unshown button has no rect for a press to land in
 
@@ -2982,7 +3016,7 @@ def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
 def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
     view = _trash_collection_view(qtbot, FakeActions())
 
-    view._browser._thumb_widgets["d1"].clicked.emit("d1", _NO_MOD)
+    _click_tile(view, "d1")
 
     assert _folder_buttons(view) == []      # it left its folder when its row did
 
@@ -2994,7 +3028,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["v1"].clicked.emit("v1", _NO_MOD)
+    _click_tile(view, "v1")
 
     (button,) = _folder_buttons(view)
     button.click()
@@ -3010,7 +3044,7 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
+    _click_tile(view, "i1")
     assert _folder_buttons(view)
 
     view._videos_only.setChecked(True)
@@ -3858,7 +3892,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     for panel in view._info_tabs.config_panels():
         panel._preview.show_media = MagicMock()  # don't start WMF playback
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    view._browser._thumbnail_clicked("vid1", _NO_MOD)
+    _click_tile(view, "vid1")
     tabs = view._info_tabs.count()
 
     view.follow_link("img1")
@@ -3873,8 +3907,8 @@ def test_back_and_forward_walk_the_viewed_generations(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
-    view._browser._thumbnail_clicked("i2", _NO_MOD)
+    _click_tile(view, "i1")
+    _click_tile(view, "i2")
     assert view._selected["prompt_id"] == "i2"
 
     view._navigation.go_back()
@@ -3893,7 +3927,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    view._browser._thumbnail_clicked("vid1", _NO_MOD)   # viewing the video
+    _click_tile(view, "vid1")   # viewing the video
     view.follow_link("img1")      # follow its input-image link
 
     assert view._selected["prompt_id"] == "img1"
@@ -3908,8 +3942,8 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
 
     _select_first_leaf(view)   # opening a folder is somewhere to come back from
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
-    view._browser._thumbnail_clicked("i2", _NO_MOD)
+    _click_tile(view, "i1")
+    _click_tile(view, "i2")
     assert view._bank.back.isEnabled() and not view._bank.forward.isEnabled()
 
     for _ in range(3):
@@ -3940,7 +3974,7 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     _select_first_leaf(view)                    # a settings folder — deletable
     assert view._bank.delete.isEnabled()
 
-    view._browser._thumbnail_clicked("i1", _NO_MOD)               # a picked thumbnail — deletable
+    _click_tile(view, "i1")               # a picked thumbnail — deletable
     assert view._bank.delete.isEnabled()
 
 
@@ -3951,7 +3985,7 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
 
     view._bank.delete.click()
 
@@ -3966,7 +4000,7 @@ def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
 
     assert view._bank.favorite.isEnabled()
     assert view._bank.favorite.toolTip() == "Favorite 1 item"
@@ -3974,7 +4008,7 @@ def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     assert db.get_generation("i1")["starred"]
 
     # A second press is the other half of the one toggle.
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
     assert view._bank.favorite.toolTip() == "Unfavorite 1 item"
     view._bank.favorite.click()
     assert not db.get_generation("i1")["starred"]
@@ -4012,7 +4046,7 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     queued = []
     view._enhance.enhance_items = queued.append
 
-    view._browser._thumbnail_clicked("g0", _NO_MOD)
+    _click_tile(view, "g0")
     assert view._bank.enhance.toolTip().startswith("Enhance 1 item")
     view._bank.enhance.click()
 
@@ -4038,7 +4072,7 @@ def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
     _video_leaf(view)
     assert not view._bank.enhance.isEnabled()   # the folder holds only videos
 
-    view._browser._thumbnail_clicked("v1", _NO_MOD)
+    _click_tile(view, "v1")
     assert not view._bank.enhance.isEnabled()
     assert "no video enhancer" in view._bank.enhance.toolTip()
 
@@ -4077,7 +4111,7 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     view.refresh()
     _select_first_leaf(view)
 
-    view._browser._thumbnail_clicked("g0", _NO_MOD)
+    _click_tile(view, "g0")
     assert not view._bank.enhance.isEnabled()
     assert "these settings" in view._bank.enhance.toolTip()
 
@@ -4167,7 +4201,7 @@ def test_favoriting_the_picked_items_turns_the_favorite_button_to_unfavorite(qtb
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
     assert view._bank.favorite.toolTip() == "Favorite 1 item"
 
     view._bank.favorite.click()
@@ -4197,7 +4231,7 @@ def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])  # both on screen
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
     view._browser.selected_ids.add("i2")   # both picked, as a Ctrl-click
 
     view._browser._thumb_widgets["i1"]._controls.triggered.emit(corner_controls.STAR)
@@ -4223,7 +4257,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._browser._thumbnail_clicked("g0", _NO_MOD)
+    _click_tile(view, "g0")
     star = view._info_tabs.current_config_panel()._preview._controls.buttons()[0]
 
     star.click()
@@ -4298,7 +4332,7 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
+    _click_tile(view, "i1")
     view._browser.selected_ids.add("v1")   # as a Ctrl-click across the two
     view._re_aim()
     queued = []
@@ -4383,7 +4417,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     view.refresh()
 
     view._tree.setCurrentItem(view._leaf_by_id["a"])  # the folder holding "a"
-    view._browser._thumbnail_clicked("a", _NO_MOD)                       # viewing it
+    _click_tile(view, "a")                       # viewing it
     assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
     view._delete_folder(view._current_deletable_folder())
@@ -4407,7 +4441,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    view._browser._thumbnail_clicked("vid1", _NO_MOD)               # viewing the video
+    _click_tile(view, "vid1")               # viewing the video
     assert view._selected["prompt_id"] == "vid1"
 
     view.follow_link("img1")                  # follow its source-image link
@@ -4428,7 +4462,7 @@ def _linked_view(qtbot, source="i7", count=12):
     view = GalleryView(FakeDB([video] + images))
     _on_screen(qtbot, view, 1100, 800)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    view._browser._thumbnail_clicked("vid1", _NO_MOD)               # viewing the video
+    _click_tile(view, "vid1")               # viewing the video
     return view
 
 
@@ -4480,7 +4514,7 @@ def test_history_spans_folder_navigation(qtbot):
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["v1"])  # the video folder, landing on v1
     view._tree.setCurrentItem(view._leaf_by_id["i1"])  # then the image folder, on i1
-    view._browser._thumbnail_clicked("i2", _NO_MOD)    # then its other item
+    _click_tile(view, "i2")    # then its other item
     assert view._selected["prompt_id"] == "i2"
 
     view._navigation.go_back()                    # the image folder, on what it opened on
@@ -4579,7 +4613,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
 
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     view._browser._drill_into(view._browser._visible_keys[0])  # into the dog folder, on i2
-    view._browser._thumbnail_clicked("i3", _NO_MOD)            # view another item there
+    _click_tile(view, "i3")            # view another item there
     assert view._tree.currentItem() is not _collection(view, FAVORITES_KEY)
 
     view._navigation.go_back()                                      # the folder drilled into
@@ -4593,7 +4627,7 @@ def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)         # select i2 in the collection
+    _click_tile(view, "i2")         # select i2 in the collection
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
     assert view._browser.showing_recents() is False
 
@@ -4613,7 +4647,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     for pid in ("i1", "i2", "i3"):
-        view._browser._thumb_widgets[pid].clicked.emit(pid, _NO_MOD)       # browse a few previews
+        _click_tile(view, pid)       # browse a few previews
 
     view._navigation.go_back()
     assert view._browser.showing_recents()                       # still in the collection...
@@ -4634,8 +4668,8 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)
+    _click_tile(view, "i1")
+    _click_tile(view, "i2")
 
     view._navigation.go_back()
 
@@ -4649,8 +4683,8 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    view._browser._thumbnail_clicked("i1", _NO_MOD)
-    view._browser._thumbnail_clicked("i2", _NO_MOD)
+    _click_tile(view, "i1")
+    _click_tile(view, "i2")
 
     view._navigation.go_back()
 
@@ -4668,7 +4702,7 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
     view.refresh()
 
     _search_for(view, "cat")
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)   # a hit picked among the results
+    _click_tile(view, "i1")   # a hit picked among the results
     depth = len(view._navigation._history._stack)
 
     view.refresh()
@@ -4703,7 +4737,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)         # previewed in the collection
+    _click_tile(view, "i1")         # previewed in the collection
     view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
 
     view._navigation.go_back()
@@ -4741,7 +4775,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     view.refresh()
 
     _search_for(view, "cat")
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)
+    _click_tile(view, "i1")
 
     view._navigation.go_back()
 
@@ -7889,7 +7923,7 @@ def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_
     _resolve_by_id(monkeypatch)
     view, db = _laid_out_folder(qtbot)
     far = view.visible_prompt_ids()[-3]
-    view._browser._thumbnail_clicked(far, _NO_MOD)
+    _click_tile(view, far)
     _scroll_bar(view).setValue(0)
     slideshow = _double_click_slideshow(view, qtbot)
     slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))

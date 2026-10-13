@@ -198,16 +198,25 @@ def _cloak(hwnd: int, hidden: bool) -> None:
                                   ctypes.sizeof(flag))
 
 
+def keep_out_of_sight(hwnd: int) -> None:
+    """Off the monitors, still drawn: DWM composites a cloaked window, so one
+    handed to a room in the headset still has a picture to publish."""
+    if window_exists(hwnd):
+        _cloak(hwnd, True)
+
+
+def bring_back_into_sight(hwnd: int) -> None:
+    if window_exists(hwnd):
+        _cloak(hwnd, False)
+
+
 @contextmanager
 def out_of_sight(hwnd: int) -> Iterator[None]:
-    if not window_exists(hwnd):
-        yield
-        return
-    _cloak(hwnd, True)
+    keep_out_of_sight(hwnd)
     try:
         yield
     finally:
-        _cloak(hwnd, False)
+        bring_back_into_sight(hwnd)
 
 
 def raise_window_without_activating(hwnd: int) -> bool:

@@ -11,6 +11,8 @@ from unittest.mock import patch
 import pytest
 
 from origenerator.win32 import (
+    bring_back_into_sight,
+    keep_out_of_sight,
     out_of_sight,
     place_window_in_device_pixels,
     raise_window_without_activating,
@@ -138,6 +140,22 @@ class TestOutOfSight:
 
             with out_of_sight(111):
                 assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
+
+        assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4),
+                                     (111, self.DWMWA_CLOAK, 0, 4)]
+
+    def test_a_window_stays_out_of_sight_until_it_is_brought_back(self):
+        """A window handed to a room in the headset is out of sight for as long
+        as the room has it, which is no block to hold.  DWM draws a cloaked
+        window as it always did, so there is still a picture to publish."""
+        with patch("origenerator.win32._user32") as user32, \
+                patch("origenerator.win32._dwmapi") as dwm:
+            user32.IsWindow.return_value = 1
+
+            keep_out_of_sight(111)
+            assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4)]
+
+            bring_back_into_sight(111)
 
         assert self._cloaks(dwm) == [(111, self.DWMWA_CLOAK, 1, 4),
                                      (111, self.DWMWA_CLOAK, 0, 4)]

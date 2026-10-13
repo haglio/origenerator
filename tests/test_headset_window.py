@@ -153,6 +153,29 @@ class TestTheRoomsPressesReachTheWindow:
 
         assert pressed == ["5,5"], "the press did not arrive where it was aimed"
 
+    def test_a_right_click_is_handed_over_without_waiting_for_what_it_opens(
+            self, tmp_path, qtbot):
+        """Every right-click menu in the gallery ends in menu.exec(), which runs
+        an event loop of its own and does not return until the menu is answered.
+        Handed such a click inside the poll's own tick, the poll never returned:
+        the picture stopped and so did the reading of his clicks, so he could not
+        answer the menu either.  His 2026-10-12 room froze on the first one."""
+        window = self._window(qtbot)
+        opened: list[str] = []
+        window.contextMenuEvent = lambda event: opened.append("menu")
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        try:
+            headset.publish(now=1.0)
+            headset._heard("rightclick 20 15")
+
+            assert opened == [], "the poll waited for the menu it opened"
+
+            QApplication.processEvents()
+        finally:
+            headset.close()
+
+        assert opened == ["menu"]
+
     def test_a_right_click_asks_the_widget_under_it_for_its_menu(self, tmp_path, qtbot):
         window = self._window(qtbot)
         target = window.findChild(QLabel, "target")
@@ -163,6 +186,7 @@ class TestTheRoomsPressesReachTheWindow:
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset._heard("rightclick 25 35")
+            QApplication.processEvents()
         finally:
             headset.close()
 

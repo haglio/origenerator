@@ -81,17 +81,17 @@ class CombinePanel(QWidget):
 
     def __init__(
         self,
-        image_accepts: Callable[[str], bool],
-        video_accepts: Callable[[str], bool],
+        image_lent_by: Callable[[str], str | None],
+        video_lent_by: Callable[[str], str | None],
         preview: Callable[[str], tuple[str | None, str | None]],
         parent=None,
     ):
         super().__init__(parent)
-        self.image_slot = DropSlot(MediaType.IMAGE, image_accepts, preview, "Drop an image")
+        self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, "Drop an image")
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
-        self.video_slot = DropSlot(MediaType.VIDEO, video_accepts, preview, _DROP_PLACEHOLDER,
+        self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, _DROP_PLACEHOLDER,
                                    grayscale=True)
         room = self.video_slot.sizePolicy()
         room.setRetainSizeWhenHidden(True)

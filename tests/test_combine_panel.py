@@ -17,8 +17,8 @@ TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
 def _panel(qtbot):
     panel = CombinePanel(
-        image_accepts=lambda pid: pid.startswith("img"),
-        video_accepts=lambda pid: pid.startswith("vid"),
+        image_lent_by=lambda pid: pid if pid.startswith("img") else None,
+        video_lent_by=lambda pid: pid if pid.startswith("vid") else None,
         preview=lambda pid: (None, None),
     )
     qtbot.addWidget(panel)
@@ -252,8 +252,8 @@ def test_going_back_to_custom_brings_back_the_video_the_act_replaced(qtbot):
 
 def test_a_remembered_video_that_no_longer_fits_its_slot_is_not_brought_back(qtbot):
     fitting = {"vid1"}
-    panel = CombinePanel(image_accepts=lambda pid: True,
-                         video_accepts=lambda pid: pid in fitting,
+    panel = CombinePanel(image_lent_by=lambda pid: pid,
+                         video_lent_by=lambda pid: pid if pid in fitting else None,
                          preview=lambda pid: (None, None))
     qtbot.addWidget(panel)
     panel.video_slot.set_item("vid1")

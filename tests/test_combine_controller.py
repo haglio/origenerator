@@ -39,9 +39,9 @@ class FakePanel:
         def set_item(self, prompt_id):
             self.item = prompt_id
 
-    def __init__(self, accepts_image, accepts_video, preview):
-        self.accepts_image = accepts_image
-        self.accepts_video = accepts_video
+    def __init__(self, image_lent_by, video_lent_by, preview):
+        self.image_lent_by = image_lent_by
+        self.video_lent_by = video_lent_by
         self.preview = preview
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()

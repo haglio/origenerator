@@ -132,6 +132,18 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
 
 
+def test_emptying_a_slot_stops_the_clip_it_was_looping(qtbot, tmp_path):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp))
+    _drop(slot, "vid1")
+    looping = slot._movie
+
+    slot.clear()
+
+    assert looping.state() == QMovie.MovieState.NotRunning
+    assert slot._label.movie() is None
+
+
 def test_a_grayscale_slot_drains_the_clip_it_holds(qtbot, tmp_path):
     # The video slot holds a recipe, not a result: in color it reads as a second
     # subject beside the image it will animate.

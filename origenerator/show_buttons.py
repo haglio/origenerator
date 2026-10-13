@@ -23,7 +23,7 @@ from funestra.hud_button import FIT_THE_WORD, Button
 from funestra.hud_marks import FMODE_ICON, MINIMIZE_ICON, shared_mark
 from funestra.hud_status import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.console_commands import FILTER
+from origenerator.console_commands import FILTER, spelled_for
 
 # The band, in the order the Funestras put the same controls in.  The tuples are
 # the groups the wider gap opens between.
@@ -43,6 +43,10 @@ _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name 
 #: The verb that asks the session to show this app, which is the way to
 #: anything of this app's while a session is running the room.
 ORIGENERATOR_MODE = "origenerator_activate"
+
+
+def origenerator_mode_on(side: str) -> str:
+    return spelled_for(side, ORIGENERATOR_MODE)
 
 MODE_BUTTONS = (
     ("satellites_kino_activate", "Kino", False),

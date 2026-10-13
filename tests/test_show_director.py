@@ -1077,9 +1077,67 @@ def test_closing_the_shows_drops_the_wanting_before_it_closes_anything(shows):
     director.fill_the_regions()
 
     director.close_the_shows()
+    director.fill_the_wanted_regions()
 
-    assert director.regions_wanted is False
     assert director.region_show(PORTRAIT) is None
+
+
+def test_a_side_handed_over_alone_opens_on_that_side_alone(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, _made = shows(browser=browser, fun_time=FakeSession())
+
+    director.fill_the_region(PORTRAIT)
+
+    assert director.region_show(PORTRAIT) is not None
+    assert director.region_show(LANDSCAPE) is None
+
+
+def test_a_side_let_go_alone_stays_empty_and_leaves_the_other_playing(shows):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, _made = shows(browser=browser, fun_time=FakeSession())
+    director.fill_the_regions()
+    landscape = director.region_show(LANDSCAPE)
+
+    director.close_the_show(PORTRAIT)
+    director.fill_the_wanted_regions()
+
+    assert director.region_show(PORTRAIT) is None
+    assert director.region_show(LANDSCAPE) is landscape
+
+
+def _asking_session(tmp_path):
+    session = FakeSession(funestras={PORTRAIT: object(), LANDSCAPE: object()})
+    session.dashboard_cmd_file = tmp_path / "dashboard_cmd.txt"
+    return session
+
+
+def test_a_show_for_a_side_the_session_still_plays_waits_for_the_session_to_hand_it_over(
+        shows, tmp_path):
+    """A slideshow started in the gallery on a side whose Funestra is still in
+    Kino mode: the session is asked for that Funestra, and the show opens there
+    once the session hands it over, rather than the side's library."""
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = shows(browser=browser, fun_time=_asking_session(tmp_path))
+
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    assert made == []
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split() == [
+        "portrait_origenerator_activate"]
+    director.fill_the_region(PORTRAIT)
+    assert [item[2] for item in made[0].items] == ["g1"]
+
+
+def test_a_side_let_go_before_it_was_handed_over_forgets_the_show_asked_for_it(
+        shows, tmp_path):
+    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    director, _host, made = shows(browser=browser, fun_time=_asking_session(tmp_path))
+    director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
+
+    director.close_the_show(PORTRAIT)
+    director.fill_the_region(PORTRAIT)
+
+    assert [item[2] for item in made[0].items] == ["g4"]
 
 
 def test_a_region_already_holding_a_show_is_left_alone(shows):

@@ -38,7 +38,7 @@ from origenerator.config import (
     FRAMES_BEING_MADE_DIR,
 )
 from origenerator.evolver_upscales import EvolverUpscales
-from origenerator.fun_time_bridge import ask_for_omnipause
+from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
 from origenerator.gallery.shelves import (
     FAVORITES_KEY as _FAVORITES_KEY,
@@ -194,10 +194,12 @@ class ShowDirector:
         # with an auto-generating folder however far the browser has moved on.
         # A list rather than one, because Fun Time runs two at once.
         self._live_shows: list[tuple] = []
-        # Whether the hosting session has asked for its regions (OPEN_SHOWS,
-        # until CLOSE_SHOWS): a region it wants is never left empty -- what
-        # covers it may end, but the base state comes back under it.
-        self._regions_wanted = False
+        # The regions the hosting session has handed over, until it takes
+        # each back: a region it wants is never left empty -- what covers it
+        # may end, but the base state comes back under it.
+        self._regions_wanted: set[str] = set()
+        # Shows asked for on a side the session has not handed over yet.
+        self._asked_for: dict[str, partial] = {}
         # Inside Fun Time, what occupies each satellite region — a show per
         # region, at most one each.  A show is "open" while its window is
         # visible; a closed one just goes stale in its slot until something
@@ -238,11 +240,6 @@ class ShowDirector:
     def showing(self):
         """The show in front of the user, or ``None`` with none up."""
         return self._slideshow
-
-    @property
-    def regions_wanted(self) -> bool:
-        """Whether the hosting session still wants its regions filled."""
-        return self._regions_wanted
 
     def surfaces(self) -> list:
         """Every tracked full-screen surface, each once: the standalone singles
@@ -420,6 +417,13 @@ class ShowDirector:
             if not folder_items:
                 return None
             items, kwargs["start"] = folder_items, None
+        if (channel is not None and where not in self._regions_wanted
+                and self._session_channel is not None):
+            self._asked_for[where] = partial(
+                self.open, items, rows=rows, folder_items=folder_items, location=location,
+                side=where, resume=resume, filters=filters, **kwargs)
+            ask_for_the_funestra(self._session_channel, where)
+            return None
         # Which of its items carry an enhancement, for the switch beside F-mode
         # on its HUD.
         hud = replace(kwargs.pop("hud", HudFacts()),
@@ -934,8 +938,16 @@ class ShowDirector:
         its regions is refilled with the base state, and these closes must not
         be.
         """
-        self._regions_wanted = False
+        self._regions_wanted.clear()
+        self._asked_for.clear()
         for show, _location in list(self._live_shows):
+            show.close()
+
+    def close_the_show(self, side: str) -> None:
+        self._regions_wanted.discard(side)
+        self._asked_for.pop(side, None)
+        show = self.region_show(side)
+        if show is not None:
             show.close()
 
     def _pick_where_it_played(self, prompt_id: str):
@@ -983,24 +995,43 @@ class ShowDirector:
         by hand.  A region already holding a show is left alone: the switch is
         no reason to interrupt something already up.
         """
-        self._regions_wanted = True
-        taken, self._taken_into_the_session = self._taken_into_the_session, None
-        if taken is not None and self.put_back(taken) is not None:
-            logger.info("The %s region takes up the slideshow that was up when the "
-                        "session took this window over: %d items", taken.side,
-                        len(taken.items))
         for side in _ORIENTATIONS:
-            if self.region_show(side) is not None:
-                continue
-            if not self._fill_region(side):
-                # Not a dead end: the tree this reads is built by the first
-                # refresh, and the session's OPEN_SHOWS can arrive before it
-                # (the launch races the boot).  A region owed its base state
-                # gets it on the next refresh -- see ``GalleryView.refresh`` --
-                # because a black rectangle is what this mode's base state
-                # exists to not be.
-                logger.info("Nothing of %s shape to open on the %s region yet",
-                            side, side)
+            self.fill_the_region(side)
+
+    def fill_the_wanted_regions(self) -> None:
+        for side in _ORIENTATIONS:
+            if side in self._regions_wanted:
+                self.fill_the_region(side)
+
+    def fill_the_region(self, side: str) -> None:
+        self._regions_wanted.add(side)
+        asked = self._asked_for.pop(side, None)
+        if asked is not None:
+            asked()
+            return
+        if self._put_back_what_was_taken_over(side) or self.region_show(side) is not None:
+            return
+        if not self._fill_region(side):
+            # Not a dead end: the tree this reads is built by the first
+            # refresh, and the session's open can arrive before it (the
+            # launch races the boot).  A region owed its base state gets it
+            # on the next refresh -- see ``GalleryView.refresh`` -- because a
+            # black rectangle is what this mode's base state exists to not be.
+            logger.info("Nothing of %s shape to open on the %s region yet", side, side)
+
+    def _put_back_what_was_taken_over(self, side: str) -> bool:
+        taken = self._taken_into_the_session
+        if taken is None:
+            return False
+        where = taken.side or region_for_items(taken.items)
+        if where != side:
+            return False
+        self._taken_into_the_session = None
+        if self.put_back(replace(taken, side=where)) is None:
+            return False
+        logger.info("The %s region takes up the slideshow that was up when the "
+                    "session took this window over: %d items", side, len(taken.items))
+        return True
 
     def _fill_region(self, side: str) -> bool:
         """Put *side* on its base state, and say whether there was anything to
@@ -1033,7 +1064,7 @@ class ShowDirector:
         Funestra underneath is blacked for the whole mode, so a region left empty
         is a black rectangle rather than a fallback.
         """
-        if not self._regions_wanted or self.region_show(side) is not None:
+        if side not in self._regions_wanted or self.region_show(side) is not None:
             return
         self._fill_region(side)
 

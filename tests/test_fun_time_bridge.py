@@ -205,6 +205,19 @@ def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
     assert filled == [True]
 
 
+def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, monkeypatch):
+    """Each of the session's Satellite Funestras goes into Origenerator mode by
+    itself, so the session hands this app one side at a time."""
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    filled = []
+    monkeypatch.setattr(view, "fill_the_region", filled.append)
+
+    (tmp_path / "origenerator_cmd.txt").write_text("portrait_open_show\n", encoding="utf-8")
+    bridge._tick()
+
+    assert filled == ["portrait"]
+
+
 def test_release_asks_for_the_app_back_from_the_session(qtbot, tmp_path):
     _view, bridge = _view_with_bridge(qtbot, tmp_path)
     released = []
@@ -237,6 +250,20 @@ def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SHOWS\n", encoding="utf-8")
     bridge._tick()
 
+    assert not show.isVisible()
+    assert view.region_show("portrait") is None
+
+
+def test_a_side_taken_back_on_its_own_closes_that_sides_show_alone(qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+
+    (tmp_path / "origenerator_cmd.txt").write_text("landscape_close_show\n", encoding="utf-8")
+    bridge._tick()
+    assert show.isVisible()
+
+    (tmp_path / "origenerator_cmd.txt").write_text("portrait_close_show\n", encoding="utf-8")
+    bridge._tick()
     assert not show.isVisible()
     assert view.region_show("portrait") is None
 

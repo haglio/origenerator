@@ -19,7 +19,6 @@ from shared_ui.palette import (
     BG_SECONDARY,
     BLUE,
     BORDER_PANEL,
-    GREEN,
     TEXT_PRIMARY,
     as_hex,
 )
@@ -41,4 +40,4 @@ IN_FLIGHT_BORDER = as_hex(BLUE)
 
 # The lit edge an enhancement level wears while the row that would duplicate it
 # is hovered.
-MATCH_BORDER = as_hex(GREEN)
+MATCH_BORDER = as_hex(TEXT_PRIMARY)

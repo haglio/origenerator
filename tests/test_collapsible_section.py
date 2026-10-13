@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QFormLayout, QLineEdit
 
@@ -147,6 +148,18 @@ def test_a_warning_appears_left_of_the_title_without_moving_it(qtbot):
     assert [(x, y) for x, y in _drawn_above_the_rule(section._header)
             if x > warning.right()] == title
     assert warning.right() < min(x for x, _ in title)
+
+
+def test_pressing_the_warning_neither_folds_nor_unfolds_the_section(qtbot):
+    section = _shown_section(qtbot, "Calibration", width=300)
+    section.warning.warn(_WARNING)
+    pressed = []
+    section.warning.pressed.connect(lambda: pressed.append(True))
+
+    qtbot.mouseClick(section.warning, Qt.MouseButton.LeftButton)
+
+    assert pressed == [True]
+    assert section.is_collapsed()
 
 
 def test_a_squeezed_header_cuts_its_title_short_and_keeps_its_mark_whole(qtbot):

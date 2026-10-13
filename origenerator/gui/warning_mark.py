@@ -23,4 +23,6 @@ class WarningMark(QLabel):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.pressed.emit()
-        super().mousePressEvent(event)
+            event.accept()
+        else:
+            super().mousePressEvent(event)

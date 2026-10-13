@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
@@ -31,7 +31,6 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.seed_history import SeedHistory
-from origenerator.setting_advice import ADVISED_KEYS
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -256,7 +255,7 @@ class ParamForm(QWidget):
                 continue
             if isinstance(widget, PresetComboBox):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
-            self._add_row(pd.key, pd.label, self._field_cell(pd, widget))
+            self._add_row(pd.key, pd.label, widget, self._make_extras(pd))
         for pd in self._param_defs:
             if pd.rate and self._widgets[pd.key] is not self._scenes:
                 # A frame count is made as seconds, so show it as seconds — its
@@ -277,10 +276,10 @@ class ParamForm(QWidget):
                 edited.connect(self._update_derived_display)
             edited.connect(self.changed)
 
-    def _add_row(self, key: str, label: str, field):
-        """Insert one row (a field cell or a read-only value) into its section at
-        the canonical position among the rows already there. ``field`` is a
-        ``QWidget`` or a ``QLayout`` (a field paired with its trailing controls).
+    def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
+        """Insert one row (an input or a read-only value, then its ``extras``)
+        into its section at the canonical position among the rows already there,
+        after the slot its warning mark shows in (see :meth:`_field_cell`).
 
         The row's help (see :mod:`origenerator.gui.param_help`) goes on its label
         as well as its input: the label is what you are looking at when you
@@ -295,7 +294,7 @@ class ParamForm(QWidget):
         index = self._insert_index(keys, key)
         form = self._sections[title].content_form()
         label_widget = ElidingLabel(label)
-        form.insertRow(index, label_widget, field)
+        form.insertRow(index, label_widget, self._field_cell(key, field, extras))
         keys.insert(index, key)
         # A label cut short is one you most want spelled out, so the tip says the
         # whole thing when the param has nothing more useful to explain.
@@ -320,22 +319,20 @@ class ParamForm(QWidget):
             section.setVisible(bool(self._present_keys[title]))
         self._position_dimension_controls()
 
-    def _field_cell(self, pd: ParamDef, widget: QWidget):
-        """The input, optionally paired with trailing controls.
+    def _field_cell(self, key: str, field: QWidget, extras: Sequence[QWidget]) -> QHBoxLayout:
+        """The warning slot, the input, then its trailing controls.
 
         The copy button leads (just right of the input), then the Random tick
-        (seed), the Browse button (image) or the warning mark. Each sits in a
-        shared cell so the label column stays aligned across every row. Next to a
-        tall multiline prompt the copy button hugs the top corner; next to a
-        single-line seed it centers so it lines up with the tick beside it.
+        (seed) or the Browse button (image). Each sits in a shared cell so the
+        label column stays aligned across every row. Next to a tall multiline
+        prompt the copy button hugs the top corner; next to a single-line seed
+        it centers so it lines up with the tick beside it.
         """
-        extras = self._make_extras(pd)
-        if not extras:
-            return widget
         cell = QHBoxLayout()
         cell.setContentsMargins(0, 0, 0, 0)
-        cell.addWidget(widget, 1)
-        multiline = isinstance(widget, QPlainTextEdit)
+        cell.addWidget(self._warning_slot(key))
+        cell.addWidget(field, 1)
+        multiline = isinstance(field, QPlainTextEdit)
         for extra in extras:
             if isinstance(extra, CopyButton) and multiline:
                 cell.addWidget(extra, 0, Qt.AlignmentFlag.AlignTop)
@@ -368,13 +365,21 @@ class ParamForm(QWidget):
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
-        if pd.key in ADVISED_KEYS:
-            mark = QLabel("⚠")
-            mark.setObjectName("warningMark")
-            mark.hide()
-            self._warning_marks[pd.key] = mark
-            extras.append(mark)
         return extras
+
+    def _warning_slot(self, key: str) -> QWidget:
+        mark = QLabel("⚠")
+        mark.setObjectName("warningMark")
+        policy = mark.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        mark.setSizePolicy(policy)
+        mark.hide()
+        self._warning_marks[key] = mark
+        slot = QWidget()
+        holder = QHBoxLayout(slot)
+        holder.setContentsMargins(0, 0, 0, 0)
+        holder.addWidget(mark)
+        return slot
 
     def set_warnings(self, advice: dict[str, str]) -> None:
         for key, mark in self._warning_marks.items():

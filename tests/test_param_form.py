@@ -32,6 +32,7 @@ from origenerator.seed_history import SeedUse
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import ParamDef, story_of
+from origenerator.workflows.model_files import NO_LORA
 
 
 def test_field_labels_fit_the_heading_font(qtbot):
@@ -230,13 +231,18 @@ def _field_cell_of(form, key):
     Fields live in per-section form layouts now, so search every ``QFormLayout``
     under the form, not one top-level one.
     """
+    field = _field_of(form, key)
     for fl in form.findChildren(QFormLayout):
         for r in range(fl.rowCount()):
             item = fl.itemAt(r, QFormLayout.ItemRole.FieldRole)
             if item is not None and item.layout() is not None:
-                if item.layout().indexOf(form._widgets[key]) != -1:
+                if item.layout().indexOf(field) != -1:
                     return item.layout()
     return None
+
+
+def _field_of(form, key):
+    return form._dim_stacks.get(key, form._widgets[key])
 
 
 def test_seed_copy_button_sits_left_of_the_random_tick(qtbot):
@@ -709,10 +715,11 @@ def test_a_form_sized_from_its_input_says_what_size_it_would_make(qtbot):
     assert form.output_size() == (464, 912)
 
 
-def _row_label(form, key):
-    """The "Width"/"Height" word beside a field, as its section's form lays it."""
-    return form._sections["Size"].content_form().labelForField(
-        form._widgets[key])
+def _label_beside(form, key):
+    title = param_sections.section_title(key)
+    row = form._present_keys[title].index(key)
+    return form._sections[title].content_form().itemAt(
+        row, QFormLayout.ItemRole.LabelRole).widget()
 
 
 def _dimension_defs():
@@ -800,8 +807,8 @@ def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     # On the left — entirely clear of the input column.
     assert btn.right() <= width.left()
     # And clear of the words themselves: the labels start after its lane.
-    assert btn.right() <= _row_label(form, "width").geometry().left()
-    assert btn.right() <= _row_label(form, "height").geometry().left()
+    assert btn.right() <= _label_beside(form, "width").geometry().left()
+    assert btn.right() <= _label_beside(form, "height").geometry().left()
 
 
 # --- derived dimensions: the input-image size, shown locked & unlockable ----
@@ -873,8 +880,8 @@ def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
     # not stuffed into a field's cell — so neither field is smooshed to make room.
     form = _sized_form(qtbot)
     assert form._unlock_btn.parent() is form._sections["Size"].content()
-    assert _field_cell_of(form, "width") is None    # a plain field, no trailing cell
-    assert _field_cell_of(form, "height") is None
+    assert _field_cell_of(form, "width").indexOf(form._unlock_btn) == -1
+    assert _field_cell_of(form, "height").indexOf(form._unlock_btn) == -1
 
 
 def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
@@ -893,12 +900,9 @@ def test_unlock_toggle_sits_between_the_rows_and_clears_the_labels(qtbot):
     lower = form._dim_stacks["height"].geometry()
     assert top.center().y() < btn.center().y() < lower.center().y()
 
-    dim_form = form._sections["Size"].content_form()
-    width_label = dim_form.labelForField(form._dim_stacks["width"])
-    height_label = dim_form.labelForField(form._dim_stacks["height"])
     # The button is clear of both the labels and the fields — no overlap.
-    assert btn.right() <= width_label.geometry().left()
-    assert btn.right() <= height_label.geometry().left()
+    assert btn.right() <= _label_beside(form, "width").geometry().left()
+    assert btn.right() <= _label_beside(form, "height").geometry().left()
     assert btn.right() <= top.left()
 
 
@@ -1377,9 +1381,7 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     qtbot.addWidget(form)
     for key, widget in form._widgets.items():
         assert widget.toolTip() == param_help(key), key
-    section = form._sections["Calibration"].content_form()
-    label = section.labelForField(form._widgets["denoise"])
-    assert label.toolTip() == param_help("denoise")
+    assert _label_beside(form, "denoise").toolTip() == param_help("denoise")
 
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
@@ -2014,3 +2016,66 @@ def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot)
     assert form._warning_marks["cfg"].isHidden()
     form.set_warnings({})
     assert form._warning_marks["steps"].isHidden()
+
+
+def _laid_out(qtbot, form):
+    qtbot.addWidget(form)
+    for section in form._sections.values():
+        section.set_collapsed(False)
+    form.resize(640, 2400)
+    form.show()
+    qtbot.waitExposed(form)
+    return form
+
+
+def _left(form, widget):
+    return widget.mapTo(form, QPoint(0, 0)).x()
+
+
+def test_a_warning_mark_sits_between_its_label_and_its_field(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
+
+    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+    QApplication.processEvents()
+
+    label, mark = _label_beside(form, "steps"), form._warning_marks["steps"]
+    assert _left(form, label) + label.width() <= _left(form, mark)
+    assert _left(form, mark) + mark.width() <= _left(form, form._widgets["steps"])
+
+
+def test_a_warning_appearing_moves_no_field(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
+    field = form._widgets["steps"]
+    before = field.geometry()
+
+    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+    QApplication.processEvents()
+
+    assert field.geometry() == before
+
+
+def test_a_row_shown_again_keeps_its_warning_mark_hidden(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_values({"lora_high": NO_LORA})
+    form.set_values({"lora_high": "example_lora_high.safetensors"})
+
+    assert _row_visible(form, "lora_strength_high")
+    assert form._warning_marks["lora_strength_high"].isHidden()
+
+
+def _gap_after_label(form, key):
+    label = _label_beside(form, key)
+    return _left(form, _field_of(form, key)) - _left(form, label) - label.width()
+
+
+def test_every_field_starts_as_far_from_its_label_whether_or_not_it_can_warn(qtbot):
+    form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions(),
+                                      size_deriver=lambda values: (464, 912)))
+
+    shown = [key for keys in form._present_keys.values() for key in keys
+             if _row_visible(form, key)]
+    gaps = {key: _gap_after_label(form, key) for key in shown}
+    assert {"steps", "noise_seed", "width", "scene_frames"} <= set(gaps)
+    assert len(set(gaps.values())) == 1, gaps

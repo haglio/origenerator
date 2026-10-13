@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from funestra.hud_overlay import HUD_OVERLAY_ID
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
@@ -35,7 +34,7 @@ from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE, ShowFilters, Sl
 from tests import gestures
 from tests.funestra_fakes import FakeEngine
 from tests.motion_doubles import FakeMotion
-from tests.show_hud_support import panel_targets
+from tests.show_hud_support import button_on_screen, thumbnail_on_screen
 from tests.slideshow_support import ahead
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -1190,23 +1189,6 @@ def _on_screen_wearing_its_panel(qtbot, view):
     return view
 
 
-def _middle_of(view, rect) -> QPoint:
-    left, top, _pixels = _engine(view).overlays[HUD_OVERLAY_ID]
-    x, y, width, height = rect
-    scale = view._pane._window.devicePixelRatioF()
-    return QPoint(round((left + x + width / 2) / scale), round((top + y + height / 2) / scale))
-
-
-def _middle_of_the_button(view, command) -> QPoint:
-    rect, = [rect for rect, button in panel_targets(view).buttons if button.command == command]
-    return _middle_of(view, rect)
-
-
-def _middle_of_the_thumbnail(view, path) -> QPoint:
-    rect, = [rect for rect, target in panel_targets(view).click if target == path]
-    return _middle_of(view, rect)
-
-
 def _on_the_picture(view) -> QPoint:
     """Clear of the panel in the upper left and of the corners that open it."""
     window = view._pane._window
@@ -1229,7 +1211,7 @@ def test_double_clicking_a_thumbnail_on_the_map_locks_the_show_on_it(qtbot):
     view = _on_screen_wearing_its_panel(
         qtbot, _view(qtbot, _KEYED, actions=ShowActions(neighbors=_around)))
 
-    gestures.double_click(view._pane._window, _middle_of_the_thumbnail(view, "b.png"))
+    gestures.double_click(view._pane._window, thumbnail_on_screen(view, "b.png"))
 
     assert view.isVisible()
     assert (_media_on_screen(view), view.locked) == ("b.png", True)
@@ -1238,7 +1220,7 @@ def test_double_clicking_a_thumbnail_on_the_map_locks_the_show_on_it(qtbot):
 def test_two_quick_clicks_on_next_step_on_twice_and_leave_the_show_up(qtbot):
     view = _on_screen_wearing_its_panel(qtbot, _view(qtbot))
 
-    gestures.double_click(view._pane._window, _middle_of_the_button(view, "portrait_next"))
+    gestures.double_click(view._pane._window, button_on_screen(view, "portrait_next"))
 
     assert view.isVisible()
     assert _media_on_screen(view) == "c.png"

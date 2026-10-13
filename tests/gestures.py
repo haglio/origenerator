@@ -18,3 +18,8 @@ def _where_the_mouse_lands(widget: QWidget, at: QPoint):
 def double_click(widget: QWidget, at: QPoint) -> None:
     window, point = _where_the_mouse_lands(widget, at)
     QTest.mouseDClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+
+
+def click(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mouseClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)

@@ -574,7 +574,7 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
     workflow = _video_workflow(view._tree)
     model, lora, source = (_at(workflow, *[0] * depth) for depth in (1, 2, 3))
 
-    for folder in (workflow, model, lora, source):
+    for folder in (_alls(view._tree)["Videos"], workflow, model, lora, source):
         assert _collection_names(folder) == _COLLECTION_NAMES
     assert _at(source, 0).childCount() == 0
 
@@ -1048,12 +1048,53 @@ def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
     assert mark.pixmap().toImage() == icons.media_type_icon("image").pixmap(size).toImage()
 
 
-def test_images_shows_its_workflow_folders_as_squares(qtbot):
+def _both_kinds_in_every_collection():
+    """A picture and a video in each of the five collections: both favorited and
+    asked for, an experiment of each kind, and one of each deleted."""
+    picture, video = _image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")
+    picture["starred"] = video["starred"] = 1
+    db = _bin_db(rows=[picture, video,
+                       {**_image("ie", "a dog", 50, 2), "source": "experiment"},
+                       {**_i2v_video("ve", "styleB"), "source": "experiment"}],
+                 held=[("di", _image("di", "a bird", 50, 3)),
+                       ("dv", _i2v_video("dv", "styleC"))])
+    for row in (picture, video):
+        db.record_request(prompt_id=row["prompt_id"], source_prompt_id=None, heard="scene one")
+    return db
+
+
+@pytest.mark.parametrize("collection", _COLLECTION_NAMES)
+def test_each_kinds_collection_lists_that_kind_alone(qtbot, collection):
+    view = GalleryView(_both_kinds_in_every_collection())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    listed = {}
+    for kind in ("Images", "Videos"):
+        view._tree.setCurrentItem(_collection_row(_alls(view._tree)[kind], collection))
+        listed[kind] = {gallery.media_type_of_row(view.row_for(prompt_id))
+                        for prompt_id in view.visible_prompt_ids()}
+
+    assert listed == {"Images": {"image"}, "Videos": {"video"}}
+
+
+def test_each_kinds_collections_count_that_kind_alone(qtbot):
+    view = GalleryView(_both_kinds_in_every_collection())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    for kind in ("Images", "Videos"):
+        assert [_shown(_collection_row(_alls(view._tree)[kind], name))
+                for name in _COLLECTION_NAMES[1:]] == [
+            "(1) Favorites", "(1) Experiments", "(1) Requests", "(1) Trash"]
+
+
+def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot):
     view = _of_both_kinds(qtbot)
 
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
-    assert _square_names(view) == ["SDXL Text-to-Image"]
+    assert _square_names(view) == [*_COLLECTION_NAMES, "SDXL Text-to-Image"]
 
 
 def test_videos_once_favorited_is_a_square_in_alls_favorites(qtbot, monkeypatch):

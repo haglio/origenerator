@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 from funestra.file_channel import consume_command_file
 from funestra.hud_placement import HudCorner
 from funestra.playlist import read_playlist
@@ -212,7 +213,7 @@ def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, mon
     filled = []
     monkeypatch.setattr(view, "fill_the_region", filled.append)
 
-    (tmp_path / "origenerator_cmd.txt").write_text("portrait_open_show\n", encoding="utf-8")
+    (tmp_path / "origenerator_cmd.txt").write_text("portrait_open_slideshow\n", encoding="utf-8")
     bridge._tick()
 
     assert filled == ["portrait"]
@@ -243,11 +244,11 @@ def test_a_released_bridge_answers_the_session_no_further(qtbot, tmp_path, monke
     assert not (tmp_path / "origenerator_status.txt").exists()
 
 
-def test_close_shows_clears_both_regions(qtbot, tmp_path, monkeypatch):
+def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SHOWS\n", encoding="utf-8")
+    (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SLIDESHOWS\n", encoding="utf-8")
     bridge._tick()
 
     assert not slideshow.isVisible()
@@ -258,14 +259,34 @@ def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, t
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    (tmp_path / "origenerator_cmd.txt").write_text("landscape_close_show\n", encoding="utf-8")
+    (tmp_path / "origenerator_cmd.txt").write_text("landscape_close_slideshow\n", encoding="utf-8")
     bridge._tick()
     assert slideshow.isVisible()
 
-    (tmp_path / "origenerator_cmd.txt").write_text("portrait_close_show\n", encoding="utf-8")
+    (tmp_path / "origenerator_cmd.txt").write_text("portrait_close_slideshow\n", encoding="utf-8")
     bridge._tick()
     assert not slideshow.isVisible()
     assert view.region_slideshow("portrait") is None
+
+
+@pytest.mark.parametrize(("said_before", "says_now"), [
+    ("CLOSE_SHOWS", "CLOSE_SLIDESHOWS"),
+    ("portrait_open_show", "portrait_open_slideshow"),
+    ("landscape_close_show", "landscape_close_slideshow"),
+])
+def test_a_session_that_still_says_show_is_answered_as_one_that_says_slideshow(
+        qtbot, tmp_path, monkeypatch, said_before, says_now):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    asked = []
+    for name in ("close_the_slideshows", "fill_the_region", "close_the_slideshow"):
+        monkeypatch.setattr(view, name, lambda *args, name=name: asked.append((name, args)))
+
+    for line in (said_before, says_now):
+        (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
+        bridge._tick()
+
+    assert len(asked) == 2
+    assert asked[0] == asked[1]
 
 
 def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):

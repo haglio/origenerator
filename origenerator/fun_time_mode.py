@@ -90,16 +90,18 @@ HEADSET_WORDS = (HEADSET_PRESS, HEADSET_RELEASE, HEADSET_DRAG, HEADSET_HOVER,
                  HEADSET_SCROLL, HEADSET_RIGHT_CLICK)
 
 OPEN_SHOWS = "OPEN_SHOWS"
-CLOSE_SHOWS = "CLOSE_SHOWS"
+CLOSE_SLIDESHOWS = "CLOSE_SLIDESHOWS"
 FILTER_ENHANCED = "FILTER_ENHANCED"
 RELEASE = "RELEASE"
 HAND_OVER = "HAND_OVER"
 TAKE_BACK = "TAKE_BACK"
-SESSION_VERBS = (OPEN_SHOWS, CLOSE_SHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
-#: OPEN_SHOWS and CLOSE_SHOWS for one side's Funestra alone.
-OPEN_SHOW = "open_show"
-CLOSE_SHOW = "close_show"
-SIDE_VERBS = (OPEN_SHOW, CLOSE_SHOW)
+SESSION_VERBS = (OPEN_SHOWS, CLOSE_SLIDESHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
+#: Opening and closing the slideshow on one side's Funestra alone.
+OPEN_SLIDESHOW = "open_slideshow"
+CLOSE_SLIDESHOW = "close_slideshow"
+SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
+FORMER_NAMES = {"CLOSE_SHOWS": CLOSE_SLIDESHOWS, "open_show": OPEN_SLIDESHOW,
+                "close_show": CLOSE_SLIDESHOW}
 GO_TO = "GO_TO"
 SAY = "say"
 
@@ -176,6 +178,7 @@ def command_lines() -> tuple[str, ...]:
     the line carries there."""
     return (
         *SESSION_VERBS,
+        *(former for former, now in FORMER_NAMES.items() if now in SESSION_VERBS),
         f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
         *(line for side in SIDES for line in _lines_said_to(side)),
@@ -185,6 +188,8 @@ def command_lines() -> tuple[str, ...]:
 def _lines_said_to(side: str) -> tuple[str, ...]:
     return (
         *(spelled_for(side, verb) for verb in SIDE_VERBS),
+        *(spelled_for(side, former) for former, now in FORMER_NAMES.items()
+          if now in SIDE_VERBS),
         *(spelled_for(side, press) for press in PRESSES),
         *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
         *(f"{spelled_for(side, place)}|{payload}"

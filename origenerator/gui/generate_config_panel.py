@@ -76,6 +76,7 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
+from origenerator.setting_advice import fresh_settings
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -236,6 +237,8 @@ class GenerateConfigPanel(QWidget):
         # than a flag because the loads nest (restore_config prefills, prefill
         # re-picks the workflow, which re-seeds the carried-over fields).
         self._loading_config = 0
+        self._fresh_form = False
+        self._form_checkpoint = None
         self._autoshow_held = False   # see _point_elsewhere
         self._go_to_folder = QAction("Go to folder", self)
         self._go_to_folder.setToolTip(_GO_TO_FOLDER_TIP)
@@ -543,6 +546,7 @@ class GenerateConfigPanel(QWidget):
         # fields with it — so what is left is an ordinary config, not a rewrite
         # of anything.
         self._end_folder_request()
+        self._fresh_form = False
         key = self._workflow_combo.currentData()
         if key and key in WORKFLOW_REGISTRY:
             wf = WORKFLOW_REGISTRY[key]
@@ -570,6 +574,11 @@ class GenerateConfigPanel(QWidget):
             if carried:
                 self._param_form.set_values(carried)
                 self._param_form.put_seeds(carried, is_random=False)
+            checkpoint = self._param_form.get_values().get("checkpoint")
+            if not self._loading_config:
+                self._rebase_on_the_model(None, checkpoint, keep=edited)
+                self._fresh_form = True
+            self._form_checkpoint = checkpoint
         else:
             self._clear_form()  # no workflow picked: nothing below is known yet
         self._refresh_estimate()
@@ -580,19 +589,36 @@ class GenerateConfigPanel(QWidget):
 
     def _edited_form_values(self) -> dict:
         """What the user changed on the installed form: its values minus the keys
-        still sitting at its own workflow's defaults. Switching workflows carries
-        these over (where the new workflow shares the param), so a typed prompt or
-        picked image survives the switch — while the departing workflow's defaults
-        never leak into the next one's."""
+        still where a fresh form of its workflow and model puts them. Switching
+        workflows carries these over (where the new workflow shares the param), so
+        a typed prompt or picked image survives the switch — while the departing
+        form's own starting values never leak into the next one's."""
         prior = WORKFLOW_REGISTRY.get(self._form_workflow_key or "")
         if self._param_form is None or prior is None:
             return {}
-        defaults = prior.default_params()
+        values = self._param_form.get_values()
+        fresh = fresh_settings(prior.default_params(), values.get("checkpoint"))
         drawn = self._param_form.random_seed_keys()
         return {
-            k: v for k, v in self._param_form.get_values().items()
-            if k not in drawn and (k not in defaults or v != defaults[k])
+            k: v for k, v in values.items()
+            if k not in drawn and (k not in fresh or v != fresh[k])
         }
+
+    def _follow_the_model(self):
+        if self._param_form is None:
+            return
+        before = self._form_checkpoint
+        self._form_checkpoint = self._param_form.get_values().get("checkpoint")
+        if self._fresh_form and not self._loading_config and before != self._form_checkpoint:
+            self._rebase_on_the_model(before, self._form_checkpoint)
+
+    def _rebase_on_the_model(self, before, after, keep=()):
+        defaults = WORKFLOW_REGISTRY[self._form_workflow_key].default_params()
+        old, new = fresh_settings(defaults, before), fresh_settings(defaults, after)
+        following = {k: new[k] for k, v in self._param_form.get_values().items()
+                     if k in old and k not in keep and v == old[k] != new[k]}
+        with self._loading():
+            self._param_form.set_values(following)
 
     def _detach_form(self):
         """Take the installed form off the panel, if there is one.
@@ -626,6 +652,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form = form
         self._param_form.changed.connect(self.form_edited)
         self._param_form.changed.connect(self._note_user_edit)
+        self._param_form.changed.connect(self._follow_the_model)
         self._param_form.changed.connect(self.refresh_modified_notice)
         self._param_form.changed.connect(self._mark_recipe_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.
@@ -1027,6 +1054,7 @@ class GenerateConfigPanel(QWidget):
         # every field, exactly as a person would, and a tab filled by an open is
         # not a tab someone has worked in.
         with self._loading():
+            self._fresh_form = False
             self._end_folder_request()
             self._forget_watch()
             # Switch to the matching workflow. A registered workflow the picker

@@ -13,7 +13,9 @@ from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
+import origenerator.setting_advice as advice_module
 import origenerator.workflows.derived_size as ds
+import origenerator.workflows.sdxl_t2i as sdxl_t2i_module
 from origenerator import evolver_export, gallery, osr2_driver
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
@@ -2847,3 +2849,67 @@ def test_generate_is_off_while_its_folder_is_already_making_one(panel, qtbot):
     panel.note_folder_generating(False)
     assert panel._generate_btn.isEnabled() is True
     qtbot.waitUntil(lambda: panel._generate_btn.toolTip() == "")
+
+
+# --- a model's recommended settings ------------------------------------------
+
+@pytest.fixture
+def recommended(monkeypatch):
+    default = WORKFLOW_REGISTRY["sdxl_t2i"].default_params()["checkpoint"]
+    models = {
+        default: {"name": "Default Model", "samplers": {"euler_ancestral": ["normal"]},
+                  "steps": [20, 40], "cfg": [3, 6],
+                  "start": {"sampler_name": "euler_ancestral", "scheduler": "normal",
+                            "steps": 30, "cfg": 4}},
+        "example_other.safetensors": {
+            "name": "Other Model", "samplers": {"dpmpp_2m": ["karras"]},
+            "steps": [30, 40], "cfg": [3, 7],
+            "start": {"sampler_name": "dpmpp_2m", "scheduler": "karras", "steps": 35, "cfg": 5}},
+    }
+    monkeypatch.setattr(advice_module, "model_recommendations", lambda: models)
+    monkeypatch.setattr(
+        sdxl_t2i_module, "list_model_files",
+        lambda category, fallback, **terms: (
+            [*fallback, "example_other.safetensors"] if category == "checkpoints" else list(fallback)))
+    return models
+
+
+def _drawing_settings(panel):
+    values = panel._param_form.get_values()
+    return values["sampler_name"], values["scheduler"], values["steps"], values["cfg"]
+
+
+def test_a_fresh_picture_starts_on_its_models_recommended_settings(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    assert _drawing_settings(blank_panel) == ("euler_ancestral", "normal", 30, 4.0)
+
+
+def test_picking_another_model_for_a_fresh_picture_takes_that_models_settings(
+        blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    blank_panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+
+    assert _drawing_settings(blank_panel) == ("dpmpp_2m", "karras", 35, 5.0)
+
+
+def test_picking_another_model_for_a_shown_picture_keeps_its_settings(recommended, saved_panel):
+    panel, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    panel.show_saved_generation(image, [image])
+    shown = _drawing_settings(panel)
+
+    panel._param_form._widgets["checkpoint"].setCurrentText("example_other.safetensors")
+
+    assert _drawing_settings(panel) == shown
+
+
+def test_a_models_recommended_settings_stay_with_its_workflow(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "wan22_t2i"))
+
+    values = blank_panel._param_form.get_values()
+    defaults = WORKFLOW_REGISTRY["wan22_t2i"].default_params()
+    assert (values["steps"], values["cfg"]) == (defaults["steps"], defaults["cfg"])

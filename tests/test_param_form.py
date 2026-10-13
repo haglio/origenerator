@@ -1301,11 +1301,6 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
 
 # --- collapsible sections: consistent grouping across workflows -------------
 
-def _display_order(form):
-    """Every field/row key in the order it renders, flattened across sections."""
-    return [k for t in form._section_order for k in form._present_keys[t]]
-
-
 def test_fields_are_grouped_into_collapsible_sections(qtbot):
     form = ParamForm([
         ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
@@ -1349,17 +1344,17 @@ def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):
     form = ParamForm(defs, hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
     shown = [d.key for d in defs if d.key not in wf.enhance_keys()]
-    assert _display_order(form) == sorted(shown, key=param_sections.key_rank)
+    assert form._keys_in_order() == sorted(shown, key=param_sections.key_rank)
     # Not vacuous: sdxl declares model-before-seed and dims-before-sampling, which
     # the canonical order reshuffles — so the two orders genuinely differ.
-    assert _display_order(form) != shown
+    assert form._keys_in_order() != shown
 
 
 def test_shared_sections_appear_in_the_same_order_across_workflows(qtbot):
     def section_sequence(name):
         form = ParamForm(WORKFLOW_REGISTRY[name].param_definitions())
         qtbot.addWidget(form)
-        return [t for t in form._section_order if form._present_keys[t]]
+        return [title for title, keys in form._present_keys.items() if keys]
 
     sdxl = section_sequence("sdxl_t2i")
     i2v = section_sequence("wan22_i2v")
@@ -1373,7 +1368,7 @@ def test_hidden_params_get_no_field(qtbot):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     form = ParamForm(wf.param_definitions(), hidden_keys=wf.enhance_keys())
     qtbot.addWidget(form)
-    shown = set(_display_order(form))
+    shown = set(form._keys_in_order())
     assert shown.isdisjoint(set(wf.enhance_keys()))
     assert "enhance" not in form._widgets
 
@@ -2126,6 +2121,20 @@ def test_clicking_a_sections_warning_resolves_every_warning_in_it_and_none_outsi
 
     values = form.get_values()
     assert (values["steps"], values["cfg_high"], values["lora_strength_high"]) == (40, 6.0, 1.5)
+
+
+def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"steps": 50, "lora_strength_high": 1.5})
+    form.set_warnings({**_STEPS_ADVICE, **_STRENGTH_ADVICE})
+
+    assert form.every_warning() == (
+        "LoRA Strength (First Pass): Example LoRA's page recommends a strength of 0.8–1.2. "
+        "Click to use 1.2.\n"
+        "Steps: Example Model's page recommends 20–40 steps. Click to use 40.")
+    form.resolve_every_warning()
+    values = form.get_values()
+    assert (values["steps"], values["lora_strength_high"]) == (40, 1.2)
 
 
 def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):

@@ -181,7 +181,6 @@ class ParamForm(QWidget):
         # reproduces them, without showing them.
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
-        self._section_order: list[str] = []
         # The keys occupying each section, in row order.
         self._present_keys: dict[str, list[str]] = {}
         self._label_columns: dict[str, LabelColumn] = {}
@@ -253,7 +252,6 @@ class ParamForm(QWidget):
             self._sections[title] = section
             self._present_keys[title] = []
             self._label_columns[title] = LabelColumn()
-            self._section_order.append(title)
             outer.addWidget(section)
         outer.addStretch(1)  # collect any slack at the foot, not between sections
 
@@ -421,6 +419,15 @@ class ParamForm(QWidget):
             mark.warn(self._warning(key))
         for title, section in self._sections.items():
             section.warning.warn(self._warnings_about(self._present_keys[title]))
+
+    def every_warning(self) -> str:
+        return self._warnings_about(self._keys_in_order())
+
+    def resolve_every_warning(self) -> None:
+        self._resolve_warnings(self._keys_in_order())
+
+    def _keys_in_order(self) -> list[str]:
+        return [key for keys in self._present_keys.values() for key in keys]
 
     def _warning(self, key: str) -> str:
         found = self._advice.get(key)

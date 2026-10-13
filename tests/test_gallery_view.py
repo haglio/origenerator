@@ -601,10 +601,10 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     # them again -- for that list, which is the only one on screen then.
     assert asked == [([LANDSCAPE, "portrait"], ["i1"])]
 
-    view._tree.both_button.click()
+    view._tree.together_button.click()
 
     assert asked[-1] == (["both"], ["i1"])
-    view._tree.each_shape_button.click()
+    view._tree.separate_button.click()
     workflow = _image_workflow(view._tree)
     assert workflow.data(0, RECENT_ROLE)
     assert "worked in recently" in workflow.toolTip(0)   # so the mark says what it means
@@ -3215,7 +3215,7 @@ def test_both_radios_wear_the_waiting_cursor_while_they_redraw(qtbot, monkeypatc
             while_drawing.append(QApplication.overrideCursor()), _real(*a))[1])
 
     view._videos_only.setChecked(True)
-    view._tree.both_button.click()
+    view._tree.together_button.click()
 
     assert [cursor and cursor.shape() for cursor in while_drawing] == [
         Qt.CursorShape.WaitCursor, Qt.CursorShape.WaitCursor]

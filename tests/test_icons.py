@@ -122,7 +122,7 @@ def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
     # Laid out at numbers of its own, the pair came out wider than its canvas:
     # the upright frame's left edge and the lying-down one's right edge were cut
     # off at the sides of the button.
-    assert not _ink_at_the_edges(icons.each_shape_mark(BUTTON_MARK))
+    assert not _ink_at_the_edges(icons.separate_mark(BUTTON_MARK))
 
 
 def test_a_shelf_mark_is_drawn_once():

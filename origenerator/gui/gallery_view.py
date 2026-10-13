@@ -794,7 +794,7 @@ class GalleryView(QWidget):
         # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
         self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
-        self._tree.offer_both(self._fun_time is None)
+        self._tree.offer_separate_and_together(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
@@ -1029,7 +1029,7 @@ class GalleryView(QWidget):
         if self._osr2_motion is not None:
             self._osr2_motion.stop()
         self._fun_time = session
-        self._tree.offer_both(False)
+        self._tree.offer_separate_and_together(False)
         self._shows.become_hosted(session)
         self._info_tabs.become_hosted(session)
         self._voice.become_hosted()
@@ -1048,7 +1048,7 @@ class GalleryView(QWidget):
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
-        self._tree.offer_both(True)
+        self._tree.offer_separate_and_together(True)
         self._shows.become_standalone(self._osr2_motion)
         self._info_tabs.become_standalone()
         self._bank.become_standalone()

@@ -13,7 +13,7 @@ of workflow/model/LoRA a folder is; the media-type badges
 (:func:`media_type_badge`) are corner chips marking a Recents tile as an image
 or a video.
 
-:func:`side_mark` and :func:`each_shape_mark` are the marks over the table of
+:func:`side_mark` and :func:`separate_mark` are the marks over the table of
 contents and on the radio that chooses how it is drawn: a frame of the
 proportions each side holds, drawn here because what they say is the difference
 between them rather than any one named mark.  :func:`recent_mark_icon`
@@ -359,7 +359,7 @@ def both_kinds_mark(size: int = MARK_BESIDE_A_WORD) -> QPixmap:
 
 
 @cache
-def each_shape_mark(size: int) -> QPixmap:
+def separate_mark(size: int) -> QPixmap:
     """The two frames side by side: a list of each shape rather than one of
     both. Sized by its caller, the radio over the list being the only one."""
     def draw(painter: QPainter):

@@ -178,8 +178,8 @@ def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_li
     view.show()
     qtbot.waitExposed(view)
 
-    assert not view._tree.each_shape_button.isVisible()
-    assert not view._tree.both_button.isVisible()
+    assert not view._tree.separate_button.isVisible()
+    assert not view._tree.together_button.isVisible()
     assert view._tree._splitter.mapTo(view._tree, QPoint()).y() == 0
 
 
@@ -1347,7 +1347,7 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
 def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed_back(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    buttons = (view._tree.each_shape_button, view._tree.both_button)
+    buttons = (view._tree.separate_button, view._tree.together_button)
 
     view.become_hosted(_session())
     hosted = [button.isVisibleTo(view) for button in buttons]

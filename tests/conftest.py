@@ -58,8 +58,9 @@ import urllib.request
 import winsound
 
 import pytest
-from PyQt6.QtCore import QCoreApplication, QEvent, QObject, pyqtSignal, qInstallMessageHandler
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
+from PyQt6.QtCore import QCoreApplication, QEvent, QObject, Qt, pyqtSignal, qInstallMessageHandler
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
 
 from origenerator import config, osr2_driver, osr2_motion_driver
@@ -560,3 +561,21 @@ def _previews_start_running():
     omnipause.freeze(False)
     yield
     omnipause.freeze(False)
+
+
+@pytest.fixture(autouse=True)
+def _no_mouse_button_left_held():
+    """Let go of whatever a test pressed and never released.
+
+    QTest carries the buttons it pressed from one event to the next, for the
+    whole run: a drag whose QDrag.exec is stood in for never sees its release,
+    so the next test's click through a window arrives with that button still
+    held, and lands as part of a drag that began in a widget already gone.
+    """
+    yield
+    if QApplication.instance() is None:
+        return
+    stand_in = QWidget()
+    for button in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton,
+                   Qt.MouseButton.RightButton):
+        QTest.mouseRelease(stand_in, button)

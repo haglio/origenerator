@@ -559,6 +559,8 @@ class ShowDirector:
         if built:
             self._present_surface(view, side)
             view.set_queue(*self._host.queue_now())
+        elif view.isMinimized():
+            view.showFullScreen()
         return view
 
     def items_of(self, rows) -> list:

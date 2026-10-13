@@ -130,7 +130,8 @@ from origenerator.voice.commands import match_voice_command as match
 from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from tests.show_hud_support import engine_of, hud_button_names, panel_targets
+from tests import gestures
+from tests.show_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
@@ -7262,6 +7263,22 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
 
     show.press(f"{side}_lock")
     assert show.locked is True
+    show.close()
+
+
+def test_starting_a_show_while_the_last_one_sits_minimized_puts_it_back_on_screen(
+        qtbot, monkeypatch):
+    view, show = _a_show_standing_on_its_own(qtbot, monkeypatch)
+    view.resize(1200, 800)
+    view.show()
+    qtbot.waitExposed(view)
+    gestures.click(show._pane._window, button_on_screen(show, f"{show.hud_side}_minimize"))
+    assert show.isMinimized()
+
+    gestures.click(view._bank.slideshow, view._bank.slideshow.rect().center())
+
+    assert view._shows.showing is show
+    assert not show.isMinimized()
     show.close()
 
 

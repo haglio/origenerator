@@ -95,6 +95,7 @@ class FakeShow:
         self.fullscreen = 0
         self.closes = 0
         self.visible = True
+        self.minimized = False
         self.live = False
         self.ids = set()
         self.hud_order_label = SHUFFLE_LABEL
@@ -248,6 +249,10 @@ class FakeShow:
     # the window it is
     def showFullScreen(self):
         self.fullscreen += 1
+        self.minimized = False
+
+    def isMinimized(self):
+        return self.minimized
 
     def show(self):
         self.shown += 1

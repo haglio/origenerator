@@ -76,7 +76,7 @@ from origenerator.library_views import LibraryViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.seed_history import SeedUse, SeedUseKind, seed_history
-from origenerator.setting_advice import fresh_settings
+from origenerator.setting_advice import fresh_settings, setting_advice
 from origenerator.timing import estimate_label
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -581,6 +581,7 @@ class GenerateConfigPanel(QWidget):
             self._form_checkpoint = checkpoint
         else:
             self._clear_form()  # no workflow picked: nothing below is known yet
+        self._refresh_warnings()
         self._refresh_estimate()
         self.refresh_generate_caption()
         self._sync_generate()
@@ -620,6 +621,10 @@ class GenerateConfigPanel(QWidget):
         with self._loading():
             self._param_form.set_values(following)
 
+    def _refresh_warnings(self):
+        if self._param_form is not None:
+            self._param_form.set_warnings(setting_advice(self._param_form.get_values()))
+
     def _detach_form(self):
         """Take the installed form off the panel, if there is one.
 
@@ -653,6 +658,7 @@ class GenerateConfigPanel(QWidget):
         self._param_form.changed.connect(self.form_edited)
         self._param_form.changed.connect(self._note_user_edit)
         self._param_form.changed.connect(self._follow_the_model)
+        self._param_form.changed.connect(self._refresh_warnings)
         self._param_form.changed.connect(self.refresh_modified_notice)
         self._param_form.changed.connect(self._mark_recipe_prompt_edits)
         # Any edit can make the config match a past generation, or stop matching one.

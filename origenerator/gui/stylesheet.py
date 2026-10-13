@@ -3,6 +3,7 @@ from __future__ import annotations
 from shared_ui import palette
 from shared_ui.chrome import control_ground, family_stylesheet, field_rules, tool_button_rules
 from shared_ui.colors import (
+    AMBER,
     BG_SECONDARY,
     BG_TERTIARY,
     BLUE,
@@ -102,6 +103,9 @@ def build_stylesheet() -> str:
     }}
     QLabel#dimensionsHint {{
         color: {_h(TEXT_MUTED)};
+    }}
+    QLabel#warningMark {{
+        color: {_h(AMBER)};
     }}
 {field_rules()}
     QSpinBox, QDoubleSpinBox {{

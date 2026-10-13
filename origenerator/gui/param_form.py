@@ -31,6 +31,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.seed_history import SeedHistory
+from origenerator.setting_advice import ADVISED_KEYS
 from origenerator.speech import CUSTOM_VOICE
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.derived_size import override_size
@@ -161,6 +162,7 @@ class ParamForm(QWidget):
         # and the seeds, the read-only inspect pane's copy targets before it merged
         # into this editable form.
         self._copy_buttons: dict[str, CopyButton] = {}
+        self._warning_marks: dict[str, QLabel] = {}
         # A single swap-width-and-height button, built only when the workflow has
         # both dimension params (t2i does; i2v derives its size in-graph). None
         # when absent, so callers can tell whether the control exists. It floats as
@@ -322,10 +324,10 @@ class ParamForm(QWidget):
         """The input, optionally paired with trailing controls.
 
         The copy button leads (just right of the input), then the Random tick
-        (seed) or Browse button (image). Each sits in a shared cell so the label
-        column stays aligned across every row. Next to a tall multiline prompt the
-        copy button hugs the top corner; next to a single-line seed it centers so
-        it lines up with the tick beside it.
+        (seed), the Browse button (image) or the warning mark. Each sits in a
+        shared cell so the label column stays aligned across every row. Next to a
+        tall multiline prompt the copy button hugs the top corner; next to a
+        single-line seed it centers so it lines up with the tick beside it.
         """
         extras = self._make_extras(pd)
         if not extras:
@@ -366,7 +368,18 @@ class ParamForm(QWidget):
             )
             self._browse_buttons[pd.key] = browse
             extras.append(browse)
+        if pd.key in ADVISED_KEYS:
+            mark = QLabel("⚠")
+            mark.setObjectName("warningMark")
+            mark.hide()
+            self._warning_marks[pd.key] = mark
+            extras.append(mark)
         return extras
+
+    def set_warnings(self, advice: dict[str, str]) -> None:
+        for key, mark in self._warning_marks.items():
+            mark.setToolTip(advice.get(key, ""))
+            mark.setHidden(key not in advice)
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:
         """Mark a prompt field with the change a spoken request made to it —

@@ -2913,3 +2913,14 @@ def test_a_models_recommended_settings_stay_with_its_workflow(blank_panel, recom
     values = blank_panel._param_form.get_values()
     defaults = WORKFLOW_REGISTRY["wan22_t2i"].default_params()
     assert (values["steps"], values["cfg"]) == (defaults["steps"], defaults["cfg"])
+
+
+def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    mark = blank_panel._param_form._warning_marks["steps"]
+    assert mark.isHidden()
+
+    blank_panel._param_form._widgets["steps"].setValue(80)
+
+    assert not mark.isHidden()
+    assert mark.toolTip() == "Default Model's page recommends 20–40 steps."

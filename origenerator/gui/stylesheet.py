@@ -13,6 +13,7 @@ from shared_ui.colors import (
     TEXT_PRIMARY,
     TEXT_SECONDARY,
     family_palette,
+    hovered,
 )
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
@@ -405,6 +406,11 @@ def build_stylesheet() -> str:
     QLabel#dropSlot[dragActive="true"] {{
         border: 1px solid {_h(BLUE)};
         background-color: {_h(BG_TERTIARY)};
+        color: {_h(TEXT_PRIMARY)};
+    }}
+    QLabel#dropSlot[dropTarget="true"] {{
+        border: 1px solid {_h(BLUE)};
+        background-color: {_h(hovered(BG_TERTIARY))};
         color: {_h(TEXT_PRIMARY)};
     }}
     """

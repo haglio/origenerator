@@ -4,11 +4,14 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMovie
+from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
+from shared_ui.colors import hovered
+from shared_ui.testing import ground
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.stylesheet import build_stylesheet
 
 
 def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
@@ -175,6 +178,46 @@ def test_set_candidate_lights_and_clears_the_slot(qtbot):
 
     slot.set_candidate(False)
     assert slot._label.property("dragActive") is False  # cleared when the drag ends
+
+
+def test_a_drag_over_the_slot_lights_it_as_where_the_drop_lands(qtbot):
+    slot = _slot(qtbot)
+
+    _drag_enter(slot, "img1")
+    assert slot._label.property("dropTarget") is True
+
+    slot.dragLeaveEvent(QDragLeaveEvent())
+    assert slot._label.property("dropTarget") is False
+
+
+def test_a_drag_the_slot_would_turn_away_does_not_light_it(qtbot):
+    slot = _slot(qtbot, lent_by=_pictures_only)
+
+    _drag_enter(slot, "vid1")
+
+    assert slot._label.property("dropTarget") is False
+
+
+def test_letting_go_over_the_slot_puts_it_out(qtbot):
+    slot = _slot(qtbot)
+    _drag_enter(slot, "img1")
+
+    _drop(slot, "img1")
+
+    assert slot._label.property("dropTarget") is False
+
+
+def test_the_slot_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(qtbot):
+    slot = _slot(qtbot)
+    slot.setStyleSheet(build_stylesheet())
+    slot.show()
+    qtbot.waitExposed(slot)
+    slot.set_candidate(True)
+    lit = ground(slot._label)
+
+    _drag_enter(slot, "img1")
+
+    assert ground(slot._label) == hovered(QColor(lit)).name()
 
 
 def test_accepts_delegates_to_the_predicate(qtbot):

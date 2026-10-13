@@ -63,6 +63,7 @@ class DropSlot(QWidget):
         self._label = QLabel(placeholder)
         self._label.setObjectName("dropSlot")
         self._label.setProperty("dragActive", False)  # lit while a matching drag is underway
+        self._label.setProperty("dropTarget", False)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setWordWrap(True)
         self._label.setMinimumHeight(_PREVIEW_SIZE)
@@ -143,27 +144,37 @@ class DropSlot(QWidget):
         Driven by the drag's start/end, not by hover, so the drop zone stands out
         the moment a matching drag begins — you see where to aim before arriving.
         """
-        if self._label.property("dragActive") == active:
+        self._light("dragActive", active)
+
+    def set_targeted(self, targeted: bool):
+        self._light("dropTarget", targeted)
+
+    def _light(self, state: str, on: bool):
+        if self._label.property(state) == on:
             return
-        self._label.setProperty("dragActive", active)
+        self._label.setProperty(state, on)
         self._label.style().unpolish(self._label)
         self._label.style().polish(self._label)
 
     def dragEnterEvent(self, event):
-        # Accept so the drop lands (and the OS shows a "can drop" cursor); the
-        # highlight is already on from drag-start, so nothing to toggle here.
-        if self._lent(event.mimeData()) is not None:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
+        self._aim(event)
 
     def dragMoveEvent(self, event):
-        if self._lent(event.mimeData()) is not None:
+        self._aim(event)
+
+    def _aim(self, event):
+        lands = self._lent(event.mimeData()) is not None
+        self.set_targeted(lands)
+        if lands:
             event.acceptProposedAction()
         else:
             event.ignore()
 
+    def dragLeaveEvent(self, event):
+        self.set_targeted(False)
+
     def dropEvent(self, event):
+        self.set_targeted(False)
         held = self._lent(event.mimeData())
         if held is None:
             event.ignore()

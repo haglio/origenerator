@@ -5,7 +5,7 @@ from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
-from origenerator.gallery.collection import RECENTS_KEY
+from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, RECENTS_KEY
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.folder_tree import (
     COUNT_ROLE,
@@ -397,6 +397,11 @@ def _row_pixels(tree, item) -> list:
             for x in range(tree.viewport().width())]
 
 
+def _wears_within(tree, item, columns: QRect, ink) -> bool:
+    return any(ink(color) for x, color in _row_pixels(tree, item)
+               if columns.left() <= x <= columns.right())
+
+
 def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
     # The platform draws a picked row an accent bar down its left edge on top of
     # that ground -- straight through the mark the row leads with, and saying
@@ -445,8 +450,19 @@ def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
     tree, leaf = _tree_with_leaf(qtbot, favorite=True)
     star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
 
-    assert any(_is_green(color) for x, color in _row_pixels(tree, leaf)
-               if star.left() <= x <= star.right())
+    assert _wears_within(tree, leaf, star, _is_green)
+
+
+def test_a_picked_favorited_folders_star_is_ringed_in_white(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot, favorite=True)
+    tree.setStyleSheet(build_stylesheet())
+    star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    assert not _wears_within(tree, leaf, star, _is_white)
+
+    tree.setCurrentItem(leaf)
+
+    assert _wears_within(tree, leaf, star, _is_white)
+    assert _wears_within(tree, leaf, star, _is_green)
 
 
 def _laid_out(tree, item, element) -> QRect:
@@ -458,15 +474,15 @@ def _laid_out(tree, item, element) -> QRect:
     return tree.style().subElementRect(element, option, tree)
 
 
-def _tree_with_a_collection(qtbot):
+def _tree_with_a_collection(qtbot, which=RECENTS_KEY):
     """A collection row under a workflow folder, under All, the way a side lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")
     folder = _folder_row("Workflow", "wf")
     folder.setIcon(0, icons.level_badge_icon("workflow"))
-    collection = QTreeWidgetItem(["Latest"])
-    collection.setIcon(0, icons.collection_icon(RECENTS_KEY))
+    collection = QTreeWidgetItem([COLLECTION_LABELS[which]])
+    collection.setIcon(0, icons.collection_icon(which))
     folder.addChild(collection)
     top.addChild(folder)
     tree.addTopLevelItem(top)
@@ -487,6 +503,18 @@ def test_a_picked_collection_row_is_blue_from_its_mark_to_its_name(qtbot):
     image = tree.viewport().grab().toImage()
     between = [image.pixelColor(x, middle).name() for x in range(mark.right() + 1, name.left())]
     assert between and set(between) == {BLUE.name()}
+
+
+def test_a_picked_favorites_rows_star_is_ringed_in_white(qtbot):
+    tree, favorites = _tree_with_a_collection(qtbot, FAVORITES_KEY)
+    tree.setStyleSheet(build_stylesheet())
+    mark = _laid_out(tree, favorites, QStyle.SubElement.SE_ItemViewItemDecoration)
+    assert not _wears_within(tree, favorites, mark, _is_white)
+
+    tree.setCurrentItem(favorites)
+
+    assert _wears_within(tree, favorites, mark, _is_white)
+    assert _wears_within(tree, favorites, mark, _is_green)
 
 
 def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):

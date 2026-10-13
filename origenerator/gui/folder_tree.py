@@ -159,11 +159,11 @@ class FolderTree(QTreeWidget):
 
     def drawRow(self, painter, option, index):
         super().drawRow(painter, option, index)
+        mode = (QIcon.Mode.Selected if self.selectionModel().isSelected(index)
+                else QIcon.Mode.Normal)
         if index.data(RECENT_ROLE):
-            picked = self.selectionModel().isSelected(index)
             self._recent.paint(painter, _mark_rect(self.visualRect(index)),
-                               Qt.AlignmentFlag.AlignCenter,
-                               QIcon.Mode.Selected if picked else QIcon.Mode.Normal)
+                               Qt.AlignmentFlag.AlignCenter, mode)
         group = self._group_with_actions(index)
         if group is None:
             return
@@ -171,7 +171,10 @@ class FolderTree(QTreeWidget):
         if not (group.favorite or hovered):
             return
         star_rect, delete_rect = _action_rects(self.visualRect(index))
-        (self._star_on if group.favorite else self._star).paint(painter, star_rect)
+        if group.favorite:
+            self._star_on.paint(painter, star_rect, Qt.AlignmentFlag.AlignCenter, mode)
+        else:
+            self._star.paint(painter, star_rect)
         if hovered:
             self._delete.paint(painter, delete_rect)
 

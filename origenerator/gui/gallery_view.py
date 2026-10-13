@@ -114,7 +114,7 @@ from origenerator.gui.notice_overlay import ERROR, NOTICE
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.pane_arrangement import PaneArrangement
-from origenerator.gui.panes import FootSplitter, pane, pane_splitter
+from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_still, pane
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
@@ -782,6 +782,7 @@ class GalleryView(QWidget):
             info_tabs=self._info_tabs, queue=self._queue)
         layout.addWidget(self._arrangement.hosted() if self._fun_time is not None
                          else self._arrangement.standalone(), 1)
+        hold_the_borders_still(self, self._fun_time is not None)
 
     def _build_toc_pane(self):
         """The left pane's sections: the OSR2 HUD of a window that drives the
@@ -851,7 +852,7 @@ class GalleryView(QWidget):
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
             sections.insert(0, self._motion_pane)
-        toc = pane_splitter(Qt.Orientation.Vertical)
+        toc = PaneSplitter(Qt.Orientation.Vertical)
         for section in sections:
             toc.addWidget(section)
         toc.setStretchFactor(sections.index(finding), 1)  # the folder list takes the height
@@ -1048,6 +1049,7 @@ class GalleryView(QWidget):
         self._kept_device = (self._osr2_motion, self._osr2_driver, self._motion_panel)
         self._osr2_motion = self._osr2_driver = self._motion_panel = None
         self._arrangement.fold_into_the_session_column(self.layout())
+        hold_the_borders_still(self, True)
 
     def become_standalone(self) -> None:
         self.set_room_paused(False)
@@ -1065,6 +1067,7 @@ class GalleryView(QWidget):
             drive=self.osr2_control if self._osr2_motion is not None else None,
             mic=self._bank.mic)
         self._arrangement.unfold_from_the_session_column(self.layout())
+        hold_the_borders_still(self, False)
 
     def _wire_config_panel(self, panel):
         """Route a config tab's footer links to the gallery: its "from source

@@ -68,7 +68,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.panes import pane, pane_splitter
+from origenerator.gui.panes import PaneSplitter, pane
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
@@ -286,6 +286,7 @@ class GenerateConfigPanel(QWidget):
         body.addStretch(1)
         self._settings_pane = self._build_settings_pane()
         self._media_split.addWidget(self._settings_pane)
+        self._media_split.hold_still(self._fun_time is not None)
         layout.addWidget(self._media_split, 1)
         self._media_side_by_side = False
         # Lays out the empty state on a fresh panel — no form, no estimate, and a
@@ -311,7 +312,7 @@ class GenerateConfigPanel(QWidget):
         # between them is a drag handle like every other pane boundary in this
         # app: a tall picture can be given the room it wants without the form
         # being pinned to a ratio someone else chose.
-        self._media_split = pane_splitter(Qt.Orientation.Vertical)
+        self._media_split = PaneSplitter(Qt.Orientation.Vertical)
         # The picture keeps its margin inside this, so the splitter itself can
         # span the tab (see _build_ui).
         self._preview_pane, preview_column = pane()

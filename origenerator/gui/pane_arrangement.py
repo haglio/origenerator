@@ -22,7 +22,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QBoxLayout, QSplitter, QWidget
 
-from origenerator.gui.panes import pane_splitter
+from origenerator.gui.panes import PaneSplitter
 
 
 class PaneArrangement:
@@ -32,8 +32,8 @@ class PaneArrangement:
         self._info_pane = info_pane
         self._info_tabs = info_tabs
         self._queue = queue
-        self.panes = pane_splitter(Qt.Orientation.Horizontal)
-        self.folder_panes = pane_splitter(Qt.Orientation.Horizontal)
+        self.panes = PaneSplitter(Qt.Orientation.Horizontal)
+        self.folder_panes = PaneSplitter(Qt.Orientation.Horizontal)
         self.stack: QSplitter | None = None
         self.left_column: QSplitter | None = None
         toc.setMinimumWidth(120)
@@ -42,7 +42,7 @@ class PaneArrangement:
 
     def standalone(self) -> QSplitter:
         """The three panes side by side, as a window of its own opens them."""
-        self.left_column = pane_splitter(Qt.Orientation.Vertical)
+        self.left_column = PaneSplitter(Qt.Orientation.Vertical)
         self.folder_panes.insertWidget(0, self._toc)
         self.left_column.addWidget(self.folder_panes)
         self.left_column.addWidget(self._queue)
@@ -76,7 +76,7 @@ class PaneArrangement:
 
     def hosted(self) -> QSplitter:
         """The upright arrangement a Fun Time session's rect asks for."""
-        self.stack = pane_splitter(Qt.Orientation.Vertical)
+        self.stack = PaneSplitter(Qt.Orientation.Vertical)
         # Hosted, the queue is not the folder column's strip.  It spans the
         # whole foot of the rect (added to stack below), so the corner
         # under the tree is the queue rather than more tree — which is where

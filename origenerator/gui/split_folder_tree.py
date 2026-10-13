@@ -30,7 +30,7 @@ from origenerator.gallery.sides import BOTH, ORIENTATIONS, SIDE_LABELS, SIDES
 from origenerator.gui import icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
-from origenerator.gui.panes import pane_splitter
+from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.stylesheet import CHOSEN
 
 _MIN_SECTION_HEIGHT = 90
@@ -124,7 +124,7 @@ class SplitFolderTree(QWidget):
         self._sides = ORIENTATIONS
         self._active = ORIENTATIONS[0]
 
-        self._splitter = pane_splitter(Qt.Orientation.Vertical)
+        self._splitter = PaneSplitter(Qt.Orientation.Vertical)
         for side in SIDES:
             self._splitter.addWidget(self._build_section(group_role, side))
             self._splitter.setStretchFactor(len(self._trees) - 1, 1)

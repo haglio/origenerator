@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent
+from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
 from shared_ui.colors import hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
@@ -268,6 +268,19 @@ def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
 
     panel._between.dragLeaveEvent(QDragLeaveEvent())
     assert not _under_the_drag(panel.image_slot) and not _under_the_drag(panel.video_slot)
+
+
+def test_both_slots_stay_lit_while_the_drag_moves_about_between_them(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    _drag_over(panel._between, "vid1")
+    mime = generation_mime("vid1")
+    event = QDragMoveEvent(QPoint(5, 3), Qt.DropAction.CopyAction, mime,
+                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    panel._between.dragMoveEvent(event)
+
+    assert event.isAccepted()
+    assert _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
 
 
 def test_letting_go_between_the_slots_puts_both_out(qtbot):

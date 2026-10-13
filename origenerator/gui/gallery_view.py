@@ -794,8 +794,6 @@ class GalleryView(QWidget):
         # its own: the table of contents exists once per side, and which one you
         # are in is what decides the screen a slideshow goes to.
         self._tree = SplitFolderTree(_GROUP_ROLE)  # its rows offer star/delete themselves
-        # A mixed show has no region to land on inside a session, which plays a
-        # shape on each of its two screens, so Both is standalone's alone.
         self._tree.offer_both(self._fun_time is None)
         self._tree.sides_changed.connect(self._on_sides_changed)
         self._tree_view = GalleryTree(self._tree)  # fills it + the key/prompt→item maps
@@ -1031,8 +1029,6 @@ class GalleryView(QWidget):
         if self._osr2_motion is not None:
             self._osr2_motion.stop()
         self._fun_time = session
-        # The room plays a shape on each of its two screens, so a mixed show has
-        # nowhere to land and the list goes back to the two shapes.
         self._tree.offer_both(False)
         self._shows.become_hosted(session)
         self._info_tabs.become_hosted(session)
@@ -1052,7 +1048,7 @@ class GalleryView(QWidget):
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
-        self._tree.offer_both(True)   # one screen again, so a mixed show can play
+        self._tree.offer_both(True)
         self._shows.become_standalone(self._osr2_motion)
         self._info_tabs.become_standalone()
         self._bank.become_standalone()

@@ -173,6 +173,16 @@ def test_fun_time_gallery_has_no_collapse_toggle_on_its_left_pane(qtbot):
     assert view._arrangement.panes.isCollapsible(0)
 
 
+def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_list(qtbot):
+    view = _fun_time_view(qtbot)
+    view.show()
+    qtbot.waitExposed(view)
+
+    assert not view._tree.each_shape_button.isVisible()
+    assert not view._tree.both_button.isVisible()
+    assert view._tree._splitter.mapTo(view._tree, QPoint()).y() == 0
+
+
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
     """Standalone the folder column and the info pane sit beside each other,
     with the tree inside that column rather than out on the window's edge."""
@@ -1332,6 +1342,19 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
     assert arrangement.left_column.widget(0) is arrangement.folder_panes
     assert arrangement.left_column.widget(1) is view._queue
     assert arrangement.folder_panes.count() == built._arrangement.folder_panes.count() == 2
+
+
+def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed_back(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    buttons = (view._tree.each_shape_button, view._tree.both_button)
+
+    view.become_hosted(_session())
+    hosted = [button.isVisibleTo(view) for button in buttons]
+    view.become_standalone()
+
+    assert hosted == [False, False]
+    assert [button.isVisibleTo(view) for button in buttons] == [True, True]
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):

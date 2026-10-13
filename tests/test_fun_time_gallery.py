@@ -264,8 +264,10 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
         qtbot.addWidget(slideshow)
 
 
-def test_esc_reaching_a_gallery_in_a_session_stops_its_slideshow(qtbot, tmp_path, monkeypatch):
-    view = _fun_time_view(qtbot)
+def test_esc_reaching_a_gallery_in_a_session_asks_the_session_for_omnipause(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100)
     slideshow = view._slideshows._region_slideshows["landscape"]
@@ -273,25 +275,9 @@ def test_esc_reaching_a_gallery_in_a_session_stops_its_slideshow(qtbot, tmp_path
 
     assert _press_escape(view) is True
 
-    assert not slideshow.is_showing()
-
-
-def test_esc_again_puts_the_slideshow_back_on_its_own_region(qtbot, tmp_path, monkeypatch):
-    view = _fun_time_view(qtbot)
-    _keys_are_the_gallerys(view)
-    _open_slideshow(view, monkeypatch, tmp_path, "wide", 200, 100, count=2)
-    slideshow = view._slideshows._region_slideshows["landscape"]
-    qtbot.addWidget(slideshow)
-    slideshow.step(1)
-    was_showing = slideshow.hud_prompt_id
-
-    _press_escape(view)
-    _press_escape(view)
-
-    again = view.region_slideshow("landscape")
-    qtbot.addWidget(again)
-    assert again is not slideshow
-    assert again.hud_prompt_id == was_showing
+    channel = tmp_path / "dashboard_cmd.txt"
+    assert channel.read_text(encoding="utf-8").split() == ["omnipause_toggle"]
+    assert slideshow.is_showing()
 
 
 def test_a_new_slideshow_replaces_the_regions_current_occupant(qtbot, tmp_path, monkeypatch):

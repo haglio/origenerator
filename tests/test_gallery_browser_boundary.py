@@ -200,8 +200,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     and at each crossing. 275 -> 276: a folder Auto-Generate runs in takes a
     star, as a folder dropped onto Favorites does, so putting a folder's star
     where it is asked to be -- which the star's own toggle, that drop and the
-    loop all ask -- is one method.)"""
+    loop all ask -- is one method. 276 -> 273: Esc pauses the room rather than
+    stopping everything and putting it back, so the four methods that read,
+    stopped and restarted what was running went, and one asks whether the OSR2
+    is moving.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 276
+               for x in _class_def(VIEW, "GalleryView").body) == 273
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 88

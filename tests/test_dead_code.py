@@ -342,7 +342,11 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # does is tests/test_app_link.py and tests/test_link_listener.py.
 # 17887 when cruise control left the app, taken down to what the tree measured.
 # 17882 when the window a headset room has stayed off the monitors.
-MAX_PROSE_LINES = 17882
+# 17795 when Esc came to pause the room rather than stop and restart it: what
+# the key does is test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again,
+# test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up and
+# test_esc_pauses_a_moving_osr2_even_from_a_text_field.
+MAX_PROSE_LINES = 17795
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

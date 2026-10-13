@@ -604,7 +604,7 @@ class PreviewWidget(QWidget):
         self.open_fullscreen()
 
     def open_fullscreen(self):
-        """Pop what's on screen open fullscreen (Escape or a double-click closes it):
+        """Pop what's on screen open fullscreen (a double-click closes it):
         a slideshow of this generation's folder, held on this one.
 
         That's the current file, or — while a generation is running under this pane —

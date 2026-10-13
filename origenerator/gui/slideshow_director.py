@@ -28,7 +28,7 @@ from funestra.hud_placement import HudCorner
 from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import read_mode
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.config import (
@@ -281,16 +281,6 @@ class SlideshowDirector:
         standalone, where that window is the whole of what is up."""
         return _still_up(self._slideshow)
 
-    def is_in_front(self) -> bool:
-        """True when the window ahead of the gallery is our own fullscreen
-        slideshow — one of the things Esc turns off, rather than a window to hand
-        the key back to. A dialog or popup over the slideshow still owns it."""
-        if self._slideshow is None:
-            return False
-        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
-            return False
-        return QApplication.activeWindow() is self._slideshow
-
     def anything_to_play(self) -> bool:
         """Whether the view on screen holds media a slideshow could play at all."""
         return next(self._playable(self._host.rows_to_play()), None) is not None
@@ -500,16 +490,22 @@ class SlideshowDirector:
         if self._fun_time is None:
             self._filters = filters
 
+    def pause_or_play_the_room(self) -> None:
+        if self._fun_time is None:
+            self._host.set_room_paused(not self._room_paused)
+        elif self._session_channel is not None:
+            ask_for_omnipause(self._session_channel)
+
     def _ask_the_room_to_pause(self):
         if self._fun_time is None:
-            return self._pause_or_play_the_room
+            return self._pause_or_play_the_room_while_a_slideshow_is_up
         if self._session_channel is None:
             return None
-        return partial(ask_for_omnipause, self._session_channel)
+        return self.pause_or_play_the_room
 
-    def _pause_or_play_the_room(self) -> None:
+    def _pause_or_play_the_room_while_a_slideshow_is_up(self) -> None:
         if self._window_up() is not None:
-            self._host.set_room_paused(not self._room_paused)
+            self.pause_or_play_the_room()
 
     def _hand_to_the_funestra(self, items, side: str, channel, *, actions, hud,
                             levels, **kwargs):
@@ -844,9 +840,7 @@ class SlideshowDirector:
 
     def _on_closed(self, slideshow=None):
         """A slideshow was dismissed (however): let it go, and hand the OSR2 back to
-        whatever the toggle was driving. A slideshow standing on its own lets go of
-        the room's pause too, since it was the one thing a click could play the
-        room again from. The mic is untouched — it answers to its own button,
+        whatever the toggle was driving. The mic is untouched — it answers to its own button,
         and "start slideshow" has to still be heard now there is no slideshow to
         hear it over.
 
@@ -866,8 +860,8 @@ class SlideshowDirector:
         if self._fun_time is None and self._room_paused:
             self._host.set_room_paused(False)
         if side is not None:
-            # Whatever ended it -- the loop button pressed off, an Escape, a set
-            # culled empty -- the region goes back to browsing its library.  The
+            # Whatever ended it -- the loop button pressed off, a set culled
+            # empty -- the region goes back to browsing its library.  The
             # Funestra under it is blacked for the whole mode, so an empty region
             # is a black rectangle, which is the one thing the base state is for.
             self._region_slideshows[side] = None
@@ -1063,7 +1057,7 @@ class SlideshowDirector:
         """Put *side* back on its base state, if the mode still wants it there.
 
         What a region does when the slideshow covering it ends -- the loop button
-        pressed off, an Escape, a set culled empty.  In origenerator mode the
+        pressed off, a set culled empty.  In origenerator mode the
         Funestra underneath is blacked for the whole mode, so a region left empty
         is a black rectangle rather than a fallback.
         """

@@ -256,7 +256,7 @@ class HeadsetWindow(QObject):
         if target is None or sip.isdeleted(target) or _held_off(target):
             return
         at = self._window.mapToGlobal(self._pointer)
-        QApplication.sendEvent(target, QContextMenuEvent(
+        QApplication.postEvent(target, QContextMenuEvent(
             QContextMenuEvent.Reason.Mouse, target.mapFromGlobal(at), at))
 
     def _scroll(self, delta: int) -> None:

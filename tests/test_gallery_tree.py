@@ -45,20 +45,21 @@ def _folder_of_your_own(folder_id, name):
                                folder_id=folder_id)
 
 
-def _gallery_tree(qtbot, rows, folders_of_your_own=()):
+def _gallery_tree(qtbot, rows, folders_of_your_own=(), folder_meta=None):
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
     tree.populate(
-        [SideModel(LANDSCAPE, gallery.build_gallery_tree(rows),
+        [SideModel(LANDSCAPE, gallery.build_gallery_tree(rows, folder_meta),
                    custom_folders=list(folders_of_your_own), show_recents=True),
-         SideModel(PORTRAIT, [])])
+         SideModel(PORTRAIT, [])],
+        folder_meta=folder_meta)
     return pane, tree
 
 
-def _table_of_contents(qtbot, rows, folders_of_your_own=()):
+def _table_of_contents(qtbot, rows, folders_of_your_own=(), folder_meta=None):
     """The Landscape half, built from ``rows`` and opened all the way down."""
-    pane, _tree = _gallery_tree(qtbot, rows, folders_of_your_own)
+    pane, _tree = _gallery_tree(qtbot, rows, folders_of_your_own, folder_meta)
     pane.resize(500, 1600)
     pane.show()
     qtbot.waitExposed(pane)
@@ -104,7 +105,7 @@ def test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_n
         marks.setdefault(depth, set()).add(_mark_left(half, item))
         names.setdefault(depth, set()).add(_name_left(half, item))
 
-    assert sorted(marks) == [0, 1, 2, 3, 4, 5]
+    assert sorted(marks) == [0, 1, 2, 3, 4, 5, 6]
     assert all(len(lefts) == 1 for lefts in marks.values()), marks
     assert all(len(lefts) == 1 for lefts in names.values()), names
 
@@ -122,6 +123,41 @@ def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):
     assert (all_row.text(0), latest.text(0)) == ("All", "Latest")
     assert _wears(all_row, "database")
     assert _wears(latest, "latest")
+
+
+def _children(item):
+    return [item.child(i) for i in range(item.childCount())]
+
+
+def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
+    half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
+    (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    *collections, images, videos = _children(all_row)
+
+    assert [row.text(0) for row in _children(all_row)] == [
+        "Latest", "Favorites", "Experiments", "Requests", "Trash", "Images", "Videos"]
+    assert all(row.data(0, GROUP_ROLE) is None for row in collections)
+    for kind in (images, videos):
+        assert [isinstance(row.data(0, GROUP_ROLE), gallery.WorkflowGroup)
+                for row in _children(kind)] == [True]
+
+
+def test_images_wear_the_photo_and_videos_the_play_mark_and_say_which_they_are(qtbot):
+    half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
+    (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    *_collections, images, videos = _children(all_row)
+
+    assert _wears(images, "photo") and images.toolTip(0) == "Images"
+    assert _wears(videos, "play") and videos.toolTip(0) == "Videos"
+
+
+def test_a_kind_folder_given_a_name_still_says_which_kind_it_holds(qtbot):
+    half = _table_of_contents(qtbot, [_image("i1", "a cat")],
+                              folder_meta={"image": {"custom_name": "Stills"}})
+    (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
+    *_collections, images = _children(all_row)
+
+    assert (images.text(0), images.toolTip(0)) == ("Stills", "Stills · Images")
 
 
 def _folders_holding(half, workflow_name):

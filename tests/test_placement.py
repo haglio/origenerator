@@ -29,7 +29,8 @@ def _library(rows):
 
 
 def _models(library):
-    (workflow,) = child_groups(library)
+    (images,) = child_groups(library)
+    (workflow,) = child_groups(images)
     return {model.label: model for model in child_groups(workflow)}
 
 

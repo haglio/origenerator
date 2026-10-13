@@ -82,6 +82,12 @@ def _same_name(typed: str, name: str) -> bool:
     return " ".join(typed.split()).casefold() == " ".join(name.split()).casefold()
 
 
+def _tooltip_of(group, badge) -> str:
+    if badge is None or isinstance(group, gallery.SettingsGroup) or badge[1] == group.label:
+        return group.label
+    return f"{group.label} · {badge[1]}"
+
+
 def _shown_collections(side) -> list[str]:
     return [collection for collection in COLLECTIONS
             if (collection != RECENTS_KEY or side.show_recents)
@@ -200,7 +206,7 @@ class GalleryTree:
         """Open every side's All row on a gallery's first build.
 
         Every other folder defaults shut, but All shut is a side with nothing in
-        it — the workflow folders are where the gallery starts. Only on the first
+        it — Images and Videos are where the gallery starts. Only on the first
         build: after that its state is the user's, saved and restored with every
         other folder's, so collapsing it sticks.
         """
@@ -232,14 +238,10 @@ class GalleryTree:
         badge = icons.folder_badge(group)
         if badge is not None:
             item.setIcon(0, badge[0])
-        level = gallery.folder_level(group)
-        if level is not None:
-            item.setToolTip(0, f"{group.label} · {icons.LEVEL_LABELS[level]}")
-        else:
-            item.setToolTip(0, group.label)
+        item.setToolTip(0, _tooltip_of(group, badge))
         self._register(item, oriented_key(group.key, side.side), parent_item,
                        folder_key=group.key)
-        if not isinstance(group, gallery.SettingsGroup):
+        if not isinstance(group, (gallery.SettingsGroup, gallery.MediaGroup)):
             self._add_collections(item, side, group.key)
         for child in gallery.child_groups(group):
             self._add_node(child, item, side)

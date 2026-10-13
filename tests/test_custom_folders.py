@@ -32,9 +32,11 @@ def _tree(rows):
 
 
 def _lora_folder(tree):
-    """The "(no LoRA)" folder these rows all land under: workflow -> model ->
-    LoRA, whose children are the settings leaves."""
-    return gallery.child_groups(gallery.child_groups(tree[0])[0])[0]
+    """The "(no LoRA)" folder these rows all land under: Images -> workflow ->
+    model -> LoRA, whose children are the settings leaves."""
+    (images,) = tree
+    (workflow,) = gallery.child_groups(images)
+    return gallery.child_groups(gallery.child_groups(workflow)[0])[0]
 
 
 # --- keys --------------------------------------------------------------------

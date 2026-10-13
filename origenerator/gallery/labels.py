@@ -34,6 +34,8 @@ from origenerator.media import MediaType
 # File extensions stripped from a model filename to make a tidy folder label.
 MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf", ".sft")
 
+MEDIA_LABELS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
+
 
 def workflow_label(workflow_name: str | None) -> str:
     """Human-facing folder name for a workflow: its display name, else the key."""

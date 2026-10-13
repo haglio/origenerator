@@ -15,7 +15,7 @@ The logic is split by responsibility, in dependency order:
 * :mod:`.moments` — the moment a stored stamp names, whichever way it was written.
 * :mod:`.time_sections` — where a newest-first listing breaks between one sitting
   and the next, and what each section's heading says about when it was made.
-* :mod:`.tree` — nesting rows into the workflow -> model -> LoRA ->
+* :mod:`.tree` — nesting rows into the media -> workflow -> model -> LoRA ->
   [source image] -> settings hierarchy, and the bookmark-key helpers around it.
 * :mod:`.enhance_settings` — what a folder's enhancement is configured with,
   and how one enhancement is described.
@@ -83,6 +83,7 @@ from origenerator.gallery.groups import (
     AllGroup,
     CustomGroup,
     LoraGroup,
+    MediaGroup,
     ModelGroup,
     SettingsGroup,
     SourceImageGroup,
@@ -185,6 +186,7 @@ __all__ = [
     "EnhanceSettings",
     "JobKind",
     "LoraGroup",
+    "MediaGroup",
     "ModelGroup",
     "SettingsGroup",
     "SourceImageGroup",

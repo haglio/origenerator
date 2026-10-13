@@ -24,7 +24,7 @@ PUBLISHED = {
     "ENHANCE_COMMAND", "ENHANCE_SETTING_KEYS", "ENHANCE_WORKFLOW",
     "EnhanceLevel", "EnhanceSettings", "GENERATION_SEED_KEYS",
     "JobKind", "LoraGroup",
-    "MATCH_SOURCE_MODEL", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
+    "MATCH_SOURCE_MODEL", "MediaGroup", "ModelGroup", "SELECTION_KEY", "CYCLE_FRAMES",
     "SettingsGroup",
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_path",
     "build_custom_folders", "build_gallery_tree", "build_image_config_index",

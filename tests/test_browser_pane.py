@@ -486,7 +486,8 @@ def _made_with(prompt_id, checkpoint, prompt="scene one", starred=0):
 
 
 def _models(tree):
-    (workflow,) = tree
+    (images,) = tree
+    (workflow,) = gallery.child_groups(images)
     return {model.label: model for model in gallery.child_groups(workflow)}
 
 

@@ -68,7 +68,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
-from origenerator.gui.panes import PaneSplitter, pane
+from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
@@ -340,9 +340,10 @@ class GenerateConfigPanel(QWidget):
         body_host = QWidget()
         body = QVBoxLayout(body_host)
         # The scroll spans the tab, so the margin keeping the fields off the
-        # pane's sides is here; on the right it also stops them running under
-        # the scroll bar.
-        body.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        # pane's sides and off the border above them is here; on the right it
+        # also stops them running under the scroll bar.
+        body.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD,
+                                MARGIN_STANDARD, 0)
         body.setSpacing(8)
         self._scroll.setWidget(body_host)
         return body
@@ -437,10 +438,12 @@ class GenerateConfigPanel(QWidget):
         settings_pane = QWidget()
         column = QVBoxLayout(settings_pane)
         column.setContentsMargins(0, MARGIN_STANDARD, 0, 0)
-        column.setSpacing(MARGIN_STANDARD)
+        column.setSpacing(0)
         bank = self._build_button_bank()
-        bank.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        bank.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, MARGIN_STANDARD)
         column.addLayout(bank)
+        self._settings_border = pane_border()
+        column.addWidget(self._settings_border)
         column.addWidget(self._scroll, 1)
         return settings_pane
 

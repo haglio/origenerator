@@ -18,6 +18,7 @@ from shared_ui.preview_icon import app_icon
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.config import PROJECT_DIR
+from origenerator.gui.panes import BORDER_NAME
 from origenerator.spin_arrows import arrow_paths
 
 # Set on a button whose ON state says a choice has been made rather than that
@@ -260,7 +261,7 @@ def build_stylesheet() -> str:
     QTabWidget::pane {{
         border: none;
     }}
-    QSplitter::handle {{
+    QSplitter::handle, QFrame#{BORDER_NAME} {{
         background-color: {_h(BG_SECONDARY)};
     }}
     QSplitter::handle:hover {{

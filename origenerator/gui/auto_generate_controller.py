@@ -7,8 +7,8 @@ re-roll through an injected ``launch(key)`` and is told of each outcome via
 :meth:`note_finished`/:meth:`note_canceled`/:meth:`note_failed`, so it stays free
 of the view and the job internals and unit-tests without them.
 
-Stopping is the user's word alone — :meth:`stop` (the Auto toggle) and
-:meth:`stop_all` (Esc). Cancelling the variation being made is not that word: it
+Stopping is the user's word alone — :meth:`stop` (a stop asked of one folder)
+and :meth:`stop_all` (the Auto toggle). Cancelling the variation being made is not that word: it
 throws away *this seed*, which is what a loop of random seeds is for, so the loop
 takes it as its cue to try another at once.
 
@@ -75,8 +75,8 @@ class AutoGenerateController(QObject):
 
         Cancel means "not this one", not "stop": a loop of random seeds is exactly
         the place to throw one away, and having to re-arm Auto after every discard
-        made the button fight the user. Only :meth:`stop`/:meth:`stop_all` — the
-        toggle and Esc — end a loop.
+        made the button fight the user. Only :meth:`stop`/:meth:`stop_all` end a
+        loop.
         """
         self._advance(key)
 
@@ -86,7 +86,7 @@ class AutoGenerateController(QObject):
         self._end(key)
 
     def stop_all(self) -> None:
-        """End every running loop at once (e.g. the user pressed Esc)."""
+        """End every running loop at once."""
         for key in list(self._active):
             self._end(key)
 

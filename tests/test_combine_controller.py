@@ -14,7 +14,7 @@ import json
 import pytest
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import evolver_export, recipe_match
+from origenerator import evolver_export, gallery, recipe_match
 from origenerator.gui import combine_controller as module
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController
@@ -39,9 +39,9 @@ class FakePanel:
         def set_item(self, prompt_id):
             self.item = prompt_id
 
-    def __init__(self, accepts_image, accepts_video, preview):
-        self.accepts_image = accepts_image
-        self.accepts_video = accepts_video
+    def __init__(self, image_lent_by, video_lent_by, preview):
+        self.image_lent_by = image_lent_by
+        self.video_lent_by = video_lent_by
         self.preview = preview
         self.image_slot = self._Slot()
         self.video_slot = self._Slot()
@@ -202,6 +202,9 @@ class FakeHost:
     def image_rows(self):
         return self.rows
 
+    def image_config_index(self):
+        return gallery.build_image_config_index(self.rows)
+
     def animated_preview(self, row):
         return f"{row['prompt_id']}.webp"
 
@@ -293,6 +296,28 @@ def test_the_image_slot_takes_a_picture_with_a_file_to_seed_from(combine):
 
     assert controller._accepts_image("img") is True
     assert controller._accepts_image("clip") is False
+
+
+def test_a_picture_lends_the_image_slot_itself(combine):
+    controller, _host = combine(db=FakeDB([_image("img")]))
+
+    assert controller._picture_lent_by("img") == "img"
+    assert controller._picture_lent_by("gone") is None
+
+
+def test_a_video_lends_the_image_slot_the_picture_it_was_made_from(combine):
+    picture = _image("img", files=("frame.png",))
+    controller, _host = combine(
+        FakeHost(rows=[picture]),
+        db=FakeDB([picture, _video("clip", source_image="images/frame.png [output]")]))
+
+    assert controller._picture_lent_by("clip") == "img"
+
+
+def test_a_video_made_from_a_picture_the_gallery_lacks_lends_the_image_slot_nothing(combine):
+    controller, _host = combine(db=FakeDB([_video("clip", source_image="elsewhere.png")]))
+
+    assert controller._picture_lent_by("clip") is None
 
 
 def test_the_video_slot_takes_only_a_recipe_this_app_can_rebuild(combine):
@@ -510,11 +535,10 @@ def test_the_mined_recipe_is_matched_against_its_start_frames_scene(combine,
     monkeypatch.setattr(module.recipe_match, "smart_recipe", smart)
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "find_source_image_id",
-                        lambda row, rows: "img")
-    image = _image("img", prompt="a doll on a couch")
+    image = _image("img", prompt="a doll on a couch", files=("frame.png",))
     controller, _host = combine(
-        FakeHost(rows=[image]), db=FakeDB([image, _video("clip")]))
+        FakeHost(rows=[image]),
+        db=FakeDB([image, _video("clip", source_image="frame.png [output]")]))
 
     controller.generate_category("img", "waving")
 

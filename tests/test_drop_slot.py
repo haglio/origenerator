@@ -3,20 +3,27 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMovie
+from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
+from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
+from shared_ui.colors import hovered
+from shared_ui.testing import ground
 
 from origenerator.gui.drop_slot import DropSlot
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.media_badge import MediaBadge
+from origenerator.gui.stylesheet import build_stylesheet
 
 
-def _slot(qtbot, kind="image", accepts=lambda pid: True,
+def _slot(qtbot, kind="image", lent_by=lambda pid: pid,
           preview=lambda pid: (None, None), placeholder="Drop here", grayscale=False):
-    slot = DropSlot(kind=kind, accepts=accepts, preview=preview, placeholder=placeholder,
+    slot = DropSlot(kind=kind, lent_by=lent_by, preview=preview, placeholder=placeholder,
                     grayscale=grayscale)
     qtbot.addWidget(slot)
     return slot
+
+
+def _pictures_only(pid):
+    return pid if pid.startswith("img") else None
 
 
 def _drop(slot, pid):
@@ -45,7 +52,7 @@ def _write_looping_webp(path, size=(64, 48)):
 
 
 def test_dropping_an_allowed_id_fills_the_slot_and_notifies(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
     seen = []
     slot.changed.connect(lambda: seen.append(slot.current_id()))
 
@@ -56,16 +63,25 @@ def test_dropping_an_allowed_id_fills_the_slot_and_notifies(qtbot):
     assert seen == ["img1"]
 
 
+def test_a_dropped_item_is_held_as_what_it_lends_the_slot(qtbot):
+    slot = _slot(qtbot, lent_by={"vid1": "img1"}.get)
+
+    ev = _drop(slot, "vid1")
+
+    assert slot.current_id() == "img1"
+    assert ev.isAccepted()
+
+
 def test_dropping_a_disallowed_id_is_ignored(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     _drop(slot, "vid9")
 
-    assert slot.current_id() is None  # the predicate rejected it
+    assert slot.current_id() is None  # it lends this slot nothing
 
 
 def test_drag_enter_accepts_only_allowed_ids(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     assert _drag_enter(slot, "img1").isAccepted()
     assert not _drag_enter(slot, "vid1").isAccepted()
@@ -116,6 +132,18 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     assert movie.state() == QMovie.MovieState.Running  # looping, not a still
 
 
+def test_emptying_a_slot_stops_the_clip_it_was_looping(qtbot, tmp_path):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    slot = _slot(qtbot, kind="video", preview=lambda pid: (None, webp))
+    _drop(slot, "vid1")
+    looping = slot._movie
+
+    slot.clear()
+
+    assert looping.state() == QMovie.MovieState.NotRunning
+    assert slot._label.movie() is None
+
+
 def test_a_grayscale_slot_drains_the_clip_it_holds(qtbot, tmp_path):
     # The video slot holds a recipe, not a result: in color it reads as a second
     # subject beside the image it will animate.
@@ -164,8 +192,62 @@ def test_set_candidate_lights_and_clears_the_slot(qtbot):
     assert slot._label.property("dragActive") is False  # cleared when the drag ends
 
 
+def test_a_drag_over_the_slot_lights_it_as_where_the_drop_lands(qtbot):
+    slot = _slot(qtbot)
+
+    _drag_enter(slot, "img1")
+    assert slot._label.property("dropTarget") is True
+
+    slot.dragLeaveEvent(QDragLeaveEvent())
+    assert slot._label.property("dropTarget") is False
+
+
+def test_a_drag_the_slot_would_turn_away_does_not_light_it(qtbot):
+    slot = _slot(qtbot, lent_by=_pictures_only)
+
+    _drag_enter(slot, "vid1")
+
+    assert slot._label.property("dropTarget") is False
+
+
+def test_a_drag_carrying_no_gallery_item_is_turned_away(qtbot):
+    # A file dragged in from outside the app, say.
+    slot = _slot(qtbot)
+    mime = QMimeData()
+    mime.setText("elsewhere.png")
+    event = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    slot.dragEnterEvent(event)
+
+    assert not event.isAccepted()
+    assert slot._label.property("dropTarget") is False
+
+
+def test_letting_go_over_the_slot_puts_it_out(qtbot):
+    slot = _slot(qtbot)
+    _drag_enter(slot, "img1")
+
+    _drop(slot, "img1")
+
+    assert slot._label.property("dropTarget") is False
+
+
+def test_the_slot_under_the_drag_sits_one_step_lighter_than_one_only_lit_for_it(qtbot):
+    slot = _slot(qtbot)
+    slot.setStyleSheet(build_stylesheet())
+    slot.show()
+    qtbot.waitExposed(slot)
+    slot.set_candidate(True)
+    lit = ground(slot._label)
+
+    _drag_enter(slot, "img1")
+
+    assert ground(slot._label) == hovered(QColor(lit)).name()
+
+
 def test_accepts_delegates_to_the_predicate(qtbot):
-    slot = _slot(qtbot, accepts=lambda pid: pid.startswith("img"))
+    slot = _slot(qtbot, lent_by=_pictures_only)
 
     assert slot.accepts("img1") is True
     assert slot.accepts("vid1") is False

@@ -6,7 +6,9 @@ a fitting past video for you, or drop a specific i2v video for a custom action. 
 dropped video shows in gray: it is here for its settings, not as a second picture
 to be made. The two are mutually exclusive: picking an act clears a dropped video
 and hides the slot until "(custom)" is picked again, and dropping a video wipes the
-dropdown back to "(custom)".
+dropdown back to "(custom)". A video dropped into the top slot lends it only the
+picture it was made from, and one let go in the gap between the two slots lends
+each slot what it can.
 Either way, two buttons act on the chosen recipe: Generate re-runs it on the dropped
 image now, while “Edit…” hands it to a generate tab to change first.
 
@@ -20,13 +22,11 @@ Acts with nothing to answer a pick — no video to mine a recipe from and no cur
 recipe in the content overlay — are greyed out
 (:meth:`CombinePanel.set_available_categories`).
 
-The panel is pure UI: it holds the two :class:`DropSlot`s, the category dropdown, the
-intent radios and the two buttons, and reports what was asked for as one
-:class:`CombineRequest` on :attr:`combine_requested` — which recipe (a dropped video
-or a picked act), which lane, and whether the press was Generate or “Edit…”. Its
-controller (:mod:`origenerator.gui.combine_controller`) owns the database, the slot
-predicates, the category→recipe routing, and both the generation and the generator
-tab.
+The panel is pure UI: its slots, dropdown, radios and buttons report what was asked
+for as one :class:`CombineRequest` on :attr:`combine_requested` — which recipe,
+which lane, and whether the press was Generate or “Edit…”. Its controller
+(:mod:`origenerator.gui.combine_controller`) owns the database, what each slot is
+lent, the category→recipe routing, and both the generation and the generator tab.
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator.content import genau_flick_word
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.media import MediaType
 from origenerator.recipe_match import CATEGORIES, GENAU, VIDEO
 
@@ -81,21 +81,23 @@ class CombinePanel(QWidget):
 
     def __init__(
         self,
-        image_accepts: Callable[[str], bool],
-        video_accepts: Callable[[str], bool],
+        image_lent_by: Callable[[str], str | None],
+        video_lent_by: Callable[[str], str | None],
         preview: Callable[[str], tuple[str | None, str | None]],
         parent=None,
     ):
         super().__init__(parent)
-        self.image_slot = DropSlot(MediaType.IMAGE, image_accepts, preview, "Drop an image")
+        self.image_slot = DropSlot(MediaType.IMAGE, image_lent_by, preview, "Drop an image")
         # Gray, always: the video in this slot is never what gets made — only the
         # settings the making follows. In color it reads as a second subject beside
         # the image, which is the one thing it is not.
-        self.video_slot = DropSlot(MediaType.VIDEO, video_accepts, preview, _DROP_PLACEHOLDER,
+        self.video_slot = DropSlot(MediaType.VIDEO, video_lent_by, preview, _DROP_PLACEHOLDER,
                                    grayscale=True)
         room = self.video_slot.sizePolicy()
         room.setRetainSizeWhenHidden(True)
         self.video_slot.setSizePolicy(room)
+        self._between = DropZone((self.image_slot, self.video_slot))
+        self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
@@ -165,11 +167,12 @@ class CombinePanel(QWidget):
             "Re-run a video's recipe on the dropped image: pick an act, or drop a video."
         )
         layout.addWidget(heading)
-        layout.addWidget(self.image_slot)
-        # One group apart from the next, the same distance the button bank
-        # puts between its groups.
-        layout.addSpacing(BUTTON_GROUP_GAP)
-        layout.addWidget(self._video_part)
+        parted = QVBoxLayout()
+        parted.setSpacing(0)  # the room between them is the whole gap
+        parted.addWidget(self.image_slot)
+        parted.addWidget(self._between)
+        parted.addWidget(self._video_part)
+        layout.addLayout(parted)
         layout.addWidget(self._intent_part)
         layout.addWidget(self._generate_btn)
         layout.addWidget(self._open_btn)

@@ -141,8 +141,8 @@ class ToolbarBank(QWidget):
     the Main Funestra owns the room's sound and the session owns the mic, so a
     second switch for either would be a switch over something this window does
     not hold. There is no OSR2 switch here at all any more: the Funestras' console
-    carries a control-state group — parked, retracted, driving, control off —
-    and that group is where the device is switched now, on every surface.
+    carries one, on driving and off parked, and that is where the device is
+    switched now, on every surface.
     """
 
     def __init__(self, acts: BankActs, *, hosted: bool):

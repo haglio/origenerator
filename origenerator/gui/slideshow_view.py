@@ -31,7 +31,6 @@ from funestra.console import ModeHud
 from funestra.file_channel import append_command
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_placement import HudCorner
-from funestra.modes import Osr2State
 from funestra.playback_rate import RATE_STEP
 from funestra.playlist import PlaylistItem
 from funestra.pointer import OMNIPAUSE_TOGGLE
@@ -95,7 +94,6 @@ _FOLLOWED = "followed"
 # How often the panel is rebuilt: on its own beat, and faster while something
 # on it is moving -- the drive's trace.
 _REFRESH_MS = 300
-_MOVING = frozenset({Osr2State.ROBOT_HAND, Osr2State.FUNSCRIPT})
 _FOOT_VERBS = frozenset({FOOT_PRESS, FOOT_DRAG, FOOT_RELEASE, FOOT_WHEEL})
 _RATE_STEPS = {"speed_up": RATE_STEP, "speed_down": -RATE_STEP}
 
@@ -534,7 +532,8 @@ class SlideshowView(QWidget):
         return model
 
     def _panel_moving(self) -> bool:
-        return self._panel_model is not None and self._panel_model.osr2 in _MOVING
+        drive = self._panel_model.drive if self._panel_model is not None else None
+        return drive is not None and drive.live
 
     def item_label(self) -> str:
         """The muted line under the status: what is on screen right now, named
@@ -1125,7 +1124,7 @@ class SlideshowView(QWidget):
             return None
         control = self._actions.osr2_control
         return slideshow_device(
-            self._motion, pace_s=self.dwell_s, device_on=bool(osr2_device.device_on()),
+            self._motion, pace_s=self.dwell_s, device=osr2_device.device_mode(),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None)
 

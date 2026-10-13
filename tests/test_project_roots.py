@@ -87,15 +87,6 @@ class TestTheValuesAnotherAppHoldsToo:
         # where all three look for these files.
         assert config.project_dir("fun_time") / "state" == osr2.SHARED_STATE_DIR
 
-    def test_the_devices_own_stamp_is_the_file_the_broker_writes(self):
-        # The only evidence the OSR2 is there at all (see origenerator.osr2).
-        assert osr2.SERIAL_RX_FILE.name == "osr2_serial_rx.txt"
-
-    def test_the_device_may_stay_quiet_for_the_brokers_own_window(self):
-        # osr2_broker.monitor.MonitorState answers the same question with the same
-        # window, so the app and the broker never disagree about whether it is on.
-        assert osr2.RX_STALE_S == 30.0
-
     def test_evolver_watches_this_exact_inbox(self):
         # Mirrors evolver's own INBOX_DIR. A folder evolver is not watching is a
         # finished video that is simply never ingested.

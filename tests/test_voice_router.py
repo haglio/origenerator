@@ -518,7 +518,7 @@ def test_a_switch_that_cannot_be_flipped_here_says_so(router):
 
     voice.on_command(AppCommand.DRIVE_ON)
 
-    assert slideshows.answers == ["🎤 OSR2 control can't be switched here"]
+    assert slideshows.answers == ["🎤 OSR2 can't be switched here"]
     assert slideshows.answer_kinds == [WARNING]
 
 

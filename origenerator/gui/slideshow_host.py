@@ -131,7 +131,7 @@ class SlideshowHost(Protocol):
 
     def press_console(self, action: str) -> bool:
         """Do what a press on the console's own rows asks — the pace, the
-        motion, the four OSR2 control states, a level dragged on the readout —
+        motion, the OSR2 switch, a level dragged on the readout —
         and say whether this was one of those verbs at all.
 
         False for a host with no device to drive, which leaves the panel to

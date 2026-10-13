@@ -206,6 +206,9 @@ _say(AppCommand.MIC_OFF, "mic off", "voice off")
 # Fun Time's word for the console's control-off button, which is this switch
 # off -- the letters and the number however whisper writes them.
 _say(AppCommand.DRIVE_OFF, "osr 2 off", "o s r 2 off", "osr two off", "o s r two off")
+for _osr2 in ("osr 2", "o s r 2", "osr two", "o s r two"):
+    _say(AppCommand.DRIVE_OFF, f"{_osr2} control off")
+    _say(AppCommand.DRIVE_ON, f"{_osr2} control on")
 
 # The slideshow's own narrowing filter, in Fun Time's own grammar: "filter <what to
 # keep>" turns one on, and "clear filter" is the way back to all of it — the

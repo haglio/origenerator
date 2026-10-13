@@ -158,6 +158,14 @@ def test_the_osr2_is_let_go_of_in_fun_times_words(said):
     assert match_app_command(said) is AppCommand.DRIVE_OFF
 
 
+@pytest.mark.parametrize(("said", "command"), [
+    ("OSR2 control off", AppCommand.DRIVE_OFF), ("OSR two control off", AppCommand.DRIVE_OFF),
+    ("OSR2 control on", AppCommand.DRIVE_ON), ("O S R two control on", AppCommand.DRIVE_ON),
+])
+def test_osr2_control_is_the_switch_by_the_name_its_label_gives_it(said, command):
+    assert match_app_command(said) is command
+
+
 def test_the_mic_can_be_shut_by_voice_but_not_opened():
     # A shut recognizer hears nothing, so there is no spoken way back — the same
     # reason Fun Time's mic has "voice off" and no "voice on".

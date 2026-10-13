@@ -13,10 +13,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 
-# The key legend, shown as the drive panel's tooltip.
-MOTION_KEY_LEGEND = ("Space drives · J/L speed · 7/9 travel · U/O center"
-                     r" · I shape · ; human inspired · \ nudge")
-
 
 def apply_motion_key(motion, key, *, on_drive_toggle=None) -> bool:
     """Route one of genau's motion keys to ``motion``; ``False`` for any other

@@ -45,9 +45,10 @@ logger = logging.getLogger(__name__)
 #
 # The keys are the state file's public surface and cannot change, "generate_tabs"
 # included: it is from before the Generate and Gallery views merged, and a
-# session saved then still opens. "osr2_enabled" is the same: it holds which of
-# the four OSR2 control states the app was left in, and reads the True or False
-# of the on/off switch it held before.
+# session saved then still opens. "osr2_enabled" is the same: it holds whether
+# the OSR2 switch was left driving or parked, and reads the True or False the
+# switch held before it had four states, and the retracted and control off of
+# those four, as parked.
 #
 # The order is the restore order and is load-bearing: the tabs before the folder
 # before the generation, each later one needing what the earlier ones put up.

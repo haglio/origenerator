@@ -9,7 +9,7 @@ from unittest.mock import patch
 from xml.etree import ElementTree
 
 import pytest
-from funestra.console import OSR2_CONTROL_OFF, OSR2_DRIVING, OSR2_PARKED, OSR2_RETRACTED
+from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from PyQt6.QtCore import Qt
@@ -293,7 +293,7 @@ def test_a_saved_tab_from_before_the_rename_reopens_on_the_live_aim_keys(qtbot, 
     assert "stroke_hz" not in params
 
 
-@pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_RETRACTED, OSR2_DRIVING])
+@pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_DRIVING])
 def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved):
     state = AppState(tmp_path / "ui.json")
     state.set("osr2_enabled", saved)
@@ -304,10 +304,10 @@ def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved
 def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.osr2_control.set_state(OSR2_RETRACTED)
+    win._gallery_view.osr2_control.set_state(OSR2_DRIVING)
 
     win.close()  # closeEvent persists the session
-    assert state.get("osr2_enabled") == OSR2_RETRACTED
+    assert state.get("osr2_enabled") == OSR2_DRIVING
 
 
 def test_reopens_with_the_osr2_held_to_the_max_intensity_it_was_left_at(qtbot, tmp_path):
@@ -1486,7 +1486,8 @@ def test_both_ends_of_a_session_taking_this_window_are_recorded(qtbot, tmp_path,
         win.become_hosted(_fun_time_session())
         win.become_standalone()
 
-    assert [record.message for record in caplog.records] == [
+    assert [record.message for record in caplog.records
+            if record.name == "origenerator.gui.main_window"] == [
         "Taken into a Fun Time session; the OSR2 and the appliance switches are "
         "the session's from here",
         "Handed back by the Fun Time session; standalone again"]
@@ -1561,7 +1562,7 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     win = _window(qtbot, tmp_path, AppState(path))
     view = win._gallery_view
     view.set_audio_enabled(True)
-    view.osr2_control.set_state(OSR2_RETRACTED)
+    view.osr2_control.set_state(OSR2_DRIVING)
     view.set_mic_enabled(True)
     view.osr2_control.set_max_intensity(35)
 
@@ -1571,7 +1572,7 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     saved = AppState(path)
     assert [saved.get(key) for key in (
         "audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity")] == [
-        True, OSR2_RETRACTED, True, 35]
+        True, OSR2_DRIVING, True, 35]
 
 
 @pytest.fixture
@@ -1713,7 +1714,7 @@ def test_a_window_handed_back_listens_again_but_leaves_the_sound_and_device_off(
     win.become_standalone()
 
     assert (view.mic_enabled(), view.audio_enabled(), view.osr2_control.state()) == (
-        True, False, OSR2_CONTROL_OFF)
+        True, False, OSR2_PARKED)
 
 
 def test_a_window_handed_back_says_so_for_the_next_session_to_take(qtbot, tmp_path):

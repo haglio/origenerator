@@ -2061,6 +2061,26 @@ def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot)
     assert form._warning_marks["steps"].isHidden()
 
 
+_SAMPLER_ADVICE = {"sampler_name": Advice("Example Model's page recommends euler_ancestral.",
+                                          "euler_ancestral")}
+
+
+def test_a_section_warns_with_every_warning_inside_it_one_per_line(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_warnings({**_SAMPLER_ADVICE, **_STEPS_ADVICE})
+
+    calibration = form._sections["Calibration"].warning
+    assert not calibration.isHidden()
+    assert calibration.toolTip() == (
+        "Steps: Example Model's page recommends 20–40 steps. Click to use 40.\n"
+        "Sampler: Example Model's page recommends euler_ancestral. Click to use euler_ancestral.")
+    assert form._sections["Models & LoRAs"].warning.isHidden()
+    form.set_warnings({})
+    assert calibration.isHidden()
+
+
 def _laid_out(qtbot, form):
     qtbot.addWidget(form)
     for section in form._sections.values():
@@ -2078,8 +2098,7 @@ def _left(form, widget):
 def test_clicking_a_warning_sets_its_setting_to_the_recommended_value(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
     form.set_values({"steps": 50, "sampler_name": "heun"})
-    form.set_warnings({**_STEPS_ADVICE, "sampler_name": Advice(
-        "Example Model's page recommends euler_ancestral.", "euler_ancestral")})
+    form.set_warnings({**_STEPS_ADVICE, **_SAMPLER_ADVICE})
 
     qtbot.mouseClick(form._warning_marks["steps"], Qt.MouseButton.LeftButton)
     qtbot.mouseClick(form._warning_marks["sampler_name"], Qt.MouseButton.LeftButton)

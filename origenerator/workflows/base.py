@@ -191,7 +191,7 @@ class ParamDef:
 
 def sampler_params(defaults: dict) -> list[ParamDef]:
     return [
-        ParamDef("sampler_name", "Drawing Method", ParamType.COMBO, defaults["sampler_name"],
+        ParamDef("sampler_name", "Sampler", ParamType.COMBO, defaults["sampler_name"],
                  options=SAMPLER_OPTIONS),
         ParamDef("scheduler", "Step Spacing", ParamType.COMBO, defaults["scheduler"],
                  options=SCHEDULER_OPTIONS),

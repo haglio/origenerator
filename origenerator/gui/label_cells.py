@@ -1,25 +1,9 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PyQt6.QtCore import QSize
+from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
-
-class WarningMark(QLabel):
-    pressed = pyqtSignal()
-
-    def __init__(self):
-        super().__init__("⚠")
-        self.setObjectName("warningMark")
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        policy = self.sizePolicy()
-        policy.setRetainSizeWhenHidden(True)
-        self.setSizePolicy(policy)
-        self.hide()
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.pressed.emit()
-        super().mousePressEvent(event)
+from origenerator.gui.warning_mark import WarningMark
 
 
 class LabelColumn:

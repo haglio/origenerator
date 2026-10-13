@@ -25,7 +25,7 @@ from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
-from origenerator.gui.label_cells import LabelCell, LabelColumn, WarningMark
+from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import definition_help, option_help, param_help
@@ -33,6 +33,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.tooltip_shape import shaped
+from origenerator.gui.warning_mark import WarningMark
 from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
@@ -414,8 +415,7 @@ class ParamForm(QWidget):
         self._advice = dict(advice)
         for key, mark in self._warning_marks.items():
             found = advice.get(key)
-            mark.setToolTip(f"{found.text} Click to use {found.fix_shown}." if found else "")
-            mark.setHidden(found is None)
+            mark.warn(f"{found.text} Click to use {found.fix_shown}." if found else "")
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:
         """Mark a prompt field with the change a spoken request made to it —

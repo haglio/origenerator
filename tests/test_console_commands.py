@@ -75,5 +75,5 @@ def test_a_verb_names_the_side_it_is_said_to_however_it_is_cased():
     assert side_spoken_to("PORTRAIT_NEXT", SIDES) == "portrait"
     assert side_spoken_to("FILTER_LANDSCAPE_SEEDS", SIDES) == "landscape"
     assert side_spoken_to("landscape_lock", SIDES) == "landscape"
-    assert side_spoken_to("OPEN_SHOWS", SIDES) is None
+    assert side_spoken_to("CLOSE_SLIDESHOWS", SIDES) is None
     assert side_spoken_to("PORTRAITS_OF_NOBODY", SIDES) is None

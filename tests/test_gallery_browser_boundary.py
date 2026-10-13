@@ -219,8 +219,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     so the five methods that offered the Images / Videos / Both choice,
     answered it, said what it held and saved and restored it went. And the
     pane 86 -> 85: another Latest opens on its first page by itself, so the
-    step that choice asked for went.)"""
+    step that choice asked for went.
+    280 -> 279: the session opens each side on its own, so the open of both
+    at once, which nothing sends now, went.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 280
+               for x in _class_def(VIEW, "GalleryView").body) == 279
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

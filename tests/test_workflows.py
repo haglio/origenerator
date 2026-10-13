@@ -2623,11 +2623,11 @@ def test_the_authored_funscript_keeps_the_clips_real_time_at_every_rate():
 # ---- what the form calls a setting ----
 
 # The graph's names for these stay in the tooltips; the label says what the
-# setting does to the picture. The prompts and the LoRAs are the exceptions the
-# test below pins: those are what everyone who makes pictures calls them, so
-# renaming them cost the user the words he uses.
+# setting does to the picture. The prompts, the LoRAs and the sampler are the
+# exceptions the test below pins: those are what everyone who makes pictures
+# calls them, so renaming them cost the user the words he uses.
 _GRAPH_JARGON = re.compile(
-    r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Sampler|Scheduler|Shift"
+    r"CFG|Denoise|Stage|Guidance|Input Image|ControlNet|Scheduler|Shift"
     r"|\((High|Low|Speech)\)|Audio|\(Hz\)|\(End %\)|\(0 = half\)|\b[XY]\b"
 )
 
@@ -2640,6 +2640,7 @@ _NAMES_EVERYONE_USES = {
     "lora_strength_high": "LoRA Strength (First Pass)",
     "lora_low": "LoRA (Second Pass)",
     "lora_strength_low": "LoRA Strength (Second Pass)",
+    "sampler_name": "Sampler",
 }
 
 
@@ -2650,7 +2651,7 @@ def test_form_labels_say_what_a_setting_does_not_what_the_graph_calls_it(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_the_prompts_and_loras_keep_the_names_everyone_already_uses(name):
+def test_the_prompts_loras_and_sampler_keep_the_names_everyone_already_uses(name):
     labels = {pd.key: pd.label for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     named = {key: labels[key] for key in labels.keys() & _NAMES_EVERYONE_USES.keys()}
     assert named == {key: _NAMES_EVERYONE_USES[key] for key in named}

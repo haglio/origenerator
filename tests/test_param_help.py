@@ -12,8 +12,9 @@ import re
 import pytest
 
 from origenerator.gallery import ENHANCE_SETTING_KEYS
-from origenerator.gui.param_help import PARAM_HELP, param_help
+from origenerator.gui.param_help import PARAM_HELP, option_help, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import SAMPLER_OPTIONS
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
@@ -91,3 +92,9 @@ def test_help_calls_a_lora_a_lora():
     loras = ("lora_high", "lora_low", "lora_strength_high", "lora_strength_low")
     assert all("LoRA" in PARAM_HELP[key] for key in loras)
     assert [key for key, text in PARAM_HELP.items() if "add-on" in text.lower()] == []
+
+
+def test_every_sampler_says_how_it_works_and_how_long_it_takes():
+    unexplained = [name for name in SAMPLER_OPTIONS
+                   if "per step" not in option_help("sampler_name", name)]
+    assert unexplained == []

@@ -23,7 +23,7 @@ from origenerator.gui import icons, param_sections, seed_combo
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.param_form import ParamForm
-from origenerator.gui.param_help import param_help
+from origenerator.gui.param_help import option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
@@ -1979,3 +1979,14 @@ def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
     assert form._widgets["voice_sample"].text() == "C:/v/her.wav"
     assert "Voice Sample" in asked["caption"] and "*.wav" in asked["kinds"]
     assert form.get_values()["voice_sample"] == "C:/v/her.wav"
+
+
+def test_each_sampler_in_the_dropdown_explains_itself_on_hover(qtbot):
+    form = ParamForm([ParamDef("sampler_name", "Sampler", "combo", "euler",
+                               options=["euler", "euler_ancestral"])])
+    qtbot.addWidget(form)
+    combo = form._widgets["sampler_name"]
+    tips = [combo.itemData(row, Qt.ItemDataRole.ToolTipRole) for row in range(combo.count())]
+    assert tips == [option_help("sampler_name", "euler"),
+                    option_help("sampler_name", "euler_ancestral")]
+    assert all(tips)

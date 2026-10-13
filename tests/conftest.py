@@ -291,7 +291,7 @@ def _never_take_the_real_device(monkeypatch):
     default, so nothing is left reaching the hardware by accident.
     """
     class _NoDevice:
-        def park(self): pass
+        def ask(self, verb): pass
         def send_position(self, pos, interval_ms): pass
         def close(self): pass
 

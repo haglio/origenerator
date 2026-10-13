@@ -17,25 +17,16 @@ import socket
 from pathlib import Path
 
 from app_support import osr2_device, ports
+from app_support.osr2_hold import ask_the_broker
 from funestra.tcode import (
-    PARK_COMMAND,
     UdpTCodeSink,
     format_tcode_command,
     to_tcode_position,
 )
-from PyQt6.QtCore import QTimer
 
 from origenerator.config import project_dir
 
 logger = logging.getLogger(__name__)
-
-# The device's rest command -- motion axis to the floor over half a second, the
-# family's one spelling of it, which the broker parks with too -- so a stopped
-# video leaves the OSR2 where the broker expects it.
-PARK_TCODE = PARK_COMMAND
-# The broker's own wait before an OmniPause park (osr2_broker.hold's
-# HoldScheduler.DELAY_SECONDS): a room that plays again inside it is never parked.
-PARK_SETTLE_MS = 1000
 
 BROKER_HOST = "127.0.0.1"
 TCODE_UDP_PORT = ports.TCODE_UDP
@@ -71,9 +62,10 @@ class Osr2Broker:
     """
 
     def __init__(self, host: str = BROKER_HOST, port: int = TCODE_UDP_PORT, *,
-                 sock_factory=None):
+                 sock_factory=None, state_dir: Path = SHARED_STATE_DIR):
         self._host = host
         self._port = port
+        self._state_dir = Path(state_dir)
         self._sock_factory = sock_factory or (
             lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         )
@@ -84,9 +76,8 @@ class Osr2Broker:
         """Move the motion axis to ``pos_0_100`` over ``interval_ms``."""
         self._send(format_position(pos_0_100, interval_ms))
 
-    def park(self) -> None:
-        """Send the device to its resting position."""
-        self._send(PARK_TCODE)
+    def ask(self, verb: str) -> None:
+        ask_the_broker(self._state_dir, verb)
 
     def close(self) -> None:
         if self._sink is not None:
@@ -107,16 +98,3 @@ class Osr2Broker:
             if not self._send_error_logged:
                 self._send_error_logged = True
                 logger.warning("OSR2 UDP send to %s:%s failed: %s", self._host, self._port, e)
-
-
-def park_once_settled(broker, parent) -> QTimer:
-    timer = QTimer(parent)
-    timer.setSingleShot(True)
-    timer.setInterval(PARK_SETTLE_MS)
-    timer.timeout.connect(lambda: _park_for_the_pause(broker))
-    return timer
-
-
-def _park_for_the_pause(broker) -> None:
-    broker.park()
-    logger.info("OSR2 parked: the room is paused")

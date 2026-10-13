@@ -1142,7 +1142,7 @@ class GalleryView(QWidget):
             return
         self._reconciling_osr2 = True
         try:
-            held = self._osr2_motion.held_at is not None
+            held = self._osr2_motion.held is not None
             target = (self._osr2_drive_source()
                       if self.osr2_control.engaged() and not held else None)
             wants_motion = self.osr2_control.engaged() and target is None

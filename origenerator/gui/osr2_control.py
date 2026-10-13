@@ -19,7 +19,7 @@ import logging
 
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
-from funestra.robot_hand import FULL_INTENSITY, PARK_CENTER
+from funestra.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class Osr2Control(QObject):
         """Driving while the device gets the funscript or the motion from here,
         and parked otherwise: the motion stilled at home, or nothing here
         reaching the device at all."""
-        held = self._motion.held_at if self._motion is not None else None
+        held = self._motion.held if self._motion is not None else None
         return OSR2_DRIVING if self._engaged and held is None else OSR2_PARKED
 
     def set_state(self, state: str) -> None:
@@ -113,7 +113,7 @@ class Osr2Control(QObject):
             if state == OSR2_DRIVING:
                 self._motion.release()
             else:
-                self._motion.hold(PARK_CENTER)
+                self._motion.hold(OSR2_PARKED)
         was = self._engaged
         self._engage(True)
         if self._engaged == was:

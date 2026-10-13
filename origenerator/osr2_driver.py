@@ -11,13 +11,14 @@ from __future__ import annotations
 import logging
 
 from app_support.funscript import read_actions
+from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 from funestra.robot_hand import FULL_INTENSITY
 from PyQt6.QtCore import QObject, QTimer
 
 from origenerator.config import COMFYUI_OUTPUT_DIR
 from origenerator.funscript import funscript_of
-from origenerator.osr2 import Osr2Broker, park_once_settled
+from origenerator.osr2 import Osr2Broker
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +55,17 @@ class Osr2Driver(QObject):
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self.poll)
         self._frozen = False
-        self._park_once_settled = park_once_settled(self._broker, self)
 
     def set_frozen(self, frozen: bool) -> None:
+        if frozen == self._frozen:
+            return
         self._frozen = frozen
-        if frozen and self._player is not None:
-            self._park_once_settled.start()
-        else:
-            self._park_once_settled.stop()
+        if self._player is not None:
+            self._broker.ask(PARK if frozen else RESUME)
+
+    @property
+    def parked_by_the_pause(self) -> bool:
+        return self._player is not None and self._frozen
 
     def start(self, player, actions: list[dict]) -> None:
         """Take over the device for ``player``'s video, streaming ``actions``.
@@ -76,6 +80,7 @@ class Osr2Driver(QObject):
         self._script = Funscript(sorted((int(a["at"]), int(a["pos"])) for a in actions))
         self._duration_ms = self._script.actions[-1][0]
         self._streaming = False  # for a one-shot "first T-code sent" log line
+        self._broker.ask(PARK if self._frozen else RESUME)
         self._timer.start()
         logger.info("OSR2 drive engaged: %d actions, %d ms",
                     len(self._script.actions), self._duration_ms)
@@ -85,11 +90,11 @@ class Osr2Driver(QObject):
         if self._player is None:
             return
         self._timer.stop()
-        self._park_once_settled.stop()
         self._player = None
         self._script = None
         self._duration_ms = 0
-        self._broker.park()
+        if not self._frozen:
+            self._broker.ask(PARK)
         logger.info("OSR2 drive released: parked")
 
     @property

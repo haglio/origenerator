@@ -1,21 +1,25 @@
 from __future__ import annotations
 
+from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 
-from origenerator import osr2
 from origenerator.osr2_driver import Osr2Driver
 
 
 class FakeBroker:
     def __init__(self):
         self.positions = []
-        self.parked = 0
+        self.asked = []
 
     def send_position(self, pos, interval_ms):
         self.positions.append((pos, interval_ms))
 
-    def park(self):
-        self.parked += 1
+    def ask(self, verb):
+        self.asked.append(verb)
+
+    @property
+    def parked(self):
+        return self.asked.count(PARK)
 
 
 class FakePlayer:
@@ -145,8 +149,7 @@ def test_a_driver_with_nothing_to_follow_draws_nothing(qapp):
     assert Osr2Driver(broker=FakeBroker()).trace(8, 1.0) == ()
 
 
-def test_a_frozen_room_stops_a_script_at_once_and_parks_it_once_settled(qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_frozen_room_stops_a_script_at_once_and_asks_the_broker_to_park_it(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
     driver.start(FakePlayer(pos=100), ACTIONS)
@@ -154,36 +157,30 @@ def test_a_frozen_room_stops_a_script_at_once_and_parks_it_once_settled(qtbot, m
     driver.set_frozen(True)
     driver.poll()
 
-    assert broker.positions == [] and broker.parked == 0
-    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+    assert broker.positions == [] and broker.asked == [RESUME, PARK]
     assert driver.active
 
 
-def test_a_script_played_again_before_the_room_settles_follows_the_playhead_unparked(
-        qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_script_played_again_hands_the_device_back_and_follows_the_playhead(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
     driver.start(FakePlayer(pos=100), ACTIONS)
 
     driver.set_frozen(True)
     driver.set_frozen(False)
-    qtbot.wait(30)
     driver.poll()
 
-    assert broker.parked == 0
+    assert broker.asked == [RESUME, PARK, RESUME]
     assert broker.positions == [(100, 400)]
 
 
-def test_a_script_let_go_of_in_a_frozen_room_is_parked_once_and_at_once(qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_script_let_go_of_in_a_frozen_room_is_parked_once(qtbot):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)
     driver.start(FakePlayer(pos=100), ACTIONS)
     driver.set_frozen(True)
 
     driver.stop()
-    qtbot.wait(30)
 
     assert broker.parked == 1
 

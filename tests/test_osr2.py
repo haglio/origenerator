@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from app_support.file_channel import consume_command_file
 from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode
-from app_support.state_files import BROKER_MODE, OSR2_SERIAL_RX
-from funestra.tcode import PARK_COMMAND
+from app_support.osr2_hold import PARK
+from app_support.state_files import BROKER_CMD, BROKER_MODE, OSR2_SERIAL_RX
 
-from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_mode, format_position
+from origenerator.osr2 import Osr2Broker, device_mode, format_position
 
 
 class FakeSock:
@@ -35,21 +36,16 @@ def test_format_position_clamps_out_of_range():
     assert format_position(140, 40) == "L09999I40"
 
 
-def test_park_tcode_is_the_familys_park_command():
-    assert PARK_TCODE is PARK_COMMAND
-    assert PARK_TCODE == "L00000I500"
+def test_a_hold_is_asked_of_the_broker_where_it_drains_its_verbs(tmp_path):
+    Osr2Broker(state_dir=tmp_path).ask(PARK)
+
+    assert consume_command_file(tmp_path / BROKER_CMD) == [PARK]
 
 
 def test_send_position_streams_a_newline_terminated_tcode_datagram():
     sock = FakeSock()
     _broker(sock).send_position(50, 100)
     assert sock.sent == [(b"L05000I100\n", ("127.0.0.1", 50557))]
-
-
-def test_park_sends_the_rest_command():
-    sock = FakeSock()
-    _broker(sock).park()
-    assert sock.sent == [(b"L00000I500\n", ("127.0.0.1", 50557))]
 
 
 # --- is the device there: what the console reads to say "Off" ---------------
@@ -84,8 +80,8 @@ def test_a_device_silent_for_the_whole_shared_window_reads_as_off(tmp_path):
 def test_a_broker_named_nothing_streams_where_the_broker_listens():
     named, unnamed = FakeSock(), FakeSock()
 
-    Osr2Broker("127.0.0.1", 50557, sock_factory=lambda: named).park()
-    Osr2Broker(sock_factory=lambda: unnamed).park()
+    Osr2Broker("127.0.0.1", 50557, sock_factory=lambda: named).send_position(50, 100)
+    Osr2Broker(sock_factory=lambda: unnamed).send_position(50, 100)
 
     assert unnamed.sent == named.sent
 

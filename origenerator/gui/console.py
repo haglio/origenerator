@@ -38,10 +38,7 @@ from funestra.drive_readout import (
 )
 from funestra.hud_button import Button
 from funestra.modes import MainMode, Osr2State
-from funestra.robot_hand import (
-    PARK_CENTER,
-    POSITION_MAX,
-)
+from funestra.robot_hand import POSITION_MAX
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
@@ -142,10 +139,9 @@ def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
     return ConsoleHud(
         console=ConsoleModel(
             main_mode=MainMode.GENAU,
-            osr2=shown.osr2, osr2_control=control,
+            osr2=shown.osr2, osr2_control=control, paused=shown.paused,
             osr2_rows=shown.osr2_rows,
             max_intensity=shown.max_intensity,
-            parks_at_once=True,
         ),
         drive=shown.drive,
     )
@@ -171,6 +167,7 @@ class SlideshowDevice:
     # The pace an unlocked slide moves on at -- about the SET, so it rides with
     # the rows that step it rather than with the device.
     rows: tuple = ()
+    paused: bool = False
 
 
 def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Osr2Mode.CONTROLLED,
@@ -196,11 +193,12 @@ def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Os
         drive=(script_hud(script, motion.state) if scripted
                else drive_hud(motion.state, driving)),
         max_intensity=motion.state.state.max_intensity,
+        paused=motion.parked_by_the_pause or (script is not None and script.parked_by_the_pause),
     )
 
 
 def panel_room(motion) -> tuple[int, int]:
-    driving = SimpleNamespace(active=True, state=motion.state)
+    driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
     return ConsolePainter(device_only=True).rgba(console_hud(driving, control=OSR2_DRIVING))[1]
 
 
@@ -284,4 +282,4 @@ def _ask_for_control(state: str, motion, control) -> None:
     elif state == OSR2_DRIVING:
         motion.release()
     elif state == OSR2_PARKED:
-        motion.hold(PARK_CENTER)
+        motion.hold(OSR2_PARKED)

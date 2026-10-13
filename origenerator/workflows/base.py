@@ -88,6 +88,14 @@ _ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_resc
 _ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
 
 
+def _text_encode(clip_ref, text: str) -> dict:
+    return {"class_type": "CLIPTextEncode", "inputs": {"clip": clip_ref, "text": text}}
+
+
+def _words_ahead_of(words: str, prompt: str) -> str:
+    return ", ".join(text for text in (words, prompt) if text)
+
+
 @dataclass(frozen=True)
 class SizedInput:
     """The nodes that size a run off its input image, and what reads them:
@@ -377,13 +385,7 @@ class WorkflowTemplate(ABC):
         if index == 0 or text == scenes[0]:
             return {}, first_ref
         node_id = f"s{index}_{role}"
-        node = {
-            node_id: {
-                "class_type": "CLIPTextEncode",
-                "inputs": {"clip": clip_ref, "text": text},
-            }
-        }
-        return node, [node_id, 0]
+        return {node_id: _text_encode(clip_ref, text)}, [node_id, 0]
 
     @classmethod
     def scene_plan(cls, params: dict) -> list[tuple[int, int]]:
@@ -624,7 +626,9 @@ class WorkflowTemplate(ABC):
         each rect is cropped out and enlarged to the sampler's own working size,
         re-sampled at that part's own denoise, and composited back through a
         feathered mask — so a mouth or a finger is redrawn at real resolution
-        while every pixel outside the rects is left untouched.
+        while every pixel outside the rects is left untouched. A part found as
+        an outline (skin, hair) is redrawn inside that outline instead, toward
+        its own words put ahead of the picture's prompt.
 
         One pass per part asked for (:func:`~origenerator.workflows.detail_parts.
         detail_fix_passes` reads ``enhance_detail_fixes`` and drops what isn't
@@ -640,19 +644,20 @@ class WorkflowTemplate(ABC):
         the tail's output.
         """
         nodes: dict = {}
-        for index, (detector, denoise) in enumerate(detail_fix_passes(params)):
+        for index, fix in enumerate(detail_fix_passes(params)):
             provider_id, segs_id, detailer_id = (
                 f"fix{index}_{role}" for role in ("detector", "segs", "detailer"))
             nodes[provider_id] = {
                 "class_type": "UltralyticsDetectorProvider",
                 # The provider's own picker prefixes its detector models
                 # this way, and the value is matched against that list.
-                "inputs": {"model_name": f"bbox/{detector}"},
+                "inputs": {"model_name": f"bbox/{fix.detector}"},
             }
+            finder, output = (("segm", 1) if fix.part.outline else ("bbox", 0))
             nodes[segs_id] = {
-                "class_type": "BboxDetectorSEGS",
+                "class_type": f"{finder.capitalize()}DetectorSEGS",
                 "inputs": {
-                    "bbox_detector": [provider_id, 0],
+                    f"{finder}_detector": [provider_id, output],
                     "image": image_ref,
                     "threshold": _DETECTOR_THRESHOLD,
                     "dilation": _DETECTOR_DILATION,
@@ -661,6 +666,14 @@ class WorkflowTemplate(ABC):
                     "labels": "all",
                 },
             }
+            positive, negative = positive_ref, negative_ref
+            if fix.part.prompt:
+                positive_id, negative_id = f"fix{index}_positive", f"fix{index}_negative"
+                nodes[positive_id] = _text_encode(
+                    clip_ref, _words_ahead_of(fix.part.prompt, params["positive_prompt"]))
+                nodes[negative_id] = _text_encode(
+                    clip_ref, _words_ahead_of(fix.part.avoid, params["negative_prompt"]))
+                positive, negative = [positive_id, 0], [negative_id, 0]
             nodes[detailer_id] = {
                 "class_type": "DetailerForEach",
                 "inputs": {
@@ -679,9 +692,9 @@ class WorkflowTemplate(ABC):
                     "cfg": params["cfg"],
                     "sampler_name": params["sampler_name"],
                     "scheduler": params["scheduler"],
-                    "positive": positive_ref,
-                    "negative": negative_ref,
-                    "denoise": denoise,
+                    "positive": positive,
+                    "negative": negative,
+                    "denoise": fix.denoise,
                     "feather": _DETAIL_FEATHER,
                     "noise_mask": True,
                     "force_inpaint": True,

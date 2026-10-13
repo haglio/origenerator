@@ -2697,3 +2697,52 @@ def test_a_wan_2_2_form_offers_no_seed_for_the_pass_that_draws_no_new_noise(name
 
     assert second_passes and all(p["sampler_name"] == "euler" for p in second_passes)
     assert "seed" not in {pd.key for pd in wf.param_definitions()}
+
+
+def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around_it():
+    # A box around the hair takes the face with it, and a box around the skin is
+    # most of the picture; their detectors draw the part's outline, and the
+    # redraw stays inside it.
+    payload = _enhance_payload(installed=["skin_finder.pt"], enhance_detail_fixes={"skin": 0.4})
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    segs = payload[detailer["inputs"]["segs"][0]]
+    assert segs["class_type"] == "SegmDetectorSEGS"
+    provider_id, output = segs["inputs"]["segm_detector"]
+    assert payload[provider_id]["class_type"] == "UltralyticsDetectorProvider"
+    assert output == 1
+    assert "bbox_detector" not in segs["inputs"]
+    assert segs["inputs"]["image"] == detailer["inputs"]["image"]
+
+
+def test_a_part_with_its_own_words_is_redrawn_toward_them_ahead_of_the_pictures_prompt():
+    # The picture's prompt made the smooth skin in the first place, so the pass
+    # leads with the part's own words — and keeps the picture's after them,
+    # since those are what say the skin's tone and the hair's color.
+    skin = next(part for part in detail_module.part_table() if part.name == "skin")
+    payload = _enhance_payload(
+        installed=["skin_finder.pt"], positive_prompt="a lantern on a jetty",
+        negative_prompt="blurry", enhance_detail_fixes={"skin": 0.4},
+    )
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    positive = payload[detailer["inputs"]["positive"][0]]
+    negative = payload[detailer["inputs"]["negative"][0]]
+    assert positive["class_type"] == negative["class_type"] == "CLIPTextEncode"
+    assert positive["inputs"]["text"] == f"{skin.prompt}, a lantern on a jetty"
+    assert negative["inputs"]["text"] == f"{skin.avoid}, blurry"
+    assert positive["inputs"]["clip"] == negative["inputs"]["clip"] == detailer["inputs"]["clip"]
+    # The whole-frame pass still reads the prompt as typed.
+    sampler = _find_node(payload, "KSampler")["inputs"]
+    assert payload[sampler["positive"][0]]["inputs"]["text"] == "a lantern on a jetty"
+    assert payload[sampler["negative"][0]]["inputs"]["text"] == "blurry"
+
+
+def test_a_picture_with_no_prompt_leaves_a_part_its_own_words_alone():
+    skin = next(part for part in detail_module.part_table() if part.name == "skin")
+    payload = _enhance_payload(installed=["skin_finder.pt"], positive_prompt="",
+                               negative_prompt="", enhance_detail_fixes={"skin": 0.4})
+
+    (detailer,) = _nodes_of(payload, "DetailerForEach")
+    assert payload[detailer["inputs"]["positive"][0]]["inputs"]["text"] == skin.prompt
+    assert payload[detailer["inputs"]["negative"][0]]["inputs"]["text"] == skin.avoid

@@ -133,3 +133,19 @@ def test_a_graph_that_cannot_be_read_gives_up_nothing():
 def test_a_graph_of_things_that_are_not_nodes_gives_up_nothing():
     assert graph_level_params(_row({"1": "not a node", "2": {"inputs": 7}}),
                               _KEYS) == {}
+
+
+def test_a_pass_redrawn_inside_an_outline_is_named_by_its_detector_too():
+    # Skin and hair are found as outlines rather than boxes, so their detector
+    # sits on the other finder node, and the part is still read off its model.
+    graph = _sampler_graph()
+    graph["10"] = {"class_type": "UltralyticsDetectorProvider",
+                   "inputs": {"model_name": "bbox/skin_finder.pt"}}
+    graph["11"] = {"class_type": "SegmDetectorSEGS",
+                   "inputs": {"segm_detector": ["10", 1]}}
+    graph["12"] = {"class_type": "DetailerForEach",
+                   "inputs": {"segs": ["11", 0], "denoise": 0.4}}
+
+    fixes = graph_level_params(_row(graph), _KEYS)["enhance_detail_fixes"]
+
+    assert fixes == {"skin": 0.4}

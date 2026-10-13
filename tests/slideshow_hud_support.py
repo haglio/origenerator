@@ -3,7 +3,13 @@ from __future__ import annotations
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from PyQt6.QtCore import QPoint
 
+from origenerator.fun_time_mode import SIDES
 from tests.funestra_fakes import FakeEngine
+
+
+def open_both_sides(gallery_or_director) -> None:
+    for side in SIDES:
+        gallery_or_director.fill_the_region(side)
 
 
 def funestra_of(slideshow):

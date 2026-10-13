@@ -3092,12 +3092,6 @@ class GalleryView(QWidget):
         if group is not None:
             self._toggle_favorite(group.key)
 
-    def fill_the_regions(self) -> None:
-        """Put a slideshow on each satellite region — what entering origenerator
-        mode means. The hosting session's bridge asks this window for it.
-        """
-        self._slideshows.fill_the_regions()
-
     def close_the_slideshows(self) -> None:
         """Give every slideshow back — the session leaving origenerator mode, or
         this view going away with slideshows still up.

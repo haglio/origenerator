@@ -90,19 +90,16 @@ HEADSET_RIGHT_CLICK = "rightclick"
 HEADSET_WORDS = (HEADSET_PRESS, HEADSET_RELEASE, HEADSET_DRAG, HEADSET_HOVER,
                  HEADSET_SCROLL, HEADSET_RIGHT_CLICK)
 
-OPEN_SHOWS = "OPEN_SHOWS"
 CLOSE_SLIDESHOWS = "CLOSE_SLIDESHOWS"
 FILTER_ENHANCED = "FILTER_ENHANCED"
 RELEASE = "RELEASE"
 HAND_OVER = "HAND_OVER"
 TAKE_BACK = "TAKE_BACK"
-SESSION_VERBS = (OPEN_SHOWS, CLOSE_SLIDESHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
+SESSION_VERBS = (CLOSE_SLIDESHOWS, FILTER_ENHANCED, RELEASE, TAKE_BACK)
 #: Opening and closing the slideshow on one side's Funestra alone.
 OPEN_SLIDESHOW = "open_slideshow"
 CLOSE_SLIDESHOW = "close_slideshow"
 SIDE_VERBS = (OPEN_SLIDESHOW, CLOSE_SLIDESHOW)
-FORMER_NAMES = {"CLOSE_SHOWS": CLOSE_SLIDESHOWS, "open_show": OPEN_SLIDESHOW,
-                "close_show": CLOSE_SLIDESHOW}
 GO_TO = "GO_TO"
 SAY = "say"
 
@@ -117,14 +114,6 @@ CHECK_LAUNCH_FLAG = "--check-launch"
 #: with the pid).  The splash deliberately wears another ("Origenerator
 #: Loading"), so a caption match cannot reach it.
 WINDOW_TITLE = "Origenerator"
-
-# The captions a host resolves the slideshows by (with the process pid), the way it
-# resolves its own satellites by "Portrait AI Funestra"/"Landscape AI Funestra".
-# Per REGION, not per view class: whatever view occupies a region carries that
-# region's caption.
-PORTRAIT_SLIDESHOW_TITLE = "Origenerator Portrait"
-LANDSCAPE_SLIDESHOW_TITLE = "Origenerator Landscape"
-SLIDESHOW_TITLES = {"portrait": PORTRAIT_SLIDESHOW_TITLE, "landscape": LANDSCAPE_SLIDESHOW_TITLE}
 
 #: Beside the launcher at the checkout root, which is the path a host is
 #: already told.  Running this module rewrites it.
@@ -179,7 +168,6 @@ def command_lines() -> tuple[str, ...]:
     the line carries there."""
     return (
         *SESSION_VERBS,
-        *(former for former, now in FORMER_NAMES.items() if now in SESSION_VERBS),
         f"{HAND_OVER}|{{frames}}|{{input}}",
         f"{GO_TO}|{{file}}",
         *(line for side in SIDES for line in _lines_said_to(side)),
@@ -189,8 +177,6 @@ def command_lines() -> tuple[str, ...]:
 def _lines_said_to(side: str) -> tuple[str, ...]:
     return (
         *(spelled_for(side, verb) for verb in SIDE_VERBS),
-        *(spelled_for(side, former) for former, now in FORMER_NAMES.items()
-          if now in SIDE_VERBS),
         *(spelled_for(side, press) for press in PRESSES),
         *(f"{spelled_for(side, press)}|{{file}}" for press in PRESSES_ABOUT_A_FILE),
         *(f"{spelled_for(side, place)}|{payload}"
@@ -214,7 +200,6 @@ def declaration() -> dict:
     return {
         "module": MODULE,
         "window_title": WINDOW_TITLE,
-        "show_titles": dict(SLIDESHOW_TITLES),
         "check_launch_flag": CHECK_LAUNCH_FLAG,
         "required_flags": list(required_flags()),
         "region_flags": {side: list(region_flags(side)) for side in SIDES},

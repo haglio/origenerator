@@ -29,6 +29,7 @@ from origenerator.gui.label_cells import LabelCell, LabelColumn, WarningMark
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
 from origenerator.gui.param_help import option_help, param_help
+from origenerator.gui.picture_field import PictureNamer
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
@@ -127,8 +128,10 @@ class ParamForm(QWidget):
         pins_reused_seed: bool = True,
         heights=None,
         seed_history: SeedHistory | None = None,
+        name_picture: PictureNamer | None = None,
     ):
         super().__init__(parent)
+        self._name_picture = name_picture
         # Where a dragged prompt height is filed: the window's own set, handed
         # down rather than reached for, so a form can be built at chosen sizes.
         self._heights = heights
@@ -702,7 +705,16 @@ class ParamForm(QWidget):
             self._kind(pd).browse_filter,
         )
         if path:
-            self._widgets[key].setText(path)
+            self.put_file(key, path)
+
+    def has_field(self, key: str) -> bool:
+        return key in self._widgets
+
+    def put_file(self, key: str, path: str) -> None:
+        self._widgets[key].setText(path)
+
+    def set_drop_candidate(self, key: str, active: bool) -> None:
+        self._widgets[key].set_candidate(active)
 
     @staticmethod
     def _initial_browse_path(current: str, home: Path | None = None) -> str:
@@ -724,7 +736,7 @@ class ParamForm(QWidget):
         return str(COMFYUI_INPUT_DIR)
 
     def _kind(self, pd: ParamDef):
-        return field_kind(pd, self._heights, self._seed_history)
+        return field_kind(pd, self._heights, self._seed_history, self._name_picture)
 
     def _make_widget(self, pd: ParamDef) -> QWidget:
         if self._scenes is not None and pd.key in _SCENE_KEYS:

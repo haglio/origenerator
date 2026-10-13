@@ -106,6 +106,7 @@ from origenerator.gallery.labels import (
 from origenerator.gallery.output import (
     animated_preview_path,
     generation_of_file,
+    input_image_reference,
     is_in_progress,
     media_type_of_row,
     output_disk_files,
@@ -133,6 +134,7 @@ from origenerator.gallery.source_image import (
     find_source_image_id,
     source_image_id_for,
     source_image_id_in,
+    source_image_id_of,
     videos_from_source_image,
 )
 from origenerator.gallery.time_sections import new_work_opens_a_section, section_headings
@@ -231,6 +233,7 @@ __all__ = [
     "generation_of_file",
     "generation_seed",
     "group_level",
+    "input_image_reference",
     "is_enhance_product_row",
     "is_enhanceable_row",
     "is_enhanced_row",
@@ -277,6 +280,7 @@ __all__ = [
     "settings_signature",
     "source_image_id_for",
     "source_image_id_in",
+    "source_image_id_of",
     "start_frame_index",
     "unreviewed_experiments",
     "videos_from_source_image",

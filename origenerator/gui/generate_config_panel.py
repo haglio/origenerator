@@ -35,6 +35,7 @@ from origenerator.gallery import (
     describe_enhance_params,
     displayed_levels,
     enhance_params_for,
+    input_image_reference,
     item_label,
     level_matching_settings,
     media_type_of_row,
@@ -42,6 +43,7 @@ from origenerator.gallery import (
     prompts_differ_from,
     resolve_preview,
     settings_signature,
+    source_image_id_of,
     workflow_output_type,
 )
 from origenerator.gallery.sides import PORTRAIT, orientation_of_size
@@ -60,6 +62,7 @@ from origenerator.gui.export_lane import EXPORT_LANES
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_request import FolderRequest
 from origenerator.gui.generate_button import DEFAULT_CAPTION, GenerateButton
+from origenerator.gui.generation_drag import dropped_generation
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyPicker
 from origenerator.gui.inflight import (
     ALREADY_MAKING_ONE_TIP,
@@ -70,6 +73,7 @@ from origenerator.gui.metadata_block import MetadataBlock
 from origenerator.gui.no_wheel import NoWheelComboBox
 from origenerator.gui.panes import PaneSplitter, pane, pane_border
 from origenerator.gui.param_form import ParamForm
+from origenerator.gui.picture_field import its_own_file
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.related_media import RelatedMedia
 from origenerator.library_views import LibraryViews
@@ -246,6 +250,48 @@ class GenerateConfigPanel(QWidget):
         self._go_to_folder.triggered.connect(self._on_go_to_folder)
         self._can_go_to_folder = None   # the gallery's; see set_folder_check
         self._build_ui()
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        self._answer_a_drag(event)
+
+    def dragMoveEvent(self, event):
+        self._answer_a_drag(event)
+
+    def _answer_a_drag(self, event) -> None:
+        if self._dropped_image(event.mimeData()) is None:
+            event.ignore()
+        else:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        image = self._dropped_image(event.mimeData())
+        if image is None:
+            event.ignore()
+            return
+        self._param_form.put_file("input_image", image)
+        event.acceptProposedAction()
+
+    def _dropped_image(self, mime) -> str | None:
+        return self._image_for(dropped_generation(mime))
+
+    def _image_for(self, prompt_id: str | None) -> str | None:
+        form = self._param_form
+        if prompt_id is None or form is None or not form.has_field("input_image"):
+            return None
+        return input_image_reference(self._db.get_generation(prompt_id))
+
+    def show_drop_candidate(self, prompt_id: str | None) -> None:
+        form = self._param_form
+        if form is not None and form.has_field("input_image"):
+            form.set_drop_candidate("input_image", self._image_for(prompt_id) is not None)
+
+    def _picture_named_by(self, value: str) -> tuple[str | None, str]:
+        prompt_id = source_image_id_of(value, self._library.now().image_config_index)
+        row = self._db.get_generation(prompt_id) if prompt_id else None
+        if row is None:
+            return its_own_file(value)
+        return row.get("thumbnail_path"), item_label(row)
 
     @contextmanager
     def _loading(self):
@@ -564,7 +610,8 @@ class GenerateConfigPanel(QWidget):
                                          hidden_keys=wf.enhance_keys(),
                                          pins_reused_seed=wf.pins_reused_seed(),
                                          heights=self._heights,
-                                         seed_history=self._seed_history))
+                                         seed_history=self._seed_history,
+                                         name_picture=self._picture_named_by))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried = {

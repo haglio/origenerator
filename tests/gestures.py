@@ -25,6 +25,21 @@ def click(widget: QWidget, at: QPoint) -> None:
     QTest.mouseClick(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
 
 
+def press(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mousePress(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+
+
+def move(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mouseMove(window, point)
+
+
+def release(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mouseRelease(window, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+
+
 def press_key(widget: QWidget, key: Qt.Key,
               modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier) -> None:
     QTest.keyClick(widget.window().windowHandle(), key, modifiers)

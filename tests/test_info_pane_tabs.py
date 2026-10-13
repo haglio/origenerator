@@ -329,7 +329,7 @@ def test_tab_text_and_mark_follow_the_item_a_click_shows(tabs):
     tabs.load_selection(row, [row])
 
     idx = tabs.currentIndex()
-    assert tabs.tabText(idx) == "sdxl_g1.png"    # the item, by its file
+    assert tabs.tabText(idx) == "seed 4"         # the item, by its seed
     assert not tabs.tabIcon(idx).isNull()        # and wearing its kind's mark
 
 

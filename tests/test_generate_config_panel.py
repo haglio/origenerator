@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QSize, Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
+from PyQt6.QtGui import QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QSplitter, QSplitterHandle
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY
 
@@ -36,6 +36,7 @@ from origenerator.gui import related_media as related_media_module
 from origenerator.gui.animated_strip import _VideoTile
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_form import ParamForm
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
@@ -757,6 +758,97 @@ def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tm
     assert panel._generate_btn.toolTip() == "Nothing to start from — pick a Start Image first"
 
 
+def _drop_on(widget, prompt_id):
+    mime = generation_mime(prompt_id)
+    at = QPointF(widget.rect().center())
+    enter = QDragEnterEvent(at.toPoint(), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(widget, enter)
+    drop = QDropEvent(at, Qt.DropAction.CopyAction, mime,
+                      Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(widget, drop)
+    return enter
+
+
+def _start_image_tab(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    panel = GenerateConfigPanel(MagicMock(), db)
+    qtbot.addWidget(panel)
+    panel._workflow_combo.setCurrentIndex(_combo_index(panel, "wan22_i2v"))
+    return panel, db, panel._param_form._widgets["input_image"]
+
+
+def test_an_image_dropped_on_the_start_image_becomes_it(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    _image_row(db, filename="sdxl_img1.png")
+
+    _drop_on(start_image, "img1")
+
+    assert start_image.text() == "image/sdxl_img1.png [output]"
+
+
+def test_an_image_dropped_on_the_start_image_shows_there_by_its_name(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    thumbnail = tmp_path / "thumb.png"
+    Image.new("RGB", (8, 8)).save(thumbnail)
+    _image_row(db, filename="sdxl_img1.png")
+    db.update_generation("img1", thumbnail_path=str(thumbnail))
+
+    _drop_on(start_image, "img1")
+
+    assert start_image._name.text() == "seed 1"
+    assert not start_image._well.pixmap().isNull()
+
+
+def test_the_start_image_lights_for_a_dragged_image_and_not_for_a_video(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    _image_row(db)
+    _video_row(db, "vid1")
+    lit = []
+
+    for dragged in ("img1", "vid1", None):
+        panel.show_drop_candidate(dragged)
+        lit.append(start_image._well.property("dragActive"))
+
+    assert lit == [True, False, False]
+
+
+def test_a_video_dropped_on_the_start_image_is_turned_away(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    _video_row(db, "vid1")
+
+    enter = _drop_on(start_image, "vid1")
+
+    assert not enter.isAccepted()
+    assert start_image.text() == ""
+
+
+def test_an_image_dragged_across_the_tab_can_be_let_go_anywhere_on_it(qtbot, tmp_path):
+    panel, db, start_image = _start_image_tab(qtbot, tmp_path)
+    _image_row(db, filename="sdxl_img1.png")
+    mime = generation_mime("img1")
+    left, plain = Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier
+    picker = panel._workflow_combo
+    over_the_picker = QPointF(picker.rect().center())
+    QApplication.sendEvent(start_image, QDragEnterEvent(
+        start_image.rect().center(), Qt.DropAction.CopyAction, mime, left, plain))
+    move = QDragMoveEvent(over_the_picker.toPoint(), Qt.DropAction.CopyAction, mime, left, plain)
+    QApplication.sendEvent(picker, move)
+    QApplication.sendEvent(picker, QDropEvent(
+        over_the_picker, Qt.DropAction.CopyAction, mime, left, plain))
+
+    assert move.isAccepted()
+    assert start_image.text() == "image/sdxl_img1.png [output]"
+
+
+def test_an_image_dropped_on_settings_with_no_start_image_is_turned_away(panel):
+    _image_row(panel._db)
+
+    enter = _drop_on(panel._workflow_combo, "img1")
+
+    assert not enter.isAccepted()
+
+
 # --- show the newest matching generation instead of the blank placeholder -----
 
 def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
@@ -1051,13 +1143,13 @@ def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
     assert panel.title() == "Wizards"
 
 
-def test_a_displayed_item_names_the_tab_by_its_file(panel, tmp_path):
+def test_a_displayed_item_names_the_tab_by_its_seed_never_its_file(panel, tmp_path):
     row = _image_row(panel._db, filename="sdxl_img1.png")
     panel._preview.show_media = MagicMock()
 
     panel.show_saved_generation(row, [row])
 
-    assert panel.title() == "sdxl_img1.png"
+    assert panel.title() == "seed 1"
 
 
 def test_title_changed_when_the_shown_item_changes(panel):
@@ -1068,7 +1160,7 @@ def test_title_changed_when_the_shown_item_changes(panel):
 
     panel.show_saved_generation(row, [row])
 
-    assert titles and titles[-1] == "sdxl_img1.png"
+    assert titles and titles[-1] == "seed 1"
 
 
 def test_the_mark_is_the_shown_items_own_thumbnail(panel, tmp_path):

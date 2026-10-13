@@ -20,12 +20,42 @@ from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from origenerator.gui.generation_drag import GENERATION_MIME
+from origenerator.gui.generation_drag import dropped_generation
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 from origenerator.gui.looping_preview import looping_movie
 from origenerator.gui.media_badge import MediaBadge
 
 _PREVIEW_SIZE = 96  # the dropped thumbnail fits inside this; small enough for a 120px pane
+
+
+class DropWell(QLabel):
+    """The outlined well a drop lands in: a label, since a bare QWidget paints no
+    stylesheet border without WA_StyledBackground."""
+
+    def __init__(self, placeholder: str, parent=None):
+        super().__init__(placeholder, parent)
+        self.setObjectName("dropSlot")
+        self.setProperty("dragActive", False)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setWordWrap(True)
+        self.setMinimumHeight(_PREVIEW_SIZE)
+
+    def show_picture(self, path, *, drained: bool = False) -> bool:
+        picture = QPixmap(str(path)) if path and Path(path).exists() else QPixmap()
+        if picture.isNull():
+            return False
+        self.setText("")
+        picture = picture.scaled(_PREVIEW_SIZE, _PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+                                 Qt.TransformationMode.SmoothTransformation)
+        self.setPixmap(grayscale_pixmap(picture) if drained else picture)
+        return True
+
+    def set_candidate(self, active: bool) -> None:
+        if self.property("dragActive") == active:
+            return
+        self.setProperty("dragActive", active)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 class DropSlot(QWidget):
@@ -58,14 +88,7 @@ class DropSlot(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        # Style the child label, not the bare QWidget: a plain QWidget subclass
-        # paints no stylesheet border without WA_StyledBackground.
-        self._label = QLabel(placeholder)
-        self._label.setObjectName("dropSlot")
-        self._label.setProperty("dragActive", False)  # lit while a matching drag is underway
-        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label.setWordWrap(True)
-        self._label.setMinimumHeight(_PREVIEW_SIZE)
+        self._label = DropWell(placeholder)
         layout.addWidget(self._label)
         # A corner chip naming this slot's kind, shown only once something's dropped.
         self._badge = MediaBadge(kind, self)
@@ -115,14 +138,7 @@ class DropSlot(QWidget):
                 play_grayscale(self._movie, self._label)  # still loops, just drained
             else:
                 self._label.setMovie(self._movie)
-        elif thumb_path and Path(thumb_path).exists() and not QPixmap(str(thumb_path)).isNull():
-            self._label.setText("")
-            picture = QPixmap(str(thumb_path)).scaled(
-                _PREVIEW_SIZE, _PREVIEW_SIZE,
-                Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
-            )
-            self._label.setPixmap(grayscale_pixmap(picture) if self._grayscale else picture)
-        else:
+        elif not self._label.show_picture(thumb_path, drained=self._grayscale):
             self._label.setText("✓")  # held, but no thumbnail to show
         self._badge.setVisible(True)
         self._badge.raise_()  # keep the kind chip above the preview
@@ -133,10 +149,8 @@ class DropSlot(QWidget):
 
     def _pid_from(self, mime) -> str | None:
         """The dropped generation's id if it carries our type and passes ``accepts``."""
-        if not mime.hasFormat(GENERATION_MIME):
-            return None
-        pid = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
-        return pid if self._accepts(pid) else None
+        pid = dropped_generation(mime)
+        return pid if pid is not None and self._accepts(pid) else None
 
     def accepts(self, prompt_id: str) -> bool:
         """Whether this slot would take ``prompt_id`` (its kind gate)."""
@@ -148,11 +162,7 @@ class DropSlot(QWidget):
         Driven by the drag's start/end, not by hover, so the drop zone stands out
         the moment a matching drag begins — you see where to aim before arriving.
         """
-        if self._label.property("dragActive") == active:
-            return
-        self._label.setProperty("dragActive", active)
-        self._label.style().unpolish(self._label)
-        self._label.style().polish(self._label)
+        self._label.set_candidate(active)
 
     def dragEnterEvent(self, event):
         # Accept so the drop lands (and the OS shows a "can drop" cursor); the

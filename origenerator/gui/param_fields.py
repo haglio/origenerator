@@ -15,6 +15,7 @@ from shared_ui.tick_control import TickControl
 from origenerator.gui import diff_text
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
+from origenerator.gui.picture_field import PictureField, PictureNamer, its_own_file
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_combo import SeedComboBox
@@ -91,6 +92,14 @@ class _Seed(FieldKind):
 
 class _ImagePath(_Line):
     browse_filter = "Images (*.png *.jpg *.jpeg *.webp);;All Files (*)"
+
+    def __init__(self, name_picture: PictureNamer = its_own_file):
+        self._name_picture = name_picture
+
+    def make(self, pd):
+        widget = PictureField(self._name_picture)
+        widget.setText(str(pd.default))
+        return widget
 
     def read(self, pd, widget):
         # A LoadImage path resolves only without the invisible wrapping above.
@@ -237,13 +246,16 @@ _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
 
-def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = None) -> FieldKind:
+def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = None,
+               name_picture: PictureNamer | None = None) -> FieldKind:
     """The kind of field ``pd`` is edited in. ``heights`` is the set a prompt's
     dragged height is filed in, which is the form's to supply."""
     if pd.type == ParamType.STR and pd.multiline:
         return _Prompt(heights) if heights is not None else _PROMPT
     if pd.type == ParamType.SEED:
         return _Seed(seed_history)
+    if pd.type == ParamType.IMAGE and name_picture is not None:
+        return _ImagePath(name_picture)
     if pd.type in (ParamType.INT, ParamType.FLOAT) and pd.options:
         return _PRESETS
     return _KINDS[pd.type]

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from funestra.console import OSR2_DRIVING, OSR2_PARKED
-from funestra.robot_hand import PARK_CENTER
 
 from origenerator.gui.osr2_control import Osr2Control
 
@@ -13,15 +12,15 @@ class FakeMotion:
     active = False
 
     def __init__(self):
-        self.held_at = None
+        self.held = None
         self.calls = []
 
-    def hold(self, center):
-        self.held_at = center
-        self.calls.append(("hold", center))
+    def hold(self, control):
+        self.held = control
+        self.calls.append(("hold", control))
 
     def release(self):
-        self.held_at = None
+        self.held = None
         self.calls.append("release")
 
     def set_max_intensity(self, level):
@@ -62,7 +61,7 @@ def test_off_stills_the_motion_at_home_and_on_lets_it_go():
     control.set_state(OSR2_PARKED)
     control.set_state(OSR2_DRIVING)
 
-    assert motion.calls == [("hold", PARK_CENTER), "release"]
+    assert motion.calls == [("hold", OSR2_PARKED), "release"]
 
 
 def test_parking_a_switch_nothing_had_turned_on_holds_the_device_home():
@@ -82,11 +81,11 @@ def test_the_park_is_in_place_before_the_switch_says_so():
     motion = FakeMotion()
     control = _control(motion)
     seen = []
-    control.changed.connect(lambda: seen.append(motion.held_at))
+    control.changed.connect(lambda: seen.append(motion.held))
 
     control.set_state(OSR2_PARKED)
 
-    assert seen == [PARK_CENTER]
+    assert seen == [OSR2_PARKED]
 
 
 def test_driving_to_parked_still_says_so():

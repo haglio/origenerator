@@ -28,11 +28,13 @@ import logging
 import threading
 import time
 
+from app_support.osr2_hold import PARK, RESUME
+from funestra.console import HOLD_VERB
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion
-from origenerator.osr2 import Osr2Broker, park_once_settled
+from origenerator.osr2 import Osr2Broker
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +119,9 @@ class Osr2MotionDriver(QObject):
         self._interval_s = interval_ms / 1000.0
         self._make_ticker = ticker_factory or _TickThread
         self._ticker = None
-        self._held_at: int | None = None
+        self._held: str | None = None
         self._frozen = False
-        self._park_once_settled = park_once_settled(self._broker, self)
+        self._asked: str | None = None
 
     @property
     def active(self) -> bool:
@@ -155,27 +157,40 @@ class Osr2MotionDriver(QObject):
         self._active = False
         self._state.state.playing = False
         self._stop_the_clock()
-        self._park_once_settled.stop()
-        self._broker.park()
+        self._ask_the_broker(PARK)
         logger.info("OSR2 motion released: parked")
         self.active_changed.emit(False)
 
     def _sending(self) -> bool:
-        return self._active and (not self._frozen or self._held_at is not None)
+        return self._active and not self._frozen and self._held is None
+
+    @property
+    def parked_by_the_pause(self) -> bool:
+        return self._active and self._frozen and self._held is None
 
     def _run_the_clock_while_sending(self) -> None:
         if self._sending():
-            self._park_once_settled.stop()
             if self._ticker is None:
+                self._hand_the_device_back()
                 now = self._now()
                 self._last_tick = now
                 self._glide_from(now)
                 self.poll()  # move on the keypress, not a tick later
                 self._ticker = self._make_ticker(self.poll, self._interval_s)
                 self._ticker.start()
-        elif self._ticker is not None:
+        else:
             self._stop_the_clock()
-            self._park_once_settled.start()
+            if self._active:
+                self._ask_the_broker(HOLD_VERB[self._held] if self._held else PARK)
+
+    def _ask_the_broker(self, verb: str) -> None:
+        if verb != self._asked:
+            self._asked = verb
+            self._broker.ask(verb)
+
+    def _hand_the_device_back(self) -> None:
+        self._asked = None
+        self._broker.ask(RESUME)
 
     def _stop_the_clock(self) -> None:
         ticker, self._ticker = self._ticker, None
@@ -193,8 +208,8 @@ class Osr2MotionDriver(QObject):
         to instead of where the motion was when the command left.
 
         A tick that lands after the device was given up sends nothing: the park
-        stop() left on the wire is where whoever has it next expects to find the
-        device, and one stale position after it takes the device back.
+        stop() asked the broker for is where whoever has it next expects to find
+        the device, and one stale position after it takes the device back.
         """
         if not self._sending():
             return
@@ -204,8 +219,7 @@ class Osr2MotionDriver(QObject):
             motion_engine.advance(self._state, now - self._last_tick)
             self._last_tick = now
             motion_engine.tick_learned_motion(self._state, now)
-            pos = (self._held_at if self._held_at is not None
-                   else motion_engine.position_ahead(self._state, lead_ms / 1000.0))
+            pos = motion_engine.position_ahead(self._state, lead_ms / 1000.0)
         self._broker.send_position(pos, lead_ms)
         if not self._streaming:
             self._streaming = True
@@ -282,20 +296,15 @@ class Osr2MotionDriver(QObject):
             motion_engine.quarter_offset(self._state)
 
     @property
-    def held_at(self) -> int | None:
-        return self._held_at
+    def held(self) -> str | None:
+        return self._held
 
-    def hold(self, center: int) -> None:
-        with self._lock:
-            self._held_at = center
-            self._glide_from(self._now())
+    def hold(self, control: str) -> None:
+        self._held = control
         self._run_the_clock_while_sending()
 
     def release(self) -> None:
-        with self._lock:
-            if self._held_at is not None:
-                self._held_at = None
-                self._glide_from(self._now())
+        self._held = None
         self._run_the_clock_while_sending()
 
     def _glide_from(self, now: float) -> None:

@@ -342,7 +342,8 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # does is tests/test_app_link.py and tests/test_link_listener.py.
 # 17887 when cruise control left the app, taken down to what the tree measured.
 # 17882 when the window a headset room has stayed off the monitors.
-MAX_PROSE_LINES = 17882
+# 17855 when the OSR2's switch came in and its holds went to the broker.
+MAX_PROSE_LINES = 17855
 
 
 def _prose_and_code(path: Path) -> tuple[int, int]:

@@ -52,10 +52,11 @@ class FakeMotion:
     def set_center(self, value):
         self.calls.append(("set_center", value))
 
-    held_at = None
+    held = None
+    parked_by_the_pause = False
 
-    def hold(self, center):
-        self.calls.append(("hold", center))
+    def hold(self, control):
+        self.calls.append(("hold", control))
 
     def release(self):
         self.calls.append("release")

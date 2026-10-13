@@ -14,7 +14,6 @@ from funestra.console import (
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra.robot_hand import PARK_CENTER
 from PIL import Image
 from PIL import Image as _Image
 from PyQt6 import sip
@@ -12312,6 +12311,8 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
 # --- Drive OSR2: one global toggle, following whatever video is in front ----
 
 class _FakeDriver:
+    parked_by_the_pause = False
+
     def __init__(self):
         self.started = []
         self.stopped = 0
@@ -12391,7 +12392,7 @@ def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device
     view.osr2_control.set_state(OSR2_PARKED)
 
     assert view.osr2_control.engaged() is True
-    assert ("hold", PARK_CENTER) in view._osr2_motion.calls
+    assert ("hold", OSR2_PARKED) in view._osr2_motion.calls
     assert view.osr2_control.state() == OSR2_PARKED
 
 
@@ -12408,7 +12409,7 @@ def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbo
 
     assert driver.stopped == 1
     assert view._osr2_motion.active is True
-    assert ("hold", PARK_CENTER) in view._osr2_motion.calls
+    assert ("hold", OSR2_PARKED) in view._osr2_motion.calls
 
 
 def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
@@ -12497,7 +12498,7 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     assert driver.started == [] and view._osr2_motion.active
 
     view.osr2_control.setChecked(False)  # off is parked: the motion stilled at home
-    assert view._osr2_motion.held_at == PARK_CENTER
+    assert view._osr2_motion.held == OSR2_PARKED
 
 
 def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
@@ -12513,7 +12514,7 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     gestures.press_key(view, Qt.Key.Key_Space)
 
     assert not view.osr2_control.isChecked()      # the switch went off, not the motion
-    assert driver.stopped >= 1 and view._osr2_motion.held_at == PARK_CENTER
+    assert driver.stopped >= 1 and view._osr2_motion.held == OSR2_PARKED
 
 
 def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
@@ -12751,18 +12752,19 @@ class _SignalMotion(QObject):
         self.active = False
         self.calls = []
         self.state = Motion()
-        self.held_at = None
+        self.held = None
         self.frozen = False
+        self.parked_by_the_pause = False
 
     def set_frozen(self, frozen):
         self.frozen = frozen
 
-    def hold(self, center):
-        self.held_at = center
-        self.calls.append(("hold", center))
+    def hold(self, control):
+        self.held = control
+        self.calls.append(("hold", control))
 
     def release(self):
-        self.held_at = None
+        self.held = None
         self.calls.append(("release",))
 
     def set_max_intensity(self, level):
@@ -12943,7 +12945,7 @@ def test_escape_panic_parks_a_running_motion(qtbot, monkeypatch):
     assert view._osr2_motion.active
     assert view._handle_escape() is True
     assert not view.osr2_control.isChecked()
-    assert view._osr2_motion.held_at == PARK_CENTER
+    assert view._osr2_motion.held == OSR2_PARKED
 
 
 def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):

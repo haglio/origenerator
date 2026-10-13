@@ -123,12 +123,11 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
     assert hud.console.osr2_controls == ()
 
 
-def test_the_console_says_this_app_holds_the_device_itself(qtbot):
-    """A hold here reaches the device at once, not after the broker's second,
-    so the readout's dot sets off for the held end at once too."""
+def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot):
     _panel_, motion = _panel(qtbot)
+    motion.parked_by_the_pause = True
 
-    assert console_hud(motion, control=OSR2_PARKED).console.parks_at_once
+    assert console_hud(motion, control=OSR2_DRIVING).console.paused
 
 
 def test_every_button_the_console_declares_does_something_here(qtbot):
@@ -265,6 +264,8 @@ def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
 class FakeScript:
     """The funscript driver reduced to what the console asks of one: whether it
     has the device, and the line it is about to send."""
+
+    parked_by_the_pause = False
 
     def __init__(self, active=True, heights=None):
         self.active = active

@@ -4,10 +4,12 @@ from __future__ import annotations
 import threading
 import time
 
+from app_support.osr2_hold import PARK, RESUME, RETRACT
+from funestra.console import OSR2_PARKED, OSR2_RETRACTED
 from funestra.learned_model import LearnedModel, Phrase, classify
-from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER, RobotHandState, set_max_intensity
+from funestra.robot_hand import RobotHandState, set_max_intensity
 
-from origenerator import motion_engine, osr2
+from origenerator import motion_engine
 from origenerator.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
@@ -19,13 +21,17 @@ from origenerator.osr2_motion_driver import (
 class FakeBroker:
     def __init__(self):
         self.positions = []
-        self.parked = 0
+        self.asked = []
 
     def send_position(self, pos, interval_ms):
         self.positions.append((pos, interval_ms))
 
-    def park(self):
-        self.parked += 1
+    def ask(self, verb):
+        self.asked.append(verb)
+
+    @property
+    def parked(self):
+        return self.asked.count(PARK)
 
 
 class FakeClock:
@@ -71,7 +77,7 @@ def test_starting_takes_the_device(qtbot):
     driver.active_changed.connect(handovers.append)
     assert driver.toggle() is True
     assert driver.active
-    assert broker.parked == 0  # taking the device isn't parking it
+    assert broker.asked == [RESUME]  # taking the device lets go of any hold
     assert handovers == [True]  # announced, so the funscript drive stands down
     assert driver.tickers[0].started == 1  # and the clock is running
 
@@ -230,45 +236,37 @@ def test_a_hold_leaves_amp_speed_and_center_where_they_were(qtbot):
     driver.set_center(40)
     driver.set_speed(70)
 
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_RETRACTED)
 
     bars = driver.state.state
     assert (bars.amplitude, bars.intended_center, bars.speed) == (60, 40, 70)
 
 
-def test_while_held_the_device_is_sent_the_end_it_is_held_at(qtbot):
+def test_while_held_the_broker_holds_the_device_and_the_motion_sends_nothing(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
+    sent = len(broker.positions)
 
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_RETRACTED)
     clock.t += 1.0
     driver.poll()
 
-    assert driver.held_at == RETRACT_CENTER
-    assert broker.positions[-1][0] == RETRACT_CENTER
-
-
-def test_the_trip_to_the_held_end_is_given_the_takeovers_glide(qtbot):
-    driver, broker, clock = _driver(qtbot)
-    driver.start()
-    clock.t += 1.0
-
-    driver.hold(PARK_CENTER)
-    driver.poll()
-
-    assert broker.positions[-1] == (PARK_CENTER, _HANDOFF_MS)
+    assert driver.held == OSR2_RETRACTED
+    assert broker.asked[-1] == RETRACT
+    assert len(broker.positions) == sent
 
 
 def test_driving_brings_the_device_back_to_the_motion_with_the_takeovers_glide(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
-    driver.hold(PARK_CENTER)
+    driver.hold(OSR2_PARKED)
     clock.t += 1.0
     driver.poll()
 
     driver.release()
     driver.poll()
 
+    assert broker.asked[-1] == RESUME
     pos, interval = broker.positions[-1]
     assert interval == _HANDOFF_MS
     assert pos == motion_engine.position_ahead(driver.state, interval / 1000)
@@ -280,11 +278,11 @@ def test_park_then_retract_then_driving_leaves_amp_speed_and_center_as_they_were
     motion_engine.set_center(driver.state.state, 40)
     motion_engine.set_speed(driver.state.state, 70)
 
-    driver.hold(PARK_CENTER)
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_PARKED)
+    driver.hold(OSR2_RETRACTED)
     driver.release()
 
-    assert driver.held_at is None
+    assert driver.held is None
     assert (driver.state.state.amplitude, driver.state.state.intended_center,
             driver.state.state.speed) == (60, 40, 70)
 
@@ -293,7 +291,7 @@ def test_human_inspired_motion_stays_on_through_a_hold(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.set_learned(True)
 
-    driver.hold(PARK_CENTER)
+    driver.hold(OSR2_PARKED)
     driver.release()
 
     assert driver.state.learned.active is True
@@ -312,7 +310,7 @@ def test_amp_speed_center_and_human_inspired_answer_while_held_as_they_do_in_fun
     driver, _broker, _clock = _driver(qtbot)
     driver.set_amplitude(60)
     speed = driver.state.state.speed
-    driver.hold(PARK_CENTER)
+    driver.hold(OSR2_PARKED)
 
     driver.adjust_amplitude(10)
     driver.set_center(50)
@@ -327,7 +325,7 @@ def test_amp_speed_center_and_human_inspired_answer_while_held_as_they_do_in_fun
 def test_the_max_intensity_is_the_devices_to_keep_even_through_a_hold(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.start()
-    driver.hold(PARK_CENTER)
+    driver.hold(OSR2_PARKED)
 
     driver.set_max_intensity(30)
 
@@ -341,7 +339,7 @@ def test_a_max_intensity_lowered_while_held_lowers_the_bars_at_once(qtbot):
     bars = driver.state.state
     pushed = RobotHandState(amplitude=90, speed=90, intended_center=bars.intended_center)
     set_max_intensity(pushed, 30)
-    driver.hold(PARK_CENTER)
+    driver.hold(OSR2_PARKED)
 
     driver.set_max_intensity(30)
 
@@ -378,27 +376,23 @@ def test_a_frozen_room_stops_the_motion_at_once_and_sends_nothing_more(qtbot):
     assert driver.active
 
 
-def test_the_motion_parks_once_the_frozen_room_has_settled(qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_frozen_room_asks_the_broker_to_park_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
 
     driver.set_frozen(True)
 
-    assert broker.parked == 0
-    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+    assert broker.asked == [RESUME, PARK]
 
 
-def test_a_room_that_plays_again_before_it_settles_is_never_parked(qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_room_played_again_hands_the_device_back_to_the_motion(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
 
     driver.set_frozen(True)
     driver.set_frozen(False)
-    qtbot.wait(30)
 
-    assert broker.parked == 0
+    assert broker.asked == [RESUME, PARK, RESUME]
 
 
 def test_the_motion_plays_on_from_where_the_room_froze_it(qtbot):
@@ -428,19 +422,18 @@ def test_a_motion_started_in_a_frozen_room_waits_for_it_to_play(qtbot):
     assert broker.positions and driver.tickers[0].started == 1
 
 
-def test_a_held_motion_stays_at_its_end_through_a_freeze(qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_a_held_motion_stays_at_its_end_through_a_freeze(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_RETRACTED)
+    sent = len(broker.positions)
 
     driver.set_frozen(True)
-    qtbot.wait(30)
     clock.t += 1.0
     driver.poll()
 
-    assert broker.parked == 0
-    assert broker.positions[-1][0] == RETRACT_CENTER
+    assert broker.asked == [RESUME, RETRACT]
+    assert len(broker.positions) == sent
 
 
 def test_a_hold_asked_for_in_a_frozen_room_takes_the_device_to_its_end(qtbot):
@@ -448,22 +441,20 @@ def test_a_hold_asked_for_in_a_frozen_room_takes_the_device_to_its_end(qtbot):
     driver.start()
     driver.set_frozen(True)
 
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_RETRACTED)
 
-    assert broker.positions[-1] == (RETRACT_CENTER, _HANDOFF_MS)
+    assert broker.asked[-1] == RETRACT
 
 
-def test_letting_a_hold_go_in_a_frozen_room_parks_the_device_once_it_settles(
-        qtbot, monkeypatch):
-    monkeypatch.setattr(osr2, "PARK_SETTLE_MS", 1)
+def test_letting_a_hold_go_in_a_frozen_room_parks_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
-    driver.hold(RETRACT_CENTER)
+    driver.hold(OSR2_RETRACTED)
     driver.set_frozen(True)
 
     driver.release()
 
-    qtbot.waitUntil(lambda: broker.parked == 1, timeout=1000)
+    assert broker.asked[-1] == PARK
 
 
 def test_a_motion_stopped_in_a_frozen_room_parks_now_and_stays_stopped(qtbot):

@@ -126,6 +126,11 @@ def fix_command_phrases() -> frozenset[str]:
     return frozenset(phrases)
 
 
+def published_fix_phrases() -> tuple[str, ...]:
+    """Every fix of a built-in part a host's recognizer should hear."""
+    return tuple(f"fix {word}" for part in _BUILTIN_PARTS for word in part.spoken)
+
+
 def fix_command_spelling(text: str) -> str | None:
     """A fix command with its lead verb spelled the way the app names it —
     "Six teeth." read back as "fix teeth" — or ``None`` when it is no fix."""
@@ -171,8 +176,7 @@ def name_parts(parts) -> str:
 
 
 def _denoise(value) -> float | None:
-    """A part's stored number as a denoise, or ``None`` for zero, or for a
-    value that is no number at all."""
+    """A part's stored number as a denoise; ``None`` for zero or for no number."""
     try:
         number = float(value)
     except (TypeError, ValueError):

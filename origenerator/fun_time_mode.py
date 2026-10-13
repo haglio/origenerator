@@ -35,6 +35,7 @@ from origenerator.media import MediaType
 from origenerator.slideshow import Slide
 from origenerator.slideshow_buttons import PANEL_PLACES, PRESSES, PRESSES_ABOUT_A_FILE
 from origenerator.win32 import process_creation_time, this_process_creation_time
+from origenerator.workflows.detail_parts import published_fix_phrases
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,7 @@ def declaration() -> dict:
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
         "handoff": handoff(*_A_WINDOW),
+        "fix_phrases": list(published_fix_phrases()),
     }
 
 

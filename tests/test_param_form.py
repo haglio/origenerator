@@ -1378,8 +1378,8 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
     for key, widget in form._widgets.items():
         assert widget.toolTip() == param_help(key), key
     section = form._sections["Calibration"].content_form()
-    label = section.labelForField(form._widgets["steps"])
-    assert label.toolTip() == param_help("steps")
+    label = section.labelForField(form._widgets["denoise"])
+    assert label.toolTip() == param_help("denoise")
 
 
 def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
@@ -2001,3 +2001,16 @@ def test_one_composition_focus_gives_both_passes_its_value(qtbot):
 
     form._widgets["shift_high"].setValue(6.0)
     assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (6.0, 6.0)
+
+
+def test_a_setting_off_its_recommendation_wears_a_warning_with_the_advice(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_warnings({"steps": "Example Model's page recommends 20–40 steps."})
+
+    assert not form._warning_marks["steps"].isHidden()
+    assert form._warning_marks["steps"].toolTip() == "Example Model's page recommends 20–40 steps."
+    assert form._warning_marks["cfg"].isHidden()
+    form.set_warnings({})
+    assert form._warning_marks["steps"].isHidden()

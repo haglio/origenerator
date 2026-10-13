@@ -131,9 +131,9 @@ _SWITCHES = {
     AppCommand.AUDIO: (_AUDIO, None, "the audio bed"),
     AppCommand.AUDIO_ON: (_AUDIO, True, "the audio bed"),
     AppCommand.AUDIO_OFF: (_AUDIO, False, "the audio bed"),
-    AppCommand.DRIVE: (_DRIVE, None, "OSR2 control"),
-    AppCommand.DRIVE_ON: (_DRIVE, True, "OSR2 control"),
-    AppCommand.DRIVE_OFF: (_DRIVE, False, "OSR2 control"),
+    AppCommand.DRIVE: (_DRIVE, None, "OSR2"),
+    AppCommand.DRIVE_ON: (_DRIVE, True, "OSR2"),
+    AppCommand.DRIVE_OFF: (_DRIVE, False, "OSR2"),
     AppCommand.MIC_OFF: (_MIC, False, "the mic"),
 }
 

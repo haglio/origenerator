@@ -1,15 +1,12 @@
-"""The app's one OSR2 switch, and which of the four control states it is in.
+"""The app's one OSR2 switch: on drives the device, off parks it.
 
-It was a button in the toolbar until the Funestras' console grew a control-state
-group of its own -- control off, parked, retracted, driving -- and a second
-switch for one device is exactly what that group replaces. What is left is the
-switch itself, with no widget: the console sets it, and so do Space, Esc, a
-spoken word and a resumed session.
+The switch itself has no widget: the console's button sets it, and so do Space,
+Esc, a spoken word and a resumed session.
 
 It holds both of the app's drivers, because "what is the OSR2 doing" is one
 question and they are two halves of the answer: the funscript driver while a
 scripted video is in front, the self-generated motion otherwise, and neither
-while the device is held at an end or let go of.
+while the device is parked.
 
 It wears a checkable button's three names on purpose. Every one of those
 callers flipped a button before, and the voice router still flips the audio bed
@@ -20,26 +17,17 @@ from __future__ import annotations
 
 import logging
 
-from funestra.console import (
-    OSR2_CONTROL_OFF,
-    OSR2_DRIVING,
-    OSR2_PARKED,
-    OSR2_RETRACTED,
-)
+from funestra.console import OSR2_DRIVING, OSR2_PARKED
 from funestra.drive_readout import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
-from funestra.robot_hand import FULL_INTENSITY, PARK_CENTER, RETRACT_CENTER
+from funestra.robot_hand import FULL_INTENSITY, PARK_CENTER
 from PyQt6.QtCore import QObject, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
-_HELD_AT = {OSR2_PARKED: PARK_CENTER, OSR2_RETRACTED: RETRACT_CENTER}
-_HELD_STATE = {center: state for state, center in _HELD_AT.items()}
-
 
 class Osr2Control(QObject):
-    # Anything that can change which of the four buttons lights, the holds
-    # included: what re-aims the device, and what a console showing the group
-    # redraws on.
+    # Anything that can change whether the switch is on, the park included:
+    # what re-aims the device, and what a console showing the switch redraws on.
     changed = pyqtSignal()
     # The app has finished re-aiming the device, so what is driving it may be
     # different: every console over it draws itself again.
@@ -52,13 +40,13 @@ class Osr2Control(QObject):
         # rather than asked of the gallery so a slideshow's console, which never sees
         # the gallery, can still say what has the device.
         self.script = script
-        self._checked = False
+        self._engaged = False
         # Whether a Fun Time session beside this window has claimed the device.
         self._session_has_it = False
         self._max_intensity = FULL_INTENSITY
 
     def drive_with(self, motion, script) -> None:
-        self.setChecked(False)
+        self._engage(False)
         self._motion = motion
         self.script = script
         self._hold_the_drivers_to_the_max_intensity()
@@ -89,84 +77,88 @@ class Osr2Control(QObject):
         return self._motion is not None and not self._session_has_it
 
     def isChecked(self) -> bool:  # noqa: N802 - a button's name, deliberately
-        return self._checked
+        return self.state() == OSR2_DRIVING
 
     def setChecked(self, on) -> None:  # noqa: N802 - a button's name, deliberately
-        """Set the switch, announcing the move to whoever is following it.
+        """Switch on (driving) or off (parked), as a button flips it.
 
         Silent when it is already there, like a button's own toggled signal, so
         a switch put where the app already is does not re-run what a click does.
         """
-        on = bool(on) and self.isEnabled()
-        if on == self._checked:
+        if bool(on) == self.isChecked() or not self.isEnabled():
             return
-        self._checked = on
-        self._say_where_the_device_stands()
-        self.changed.emit()
+        self.set_state(OSR2_DRIVING if on else OSR2_PARKED)
+
+    def engaged(self) -> bool:
+        """Whether this app puts anything on the device: driving it, or holding
+        it parked at home."""
+        return self._engaged
 
     def state(self) -> str:
-        """Which of the console's four control states this app is in.
-
-        Driving covers every way the device can be getting something from here,
-        funscript or motion; the two holds are the motion stilled at one end or
-        the other; off is the switch off, with nothing going out at all.
-        """
-        if not self._checked:
-            return OSR2_CONTROL_OFF
+        """Driving while the device gets the funscript or the motion from here,
+        and parked otherwise: the motion stilled at home, or nothing here
+        reaching the device at all."""
         held = self._motion.held_at if self._motion is not None else None
-        return _HELD_STATE.get(held, OSR2_DRIVING)
+        return OSR2_DRIVING if self._engaged and held is None else OSR2_PARKED
 
     def set_state(self, state: str) -> None:
-        """Ask for one of those four -- what a press on the console's group is.
+        """Switch on (driving) or off (parked) -- what a press on the console is.
 
-        The hold moves first, so whatever reconciles on the switch already sees
-        it; and a state that leaves the switch where it was still says so, since
-        driving to parked flips nothing and would otherwise reach nobody.
+        The park moves first, so whatever reconciles on the switch already sees
+        it; and a move that leaves the app holding the device still says so,
+        since driving to parked engages nothing new and would otherwise reach
+        nobody.
         """
         if self._motion is not None:
-            if state in _HELD_AT:
-                self._motion.hold(_HELD_AT[state])
-            elif state == OSR2_DRIVING:
+            if state == OSR2_DRIVING:
                 self._motion.release()
-        was = self._checked
-        self.setChecked(state != OSR2_CONTROL_OFF)
-        if self._checked == was:
+            else:
+                self._motion.hold(PARK_CENTER)
+        was = self._engaged
+        self._engage(True)
+        if self._engaged == was:
             self._say_where_the_device_stands()
             self.changed.emit()
+
+    def _engage(self, on: bool) -> None:
+        on = bool(on) and self.isEnabled()
+        if on == self._engaged:
+            return
+        self._engaged = on
+        self._say_where_the_device_stands()
+        self.changed.emit()
 
     def the_session_has_it(self, held: bool) -> None:
         """A Fun Time session has claimed the OSR2, or has let it go.
 
-        Switching off is what stops whatever this app had on the device: the
-        view's one reconcile answers the change, as it does for a press.
+        Letting go is what stops whatever this app had on the device: the view's
+        one reconcile answers the change, as it does for a press.
         """
         if held == self._session_has_it:
             return
         logger.info("The OSR2 is %s", "Fun Time's" if held else "ours again")
         self._session_has_it = held
-        was = self._checked
-        self.setChecked(False)
-        if self._checked == was:
+        was = self._engaged
+        self._engage(False)
+        if self._engaged == was:
             self.changed.emit()
 
     def _say_where_the_device_stands(self) -> None:
-        """Record which of the four the app just moved to.
+        """Record whether the app just switched the device on or off.
 
-        The drivers log their own engage and release, which leaves the two
-        holds and the off silent -- so a log could not answer whether the OSR2
-        was under this app at all, which is the first question anyone debugging
-        two apps on one device asks.
+        The drivers log their own engage and release, which leaves the park
+        silent -- so a log could not answer whether the OSR2 was under this app
+        at all, which is the first question anyone debugging two apps on one
+        device asks.
         """
         logger.info("OSR2 control: %s", self.state())
 
     def restore(self, saved) -> None:
-        """Put back the state a saved session was left in.  True is a session
-        saved while this was an on/off switch; anything unrecognized opens with
-        the device let go of."""
-        if saved is True:
-            saved = OSR2_DRIVING
-        known = saved in (OSR2_PARKED, OSR2_RETRACTED, OSR2_DRIVING)
-        self.set_state(saved if known else OSR2_CONTROL_OFF)
+        """Put back the state a saved session was left in: on if it was driving
+        (True from a session saved while this was last an on/off switch), off
+        for anything else -- parked, the retracted and control off this no
+        longer has, or nothing at all."""
+        self.set_state(OSR2_DRIVING if saved in (True, OSR2_DRIVING) else OSR2_PARKED)
 
     def source(self) -> str | None:
         """What is sending to the device right now, or None while nothing is.

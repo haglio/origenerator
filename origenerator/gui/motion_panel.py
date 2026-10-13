@@ -7,9 +7,8 @@ Fun Time runs.  What goes on it and what a press takes off it are
 :mod:`origenerator.gui.console`'s, which a slideshow's own panel asks the same
 questions of.
 
-The on/off switch IS on it: the control-state group -- parked, retracted,
-driving, control off -- is the app's one OSR2 switch now, and the toolbar's
-separate one is gone.
+The on/off switch IS on it: the console's OSR2 switch -- on driving, off
+parked -- is the app's one, and the toolbar's separate one is gone.
 
 This is the surface with no slideshow under it.  A slideshow does not float one of these:
 it wears ONE panel (:mod:`origenerator.gui.slideshow_panel`), which carries the device
@@ -33,23 +32,23 @@ from origenerator.gui.console import (
     panel_room,
     post_device_action,
 )
-from origenerator.gui.motion_hud import MOTION_KEY_LEGEND
+
+DEVICE_WATCH_MS = 1000
 
 
 class MotionPanel(QWidget):
     """The console, floated over whichever surface hosts it.
 
-    It is always here, motion or no motion. With nothing driving, it draws
-    itself exactly as Fun Time's does with the OSR2 off: the OSR2 row reads
-    "Off", the readout grays, and the trace holds still rather than animating a
-    wave nobody is riding.
+    It is always here, motion or no motion. With nothing driving, its readout
+    grays and its trace holds still rather than animating a wave nobody is
+    riding.
     """
 
     # Fun Time insets its HUD from the window's top-left corner by this much, and
     # a reader glancing between the two apps looks for one panel in one place.
     MARGIN = hud_xy()[0]
 
-    def __init__(self, motion, parent=None, device_on=None, control=None):
+    def __init__(self, motion, parent=None, device=None, control=None):
         super().__init__(parent)
         self._motion = motion
         # The app's one OSR2 switch: the control-state group's four buttons
@@ -62,12 +61,12 @@ class MotionPanel(QWidget):
             # And whenever the app re-aims the device: which driver has it moves
             # with the video in front as much as with a press on this panel.
             control.settled.connect(self.refresh)
-        # How to ask whether the OSR2 is on the wire, or None for the real read.
+        # How to ask what the OSR2 reads as, or None for the real read.
         # Injectable so a test never reaches the machine's own broker stamps.
-        self._ask_device = device_on
+        self._ask_device = device
+        self._drawn_device = None
         self._painter = ConsolePainter(device_only=True)
         self.setMouseTracking(True)
-        self.setToolTip(f"OSR2 motion — {MOTION_KEY_LEGEND}")
         self.setFixedSize(*panel_room(motion))
         # The trace scrolls with the phase, so repaint on a beat while it is
         # moving — and only while it is. A still console redrawn ten times a
@@ -76,6 +75,9 @@ class MotionPanel(QWidget):
         self._repaint = QTimer(self)
         self._repaint.setInterval(REPAINT_MS)
         self._repaint.timeout.connect(self.update)
+        self._device_watch = QTimer(self)
+        self._device_watch.setInterval(DEVICE_WATCH_MS)
+        self._device_watch.timeout.connect(self._redraw_if_the_device_switched)
         # Followed from wherever the motion was toggled — the signal for a driver
         # that has one, and :meth:`refresh` (which the hosts call on every motion
         # key) for one that doesn't.
@@ -118,10 +120,12 @@ class MotionPanel(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._sync_repaint()
+        self._device_watch.start()
 
     def hideEvent(self, event):
         super().hideEvent(event)
         self._repaint.stop()
+        self._device_watch.stop()
 
     # --- presses: the console says what they post, this routes them ---------
 
@@ -175,16 +179,23 @@ class MotionPanel(QWidget):
         """The console drawn — the picture, before it is a widget. Returned
         rather than blitted straight so a test can look at what was actually
         drawn without a screen in front of it."""
+        self._drawn_device = self._device()
         return self._painter.rgba(console_hud(
-            self._motion, device_on=self._device_on(),
+            self._motion, device=self._drawn_device,
             control=self._osr2_control(), script=self._script()))
 
-    def _device_on(self) -> bool:
-        """Whether the OSR2 is answering, asked afresh on every draw — the device
-        is switched on and off without this app knowing, so there is nothing to
-        cache the answer against."""
-        ask = self._ask_device if self._ask_device is not None else osr2.device_on
-        return bool(ask())
+    def _redraw_if_the_device_switched(self) -> bool:
+        if self._device() == self._drawn_device:
+            return False
+        self.update()
+        return True
+
+    def _device(self):
+        """What the OSR2 reads as, asked afresh on every draw — the device is
+        switched on and off, and into its own auto mode, without this app
+        knowing, so there is nothing to cache the answer against."""
+        ask = self._ask_device if self._ask_device is not None else osr2.device_mode
+        return ask()
 
     def paintEvent(self, event):
         raw, (width, height) = self.render_console()

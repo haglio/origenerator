@@ -9,10 +9,10 @@ from __future__ import annotations
 import itertools
 import random
 
+from app_support.osr2_device import Osr2Mode
 from funestra import drive_layout
 from funestra.console import (
     OSR2_CONTROL_BUTTONS,
-    OSR2_CONTROL_OFF,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
@@ -21,7 +21,7 @@ from funestra.console_hud import ConsolePainter
 from funestra.drive_readout import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.modes import Osr2State
-from funestra.robot_hand import PARK_CENTER, POSITION_MAX
+from funestra.robot_hand import POSITION_MAX
 from PyQt6.QtCore import QEvent, QObject, QPointF, Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
@@ -103,8 +103,7 @@ def test_the_main_windows_console_is_its_osr2_section_alone(qtbot):
                  "genau_clip_seconds_down", "genau_clip_seconds_up"):
         assert gone not in actions, gone
     for kept in ("robot_hand_toggle_learned",
-                 "robot_hand_cycle_shape", "quarter_button", "robot_hand_park",
-                 "robot_hand_retract", "robot_hand_release",
+                 "robot_hand_cycle_shape", "quarter_button", "robot_hand_release",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
 
@@ -117,12 +116,19 @@ def test_the_console_declares_the_buttons_this_app_answers(qtbot):
     hud = console_hud(motion, control=OSR2_DRIVING)
 
     assert hud.console.rows == ()
-    assert [[b.command for b in row] for row in hud.console.osr2_rows] == [
-        ["robot_hand_toggle_learned", "robot_hand_cycle_shape",
-         "quarter_button", "osr2_control_off", "robot_hand_park", "robot_hand_retract",
-         "robot_hand_release"],
+    assert [[b.command for b in row if b.command] for row in hud.console.osr2_rows] == [
+        ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape",
+         "quarter_button"],
     ]
     assert hud.console.osr2_controls == ()
+
+
+def test_the_console_says_this_app_holds_the_device_itself(qtbot):
+    """A hold here reaches the device at once, not after the broker's second,
+    so the readout's dot sets off for the held end at once too."""
+    _panel_, motion = _panel(qtbot)
+
+    assert console_hud(motion, control=OSR2_PARKED).console.parks_at_once
 
 
 def test_every_button_the_console_declares_does_something_here(qtbot):
@@ -219,41 +225,41 @@ def test_a_panel_with_no_switch_hands_the_max_intensity_to_the_motion(qtbot):
     assert motion.calls == [("max_intensity", 0)]
 
 
-def test_the_control_group_asks_the_apps_one_switch(qtbot):
-    """The four buttons are the app's OSR2 switch now, on every surface -- which
-    is what the separate toolbar one was replaced by."""
+def test_the_console_switch_is_the_apps_one_switch(qtbot):
+    """A press while driving parks, and a press while parked drives -- which is
+    what the separate toolbar one was replaced by."""
     control = FakeControl()
     panel, _motion = _panel(qtbot, control=control)
+
     panel.render_console()
+    _press(panel, OSR2_CONTROL_BUTTONS[OSR2_PARKED])
+    panel.render_console()
+    _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
-    for action in OSR2_CONTROL_BUTTONS.values():
-        _press(panel, action)
-
-    assert control.asked == list(OSR2_CONTROL_BUTTONS)
+    assert control.asked == [OSR2_PARKED, OSR2_DRIVING]
 
 
 def test_the_group_lights_the_state_the_switch_is_in(qtbot):
     """The console draws the lit button; what this app owes it is the answer to
     which state, which nothing on the panel itself knows."""
-    control = FakeControl(OSR2_CONTROL_OFF)
+    control = FakeControl(OSR2_PARKED)
     panel, motion = _panel(qtbot, control=control)
 
     hud = console_hud(motion, control=control.state())
 
-    assert hud.console.osr2_control == OSR2_CONTROL_OFF
+    assert hud.console.osr2_control == OSR2_PARKED
     assert panel.render_console()[0]  # and it paints in that state
 
 
 def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
     """A console outside a gallery -- a test's, and any future host that hands
-    over no switch -- can still park and release what it does have."""
+    over no switch -- can still release what it does have."""
     panel, motion = _panel(qtbot)
     panel.render_console()
 
-    _press(panel, OSR2_CONTROL_BUTTONS[OSR2_PARKED])
     _press(panel, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
-    assert motion.calls == [("hold", PARK_CENTER), "release"]
+    assert motion.calls == ["release"]
 
 
 class FakeScript:
@@ -305,6 +311,14 @@ def test_the_motion_is_drawn_again_once_the_script_is_done(qtbot):
     assert hud.console.osr2 is Osr2State.ROBOT_HAND
 
 
+def test_with_its_switch_off_the_console_says_parked_over_a_device_that_is_on(qtbot):
+    painter = ConsolePainter()
+    hud = console_hud(FakeMotion(), device=Osr2Mode.CONTROLLED, control=OSR2_PARKED)
+    painter.rgba(hud)
+
+    assert painter._osr2_state(hud.console) == OSR2_PARKED
+
+
 def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     """The script streams into the air with the OSR2 switched off, and a green
     line would say it was arriving."""
@@ -312,7 +326,7 @@ def test_a_device_that_is_not_answering_is_driven_by_nobody(qtbot):
     control = FakeControl(script=script)
     panel, motion = _panel(qtbot, control=control)
 
-    hud = console_hud(motion, device_on=False, control=control.state(),
+    hud = console_hud(motion, device=Osr2Mode.OFF, control=control.state(),
                       script=script)
 
     assert hud.console.osr2 is Osr2State.OFF
@@ -322,7 +336,7 @@ def test_a_parked_device_offers_none_of_the_motions_marks(qtbot):
     # A press that could do nothing is not offered — the readout is dimmed whole
     # while nothing is reaching the device, exactly as it is in Fun Time while a
     # funscript has it.
-    panel, motion = _panel(qtbot)
+    panel, _motion = _panel(qtbot, control=FakeControl(state=OSR2_PARKED))
     panel.render_console()
     marks = [b for _r, b in panel._painter.buttons
              if b.command.startswith(("robot_hand_speed", "robot_hand_amplitude", "robot_hand_center"))]
@@ -340,13 +354,17 @@ def test_dragging_a_band_sets_the_level_under_the_pointer(qtbot):
     assert motion.calls == [("set_speed", 100)]
 
 
-def test_the_console_says_the_device_is_parked_while_it_is(qtbot):
+def test_the_readout_is_the_motion_only_while_it_runs(qtbot):
     motion = FakeMotion()
     assert drive_hud(motion.state, False).driven == DRIVEN_BY_NOTHING
     assert drive_hud(motion.state, True).driven == DRIVEN_BY_ROBOT_HAND
-    assert console_hud(motion).console.osr2 is Osr2State.OFF
-    motion.active = True
-    assert console_hud(motion).console.osr2 is Osr2State.ROBOT_HAND
+
+
+def test_off_is_said_only_of_a_device_that_is_switched_off(qtbot):
+    motion = FakeMotion()
+    for running in (False, True):
+        motion.active = running
+        assert console_hud(motion).console.osr2 is Osr2State.ROBOT_HAND, running
 
 
 def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
@@ -358,24 +376,46 @@ def test_a_motion_with_the_osr2_switched_off_says_off_and_drives_nothing(qtbot):
     motion = FakeMotion()
     motion.active = True
 
-    hud = console_hud(motion, device_on=False)
+    hud = console_hud(motion, device=Osr2Mode.OFF)
 
     assert hud.console.osr2 is Osr2State.OFF
     assert hud.drive.driven == DRIVEN_BY_NOTHING and not hud.drive.live
+
+
+def test_the_panel_redraws_once_the_device_switches_under_what_it_drew(qtbot):
+    device = {"on": False}
+    panel = MotionPanel(FakeMotion(),
+                        device=lambda: Osr2Mode.CONTROLLED if device["on"] else Osr2Mode.OFF,
+                        control=FakeControl(state=OSR2_PARKED))
+    qtbot.addWidget(panel)
+    panel.render_console()
+
+    assert panel._redraw_if_the_device_switched() is False
+    device["on"] = True
+    assert panel._redraw_if_the_device_switched() is True
+
+
+def test_the_panel_watches_the_device_for_as_long_as_it_is_shown(qtbot):
+    panel, _motion = _panel(qtbot, control=FakeControl(state=OSR2_PARKED))
+
+    panel.show()
+    assert panel._device_watch.isActive()
+    panel.hide()
+    assert not panel._device_watch.isActive()
 
 
 def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
     # Asked per draw rather than once: the OSR2 is switched on and off without
     # this app's back, so a console that read it at build time would go on
     # claiming whatever was true when it opened.
-    answers = [False, True]
+    answers = [Osr2Mode.OFF, Osr2Mode.CONTROLLED]
     motion = FakeMotion()
     motion.active = True
-    panel = MotionPanel(motion, device_on=lambda: answers.pop(0))
+    panel = MotionPanel(motion, device=lambda: answers.pop(0))
     qtbot.addWidget(panel)
 
     panel.render_console()
-    assert answers == [True]  # it asked
+    assert answers == [Osr2Mode.CONTROLLED]  # it asked
     panel.render_console()
     assert answers == []      # and asked again rather than reusing the answer
 
@@ -430,6 +470,12 @@ def test_the_button_goes_back_once_the_pointer_leaves(qtbot):
     assert _ground_lightness(panel, button) == at_rest
 
 
+def test_no_tooltip_of_the_panels_own_comes_up_over_a_buttons_name(qtbot):
+    panel, _motion = _panel(qtbot)
+
+    assert panel.toolTip() == ""
+
+
 def test_the_panel_actually_paints(qtbot):
     # A NameError in paintEvent takes the whole app down the first time the
     # panel is shown — which is what shipped once.
@@ -455,14 +501,14 @@ def test_no_state_draws_the_console_outside_the_room_kept_for_it():
     motion = FakeMotion()
     room_width, room_height = panel_room(motion)
 
-    for control, active, device_on, script in itertools.product(
-            (*OSR2_CONTROL_BUTTONS, OSR2_CONTROL_UNANSWERED), (False, True), (False, True),
+    for control, active, device, script in itertools.product(
+            (*OSR2_CONTROL_BUTTONS, OSR2_CONTROL_UNANSWERED), (False, True), Osr2Mode,
             (None, FakeScript())):
         motion.active = active
         _raw, (width, height) = ConsolePainter(device_only=True).rgba(
-            console_hud(motion, device_on=device_on, control=control, script=script))
+            console_hud(motion, device=device, control=control, script=script))
 
-        assert width <= room_width and height <= room_height, (control, active, device_on)
+        assert width <= room_width and height <= room_height, (control, active, device)
 
 
 def test_the_readout_holds_the_waves_picture_still_between_knots(qtbot):
@@ -501,3 +547,22 @@ def test_the_readout_holds_the_learned_motions_picture_still_between_knots(qtbot
     assert after.waveform == before.waveform
     assert after.slide > before.slide
     assert after.edge == before.edge
+
+
+def test_with_the_osr2_running_its_own_auto_mode_the_line_says_auto(qtbot):
+    motion = FakeMotion()
+    motion.active = True
+
+    assert console_hud(motion, device=Osr2Mode.AUTO).console.osr2 is Osr2State.AUTO
+
+
+def test_the_panel_redraws_once_the_osr2_goes_into_its_own_auto_mode(qtbot):
+    device = {"mode": Osr2Mode.CONTROLLED}
+    panel = MotionPanel(FakeMotion(), device=lambda: device["mode"],
+                        control=FakeControl(state=OSR2_DRIVING))
+    qtbot.addWidget(panel)
+    panel.render_console()
+
+    device["mode"] = Osr2Mode.AUTO
+
+    assert panel._redraw_if_the_device_switched() is True

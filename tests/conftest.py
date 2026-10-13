@@ -309,7 +309,8 @@ def _never_take_the_real_device(monkeypatch):
     # them would pass or fail with the hardware. The stand-in says it is there —
     # the console's own state before it could tell — and the tests about the
     # device being off inject their own.
-    monkeypatch.setattr(motion_panel.osr2, "device_on", lambda **_kw: True)
+    monkeypatch.setattr(motion_panel.osr2, "device_mode",
+                        lambda **_kw: motion_panel.osr2.osr2_device.Osr2Mode.CONTROLLED)
 
 
 @pytest.fixture(autouse=True)

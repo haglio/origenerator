@@ -10,7 +10,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from funestra.console import OSR2_CONTROL_OFF, OSR2_RETRACTED
+from funestra.console import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
@@ -104,7 +104,7 @@ def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     assert view._osr2_motion is None
     assert view._osr2_driver is None
     assert view.osr2_control.isEnabled() is False
-    assert view.osr2_control.state() == OSR2_CONTROL_OFF
+    assert view.osr2_control.state() == OSR2_PARKED
     assert view._motion_panel is None
 
 
@@ -126,7 +126,7 @@ def test_fun_time_gallery_carries_the_standalone_osr2_state_through(qtbot):
 
     view.restore_osr2_state(OSR2_RETRACTED)
 
-    assert view.osr2_control.state() == OSR2_CONTROL_OFF
+    assert view.osr2_control.state() == OSR2_PARKED
     assert view.osr2_state() == OSR2_RETRACTED
 
 
@@ -1478,7 +1478,7 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
         view._voice.on_command(word)
 
     assert answers == [(f"🎤 {name} is the session's here", WARNING)
-                       for name in ("the audio bed", "OSR2 control", "the mic")]
+                       for name in ("the audio bed", "OSR2", "the mic")]
 
 
 def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
@@ -1492,7 +1492,7 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
     view.osr2_control.the_session_has_it(True)
     view._voice.on_command(AppCommand.DRIVE_ON)
 
-    assert answers == [("🎤 OSR2 control can't be switched here", WARNING)]
+    assert answers == [("🎤 OSR2 can't be switched here", WARNING)]
 
 
 def _thick_borders(view):

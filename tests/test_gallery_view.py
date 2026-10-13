@@ -10,12 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from funestra.console import (
-    OSR2_CONTROL_OFF,
     OSR2_DRIVING,
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER
+from funestra.robot_hand import PARK_CENTER
 from PIL import Image
 from PIL import Image as _Image
 from PyQt6 import sip
@@ -12428,19 +12427,19 @@ def test_the_consoles_control_group_is_the_apps_one_osr2_switch(qtbot):
     assert driver.started == [("player-A", "actions-A")]
     assert view.osr2_control.state() == OSR2_DRIVING
 
-    view.osr2_control.set_state(OSR2_CONTROL_OFF)
+    view.osr2_control.set_state(OSR2_PARKED)
     assert driver.stopped == 1
     assert view.osr2_control.isChecked() is False
 
 
-def test_a_hold_from_the_console_stills_the_motion_and_keeps_control(qtbot):
+def test_parking_from_the_console_stills_the_motion_at_home_and_keeps_the_device(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
 
-    view.osr2_control.set_state(OSR2_RETRACTED)
+    view.osr2_control.set_state(OSR2_PARKED)
 
-    assert view.osr2_control.isChecked() is True
-    assert ("hold", RETRACT_CENTER) in view._osr2_motion.calls
-    assert view.osr2_control.state() == OSR2_RETRACTED
+    assert view.osr2_control.engaged() is True
+    assert ("hold", PARK_CENTER) in view._osr2_motion.calls
+    assert view.osr2_control.state() == OSR2_PARKED
 
 
 def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbot):
@@ -12544,8 +12543,8 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     view.osr2_control.setChecked(True)
     assert driver.started == [] and view._osr2_motion.active
 
-    view.osr2_control.setChecked(False)
-    assert not view._osr2_motion.active
+    view.osr2_control.setChecked(False)  # off is parked: the motion stilled at home
+    assert view._osr2_motion.held_at == PARK_CENTER
 
 
 def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
@@ -12561,7 +12560,7 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     gestures.press_key(view, Qt.Key.Key_Space)
 
     assert not view.osr2_control.isChecked()      # the switch went off, not the motion
-    assert driver.stopped >= 1 and not view._osr2_motion.active
+    assert driver.stopped >= 1 and view._osr2_motion.held_at == PARK_CENTER
 
 
 def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
@@ -12610,11 +12609,19 @@ def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
 
 def test_the_control_state_round_trips_for_persistence(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
-    assert view.osr2_state() == OSR2_CONTROL_OFF
+    assert view.osr2_state() == OSR2_PARKED
 
-    for state in (OSR2_PARKED, OSR2_RETRACTED, OSR2_DRIVING, OSR2_CONTROL_OFF):
+    for state in (OSR2_PARKED, OSR2_DRIVING):
         view.restore_osr2_state(state)
         assert view.osr2_state() == state, state
+
+
+def test_a_session_saved_under_retracted_or_control_off_reopens_parked(qtbot):
+    view, _driver, _panel = _osr2_view(qtbot)
+
+    for saved in (OSR2_RETRACTED, "control_off"):
+        view.restore_osr2_state(saved)
+        assert view.osr2_state() == OSR2_PARKED, saved
 
 
 class _FakeAmbientAudio:
@@ -12973,7 +12980,7 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     assert view._osr2_motion.active
 
 
-def test_escape_panic_stops_a_running_motion(qtbot, monkeypatch):
+def test_escape_panic_parks_a_running_motion(qtbot, monkeypatch):
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Esc is the gallery's here — no dialog and no fullscreen view up. Said
     # outright, because which window Qt calls active is ambient in a test process
@@ -12982,7 +12989,8 @@ def test_escape_panic_stops_a_running_motion(qtbot, monkeypatch):
     view.osr2_control.setChecked(True)
     assert view._osr2_motion.active
     assert view._handle_escape() is True
-    assert not view._osr2_motion.active
+    assert not view.osr2_control.isChecked()
+    assert view._osr2_motion.held_at == PARK_CENTER
 
 
 def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
@@ -15492,7 +15500,7 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
 
     view._voice.listener.speak("drive on")
     assert view.osr2_control.isChecked()
-    assert view._voice.status.text() == "🎤 OSR2 control on"
+    assert view._voice.status.text() == "🎤 OSR2 on"
 
     view._voice.listener.speak("drive")           # bare: flips whichever way it stands
     assert not view.osr2_control.isChecked()
@@ -15501,16 +15509,14 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     assert not view.osr2_control.isChecked()
 
 
-def test_osr2_off_lets_go_of_the_device_and_says_it_is_control(qtbot, tmp_path):
-    """The word is the console's fourth button, and the answer names what went
-    off: this app's control, not the device."""
+def test_osr2_off_parks_the_device_as_the_console_switch_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     view._voice.listener.speak("drive on")
 
     view._voice.listener.speak("OSR2 off")
 
-    assert view.osr2_control.state() == OSR2_CONTROL_OFF
-    assert view._voice.status.text() == "🎤 OSR2 control off"
+    assert view.osr2_control.state() == OSR2_PARKED
+    assert view._voice.status.text() == "🎤 OSR2 off"
 
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):

@@ -6,6 +6,7 @@ import json
 
 import numpy as np
 import pytest
+from app_support.osr2_device import Osr2Mode
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
@@ -159,15 +160,16 @@ class TestTheOnePanelASlideshowWears:
         assert "robot_hand_cycle_shape" not in posted
 
     def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
-        """Human-inspired motion, the waveform, the quarter nudge and the four
-        control states act on the OSR2, so they sit in its own block at the foot
-        of the panel rather than up among the rows that act on the set."""
+        """Human-inspired motion, the waveform, the quarter nudge and the OSR2
+        switch act on the OSR2, so they sit in its own block at the foot of the
+        panel rather than up among the rows that act on the set."""
         model = self._model(qtbot)
         aiming = [button.command for row in model.osr2_rows for button in row]
 
-        assert aiming[:3] == ["robot_hand_toggle_learned", "robot_hand_cycle_shape",
-                              "quarter_button"]
-        assert "osr2_control_off" in aiming
+        assert "robot_hand_toggle_learned" in aiming
+        assert "robot_hand_cycle_shape" in aiming
+        assert "quarter_button" in aiming
+        assert "robot_hand_release" in aiming
 
     def test_the_transport_is_drawn_once(self, qtbot):
         """The console's own prev/next/lock/trash row is off it: the side's
@@ -235,6 +237,32 @@ class TestTheOnePanelASlideshowWears:
         slideshow.press("portrait_next")
 
         assert slideshow._playlist.index != before
+
+    def _worn_on_a_device_that_is_on(self, qtbot, monkeypatch, now):
+        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_mode",
+                            lambda: Osr2Mode.CONTROLLED)
+        slideshow = self._slideshow(qtbot, clock=lambda: now[0])
+        slideshow.wear_the_hud("portrait")
+        return slideshow
+
+    def test_an_idle_device_leaves_the_panel_on_its_resting_beat(self, qtbot, monkeypatch):
+        now = [0.0]
+        slideshow = self._worn_on_a_device_that_is_on(qtbot, monkeypatch, now)
+        first = slideshow._hud_model()
+
+        now[0] = 0.15
+
+        assert slideshow._hud_model() is first
+
+    def test_a_moving_trace_rebuilds_the_panel_on_the_fast_beat(self, qtbot, monkeypatch):
+        now = [0.0]
+        slideshow = self._worn_on_a_device_that_is_on(qtbot, monkeypatch, now)
+        slideshow._motion.active = True
+        first = slideshow._hud_model()
+
+        now[0] = 0.15
+
+        assert slideshow._hud_model() is not first
 
 
 class TestWhereTheSlideshowsPanelSits:

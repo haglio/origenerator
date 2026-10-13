@@ -326,7 +326,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 18173 when the row that aims the device moved to funestra, taken down to
 # what the tree measured: the note that a console with no OSR2 switch offers no
 # control-off is funestra's
-# test_a_host_with_no_switch_offers_no_control_off_and_sets_the_holds_apart.
+# test_the_switch_is_off_while_held_or_unsaid_and_a_press_drives.
 #
 # 18089 when bringing a window to the front became the family's, taken down to
 # what the tree measured: why the boot takes the foreground by force is

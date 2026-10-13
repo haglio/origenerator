@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode
+from app_support.state_files import BROKER_MODE, OSR2_SERIAL_RX
 from funestra.tcode import PARK_COMMAND
 
-from origenerator import osr2
-from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_on, format_position
+from origenerator.osr2 import PARK_TCODE, Osr2Broker, device_mode, format_position
 
 
 class FakeSock:
@@ -54,46 +55,30 @@ def test_park_sends_the_rest_command():
 # --- is the device there: what the console reads to say "Off" ---------------
 
 def _rx(tmp_path, stamped=None):
-    """The broker's stamp of when the OSR2 last spoke, at whatever time is given."""
-    path = tmp_path / "rx.txt"
+    """The broker's directory, its stamp of when the OSR2 last spoke at whatever
+    time is given."""
     if stamped is not None:
-        path.write_text(str(stamped), encoding="utf-8")
-    return path
+        (tmp_path / OSR2_SERIAL_RX).write_text(str(stamped), encoding="utf-8")
+    return tmp_path
 
 
 def test_the_device_having_spoken_recently_means_it_is_there(tmp_path):
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 995.0)) is True
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path, 995.0)) is Osr2Mode.CONTROLLED
 
 
 def test_a_device_that_has_gone_quiet_reads_as_off(tmp_path):
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 960.0)) is False
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path, 960.0)) is Osr2Mode.OFF
 
 
 def test_nothing_stamped_at_all_reads_as_off(tmp_path):
     # A broker that never ran, a state dir that isn't there, a hand-mangled file:
     # all of them are "as far as anything here can tell, no device".
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path)) is False
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path, "just now")) is False
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path)) is Osr2Mode.OFF
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path, "just now")) is Osr2Mode.OFF
 
 
-def test_the_staleness_window_can_be_named_like_the_file_it_reads(tmp_path):
-    """It was read off the config module from inside the function while the file
-    beside it was a parameter, so a caller could point the check at a stamp but
-    not at a window. Both are arguments now, and both still default to the
-    broker's own numbers."""
-    stamped = _rx(tmp_path, 960.0)
-
-    assert device_on(now=1000.0, rx_file=stamped, stale_s=60.0) is True
-    assert device_on(now=1000.0, rx_file=stamped, stale_s=10.0) is False
-
-
-def test_the_window_defaults_to_the_brokers_own(tmp_path, monkeypatch):
-    """Named or not, the number is the broker's, so the app and the broker never
-    disagree about whether the OSR2 is there."""
-    monkeypatch.setattr(osr2, "RX_STALE_S", 5.0)
-
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 997.0)) is True
-    assert device_on(now=1000.0, rx_file=_rx(tmp_path, 990.0)) is False
+def test_a_device_silent_for_the_whole_shared_window_reads_as_off(tmp_path):
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path, 1000.0 - SILENT_ONCE_OFF_S)) is Osr2Mode.OFF
 
 
 def test_a_broker_named_nothing_streams_where_the_broker_listens():
@@ -103,3 +88,9 @@ def test_a_broker_named_nothing_streams_where_the_broker_listens():
     Osr2Broker(sock_factory=lambda: unnamed).park()
 
     assert unnamed.sent == named.sent
+
+
+def test_a_device_running_its_own_auto_mode_reads_as_auto(tmp_path):
+    (tmp_path / BROKER_MODE).write_text("1", encoding="utf-8")
+
+    assert device_mode(now=1000.0, state_dir=_rx(tmp_path, 995.0)) is Osr2Mode.AUTO

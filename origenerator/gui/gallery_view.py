@@ -653,7 +653,7 @@ class GalleryView(QWidget):
             # running with the switch off is one something else started — the
             # stop has always covered that case, and so does the resume.
             motion=(self._osr2_motion is not None and self._osr2_motion.active
-                    and not self.osr2_control.isChecked()),
+                    and not self.osr2_control.engaged()),
             auto=self._auto.active_key(),
             audio=self._bank.audio is not None and self._bank.audio.isChecked(),
             slideshow=slideshow is not None,
@@ -1121,10 +1121,10 @@ class GalleryView(QWidget):
     def reconcile_osr2(self):
         """Put the right thing on the device, or nothing.
 
-        With the switch off, neither source drives. Held at an end of the travel,
-        the motion is what drives — stilled there, which is how the device gets
-        to that end and stays — and the funscript stands down however scripted
-        the video in front is, or it would drive straight through the hold.
+        With the app off the device, neither source drives. Parked, the motion
+        is what drives — stilled at home, which is how the device gets there and
+        stays — and the funscript stands down however scripted the video in
+        front is, or it would drive straight through the park.
         Otherwise the surface in front picks: a funscript when what it has on
         screen carries one, and the self-generated motion every other moment,
         which is most of them — a folder of images, a clip with no script, an
@@ -1144,8 +1144,8 @@ class GalleryView(QWidget):
         try:
             held = self._osr2_motion.held_at is not None
             target = (self._osr2_drive_source()
-                      if self.osr2_control.isChecked() and not held else None)
-            wants_motion = self.osr2_control.isChecked() and target is None
+                      if self.osr2_control.engaged() and not held else None)
+            wants_motion = self.osr2_control.engaged() and target is None
             # Whoever gives the device up goes first: each driver puts back what
             # it found on taking over, and must not find the other still there.
             if not wants_motion and self._osr2_motion.active:
@@ -1201,10 +1201,10 @@ class GalleryView(QWidget):
         self._retarget_find()
 
     def osr2_state(self):
-        """Which of the four control states to reopen in.  A window that may not
+        """Whether to reopen with the switch on or off.  A window that may not
         drive (hosted by Fun Time) hands back what it was opened with instead:
         the standalone app keeps the same state file, and a hosted run would
-        otherwise leave it saying control off."""
+        otherwise leave it saying parked."""
         if not self.osr2_control.isEnabled():
             return self._osr2_left_in
         return self.osr2_control.state()

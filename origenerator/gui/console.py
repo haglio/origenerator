@@ -8,8 +8,8 @@ rather than once per surface.
 Nothing is drawn here. :class:`funestra.console_hud.ConsolePainter` and the
 sections it is built from do the drawing; this only says what they are drawing:
 the pace an unlocked slide moves on at, the motion's bars sampled forward, the
-funscript's line where a script has the device, and which of the four control
-states the app's one OSR2 switch is in.
+funscript's line where a script has the device, and whether the app's one OSR2
+switch is on.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
+from app_support.osr2_device import Osr2Mode
 from funestra import drive_layout
 from funestra.console import (
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
-    OSR2_RETRACTED,
     ROW_LABEL_W,
     VALUE_W,
     ConsoleModel,
@@ -41,14 +41,13 @@ from funestra.modes import MainMode, Osr2State
 from funestra.robot_hand import (
     PARK_CENTER,
     POSITION_MAX,
-    RETRACT_CENTER,
 )
 
 from origenerator import motion_engine
 from origenerator.console_commands import level_asked_for, max_intensity_asked_for
 from origenerator.gui.slideshow_pace import STEP_S as DWELL_STEP_S
 
-# Which of the console's four control buttons asks for which state, read off
+# Which press on the console's OSR2 switch asks for which state, read off
 # funestra's own mapping so a press cannot drift from the button that lights.
 OSR2_CONTROL_BY_COMMAND = {verb: state for state, verb in OSR2_CONTROL_BUTTONS.items()}
 
@@ -118,7 +117,7 @@ def script_hud(script, motion) -> DriveHud:
         driven=DRIVEN_BY_FUNSCRIPT, trace_seconds=_TRACE_SECONDS, waveform=heights)
 
 
-def console_hud(motion, *, device_on: bool = True,
+def console_hud(motion, *, device: Osr2Mode = Osr2Mode.CONTROLLED,
                 control: str = OSR2_CONTROL_UNANSWERED, script=None) -> ConsoleHud:
     """The console's OSR2 section as Fun Time's painter takes it.
 
@@ -130,24 +129,25 @@ def console_hud(motion, *, device_on: bool = True,
     OSR2 row says FunScript -- the motion is stopped, and drawing it would be a
     picture of something nobody is sending.
 
-    ``device_on`` is whether the OSR2 is answering at all
-    (:func:`origenerator.osr2.device_on`). A motion running with the device off
-    is a motion nobody is receiving, and the console says so exactly as Fun
-    Time's does: the OSR2 row reads "Off" and the painter takes that as nothing
-    driving, which grays the readout and holds the trace still. The motion goes
-    on — it cannot see the device either way — so this is the only
-    thing standing between a switched-off OSR2 and a console animating a blue
-    wave nothing is riding.
+    ``device`` is what the OSR2 reads as (:func:`origenerator.osr2.device_mode`):
+    switched off, running its own auto mode, or taking this app's commands. A
+    motion running with the device off is a motion nobody is receiving, and the
+    console says so exactly as Fun Time's does: the OSR2 row reads "Off" and the
+    painter takes that as nothing driving, which grays the readout and holds the
+    trace still. The motion goes on — it cannot see the device either way — so
+    this is the only thing standing between a switched-off OSR2 and a console
+    animating a blue wave nothing is riding.
     """
-    device = slideshow_device(motion, device_on=device_on, control=control, script=script)
+    shown = slideshow_device(motion, device=device, control=control, script=script)
     return ConsoleHud(
         console=ConsoleModel(
             main_mode=MainMode.GENAU,
-            osr2=device.osr2, osr2_control=control,
-            osr2_rows=device.osr2_rows,
-            max_intensity=device.max_intensity,
+            osr2=shown.osr2, osr2_control=control,
+            osr2_rows=shown.osr2_rows,
+            max_intensity=shown.max_intensity,
+            parks_at_once=True,
         ),
-        drive=device.drive,
+        drive=shown.drive,
     )
 
 
@@ -163,7 +163,7 @@ class SlideshowDevice:
 
     osr2_rows: tuple
     osr2: str
-    # Which of the four states the app's one OSR2 switch is in, or empty where
+    # Whether the app's one OSR2 switch is on (driving) or off (parked), or empty where
     # nobody handed a switch over -- the panel resolves the pair into one word.
     osr2_control: str
     drive: DriveHud
@@ -173,26 +173,26 @@ class SlideshowDevice:
     rows: tuple = ()
 
 
-def slideshow_device(motion, *, pace_s: int | None = None, device_on: bool = True,
-                     control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
+def slideshow_device(motion, *, pace_s: int | None = None, device: Osr2Mode = Osr2Mode.CONTROLLED,
+                control: str = OSR2_CONTROL_UNANSWERED, script=None) -> SlideshowDevice:
     """What the device is doing, as a panel takes it — see :class:`SlideshowDevice`.
 
     ``script`` is the funscript driver, when this app has one: while it has the
     device the readout is the script's line rather than the motion's, and the
-    line says FunScript.  ``device_on`` is whether the OSR2 is answering at all;
-    with it off nothing here is being received, so the line reads Off, the
-    readout grays and the trace holds still rather than animating a wave nobody
-    is riding.
+    line says FunScript.  ``device`` is what the OSR2 reads as; switched off
+    nothing here is being received, so the line reads Off, the readout grays and
+    the trace holds still rather than animating a wave nobody is riding, and in
+    its own auto mode the line reads Auto.
     """
-    scripted = script is not None and script.active and device_on
-    driving = motion.active and device_on and not scripted
+    on = device is not Osr2Mode.OFF
+    scripted = script is not None and script.active and on
+    driving = motion.active and on and not scripted
     return SlideshowDevice(
         osr2_control=control,
         rows=() if pace_s is None else (pace_row(pace_s),),
         osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
-        osr2=(Osr2State.FUNSCRIPT if scripted
-              else Osr2State.ROBOT_HAND if driving else Osr2State.OFF),
+        osr2=Osr2State.of(device, funscript_driving=scripted),
         drive=(script_hud(script, motion.state) if scripted
                else drive_hud(motion.state, driving)),
         max_intensity=motion.state.state.max_intensity,
@@ -276,12 +276,12 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
 
 
 def _ask_for_control(state: str, motion, control) -> None:
-    """A press on the control-state group.  With no switch handed over there is
-    still the motion to hold, which is what a panel outside a gallery can do
-    about the device."""
+    """A press on the OSR2 switch.  With no switch handed over there is still
+    the motion to park, which is what a panel outside a gallery can do about the
+    device."""
     if control is not None:
         control.set_state(state)
     elif state == OSR2_DRIVING:
         motion.release()
-    elif state in (OSR2_PARKED, OSR2_RETRACTED):
-        motion.hold(PARK_CENTER if state == OSR2_PARKED else RETRACT_CENTER)
+    elif state == OSR2_PARKED:
+        motion.hold(PARK_CENTER)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import origenerator.setting_advice as advice_module
-from origenerator.setting_advice import fresh_settings, setting_advice
+from origenerator.setting_advice import fresh_settings, recommended_choices, setting_advice
 
 MODELS = {
     "example_model.safetensors": {
@@ -102,3 +102,23 @@ def test_a_known_model_starts_a_fresh_picture_on_its_recommended_settings():
     assert fresh_settings(defaults, "example_model.safetensors") == {
         **defaults, "sampler_name": "euler_ancestral", "steps": 30, "cfg": 4}
     assert fresh_settings(defaults, "another_model.safetensors") == defaults
+
+
+def test_a_models_samplers_and_the_spacings_its_page_pairs_are_its_recommended_choices():
+    assert recommended_choices(_picture(sampler_name="dpmpp_2m")) == {
+        "sampler_name": ("euler_ancestral", "dpmpp_2m"), "scheduler": ("karras",)}
+
+
+def test_without_a_page_only_the_spacing_its_sampler_wants_is_recommended():
+    unknown = _picture(checkpoint="another_model.safetensors", sampler_name="dpmpp_2m")
+    assert recommended_choices(unknown) == {"sampler_name": (),
+                                            "scheduler": ("karras", "exponential")}
+    assert recommended_choices(dict(unknown, sampler_name="euler")) == {"sampler_name": (),
+                                                                       "scheduler": ()}
+
+
+def test_a_sampler_off_the_page_still_hears_which_step_spacing_it_wants():
+    advice = setting_advice(_picture(sampler_name="dpmpp_sde", scheduler="normal"))
+    assert advice == {
+        "sampler_name": "Example Model's page recommends euler_ancestral or dpmpp_2m.",
+        "scheduler": "dpmpp_sde works best with karras."}

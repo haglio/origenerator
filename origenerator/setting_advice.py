@@ -33,6 +33,17 @@ def fresh_settings(defaults: dict, checkpoint: str | None) -> dict:
     return {**defaults, **{key: value for key, value in start.items() if key in defaults}}
 
 
+def recommended_choices(params: dict) -> dict[str, tuple[str, ...]]:
+    samplers = _model_page(params).get("samplers") or {}
+    sampler = params.get("sampler_name")
+    spacings = samplers.get(sampler) or GOOD_STEP_SPACING.get(sampler) or ()
+    return {"sampler_name": tuple(samplers), "scheduler": tuple(spacings)}
+
+
+def _model_page(params: dict) -> dict:
+    return model_recommendations().get(params.get("checkpoint") or "") or {}
+
+
 def setting_advice(params: dict) -> dict[str, str]:
     advice = _model_advice(params)
     for key, text in _lora_advice(params).items():
@@ -43,14 +54,14 @@ def setting_advice(params: dict) -> dict[str, str]:
 def _model_advice(params: dict) -> dict[str, str]:
     advice: dict[str, str] = {}
     sampler, spacing = params.get("sampler_name"), params.get("scheduler")
-    page = model_recommendations().get(params.get("checkpoint") or "") or {}
-    name, samplers = page.get("name"), page.get("samplers") or {}
-    if samplers and sampler not in samplers:
-        advice["sampler_name"] = f"{name}'s page recommends {_either(samplers)}."
-    elif samplers.get(sampler) and spacing not in samplers[sampler]:
-        advice["scheduler"] = f"{name}'s page pairs {sampler} with {_either(samplers[sampler])}."
-    elif spacing not in GOOD_STEP_SPACING.get(sampler, (spacing,)):
-        advice["scheduler"] = f"{sampler} works best with {_either(GOOD_STEP_SPACING[sampler])}."
+    page = _model_page(params)
+    name, choices = page.get("name"), recommended_choices(params)
+    if choices["sampler_name"] and sampler not in choices["sampler_name"]:
+        advice["sampler_name"] = f"{name}'s page recommends {_either(choices['sampler_name'])}."
+    if choices["scheduler"] and spacing not in choices["scheduler"]:
+        paired_by_page = bool((page.get("samplers") or {}).get(sampler))
+        pairs = f"{name}'s page pairs {sampler}" if paired_by_page else f"{sampler} works best"
+        advice["scheduler"] = f"{pairs} with {_either(choices['scheduler'])}."
     for key, unit in (("steps", " steps"), ("cfg", "")):
         if _outside(params.get(key), page.get(key)):
             advice[key] = f"{name}'s page recommends {_span(page[key])}{unit}."

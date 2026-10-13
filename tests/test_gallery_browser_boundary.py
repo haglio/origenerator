@@ -197,8 +197,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     side's region and gives one side back through two more. 274 -> 275: the panes
     fold for the rect a session on the monitors names and sit side by side in a
     headset room, so which shape they wear is one question, asked at a takeover
-    and at each crossing.)"""
+    and at each crossing. 275 -> 276: a folder Auto-Generate runs in takes a
+    star, as a folder dropped onto Favorites does, so putting a folder's star
+    where it is asked to be -- which the star's own toggle, that drop and the
+    loop all ask -- is one method.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 275
+               for x in _class_def(VIEW, "GalleryView").body) == 276
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 88

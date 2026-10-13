@@ -2329,8 +2329,9 @@ class GalleryView(QWidget):
         groups = [g for key in keys if (g := self.group_for_key(key)) is not None]
         if target_key == _FAVORITES_KEY:
             for group in groups:
-                if not group.favorite:
-                    self._toggle_favorite(group.key)
+                if _takes_a_favorite(group):
+                    self._set_folder_favorite(group.key, True)
+            self._re_aim()
             return
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
@@ -2778,6 +2779,7 @@ class GalleryView(QWidget):
                 self._auto_working[target] = self._auto_working.pop(key)
                 self._auto.rekey(key, target)
                 self._voice.re_home(key, target)
+                self._set_folder_favorite(target, True)
                 self._pending_auto_key = target
                 key, working = target, self._auto_working[target]
             params = randomize_seeds(working["params"], working["workflow"].seed_keys())
@@ -2838,12 +2840,13 @@ class GalleryView(QWidget):
         self._sync_discard_buttons()  # Cancel ⇄ Next seed, on all three surfaces
 
     def _begin_auto(self, key: str):
-        """Capture the folder's settings as the loop's working params and start
-        the loop, giving an open mic a prompt to steer."""
+        """Capture the folder's settings as the loop's working params, start the
+        loop and star the folder, giving an open mic a prompt to steer."""
         self._capture_working(key)
         self._auto.start(key)
         if self._auto.is_active(key):
             self._voice.steer(key)  # steers this folder's prompt, if the mic is on
+            self._set_folder_favorite(key, True)
         else:
             self._auto_working.pop(key, None)  # the launch didn't take
 
@@ -4259,9 +4262,13 @@ class GalleryView(QWidget):
         # A star is the folder's, not the row's: both sides draw the same folder,
         # so favoriting it on one is favoriting it.
         group = self.group_for_key(key)
-        if not _takes_a_favorite(group):
+        if _takes_a_favorite(group):
+            self._set_folder_favorite(group.key, not group.favorite)
+            self._re_aim()
+
+    def _set_folder_favorite(self, key: str, favorite: bool):
+        if bool(self._folder_meta.get(key, {}).get("starred")) == favorite:
             return
-        favorite, key = not group.favorite, group.key
         self._db.set_folder_favorite(key, favorite)
         self._tree_view.mark_favorite(key, favorite)
         self._folder_meta[key] = {**self._folder_meta.get(key, {"custom_name": None}),
@@ -4271,7 +4278,6 @@ class GalleryView(QWidget):
         self._drawn_version += 1
         if not self._redrew_the_favorites_collection():
             self._browser.mark_folder_favorite(key, favorite)
-        self._re_aim()
 
     def _delete_folder_by_key(self, key: str):
         """Delete the folder a hover-row trash click names."""

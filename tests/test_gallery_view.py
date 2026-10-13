@@ -6514,6 +6514,33 @@ def test_toggling_auto_starts_a_reroll_loop(qtbot, tmp_path):
     assert view._bank.auto.isChecked()
 
 
+def test_auto_generating_in_a_folder_favorites_it(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+
+    view._bank.auto.click()
+
+    assert db.folder_meta_map()[key]["starred"] is True
+    assert view.group_for_key(key).favorite
+
+
+def test_auto_generating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._toggle_favorite(key)
+
+    view._bank.auto.click()
+
+    assert db.folder_meta_map()[key]["starred"] is True
+    assert view.group_for_key(key).favorite
+
+
 def test_auto_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
@@ -7048,6 +7075,26 @@ def test_a_steered_loop_rewrites_the_prompt_it_launches_from(qtbot, tmp_path):
     # completing the re-homed generation makes its folder exist -> the view follows
     client.job_completed.emit(view._live_jobs[new_key].prompt_id, _REROLL_HISTORY)
     assert _selected_folder(view) == new_key
+
+
+def test_a_steered_loop_favorites_the_folder_it_moves_to(qtbot, tmp_path):
+    client = _reroll_client()
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._bank.mic.setChecked(True)
+    view._toggle_auto(True)
+    (launch_key,) = view._live_jobs.keys()
+
+    view._voice.listener.say({"positive": "a cat, no hat", "negative": "ugly"})
+    client.job_completed.emit(view._live_jobs[launch_key].prompt_id, _REROLL_HISTORY)
+    (new_key,) = view._live_jobs.keys()
+    client.job_completed.emit(view._live_jobs[new_key].prompt_id, _REROLL_HISTORY)
+
+    assert db.folder_meta_map()[new_key]["starred"] is True
+    assert view.group_for_key(new_key).favorite
 
 
 def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
@@ -13603,6 +13650,24 @@ def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):
     view._on_folders_dropped(FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
+
+
+def test_dropping_a_favorite_folder_onto_favorites_leaves_it_a_favorite(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    view._toggle_favorite(cat)
+
+    view._on_folders_dropped(FAVORITES_KEY, [cat])
+
+    assert view._db.folder_meta_map()[cat]["starred"] is True
+
+
+def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
+    view, cat, _dog = _two_leaf_view(qtbot)
+    made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
+
+    view._on_folders_dropped(FAVORITES_KEY, [made])
+
+    assert made not in view._db.folder_meta_map()
 
 
 def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):

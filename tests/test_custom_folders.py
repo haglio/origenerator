@@ -42,18 +42,15 @@ def _lora_folder(tree):
 def test_a_custom_folder_key_round_trips_to_its_id():
     key = gallery.custom_folder_key(7)
     assert gallery.custom_folder_id(key) == 7
-    assert gallery.is_custom_key(key)
 
 
 @pytest.mark.parametrize("key", ["image", "image/sdxl_t2i", "__starred__", "__recents__"])
 def test_a_derived_or_shelf_key_is_not_a_custom_folder(key):
     assert gallery.custom_folder_id(key) is None
-    assert not gallery.is_custom_key(key)
 
 
-def test_the_live_selection_counts_as_custom_but_names_no_saved_folder():
+def test_the_live_selection_names_no_saved_folder():
     # It renders like a saved folder while carrying nothing to save it under.
-    assert gallery.is_custom_key(gallery.SELECTION_KEY)
     assert gallery.custom_folder_id(gallery.SELECTION_KEY) is None
 
 
@@ -232,31 +229,6 @@ def test_undoing_an_add_leaves_the_items_that_were_already_there(tmp_path):
 
     (record,) = db.list_custom_folders()
     assert record["items"] == ["a"]
-
-
-def test_renaming_a_custom_folder_is_undoable_and_never_blanks_the_name(tmp_path):
-    db, actions = _actions(tmp_path)
-    folder_id = actions.custom_folders.create("Favorites", [])
-    key = gallery.custom_folder_key(folder_id)
-
-    actions.rename_folder(key, "")  # a derived folder resets; this one has nothing to
-    assert db.list_custom_folders()[0]["name"] == "Favorites"
-
-    actions.rename_folder(key, "Best of")
-    assert db.list_custom_folders()[0]["name"] == "Best of"
-    actions.undo()
-    assert db.list_custom_folders()[0]["name"] == "Favorites"
-
-
-def test_renaming_a_custom_folder_writes_no_folder_meta_overlay(tmp_path):
-    # Its name is the row itself — an overlay keyed by "__custom__/1" would be a
-    # second, silently-winning name.
-    db, actions = _actions(tmp_path)
-    folder_id = actions.custom_folders.create("Favorites", [])
-
-    actions.rename_folder(gallery.custom_folder_key(folder_id), "Best of")
-
-    assert db.folder_meta_map() == {}
 
 
 def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):

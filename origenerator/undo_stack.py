@@ -1,8 +1,8 @@
 """One undo stack and the redo stack under it. Knows nothing of what it undoes.
 
 Session-scoped, bounded, and generic: a step is a label, a way to reverse it,
-and optionally a way to run it again. What it reverses — a delete, a rename, a
-folder gathered by hand — is entirely the caller's business (see
+and optionally a way to run it again. What it reverses — a delete, a folder
+gathered by hand — is entirely the caller's business (see
 :mod:`origenerator.gallery_actions`, which holds one).
 
 Two things about it are unusual and deliberate. **A redo re-runs the original
@@ -28,7 +28,7 @@ class UndoEntry:
 
     # ``undo`` returns something for the caller to navigate back to (a restored
     # generation's prompt id), or ``None`` when there's nowhere in particular to
-    # go (e.g. a rename).
+    # go (e.g. a folder gathered by hand).
     label: str
     undo: Callable[[], str | None]
     commit: Callable[[], None] | None = None  # run when dropped without undoing

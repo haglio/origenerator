@@ -190,8 +190,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the same, so the three places that built a tile hand their row to the one
     method that takes it back or builds it. 276 -> 274: a double-click on a
     folder in the list opens or closes it and renames nothing, so the two methods
-    that opened its name for typing and saved what was typed went.)"""
+    that opened its name for typing and saved what was typed went. 274 -> 272:
+    Rename... left the folder list's menus too, and with it the dialog that asked
+    for the name and the step that saved it.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 274
+               for x in _class_def(VIEW, "GalleryView").body) == 272
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 88

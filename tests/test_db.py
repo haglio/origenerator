@@ -507,15 +507,10 @@ def test_folder_meta_starts_empty(tmp_path):
     assert db.folder_meta_map() == {}
 
 
-def test_rename_folder_round_trips(tmp_path):
-    db = Database(tmp_path / "test.db")
-    db.rename_folder("video/wan22_i2v", "Dance clips")
-    assert db.folder_meta_map()["video/wan22_i2v"]["custom_name"] == "Dance clips"
-
-
 def test_favorite_folder_round_trips_and_preserves_custom_name(tmp_path):
     db = Database(tmp_path / "test.db")
-    db.rename_folder("image/sdxl_t2i", "Portraits")
+    db.upsert_folder_meta("image/sdxl_t2i", custom_name="Portraits", favorite=False,
+                          level=None, ref_prompt_id=None)
     db.set_folder_favorite("image/sdxl_t2i", True)
 
     meta = db.folder_meta_map()["image/sdxl_t2i"]

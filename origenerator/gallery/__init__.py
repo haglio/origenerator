@@ -44,7 +44,6 @@ from origenerator.gallery.custom import (
     build_custom_folders,
     custom_folder_id,
     custom_folder_key,
-    is_custom_key,
     selection_group,
 )
 from origenerator.gallery.enhance import (
@@ -91,7 +90,6 @@ from origenerator.gallery.groups import (
     child_groups,
     folder_level,
     group_level,
-    is_renamable,
     rows_under,
 )
 from origenerator.gallery.keys import folder_id
@@ -233,13 +231,11 @@ __all__ = [
     "generation_of_file",
     "generation_seed",
     "group_level",
-    "is_custom_key",
     "is_enhance_product_row",
     "is_enhanceable_row",
     "is_enhanced_row",
     "is_image_conditioned",
     "is_in_progress",
-    "is_renamable",
     "item_label",
     "job_kind_label",
     "legacy_parentless_folder_key",

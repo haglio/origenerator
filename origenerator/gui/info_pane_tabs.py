@@ -113,7 +113,7 @@ class InfoPaneTabs(QTabWidget):
         self._preview_panel: GenerateConfigPanel | None = None
         # A double-click on a tab's ✕ closes it, then the tabs shift and the
         # completing click lands on the neighbor as a tabBarDoubleClicked; stamp
-        # each close so that stray double-click isn't taken for a rename gesture.
+        # each close so that stray double-click isn't taken for a pin.
         self._last_close_at = float("-inf")
         self._how_many = HOW_MANY[0]
         self._add_subtab()  # the pane's resting tab

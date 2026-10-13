@@ -15,7 +15,7 @@ from origenerator.db_connection import Store
 
 
 class FolderMetaStore(Store):
-    """The six queries over the `folder_meta` table."""
+    """The five queries over the `folder_meta` table."""
 
     def folder_meta_map(self) -> dict[str, dict]:
         """Return ``{folder_key: {"custom_name": str|None, "starred": bool}}``."""
@@ -30,17 +30,6 @@ class FolderMetaStore(Store):
             }
             for r in rows
         }
-
-    def rename_folder(self, folder_key: str, custom_name: str | None):
-        """Set (or clear, when ``None``) a folder's custom display name."""
-        with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO folder_meta (folder_key, custom_name)
-                   VALUES (?, ?)
-                   ON CONFLICT(folder_key)
-                   DO UPDATE SET custom_name = excluded.custom_name""",
-                (folder_key, custom_name),
-            )
 
     def set_folder_favorite(self, folder_key: str, favorite: bool):
         with self._connect() as conn:

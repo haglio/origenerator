@@ -278,8 +278,8 @@ class _Entry:
     seeds: frozenset[str]
     # The names the user gave the folders this row sits in. Unlike the other
     # fields this one isn't a property of the row, so it is taken fresh on every
-    # re-index rather than carried over with the cached stems — a folder renamed
-    # a moment ago has to be findable by its new name now.
+    # re-index rather than carried over with the cached stems — a folder made a
+    # moment ago has to be findable by its name now.
     folders: frozenset[str] = frozenset()
 
 

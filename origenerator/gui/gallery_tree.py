@@ -14,8 +14,8 @@ the rows drawing it, which is how a navigation that knows only a folder key
 (a re-roll, a combine, a folder tile) finds a row to select.
 
 Pure rendering and lookups over the pane the GalleryView owns and lays out; it
-has no database or refresh concerns — folder rename/star/delete live in the
-view, which rebuilds every side through :meth:`populate`.
+has no database or refresh concerns — folder star/delete live in the view,
+which rebuilds every side through :meth:`populate`.
 
 The folders the user composed by hand are drawn flat: a custom folder's items
 can sit anywhere in the hierarchy, so nesting them under it would draw the same
@@ -126,8 +126,8 @@ class GalleryTree:
 
         ``sides`` are the :class:`SideModel`s of the sections the pane is
         drawing. ``folder_meta`` is the same label/star overlay the tree models
-        were built with, so the All row each side wraps around its model can be
-        renamed and favorited like any folder under it.
+        were built with, so the All row each side wraps around its model wears
+        its name and star like any folder under it.
 
         ``recently_worked`` are the ``(side, folder key)`` pairs of the folders
         worked in lately (:func:`~origenerator.gallery.recently_worked_folders`),

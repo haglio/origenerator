@@ -1,4 +1,4 @@
-"""How a derived folder is identified, and what it is called before you name it.
+"""How a derived folder is identified, and what it is called.
 
 A folder's *key* is what its star, its custom name and its place in a custom
 folder hang off, so it has to be derivable from any row under it and has to stay
@@ -12,11 +12,8 @@ prompt is a paragraph where a folder name is a line — the breadcrumb over the
 browser pane ran to a dozen lines and squeezed the pictures it sits above. A code
 is one line, is the same code in the tree, the header and a branch preview, and
 lasts exactly as long as the folder does. Nothing is lost by it: what the prompt
-said is on every generation inside the folder, the settings that set it apart
-from its siblings ride its tooltip, and any folder worth telling apart at a
-glance is one worth naming — every folder here can be renamed in place
-(:meth:`origenerator.db.Database.rename_folder`), which is the whole point of a
-name that starts out generic.
+said is on every generation inside the folder, and the settings that set it
+apart from its siblings ride its tooltip.
 """
 from __future__ import annotations
 

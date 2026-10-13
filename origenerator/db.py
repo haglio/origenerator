@@ -180,9 +180,6 @@ class Database:
     def folder_meta_map(self) -> dict[str, dict]:
         return self.folder_meta.folder_meta_map()
 
-    def rename_folder(self, folder_key: str, custom_name: str | None):
-        return self.folder_meta.rename_folder(folder_key, custom_name)
-
     def set_folder_favorite(self, folder_key: str, favorite: bool):
         return self.folder_meta.set_folder_favorite(folder_key, favorite)
 
@@ -204,9 +201,6 @@ class Database:
     def create_custom_folder(self, name: str, folder_id: int | None = None,
                              side: str | None = None) -> int:
         return self.custom_folders.create_custom_folder(name, folder_id, side)
-
-    def rename_custom_folder(self, folder_id: int, name: str):
-        return self.custom_folders.rename_custom_folder(folder_id, name)
 
     def set_custom_folder_side(self, folder_id: int, side: str):
         return self.custom_folders.set_custom_folder_side(folder_id, side)

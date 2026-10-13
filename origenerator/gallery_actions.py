@@ -1,8 +1,8 @@
-"""Gallery mutations with undo/redo: delete generations/folders, rename folders.
+"""Gallery mutations with undo/redo: delete generations and folders, group folders.
 
 A Qt-free controller the gallery view drives. Every mutation records how to
 reverse it on one undo stack, so a single Undo (button or Ctrl+Z) walks back the
-most recent delete or rename. Deletes move the underlying files to the trash and
+most recent change. Deletes move the underlying files to the trash and
 drop their rows; undo puts both back. The stack is session-scoped, and the oldest
 entry is dropped once it overflows.
 
@@ -30,7 +30,6 @@ from pathlib import Path
 
 from origenerator import recovery
 from origenerator.gallery import (
-    custom_folder_id,
     output_disk_files,
     remove_enhance_levels,
     resolve_preview,
@@ -326,23 +325,6 @@ class GalleryActions:
         self._history.push(UndoEntry("Reject experiment", undo, batch.purge,
                               redo=lambda: self.reject_experiment(row)))
 
-    # --- rename ------------------------------------------------------------
-
-    def rename_folder(self, key: str, name: str | None) -> None:
-        """Rename a folder. A derived folder gets an overlay name (blank resets it
-        to the label its settings produce); a custom folder's name IS the folder,
-        so a blank one is refused rather than leaving an unnamed row."""
-        folder_id = custom_folder_id(key)
-        if folder_id is not None:
-            self.custom_folders.rename(folder_id, name)
-            return
-        previous = self._db.folder_meta_map().get(key, {}).get("custom_name")
-        self._db.rename_folder(key, name)
-        self._history.push(UndoEntry(
-            "Rename folder", lambda: self._db.rename_folder(key, previous),
-            redo=lambda: self.rename_folder(key, name),
-        ))
-
     # --- what the gallery's Undo and Redo drive ----------------------------
 
     def can_undo(self) -> bool:
@@ -456,20 +438,6 @@ class CustomFolderActions:
 
         self._history.push(UndoEntry(f"Remove folder “{name}”", undo,
                                      redo=lambda: self.delete(folder_id)))
-
-    def rename(self, folder_id: int, name: str | None) -> None:
-        if not name:
-            return  # nothing to fall back to — keep the name it has
-        record = self._find(folder_id)
-        if record is None:
-            return
-        previous = record["name"]
-        self._db.rename_custom_folder(folder_id, name)
-        self._history.push(UndoEntry(
-            "Rename folder",
-            lambda: self._db.rename_custom_folder(folder_id, previous),
-            redo=lambda: self.rename(folder_id, name),
-        ))
 
     def _find(self, folder_id: int) -> dict | None:
         for record in self._db.list_custom_folders():

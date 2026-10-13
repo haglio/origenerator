@@ -173,7 +173,6 @@ class FakeActions:
         self.output_dir = output_dir
         self.thumb_dir = thumb_dir
         self.deleted = []   # each entry is one delete batch (list of rows)
-        self.renamed = []   # (key, name) pairs
         self.rejected = []  # experiment rows handed to reject_experiment
         self.restored = []  # each entry is one restore_deleted call's ids
         self.purged = []    # each entry is one purge_deleted call's ids
@@ -200,10 +199,6 @@ class FakeActions:
     def reject_experiment(self, row):
         self.rejected.append(row)
         self._label = "Reject experiment"
-
-    def rename_folder(self, key, name):
-        self.renamed.append((key, name))
-        self._label = "Rename folder"
 
     def undo(self):
         self.undo_count += 1
@@ -285,9 +280,8 @@ class FakeDB:
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["enhance_json"] = enhance_json
 
-    def rename_folder(self, key, custom_name):
-        self._meta.setdefault(key, {"custom_name": None, "starred": False})
-        self._meta[key]["custom_name"] = custom_name
+    def upsert_folder_meta(self, key, *, custom_name, favorite, level, ref_prompt_id):
+        self._meta[key] = {"custom_name": custom_name, "starred": bool(favorite)}
 
     def set_folder_favorite(self, key, favorite):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
@@ -353,9 +347,6 @@ class FakeDB:
         self._next_custom = max(self._next_custom, folder_id) + 1
         self._custom[folder_id] = {"name": name, "side": side, "items": {}}
         return folder_id
-
-    def rename_custom_folder(self, folder_id, name):
-        self._custom[folder_id]["name"] = name
 
     def delete_custom_folder(self, folder_id):
         self._custom.pop(folder_id, None)
@@ -1205,7 +1196,8 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     view.refresh()
     leaf = _children_by_prompt(
         _at(_image_workflow(view._tree), 0, 0))["a dog"]
-    db.rename_folder(_key(leaf), "Beach trip")
+    db.upsert_folder_meta(_key(leaf), custom_name="Beach trip", favorite=False,
+                          level=None, ref_prompt_id=None)
     view.refresh()
 
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
@@ -1691,20 +1683,6 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
 
     assert _find_count(view) == "2 of 2"
     assert _press_ctrl_f(view, monkeypatch) is True
-
-
-def test_renaming_a_folder_persists_and_relabels_it(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
-
-    workflow = _image_workflow(view._tree)
-    key = _key(workflow)
-    view._apply_rename(key, "Best Models")
-
-    assert db.folder_meta_map()[key]["custom_name"] == "Best Models"
-    assert _image_workflow(view._tree).text(0) == "Best Models"
 
 
 def _square_texts(view, key) -> list[str]:
@@ -5998,19 +5976,6 @@ def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
     assert (actions.undo_count, actions.redo_count) == (1, 1)
 
 
-def test_renaming_goes_through_the_undoable_actions(qtbot):
-    actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _key(_image_workflow(view._tree))
-
-    view._apply_rename(key, "Best Models")
-
-    assert actions.renamed == [(key, "Best Models")]
-    assert view._bank.undo.isEnabled()  # the rename is now undoable
-
-
 def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
     db = Database(tmp_path / "g.db")
     output_dir = tmp_path / "output"
@@ -9168,7 +9133,7 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
-    # A text editor (e.g. an inline rename field) has focus: Delete edits text.
+    # A text field (the search, say) has focus: Delete edits text.
     editor = QLineEdit()
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QApplication.focusWidget", lambda: editor
@@ -13416,7 +13381,7 @@ def test_esc_stops_the_audio_bed_on_its_own(qtbot):
     assert not view._bank.audio.isChecked() and bed.stops == 1
 
 
-# --- folders the user composes: multi-select, group, drop, rename, remove -----
+# --- folders the user composes: multi-select, group, drop, remove -------------
 
 def _two_leaf_view(qtbot, extra=(), actions=None):
     """A view whose Images tree holds two settings folders ("a cat", "a dog")
@@ -13655,16 +13620,6 @@ def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
     assert view._db.list_custom_folders()[0]["id"] == folder_id
 
 
-def test_renaming_a_custom_folder_renames_the_folder_itself(qtbot):
-    view, cat, _dog = _two_leaf_view(qtbot)
-    folder_id = _make_folder(view, "Favorites", [cat])
-
-    view._apply_rename(gallery.custom_folder_key(folder_id), "Best of")
-
-    assert view._db.list_custom_folders()[0]["name"] == "Best of"
-    assert "Best of" in _top_level(view._tree)
-
-
 def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
@@ -13695,8 +13650,8 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
 # Every test below raises a real menu and answers it by the words the user reads,
 # because the menu is where the label is wired to the handler. Calling the handler
 # instead — which is what the rest of this file does — leaves that wiring covered
-# by nothing at all: swapping the custom folder's Rename and Remove arms so that
-# "Rename…" deletes the folder used to pass all 657 tests.
+# by nothing at all: swapping two arms of the custom folder's menu, so that its
+# harmless entry deleted the folder, used to pass all 657 tests.
 
 def _tree_menu(view, key=None, side=LANDSCAPE):
     """Raise a tree row's context menu the way the tree's own signal does, or the
@@ -13706,7 +13661,7 @@ def _tree_menu(view, key=None, side=LANDSCAPE):
     )
 
 
-def test_a_folders_menu_offers_rename_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
+def test_a_folders_menu_offers_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -13714,13 +13669,12 @@ def test_a_folders_menu_offers_rename_favorite_and_a_delete_kept_apart(qtbot, mo
     _tree_menu(view, cat)
 
     # The separator is the point: the one entry that destroys anything sits below
-    # it, away from the two that cost nothing.
-    assert labels == ["Rename…", "Favorite", "", "Delete folder…"]
+    # it, away from the one that costs nothing.
+    assert labels == ["Favorite", "", "Delete folder…"]
 
 
-def test_a_workflows_menu_offers_neither_a_rename_nor_a_delete(qtbot, monkeypatch):
-    # Its name states which workflow it is, so a name of your own there would only
-    # hide that; and a whole workflow's history must never go in one action.
+def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
+    # A whole workflow's history must never go in one action.
     view, _cat, _dog = _two_leaf_view(qtbot)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -13728,33 +13682,6 @@ def test_a_workflows_menu_offers_neither_a_rename_nor_a_delete(qtbot, monkeypatc
     _tree_menu(view, _key(_image_workflow(view._tree)))
 
     assert labels == ["Favorite"]
-
-
-def test_renaming_a_folder_from_its_menu_renames_it_and_takes_nothing_away(
-        qtbot, monkeypatch):
-    view, cat, _dog = _two_leaf_view(qtbot)
-    _answer_menu(monkeypatch, "Rename…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
-                        staticmethod(lambda *a, **kw: ("Kittens", True)))
-
-    _tree_menu(view, cat)
-
-    assert view._db.folder_meta_map()[cat]["custom_name"] == "Kittens"
-    assert view._tree_item_for(cat).text(0) == "Kittens"
-    # The folder is renamed, not emptied: this menu's other entries destroy things.
-    assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
-
-
-def test_dismissing_the_rename_dialog_leaves_the_folder_named_as_it_was(
-        qtbot, monkeypatch):
-    view, cat, _dog = _two_leaf_view(qtbot)
-    _answer_menu(monkeypatch, "Rename…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
-                        staticmethod(lambda *a, **kw: ("Kittens", False)))  # Cancel
-
-    _tree_menu(view, cat)
-
-    assert view._db.folder_meta_map() == {}
 
 
 def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
@@ -13829,7 +13756,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     assert view._db.get_generation("i2") is not None  # dropped from it, not deleted
 
 
-def test_the_menu_over_a_folder_of_your_own_offers_only_rename_and_remove(
+def test_the_menu_over_a_folder_of_your_own_offers_only_its_removal(
         qtbot, monkeypatch):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat])
@@ -13840,22 +13767,7 @@ def test_the_menu_over_a_folder_of_your_own_offers_only_rename_and_remove(
 
     # No star (a bookmark of a bookmark shelf collects nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
-    assert labels == ["Rename…", "", "Remove folder…"]
-
-
-def test_renaming_a_folder_of_your_own_renames_it_rather_than_removing_it(
-        qtbot, monkeypatch):
-    view, cat, _dog = _two_leaf_view(qtbot)
-    folder_id = _make_folder(view, "Keepers", [cat])
-    _answer_menu(monkeypatch, "Rename…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
-                        staticmethod(lambda *a, **kw: ("Best of", True)))
-
-    _tree_menu(view, gallery.custom_folder_key(folder_id))
-
-    (record,) = view._db.list_custom_folders()
-    assert record["name"] == "Best of" and record["items"] == [cat]
-    assert "Best of" in _top_level(view._tree)
+    assert labels == ["Remove folder…"]
 
 
 def test_removing_a_folder_of_your_own_from_its_menu_keeps_what_it_gathered(
@@ -13944,7 +13856,7 @@ def test_right_clicking_outside_a_selection_is_about_the_row_under_the_cursor(
 
     _tree_menu(view, fish)
 
-    assert labels == ["Rename…", "Favorite", "", "Delete folder…"]
+    assert labels == ["Favorite", "", "Delete folder…"]
 
 
 # --- somebody else's queue on the shared ComfyUI ----------------------------

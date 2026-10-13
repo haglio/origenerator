@@ -4156,7 +4156,7 @@ class GalleryView(QWidget):
         )
         return reply == QMessageBox.StandardButton.Yes
 
-    # --- rename & star -----------------------------------------------------
+    # --- right-click menus & star --------------------------------------------
 
     def _on_tree_context_menu(self, item, global_pos: QPoint, side: str):
         if item is None:
@@ -4200,9 +4200,6 @@ class GalleryView(QWidget):
             self._custom_folder_context_menu(group, global_pos)
             return
         menu = QMenu(self)
-        # No rename for a folder named after what it holds — a workflow, a model,
-        # a LoRA, a source image (see :func:`gallery.is_renamable`).
-        rename_action = menu.addAction("Rename…") if gallery.is_renamable(group) else None
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
         # Inside a folder the user made, an item tile can also be dropped from it.
         # Right-clicking the same folder in the tree offers nothing of the sort —
@@ -4218,9 +4215,7 @@ class GalleryView(QWidget):
             menu.addSeparator()
             delete_action = menu.addAction("Delete folder…")
         chosen = menu.exec(global_pos)
-        if rename_action is not None and chosen == rename_action:
-            self._rename_folder(key)
-        elif chosen == favorite_action:
+        if chosen == favorite_action:
             self._toggle_favorite(key)
         elif remove_action is not None and chosen == remove_action:
             self._remove_from_custom_folder(open_custom, group.key)
@@ -4243,36 +4238,13 @@ class GalleryView(QWidget):
         return {submenu.addAction(folder.label): folder.key for folder in targets}
 
     def _custom_folder_context_menu(self, group, global_pos: QPoint):
-        """A folder the user made: rename it, or remove the grouping. It has no
-        star (a bookmark of a bookmark shelf collects nothing) and no delete —
-        removing it must never touch the generations it gathers."""
+        """A folder the user made: remove the grouping. It has no star (a
+        bookmark of a bookmark shelf collects nothing) and no delete — removing
+        it must never touch the generations it gathers."""
         menu = QMenu(self)
-        rename_action = menu.addAction("Rename…")
-        menu.addSeparator()
         remove_action = menu.addAction("Remove folder…")
-        chosen = menu.exec(global_pos)
-        if chosen == rename_action:
-            self._rename_folder(group.key)
-        elif chosen == remove_action:
+        if menu.exec(global_pos) == remove_action:
             self._remove_custom_folder(group)
-
-    def _rename_folder(self, key: str):
-        group = self.group_for_key(key)
-        current = group.label if group is not None else ""
-        # A derived folder's name is an overlay over the one its settings produce,
-        # so blank resets it; a custom folder's name is all it has, so it can't.
-        prompt = ("Folder name:" if gallery.is_custom_key(key)
-                  else "Folder name (blank to reset):")
-        text, ok = QInputDialog.getText(self, "Rename Folder", prompt, text=current)
-        if ok:
-            self._apply_rename(key, text)
-
-    def _apply_rename(self, key: str, name: str):
-        # The name belongs to the folder, so it is saved against the folder's own
-        # key — both sides draw the renamed folder.
-        self._actions.rename_folder(_base_of(key), name.strip() or None)
-        self.refresh()
-        self._re_aim()
 
     def _toggle_favorite(self, key: str):
         # A star is the folder's, not the row's: both sides draw the same folder,

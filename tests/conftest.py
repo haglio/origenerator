@@ -323,7 +323,7 @@ def _no_dialog_nobody_can_answer(monkeypatch):
     it: it spins a nested event loop that nothing ever ends, so the test stops
     dead and holds the merge gate open until GitHub's six-hour limit, with no
     output naming which test it was. That is worse than the wrong answer in every
-    way, and it is one mis-wired menu entry away at all times — a "Rename…"
+    way, and it is one mis-wired menu entry away at all times — a "Favorite"
     pointed at the delete's handler asks for confirmation, and there the run
     stops. Every test that means to reach a dialog answers it with a monkeypatch
     of its own, which lands over this one.

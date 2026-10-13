@@ -491,7 +491,7 @@ class _Tier:
     """What every folder level under one workflow is built against.
 
     The media type and the workflow name are the two halves of every key below;
-    ``folder_meta`` is what the user has renamed and favorited; ``image_index``
+    ``folder_meta`` is the names and stars the folders carry; ``image_index``
     resolves a start frame to the picture it is. All four used to travel as four
     parameters through five builders that each handed them on untouched, and
     every builder's `children_for` lambda had to list them again.
@@ -739,6 +739,6 @@ ALL_LABEL = "All"
 
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
-    """The workflow folders gathered under one folder, renamable like any other."""
+    """The workflow folders gathered under one folder, named and starred like any other."""
     label, favorite = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
     return AllGroup(ALL_KEY, label, list(tree_model), favorite)

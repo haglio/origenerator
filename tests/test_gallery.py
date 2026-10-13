@@ -7,7 +7,6 @@ import pytest
 
 from origenerator.gallery import (
     ALL_KEY,
-    AllGroup,
     CustomGroup,
     LoraGroup,
     ModelGroup,
@@ -31,7 +30,6 @@ from origenerator.gallery import (
     generation_of_file,
     group_level,
     is_enhanced_row,
-    is_renamable,
     job_kind_label,
     legacy_preframe_settings_folder_key,
     legacy_preversion_settings_folder_key,
@@ -1797,21 +1795,6 @@ def test_a_custom_name_replaces_the_code():
 
     named = build_gallery_tree(rows, {leaf.key: {"custom_name": "Cats"}})[0].children[0].children[0].children[0]
     assert named.label == "Cats"
-
-
-def test_only_a_folder_with_a_name_of_its_own_can_be_renamed():
-    # A folder named after the fact it stands for — a workflow, a model, a LoRA,
-    # the source image a video animates — has no name of its own to change, and
-    # changing it would only hide which one it is. The code-named leaves, the All
-    # row and the folders the user composed do.
-    assert not is_renamable(WorkflowGroup("k", "wf", "WF", []))
-    assert not is_renamable(ModelGroup("k", "M", []))
-    assert not is_renamable(LoraGroup("k", "L", []))
-    assert not is_renamable(SourceImageGroup("k", "3A7F2C10", []))
-
-    assert is_renamable(SettingsGroup("k", "3A7F2C10", []))
-    assert is_renamable(AllGroup(ALL_KEY, "All", []))
-    assert is_renamable(CustomGroup("__custom__/1", "Keepers", []))
 
 
 def test_a_picture_previews_from_its_own_full_file(tmp_path):

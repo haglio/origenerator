@@ -972,7 +972,9 @@ def test_a_config_with_no_result_is_named_by_its_folder(panel):
 
 
 def test_a_folder_the_user_named_gives_the_tab_that_name(panel):
-    panel._db.rename_folder(settings_key("image", *panel.workflow_and_signature()), "Wizards")
+    panel._db.upsert_folder_meta(settings_key("image", *panel.workflow_and_signature()),
+                                 custom_name="Wizards", favorite=False, level=None,
+                                 ref_prompt_id=None)
 
     assert panel.title() == "Wizards"
 

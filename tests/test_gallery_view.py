@@ -109,7 +109,7 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.preview_widget import PreviewWidget
 from origenerator.gui.request_worker import RevisionWorker
 from origenerator.gui.reroll_tile import RerollTile
-from origenerator.gui.show_panel import show_hud_model
+from origenerator.gui.slideshow_panel import slideshow_hud_model
 from origenerator.gui.thumbnail_widget import ThumbnailWidget
 from origenerator.motion_engine import Motion
 from origenerator.orientation import (
@@ -121,8 +121,8 @@ from origenerator.orientation import (
     oriented_key,
 )
 from origenerator.prompt_edit import apply_request
-from origenerator.show_buttons import MODE_BUTTONS
 from origenerator.slideshow import DEFAULT_IMAGE_DWELL_MS, LIVE
+from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import SurfaceCommand
@@ -131,7 +131,7 @@ from origenerator.voice.dictation import RequestDictation
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
 from tests import gestures
-from tests.show_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
+from tests.slideshow_hud_support import button_on_screen, engine_of, hud_button_names, panel_targets
 from tests.slideshow_support import ahead
 from tests.test_folder_tree import _shown
 from tests.test_osr2_driver import ACTIONS, FakeBroker, FakePlayer
@@ -151,7 +151,7 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def _will_move_on(view) -> bool:
-    """Whether the show pages on by itself when the item on screen runs out.
+    """Whether the slideshow pages on by itself when the item on screen runs out.
 
     The engine holds a picture for the pace and ends it the way it ends a
     finished clip, so there is no clock of the view's own to ask: what decides
@@ -479,7 +479,7 @@ def _collection(view, key, orientation=LANDSCAPE):
 def _side_rows(view, orientation):
     """The prompt ids one side of the tree holds, from its All row down."""
     return [row["prompt_id"]
-            for row in view._shows.rows_at(oriented_key(gallery.ALL_KEY, orientation))]
+            for row in view._slideshows.rows_at(oriented_key(gallery.ALL_KEY, orientation))]
 
 
 def _key(item):
@@ -1825,8 +1825,8 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
     assert view._tree_item_for(dog) is row
 
 
-def test_each_tick_puts_what_a_show_is_locked_on_first(qtbot, monkeypatch):
-    # However the lock came about: a picture locked from the map, a show put
+def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
+    # However the lock came about: a picture locked from the map, a slideshow put
     # back the way it was left, a Funestra locking itself.
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []
@@ -2581,11 +2581,11 @@ def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     assert not view._bank.slideshow.isHidden()
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert {item[2] for item in view._shows.showing._playlist._items} == {"d1", "d2"}
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert {item[2] for item in view._slideshows.showing._playlist._items} == {"d1", "d2"}
+    view._slideshows.showing.close()
 
 
 def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, monkeypatch):
@@ -2599,11 +2599,11 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     view._on_thumbnail_clicked("d1")
 
-    show = _double_click_show(view, qtbot)
+    slideshow = _double_click_slideshow(view, qtbot)
 
-    assert [item[2] for item in show._playlist._items] == view.visible_prompt_ids()
-    assert show._playlist.current()[2] == "d1"  # opened on the shown item
-    show.close()
+    assert [item[2] for item in slideshow._playlist._items] == view.visible_prompt_ids()
+    assert slideshow._playlist.current()[2] == "d1"  # opened on the shown item
+    slideshow.close()
 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
@@ -4116,7 +4116,7 @@ def test_a_favorite_tiles_favorite_corner_takes_the_bookmark_away(qtbot):
     assert not db.get_generation("i1")["starred"]
 
 
-def test_a_favorite_from_a_show_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
+def test_a_favorite_from_a_slideshow_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -6041,13 +6041,13 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
     # Its Up key condemns the very item it's playing — the file it holds open.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    view._shows._slideshow = MagicMock()
+    view._slideshows._slideshow = MagicMock()
 
     view._release_held_media([tmp_path / "clip.mp4"])
 
-    # With the paths, not merely called: handing the show an empty list releases
+    # With the paths, not merely called: handing the slideshow an empty list releases
     # nothing, and Windows then refuses to move the file the delete is about.
-    view._shows.showing.release_media.assert_called_once_with([tmp_path / "clip.mp4"])
+    view._slideshows.showing.release_media.assert_called_once_with([tmp_path / "clip.mp4"])
 
 
 # --- re-roll ("+") tile -----------------------------------------------------
@@ -7065,7 +7065,7 @@ def test_a_loop_ending_leaves_voice_with_nothing_to_steer(qtbot, tmp_path):
 
 
 def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
-    # It used to come on with the Auto loop and again with a fullscreen show,
+    # It used to come on with the Auto loop and again with a fullscreen slideshow,
     # which made "is it listening?" a thing to work out rather than to look at.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -7207,111 +7207,111 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     view.refresh()
     _select_first_leaf(view)
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert len(view._shows.showing._playlist) == 2  # both variations queued to play
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert len(view._slideshows.showing._playlist) == 2  # both variations queued to play
+    view._slideshows.showing.close()
 
 
-def _standalone_show(qtbot, monkeypatch):
-    """A fullscreen show of two pictures, opened with no session under it."""
+def _standalone_slideshow(qtbot, monkeypatch):
+    """A fullscreen slideshow of two pictures, opened with no session under it."""
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
-    return view._shows.showing
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
+    return view._slideshows.showing
 
 
 MODE_VERBS = frozenset(action for action, _label, _lit in MODE_BUTTONS)
 
 
-def test_a_standalone_show_wears_the_funestras_own_hud(qtbot, monkeypatch):
-    # Nothing about a show is different for not being inside a session: it is
+def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
+    # Nothing about a slideshow is different for not being inside a session: it is
     # the same set played the same way, so it wears the same panel a region
-    # show wears — and the view's own furnishings come off, because the map
+    # slideshow wears — and the view's own furnishings come off, because the map
     # says all of it.
 
-    show = _standalone_show(qtbot, monkeypatch)
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
 
-    assert {"prev", "next", "lock", "trash"} <= set(hud_button_names(show))
-    show.close()
+    assert {"prev", "next", "lock", "trash"} <= set(hud_button_names(slideshow))
+    slideshow.close()
 
 
 def test_a_standalone_hud_draws_no_mode_row(qtbot, monkeypatch):
     # The mode pair hands a region back to the Funestra under it.  There is no
-    # Funestra under a standalone show and no session to tell, so the row is not
-    # drawn rather than drawn dead.  The window IS this show's, though, so the
+    # Funestra under a standalone slideshow and no session to tell, so the row is not
+    # drawn rather than drawn dead.  The window IS this slideshow's, though, so the
     # minimize a hosted one leaves off is on it.
 
-    show = _standalone_show(qtbot, monkeypatch)
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
 
-    names = hud_button_names(show)
+    names = hud_button_names(slideshow)
     assert MODE_VERBS.isdisjoint(names)
     assert "minimize" in names
-    show.close()
+    slideshow.close()
 
 
-def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch):
+def test_a_standalone_huds_transport_lands_on_the_slideshow_itself(qtbot, monkeypatch):
     # Hosted, prev/next/lock/trash go out on the session's command file and come
-    # back through its dispatch onto this very show.  With no file to post on,
-    # the press reaches the show directly instead of being swallowed.
+    # back through its dispatch onto this very slideshow.  With no file to post on,
+    # the press reaches the slideshow directly instead of being swallowed.
 
-    show = _standalone_show(qtbot, monkeypatch)
-    side = show.hud_side
-    opened = show._playlist.current()
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
+    side = slideshow.hud_side
+    opened = slideshow._playlist.current()
 
-    show.press(f"{side}_next")
-    assert show._playlist.current() != opened
+    slideshow.press(f"{side}_next")
+    assert slideshow._playlist.current() != opened
 
-    show.press(f"{side}_lock")
-    assert show.locked is True
-    show.close()
+    slideshow.press(f"{side}_lock")
+    assert slideshow.locked is True
+    slideshow.close()
 
 
-def test_starting_a_show_while_the_last_one_sits_minimized_puts_it_back_on_screen(
+def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_screen(
         qtbot, monkeypatch):
-    view, show = _a_show_standing_on_its_own(qtbot, monkeypatch)
+    view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
     _on_screen(qtbot, view, 1200, 800)
-    gestures.click(show._pane._window, button_on_screen(show, f"{show.hud_side}_minimize"))
-    assert show.isMinimized()
+    gestures.click(slideshow._pane._window, button_on_screen(slideshow, f"{slideshow.hud_side}_minimize"))
+    assert slideshow.isMinimized()
 
     gestures.click(view._bank.slideshow, view._bank.slideshow.rect().center())
 
-    assert view._shows.showing is show
-    assert not show.isMinimized()
-    show.close()
+    assert view._slideshows.showing is slideshow
+    assert not slideshow.isMinimized()
+    slideshow.close()
 
 
-def test_wasd_reach_a_standalone_show_past_the_gallerys_own_key_filter(qtbot, monkeypatch):
-    show = _standalone_show(qtbot, monkeypatch)
-    opened = show._playlist.current()
+def test_wasd_reach_a_standalone_slideshow_past_the_gallerys_own_key_filter(qtbot, monkeypatch):
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
+    opened = slideshow._playlist.current()
 
-    qtbot.keyClick(show, Qt.Key.Key_D)
-    assert show._playlist.current() != opened
+    qtbot.keyClick(slideshow, Qt.Key.Key_D)
+    assert slideshow._playlist.current() != opened
 
-    qtbot.keyClick(show, Qt.Key.Key_A)
-    assert show._playlist.current() == opened
-    show.close()
+    qtbot.keyClick(slideshow, Qt.Key.Key_A)
+    assert slideshow._playlist.current() == opened
+    slideshow.close()
 
 
 def test_a_standalone_huds_order_pair_plays_the_library_of_its_shape(qtbot, monkeypatch):
-    show = _standalone_show(qtbot, monkeypatch)
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
     played = []
 
     for order in ("latest", "shuffle"):
-        show.press(f"{show.hud_side}_{order}")
-        playlist = show._playlist
-        played.append((show.hud_order_label,
+        slideshow.press(f"{slideshow.hud_side}_{order}")
+        playlist = slideshow._playlist
+        played.append((slideshow.hud_order_label,
                        sorted(playlist.items[index][2] for index in playlist.order)))
 
     # Latest plays one of a sitting's run of one configuration, and these two
     # pictures are such a run; Shuffle plays the shape's whole library.
     assert played == [("Latest", ["i1"]), ("Shuffle", ["i1", "i2"])]
-    show.close()
+    slideshow.close()
 
 
 def test_a_video_asked_for_while_the_slideshow_plays_is_made(qtbot, monkeypatch, tmp_path):
@@ -7321,8 +7321,8 @@ def test_a_video_asked_for_while_the_slideshow_plays_is_made(qtbot, monkeypatch,
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
 
     video = view._jobs.start_prepared("k", _WAN_I2V, _WAN_I2V.default_params())
 
@@ -7337,23 +7337,23 @@ def test_locking_a_picture_makes_its_waiting_enhancement_the_next_one_made(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    on_screen = show.voice_target()
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    on_screen = slideshow.voice_target()
     view.enhance_items([on_screen, *({"g0", "g1", "g2"} - {on_screen})])
 
-    show.toggle_lock()
+    slideshow.toggle_lock()
 
     (wanted,) = view._enhance.jobs_targeting([view.row_for(on_screen)])
     assert view._jobs.queue_order[0] == wanted.prompt_id
     assert client.submit_job.call_args_list[-1].args[1] == wanted.prompt_id
-    show.close()
+    slideshow.close()
 
 
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     # A folder gets its node the moment a generation starts, so this one has a
-    # row and no picture. A button offering a show that opens nothing is worse
+    # row and no picture. A button offering a slideshow that opens nothing is worse
     # than no button: it reappears once the first item lands.
     view = GalleryView(FakeDB([_running_row("in_flight", prompt="a cat")]))
     qtbot.addWidget(view)
@@ -7387,7 +7387,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert view._bank.slideshow.isHidden()
 
 
-def test_a_show_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
+def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
                                                                                monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -7397,19 +7397,19 @@ def test_a_show_after_one_of_the_favorites_collection_is_not_held_to_the_favorit
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing.hud_favorites_filter
-    view._shows.showing.close()
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing.hud_favorites_filter
+    view._slideshows.showing.close()
 
     _select_first_leaf(view)
-    view._shows.start()
+    view._slideshows.start()
 
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    assert not show.hud_favorites_filter
-    assert sorted(item[2] for item in show._playlist._items) == ["i1", "i2"]
-    show.close()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert not slideshow.hud_favorites_filter
+    assert sorted(item[2] for item in slideshow._playlist._items) == ["i1", "i2"]
+    slideshow.close()
 
 
 def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
@@ -7419,11 +7419,11 @@ def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert len(view._shows.showing._playlist) == 2  # both recent generations queued
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert len(view._slideshows.showing._playlist) == 2  # both recent generations queued
+    view._slideshows.showing.close()
 
 
 def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
@@ -7434,40 +7434,40 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     view._images_only.setChecked(True)  # the collection now lists images only
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
+    qtbot.addWidget(view._slideshows.showing)
     # It plays what the collection shows, not everything recent.
-    assert [item[2] for item in view._shows.showing._playlist._items] == ["i1"]
-    view._shows.showing.close()
+    assert [item[2] for item in view._slideshows.showing._playlist._items] == ["i1"]
+    view._slideshows.showing.close()
 
 
-def test_the_enhanced_switch_narrows_a_show_to_the_pictures_made_better(qtbot, monkeypatch):
+def test_the_enhanced_switch_narrows_a_slideshow_to_the_pictures_made_better(qtbot, monkeypatch):
     # A folder enhanced through carries both versions of everything, and a pass
     # of that is every picture twice — the second time being the point.  The
-    # switch is the show's own, beside F-mode on the HUD it wears.
+    # switch is the slideshow's own, beside F-mode on the HUD it wears.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    assert len(show._playlist) == 2
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert len(slideshow._playlist) == 2
 
-    show.toggle_enhanced_mode()
+    slideshow.toggle_enhanced_mode()
 
-    assert [item[2] for item in show._playlist._items] == ["i2"]
-    show.toggle_enhanced_mode()   # and back again, all of them
-    assert len(show._playlist) == 2
-    show.close()
+    assert [item[2] for item in slideshow._playlist._items] == ["i2"]
+    slideshow.toggle_enhanced_mode()   # and back again, all of them
+    assert len(slideshow._playlist) == 2
+    slideshow.close()
 
 
-def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
-    # The button sits beside F-mode on the HUD every show wears, and pressing it
-    # lands on the show itself, hosted or not; the status line names the cut.
+def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypatch):
+    # The button sits beside F-mode on the HUD every slideshow wears, and pressing it
+    # lands on the slideshow itself, hosted or not; the status line names the cut.
 
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -7475,44 +7475,44 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_show(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    names = hud_button_names(show)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    names = hud_button_names(slideshow)
     assert names.index("enhanced") == names.index("fmode") + 1
 
-    show.press(f"{show.hud_side}_enhanced")
+    slideshow.press(f"{slideshow.hud_side}_enhanced")
 
-    assert show.hud_enhanced_mode is True
-    assert [item[2] for item in show._playlist._items] == ["i2"]
-    model = show_hud_model(show.hud_side, show, hosted=False)
+    assert slideshow.hud_enhanced_mode is True
+    assert [item[2] for item in slideshow._playlist._items] == ["i2"]
+    model = slideshow_hud_model(slideshow.hud_side, slideshow, hosted=False)
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{show.hud_side}_enhanced"] and "Enhanceds" in model.lock_label
-    show.close()
+    assert lit[f"{slideshow.hud_side}_enhanced"] and "Enhanceds" in model.lock_label
+    slideshow.close()
 
 
-def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_show(qtbot, monkeypatch):
-    # The show takes in what lands while it runs; the switch decides that too,
-    # or a narrowed show would fill back up with the very rows it left out.
+def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qtbot, monkeypatch):
+    # The slideshow takes in what lands while it runs; the switch decides that too,
+    # or a narrowed slideshow would fill back up with the very rows it left out.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    show.set_enhanced_mode(True)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.set_enhanced_mode(True)
     plain, better = _image("i3", "a cat", 50, 3), _enhanced_image("i4", "a cat", 50, 4)
-    monkeypatch.setattr(view._shows, "rows_at", lambda location: [plain, better])
+    monkeypatch.setattr(view._slideshows, "rows_at", lambda location: [plain, better])
 
-    view._shows.note_finished(plain)
-    view._shows.note_finished(better)
+    view._slideshows.note_finished(plain)
+    view._slideshows.note_finished(better)
 
-    assert sorted(item[2] for item in show._playlist._items) == ["i2", "i4"]
-    show.clear_modes()
-    assert sorted(item[2] for item in show._playlist._items) == ["i2", "i3", "i4"]
-    show.close()
+    assert sorted(item[2] for item in slideshow._playlist._items) == ["i2", "i4"]
+    slideshow.clear_modes()
+    assert sorted(item[2] for item in slideshow._playlist._items) == ["i2", "i3", "i4"]
+    slideshow.close()
 
 
 def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch):
@@ -7527,41 +7527,41 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    show.toggle_favorites_filter()
-    show.toggle_enhanced_mode()
-    assert [item[2] for item in show._playlist._items] == ["i2"]
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.toggle_favorites_filter()
+    slideshow.toggle_enhanced_mode()
+    assert [item[2] for item in slideshow._playlist._items] == ["i2"]
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (show.hud_favorites_filter, show.hud_enhanced_mode) == (False, False)
-    assert len(show._playlist) == 2
-    show.close()
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (False, False)
+    assert len(slideshow._playlist) == 2
+    slideshow.close()
 
 
-def test_filter_enhanced_turns_the_shows_switch_on_and_says_what_is_left(qtbot, monkeypatch):
+def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert show.hud_enhanced_mode is True
-    assert "1 to play" in show._note.text()
+    assert slideshow.hud_enhanced_mode is True
+    assert "1 to play" in slideshow._note.text()
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert show.hud_enhanced_mode is False
-    assert "all of them" in show._note.text()
-    show.close()
+    assert slideshow.hud_enhanced_mode is False
+    assert "all of them" in slideshow._note.text()
+    slideshow.close()
 
 
 def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypatch):
@@ -7570,19 +7570,19 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     qtbot.addWidget(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert show.hud_enhanced_mode is False
-    assert "nothing here is enhanced" in show._note.text()
-    show.close()
+    assert slideshow.hud_enhanced_mode is False
+    assert "nothing here is enhanced" in slideshow._note.text()
+    slideshow.close()
 
 
-def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
-    # The switch is a show's: with none up there is nothing for the word to
+def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
+    # The switch is a slideshow's: with none up there is nothing for the word to
     # narrow, and it says so rather than arming something for later.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
@@ -7592,24 +7592,24 @@ def test_filter_enhanced_needs_a_show_to_narrow(qtbot, monkeypatch):
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert "needs a show" in view._voice.status.text()
+    assert "needs a slideshow" in view._voice.status.text()
     assert not view._bank.slideshow.isHidden()   # everything is still there to play
 
 
-def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
-    # A show used to float two: the Funestras' HUD over the set, and Genau's whole
+def test_a_slideshow_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
+    # A slideshow used to float two: the Funestras' HUD over the set, and Genau's whole
     # console under it for the device.  Between them the status was said twice
     # and disagreed, and prev/next/lock/trash were drawn on both.  One panel
     # now -- the HUD, carrying the device's line, the readout and the two rows
     # that aim them.
 
-    show = _standalone_show(qtbot, monkeypatch)
-    assert show.findChildren(MotionPanel) == []
-    posted = [button.command for _rect, button in panel_targets(show).buttons]
+    slideshow = _standalone_slideshow(qtbot, monkeypatch)
+    assert slideshow.findChildren(MotionPanel) == []
+    posted = [button.command for _rect, button in panel_targets(slideshow).buttons]
     assert "robot_hand_cycle_shape" in posted   # the motion's row is on it
     assert "genau_clip_seconds_up" in posted    # and the pace's
-    assert show._hud_model().drive is not None  # with the readout under them
-    show.close()
+    assert slideshow._hud_model().drive is not None  # with the readout under them
+    slideshow.close()
 
 
 def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
@@ -7627,12 +7627,12 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
     assert not view._bank.slideshow.isHidden()
     assert "Experiments" in view._bank.slideshow.toolTip()
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
+    qtbot.addWidget(view._slideshows.showing)
     # What the collection shows, so the judged one stays out of the rotation.
-    assert {item[2] for item in view._shows.showing._playlist._items} == {"e1", "e2"}
-    view._shows.showing.close()
+    assert {item[2] for item in view._slideshows.showing._playlist._items} == {"e1", "e2"}
+    view._slideshows.showing.close()
 
 
 def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
@@ -7662,12 +7662,12 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view._toggle_favorite(_key(_at(lora, 0)))   # ...and a favorited folder (the cat one)
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
+    qtbot.addWidget(view._slideshows.showing)
     # The item, plus what the bookmarked folder's tile stands for.
-    assert {item[2] for item in view._shows.showing._playlist._items} == {"i1", "i2"}
-    view._shows.showing.close()
+    assert {item[2] for item in view._slideshows.showing._playlist._items} == {"i1", "i2"}
+    view._slideshows.showing.close()
 
 
 def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbot, monkeypatch):
@@ -7676,56 +7676,56 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     shown = slideshow._playlist.current()[2]
 
     slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
-    assert view._shows.showing is None               # out of the slideshow...
+    assert view._slideshows.showing is None               # out of the slideshow...
     assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
     assert view._browser.selected_ids == {shown}     # with that picture picked
-    # And the item open in a tab: leaving a show for an item is a decision to
+    # And the item open in a tab: leaving a slideshow for an item is a decision to
     # work on it, which a folder under a stale form isn't.
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == shown
 
 
-def test_a_show_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
-                                                                         monkeypatch):
-    # Locking a slide is the user saying this is the one, so ending the show there
-    # picks it in the collection the show was playing, the same as every other way out.
+def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
+                                                                              monkeypatch):
+    # Locking a slide is the user saying this is the one, so ending the slideshow there
+    # picks it in the collection the slideshow was playing, the same as every other way out.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     held = slideshow._playlist.current()[2]
     slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
 
     slideshow.close()   # Escape, the spoken "close", a double-click: all this
 
-    assert view._shows.showing is None
+    assert view._slideshows.showing is None
     assert held in view.visible_prompt_ids()       # its own folder in the pane...
     assert view._browser.selected_ids == {held}    # ...with it picked...
     assert view._info_tabs.current_config_panel().displayed_row()["prompt_id"] == held
 
 
-def test_a_show_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
+def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
         qtbot, monkeypatch):
     # However you leave -- Escape, a double-click, the spoken "close" -- the
     # picture you were looking at is the one you want to find, picked in the collection
-    # the show was playing rather than left for you to hunt for.
+    # the slideshow was playing rather than left for you to hunt for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     shown = slideshow._playlist.current()[2]
 
@@ -7745,7 +7745,7 @@ def _laid_out_folder(qtbot, count=60):
 
 
 def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeypatch):
-    # Latest draws fifty pictures at a time, so a show stepped well past them hands
+    # Latest draws fifty pictures at a time, so a slideshow stepped well past them hands
     # back one the collection has not drawn yet: it is drawn, picked and scrolled to,
     # rather than the collection coming back with nothing marked on it.
     _resolve_by_id(monkeypatch)
@@ -7753,8 +7753,8 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
                                for n in reversed(range(120))]))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     for _ in range(70):
         slideshow._step(1)
@@ -7783,7 +7783,7 @@ def _folder_square_holding(view, prompt_id: str) -> str:
     raise AssertionError(f"no drawn square holds {prompt_id} ({folder})")
 
 
-def test_leaving_a_show_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
+def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
                                                                           monkeypatch):
     # All shows folders, not the pictures inside them, so there is no picture to
     # pick -- the square the slide came out of is what the eye is looking for.
@@ -7793,8 +7793,8 @@ def test_leaving_a_show_of_all_picks_the_folder_square_its_slide_came_from(qtbot
     view.refresh()
     all_row = _top_level(view._tree)["All"]
     view._tree.setCurrentItem(all_row)
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     shown = slideshow._playlist.current()[2]
 
@@ -7806,7 +7806,7 @@ def test_leaving_a_show_of_all_picks_the_folder_square_its_slide_came_from(qtbot
     assert picked == [_folder_square_holding(view, shown)]
 
 
-def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_from(
+def test_leaving_a_favorites_slideshow_picks_the_bookmarked_folder_its_slide_came_from(
         qtbot, monkeypatch):
     # A star on a folder puts the folder in the Favorites collection, not the pictures
     # inside it, so a slide that came out of one has no picture of its own there.
@@ -7818,8 +7818,8 @@ def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_fro
     view._toggle_favorite(bookmarked)
     collection = _collection(view, FAVORITES_KEY)
     view._tree.setCurrentItem(collection)
-    view._shows.start()
-    slideshow = view._shows.showing
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow)
     shown = slideshow._playlist.current()[2]
     assert shown not in view.visible_prompt_ids()
@@ -7837,16 +7837,16 @@ def _in_view(view, prompt_id) -> bool:
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def test_the_picture_a_locked_show_ends_on_stays_picked_and_in_view_as_the_library_moves(
+def test_the_picture_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view, db = _laid_out_folder(qtbot)
     far = view.visible_prompt_ids()[-3]
     view._browser._thumbnail_clicked(far, _NO_MOD)
     _scroll_bar(view).setValue(0)
-    show = _double_click_show(view, qtbot)
-    show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
-    show.close()
+    slideshow = _double_click_slideshow(view, qtbot)
+    slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    slideshow.close()
     qtbot.wait(1)
     assert _in_view(view, far)
 
@@ -7904,8 +7904,8 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     assert _in_view(view, far)
 
 
-def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
-    # Closing a show is usually a detour, not being done with it — so the next
+def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
+    # Closing a slideshow is usually a detour, not being done with it — so the next
     # one stands where the last was left rather than at the top of a fresh
     # shuffle, and the item you were looking at doesn't have to be found again.
     _resolve_by_id(monkeypatch)
@@ -7915,44 +7915,44 @@ def test_reopening_a_show_comes_back_to_the_slide_it_was_closed_on(qtbot, monkey
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._shows.start()
-    first = view._shows.showing
+    view._slideshows.start()
+    first = view._slideshows.showing
     qtbot.addWidget(first)
     first.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Right, _NO_MOD))
     stopped_on = first._playlist.current()[2]
     order = first._playlist.order_ids()
     first.close()
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing._playlist.current()[2] == stopped_on
-    assert view._shows.showing._playlist.order_ids() == order   # the same pass, too
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing._playlist.current()[2] == stopped_on
+    assert view._slideshows.showing._playlist.order_ids() == order   # the same pass, too
+    view._slideshows.showing.close()
 
 
-def test_a_show_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
-    # A hold is the user saying this is the one: the show reopened on the folder
-    # it was playing is still stopped on that slide. A show of Latest opens on the
+def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
+    # A hold is the user saying this is the one: the slideshow reopened on the folder
+    # it was playing is still stopped on that slide. A slideshow of Latest opens on the
     # newest picture instead, which is what Latest is opened for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    view._shows.start()
-    first = view._shows.showing
+    view._slideshows.start()
+    first = view._slideshows.showing
     qtbot.addWidget(first)
     first.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
     held = first._playlist.current()[2]
     first.close()
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing._playlist.current()[2] == held
-    assert view._shows.showing._playlist.locked
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing._playlist.current()[2] == held
+    assert view._slideshows.showing._playlist.locked
+    view._slideshows.showing.close()
 
 
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
@@ -7964,7 +7964,7 @@ def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._shows.items_of([row])[0] == ("i1.png", "image", "i1", "thumb.png")
+    assert view._slideshows.items_of([row])[0] == ("i1.png", "image", "i1", "thumb.png")
 
 
 def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbot, monkeypatch):
@@ -7977,11 +7977,11 @@ def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbo
     view._toggle_favorite(_select_first_leaf(view))  # star the folder holding it too
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
-    view._shows.start()
+    view._slideshows.start()
 
-    qtbot.addWidget(view._shows.showing)
-    assert [item[2] for item in view._shows.showing._playlist._items] == ["i1"]  # not twice
-    view._shows.showing.close()
+    qtbot.addWidget(view._slideshows.showing)
+    assert [item[2] for item in view._slideshows.showing._playlist._items] == ["i1"]  # not twice
+    view._slideshows.showing.close()
 
 
 # --- a slideshow of a folder that is still filling ---------------------------
@@ -7989,9 +7989,9 @@ def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbo
 def _slideshow_of_first_leaf(qtbot, view):
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
-    return view._shows.showing
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
+    return view._slideshows.showing
 
 
 def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
@@ -8011,8 +8011,8 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_a_generation_from_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch):
-    # Every completion is offered to the open show; only the ones it would have
+def test_a_generation_from_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeypatch):
+    # Every completion is offered to the open slideshow; only the ones it would have
     # played had it opened now belong to it.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -8045,9 +8045,9 @@ def _resolve_finished_only(monkeypatch):
     )
 
 
-def test_a_run_that_starts_to_look_like_something_joins_the_open_show(qtbot, monkeypatch):
+def test_a_run_that_starts_to_look_like_something_joins_the_open_slideshow(qtbot, monkeypatch):
     # The wait is not worth a slide, but the first iterations coming in are the
-    # best thing in a folder that is filling — and they used to reach the show
+    # best thing in a folder that is filling — and they used to reach the slideshow
     # only minutes later, as the finished file.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
@@ -8063,7 +8063,7 @@ def test_a_run_that_starts_to_look_like_something_joins_the_open_show(qtbot, mon
     slideshow.close()
 
 
-def test_a_run_in_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch):
+def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1),
                  _running("i2", prompt="a dog", steps=12)])   # another folder
@@ -8077,7 +8077,7 @@ def test_a_run_in_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch)
     slideshow.close()
 
 
-def test_a_run_being_made_joins_a_recents_show_too(qtbot, monkeypatch):
+def test_a_run_being_made_joins_a_recents_slideshow_too(qtbot, monkeypatch):
     # Recents is a collection of results and a run has none yet, so it cannot answer
     # off its own list — but every generation this app makes lands there.
     _resolve_finished_only(monkeypatch)
@@ -8086,17 +8086,17 @@ def test_a_run_being_made_joins_a_recents_show_too(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
 
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
-    assert view._shows.showing.holds("i2")
-    view._shows.showing.close()
+    assert view._slideshows.showing.holds("i2")
+    view._slideshows.showing.close()
 
 
 def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
-    # It is a better version of a picture the show may already be playing, and it
+    # It is a better version of a picture the slideshow may already be playing, and it
     # says so in that picture's own corner — not as a second, worse slide of it.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1),
@@ -8106,16 +8106,16 @@ def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
 
     view._on_reroll_preview("some-key", "e1", b"a-frame")
 
-    assert not view._shows.showing.holds("e1")
-    view._shows.showing.close()
+    assert not view._slideshows.showing.holds("e1")
+    view._slideshows.showing.close()
 
 
-def test_a_run_the_show_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch):
+def test_a_run_the_slideshow_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
@@ -8131,7 +8131,7 @@ def test_a_run_the_show_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch)
     slideshow.close()
 
 
-def test_a_run_that_stopped_being_made_leaves_the_open_show(qtbot, monkeypatch):
+def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypatch):
     # Cancelled or failed: no file is coming, and the half-rendered frame it got
     # to would otherwise hold a place in the pass forever.
     _resolve_finished_only(monkeypatch)
@@ -8605,36 +8605,36 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     _key, job = _running_reroll(view)
     _generating_tile(view).selected.emit()
     client.preview_image.emit(job.prompt_id, _png_bytes())
-    show = _preview_of(view).open_fullscreen()
-    qtbot.addWidget(show)
+    slideshow = _preview_of(view).open_fullscreen()
+    qtbot.addWidget(slideshow)
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == \
+    assert [slide.prompt_id for slide in slideshow._playlist.in_play_order()] == \
         view.visible_prompt_ids()
-    assert show._playlist.current().prompt_id == job.prompt_id
-    qtbot.keyClick(show, Qt.Key.Key_Down)
+    assert slideshow._playlist.current().prompt_id == job.prompt_id
+    qtbot.keyClick(slideshow, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(job.prompt_id)) is not None
-    show.close()
+    slideshow.close()
 
 
-def test_a_cancelled_generation_closes_the_show_watching_it(qtbot, tmp_path):
-    # Nothing will ever land, so the show would sit on a stale partial frame.
+def test_a_cancelled_generation_closes_the_slideshow_watching_it(qtbot, tmp_path):
+    # Nothing will ever land, so the slideshow would sit on a stale partial frame.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
     _generating_tile(view).selected.emit()
-    show = _double_click_show(view, qtbot, media=None, frame=_png_bytes())
-    show.show()
+    slideshow = _double_click_slideshow(view, qtbot, media=None, frame=_png_bytes())
+    slideshow.show()
 
     view._cancel_reroll(key)
 
-    assert not show.isVisible()
+    assert not slideshow.isVisible()
 
 
-def test_a_cancelled_generation_leaves_a_show_of_a_saved_file_alone(qtbot, tmp_path):
+def test_a_cancelled_generation_leaves_a_slideshow_of_a_saved_file_alone(qtbot, tmp_path):
     # One opened over a saved file has its own thing on screen: it stays up.
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
@@ -8642,13 +8642,13 @@ def test_a_cancelled_generation_leaves_a_show_of_a_saved_file_alone(qtbot, tmp_p
     view.refresh()
     key, _job = _running_reroll(view)
     _generating_tile(view).selected.emit()
-    show = _double_click_show(view, qtbot)
-    show.show()
+    slideshow = _double_click_slideshow(view, qtbot)
+    slideshow.show()
 
     view._cancel_reroll(key)
 
-    assert show.isVisible()
-    show.close()
+    assert slideshow.isVisible()
+    slideshow.close()
 
 
 def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
@@ -9568,7 +9568,7 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
-    # The show covers the strip, so the queue follows onto the panel in front
+    # The slideshow covers the strip, so the queue follows onto the panel in front
     # of the user, in the same order.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
@@ -9578,24 +9578,24 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     view.refresh()
     _select_first_leaf(view)
 
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
-    show = view._shows.showing
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
+    slideshow = view._slideshows.showing
 
     # Filled at the opening rather than a poll and a half later, and with the
     # same rows and the same job being made the docked strip is showing.
-    assert [item.key for item in show.hud_queue[0]] == view._queue.keys() == ["gen1"]
-    assert queue_section(*show.hud_queue).leader.key == "gen1"
+    assert [item.key for item in slideshow.hud_queue[0]] == view._queue.keys() == ["gen1"]
+    assert queue_section(*slideshow.hud_queue).leader.key == "gen1"
 
     db.delete_generation("gen1")  # the job ends
     view._poll()
-    assert queue_section(*show.hud_queue) is None  # nothing in flight, no block
+    assert queue_section(*slideshow.hud_queue) is None  # nothing in flight, no block
 
-    show.close()
+    slideshow.close()
 
 
-def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
-    # The block on the show's panel lists the same line as the lower strip and
+def test_a_row_dragged_in_the_slideshows_queue_re_lines_the_real_queue(qtbot, monkeypatch):
+    # The block on the slideshow's panel lists the same line as the lower strip and
     # asks for the same things, so it reaches the same handler.
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])
@@ -9609,15 +9609,15 @@ def test_a_row_dragged_in_the_shows_queue_re_lines_the_real_queue(qtbot, monkeyp
         qtbot.addWidget(view)
         view.refresh()
         _select_first_leaf(view)
-        view._shows.start()
-        qtbot.addWidget(view._shows.showing)
-        show = view._shows.showing
+        view._slideshows.start()
+        qtbot.addWidget(view._slideshows.showing)
+        slideshow = view._slideshows.showing
 
-        before = [item.key for item in show.hud_queue[0]]
-        show.requeue([before[0], before[2], before[1]])  # the last waiting job, up one
+        before = [item.key for item in slideshow.hud_queue[0]]
+        slideshow.requeue([before[0], before[2], before[1]])  # the last waiting job, up one
 
         reorder.assert_called_once_with([before[0], before[2], before[1]])
-    view._shows.showing.close()
+    view._slideshows.showing.close()
 
 
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
@@ -11082,7 +11082,7 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
 
 
 class _VoiceSurface:
-    """A show standing in for the one being spoken over."""
+    """A slideshow standing in for the one being spoken over."""
 
     def __init__(self, prompt_id, *, favoritable=True):
         self._prompt_id = prompt_id
@@ -11137,7 +11137,7 @@ class _VoiceSurface:
         self.locked = locked
         return True
 
-    # The gallery's poll feeds every open show its queue and what is in flight,
+    # The gallery's poll feeds every open slideshow its queue and what is in flight,
     # and it fires while these tests run: a stand-in that answered none of that
     # blew up inside the Qt event loop, on whichever test the timer happened to
     # land in.
@@ -11153,7 +11153,7 @@ class _VoiceSurface:
     def note_in_flight(self, prompt_ids):
         self.in_flight = set(prompt_ids)
 
-    # A real show is a SlideshowView, which answers all of these, and the view
+    # A real slideshow is a SlideshowView, which answers all of these, and the view
     # calls them without asking first. A stand-in that answered fewer would have
     # to be guarded against in production, which is the same as saying the
     # guards would exist for this class alone.
@@ -11177,19 +11177,19 @@ class _VoiceSurface:
         self.adopted = True
 
 
-def test_the_poll_runs_over_a_show_being_spoken_to(qtbot, tmp_path):
-    # The 1.5s poll feeds every open show, and it lands mid-test wherever it
-    # lands: a stand-in that had drifted out of step with what a show answers
+def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
+    # The 1.5s poll feeds every open slideshow, and it lands mid-test wherever it
+    # lands: a stand-in that had drifted out of step with what a slideshow answers
     # raised inside the Qt event loop, failing whichever test it fired in rather
     # than the one that let it drift.
     view = GalleryView(_enhanceable_db(tmp_path, count=1))
     qtbot.addWidget(view)
     view.refresh()
-    view._shows._slideshow = _VoiceSurface("g0")
+    view._slideshows._slideshow = _VoiceSurface("g0")
 
     view._update_queue()
 
-    assert view._shows.showing.queued == []
+    assert view._slideshows.showing.queued == []
 
 
 def _enhanceable_db(tmp_path, count=2):
@@ -11881,7 +11881,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
                                                                  monkeypatch):
     # Holding a slide asks for an enhancement, and what it gets first is a place
-    # in the line — a show of held slides has several out at once.
+    # in the line — a slideshow of held slides has several out at once.
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
@@ -11889,19 +11889,19 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
 
-    show.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
 
     (job,) = view._jobs.all_jobs
-    assert show.hud_item_note == "Enhancement queued"
+    assert slideshow.hud_item_note == "Enhancement queued"
 
     view._client.preview_image.emit(job.prompt_id, _png_bytes())  # ComfyUI began
 
-    assert show.hud_item_note == "Enhancing…"
-    show.close()
+    assert slideshow.hud_item_note == "Enhancing…"
+    slideshow.close()
 
 
 def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypatch,
@@ -12333,29 +12333,29 @@ class _FakeDriver:
         return ()
 
 
-def _double_click_show(view, qtbot, *, media=("shown.png", "image"), frame=None,
-                       target=None):
+def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), frame=None,
+                            target=None):
     """The double-click path end to end: the gallery opens the folder under the
-    pane as a real show.
+    pane as a real slideshow.
 
     ``media`` is what the pane was showing — ``None`` for a generation still
-    running under it, which opens the show over ``frame`` — and the generation
+    running under it, which opens the slideshow over ``frame`` — and the generation
     it names is the tile these tests clicked, which is what the tab shows.
     ``target`` stands in for the OSR2 drive target the clip on screen would
     offer, since these tests carry no real scripted video.
     """
     shown = view.selected_prompt_id() if media is not None else None
-    show = view._shows.open_on_preview(media, frame, shown)
-    qtbot.addWidget(show)
+    slideshow = view._slideshows.open_on_preview(media, frame, shown)
+    qtbot.addWidget(slideshow)
     if target is not None:
-        _aim_show(view, show, target)
-    return show
+        _aim_slideshow(view, slideshow, target)
+    return slideshow
 
 
-def _aim_show(view, show, target):
+def _aim_slideshow(view, slideshow, target):
     """Say what the clip on screen offers the device, and reconcile as a step
     onto it would."""
-    show.osr2_drive_target = lambda: target
+    slideshow.osr2_drive_target = lambda: target
     view.reconcile_osr2()
 
 
@@ -12531,13 +12531,13 @@ def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_aga
     assert section.is_collapsed() == folded
 
 
-def test_a_show_gets_space_wired_to_the_switch(qtbot):
+def test_a_slideshow_gets_space_wired_to_the_switch(qtbot):
     # Every surface that answers the motion keys has to send Space to the one
-    # switch rather than to the motion it was handed — the show as much as the
+    # switch rather than to the motion it was handed — the slideshow as much as the
     # main window, since a slideshow is where the device is usually driven from.
     view, _driver, _panel = _osr2_view(qtbot)
-    show = _double_click_show(view, qtbot)
-    assert show._actions.drive_toggle == view.toggle_osr2_drive
+    slideshow = _double_click_slideshow(view, qtbot)
+    assert slideshow._actions.drive_toggle == view.toggle_osr2_drive
 
 
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
@@ -12645,7 +12645,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
-    # Left/Right step through the folder: the show is built from the visible
+    # Left/Right step through the folder: the slideshow is built from the visible
     # items' media, in the browser's order, starting on the one already shown —
     # and held at nought, so nothing moves until an arrow does.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
@@ -12660,17 +12660,17 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     _open_leaf(view)
     view._on_thumbnail_clicked("i2")  # i2 is the shown/selected item
 
-    show = _double_click_show(view, qtbot)
+    slideshow = _double_click_slideshow(view, qtbot)
 
     order = view._browser.visible_prompt_ids()
-    # Each entry carries its generation's id, so the show's Up and Down can name
+    # Each entry carries its generation's id, so the slideshow's Up and Down can name
     # what to trash and what to bookmark, and its stored thumbnail, which is the
     # only still a video has for the neighbor previews.
-    assert show._playlist._items == [(f"{pid}.png", "image", pid, None)
-                                     for pid in order]
-    assert show._playlist.order == list(range(len(order)))  # the browser's order
-    assert show._playlist.current()[2] == "i2"  # opened on the shown item
-    show.close()
+    assert slideshow._playlist._items == [(f"{pid}.png", "image", pid, None)
+                                          for pid in order]
+    assert slideshow._playlist.order == list(range(len(order)))  # the browser's order
+    assert slideshow._playlist.current()[2] == "i2"  # opened on the shown item
+    slideshow.close()
 
 
 def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
@@ -12688,15 +12688,15 @@ def test_a_double_click_while_a_loop_runs_opens_the_folder_on_the_shown_picture(
     landed = view._live_jobs[key].prompt_id
     client.job_completed.emit(landed, _REROLL_HISTORY)  # the tab shows it; the next runs
 
-    show = _preview_of(view).open_fullscreen()
-    qtbot.addWidget(show)
+    slideshow = _preview_of(view).open_fullscreen()
+    qtbot.addWidget(slideshow)
 
-    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == \
+    assert [slide.prompt_id for slide in slideshow._playlist.in_play_order()] == \
         view.visible_prompt_ids()
-    assert show._playlist.current().prompt_id == landed
-    qtbot.keyClick(show, Qt.Key.Key_Down)
+    assert slideshow._playlist.current().prompt_id == landed
+    qtbot.keyClick(slideshow, Qt.Key.Key_Down)
     assert view._enhance.run_of(view.row_for(landed)) is not None
-    show.close()
+    slideshow.close()
 
 
 def test_a_double_click_on_a_picture_from_another_folder_opens_that_folder(
@@ -12711,24 +12711,24 @@ def test_a_double_click_on_a_picture_from_another_folder_opens_that_folder(
     folder_b = view.visible_prompt_ids()
     view._tree.setCurrentItem(view._leaf_by_id["a1"])
 
-    show = view._shows.open_on_preview(("b1.png", "image"), None, "b1")
-    qtbot.addWidget(show)
+    slideshow = view._slideshows.open_on_preview(("b1.png", "image"), None, "b1")
+    qtbot.addWidget(slideshow)
 
-    assert [slide.prompt_id for slide in show._playlist.in_play_order()] == folder_b
-    assert show._playlist.current().prompt_id == "b1"
-    show.close()
+    assert [slide.prompt_id for slide in slideshow._playlist.in_play_order()] == folder_b
+    assert slideshow._playlist.current().prompt_id == "b1"
+    slideshow.close()
 
 
-def test_stepping_a_double_clicked_show_re_aims_the_osr2(qtbot):
+def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
     # Stepping to another clip re-aims the one device at the newly shown video.
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
-    show = _double_click_show(view, qtbot, target=("A.mp4", "pA", "aA"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
-    _aim_show(view, show, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
+    _aim_slideshow(view, slideshow, ("B.mp4", "pB", "aB"))  # Left/Right landed on another clip
     assert driver.started[-1] == ("pB", "aB")
-    show.close()
+    slideshow.close()
 
 
 # --- watching a folder that is auto-generating, and the app-global motion -----
@@ -12863,52 +12863,52 @@ def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, mon
     assert not view._osr2_motion.active  # the motion stood down for the script
 
 
-def _a_show_standing_on_its_own(qtbot, monkeypatch, **gallery):
+def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
                        client=ComfyUIClient(), **gallery)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._shows.start()
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    return view, show
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    return view, slideshow
 
 
-def _click_the_picture(show):
-    """A click on the show's picture, clear of its panel and of the corners that
+def _click_the_picture(slideshow):
+    """A click on the slideshow's picture, clear of its panel and of the corners that
     open it, through the window the Funestra draws into."""
-    engine_of(show)
-    show.showFullScreen()
-    QTest.qWaitForWindowExposed(show)
-    window = show._pane._window
+    engine_of(slideshow)
+    slideshow.showFullScreen()
+    QTest.qWaitForWindowExposed(slideshow)
+    window = slideshow._pane._window
     gestures.click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
 
-def test_a_click_on_a_show_pauses_the_device_the_sound_and_the_pictures_with_it(
+def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_pictures_with_it(
         qtbot, monkeypatch):
     bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    _view, show = _a_show_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
-                                              osr2_motion=motion)
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+                                                        osr2_motion=motion)
 
-    _click_the_picture(show)
-    assert (show._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+    _click_the_picture(slideshow)
+    assert (slideshow._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
         True, True, True, True)
 
-    _click_the_picture(show)
-    assert (show._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
+    _click_the_picture(slideshow)
+    assert (slideshow._paused, motion.frozen, bed.frozen, omnipause.frozen()) == (
         False, False, False, False)
-    show.close()
+    slideshow.close()
 
 
-def test_closing_a_paused_show_plays_the_room_again(qtbot, monkeypatch):
+def test_closing_a_paused_slideshow_plays_the_room_again(qtbot, monkeypatch):
     bed, motion = _FakeAmbientAudio(), _SignalMotion()
-    _view, show = _a_show_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
-                                              osr2_motion=motion)
-    _click_the_picture(show)
+    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, ambient_audio=bed,
+                                                        osr2_motion=motion)
+    _click_the_picture(slideshow)
 
-    show.close()
+    slideshow.close()
 
     assert (motion.frozen, bed.frozen, omnipause.frozen()) == (False, False, False)
 
@@ -12917,12 +12917,12 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     # The motion is app-global: dismissing a view must not park the device.
     _resolve_by_id(monkeypatch)
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
     # And its Space reaches the one switch, like every other surface's.
-    assert view._shows.showing._actions.drive_toggle == view.toggle_osr2_drive
+    assert view._slideshows.showing._actions.drive_toggle == view.toggle_osr2_drive
     view.osr2_control.setChecked(True)
-    view._shows.showing.close()
+    view._slideshows.showing.close()
     assert view._osr2_motion.active
 
 
@@ -12960,82 +12960,82 @@ def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
-    # The toggle governs a show as much as the tab preview: double-clicking a clip
+    # The toggle governs a slideshow as much as the tab preview: double-clicking a clip
     # to watch it doesn't take the device on its own.
     view, driver, _panel = _osr2_view(qtbot)
     assert not view.osr2_control.isChecked()
 
-    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
 
     assert driver.started == []
-    show.close()
+    slideshow.close()
 
 
-def test_turning_the_toggle_on_over_an_open_show_drives_its_video(qtbot):
+def test_turning_the_toggle_on_over_an_open_slideshow_drives_its_video(qtbot):
     # …and turning it on while one is up drives what's on screen, without closing it.
     view, driver, _panel = _osr2_view(qtbot)
-    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
 
     view.osr2_control.setChecked(True)
 
     assert driver.started[-1] == ("pF", "aF")
-    show.close()
+    slideshow.close()
 
 
-def test_untoggling_while_a_shows_video_drives_stops_the_device(qtbot):
+def test_untoggling_while_a_slideshows_video_drives_stops_the_device(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
-    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
     view.osr2_control.setChecked(False)
 
     assert driver.stopped >= 1
-    show.close()
+    slideshow.close()
 
 
-def test_closing_the_show_stops_driving_with_no_tab_video_behind_it(qtbot):
+def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     view.osr2_control.setChecked(True)
-    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
-    show.close()
+    slideshow.close()
 
     assert driver.stopped >= 1
 
 
-def test_the_shows_video_overrides_the_toggle_target_then_hands_back(qtbot):
+def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot):
     # With the toggle already driving the front-tab video, opening a clip fullscreen
-    # re-aims the one device at the show's player; closing hands it back.
+    # re-aims the one device at the slideshow's player; closing hands it back.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
-    show = _double_click_show(view, qtbot, target=("F.mp4", "pF", "aF"))
+    slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started[-1] == ("pF", "aF")
 
-    show.close()
+    slideshow.close()
     assert driver.started[-1] == ("pA", "aA")  # back to the toggle's video
 
 
-def test_a_show_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
-    # The surface in front answers for the device alone: a show opening on a
+def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
+    # The surface in front answers for the device alone: a slideshow opening on a
     # picture hands the OSR2 to the motion, the way a Funestra hands back to it
     # between scripted clips.  Falling through to the front tab left that tab's
-    # funscript driving under a show it has nothing to do with, until the show
+    # funscript driving under a slideshow it has nothing to do with, until the slideshow
     # happened to reach a scripted video of its own.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
-    show = _double_click_show(view, qtbot)  # a picture: nothing scripted on screen
+    slideshow = _double_click_slideshow(view, qtbot)  # a picture: nothing scripted on screen
 
     assert driver.stopped >= 1
     assert view._osr2_motion.active
-    show.close()
+    slideshow.close()
 
 
 def _press_escape(view):
@@ -13046,7 +13046,7 @@ def _press_escape(view):
 
 def _keys_are_the_gallerys(view):
     """Say outright that no other window owns the keystroke — which window Qt
-    calls active is ambient in a test process, so a fullscreen show another test
+    calls active is ambient in a test process, so a fullscreen slideshow another test
     opened and closed can still hold it."""
     view._other_window_owns_keys = lambda: False
 
@@ -13089,7 +13089,7 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     assert view._find_bar.isVisible()
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
 
 
 def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
@@ -13104,7 +13104,7 @@ def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: positive))
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
 
 
 def test_the_console_hints_that_esc_stops_the_device(qtbot):
@@ -13136,7 +13136,7 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     # (a fullscreen preview / the slideshow) is active, the gallery yields its keys.
     view, _driver, _panel = _osr2_view(qtbot)
     # Which window Qt calls active is ambient in a test process — a fullscreen
-    # show another test opened and closed can still hold it — so both sides of
+    # slideshow another test opened and closed can still hold it — so both sides of
     # the guard are said here rather than inherited.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
     assert view._other_window_owns_keys() is False  # only the gallery is up
@@ -13173,29 +13173,29 @@ def _startable_view(qtbot, tmp_path, monkeypatch):
 
 def _stoppable_view(qtbot, tmp_path, monkeypatch):
     """That gallery with everything Esc is meant to stop actually running: a loop,
-    the audio bed, and a fullscreen show — plus the mic, which it is meant to
+    the audio bed, and a fullscreen slideshow — plus the mic, which it is meant to
     leave alone."""
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
     view._toggle_auto(True)
     view._bank.audio.setChecked(True)
     view._bank.mic.setChecked(True)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
     return view, bed, key
 
 
 def test_esc_turns_off_everything_the_app_is_doing(qtbot, tmp_path, monkeypatch):
-    # One key for the whole room: the loop, the sound, and the show all stop
+    # One key for the whole room: the loop, the sound, and the slideshow all stop
     # together, so there is no second thing still going after the panic-stop.
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    assert view._auto.is_active(key) and bed.starts == 1 and view._shows.showing is not None
+    assert view._auto.is_active(key) and bed.starts == 1 and view._slideshows.showing is not None
 
     handled = _press_escape(view)
 
     assert handled is True
     assert not view._auto.is_active(key)
     assert not view._bank.audio.isChecked() and bed.stops == 1
-    assert view._shows.showing is None
+    assert view._slideshows.showing is None
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
@@ -13209,36 +13209,36 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     assert view._bank.mic.isChecked() and view._voice.listener.commands_on
 
 
-def test_esc_over_the_show_stops_what_is_running_behind_it(qtbot, tmp_path,
-                                                           monkeypatch):
-    # The show is a window of ours, and Esc closes it — but on its own that left
+def test_esc_over_the_slideshow_stops_what_is_running_behind_it(qtbot, tmp_path,
+                                                                monkeypatch):
+    # The slideshow is a window of ours, and Esc closes it — but on its own that left
     # the loop and the sound running under it, which is the opposite of what
     # the key means. So this one window doesn't take the key away.
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    show = view._shows.showing
-    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: show))
-    view._other_window_owns_keys = lambda: True  # the show is up and active
+    slideshow = view._slideshows.showing
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: slideshow))
+    view._other_window_owns_keys = lambda: True  # the slideshow is up and active
 
     handled = _press_escape(view)
 
     assert handled is True
-    assert view._shows.showing is None and not view._auto.is_active(key) and bed.stops == 1
+    assert view._slideshows.showing is None and not view._auto.is_active(key) and bed.stops == 1
 
 
-def test_esc_over_the_show_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
-                                                                 monkeypatch):
-    # A dropdown or dialog opened over the show owns Esc, as it does everywhere.
+def test_esc_over_the_slideshow_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
+                                                                      monkeypatch):
+    # A dropdown or dialog opened over the slideshow owns Esc, as it does everywhere.
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    show = view._shows.showing
+    slideshow = view._slideshows.showing
     popup = QWidget()
     qtbot.addWidget(popup)
-    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: show))
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: slideshow))
     monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: popup))
     view._other_window_owns_keys = lambda: True
 
     assert _press_escape(view) is False
-    assert view._shows.showing is show and view._auto.is_active(key) and bed.stops == 0
-    show.close()
+    assert view._slideshows.showing is slideshow and view._auto.is_active(key) and bed.stops == 0
+    slideshow.close()
 
 
 def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypatch):
@@ -13246,15 +13246,15 @@ def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypa
     # one thing to reach for either way, so it starts the room rather than
     # waiting to be taught what the room was by a stop it never saw.
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    assert not view._bank.audio.isChecked() and view._shows.showing is None
+    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
 
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
     assert view._bank.audio.isChecked() and bed.starts == 1
     assert view.osr2_control.isChecked()
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
 
 
 def test_the_standing_start_is_stopped_by_the_next_press(qtbot, tmp_path, monkeypatch):
@@ -13262,11 +13262,11 @@ def test_the_standing_start_is_stopped_by_the_next_press(qtbot, tmp_path, monkey
     # start exactly as it does from a stop.
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
     _press_escape(view)
-    qtbot.addWidget(view._shows.showing)
+    qtbot.addWidget(view._slideshows.showing)
 
     assert _press_escape(view) is True
 
-    assert not view._auto.is_active(key) and view._shows.showing is None
+    assert not view._auto.is_active(key) and view._slideshows.showing is None
     assert not view._bank.audio.isChecked() and bed.stops == 1
     assert not view.osr2_control.isChecked()
 
@@ -13276,42 +13276,42 @@ def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch
     # press it again and it comes back as it was — the way leaving an OmniPause
     # hands the room back rather than leaving every switch to be found again.
     view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    playlist = view._shows.showing._playlist
+    playlist = view._slideshows.showing._playlist
     playing = (playlist.in_play_order(), playlist.current())
 
     _press_escape(view)
-    assert not view._auto.is_active(key) and view._shows.showing is None
+    assert not view._auto.is_active(key) and view._slideshows.showing is None
 
     assert _press_escape(view) is True
 
     assert view._auto.is_active(key)
     assert view._bank.audio.isChecked() and bed.starts == 2
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
-    playlist = view._shows.showing._playlist
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
+    playlist = view._slideshows.showing._playlist
     assert (playlist.in_play_order(), playlist.current()) == playing  # same set, same picture
 
 
-def test_the_resumed_show_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
-                                                                monkeypatch):
+def test_the_resumed_slideshow_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
+                                                                     monkeypatch):
     # Not a fresh shuffle of the folder: the pass it was playing, taken up where
     # it stopped, so what comes next is what would have come next.
     view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    show = view._shows.showing
-    show._step(1)
-    show._step(1)
-    was_showing, was_at = show._playlist.current(), show._playlist.index
+    slideshow = view._slideshows.showing
+    slideshow._step(1)
+    slideshow._step(1)
+    was_showing, was_at = slideshow._playlist.current(), slideshow._playlist.index
 
     _press_escape(view)
     _press_escape(view)
 
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing._playlist.current() == was_showing
-    assert view._shows.showing._playlist.index == was_at
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing._playlist.current() == was_showing
+    assert view._slideshows.showing._playlist.index == was_at
 
 
-def test_the_resumed_show_is_narrowed_the_way_it_was_and_can_still_widen(qtbot,
-                                                                         monkeypatch):
+def test_the_resumed_slideshow_is_narrowed_the_way_it_was_and_can_still_widen(qtbot,
+                                                                              monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
@@ -13319,20 +13319,20 @@ def test_the_resumed_show_is_narrowed_the_way_it_was_and_can_still_widen(qtbot,
     _keys_are_the_gallerys(view)
     view.refresh()
     _open_recents(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
-    view._shows.showing.toggle_enhanced_mode()
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
+    view._slideshows.showing.toggle_enhanced_mode()
 
     _press_escape(view)
     _press_escape(view)
 
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    assert show.hud_enhanced_mode
-    assert [item[2] for item in show._playlist._items] == ["i2"]
-    show.toggle_enhanced_mode()
-    assert sorted(item[2] for item in show._playlist._items) == ["i1", "i2"]
-    show.close()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow.hud_enhanced_mode
+    assert [item[2] for item in slideshow._playlist._items] == ["i2"]
+    slideshow.toggle_enhanced_mode()
+    assert sorted(item[2] for item in slideshow._playlist._items) == ["i1", "i2"]
+    slideshow.close()
 
 
 def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_path,
@@ -13348,8 +13348,8 @@ def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_p
     _press_escape(view)
 
     assert view._auto.is_active(key) and not view._auto.is_active(other)
-    if view._shows.showing is not None:
-        qtbot.addWidget(view._shows.showing)
+    if view._slideshows.showing is not None:
+        qtbot.addWidget(view._slideshows.showing)
 
 
 def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
@@ -13359,31 +13359,31 @@ def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
 
     _press_escape(view)
     _press_escape(view)
-    if view._shows.showing is not None:
-        qtbot.addWidget(view._shows.showing)
+    if view._slideshows.showing is not None:
+        qtbot.addWidget(view._slideshows.showing)
 
     assert _press_escape(view) is True
     assert not view._auto.is_active(key)
     assert not view._bank.audio.isChecked() and bed.stops == 2
-    assert view._shows.showing is None
+    assert view._slideshows.showing is None
 
 
-def test_a_show_of_a_run_in_flight_comes_back_as_a_show_of_the_folder(
+def test_a_slideshow_of_a_run_in_flight_comes_back_as_a_slideshow_of_the_folder(
         qtbot, tmp_path, monkeypatch):
-    # A show following a generation has no pass to take up — what it was watching
+    # A slideshow following a generation has no pass to take up — what it was watching
     # has landed or gone by the time Esc is pressed again — so it comes back as
     # the folder in front, rather than being the one thing that stays shut.
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
-    view._shows.open([], frame=_png_bytes())  # following a run, no items yet
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing.is_live()
+    view._slideshows.open([], frame=_png_bytes())  # following a run, no items yet
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing.is_live()
 
     _press_escape(view)
-    assert view._shows.showing is None
+    assert view._slideshows.showing is None
 
     _press_escape(view)
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
 
 
 def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
@@ -13399,7 +13399,7 @@ def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
     _press_escape(view)
 
     assert view._bank.audio.isChecked()
-    assert not view._auto.is_active(key) and view._shows.showing is None
+    assert not view._auto.is_active(key) and view._slideshows.showing is None
 
 
 def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
@@ -14142,10 +14142,10 @@ def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path)
     assert view._live_jobs == {}
 
 
-def test_a_landed_enhancement_upgrades_that_item_in_the_open_show(
+def test_a_landed_enhancement_upgrades_that_item_in_the_open_slideshow(
         qtbot, tmp_path, monkeypatch):
-    # The whole point of enhancing from a show: what plays becomes the better
-    # version. It lands minutes after the ask, by which time the show is no longer
+    # The whole point of enhancing from a slideshow: what plays becomes the better
+    # version. It lands minutes after the ask, by which time the slideshow is no longer
     # on the item that asked — it takes the upgrade wherever that item sits.
     paths = {"g0": "g0.png", "g1": "g1.png"}
     monkeypatch.setattr(gallery, "resolve_preview",
@@ -14155,18 +14155,18 @@ def test_a_landed_enhancement_upgrades_that_item_in_the_open_show(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
 
     # The fold has happened: the row now leads with the enhanced file and wears
-    # its thumbnail. That upgraded row is what reaches the show.
+    # its thumbnail. That upgraded row is what reaches the slideshow.
     paths["g0"] = "g0_enhanced.png"
     db.update_generation("g0", thumbnail_path="g0_enhanced_thumb.png")
-    view._shows.note_enhanced(db.get_generation("g0"))
+    view._slideshows.note_enhanced(db.get_generation("g0"))
 
     upgraded = ("g0_enhanced.png", "image", "g0", "g0_enhanced_thumb.png")
-    assert upgraded in view._shows.showing._playlist._items
-    view._shows.showing.close()
+    assert upgraded in view._slideshows.showing._playlist._items
+    view._slideshows.showing.close()
 
 
 def test_a_slideshow_lock_on_a_video_asks_for_nothing(qtbot, tmp_path):
@@ -14179,7 +14179,7 @@ def test_a_slideshow_lock_on_a_video_asks_for_nothing(qtbot, tmp_path):
     assert view.enhance_from_slideshow("g0") is False
 
 
-def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
+def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -14191,26 +14191,26 @@ def test_a_show_is_armed_with_each_images_versions(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    show = _double_click_show(view, qtbot)
+    slideshow = _double_click_slideshow(view, qtbot)
 
     # Keyed by the file the folder shows the image under, which is not the one
-    # the show happens to have opened on, so the key comes from the same place
-    # the show's did — and asking the show for it proves it took them.
-    (key, computed), = view._shows.versions_of(
+    # the slideshow happens to have opened on, so the key comes from the same place
+    # the slideshow's did — and asking the slideshow for it proves it took them.
+    (key, computed), = view._slideshows.versions_of(
         [view.row_for(pid) for pid in view.visible_prompt_ids()]).items()
-    levels = show._levels.levels(base=key)
+    levels = slideshow._levels.levels(base=key)
     assert levels == computed
     assert [p.name for p, _kind, _label in levels] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     # Each carries its label, so the note can say which version is on screen.
     assert [label for _p, _kind, label in levels] == ["Enhance 1", "Original"]
     # And Down asks through the gallery, which holds the settings.
-    assert show._actions.enhance == view.enhance_from_slideshow
-    show.close()
+    assert slideshow._actions.enhance == view.enhance_from_slideshow
+    slideshow.close()
 
 
 def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypatch):
-    # A show opened over something still being made has no place among the
+    # A slideshow opened over something still being made has no place among the
     # folder's files — but the folder is still what it was opened from, so its
     # arrows step it rather than doing nothing at all.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
@@ -14223,24 +14223,24 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
     view.refresh()
     _open_leaf(view)
 
-    show = _double_click_show(view, qtbot, media=None, frame=_png_bytes())
+    slideshow = _double_click_slideshow(view, qtbot, media=None, frame=_png_bytes())
 
-    assert show.is_live()
-    assert [item[2] for item in show._playlist._items] == \
+    assert slideshow.is_live()
+    assert [item[2] for item in slideshow._playlist._items] == \
         view._browser.visible_prompt_ids()
-    assert show._playlist.index == 0
-    show.close()
+    assert slideshow._playlist.index == 0
+    slideshow.close()
 
 
 def test_a_generation_still_in_flight_stays_out_of_a_slideshow(qtbot):
     # It used to be seeded with no file, and drew "Generating…" as its slide —
-    # a blank between pictures. It joins the show when it has something to show.
+    # a blank between pictures. It joins the slideshow when it has something to show.
     db = FakeDB([_running_row("in_flight", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._shows.items_of(view._db.list_generations()) == []
+    assert view._slideshows.items_of(view._db.list_generations()) == []
 
 
 def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
@@ -14250,7 +14250,7 @@ def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._shows.items_of(view._db.list_generations()) == []
+    assert view._slideshows.items_of(view._db.list_generations()) == []
 
 
 def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
@@ -14267,14 +14267,14 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     view._tree.setCurrentItem(view._leaf_by_id["v1"])
     view._on_thumbnail_clicked("v1")
 
-    show = _double_click_show(view, qtbot, media=("v1.mp4", "video"))
+    slideshow = _double_click_slideshow(view, qtbot, media=("v1.mp4", "video"))
 
-    assert show._playlist._items == [("v1.mp4", "video", "v1", None)]
-    assert show._playlist.index == 0
-    show.close()
+    assert slideshow._playlist._items == [("v1.mp4", "video", "v1", None)]
+    assert slideshow._playlist.index == 0
+    slideshow.close()
 
 
-def test_a_show_opening_and_closing_leaves_the_mic_as_it_found_it(
+def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
         qtbot, tmp_path, monkeypatch):
     # It used to arm the mic and disarm it again, which is what left "start
     # slideshow" unhearable in the one state it is for.
@@ -14287,28 +14287,28 @@ def test_a_show_opening_and_closing_leaves_the_mic_as_it_found_it(
     _select_first_leaf(view)
     view._bank.mic.setChecked(True)
 
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
     assert view._voice.listener.commands_on
 
-    view._shows.showing.close()
-    assert view._shows.showing is None
+    view._slideshows.showing.close()
+    assert view._slideshows.showing is None
     assert view._voice.listener.commands_on  # still on, because the button still is
 
 
-def test_a_show_with_the_mic_off_hears_nothing(qtbot, tmp_path):
+def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
-    show = _double_click_show(view, qtbot)
+    slideshow = _double_click_slideshow(view, qtbot)
 
     assert not view._voice.listener.commands_on
-    show.close()
+    slideshow.close()
 
 
-def _fix_show(qtbot, tmp_path, monkeypatch, *detectors):
+def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     """A gallery playing one image fullscreen with the mic on, and exactly these
     detectors installed — the state every spoken fix is said into."""
     monkeypatch.setattr(gallery, "resolve_preview",
@@ -14321,64 +14321,64 @@ def _fix_show(qtbot, tmp_path, monkeypatch, *detectors):
     view.refresh()
     _select_first_leaf(view)
     view._bank.mic.setChecked(True)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
     return view
 
 
 def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
         qtbot, tmp_path, monkeypatch):
-    view = _fix_show(qtbot, tmp_path, monkeypatch, "teeth_yolov8n.pt")
+    view = _fix_slideshow(qtbot, tmp_path, monkeypatch, "teeth_yolov8n.pt")
 
     assert view._voice.listener.speak_command("Fix her teeth.") is not None
 
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing teeth" in view._shows.showing._note.text()
-    assert view._shows.showing.hud_item_note == "Enhancement queued"
+    assert "fixing teeth" in view._slideshows.showing._note.text()
+    assert view._slideshows.showing.hud_item_note == "Enhancement queued"
 
 
 def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
         qtbot, tmp_path, monkeypatch):
     # Two bad parts in one picture is one command, and one run that fixes both.
-    view = _fix_show(qtbot, tmp_path, monkeypatch,
-                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+    view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
+                          "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
     view._voice.listener.speak_command("fix hands and mouth")
 
     (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing hands & teeth" in view._shows.showing._note.text()
+    assert "fixing hands & teeth" in view._slideshows.showing._note.text()
 
 
 def test_fix_all_goes_over_every_part_something_can_find(
         qtbot, tmp_path, monkeypatch):
     # The whole table in a breath — minus the parts nothing installed can find,
     # which the caption leaves out rather than claiming a pass that can't run.
-    view = _fix_show(qtbot, tmp_path, monkeypatch,
-                     "teeth_yolov8n.pt", "hand_yolov8s.pt")
+    view = _fix_slideshow(qtbot, tmp_path, monkeypatch,
+                          "teeth_yolov8n.pt", "hand_yolov8s.pt")
 
     view._voice.listener.speak_command("fix everything")
 
     (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing hands & teeth" in view._shows.showing._note.text()
+    assert "fixing hands & teeth" in view._slideshows.showing._note.text()
 
 
 def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
         qtbot, tmp_path, monkeypatch):
-    view = _fix_show(qtbot, tmp_path, monkeypatch)
+    view = _fix_slideshow(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak_command("fix teeth")
 
     assert view._live_jobs == {}
-    assert "no teeth detector" in view._shows.showing._note.text()
+    assert "no teeth detector" in view._slideshows.showing._note.text()
 
 
-# --- spoken show control: start it, pause it, close it ----------------------
+# --- spoken slideshow control: start it, pause it, close it -----------------
 
 def _voiceable(qtbot, tmp_path, monkeypatch):
     """A gallery on a playable folder with the microphone switched on."""
@@ -14395,15 +14395,15 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
 
 def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    assert view._shows.showing is None
+    assert view._slideshows.showing is None
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
-    assert view._shows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert _will_move_on(view._shows.showing)
-    view._shows.showing.close()
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
+    assert view._slideshows.showing.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert _will_move_on(view._slideshows.showing)
+    view._slideshows.showing.close()
 
 
 def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
@@ -14411,9 +14411,9 @@ def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
 
     view._voice.listener.speak_command("open slideshow")
 
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
-    view._shows.showing.close()
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
+    view._slideshows.showing.close()
 
 
 def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
@@ -14421,59 +14421,59 @@ def test_a_double_clicked_pictures_slideshow_opens_at_the_clip_seconds_set(
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._pace.set_seconds(7)
 
-    show = _double_click_show(view, qtbot)
+    slideshow = _double_click_slideshow(view, qtbot)
 
-    assert show.dwell_s == 7
-    assert _will_move_on(show)
-    show.close()
+    assert slideshow.dwell_s == 7
+    assert _will_move_on(slideshow)
+    slideshow.close()
 
 
-def test_start_slideshow_sets_a_held_show_going(qtbot, tmp_path, monkeypatch):
-    # A show held at nought is set going by this, and there is no separate
+def test_start_slideshow_sets_a_held_slideshow_going(qtbot, tmp_path, monkeypatch):
+    # A slideshow held at nought is set going by this, and there is no separate
     # resume to learn.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._pace.set_seconds(0)
-    show = _double_click_show(view, qtbot)
-    assert show.dwell_s == 0
+    slideshow = _double_click_slideshow(view, qtbot)
+    assert slideshow.dwell_s == 0
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._shows.showing is show          # the open one, not a second window
-    assert show.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
-    assert _will_move_on(show)
-    show.close()
+    assert view._slideshows.showing is slideshow          # the open one, not a second window
+    assert slideshow.dwell_s == DEFAULT_IMAGE_DWELL_MS // 1000
+    assert _will_move_on(slideshow)
+    slideshow.close()
 
 
 def test_pause_slideshow_turns_the_pace_to_nought(qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
-    show = view._shows.showing
-    qtbot.addWidget(show)
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
 
     view._voice.listener.speak_command("pause slideshow")
 
-    assert show.dwell_s == 0
-    assert not _will_move_on(show)
-    assert view._shows.showing is show  # paused, not closed
-    show.close()
+    assert slideshow.dwell_s == 0
+    assert not _will_move_on(slideshow)
+    assert view._slideshows.showing is slideshow  # paused, not closed
+    slideshow.close()
 
 
 @pytest.mark.parametrize("said", ["stop slideshow", "end slideshow",
                                   "close slideshow"])
-def test_stopping_the_show_closes_it(qtbot, tmp_path, monkeypatch, said):
+def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
-    show = view._shows.showing
-    qtbot.addWidget(show)
-    show.show()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.show()
 
     view._voice.listener.speak_command(said)
 
-    assert not show.isVisible()
-    assert view._shows.showing is None
+    assert not slideshow.isVisible()
+    assert view._slideshows.showing is None
 
 
-def test_a_show_command_with_no_show_up_answers_in_the_gallery(
+def test_a_slideshow_command_with_no_slideshow_up_answers_in_the_gallery(
         qtbot, tmp_path, monkeypatch):
     # There is no note to write on, so the caption that carries every other
     # voice answer says it instead.
@@ -14484,7 +14484,7 @@ def test_a_show_command_with_no_show_up_answers_in_the_gallery(
     assert "no slideshow" in view._voice.status.text()
 
 
-def test_a_spoken_fix_with_no_show_up_says_so_rather_than_vanishing(
+def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
         qtbot, tmp_path, monkeypatch):
     # The mic now hears commands during a steered loop too, so "fix teeth" is
     # claimed even with nothing on screen — it must not disappear silently.
@@ -14498,17 +14498,17 @@ def test_a_spoken_fix_with_no_show_up_says_so_rather_than_vanishing(
     assert "picture on screen" in view._voice.status.text()
 
 
-def test_start_slideshow_is_heard_with_no_show_and_no_loop(qtbot, tmp_path,
+def test_start_slideshow_is_heard_with_no_slideshow_and_no_loop(qtbot, tmp_path,
                                                           monkeypatch):
     # The state the command is for: nothing playing, nothing generating, mic on.
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    assert view._shows.showing is None and view._voice._steering is None
+    assert view._slideshows.showing is None and view._voice._steering is None
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._shows.showing is not None
-    qtbot.addWidget(view._shows.showing)
-    view._shows.showing.close()
+    assert view._slideshows.showing is not None
+    qtbot.addWidget(view._slideshows.showing)
+    view._slideshows.showing.close()
 
 
 def test_a_loop_ending_leaves_the_commands_listening(qtbot, tmp_path, monkeypatch):
@@ -14548,8 +14548,8 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     view._bank.mic.setChecked(True)  # the switch, as the user flips it
     view.refresh()
     _select_first_leaf(view)
-    view._shows.start()
-    qtbot.addWidget(view._shows.showing)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing)
     return view
 
 
@@ -14557,7 +14557,7 @@ def _speak_request(view, qtbot, *utterances):
     """Say a request and wait for the app to have answered it — the revision is
     worked out off the UI thread, so the answer arrives a hop later.
 
-    Answered means the promise the show holds while it works is taken down,
+    Answered means the promise the slideshow holds while it works is taken down,
     which only that request's own answer does.  It used to wait for the words
     "working out" to leave the corner, inside a budget that was exactly the
     note's own flash time -- which told answered from timed out only because
@@ -14565,7 +14565,7 @@ def _speak_request(view, qtbot, *utterances):
     """
     for text in utterances:
         view._voice.listener.speak(text)
-    qtbot.waitUntil(lambda: view._shows.showing._working_request is None, timeout=5000)
+    qtbot.waitUntil(lambda: view._slideshows.showing._working_request is None, timeout=5000)
 
 
 def _finish_reroll(view, job):
@@ -14586,11 +14586,11 @@ def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeyp
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
-    assert view._shows.showing._playlist.paused
-    assert "Request" in view._shows.showing._note.text()
+    assert view._slideshows.showing._playlist.paused
+    assert "Request" in view._slideshows.showing._note.text()
 
     view._voice.listener.speak("no hat. Over.")
-    assert not view._shows.showing._playlist.paused
+    assert not view._slideshows.showing._playlist.paused
 
 
 def test_a_finished_request_queues_the_revision_with_the_same_seed(
@@ -14647,13 +14647,13 @@ def test_a_queued_request_is_logged_by_the_pictures_it_joins_never_by_its_words(
 
 def test_the_request_lands_on_the_slide_it_was_opened_over(
         qtbot, tmp_path, monkeypatch):
-    # The words take seconds; the show holds, but the target is taken when the
+    # The words take seconds; the slideshow holds, but the target is taken when the
     # request opens rather than when it runs out.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak("Request.")
 
-    view._shows.showing._playlist.add(("other.png", "image", "elsewhere", None))
-    view._shows.showing.step(1)
+    view._slideshows.showing._playlist.add(("other.png", "image", "elsewhere", None))
+    view._slideshows.showing.step(1)
     _speak_request(view, qtbot, "no hat. Over.")
 
     (job,) = view._live_jobs.values()
@@ -14666,7 +14666,7 @@ def test_the_requests_collection_lists_what_was_asked_for_as_ordinary_tiles(
     # asked for out loud, so it gets the tile every other collection gives one.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._shows.showing.close()
+    view._slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
@@ -14682,7 +14682,7 @@ def test_a_request_still_generating_shows_as_a_live_card(
     # collection gives work that is still in flight.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._shows.showing.close()
+    view._slideshows.showing.close()
 
     view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
 
@@ -14705,8 +14705,8 @@ def test_a_request_that_never_hears_over_says_so_and_resumes(
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat")
 
-    assert not view._shows.showing._playlist.paused
-    assert "never heard" in view._shows.showing._note.text()
+    assert not view._slideshows.showing._playlist.paused
+    assert "never heard" in view._slideshows.showing._note.text()
     assert view._live_jobs == {}
 
 
@@ -14717,7 +14717,7 @@ def test_a_request_naming_nothing_is_answered_not_generated(
     _speak_request(view, qtbot, "Request. Over.")
 
     assert view._live_jobs == {}
-    assert "didn't catch" in view._shows.showing._note.text()
+    assert "didn't catch" in view._slideshows.showing._note.text()
 
 
 def test_the_words_of_a_request_never_reach_the_fix_matcher(
@@ -14737,7 +14737,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
     # In the source tile, the same slot an image-to-video's start frame uses.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._shows.showing.close()
+    view._slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
@@ -14752,7 +14752,7 @@ def test_a_request_item_marks_its_change_in_the_prompt_field(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._shows.showing.close()
+    view._slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
@@ -14773,7 +14773,7 @@ def test_what_the_microphone_heard_reaches_the_slideshow(
 
     view._voice.listener.heard.emit("something off the mic")
 
-    assert "something off the mic" in view._shows.showing._note.text()
+    assert "something off the mic" in view._slideshows.showing._note.text()
 
 
 def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch):
@@ -14781,7 +14781,7 @@ def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.error.emit("mic unavailable — No module named 'sounddevice'")
 
-    assert "mic unavailable" in view._shows.showing._note.text()
+    assert "mic unavailable" in view._slideshows.showing._note.text()
 
 
 def test_the_slideshow_shows_the_request_as_it_is_being_said(
@@ -14790,10 +14790,10 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
-    assert "Request" in view._shows.showing._note.text()
+    assert "Request" in view._slideshows.showing._note.text()
 
     view._voice.listener.speak("no hat")
-    assert "no hat" in view._shows.showing._note.text()
+    assert "no hat" in view._slideshows.showing._note.text()
 # --- the Genau lane: a looping clip, made but not sent anywhere ---------------
 
 
@@ -14950,7 +14950,7 @@ def test_a_spoken_genau_it_is_answered_on_the_surface_that_heard_it(qtbot, tmp_p
     view = _genau_view(qtbot, tmp_path, monkeypatch)
 
     surface = _VoiceSurface("img_act")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
@@ -14973,7 +14973,7 @@ def test_a_second_genau_it_over_the_same_picture_is_refused(qtbot, tmp_path, mon
     # minutes of the one GPU making a clip that is already coming.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     surface = _VoiceSurface("img_act")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     assert len(_spoken_genau_rows(view)) == 1
@@ -14994,7 +14994,7 @@ def test_one_said_while_the_recipe_is_still_being_chosen_is_refused_too(
     monkeypatch.setattr(view, "off_thread",
                         lambda work, done: thinking.append((work, done)))
     surface = _VoiceSurface("img_act")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
@@ -15012,7 +15012,7 @@ def test_the_picture_is_let_go_of_when_the_act_has_no_recipe(qtbot, tmp_path, mo
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     monkeypatch.setattr(combine_controller.recipe_match, "best_recipe",
                         lambda *a, **k: None)
-    view._shows._slideshow = _VoiceSurface("img_act")
+    view._slideshows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
@@ -15025,7 +15025,7 @@ def test_a_picture_whose_clip_has_landed_is_answered_the_same_way(
     # would only re-make it, so it is answered rather than run.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     surface = _VoiceSurface("img_act")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (made,) = _spoken_genau_rows(view)
@@ -15043,7 +15043,7 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
     # Asking again is the only way to get a clip after a failure, so a row that
     # produced nothing must not read as this picture having been Genau'd.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
-    view._shows._slideshow = _VoiceSurface("img_act")
+    view._slideshows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
     (failed,) = _spoken_genau_rows(view)
@@ -15060,7 +15060,7 @@ def test_a_pressed_generate_of_the_same_act_is_not_what_the_guard_counts(
     # the wait: someone at the keyboard can see the queue they just joined.
     view = _genau_view(qtbot, tmp_path, monkeypatch)
     view._combine.generate_category("img_act", "dancing", recipe_match.GENAU)
-    view._shows._slideshow = _VoiceSurface("img_act")
+    view._slideshows._slideshow = _VoiceSurface("img_act")
 
     view._voice.on_command(SurfaceCommand(gallery.GENAU_COMMAND))
 
@@ -15075,19 +15075,19 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     view.refresh()
     _set_enhance(view, params={"enhance_steps": 29})
     surface = _VoiceSurface("g0")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_steps"] == 29
-    # Answered in the show's own corner: the speaker is looking at the picture.
+    # Answered in the slideshow's own corner: the speaker is looking at the picture.
     assert surface.noted == ("g0", "🎤 enhancing…", NOTICE)
 
 
 def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_path):
-    # Said over a show, this is a gesture made with no view of the Enhance panel
+    # Said over a slideshow, this is a gesture made with no view of the Enhance panel
     # — the same reason a hold's Down leaves one alone — so it says so rather
     # than re-deriving the picture at whatever the settings happen to read now.
     db = _enhanceable_db(tmp_path, count=1)
@@ -15100,7 +15100,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_picture_alone(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -15116,7 +15116,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -15134,7 +15134,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -15142,7 +15142,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     assert view._live_jobs == {}
 
 
-def test_a_spoken_enhance_with_no_show_up_presses_the_bank_button(qtbot, tmp_path):
+def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tmp_path):
     # The word names a bank button as well as the picture on screen, and with no
     # picture filling the screen it is the button — aimed the way a click aims
     # it, at the folder's images that have never been enhanced.
@@ -15177,7 +15177,7 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
     # One matcher reaches the mic for everything that tolerates a filler word, so
     # a verb added to the vocabulary lands there without this module listing the
     # parts a second time and drifting from it.  It wraps what it matches with
-    # the side the utterance named, which is how a room with two shows in it
+    # the side the utterance named, which is how a room with two slideshows in it
     # says which picture is meant.
 
     assert match("enhance").command == gallery.ENHANCE_COMMAND
@@ -15270,7 +15270,7 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
-# --- the bare vocabulary: a collection, a bank button, a word over the show ---
+# --- the bare vocabulary: a collection, a bank button, a word over the slideshow ---
 
 
 def _listening(qtbot, tmp_path, db=None):
@@ -15330,7 +15330,7 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     # one room to whoever is speaking.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.listener.speak("weird")
     assert surface.culled == 1
@@ -15345,10 +15345,10 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     assert not surface.locked and surface.said == "🎤 let go"
 
 
-def test_the_transport_words_step_the_show_they_are_said_over(qtbot, tmp_path):
+def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     for said in ("next", "skip", "back", "previous"):
         view._voice.listener.speak(said)
@@ -15356,18 +15356,18 @@ def test_the_transport_words_step_the_show_they_are_said_over(qtbot, tmp_path):
     assert surface.steps == [1, 1, -1, -1]
 
 
-def test_a_spoken_favorite_over_a_show_bookmarks_the_slide(qtbot, tmp_path):
+def test_a_spoken_favorite_over_a_slideshow_bookmarks_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.listener.speak("favorite")
 
     assert surface.favorited == 1 and surface.said == "🎤 favorited"
 
 
-def test_the_same_two_words_walk_the_history_with_no_show_up(qtbot, tmp_path):
-    # The active side, with two sides: over a show "back" is the slide before,
+def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_path):
+    # The active side, with two sides: over a slideshow "back" is the slide before,
     # and in the gallery it is the stop before — both are the one before.
     view = _listening(qtbot, tmp_path)
     first = _select_first_leaf(view)
@@ -15514,12 +15514,12 @@ def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtb
     assert not view._osr2_motion.state.learned.active
 
 
-def test_a_motion_word_answers_from_a_show_too(qtbot, tmp_path):
+def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
     # The driver is app-wide, so its words belong to no surface — but the answer
     # goes where the speaker is looking.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     view._voice.listener.speak("next shape")
 
@@ -15531,7 +15531,7 @@ def test_a_sentence_holding_a_command_word_still_steers_the_prompt(qtbot, tmp_pa
     # bare vocabulary may match anything but the whole utterance.
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._shows._slideshow = surface
+    view._slideshows._slideshow = surface
 
     assert view._voice.listener.speak("a lock of hair over her eye") is None
     assert surface.said is None and surface.steps == []
@@ -15676,10 +15676,10 @@ def test_the_poll_fetch_reads_nothing_with_no_client():
 
 def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot):
     """The gallery watches the whole application for its keys, so it is handed
-    events about every object in it — a show's own timer among them, which is
-    destroyed with the show while events about it are still in flight.  Asking
+    events about every object in it — a slideshow's own timer among them, which is
+    destroyed with the slideshow while events about it are still in flight.  Asking
     the base class about one of those dereferences a freed object and takes the
-    process down with it (2026-09-19 21:26, a Latest show closing)."""
+    process down with it (2026-09-19 21:26, a Latest slideshow closing)."""
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     doomed = QTimer()

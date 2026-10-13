@@ -1205,7 +1205,7 @@ def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_wh
     assert queue.queue_order == [seen["image"].prompt_id, video.prompt_id]
 
 
-# --- what a show is locked on is made first -------------------------------------
+# --- what a slideshow is locked on is made first --------------------------------
 
 def test_a_job_put_first_leads_the_line_and_takes_the_machine(qtbot, tmp_path):
     client = _client()

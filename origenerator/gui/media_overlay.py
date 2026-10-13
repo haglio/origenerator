@@ -5,7 +5,7 @@ over one however it is stacked — so an overlay that showed perfectly well over
 a picture vanished the moment a clip came up. Made native itself, it stacks
 against the video by Z-order like any other window. Six widgets learned that
 separately, most of them by shipping the bug first and then carrying a comment
-about it; this is the one place it is written down, so the next overlay a show
+about it; this is the one place it is written down, so the next overlay a slideshow
 grows does not become the seventh.
 """
 from __future__ import annotations

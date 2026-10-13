@@ -142,7 +142,7 @@ def test_ctrl_alt_q_asks_first(qtbot, tmp_path, monkeypatch):
     assert win.isVisible()
 
 
-def test_ctrl_alt_q_in_a_slideshow_takes_the_show_down_with_the_app(
+def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
         qtbot, tmp_path, monkeypatch):
     _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
     monkeypatch.setattr(gallery, "resolve_preview",
@@ -152,16 +152,16 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_show_down_with_the_app(
     win.show()
     win._gallery_view.refresh()
     _select_first_leaf(win._gallery_view)
-    win._gallery_view._shows.start()
-    show = win._gallery_view._shows.showing
-    qtbot.addWidget(show)
-    show.activateWindow()
-    qtbot.waitActive(show)
+    win._gallery_view._slideshows.start()
+    slideshow = win._gallery_view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.activateWindow()
+    qtbot.waitActive(slideshow)
 
-    gestures.press_key(show, Qt.Key.Key_Q, _CTRL_ALT)
+    gestures.press_key(slideshow, Qt.Key.Key_Q, _CTRL_ALT)
 
     assert not win.isVisible()
-    assert not show.isVisible()
+    assert not slideshow.isVisible()
 
 
 def test_saying_no_hands_comfyui_nothing(qtbot, tmp_path, monkeypatch):
@@ -476,18 +476,18 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     _select_first_leaf(first._gallery_view)
-    first._gallery_view._shows.start()
-    qtbot.addWidget(first._gallery_view._shows.showing)
-    first._gallery_view._shows.showing.toggle_enhanced_mode()
+    first._gallery_view._slideshows.start()
+    qtbot.addWidget(first._gallery_view._slideshows.showing)
+    first._gallery_view._slideshows.showing.toggle_enhanced_mode()
 
     first.close()
     second = _window(qtbot, tmp_path, AppState(path))
     second._gallery_view.refresh()
-    second._gallery_view._shows.start()
+    second._gallery_view._slideshows.start()
 
-    show = second._gallery_view._shows.showing
-    qtbot.addWidget(show)
-    assert show.hud_enhanced_mode
+    slideshow = second._gallery_view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    assert slideshow.hud_enhanced_mode
 
 
 def test_closing_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):
@@ -1500,12 +1500,12 @@ def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path
     assert not win._gallery_view.osr2_control.isEnabled()
 
 
-def test_a_window_shows_a_slideshow_while_its_gallery_has_one_to_hand_a_session(
+def test_a_window_slideshows_a_slideshow_while_its_gallery_has_one_to_hand_a_session(
         qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
     assert not win.shows_a_slideshow()
 
-    monkeypatch.setattr(win._gallery_view._shows, "shows_a_slideshow", lambda: True)
+    monkeypatch.setattr(win._gallery_view._slideshows, "shows_a_slideshow", lambda: True)
 
     assert win.shows_a_slideshow()
 
@@ -1607,7 +1607,7 @@ def test_a_window_handed_back_from_a_session_shows_under_its_own_taskbar_button(
     assert worn[-1] == "Origenerator"
 
 
-def test_a_window_a_session_launched_leaves_the_standalone_shows_as_it_found_them(
+def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_found_them(
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     kept = {"panels": {"landscape": {"corner": "upper_right", "minimized": True}}}
@@ -1616,7 +1616,7 @@ def test_a_window_a_session_launched_leaves_the_standalone_shows_as_it_found_the
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
-    assert win._gallery_view._shows.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
+    assert win._gallery_view._slideshows.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
     win.close()
 
     assert AppState(path).get("slideshows") == kept

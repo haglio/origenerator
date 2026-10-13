@@ -679,7 +679,7 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
 
 
 def test_a_pane_with_nothing_drawn_marks_no_folder_square(qtbot):
-    # A show closing as the app itself closes hands its slide to a pane that has
+    # A slideshow closing as the app itself closes hands its slide to a pane that has
     # nothing in it, and asking an empty pane for its squares took the app down.
     pane, _scroll = _pane(qtbot)
 

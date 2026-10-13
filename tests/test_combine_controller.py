@@ -158,7 +158,7 @@ class FakeDB:
         self.exported.append(prompt_id)
 
 
-class FakeShows:
+class FakeSlideshows:
     def __init__(self, showing=None):
         self.showing = showing
         self.runs_said = []
@@ -266,7 +266,7 @@ def combine(qtbot, monkeypatch):
     monkeypatch.setattr(module, "CombinePanel", FakePanel)
     built = []
 
-    def build(host=None, *, db=None, jobs=None, client=object(), shows=None,
+    def build(host=None, *, db=None, jobs=None, client=object(), slideshows=None,
               tabs=None, inbox=None):
         host = host or FakeHost()
         parent = QWidget()
@@ -274,7 +274,7 @@ def combine(qtbot, monkeypatch):
         controller = CombineController(
             host, parent=parent, db=db or FakeDB(), jobs=jobs or FakeReroll(),
             client=client, info_tabs_of=lambda: tabs or FakeTabs(),
-            shows=shows or FakeShows(), inbox=inbox)
+            slideshows=slideshows or FakeSlideshows(), inbox=inbox)
         # The wait between a press and a real job is what the stand-in row is
         # for; running it straight through is what lets a test press and look.
         controller._after_painting = lambda work: work()
@@ -480,20 +480,20 @@ def test_an_act_with_no_recipe_under_it_says_so_and_launches_nothing(combine,
                           "one first, or drop a specific video instead.")]
 
 
-def test_that_hint_lands_in_the_shows_corner_rather_than_a_dialog(combine,
-                                                                  monkeypatch):
+def test_that_hint_lands_in_the_slideshows_corner_rather_than_a_dialog(combine,
+                                                                       monkeypatch):
     # A dialog thrown over a picture someone is talking to is the one place this
     # must never appear.
     monkeypatch.setattr(module.recipe_match, "curated_recipe", lambda c, i: None)
     monkeypatch.setattr(module.recipe_match, "smart_recipe", lambda *a, **k: None)
     monkeypatch.setattr(module.recipe_match, "best_recipe", lambda *a, **k: None)
-    shows = FakeShows(showing=object())
-    controller, host = combine(db=FakeDB([_image("img")]), shows=shows)
+    slideshows = FakeSlideshows(showing=object())
+    controller, host = combine(db=FakeDB([_image("img")]), slideshows=slideshows)
 
     controller.generate_category("img", "waving", recipe_match.GENAU)
 
     assert host.told == []
-    assert shows.runs_said == [
+    assert slideshows.runs_said == [
         (None, "🎤 no past looping “waving” flick to base a recipe on yet", WARNING)]
 
 
@@ -802,13 +802,13 @@ def test_a_spoken_act_whose_folder_is_already_making_one_joins_that_run(combine,
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "curated_params", lambda s, r, wf: {"seed": 3})
-    shows = FakeShows(showing="img")
+    slideshows = FakeSlideshows(showing="img")
     db = FakeDB([_image("img")])
     jobs = FakeReroll(launches=None, busy=True)
-    controller, _host = combine(db=db, shows=shows, jobs=jobs)
+    controller, _host = combine(db=db, slideshows=slideshows, jobs=jobs)
 
     controller.generate_category("img", "waving", send=True)
 
     assert db.requested == ["the-run-already-going"]
     assert jobs.prepared == []
-    assert [message for _pid, message, _kind in shows.runs_said] == [module.ALREADY_MAKING_ONE]
+    assert [message for _pid, message, _kind in slideshows.runs_said] == [module.ALREADY_MAKING_ONE]

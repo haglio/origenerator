@@ -2,7 +2,7 @@
 
 A Fun Time satellite maps the clip on screen against its library: the same
 act under other seeds runs right as the seed row, and the same subject's
-other acts run down as the column.  A show of this app's generations reads
+other acts run down as the column.  A slideshow of this app's generations reads
 the same way, in the gallery's own terms.  The subject is a picture, and what
 was made of it is the videos animated from it: they run down its column, each
 named for the act it shows, and the picture heads theirs as their source.  A
@@ -11,7 +11,7 @@ picture it is of — so a picture's row is its settings folder (the workflow,
 its version, the model, the LoRA and every setting but the seed), and a
 video's is its act animated from the pictures in its own picture's folder.
 
-Pure and Qt-free: rows in, rows out.  The show keeps the item on screen and
+Pure and Qt-free: rows in, rows out.  The slideshow keeps the item on screen and
 the gallery supplies the library it is mapped against.
 """
 from __future__ import annotations
@@ -227,7 +227,7 @@ def one_per_stretch(rows, *, image_index) -> list[dict]:
     for by the newest of that stretch.
 
     A sitting makes several seeds of a configuration one after another, so a
-    listing of everything newest-first is mostly runs; a show of it plays one
+    listing of everything newest-first is mostly runs; a slideshow of it plays one
     of each, and the map's seed row reaches the rest.  What counts as one
     stretch is read off when the generations were MADE, not off where they sit
     in the listing handed over: Latest moves a picture to where its

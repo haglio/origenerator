@@ -4,15 +4,15 @@ Three things can be said, and any of them may be led by a side:
 
 * a command about the picture on screen — ``fix <part>`` or ``genau it``
   (:mod:`origenerator.gallery.voice_commands` owns both).
-* ``start`` / ``pause`` / ``stop slideshow`` — the show's own controls
-  (:mod:`origenerator.voice.show_commands`).
+* ``start`` / ``pause`` / ``stop slideshow`` — the slideshow's own controls
+  (:mod:`origenerator.voice.slideshow_commands`).
 * ``<collection>`` — play that collection, the way its slideshow button would.
 
 The side ("landscape fix teeth", "landscape favorites") is what makes them
-usable inside Fun Time, where two shows run at once on the satellite regions
+usable inside Fun Time, where two slideshows run at once on the satellite regions
 and NEITHER is the active window — the speaker is looking at one of them while
-the main window has the keyboard, so "the show that is up" names nothing and a
-collection command has no region to land on. Standalone there is one show and no
+the main window has the keyboard, so "the slideshow that is up" names nothing and a
+collection command has no region to land on. Standalone there is one slideshow and no
 regions, so a side is accepted and ignored.
 
 Kept deliberately strict, because everything unmatched here falls through to a
@@ -39,10 +39,10 @@ from origenerator.gallery.sides import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
 from origenerator.voice.app_commands import match_app_command
 from origenerator.voice.app_commands import spoken_phrases as app_command_phrases
-from origenerator.voice.show_commands import (
-    ShowCommand,
-    match_show_command,
-    show_command_phrases,
+from origenerator.voice.slideshow_commands import (
+    SlideshowCommand,
+    match_slideshow_command,
+    slideshow_command_phrases,
 )
 from origenerator.voice.text import words
 
@@ -67,7 +67,7 @@ class SurfaceCommand(NamedTuple):
     """A command about the picture on screen — a
     :class:`~origenerator.gallery.detail_parts.DetailPart` to fix or
     :data:`~origenerator.gallery.voice_commands.GENAU_COMMAND` — aimed at
-    *side*'s show (``None`` — whichever show is up)."""
+    *side*'s slideshow (``None`` — whichever slideshow is up)."""
     command: object
     side: str | None = None
 
@@ -79,17 +79,17 @@ class CollectionCommand(NamedTuple):
     side: str | None = None
 
 
-class ShowControl(NamedTuple):
-    """Start, pause or stop the show — on *side*'s region when named."""
-    command: ShowCommand
+class SlideshowControl(NamedTuple):
+    """Start, pause or stop the slideshow — on *side*'s region when named."""
+    command: SlideshowCommand
     side: str | None = None
 
 
-def match_voice_command(text: str) -> CollectionCommand | ShowControl | SurfaceCommand | None:
+def match_voice_command(text: str) -> CollectionCommand | SlideshowControl | SurfaceCommand | None:
     """What *text* asks for, or ``None`` when it is not a command at all.
 
     Each matcher is strict about its own shape and none can claim another's (a
-    show command names the slideshow, a fix leads with "fix", a Genau command
+    slideshow command names the slideshow, a fix leads with "fix", a Genau command
     leads with its own phrase, a collection command is nothing but the collection's
     name), so the order only decides which is asked first.
     """
@@ -102,9 +102,9 @@ def match_voice_command(text: str) -> CollectionCommand | ShowControl | SurfaceC
     if collection is not None:
         return CollectionCommand(collection, side)
 
-    show = match_show_command(spoken)
-    if show is not None:
-        return ShowControl(show, side)
+    control = match_slideshow_command(spoken)
+    if control is not None:
+        return SlideshowControl(control, side)
 
     surface = match_command(spoken)
     if surface is not None:
@@ -137,7 +137,7 @@ def sided_app_command(text: str):
     The bare vocabulary (:mod:`origenerator.voice.app_commands`) is whole
     utterances only — "undo", "favorite", "experiments" — which is strict enough to
     be asked ahead of an opening request.  A side may still lead one, for the
-    same reason it may lead any other order here: hosted, two shows run and
+    same reason it may lead any other order here: hosted, two slideshows run and
     neither is the active window, so "landscape lock" is the only way to say
     which picture is meant.  Unsided, it comes back bare, exactly as the
     standalone app expects it.
@@ -171,8 +171,8 @@ def _collection_named(words: list[str]) -> str | None:
 def spoken_phrases() -> frozenset[str]:
     """The whole vocabulary as a recognizer that listens for words is asked to hear it.
 
-    Unsided: a side is for a hosting session's two shows, and that session hears for
+    Unsided: a side is for a hosting session's two slideshows, and that session hears for
     itself. One said here still works, by the slower road every sentence takes.
     """
-    return (app_command_phrases() | command_phrases() | show_command_phrases()
+    return (app_command_phrases() | command_phrases() | slideshow_command_phrases()
             | frozenset(COLLECTION_KEYS))

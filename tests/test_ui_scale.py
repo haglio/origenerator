@@ -77,7 +77,7 @@ def test_a_rect_converts_against_its_own_screens_origin(monkeypatch):
     """The bug this function exists for.  Qt leaves each scaled screen's ORIGIN
     at its device position and scales only its size, so dividing a whole-desktop
     x by the scale lands deep inside the second monitor rather than at its left
-    edge — which put the portrait show in the right third of its region, hanging
+    edge — which put the portrait slideshow in the right third of its region, hanging
     off the monitor."""
     ui_scale.apply_room_scale(in_a_headset=False)
     scale = ui_scale.HOSTED_SCALE

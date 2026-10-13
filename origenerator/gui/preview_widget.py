@@ -88,7 +88,7 @@ class PreviewWidget(QWidget):
         # generation had to wait for it to land.
         self._live = False
         self._live_frame: bytes | None = None
-        self._fullscreen = None  # the show a double-click here opened, kept alive here
+        self._fullscreen = None  # the slideshow a double-click here opened, kept alive here
         self._open_fullscreen_view = None
         self._generation: str | None = None
         self.drag_out = DragOut()
@@ -375,7 +375,7 @@ class PreviewWidget(QWidget):
 
     def _end_live(self, media: tuple | None) -> None:
         """Stop mirroring a running generation, handing ``media`` — the file it
-        landed as, if any — to a fullscreen show opened over its live frames, so
+        landed as, if any — to a fullscreen slideshow opened over its live frames, so
         watching a generation fullscreen ends on the finished image rather than the
         last low-res frame.
 
@@ -391,9 +391,9 @@ class PreviewWidget(QWidget):
             win.show_landed(media, self._generation)
 
     def _following_fullscreen(self):
-        """The fullscreen show this pane opened over a running generation and is
+        """The fullscreen slideshow this pane opened over a running generation and is
         still feeding, or ``None``. One that's been dismissed — or that already
-        landed on a file, and so is an ordinary show of it now — follows
+        landed on a file, and so is an ordinary slideshow of it now — follows
         nothing."""
         win = self._fullscreen
         if win is None or not win.is_showing() or not win.is_live():
@@ -417,7 +417,7 @@ class PreviewWidget(QWidget):
         source, and Windows refuses to move a file anything holds open, so a
         pane still showing a condemned item is what makes its own deletion
         fail. Panes showing anything else are left exactly as they are: only
-        what's about to go is dropped, along with a fullscreen show of it.
+        what's about to go is dropped, along with a fullscreen slideshow of it.
         """
         if self._fullscreen is not None:
             self._fullscreen.release_media(paths)
@@ -596,7 +596,7 @@ class PreviewWidget(QWidget):
 
     def set_fullscreen_factory(self, make) -> None:
         """Wire what a double-click here opens: ``make(media, frame)`` returns the
-        show it put up -- a slideshow of the folder this pane's generation sits
+        slideshow it put up -- a slideshow of the folder this pane's generation sits
         in, which only the gallery knows -- or ``None``."""
         self._open_fullscreen_view = make
 

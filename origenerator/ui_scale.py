@@ -122,7 +122,7 @@ def to_logical_rect(x: int, y: int, width: int, height: int):
     back from Qt as logical (2560, 3, 2240, 5351) — its ORIGIN is left at the
     device position and only its SIZE is scaled.  So a whole-desktop
     ``x / scale`` puts a window 2560/0.643 = 3982 across, which is 1422 logical
-    px INTO that screen rather than at its left edge: the portrait show landed
+    px INTO that screen rather than at its left edge: the portrait slideshow landed
     in the right third of its region and spilled off the monitor, with the Funestra
     it was supposed to cover showing through beside it.
 
@@ -153,7 +153,7 @@ def _screen_origin(x: int, y: int) -> tuple[int, int]:
     every point on it.  Matching logically therefore returned the PRIMARY's
     origin for a portrait rect that belongs to the other screen, which is the
     whole-desktop division this function was written to replace: the portrait
-    show landed at device x=3474 instead of 2560, 914px into the monitor, and
+    slideshow landed at device x=3474 instead of 2560, 914px into the monitor, and
     the fix read as no fix at all.
 
     A screen's device rect is recovered from the logical one by the identity

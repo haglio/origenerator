@@ -21,7 +21,7 @@ from origenerator.gui import corner_controls, drag_thumbnail, icons, preview_wid
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_show import FunestraShow
+from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.preview_widget import PreviewWidget
 
@@ -209,7 +209,7 @@ def test_release_media_matches_the_same_file_spelled_differently(make_preview, t
 
 
 def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_path):
-    # A fullscreen show built over this pane holds the file open too.
+    # A fullscreen slideshow built over this pane holds the file open too.
     w = make_preview()
     clip = tmp_path / "clip.mp4"
     w.show_video(clip)
@@ -329,14 +329,14 @@ def test_a_video_loops(make_preview):
 
 def _arm(preview):
     """Wire what a double-click here opens, as the gallery does — the pane itself
-    has no idea what folder its generation sits in, so the show is built for it.
-    Returns a list the built shows land in."""
+    has no idea what folder its generation sits in, so the slideshow is built for it.
+    Returns a list the built slideshows land in."""
     built = []
 
     def make(media, frame, generation):
-        show = _FakeShow(media, frame=frame, generation=generation)
-        built.append(show)
-        return show
+        slideshow = _FakeSlideshow(media, frame=frame, generation=generation)
+        built.append(slideshow)
+        return slideshow
 
     preview.set_fullscreen_factory(make)
     return built
@@ -355,7 +355,7 @@ def test_double_click_opens_fullscreen_on_the_shown_generation(make_preview, tmp
 
 
 def test_a_pane_with_nothing_wired_opens_nothing(make_preview, tmp_path):
-    # Without the gallery under it there is no folder to make a show of.
+    # Without the gallery under it there is no folder to make a slideshow of.
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))
     assert w.open_fullscreen() is None
@@ -384,8 +384,8 @@ def test_a_plain_message_opens_nothing(make_preview):
 
 # --- watching a generation fullscreen while it's still being made -----------
 
-class _FakeShow:
-    """Stands in for the show a double-click opens, which is a window of this
+class _FakeSlideshow:
+    """Stands in for the slideshow a double-click opens, which is a window of this
     app's or one of a session's Funestras -- so nothing of a window is on it."""
 
     def __init__(self, media, *, frame=None, generation=None):
@@ -415,7 +415,7 @@ class _FakeShow:
 
 @pytest.fixture
 def live_preview(make_preview):
-    """A preview mirroring a running generation, with the show it opens faked out."""
+    """A preview mirroring a running generation, with the slideshow it opens faked out."""
     preview = make_preview()
     _arm(preview)
     return preview
@@ -482,7 +482,7 @@ def test_the_finished_file_takes_over_from_the_frames(live_preview, tmp_path):
     png = _make_png(tmp_path / "done.png")
     live_preview.show_image(png, "done")  # the run landed: the pane swaps to the saved file
 
-    assert win.landed == ((png, "image"), "done")  # named, so its show knows whose it is
+    assert win.landed == ((png, "image"), "done")  # named, so its slideshow knows whose it is
 
 
 def test_a_dismissed_view_stops_being_fed(live_preview, tmp_path):
@@ -507,32 +507,32 @@ def test_a_landed_view_is_not_hijacked_by_the_next_run(live_preview, tmp_path):
     assert win.frames == [_png_bytes()]  # the view still shows what it landed on
 
 
-def _show_on_a_sessions_funestra(tmp_path):
-    show = FunestraShow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
+def _slideshow_on_a_sessions_funestra(tmp_path):
+    slideshow = FunestraSlideshow([(str(tmp_path / "a.png"), "image", "id-a")], side="landscape",
                       channel=FunestraChannel(
                           playlist=tmp_path / "landscape.tsv",
                           command_file=tmp_path / "landscape_cmd.txt",
                           status_file=tmp_path / "landscape_status.txt",
                           hud_file=tmp_path / "origenerator_landscape_hud.json"),
                       frames=FrameFiles(tmp_path / "frames"))
-    show._timer.stop()
-    return show
+    slideshow._timer.stop()
+    return slideshow
 
 
 def test_a_pane_whose_picture_went_to_a_sessions_funestra_goes_on_taking_runs_and_files(
         make_preview, tmp_path):
-    show = _show_on_a_sessions_funestra(tmp_path)
+    slideshow = _slideshow_on_a_sessions_funestra(tmp_path)
     preview = make_preview()
-    preview.set_fullscreen_factory(lambda media, frame, generation: show)
+    preview.set_fullscreen_factory(lambda media, frame, generation: slideshow)
     preview.show_image(_make_png(tmp_path / "a.png"))
-    assert preview.open_fullscreen() is show
-    handed_over = show.channel.command_file.read_text(encoding="utf-8")
+    assert preview.open_fullscreen() is slideshow
+    handed_over = slideshow.channel.command_file.read_text(encoding="utf-8")
 
     preview.show_frame(_png_bytes())
     preview.show_image(_make_png(tmp_path / "landed.png"))
 
     assert not preview._image_label.pixmap().isNull()
-    assert show.channel.command_file.read_text(encoding="utf-8") == handed_over
+    assert slideshow.channel.command_file.read_text(encoding="utf-8") == handed_over
 
 
 # --- the video's timeline -----------------------------------------------
@@ -1323,7 +1323,7 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
     # player used to be parented after the stack holding its video surface, so
     # on every close it outlived that surface while still rendering into it --
     # the media pipeline's use-after-free, or Qt aborting, that Windows' own
-    # crash log shows for this app whenever a show was replaced or the app quit
+    # crash log shows for this app whenever a slideshow was replaced or the app quit
     # (2026-09-12 to 09-16, ~20 times). The real player, since only the real
     # one is a child of this widget.
 

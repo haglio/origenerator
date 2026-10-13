@@ -117,7 +117,7 @@ from origenerator.gui.panes import FootSplitter, PaneSplitter, hold_the_borders_
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.reroll_tile import RerollTile
 from origenerator.gui.search_expander import SearchExpander
-from origenerator.gui.show_director import HeldShow, ShowDirector
+from origenerator.gui.slideshow_director import HeldSlideshow, SlideshowDirector
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.toolbar_bank import (
@@ -186,22 +186,22 @@ class _Running(NamedTuple):
 
     Not the mic, which Esc never touches, and not the work already in flight: a
     generation that is rendering lands either way. What is here is the standing
-    instructions — the device, the loop, the show, the sound.
+    instructions — the device, the loop, the slideshow, the sound.
     """
 
     osr2: bool = False       # the device switch: a funscript, or the motion under it
     motion: bool = False     # the bare motion, running with the switch off
     auto: str | None = None  # the folder looping, if one is
     audio: bool = False      # the audio bed
-    show: bool = False       # a fullscreen slideshow is up
-    # ...and that show, to put back as it was. A show following a generation in
+    slideshow: bool = False       # a fullscreen slideshow is up
+    # ...and that slideshow, to put back as it was. A slideshow following a generation in
     # flight has nothing to put back, which is why this is asked separately from
-    # whether there is a show at all.
-    show_held: HeldShow | None = None
+    # whether there is a slideshow at all.
+    slideshow_held: HeldSlideshow | None = None
 
     @property
     def anything(self) -> bool:
-        return bool(self.osr2 or self.motion or self.auto or self.audio or self.show)
+        return bool(self.osr2 or self.motion or self.auto or self.audio or self.slideshow)
 
 
 class _SearchScope(NamedTuple):
@@ -284,7 +284,7 @@ class GalleryView(QWidget):
             omnipause.holds(self._osr2_motion)
         # The app's one OSR2 switch, and now its only one: the Funestras' console
         # carries the control-state group that sets it, on every surface.  Public
-        # because a show is handed it whole -- see ShowActions.
+        # because a slideshow is handed it whole -- see SlideshowActions.
         self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
         # What the session file said to reopen in, kept for a window that may
         # not drive to hand back untouched (see osr2_state).
@@ -293,7 +293,7 @@ class GalleryView(QWidget):
         # switch: driving to parked leaves the switch on, and what has to change
         # is which driver is sending and what it is sending.
         self.osr2_control.changed.connect(self.reconcile_osr2)
-        # How long a slide holds the screen, app-wide: a show's panel shows it
+        # How long a slide holds the screen, app-wide: a slideshow's panel shows it
         # as clip seconds and sets it, and the next slideshow opens at it.
         self._pace = SlideshowPace(parent=self)
         # Guards the one reconcile that owns both drive sources: starting or
@@ -414,7 +414,7 @@ class GalleryView(QWidget):
     def _build_the_panes(self, db, client, search_expander):
         """The three panes' own objects, in the order they need each other: the
         search over the tree, the browser in the middle, the trail across both,
-        then the shows, the combine, the enhance and the spoken words that all
+        then the slideshows, the combine, the enhance and the spoken words that all
         read those.
 
         Before ``_build_ui``, which places the widgets each of them builds.
@@ -496,11 +496,11 @@ class GalleryView(QWidget):
         # from one state, so Back and Forward read it there rather than being set
         # on their own (see :meth:`nav_state_changed`).
         self._trail = (False, False)
-        # The fullscreen shows: the one in front, the two a hosting session
+        # The fullscreen slideshows: the one in front, the two a hosting session
         # runs on its satellite regions, and everything that keeps them
         # current. Built after the browser it reads and before _build_ui,
         # whose slideshow button starts one.
-        self._shows = ShowDirector(
+        self._slideshows = SlideshowDirector(
             self, db=db, browser=self._browser, jobs=self._jobs,
             pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time)
         # Combine: a video's recipe run again on a dropped picture, and the
@@ -509,7 +509,7 @@ class GalleryView(QWidget):
         # which _build_ui places under the tree.
         self._combine = CombineController(
             self, parent=self, db=db, jobs=self._jobs, client=client,
-            info_tabs_of=lambda: self._info_tabs, shows=self._shows)
+            info_tabs_of=lambda: self._info_tabs, slideshows=self._slideshows)
         # The standalone enhance: its settings panel, what the Enhance button
         # would run on, and the live run's appearance on every surface showing
         # the picture it improves
@@ -517,7 +517,7 @@ class GalleryView(QWidget):
         # which _build_ui seats in the footer.
         self._enhance = EnhanceController(
             self, db=db, jobs=self._jobs, browser=self._browser,
-            shows=self._shows, info_tabs_of=lambda: self._info_tabs)
+            slideshows=self._slideshows, info_tabs_of=lambda: self._info_tabs)
         # A thumbnail or a preview picked up anywhere lights the slot it fits,
         # so the drop target is obvious from the start of the gesture.
         self._browser.drag_started.connect(self._combine.drag_started)
@@ -526,7 +526,7 @@ class GalleryView(QWidget):
         # and where each word lands (:mod:`origenerator.gui.voice_router`). Its
         # caption is placed by _build_ui, and the bank it presses is bound to it
         # once _build_ui has built one.
-        self._voice = VoiceRouter(self, parent=self, db=db, shows=self._shows,
+        self._voice = VoiceRouter(self, parent=self, db=db, slideshows=self._slideshows,
                                   client=client, motion=self._osr2_motion)
         self._folder_history: list[str] = []  # folders the user opened, to return to after a delete
 
@@ -583,7 +583,7 @@ class GalleryView(QWidget):
                         self._undo()
                     return True
             # The OSR2 motion keys work right here in the main window too — not
-            # only in the fullscreen show — whatever was clicked last, unless it
+            # only in the fullscreen slideshow — whatever was clicked last, unless it
             # is a text field taking the key as a character.
             if (self._gallery_owns_keys(even_from_the_info_pane=True)
                     and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
@@ -602,7 +602,7 @@ class GalleryView(QWidget):
         drive (a funscript or the genau motion), the auto-generate loop, the
         fullscreen slideshow, and the audio bed. Pressed with all of it off, it
         starts the room instead: what the last press took away — the same folder
-        looping, the same show on the same picture, the sound, the device — or,
+        looping, the same slideshow on the same picture, the sound, the device — or,
         with nothing to put back, all four from a standing start. So the key is
         the one thing to reach for either way, on a freshly opened app as much
         as on a running one, the way leaving an OmniPause hands the room back.
@@ -614,11 +614,11 @@ class GalleryView(QWidget):
 
         It yields when a dialog or popup owns the keystroke, so Esc still closes
         a combo dropdown, and when some other window is up. Our own slideshow is
-        not that: it closes itself on Esc, but closing only the show would leave
+        not that: it closes itself on Esc, but closing only the slideshow would leave
         the loop, the device and the sound running under it, which is the
         opposite of what the key means. Returns whether it acted.
         """
-        if self._other_window_owns_keys() and not self._shows.is_in_front():
+        if self._other_window_owns_keys() and not self._slideshows.is_in_front():
             return False
         running = self._running_now()
         if running.anything:
@@ -646,7 +646,7 @@ class GalleryView(QWidget):
 
     def _running_now(self) -> _Running:
         """Everything the app is doing under its own steam right now."""
-        show = self._shows.showing
+        slideshow = self._slideshows.showing
         return _Running(
             osr2=self.osr2_control.isChecked(),
             # Space reaches the switch rather than the motion, so a motion
@@ -656,8 +656,8 @@ class GalleryView(QWidget):
                     and not self.osr2_control.isChecked()),
             auto=self._auto.active_key(),
             audio=self._bank.audio is not None and self._bank.audio.isChecked(),
-            show=show is not None,
-            show_held=self._shows.held_show(),
+            slideshow=slideshow is not None,
+            slideshow_held=self._slideshows.held_slideshow(),
         )
 
     def _all_of_it(self) -> _Running:
@@ -672,7 +672,7 @@ class GalleryView(QWidget):
         # The folder's own key, side stripped: a loop belongs to the folder, and
         # both sides of the tree draw the same one.
         return _Running(osr2=True, auto=_base_of(self.selected_folder_key()),
-                        audio=True, show=True)
+                        audio=True, slideshow=True)
 
     def _stop_running(self, running: _Running) -> None:
         """Take all of ``running`` off."""
@@ -684,8 +684,8 @@ class GalleryView(QWidget):
             self._osr2_motion.stop()
         if running.auto:
             self._auto.stop_all()
-        if running.show:
-            self._shows.showing.close()  # the director lets it go
+        if running.slideshow:
+            self._slideshows.showing.close()  # the director lets it go
         if running.audio:
             if self._bank.audio is not None:
                 self._bank.audio.setChecked(False)  # drives _on_audio_toggle → silence
@@ -693,26 +693,26 @@ class GalleryView(QWidget):
     def _resume(self, stopped: _Running) -> None:
         """Put back what Esc took away.
 
-        In the order that leaves each one aimed where it was: the show goes up
+        In the order that leaves each one aimed where it was: the slideshow goes up
         before the device switch, so the one reconcile that picks a drive source
-        finds the show's video in front of it exactly as it did the first time.
+        finds the slideshow's video in front of it exactly as it did the first time.
 
         A loop resumes in the folder it was running in rather than the one on
         screen — the gallery is somewhere else by now as often as not, and the
         loop was never about where the user is looking.
 
-        A show with no pass under it opens on what is in front instead, which is
-        both the standing start and the show that was following a generation in
+        A slideshow with no pass under it opens on what is in front instead, which is
+        both the standing start and the slideshow that was following a generation in
         flight: that one has no pass to take up, and what it was watching has
         landed or gone by now.
         """
         if stopped.audio:
             if self._bank.audio is not None:
                 self._bank.audio.setChecked(True)
-        if stopped.show_held is not None:
-            self._shows.put_back(stopped.show_held)
-        elif stopped.show:
-            self._shows.start()
+        if stopped.slideshow_held is not None:
+            self._slideshows.put_back(stopped.slideshow_held)
+        elif stopped.slideshow:
+            self._slideshows.start()
         if stopped.auto:
             self._begin_auto(stopped.auto)
             self._re_aim()      # a resumed loop lights its switch again
@@ -830,7 +830,7 @@ class GalleryView(QWidget):
             self._motion_panel = MotionPanel(self._osr2_motion, control=self.osr2_control)
             # The one place Esc's panic stop is discoverable, now that the
             # toolbar switch whose tooltip said so is gone.  Only here: in a
-            # show Esc closes the show rather than stopping the device.
+            # slideshow Esc closes the slideshow rather than stopping the device.
             self._motion_panel.setToolTip(f"{self._motion_panel.toolTip()} · Esc stops")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -863,7 +863,7 @@ class GalleryView(QWidget):
                 go_forward=self._navigation.go_forward,
                 undo=self._undo,
                 redo=self._redo,
-                start_show=self._shows.start,
+                start_slideshow=self._slideshows.start,
                 toggle_auto=self._toggle_auto,
                 go_to_looping_folder=self._go_to_looping_folder,
                 favorite=self._favorite_selection,
@@ -1024,7 +1024,7 @@ class GalleryView(QWidget):
             self._osr2_motion.stop()
         self._fun_time = session
         self._tree.offer_separate_and_together(False)
-        self._shows.become_hosted(session)
+        self._slideshows.become_hosted(session)
         self._info_tabs.become_hosted(session)
         self._voice.become_hosted()
         self._bank.become_hosted()
@@ -1053,7 +1053,7 @@ class GalleryView(QWidget):
             self._motion_pane.show()
         self._fun_time = None
         self._tree.offer_separate_and_together(True)
-        self._shows.become_standalone(self._osr2_motion)
+        self._slideshows.become_standalone(self._osr2_motion)
         self._info_tabs.become_standalone()
         self._bank.become_standalone()
         self._voice.become_standalone(
@@ -1095,7 +1095,7 @@ class GalleryView(QWidget):
         panel.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
         panel.levels_delete_requested.connect(self.delete_enhance_levels)
         panel.set_enhance_settings(self._enhance.settings)
-        panel.set_fullscreen_factory(self._shows.open_on_preview)
+        panel.set_fullscreen_factory(self._slideshows.open_on_preview)
         panel.cancel_requested.connect(lambda p=panel: self._cancel_panel_reroll(p))
         # Dragging the tab's preview out lights the combine slot it fits, like a
         # browser thumbnail (see :meth:`CombineController.drag_started`).
@@ -1131,7 +1131,7 @@ class GalleryView(QWidget):
         empty tab.
 
         Idempotent, so tab switches, browsing, completions and opening or closing
-        a show all resolve without churning the device. The guard makes it
+        a slideshow all resolve without churning the device. The guard makes it
         re-entrant-safe too: starting or stopping the motion emits
         ``active_changed``, and a listener that reconciles must not land back
         here mid-flight.
@@ -1156,7 +1156,7 @@ class GalleryView(QWidget):
                     self._osr2_driving = None
             else:
                 video_path, player, actions = target
-                # Same clip, new player (a show opened over it) still re-aims.
+                # Same clip, new player (a slideshow opened over it) still re-aims.
                 driving = (video_path, player)
                 if self._osr2_driving != driving:
                     self._osr2_driver.start(player, actions)
@@ -1172,16 +1172,16 @@ class GalleryView(QWidget):
     def _osr2_drive_source(self):
         """The funscript target to follow, or ``None`` when there is none to
         follow — in which case the motion is what drives (see
-        :meth:`reconcile_osr2`). The surface in front answers: a show while one
+        :meth:`reconcile_osr2`). The surface in front answers: a slideshow while one
         is up, else the front tab.
 
         The switch governs both surfaces alike: double-clicking a clip open used
         to take the device on its own, so a clip watched with the switch off
         drove anyway — the switch is what decides now, whichever surface the
         video is on."""
-        show = self._shows.surface_for(None)
-        if show is not None:
-            return show.osr2_drive_target()
+        slideshow = self._slideshows.surface_for(None)
+        if slideshow is not None:
+            return slideshow.osr2_drive_target()
         panel = self._info_tabs.current_config_panel()
         if panel is not None:
             return panel.osr2_drive_target()
@@ -1600,7 +1600,7 @@ class GalleryView(QWidget):
 
     def closeEvent(self, event):
         """Put down everything this view arms application-wide, however it was
-        let go: the poll, the filter that takes the room's keys, and the shows,
+        let go: the poll, the filter that takes the room's keys, and the slideshows,
         each a window of its own that would otherwise outlive the view that
         answers for it.
 
@@ -1612,7 +1612,7 @@ class GalleryView(QWidget):
         """
         self._poll_timer.stop()
         self._intercept_the_rooms_keys(False)
-        self.close_the_shows()
+        self.close_the_slideshows()
         super().closeEvent(event)
 
     # --- data loading & live update ---------------------------------------
@@ -1641,7 +1641,7 @@ class GalleryView(QWidget):
         # this app's boot).  Filling here costs nothing when the regions are
         # already playing, and is the only thing that rescues a session that
         # opened into the mode a moment too early.
-        self._shows.fill_the_wanted_regions()
+        self._slideshows.fill_the_wanted_regions()
 
     def _poll(self):
         """One tick: fetch every blocking read away from the GUI, apply here.
@@ -1710,10 +1710,10 @@ class GalleryView(QWidget):
             # listing already in hand feeds it, so the strip costs the tick no
             # further table reads.
             self._update_queue(self._inflight_items(rows=rows, requests=requests))
-            # And a show's corner, for the same reason and one more: a run
+            # And a slideshow's corner, for the same reason and one more: a run
             # starting is not a change to any row, so nothing else here would
-            # tell the show its locked slide went from waiting to being made.
-            self._enhance.tell_the_shows()
+            # tell the slideshow its locked slide went from waiting to being made.
+            self._enhance.tell_the_slideshows()
             self._refresh_wait_note()
         finally:
             self._poll_inflight = False
@@ -1920,7 +1920,7 @@ class GalleryView(QWidget):
         with working():
             self.refresh()
         # The row that was selected is on a side nobody draws now, so the
-        # folder-selected signal that normally re-syncs the show button never
+        # folder-selected signal that normally re-syncs the slideshow button never
         # fires for the row the rebuild landed on instead.
         self._re_aim()
 
@@ -2090,15 +2090,15 @@ class GalleryView(QWidget):
         """Restore the remembered results order."""
         self._search.set_sort(mode)
 
-    def remembered_shows(self) -> dict:
-        return self._shows.remembered()
+    def remembered_slideshows(self) -> dict:
+        return self._slideshows.remembered()
 
     def shows_a_slideshow(self) -> bool:
-        return self._shows.shows_a_slideshow()
+        return self._slideshows.shows_a_slideshow()
 
-    def remember_shows(self, saved) -> None:
+    def remember_slideshows(self, saved) -> None:
         if self._fun_time is None:
-            self._shows.remember(saved)
+            self._slideshows.remember(saved)
 
     def how_many(self) -> int:
         return self._info_tabs.how_many()
@@ -2916,8 +2916,8 @@ class GalleryView(QWidget):
     # --- what the spoken words ask of this window ----------------------------
 
     def say(self, message: str) -> None:
-        """Flash a line on the voice caption. What the shows use when there is no
-        show up to put it in the corner of."""
+        """Flash a line on the voice caption. What the slideshows use when there is no
+        slideshow up to put it in the corner of."""
         self._voice.say(message)
 
     def collection_label(self, key: str) -> str:
@@ -2951,8 +2951,8 @@ class GalleryView(QWidget):
     def rows_to_play(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
         collection's own rows in a collection, else everything under the selected
-        folder.  All of it: narrowing a show to its favorites or its enhanced
-        pictures is the show's own doing, from the two switches on its HUD.
+        folder.  All of it: narrowing a slideshow to its favorites or its enhanced
+        pictures is the slideshow's own doing, from the two switches on its HUD.
         """
         rows = self._browser.collection_rows()
         if rows is None:
@@ -2987,7 +2987,7 @@ class GalleryView(QWidget):
     def bank_state(self, enhance: Offer) -> BankState:
         """How the bank stands right now, gathered from the seams the buttons
         belong to: the trail, the undo stack, the tree's selection, the pictures
-        picked, the enhance settings, the shows, and the auto-generate loop.
+        picked, the enhance settings, the slideshows, and the auto-generate loop.
 
         Assembled here because here is where those meet. Everything it reads is
         a question already asked by name, so the record can be written by hand in
@@ -3016,8 +3016,8 @@ class GalleryView(QWidget):
             delete=self._delete_offer(),
             # Media, not rows: a folder gets its node the moment a generation
             # starts, so a folder being filled can hold nothing anyone can look at
-            # yet, and a button that opens an empty show is worse than no button.
-            slideshow=Button(visible=self._shows.anything_to_play(),
+            # yet, and a button that opens an empty slideshow is worse than no button.
+            slideshow=Button(visible=self._slideshows.anything_to_play(),
                              tip=f"Play {self.slideshow_subject()} as a slideshow"),
             # Lit means "a loop is running", in this folder or any other: clicking
             # it off stops whichever folder has it, from wherever the user is.
@@ -3109,22 +3109,22 @@ class GalleryView(QWidget):
             self._toggle_favorite(group.key)
 
     def fill_the_regions(self) -> None:
-        """Put a show on each satellite region — what entering origenerator
+        """Put a slideshow on each satellite region — what entering origenerator
         mode means. The hosting session's bridge asks this window for it.
         """
-        self._shows.fill_the_regions()
+        self._slideshows.fill_the_regions()
 
-    def close_the_shows(self) -> None:
-        """Give every show back — the session leaving origenerator mode, or
-        this view going away with shows still up.
+    def close_the_slideshows(self) -> None:
+        """Give every slideshow back — the session leaving origenerator mode, or
+        this view going away with slideshows still up.
         """
-        self._shows.close_the_shows()
+        self._slideshows.close_the_slideshows()
 
     def fill_the_region(self, side: str) -> None:
-        self._shows.fill_the_region(side)
+        self._slideshows.fill_the_region(side)
 
-    def close_the_show(self, side: str) -> None:
-        self._shows.close_the_show(side)
+    def close_the_slideshow(self, side: str) -> None:
+        self._slideshows.close_the_slideshow(side)
 
     # --- a spoken request's own generation -----------------------------------
 
@@ -3172,7 +3172,7 @@ class GalleryView(QWidget):
             self._info_tabs.refresh_displayed(updated, self._image_rows)
         self._re_aim()  # an image with no enhancement left awaits one
 
-    def show_location(self):
+    def slideshow_location(self):
         """Where the view on screen is playing FROM, as something re-askable:
         a collection key in a collection, else the open folder's key.
 
@@ -3184,43 +3184,43 @@ class GalleryView(QWidget):
         if collection is not None:
             return collection
         # The row's own key, not the folder's: which side the folder is being
-        # looked at from is what decides the screen a show of it goes to.
+        # looked at from is what decides the screen a slideshow of it goes to.
         return (self.selected_folder_key()
                 if self.current_group() is not None else None)
 
     def set_room_paused(self, paused: bool) -> None:
-        """The room stops, not just the shows: a hosting session's OmniPause,
-        or a click on a show standing on its own.
+        """The room stops, not just the slideshows: a hosting session's OmniPause,
+        or a click on a slideshow standing on its own.
 
-        The director keeps its own flag for a show not opened yet, because a
-        show is built from a set rather than held as a widget. Everything else
+        The director keeps its own flag for a slideshow not opened yet, because a
+        slideshow is built from a set rather than held as a widget. Everything else
         that moves or sounds in this window — every looping thumbnail, the
         video a generate tab plays, the audio bed and the OSR2 — asks
         :mod:`~origenerator.gui.omnipause`, so one write here reaches the ones
         built after it as well.
 
-        The shows come first and the freeze cannot be skipped if they raise, so
-        each is its own step: a freeze that stopped at the shows left the
+        The slideshows come first and the freeze cannot be skipped if they raise, so
+        each is its own step: a freeze that stopped at the slideshows left the
         thumbnails running with no sign of why.
         """
         if paused != omnipause.frozen():
             logger.info("The room is %s", "paused" if paused else "playing")
-        self._shows.set_room_paused(paused)
+        self._slideshows.set_room_paused(paused)
         omnipause.freeze(paused)
 
     def hud_place(self, side: str) -> tuple:
-        return self._shows.hud_place(side)
+        return self._slideshows.hud_place(side)
 
     def place_a_panel(self, side: str, action: str, argument: str) -> None:
-        self._shows.place_a_panel(side, action, argument)
+        self._slideshows.place_a_panel(side, action, argument)
 
-    def region_show(self, side: str):
-        """The show occupying satellite region *side*, or None. The hosting
+    def region_slideshow(self, side: str):
+        """The slideshow occupying satellite region *side*, or None. The hosting
         session's bridge asks this window for it."""
-        return self._shows.region_show(side)
+        return self._slideshows.region_slideshow(side)
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True):
-        """Bookmark a generation from a fullscreen show (its Down key) — the same
+        """Bookmark a generation from a fullscreen slideshow (its Down key) — the same
         star the gallery's own control sets — or take the bookmark back (its Up
         key over a favorite, the Funestras' "weird" on one)."""
         self.set_items_favorite([prompt_id], favorite)
@@ -3474,8 +3474,8 @@ class GalleryView(QWidget):
         # the version list of any tab displaying it — an enhancement isn't a
         # generation taking a preview over.
         self._enhance.reconcile()
-        # And straight onto an open show, which is watching for exactly this.
-        self._shows.note_generating(prompt_id, data)
+        # And straight onto an open slideshow, which is watching for exactly this.
+        self._slideshows.note_generating(prompt_id, data)
 
     def _clear_reroll_selection(self):
         """Stop treating a running re-roll's tile as the selected item — a saved
@@ -3525,13 +3525,13 @@ class GalleryView(QWidget):
 
     def _abandon_reroll_preview(self, key: str):
         """A run in folder ``key`` ended with nothing to show (cancelled or
-        failed): its tile stops being the selected item and a show opened over
+        failed): its tile stops being the selected item and a slideshow opened over
         its frames closes; and once the folder has no run left, the tabs
         following it put their own pictures back. While it still has one — the
         next of a batch, the loop's next seed — they keep following, since that
         run's frames are what comes next."""
         if key == self._selected_reroll_key:
-            self._shows.close_live()
+            self._slideshows.close_live()
             self._clear_reroll_selection()
             self._selected_row = None
         if not self._jobs.has(key):
@@ -3572,7 +3572,7 @@ class GalleryView(QWidget):
                 folded = True
                 finished_row = self._db.get_generation(source_id)
                 # A slideshow that asked for this one swaps the slide for it.
-                self._shows.note_enhanced(finished_row)
+                self._slideshows.note_enhanced(finished_row)
         self._combine.send_to_genau_if_requested(finished_row)
         # The tile stops being the selected item — unless a loop is running here,
         # where the key stands for the loop rather than for this one variation:
@@ -3581,7 +3581,7 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key and not self._auto.is_active(key):
             self._clear_reroll_selection()  # refresh re-selects it as a finished thumbnail
         self.refresh()
-        self._shows.note_finished(finished_row)  # a show of its folder gains it
+        self._slideshows.note_finished(finished_row)  # a slideshow of its folder gains it
         self._show_reroll_result_in_tab(finished_row, launcher)
         if folded:
             # The image itself changed — it now holds a level it did not a
@@ -3631,7 +3631,7 @@ class GalleryView(QWidget):
         """The run a tab was following has landed: put its picture where its live
         frames were, in every tab following folder ``key``.
 
-        Without this a tab watching a loop — or a fullscreen show opened over
+        Without this a tab watching a loop — or a fullscreen slideshow opened over
         those frames — would sit on the last partial frame of a run that has
         finished. Only the preview changes: the tab holds no more of a run it
         didn't ask for. The ``launcher`` is skipped, having just been given the
@@ -3682,8 +3682,8 @@ class GalleryView(QWidget):
             if collection is not None:
                 self._browser.show_collection(collection.key, orientation)
         # A collection the choice empties has no item to select, so the signal that
-        # normally re-syncs the show button never fires — and it went on
-        # offering a show of nothing.
+        # normally re-syncs the slideshow button never fires — and it went on
+        # offering a slideshow of nothing.
         self._re_aim()
 
     def _offer_the_kinds(self, offered: bool) -> None:
@@ -3697,7 +3697,7 @@ class GalleryView(QWidget):
 
     def queue_now(self) -> tuple[list, int]:
         """What is in flight here and how much of ComfyUI's queue is another
-        app's — the pair the lower strip and a show's corner plate both draw."""
+        app's — the pair the lower strip and a slideshow's corner plate both draw."""
         return self._inflight_items(), self._foreign_queue.total
 
     def _inflight_items(self, rows=None, requests=None) -> list:
@@ -3718,7 +3718,7 @@ class GalleryView(QWidget):
 
         An open slideshow is fed the same list twice over: once for the queue it
         covers, and once for the slides themselves, since a run that has begun to
-        look like something is a slide of that show.
+        look like something is a slide of that slideshow.
 
         ``inflight`` is the already-built card list, when the caller (the poll)
         holds one; every other caller lets it be built fresh here.
@@ -3726,8 +3726,8 @@ class GalleryView(QWidget):
         items = (self._inflight_items() if inflight is None else inflight) \
             + self._combine.launching_rows()
         self._queue.set_items(items, self._foreign_queue.total)
-        self._shows.note_queue(items, self._foreign_queue.total)
-        self._shows.note_in_flight(items)
+        self._slideshows.note_queue(items, self._foreign_queue.total)
+        self._slideshows.note_in_flight(items)
 
     def _refresh_foreign_queue(self):
         """Re-read what another app has on the shared ComfyUI.
@@ -4116,7 +4116,7 @@ class GalleryView(QWidget):
         something else keep it.
         """
         self._info_tabs.release_media(paths)
-        self._shows.release_media(paths)
+        self._slideshows.release_media(paths)
 
     def _delete_rows(self, rows):
         if not rows:
@@ -4384,7 +4384,7 @@ class GalleryView(QWidget):
         the item's own tile in it, and show the item in the info pane.
 
         The single move under every "take me to this picture" — a link, a
-        right-click "Go to folder", Back and Forward, a hosted show's lock, an
+        right-click "Go to folder", Back and Forward, a hosted slideshow's lock, an
         undo landing on what it brought back. There is no lighter version of it
         and no separate path for any of them: a move that did some of those and
         not the others is how the middle pane came to be standing still while the

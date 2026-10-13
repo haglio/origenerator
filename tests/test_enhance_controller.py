@@ -142,7 +142,7 @@ class FakeBrowser:
         self.corner_refreshes += 1
 
 
-class FakeShows:
+class FakeSlideshows:
     def __init__(self, locked=()):
         self.told = None
         self.frames = None
@@ -244,12 +244,12 @@ def enhance(monkeypatch):
     """A controller whose panel and surfaces are all recorders."""
     monkeypatch.setattr(module, "EnhancePanel", FakePanel)
 
-    def build(host=None, *, db=None, jobs=None, browser=None, shows=None,
+    def build(host=None, *, db=None, jobs=None, browser=None, slideshows=None,
               tabs=None):
         host = host or FakeHost()
         return EnhanceController(
             host, db=db or FakeDB(), jobs=jobs or FakeReroll(),
-            browser=browser or FakeBrowser(), shows=shows or FakeShows(),
+            browser=browser or FakeBrowser(), slideshows=slideshows or FakeSlideshows(),
             info_tabs_of=lambda: tabs or FakeTabs()), host
     return build
 
@@ -527,25 +527,25 @@ def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_picture(enhance,
     assert run.typical_seconds == 42.0
 
 
-def test_the_tile_the_version_list_and_the_show_all_learn_of_a_run(enhance,
-                                                                   monkeypatch):
+def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
+                                                                        monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params",
                         lambda params: "upscale x2")
     row = _image("i1")
     tab = FakeConfigPanel(row)
-    browser, shows = FakeBrowser(), FakeShows()
+    browser, slideshows = FakeBrowser(), FakeSlideshows()
     controller, _host = enhance(
         FakeHost(rows=[row]), jobs=FakeReroll([FakeJob("run-a")]),
-        browser=browser, shows=shows, tabs=FakeTabs([tab]))
+        browser=browser, slideshows=slideshows, tabs=FakeTabs([tab]))
 
     controller.reconcile()
 
     assert tab.pending == ("running", b"frame", "upscale x2")
     assert set(browser.enhancing) == {"i1"}
-    assert shows.told == {"i1": "running"}
-    assert shows.frames == {"i1": b"frame"}
+    assert slideshows.told == {"i1": "running"}
+    assert slideshows.frames == {"i1": b"frame"}
 
 
 def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
@@ -719,15 +719,15 @@ def test_a_lock_puts_the_enhancement_of_the_locked_picture_first(enhance, monkey
     db.rows["run-b"] = {"prompt_id": "run-b", "enhance_of": "i2"}
     jobs = FakeReroll([FakeJob("run-b", state="queued"), FakeJob("run-a", state="queued")])
     controller, _host = enhance(FakeHost(rows=[_image("i1"), _image("i2")]), db=db,
-                                jobs=jobs, shows=FakeShows(locked={"i1"}))
+                                jobs=jobs, slideshows=FakeSlideshows(locked={"i1"}))
 
     assert controller.enhance_from_slideshow("i1") is False
     assert jobs.first == {"run-a"}
 
 
-def test_an_enhancement_launched_for_what_a_show_is_locked_on_is_put_first(enhance,
+def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(enhance,
                                                                          monkeypatch):
-    # The Auto switch enhancing a picture a show stayed locked on while it was
+    # The Auto switch enhancing a picture a slideshow stayed locked on while it was
     # made, or a batch that takes in the locked one.
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
@@ -736,7 +736,7 @@ def test_an_enhancement_launched_for_what_a_show_is_locked_on_is_put_first(enhan
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
     controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=FakeDB([_image("i1")]),
-                                jobs=jobs, shows=FakeShows(locked={"i1"}))
+                                jobs=jobs, slideshows=FakeSlideshows(locked={"i1"}))
 
     controller.enhance_items(["i1"])
 

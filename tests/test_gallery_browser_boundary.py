@@ -106,9 +106,9 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     Latest, in a folder and on Requests, and is one method now, so Requests can
     draw its cards between the time headings that split the collection into batches.
     371 -> 341:
-    the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
+    the fullscreen slideshows came out as `SlideshowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
-    new ones for what the shows ask that had no name of its own. 341 -> 318:
+    new ones for what the slideshows ask that had no name of its own. 341 -> 318:
     everything spoken came out as `VoiceRouter` -- the microphone, the caption,
     and where each word lands -- twenty-five methods out and two in, the bank it
     presses now bound to it by keyword rather than looked up by name. 318 -> 291:
@@ -127,8 +127,8 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     longest one. 267 -> 270: the constructor names its four steps -- the
     collaborators handed in, the queue of runs, the slots a rebuild fills, and
     the panes' own objects -- which takes it under fifty statements for the first
-    time. 270 -> 267: `ShowDirector` builds a double-clicked item's slides and
-    every show's versions from the rows the browser lists, so the three methods
+    time. 270 -> 267: `SlideshowDirector` builds a double-clicked item's slides and
+    every slideshow's versions from the rows the browser lists, so the three methods
     that built them here went. 267 -> 266: a folder tile's still of a combine's
     recipe clip and a config tab's loop of it are one "what this run was made
     from", asked for once. 266 -> 265: that answer compares the run's prompts
@@ -165,11 +165,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery
     put before one went. 266 -> 268: the room's keys move this app's panels too, so
-    where each side's show wears its panel is answered here and set from the
+    where each side's slideshow wears its panel is answered here and set from the
     session's line -- the corner and whether it is collapsed read back together,
-    because a show wears them together. 268 -> 270: the OSR2's max intensity is saved
+    because a slideshow wears them together. 268 -> 270: the OSR2's max intensity is saved
     with the session beside its control state, through the pair every switch the
-    session file keeps is read and put back by. And the pane 86 -> 87: a show
+    session file keeps is read and put back by. And the pane 86 -> 87: a slideshow
     collects what a set holds once for each model the pane takes rather than
     once for each picture a running generation sends, and the pane's stamp is
     what says a new model has come. 270 -> 272: the slideshows -- where the last

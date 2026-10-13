@@ -3,23 +3,23 @@
 Fun Time drives its Satellite Funestras through a command file, a paused flag
 and a status file (``funestra.file_channel`` / ``funestra.status``); a
 hosted Origenerator answers the same idioms so the session reaches the region
-shows the way it reaches the Funestras:
+slideshows the way it reaches the Funestras:
 
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
   steps the Portrait Funestra — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
   and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
   switching INTO origenerator mode) and ``CLOSE_SHOWS`` clears them again;
-  ``FILTER_ENHANCED`` flips the enhanced-only switch a show's HUD and the
+  ``FILTER_ENHANCED`` flips the enhanced-only switch a slideshow's HUD and the
   session's console both carry; ``GO_TO|<file>`` lands the gallery on the
   generation a file is a copy of, and ``RELEASE`` gives a window the session
   took over back to standalone.  Every line it answers is declared in
   :mod:`origenerator.fun_time_mode`, which publishes them for the session.
-* The paused flag freezes the shows the way it freezes the Funestras, so
+* The paused flag freezes the slideshows the way it freezes the Funestras, so
   OmniPause is one write here too — held by the gallery, not just edged onto
-  the open shows, so a show opened mid-pause opens frozen.
+  the open slideshows, so a slideshow opened mid-pause opens frozen.
 * The status file says which regions are occupied (and by what) — a readout
   for the hosting session's diagnostics.
-* A click on a show asks the room for OmniPause (:func:`ask_for_omnipause`) on
+* A click on a slideshow asks the room for OmniPause (:func:`ask_for_omnipause`) on
   the dashboard channel, where a Funestra's click on its picture asks for it.
 """
 
@@ -51,7 +51,7 @@ from origenerator.fun_time_mode import (
     TAKE_BACK,
     FunTimeSession,
 )
-from origenerator.show_buttons import (
+from origenerator.slideshow_buttons import (
     ORIGENERATOR_MODE,
     PANEL_PLACES,
     answer,
@@ -95,7 +95,7 @@ def _split_argument(line: str) -> tuple[str, str, str]:
 
 
 class FunTimeBridge(QObject):
-    """Polls the session's channels and routes them onto the gallery's shows."""
+    """Polls the session's channels and routes them onto the gallery's slideshows."""
 
     released = pyqtSignal()
     hand_over_asked = pyqtSignal(Path, Path)  # the frames file, the input file
@@ -107,20 +107,20 @@ class FunTimeBridge(QObject):
         self._gallery = gallery
         self._paused = False
         self._published = False
-        # The verbs about the session's shows as a whole, rather than one side's.
+        # The verbs about the session's slideshows as a whole, rather than one side's.
         self._session_verbs = {
             OPEN_SHOWS: lambda: self._gallery.fill_the_regions(),
-            # Through the gallery, not show by show: it has to stop WANTING the
+            # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
             # regions first, or each close it makes here is answered by the
             # base state opening again underneath it.
-            CLOSE_SHOWS: lambda: self._gallery.close_the_shows(),
+            CLOSE_SHOWS: lambda: self._gallery.close_the_slideshows(),
             FILTER_ENHANCED: self._filter_enhanced,
             RELEASE: self._release,
             TAKE_BACK: self.take_back_asked.emit,
         }
         self._side_verbs = {
             OPEN_SHOW: lambda side: self._gallery.fill_the_region(side),
-            CLOSE_SHOW: lambda side: self._gallery.close_the_show(side),
+            CLOSE_SHOW: lambda side: self._gallery.close_the_slideshow(side),
         }
         self._released = False
         self._timer = QTimer(self)
@@ -201,25 +201,25 @@ class FunTimeBridge(QObject):
         region whose set has nothing enhanced in it refuses the narrowing — and
         one lit switch cannot say that a room is half narrowed.
         """
-        shows = [show for show in map(self._gallery.region_show, SIDES)
-                 if show is not None]
-        enhanced_only = not any(show.hud_enhanced_mode for show in shows)
-        for show in shows:
-            show.set_enhanced_mode(enhanced_only)
+        slideshows = [slideshow for slideshow in map(self._gallery.region_slideshow, SIDES)
+                      if slideshow is not None]
+        enhanced_only = not any(slideshow.hud_enhanced_mode for slideshow in slideshows)
+        for slideshow in slideshows:
+            slideshow.set_enhanced_mode(enhanced_only)
 
     def _apply_side(self, side: str, action: str, argument: str, line: str) -> None:
         """A press on *side*'s panel, onto whatever holds that side.
 
-        The same answers a show's own panel gets
-        (:func:`~origenerator.show_buttons.answer`): the session routes a
+        The same answers a slideshow's own panel gets
+        (:func:`~origenerator.slideshow_buttons.answer`): the session routes a
         Funestra's presses back here verbatim, and its own hotkeys spell the
         transport the same way, so one table says what every one of them means.
         """
-        show = self._gallery.region_show(side)
-        if show is None:
+        slideshow = self._gallery.region_slideshow(side)
+        if slideshow is None:
             return  # an empty region has nothing to drive
-        if not answer(show, action, argument):
-            logger.warning("Unanswered press for the %s show dropped: %s", side, line)
+        if not answer(slideshow, action, argument):
+            logger.warning("Unanswered press for the %s slideshow dropped: %s", side, line)
 
     # --- the paused flag ----------------------------------------------------
 
@@ -230,15 +230,15 @@ class FunTimeBridge(QObject):
         if paused == self._paused:
             return
         self._paused = paused
-        # The gallery holds the flag and fans it out, so a show opened between
+        # The gallery holds the flag and fans it out, so a slideshow opened between
         # this edge and the next one still opens frozen — the edge alone once
-        # left a mid-pause show playing.
+        # left a mid-pause slideshow playing.
         self._gallery.set_room_paused(paused)
 
     # --- status out ---------------------------------------------------------
 
     #: The whole of it: this app is up and answering.  It published six keys
-    #: for years -- which side held a show, what it was showing, whether it was
+    #: for years -- which side held a slideshow, what it was showing, whether it was
     #: locked -- and the session read none of them; it waits on this file
     #: appearing, and nothing else, to know the mode can be opened.  The owner
     #: settled that on 2026-09-05 (audit Q13): nothing was to be wired to read

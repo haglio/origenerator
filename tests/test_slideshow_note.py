@@ -48,7 +48,7 @@ def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
     monkeypatch.setattr(voice_router, "ReviseTask", lambda *a, **kw: _NeverAnswers())
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     if not showing:
-        view._shows.showing.close()  # the request is then this pane's to answer,
+        view._slideshows.showing.close()  # the request is then this pane's to answer,
         view.select_generation("orig")  # about the picture picked in it
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat. Over.")
@@ -141,30 +141,30 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
 
 
 def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkeypatch):
-    show = _mid_request(qtbot, tmp_path, monkeypatch)._shows.showing
-    assert "working out" in _corner(show)
+    slideshow = _mid_request(qtbot, tmp_path, monkeypatch)._slideshows.showing
+    assert "working out" in _corner(slideshow)
 
-    _fade(show)
+    _fade(slideshow)
 
-    assert "working out" in _corner(show)
+    assert "working out" in _corner(slideshow)
 
 
 def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, monkeypatch):
     """Whisper keeps transcribing while the request is worked out, and the app
     says what it heard. That line is a flash; the work under it is not."""
     view = _mid_request(qtbot, tmp_path, monkeypatch)
-    show = view._shows.showing
+    slideshow = view._slideshows.showing
 
     view._voice.listener.heard.emit("something else entirely")
 
-    assert "heard" in _corner(show)
-    _fade(show)
-    assert "working out" in _corner(show)
+    assert "heard" in _corner(slideshow)
+    _fade(slideshow)
+    assert "working out" in _corner(slideshow)
 
 
-def test_the_pane_says_it_is_working_too_when_no_show_is_up(qtbot, tmp_path,
-                                                            monkeypatch):
-    """A request said with no show up is answered in this pane's own caption,
+def test_the_pane_says_it_is_working_too_when_no_slideshow_is_up(qtbot, tmp_path,
+                                                                 monkeypatch):
+    """A request said with no slideshow up is answered in this pane's own caption,
     which has one slot and reverted to "Listening…" — an idle line over an app
     still working, which is the same thing the corner was doing."""
     view = _mid_request(qtbot, tmp_path, monkeypatch, showing=False)

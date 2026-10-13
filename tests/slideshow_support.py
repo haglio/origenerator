@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.gui.show_pass import rotated_onto
+from origenerator.gui.slideshow_pass import rotated_onto
 
 
 def ahead(playlist, steps: int):

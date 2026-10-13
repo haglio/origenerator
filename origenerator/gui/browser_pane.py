@@ -520,7 +520,7 @@ class BrowserPane(QObject):
         """Mark the drawn square that holds this folder and scroll it into view."""
         drawn = self._scroll.widget()
         if drawn is None:
-            return False  # a pane with nothing in it: a show closing as the app does
+            return False  # a pane with nothing in it: a slideshow closing as the app does
         for tile in drawn.findChildren(FolderTile):
             if key_holds(tile.key, folder_key):
                 self._mark_only_this_folder(drawn, tile)
@@ -1240,10 +1240,10 @@ class BrowserPane(QObject):
         """What the collection *key* gathers right now — :meth:`collection_rows` for a
         collection that is not the one on screen.
 
-        Named rather than "what is showing" because a hosted show outlives the
-        selection that opened it: inside Fun Time the shows run on the satellite
+        Named rather than "what is showing" because a hosted slideshow outlives the
+        selection that opened it: inside Fun Time the slideshows run on the satellite
         regions while the browser goes on being used elsewhere, so keeping a
-        running show fed — and answering a spoken "landscape favorites" — both
+        running slideshow fed — and answering a spoken "landscape favorites" — both
         need a collection's rows asked for by name.
         """
         base, orientation = split_key(key)

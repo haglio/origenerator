@@ -2,10 +2,10 @@
 
 The motion driver is app-global — the device shouldn't care which window is in
 front — so every surface that can drive it (the gallery window, the fullscreen
-show) answers the same keys through this helper, and each shows the same drive
+slideshow) answers the same keys through this helper, and each shows the same drive
 readout: at the main window's top left on a console of its own
-(:mod:`origenerator.gui.motion_panel`), and over a show on the one panel it
-wears (:mod:`origenerator.gui.show_panel`).  The keys are genau's own, so the
+(:mod:`origenerator.gui.motion_panel`), and over a slideshow on the one panel it
+wears (:mod:`origenerator.gui.slideshow_panel`).  The keys are genau's own, so the
 muscle memory carries: Space starts/stops, J/L speed, 7/9 amplitude, U/O center,
 I shape, ; human-inspired motion, backslash nudges a quarter cycle.
 """

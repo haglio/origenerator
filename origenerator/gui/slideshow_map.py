@@ -1,16 +1,16 @@
-"""The map a show's HUD draws around the slide on screen, and the loop that
+"""The map a slideshow's HUD draws around the slide on screen, and the loop that
 holds it still.
 
 The Funestras' map is a gamma: the clip on screen in the corner, its seed row
 running right, its column running down, one cell lit for what is playing.  A
-show draws the same gamma over its own generations — the seed row is the same
+slideshow draws the same gamma over its own generations — the seed row is the same
 act under other seeds, the column what else was made of the same picture
 (:mod:`origenerator.nav_map` says which is which) — and the
 map hangs on whatever is on screen until a loop is started along one of its
 axes, when it hangs on the slide the loop began on and the lit cell walks the
 axis instead.
 
-Qt-free records and one pure function.  :class:`~origenerator.gui.show_set.ShowSet`
+Qt-free records and one pure function.  :class:`~origenerator.gui.slideshow_set.SlideshowSet`
 keeps the loop and asks for the map; the gallery supplies the neighbors.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import NamedTuple
 from origenerator.slideshow import Slide
 
 # The two axes of the map, and what the loop key steps through: the row, then
-# the column, then off.  "" is the off stop, and where a show that is not
+# the column, then off.  "" is the off stop, and where a slideshow that is not
 # looping already stands, so the first press starts a seed loop.
 SEED_AXIS = "seed"
 ACTION_AXIS = "action"
@@ -37,7 +37,7 @@ class MapRow(NamedTuple):
     whether that name is a configuration's folder rather than an act.
 
     The two are pressed differently — a configuration's button jumps to it and
-    loops its seed row, an act's narrows the show to that act — so which it is
+    loops its seed row, an act's narrows the slideshow to that act — so which it is
     travels with the row rather than being guessed from the words.
     """
 
@@ -81,7 +81,7 @@ class Loop:
 
 
 @dataclass(frozen=True)
-class ShowMap:
+class SlideshowMap:
     """The gamma the HUD draws: the corner, the row, the column, the lit cell,
     the loop lighting one axis, and the words in the gutter."""
 
@@ -102,7 +102,7 @@ class ShowMap:
 
 
 def build_map(current: Slide, loop: Loop | None,
-              neighbors_of: Callable[[str | None], MapNeighbors]) -> ShowMap:
+              neighbors_of: Callable[[str | None], MapNeighbors]) -> SlideshowMap:
     """The map around *current* — held on it, or on the slide *loop* began on.
 
     A running loop keeps the map where it started and walks the lit cell along
@@ -113,21 +113,21 @@ def build_map(current: Slide, loop: Loop | None,
     at = loop.position_of(current) if loop is not None else None
     if loop is None or at is None:
         around = neighbors_of(current.prompt_id)
-        return ShowMap(current, around.seeds, around.column, CORNER, "",
-                       around.label)
+        return SlideshowMap(current, around.seeds, around.column, CORNER, "",
+                            around.label)
     anchor = loop.pool[0]
     playing = CORNER if at == 0 else (loop.axis, at - 1)
     at_anchor = neighbors_of(anchor.prompt_id)
     if loop.axis == SEED_AXIS:
         lit = neighbors_of(current.prompt_id)
-        return ShowMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
-                       at_anchor.label)
+        return SlideshowMap(anchor, loop.pool[1:], lit.column, playing, loop.axis,
+                            at_anchor.label)
     # A loop down the column plays the whole group, twins of an act included,
     # so every slide in it is a row of its own, named as the library names it.
     column = tuple(MapRow(slide, neighbors_of(slide.prompt_id).label)
                    for slide in loop.pool[1:])
-    return ShowMap(anchor, at_anchor.seeds, column, playing, loop.axis,
-                   at_anchor.label)
+    return SlideshowMap(anchor, at_anchor.seeds, column, playing, loop.axis,
+                        at_anchor.label)
 
 
 def acts_posted(query: str) -> str:

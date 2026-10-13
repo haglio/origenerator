@@ -8,7 +8,7 @@ method of its own, and every event handler in the gallery had to remember which
 subset of those to call. The comments recorded what that cost: one of them existed
 because "nothing else repaints them at that moment", and a media filter ended with
 an extra call because the signal that normally re-synced that button never fires
-and it went on offering a show of nothing. Both were bugs fixed by adding another
+and it went on offering a slideshow of nothing. Both were bugs fixed by adding another
 call, and a protocol whose fix is another call guarantees more of them.
 
 There is one call now. :class:`BankState` says how all sixteen buttons stand, as
@@ -91,7 +91,7 @@ class BankActs(NamedTuple):
     go_forward: Callable[[], None]
     undo: Callable[[], None]
     redo: Callable[[], None]
-    start_show: Callable[[], None]
+    start_slideshow: Callable[[], None]
     toggle_auto: Callable[[bool], None]
     go_to_looping_folder: Callable[[str], None]
     favorite: Callable[[], None]
@@ -158,7 +158,7 @@ class ToolbarBank(QWidget):
         # Recents/Favorites collection — with its tooltip naming that subject.
         self.slideshow = _tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow",
-            acts.start_show)
+            acts.start_slideshow)
         self.slideshow.hide()
         self.auto = _tool_button(
             icons.autoloop_icon(),
@@ -204,7 +204,7 @@ class ToolbarBank(QWidget):
             self.mic = _tool_button(
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
-                "“undo”, “star”), Fun Time's own words over a show (“next”, "
+                "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
                 "“weird”, “lock”), orders about the picture (“enhance”, “fix "
                 "hands”, “genau it”), and prompt steering while a folder is "
                 "auto-generating (left listening by Esc, which stops everything else)",

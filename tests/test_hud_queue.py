@@ -1,4 +1,4 @@
-"""The generation queue as a block of the one panel a show wears."""
+"""The generation queue as a block of the one panel a slideshow wears."""
 from __future__ import annotations
 
 import numpy as np
@@ -19,7 +19,7 @@ def _item(key="j1", caption="Alpha Workflow › a paper kite", status="queued", 
 
 
 def test_nothing_in_flight_is_no_block_at_all():
-    """A show with an idle queue wears the panel it always wore."""
+    """A slideshow with an idle queue wears the panel it always wore."""
     assert queue_section([], 0) is None
 
 
@@ -107,7 +107,7 @@ def test_the_word_that_throws_a_job_away_is_drawn_in_the_panels_own_ink():
 
 
 class _Host:
-    """What the pointer asks of the show: the line, a re-line, and the Clear."""
+    """What the pointer asks of the slideshow: the line, a re-line, and the Clear."""
 
     def __init__(self, items, foreign=0):
         self.hud_queue = (items, foreign)

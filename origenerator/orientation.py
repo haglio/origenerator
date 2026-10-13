@@ -4,7 +4,7 @@ A set of mixed-shape media has no one screen to play on.  A hosting Fun Time
 session shows portrait media on the portrait region and landscape on the
 landscape one, so "slideshow of this folder" was a routing guess that was wrong
 for half the items in it — and standalone the same set is routed by a majority
-vote, which letterboxes the losing half.  A mixed show is a design space this
+vote, which letterboxes the losing half.  A mixed slideshow is a design space this
 app does not want to be in at all.
 
 So the table of contents exists twice over, once per shape: the TOC pane is two

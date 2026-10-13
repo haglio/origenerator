@@ -1,21 +1,21 @@
-"""The buttons Origenerator declares on a show's HUD: what each posts, its
+"""The buttons Origenerator declares on a slideshow's HUD: what each posts, its
 face, its tooltip and the state it draws."""
 from __future__ import annotations
 
 from funestra.hud_status import LATEST_LABEL, SHUFFLE_LABEL
 
-from origenerator.show_buttons import answer, show_rows
+from origenerator.slideshow_buttons import answer, slideshow_rows
 
 
 def _band(**fields) -> tuple:
-    return show_rows("portrait", **fields)[-1]
+    return slideshow_rows("portrait", **fields)[-1]
 
 
 def _names(buttons) -> list[str]:
     return [button.command.removeprefix("portrait_") for button in buttons]
 
 
-def test_the_band_is_the_controls_a_show_answers_in_the_funestras_order():
+def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
     assert _names(_band()) == [
         "prev", "next", "lock", "trash", "fmode", "enhanced", "reset",
         "shuffle", "latest", "cycle_version", "minimize"]
@@ -23,11 +23,11 @@ def test_the_band_is_the_controls_a_show_answers_in_the_funestras_order():
 
 def test_every_button_posts_that_sides_own_verb_and_names_itself():
     """"portrait_next", "landscape_trash" — the same spelling a satellite's
-    band posts, so the session routes a show's press with no new verbs; and
+    band posts, so the session routes a slideshow's press with no new verbs; and
     every glyph on this panel is cryptic on purpose, so each one names itself
     on hover."""
     for side in ("portrait", "landscape"):
-        for button in show_rows(side)[-1]:
+        for button in slideshow_rows(side)[-1]:
             assert button.command.startswith(f"{side}_"), button.command
             assert button.tooltip, button.command
 
@@ -40,7 +40,7 @@ def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thi
 
 
 def test_the_switches_light_and_the_things_done_never_do():
-    """The lock and the two filters are states the show sits in — the lock and
+    """The lock and the two filters are states the slideshow sits in — the lock and
     F-mode in the favorites' green, the enhanced-only switch in an enhanced
     picture's own amber; a step, the bin and reset are things done."""
     band = dict(zip(_names(_band(locked=True, favorites_filter=True, enhanced=True)),
@@ -62,11 +62,11 @@ def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
                 if name in ("shuffle", "latest") and button.lit] == lit, order
 
 
-def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
-    """Hosted, this show covers a Satellite Funestra and has no window of its own
+def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
+    """Hosted, this slideshow covers a Satellite Funestra and has no window of its own
     to park, so the mode pair leads the panel with this mode lit — and the
     minimize a Funestra's band ends with is not declared at all."""
-    rows = show_rows("portrait", hosted=True)
+    rows = slideshow_rows("portrait", hosted=True)
     mode_row = [button.command for button in rows[0]]
 
     assert mode_row == ["satellites_kino_activate", "origenerator_activate"]
@@ -75,20 +75,20 @@ def test_a_hosted_show_offers_the_session_the_way_back_instead_of_minimize():
     assert "minimize" not in _names(rows[-1])
 
 
-def test_a_show_on_its_own_has_a_window_to_park_and_no_session_to_switch():
+def test_a_slideshow_on_its_own_has_a_window_to_park_and_no_session_to_switch():
     """Standalone there is no Funestra under it and no mode to leave, so the pair
     is not drawn — a lit button nothing answers would be a picture of one."""
-    rows = show_rows("portrait")
+    rows = slideshow_rows("portrait")
 
     assert len(rows) == 1
     assert "minimize" in _names(rows[-1])
 
 
-def test_a_show_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
+def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
     """The Funestra's window is the session's, so minimize is the session's; and
     the mode pair is on the panel the session draws around this band, not in
-    it.  What is left is exactly what the show itself answers."""
-    rows = show_rows("portrait", hosted=True, own_window=False)
+    it.  What is left is exactly what the slideshow itself answers."""
+    rows = slideshow_rows("portrait", hosted=True, own_window=False)
 
     assert len(rows) == 1
     assert _names(rows[0]) == [
@@ -97,15 +97,15 @@ def test_a_show_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
 
 
 class _Host:
-    """A show reduced to the calls a press can make of one."""
+    """A slideshow reduced to the calls a press can make of one."""
 
     def __init__(self):
         self.calls = []
 
-    def show_step(self, delta):
+    def slideshow_step(self, delta):
         self.calls.append(("step", delta))
 
-    def show_toggle_lock(self):
+    def slideshow_toggle_lock(self):
         self.calls.append("lock")
 
     def set_locked(self, locked):
@@ -114,13 +114,13 @@ class _Host:
     def set_favorites_filter(self, on):
         self.calls.append(("favorites filter", on))
 
-    def show_cull(self):
+    def slideshow_cull(self):
         self.calls.append("cull")
 
-    def show_reset(self):
+    def slideshow_reset(self):
         self.calls.append("reset")
 
-    def show_order(self, *, latest):
+    def slideshow_order(self, *, latest):
         self.calls.append(("order", latest))
 
     def toggle_favorites_filter(self):
@@ -132,25 +132,25 @@ class _Host:
     def show_item(self, path, *, lock=False):
         self.calls.append(("item", path, lock))
 
-    def show_loop(self, axis):
+    def slideshow_loop(self, axis):
         self.calls.append(("loop", axis))
 
-    def show_loop_cycle(self):
+    def slideshow_loop_cycle(self):
         self.calls.append("loop key")
 
-    def show_more_seeds(self):
+    def slideshow_more_seeds(self):
         self.calls.append("more seeds")
 
-    def show_nav(self, direction):
+    def slideshow_nav(self, direction):
         self.calls.append(("nav", direction))
 
-    def show_filter(self, query):
+    def slideshow_filter(self, query):
         self.calls.append(("filter", query))
 
-    def show_filter_to_the_act_on_screen(self):
+    def slideshow_filter_to_the_act_on_screen(self):
         self.calls.append("filter to the act on screen")
 
-    def show_step_version(self, delta):
+    def slideshow_step_version(self, delta):
         self.calls.append(("version", delta))
 
     def clear_modes(self):
@@ -188,11 +188,11 @@ def test_the_versions_button_is_dim_where_the_item_has_only_itself():
     assert not dict(zip(_names(lively), lively))["cycle_version"].dim
 
 
-def test_every_declared_button_is_answered_by_the_show():
+def test_every_declared_button_is_answered_by_the_slideshow():
     """A button this panel declares and nothing answers would be drawn dead —
-    so every one of them, minimize aside, reaches the show."""
+    so every one of them, minimize aside, reaches the slideshow."""
     host = _Host()
-    for button in show_rows("portrait", hosted=True, own_window=False)[0]:
+    for button in slideshow_rows("portrait", hosted=True, own_window=False)[0]:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("step", 1), "lock", "cull", "fmode",
@@ -202,7 +202,7 @@ def test_every_declared_button_is_answered_by_the_show():
 
 def test_the_versions_button_steps_forward_and_the_shifted_key_either_way():
     """The band has one versions button, which steps on; the session's shifted
-    step keys reach the same show with the pair, as they do on a video."""
+    step keys reach the same slideshow with the pair, as they do on a video."""
     host = _Host()
 
     assert answer(host, "cycle_version")
@@ -224,8 +224,8 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it():
 def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     """The two loop buttons, the loop key, the expand mark, the map's keys
     and the button at the head of each row — each in the Funestras' spelling,
-    each meaning on a show what it means on a Funestra.  Lifting the filter is
-    the one that means more: said to a show, "no filter" is the way out of
+    each meaning on a slideshow what it means on a Funestra.  Lifting the filter is
+    the one that means more: said to a slideshow, "no filter" is the way out of
     every narrowing, so the press is too."""
     host = _Host()
 
@@ -242,9 +242,9 @@ def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     ]
 
 
-def test_a_press_a_show_has_no_answer_to_says_so():
-    """Minimize parks a window, which is not the show's to answer; nor is the
-    strike under an act, which a show has no acts for."""
+def test_a_press_a_slideshow_has_no_answer_to_says_so():
+    """Minimize parks a window, which is not the slideshow's to answer; nor is the
+    strike under an act, which a slideshow has no acts for."""
     host = _Host()
 
     assert not answer(host, "minimize")

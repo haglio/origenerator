@@ -60,7 +60,7 @@ def _slide(panel, along: float) -> None:
 
 
 def test_the_console_carries_no_filter_switches_of_its_own(qtbot):
-    # Over a show the two switches saying what it may play are on the Funestras'
+    # Over a slideshow the two switches saying what it may play are on the Funestras'
     # HUD this panel sits under, and a second pair here would be two switches
     # for one thing — so the console offers neither, the way Genau's own does.
     panel, _motion = _panel(qtbot)

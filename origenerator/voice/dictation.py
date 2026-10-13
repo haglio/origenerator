@@ -28,7 +28,7 @@ class RequestState(Enum):
 
     An Enum like the two vocabularies beside it
     (:class:`~origenerator.voice.app_commands.AppCommand`,
-    :class:`~origenerator.voice.show_commands.ShowCommand`), so a consumer
+    :class:`~origenerator.voice.slideshow_commands.SlideshowCommand`), so a consumer
     cannot compare against a literal that was never one of these four.
     """
 

@@ -49,7 +49,7 @@ class Osr2Control(QObject):
         super().__init__(parent)
         self._motion = motion
         # The funscript driver, set once the view has built it.  Held here
-        # rather than asked of the gallery so a show's console, which never sees
+        # rather than asked of the gallery so a slideshow's console, which never sees
         # the gallery, can still say what has the device.
         self.script = script
         self._checked = False

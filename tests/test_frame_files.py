@@ -70,7 +70,7 @@ def test_forgetting_every_run_leaves_the_folder_empty(tmp_path):
     assert list((tmp_path / "frames").iterdir()) == []
 
 
-def test_frames_left_behind_by_an_earlier_show_are_cleared_away(tmp_path):
+def test_frames_left_behind_by_an_earlier_slideshow_are_cleared_away(tmp_path):
     folder = tmp_path / "frames"
     folder.mkdir()
     (folder / "run-0-7.png").write_bytes(PNG)

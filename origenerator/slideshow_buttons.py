@@ -1,15 +1,15 @@
-"""The buttons Origenerator declares on a show's HUD.
+"""The buttons Origenerator declares on a slideshow's HUD.
 
-A show wears the Funestras' own panel (:mod:`origenerator.gui.show_panel`), and a
+A slideshow wears the Funestras' own panel (:mod:`origenerator.gui.slideshow_panel`), and a
 panel's buttons are its source's to declare: rows of
 :class:`funestra.hud_button.Button`, each carrying the verb a press posts.
 The verbs are the side's own, spelled the way a satellite's are — hosted, the
 session routes ``portrait_next`` back to whatever holds that side; standalone,
-the show answers the same verb itself.
+the slideshow answers the same verb itself.
 
-Only what a show answers is declared, which depends on what is drawing the
+Only what a slideshow answers is declared, which depends on what is drawing the
 panel: minimize parks a window of this app's, so it is offered only where the
-show has one, and the session's mode pair is drawn by a show covering a
+slideshow has one, and the session's mode pair is drawn by a slideshow covering a
 region — but not by one handed to a Funestra, whose panel the session puts its
 own row on.  A button drawn for sameness whose press is swallowed says a
 feature is there when it is not.
@@ -37,7 +37,7 @@ CONTROL_GROUPS = (
 )
 _GROUP_OF = {name: index for index, group in enumerate(CONTROL_GROUPS) for name in group}
 
-# The mode pair, which is about the SESSION rather than about this show: the way
+# The mode pair, which is about the SESSION rather than about this slideshow: the way
 # back to the Funestras' own videos, and this mode lit beside it.  Its verbs are
 # the session's dashboard commands, posted verbatim.
 #: The verb that asks the session to show this app, which is the way to
@@ -55,7 +55,7 @@ MODE_BUTTONS = (
 MODE_TOOLTIPS = {
     "satellites_kino_activate": "Kino mode — the Satellite Funestras and the Random Favs Browser",
     "origenerator_activate":
-        "Origenerator mode — Origenerator over the browser, its shows over the Funestras",
+        "Origenerator mode — Origenerator over the browser, its slideshows over the Funestras",
 }
 
 CONTROL_FACES = {
@@ -84,29 +84,29 @@ CONTROL_TOOLTIPS = {
     "latest": f"{LATEST_LABEL} — every picture and video of this shape, newest first",
     "cycle_version": "Other versions of this one — an enhancement, the picture it was "
                 "made from, the upscale Evolver made of a video",
-    "minimize": "Minimize this show — bring it back from the taskbar",
+    "minimize": "Minimize this slideshow — bring it back from the taskbar",
 }
 # Reset means what the side goes back TO, which is not the same in both places:
 # hosted it is the region's base state — that side's whole library, the way a
 # Funestra's reset leaves it browsing its own — and standalone there is no such
-# state, so it is this show's own set from the top.
+# state, so it is this slideshow's own set from the top.
 RESET_TOOLTIPS = {
     True: "Reset — this side's whole library back, with both filters off",
     False: "Reset — both filters off, and this set from the top",
 }
 
 
-def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
-              enhanced: bool = False, order: str = "", hosted: bool = False,
-              own_window: bool = True,
-              has_other_versions: bool = False) -> tuple[tuple[Button, ...], ...]:
-    """The rows a show's HUD draws, for the surface it is drawn on.
+def slideshow_rows(side: str, *, locked: bool = False, favorites_filter: bool = False,
+                   enhanced: bool = False, order: str = "", hosted: bool = False,
+                   own_window: bool = True,
+                   has_other_versions: bool = False) -> tuple[tuple[Button, ...], ...]:
+    """The rows a slideshow's HUD draws, for the surface it is drawn on.
 
-    *own_window* is whether this show has a window of this app's — which is
+    *own_window* is whether this slideshow has a window of this app's — which is
     what minimize parks, and so what decides whether it is offered at all.
     Handed to one of a session's Funestras there is none, and the mode pair is
     the session's own to put on its panel; in a window over a session's region
-    the show draws that pair itself.
+    the slideshow draws that pair itself.
     """
     mode_row = hosted and own_window
     minimize = own_window and not hosted
@@ -123,43 +123,43 @@ def show_rows(side: str, *, locked: bool = False, favorites_filter: bool = False
     return (_mode_row(), band) if mode_row else (band,)
 
 
-# What each press asks of a show, by the name its verb carries after the side:
+# What each press asks of a slideshow, by the name its verb carries after the side:
 # the band's buttons, the map's own chrome and the session's own keys, all in
 # the Funestras' spelling.
 _PRESSES: dict[str, Callable[[Any], object]] = {
-    "prev": lambda show: show.show_step(-1),
-    "next": lambda show: show.show_step(1),
-    "lock": lambda show: show.show_toggle_lock(),
-    "lock_on": lambda show: show.set_locked(True),
-    "lock_off": lambda show: show.set_locked(False),
-    "trash": lambda show: show.show_cull(),
-    "reset": lambda show: show.show_reset(),
-    "shuffle": lambda show: show.show_order(latest=False),
-    "latest": lambda show: show.show_order(latest=True),
-    "fmode": lambda show: show.toggle_favorites_filter(),
-    "fmode_on": lambda show: show.set_favorites_filter(True),
-    "fmode_off": lambda show: show.set_favorites_filter(False),
-    "enhanced": lambda show: show.toggle_enhanced_mode(),
-    "seed_loop": lambda show: show.show_loop("seed"),
-    "action_loop": lambda show: show.show_loop("action"),
-    "no_loop": lambda show: show.show_loop(""),
-    "loop": lambda show: show.show_loop_cycle(),
-    "more_seeds": lambda show: show.show_more_seeds(),
-    "no_filter": lambda show: show.clear_modes(),
-    "lock_action": lambda show: show.show_filter_to_the_act_on_screen(),
-    "nav_left": lambda show: show.show_nav("left"),
-    "nav_right": lambda show: show.show_nav("right"),
-    "nav_up": lambda show: show.show_nav("up"),
-    "nav_down": lambda show: show.show_nav("down"),
-    "cycle_seed": lambda show: show.show_nav("right"),
-    "cycle_action": lambda show: show.show_nav("down"),
-    "cycle_version": lambda show: show.show_step_version(1),
-    "cycle_version_back": lambda show: show.show_step_version(-1),
+    "prev": lambda host: host.slideshow_step(-1),
+    "next": lambda host: host.slideshow_step(1),
+    "lock": lambda host: host.slideshow_toggle_lock(),
+    "lock_on": lambda host: host.set_locked(True),
+    "lock_off": lambda host: host.set_locked(False),
+    "trash": lambda host: host.slideshow_cull(),
+    "reset": lambda host: host.slideshow_reset(),
+    "shuffle": lambda host: host.slideshow_order(latest=False),
+    "latest": lambda host: host.slideshow_order(latest=True),
+    "fmode": lambda host: host.toggle_favorites_filter(),
+    "fmode_on": lambda host: host.set_favorites_filter(True),
+    "fmode_off": lambda host: host.set_favorites_filter(False),
+    "enhanced": lambda host: host.toggle_enhanced_mode(),
+    "seed_loop": lambda host: host.slideshow_loop("seed"),
+    "action_loop": lambda host: host.slideshow_loop("action"),
+    "no_loop": lambda host: host.slideshow_loop(""),
+    "loop": lambda host: host.slideshow_loop_cycle(),
+    "more_seeds": lambda host: host.slideshow_more_seeds(),
+    "no_filter": lambda host: host.clear_modes(),
+    "lock_action": lambda host: host.slideshow_filter_to_the_act_on_screen(),
+    "nav_left": lambda host: host.slideshow_nav("left"),
+    "nav_right": lambda host: host.slideshow_nav("right"),
+    "nav_up": lambda host: host.slideshow_nav("up"),
+    "nav_down": lambda host: host.slideshow_nav("down"),
+    "cycle_seed": lambda host: host.slideshow_nav("right"),
+    "cycle_action": lambda host: host.slideshow_nav("down"),
+    "cycle_version": lambda host: host.slideshow_step_version(1),
+    "cycle_version_back": lambda host: host.slideshow_step_version(-1),
 }
 # The map's thumbnails, whose presses carry the item they were made on.
 _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
-    "play_video": lambda show, path: show.show_item(path, lock=False),
-    "lock_video": lambda show, path: show.show_item(path, lock=True),
+    "play_video": lambda host, path: host.show_item(path, lock=False),
+    "lock_video": lambda host, path: host.show_item(path, lock=True),
 }
 PANEL_CORNER = "hud_corner"
 PANEL_MINIMIZED = "hud_minimized"
@@ -170,22 +170,22 @@ PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 
 
 def answer(host, action: str, argument: str = "") -> bool:
-    """Do what a press on a show's panel asks of *host*, by the name its verb
+    """Do what a press on a slideshow's panel asks of *host*, by the name its verb
     carries after the side ("next", "fmode", "play_video"), and say whether the
-    show had an answer.
+    slideshow had an answer.
 
-    One table for every way a press reaches a show — its own window's panel,
+    One table for every way a press reaches a slideshow — its own window's panel,
     a session routing a Funestra's panel back here, and the session's own keys
     — so a button means the same thing whichever of them drew it.  ``False``
-    for minimize, which is a window's rather than a show's, and for the
-    Funestras' chrome about acts, which a show has no counterpart for.
+    for minimize, which is a window's rather than a slideshow's, and for the
+    Funestras' chrome about acts, which a slideshow has no counterpart for.
     """
     if action in _PRESSES:
         _PRESSES[action](host)
     elif action in _PRESSES_ABOUT_A_FILE:
         _PRESSES_ABOUT_A_FILE[action](host, argument)
     elif action == FILTER:
-        host.show_filter(argument)
+        host.slideshow_filter(argument)
     else:
         return False
     return True

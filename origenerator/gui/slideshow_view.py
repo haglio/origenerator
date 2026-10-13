@@ -3,21 +3,21 @@
 It plays a set of generations: a folder's, a collection's, or the one folder a
 double-clicked picture came from, which is why there is no second fullscreen
 viewer with its own keys.  The set is not frozen at the opening: a run joins it
-on its first frame, which is what a show of a filling folder is watched for.
+on its first frame, which is what a slideshow of a filling folder is watched for.
 
 The Slideshow runs on a Funestra, the one this app activates for it
 (:mod:`origenerator.gui.funestra_pane`): the Funestra plays the pass it is
 handed, holds a picture for the pace and creeps over it, plays a clip to its
 end and rolls onto the next, repeats what it is locked onto, draws the one
-panel the show wears over the picture and places the presses on it.  What
+panel the slideshow wears over the picture and places the presses on it.  What
 this view answers for is the set, the pass dealt from it and the slide on
 screen: it hands the pass over, follows the Funestra as it walks the pass,
-and answers every press and key.  A show on one of a session's Funestras
-(:mod:`origenerator.gui.funestra_show`) keeps the same set and drives its
+and answers every press and key.  A slideshow on one of a session's Funestras
+(:mod:`origenerator.gui.funestra_slideshow`) keeps the same set and drives its
 Funestra through files instead.
 
 What every key does, what the lock takes with it, what a filter narrows and
-where a closing show leaves you are `tests/test_slideshow_view.py`'s to state:
+where a closing slideshow leaves you are `tests/test_slideshow_view.py`'s to state:
 each is a test named for the claim.
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ from origenerator.gui.console import (
     REPAINT_MS,
     post_device_action,
     post_pace_action,
-    show_device,
+    slideshow_device,
 )
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
@@ -55,25 +55,30 @@ from origenerator.gui.hud_queue import QueuePointer, queue_section
 from origenerator.gui.level_stepper import LevelStepper
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.notice_overlay import NOTICE, WARNING, NoticeOverlay
-from origenerator.gui.show_map import SEED_AXIS
-from origenerator.gui.show_panel import COLLAPSES, OPENS_IN, THE_SHOWS_OWN, show_hud_model
-from origenerator.gui.show_pass import playlist_item, rotated_onto, slide_item
-from origenerator.gui.show_set import (
+from origenerator.gui.slideshow_map import SEED_AXIS
+from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_panel import (
+    COLLAPSES,
+    OPENS_IN,
+    THE_SLIDESHOWS_OWN,
+    slideshow_hud_model,
+)
+from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
+from origenerator.gui.slideshow_set import (
     GENERATING,
     LOOP_IS_A_LOCK,
     LOOP_OFF,
-    ShowSet,
+    SlideshowSet,
     item_note,
     looping_note,
     narrow_to_acts,
     narrow_to_the_act_on_screen,
 )
-from origenerator.gui.show_wiring import ShowActions
-from origenerator.gui.slideshow_pace import SlideshowPace
+from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
-from origenerator.show_buttons import answer
-from origenerator.slideshow import ShowFilters, ShowState, Slide, in_order
+from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
+from origenerator.slideshow_buttons import answer
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +89,7 @@ _WIDENING_FAILED = "Widening net failed"
 _NOTHING_TO_LOOP = "Nothing to loop"
 _NOTHING_THAT_WAY = "Nothing that way"
 
-# The run a show follows full screen, as its frames are filed.
+# The run a slideshow follows full screen, as its frames are filed.
 _FOLLOWED = "followed"
 
 # How often the panel is rebuilt: on its own beat, and faster while something
@@ -111,7 +116,7 @@ _WASD_AS_ARROWS = {
 class SlideshowView(QWidget):
     # Enter on an item: leave the slideshow for that generation's own folder.
     open_requested = pyqtSignal(str)
-    # The show was dismissed (Escape, Enter out, or culled empty) — the gallery
+    # The slideshow was dismissed (Escape, Enter out, or culled empty) — the gallery
     # keeps voice-command listening tied to a fullscreen surface being up.
     closed = pyqtSignal()
     # A different item (or version) is on screen — re-aim the OSR2 drive.
@@ -123,8 +128,8 @@ class SlideshowView(QWidget):
         super().__init__(parent)
         # What a press here asks the gallery to do on its behalf — the half of
         # each gesture that lands on the generation rather than on the slide.
-        # None of it, for a show standing on its own (see ShowActions).
-        self._actions = actions if actions is not None else ShowActions()
+        # None of it, for a slideshow standing on its own (see SlideshowActions).
+        self._actions = actions if actions is not None else SlideshowActions()
         self._motion = motion  # the gallery's app-global motion driver, or None
         # How long a slide holds the screen is app-wide, because the console
         # that sets it is: turned up here or in the main window, it is the
@@ -145,8 +150,8 @@ class SlideshowView(QWidget):
         self._frames_on_screen = False
         self._loads_seen: int | None = None
         self._refusal_checked = True
-        # The panel this show wears: which side's it is, who draws it, and
-        # where it sits — settled when the show is dressed (see wear_the_hud).
+        # The panel this slideshow wears: which side's it is, who draws it, and
+        # where it sits — settled when the slideshow is dressed (see wear_the_hud).
         self._hud_side = ""
         self._dashboard_cmd_file = None
         self._label_for = None
@@ -188,7 +193,7 @@ class SlideshowView(QWidget):
         # this surface wears the Funestras' own HUD and had no business saying
         # things in a second dialect at the other end of the screen.
         self._note = NoticeOverlay(self)
-        # What the corner reads while a spoken request pauses the show; empty
+        # What the corner reads while a spoken request pauses the slideshow; empty
         # whenever nothing is being dictated.
         self._request_note = ""
         # And what it reads afterwards, while the request said is still being
@@ -214,9 +219,9 @@ class SlideshowView(QWidget):
              shuffle=None, hud=None, actions=None) -> None:
         """Take a new set into this window and start it on that set.
 
-        Standalone the monitor holds one show, so a second set asked for while
+        Standalone the monitor holds one slideshow, so a second set asked for while
         this one is up arrives here rather than in a window of its own (see
-        :meth:`~origenerator.gui.show_director.ShowDirector._open_a_window`) —
+        :meth:`~origenerator.gui.slideshow_director.SlideshowDirector._open_a_window`) —
         the same re-pointing a region's Funestra gets when the set it is showing
         changes.  It takes the set exactly as construction does, so a window
         re-pointed cannot drift from one freshly opened.
@@ -233,9 +238,9 @@ class SlideshowView(QWidget):
         self._live = not items
         self._frame = frame  # the frame the double-click landed on, if any
         # The item to hand the gallery on the way out, once there is one: Enter
-        # names it outright, and a lock names it by being the slide the show
+        # names it outright, and a lock names it by being the slide the slideshow
         # ended on. Read in :meth:`closeEvent`, which is where every way out of
-        # the show meets.
+        # the slideshow meets.
         self._land_on: str | None = None
         # The versions of each item that has any, and the place within the one
         # being stepped: Shift+Left/Right moves there rather than along the set.
@@ -243,20 +248,20 @@ class SlideshowView(QWidget):
         if image_dwell_ms is None:
             image_dwell_ms = self._pace.dwell_ms
         self._dwell_s = image_dwell_ms // 1000
-        # The set this show plays, the pass dealt from it, and what its two
+        # The set this slideshow plays, the pass dealt from it, and what its two
         # switches keep of it — all of it the same whether a window or one of
-        # a session's Funestras is showing the slides (see ShowSet).  What this
+        # a session's Funestras is showing the slides (see SlideshowSet).  What this
         # view answers for is the slide on screen, so a re-dealt pass comes
         # back here as :meth:`_pass_changed`.
-        self._set = ShowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
-                            start=start, hud=hud, on_pass_change=self._pass_changed,
-                            neighbors=self._actions.neighbors, widen=self._actions.widen,
-                            acts=self._actions.acts,
-                            on_filters_change=self._actions.filters_changed)
+        self._set = SlideshowSet(items, image_dwell_ms=image_dwell_ms, shuffle=shuffle,
+                                 start=start, hud=hud, on_pass_change=self._pass_changed,
+                                 neighbors=self._actions.neighbors, widen=self._actions.widen,
+                                 acts=self._actions.acts,
+                                 on_filters_change=self._actions.filters_changed)
 
     @property
     def _playlist(self):
-        """The pass this show is playing — the set's, since the set deals it."""
+        """The pass this slideshow is playing — the set's, since the set deals it."""
         return self._set.playlist
 
     def _pass_changed(self, kept: bool) -> None:
@@ -296,7 +301,7 @@ class SlideshowView(QWidget):
         self.media_changed.emit()  # a different clip may need the OSR2 re-aimed
 
     def _hand_over(self, *, land: bool) -> None:
-        """Give the Funestra this pass to play, turned onto the slide this show
+        """Give the Funestra this pass to play, turned onto the slide this slideshow
         stands on; *land* opens that slide afresh, where a pass handed over
         around the slide already up leaves it playing."""
         current = self._playlist.current()
@@ -312,12 +317,12 @@ class SlideshowView(QWidget):
 
     def _settle(self) -> None:
         """Hand the Funestra the pace and the hold, and take its reading of
-        the pass as the one this show stands on."""
+        the pass as the one this slideshow stands on."""
         playback = self._pane.playback
         if playback is None:
             return
         playback.set_pace(self._dwell_s)
-        # A lock is repeat-one, as it is on a Fun Time satellite; a show
+        # A lock is repeat-one, as it is on a Fun Time satellite; a slideshow
         # following a run holds its frames the same way, and so does a pace
         # of nought, since nought means nothing moves on its own -- a finished
         # clip included.
@@ -346,7 +351,7 @@ class SlideshowView(QWidget):
         return SlideshowOnAFunestra(self)
 
     def follow_the_funestra(self) -> None:
-        """The pass of this show's own the Funestra gives it each frame: stand
+        """The pass of this slideshow's own the Funestra gives it each frame: stand
         the set on whatever the Funestra moved onto by itself -- a picture's
         pace ran out, a clip ended -- step past an item it would not open,
         and move a picture being enhanced on early."""
@@ -409,9 +414,9 @@ class SlideshowView(QWidget):
             playback.step(1)
 
     def _apply_freeze(self) -> None:
-        """Hand the Funestra whatever is holding the show still.
+        """Hand the Funestra whatever is holding the slideshow still.
 
-        The room's freeze stops everything.  A spoken request stops the show
+        The room's freeze stops everything.  A spoken request stops the slideshow
         moving on rather than stopping the clip: it is about what is on screen,
         and a clip that stopped mid-sentence would be answering a question
         nobody asked.  A picture under one holds where its move had got to,
@@ -434,9 +439,9 @@ class SlideshowView(QWidget):
         return self._showing_media[0] if self._showing_a_video() else None
 
     def set_playlist(self, items, index: int) -> None:
-        """Re-seed the set this show plays, on ``index``.
+        """Re-seed the set this slideshow plays, on ``index``.
 
-        What a double-clicked picture's show is armed with once the gallery has
+        What a double-clicked picture's slideshow is armed with once the gallery has
         worked out the folder under it: the view comes up on the one item the
         pane had, and this hands it the rest in the browser's own order. A view
         still following a generation keeps its frames — it has no place among
@@ -450,10 +455,10 @@ class SlideshowView(QWidget):
         return self._set.whole_set()
 
     @property
-    def filters(self) -> ShowFilters:
+    def filters(self) -> SlideshowFilters:
         return self._set.filters
 
-    def take_up(self, filters: ShowFilters, *, keep_the_slide: bool = False) -> None:
+    def take_up(self, filters: SlideshowFilters, *, keep_the_slide: bool = False) -> None:
         if not self._live:
             self._set.take_up(filters, keep_the_slide=keep_the_slide)
 
@@ -472,12 +477,12 @@ class SlideshowView(QWidget):
         self._levels.add(levels_by_path)
         self.refresh_panel()
 
-    # --- the panel this show wears ------------------------------------------
+    # --- the panel this slideshow wears -------------------------------------
 
     def wear_the_hud(self, side: str, *, dashboard_cmd_file=None, label_for=None,
                      corner: HudCorner = HudCorner.UPPER_LEFT, minimized: bool = False,
                      collapse=None, open_in=None) -> None:
-        """Put the Funestras' own panel on this show, drawn by the Funestra.
+        """Put the Funestras' own panel on this slideshow, drawn by the Funestra.
 
         *side* is whose panel it is, which spells its verbs; *dashboard_cmd_file*
         is the session's command channel, or ``None`` standalone -- which is also
@@ -520,9 +525,9 @@ class SlideshowView(QWidget):
             return self._panel_model
         self._panel_stale = False
         self._panel_built_at = now
-        model = show_hud_model(self._hud_side, self,
-                               hosted=self._dashboard_cmd_file is not None,
-                               device=self.hud_device, foot=self._queue())
+        model = slideshow_hud_model(self._hud_side, self,
+                                    hosted=self._dashboard_cmd_file is not None,
+                                    device=self.hud_device, foot=self._queue())
         if model is not None:
             model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)
         self._panel_model = model
@@ -545,11 +550,11 @@ class SlideshowView(QWidget):
 
     def press(self, command: str) -> bool:
         """Route one press on the panel, as the Funestra hands it over: the
-        block at the foot takes the pointer, what the show answers for itself
+        block at the foot takes the pointer, what the slideshow answers for itself
         lands on it, the session's transport goes out on the dashboard channel
-        — or, with no session under this show, onto the show as well
+        — or, with no session under this slideshow, onto the slideshow as well
         (:meth:`_act_here`) — and the device's own verbs land on this window
-        either way, the OSR2 being this app's to drive wherever the show is
+        either way, the OSR2 being this app's to drive wherever the slideshow is
         drawn.  A press on the picture asks for the pause, and a double-click there leaves.
         """
         verb, _, payload = command.partition("|")
@@ -564,10 +569,10 @@ class SlideshowView(QWidget):
         if action in COLLAPSES or action == OPENS_IN:
             self._place_here_or_out_there(command, action, path)
             return True
-        if action in THE_SHOWS_OWN:
+        if action in THE_SLIDESHOWS_OWN:
             # The two filters, reset, the loops, the expand mark and the map's
-            # own clicks mean on a show what they mean on a Funestra, and the
-            # show owns what each is — so they land here, hosted or not.
+            # own clicks mean on a slideshow what they mean on a Funestra, and the
+            # slideshow owns what each is — so they land here, hosted or not.
             answer(self, action, path)
             self.refresh_panel()
             return True
@@ -610,12 +615,12 @@ class SlideshowView(QWidget):
             self._collapse(COLLAPSES[action])
 
     def _act_here(self, action: str) -> bool:
-        """A press with no session under it: the show answers it itself.
+        """A press with no session under it: the slideshow answers it itself.
 
         Standalone there is no command file to take the round trip a hosted
-        press takes, so the press lands on the show through the same answers
+        press takes, so the press lands on the slideshow through the same answers
         that round trip would have ended at.  Minimize is the one button only a
-        show on its own has, the show being the window here.
+        slideshow on its own has, the slideshow being the window here.
         """
         if action == "minimize":
             self.window().showMinimized()
@@ -664,11 +669,11 @@ class SlideshowView(QWidget):
         if self._actions.clear_queue is not None:
             self._actions.clear_queue()
 
-    # --- picking a closed show back up --------------------------------------
+    # --- picking a closed slideshow back up ---------------------------------
 
-    def state(self) -> ShowState:
-        """Where this show is, in the terms a later one can be opened at."""
-        return ShowState(
+    def state(self) -> SlideshowState:
+        """Where this slideshow is, in the terms a later one can be opened at."""
+        return SlideshowState(
             order=tuple(self._playlist.order_ids()),
             current=self._current_prompt_id(),
             locked=self._playlist.locked,
@@ -676,11 +681,11 @@ class SlideshowView(QWidget):
             loop=self._set.loop.axis if self._set.loop is not None else "",
         )
 
-    def resume(self, state: ShowState) -> bool:
-        """Open where a closed show left off rather than at the top of a fresh
+    def resume(self, state: SlideshowState) -> bool:
+        """Open where a closed slideshow left off rather than at the top of a fresh
         shuffle, and say whether the place carried.
 
-        Closing a show is usually a detour, so coming back is coming back to
+        Closing a slideshow is usually a detour, so coming back is coming back to
         that picture: the slide it ended on, its lock, and the version it had
         been stepped to -- which is why this is called after
         :meth:`set_levels`.  It carries only while that slide is among these
@@ -701,12 +706,12 @@ class SlideshowView(QWidget):
 
     def note_added(self, path, media_type: str, prompt_id: str, still=None, *,
                    favorite: bool = False, enhanced: bool = False) -> None:
-        """A generation that belongs to what this show is playing has landed:
-        it joins the set, queued to come up next, so a show of a folder that is
+        """A generation that belongs to what this slideshow is playing has landed:
+        it joins the set, queued to come up next, so a slideshow of a folder that is
         auto-generating reaches the items being made while it runs.
         ``favorited`` and ``enhanced`` are what the gallery knows of its row.
 
-        The slide on screen is left alone; one the show has been watching being
+        The slide on screen is left alone; one the slideshow has been watching being
         made keeps its place in the pass and simply becomes the file.
         """
         if favorite:
@@ -722,23 +727,23 @@ class SlideshowView(QWidget):
                 self._hand_over(land=False)
             self._frames.forget(prompt_id)
             return
-        # Into the pass only past the switches: a show narrowed to its favorites
+        # Into the pass only past the switches: a slideshow narrowed to its favorites
         # must not fill back up with every unfavorited thing the loop makes.  The
         # whole set remembers it either way, for when the switch comes off.
         if self._set.passes(slide) and self._playlist.add(slide):
             self._hand_over(land=False)
 
     def note_generating(self, prompt_id: str, frame: bytes) -> None:
-        """A generation that belongs to what this show is playing has started to
+        """A generation that belongs to what this slideshow is playing has started to
         look like something: it joins the set on that first frame, and keeps
         whichever is newest from there.
 
         The wait is not worth a slide, but the first iterations arriving are the
-        best thing in a folder that is filling — so the show puts them up as soon
+        best thing in a folder that is filling — so the slideshow puts them up as soon
         as there is anything to see, queued to come up next like any other
         arrival, rather than waiting out the minutes to the finished file.
 
-        Offered once. A run taken off the show (its Up key) does not come back on
+        Offered once. A run taken off the slideshow (its Up key) does not come back on
         its next frame, which would make that key mean nothing at all.
         """
         if self._live:
@@ -771,7 +776,7 @@ class SlideshowView(QWidget):
             self._set.forget_id(prompt_id)
             self._frames.forget(prompt_id)
             if self._playlist.is_empty():
-                self.close()  # a show of nothing but that run has nothing left
+                self.close()  # a slideshow of nothing but that run has nothing left
                 return
             if showing:
                 self._show_current()
@@ -779,7 +784,7 @@ class SlideshowView(QWidget):
                 self._hand_over(land=False)
 
     def holds(self, prompt_id: str) -> bool:
-        """Whether this show already has a slide for that generation — what the
+        """Whether this slideshow already has a slide for that generation — what the
         gallery asks before working out whether a run belongs in here at all."""
         return self._playlist.holds(prompt_id)
 
@@ -797,14 +802,14 @@ class SlideshowView(QWidget):
         self._showing_media = None
 
     def _delete_current(self):
-        """Up, the Funestras' "weird": a favorite loses its star and the show
-        moves on; anything else is deleted (if a deleter is wired) and the show
+        """Up, the Funestras' "weird": a favorite loses its star and the slideshow
+        moves on; anything else is deleted (if a deleter is wired) and the slideshow
         moves on.
 
         Two things on one key, as on a satellite, and the star on screen says
         which: locking a slide starred it, so the first press takes that back
         and only the second condemns it.  A slide still being made has nothing
-        to condemn, so Up takes it off the show and leaves the run alone --
+        to condemn, so Up takes it off the slideshow and leaves the run alone --
         calling one off is the Cancel on that run's own row of the panel.
         """
         self._playlist.unlock()  # the locked slide is the one being culled
@@ -856,7 +861,7 @@ class SlideshowView(QWidget):
         band's versions button live rather than faded."""
         return len(self._levels.levels(base=self._current_base())) > 1
 
-    def show_step_version(self, delta: int) -> None:
+    def slideshow_step_version(self, delta: int) -> None:
         self._step_level(delta)
 
     def _step_level(self, delta: int) -> None:
@@ -890,13 +895,13 @@ class SlideshowView(QWidget):
     # --- opened over a generation still being made --------------------------
 
     def is_live(self) -> bool:
-        """Whether this show is still following a generation in flight — the pane
+        """Whether this slideshow is still following a generation in flight — the pane
         that opened it checks before feeding it another frame or its result."""
         return self._live
 
     def show_frame(self, data: bytes) -> None:
         """One more streamed frame of the generation being followed. Ignored once
-        it has landed (or the show has stepped away), which is no longer this run."""
+        it has landed (or the slideshow has stepped away), which is no longer this run."""
         if self._live:
             self._frame = data
             self._put_the_followed_run_up(data)
@@ -918,7 +923,7 @@ class SlideshowView(QWidget):
 
     def show_landed(self, media: tuple, generation: str | None) -> None:
         """The followed generation finished: its saved file takes the place of
-        its frames, at the head of the folder the show was armed with."""
+        its frames, at the head of the folder the slideshow was armed with."""
         if not self._live:
             return
         self._live = False
@@ -934,7 +939,7 @@ class SlideshowView(QWidget):
 
     @property
     def dwell_s(self) -> int:
-        """The seconds this show leaves an unlocked slide up — nought while it is
+        """The seconds this slideshow leaves an unlocked slide up — nought while it is
         standing on one picture, which is how a double-clicked one opens."""
         return self._dwell_s
 
@@ -962,15 +967,15 @@ class SlideshowView(QWidget):
         """Take the slide on screen away and move on — Up's."""
         self._delete_current()
 
-    def show_reset(self) -> None:
+    def slideshow_reset(self) -> None:
         """Put the side back how it started, the Funestras' own reset: both
         switches dropped, the lock released, and the base set on screen again.
 
-        Hosted, "how it started" is the REGION's base state, not this show's
+        Hosted, "how it started" is the REGION's base state, not this slideshow's
         own: a Funestra's reset drops its filter and leaves it browsing its whole
-        library again, so a show started on one folder goes back to the library
+        library again, so a slideshow started on one folder goes back to the library
         too rather than restarting that folder.  The gallery owns that set, so
-        it comes in as a hook.  Standalone there is no such state and a show's
+        it comes in as a hook.  Standalone there is no such state and a slideshow's
         defaults are simply its own set from the beginning.
         """
         if self._actions.reset is not None:
@@ -978,12 +983,12 @@ class SlideshowView(QWidget):
             return
         self.reset_in_place()
 
-    def show_order(self, *, latest: bool) -> None:
+    def slideshow_order(self, *, latest: bool) -> None:
         if self._actions.reorder is not None:
             self._actions.reorder(self, latest)
 
     def reset_in_place(self) -> None:
-        """This show's own reset: both switches dropped, the lock released, and
+        """This slideshow's own reset: both switches dropped, the lock released, and
         the top of the set it is already playing back on screen."""
         self._playlist.unlock()
         if self._set.drop_the_filters():
@@ -992,9 +997,9 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def retune(self, items, *, enhanced_ids=None) -> None:
-        """Point this show at the region's base set instead -- what a hosted
+        """Point this slideshow at the region's base set instead -- what a hosted
         reset does, with the window left up because a region that blinks black
-        between two shows is what the base state exists to avoid.
+        between two slideshows is what the base state exists to avoid.
 
         A base state is always the same kind of set: a fresh shuffle of that
         side's whole library, no loop, both switches and the lock off, the
@@ -1013,8 +1018,8 @@ class SlideshowView(QWidget):
     @property
     def hud_order_label(self) -> str:
         """How the set is ordered, in the Funestras' words — read off this view
-        by the show's own panel (see
-        :class:`~origenerator.gui.show_host.ShowHost`)."""
+        by the slideshow's own panel (see
+        :class:`~origenerator.gui.slideshow_host.SlideshowHost`)."""
         return self._set.order_label
 
     # --- the map, and the loops along it -----------------------------------
@@ -1028,7 +1033,7 @@ class SlideshowView(QWidget):
         answered with."""
         return len(self._playlist)
 
-    def show_loop(self, axis: str) -> None:
+    def slideshow_loop(self, axis: str) -> None:
         """Loop the map's *axis* around the slide on screen, or end the loop
         for "" — the map's two loop buttons, and the session's spoken loops.
         An axis holding only the slide on screen is held rather than looped
@@ -1057,7 +1062,7 @@ class SlideshowView(QWidget):
             return False
         return bool(self._actions.browse_all(self))
 
-    def show_loop_cycle(self) -> None:
+    def slideshow_loop_cycle(self) -> None:
         """The loop key, as on a Funestra: seeds, then actions, then off — and
         the lock when there is nothing on either axis to loop, which is Down's
         whole gesture here."""
@@ -1070,7 +1075,7 @@ class SlideshowView(QWidget):
         else:
             self._flash_note(looping_note(self._set))
 
-    def show_more_seeds(self) -> None:
+    def slideshow_more_seeds(self) -> None:
         """Widen the seed row past what exactly matches and loop it — the
         map's expand mark."""
         if self._set.more_seeds():
@@ -1078,32 +1083,32 @@ class SlideshowView(QWidget):
         else:
             self._flash_note(_WIDENING_FAILED, kind=WARNING)
 
-    def show_filter(self, query: str) -> None:
+    def slideshow_filter(self, query: str) -> None:
         """The button at the head of a map row, and the session's spoken acts.
 
         A configuration's row is gone to and its seeds looped, the way it was
-        before the acts joined the column; an act's narrows the show to it.
+        before the acts joined the column; an act's narrows the slideshow to it.
         """
         row = self._set.configuration_row(query)
         if row is not None:
             if row is not self._playlist.current():
                 self._jump_to(row)
-            self.show_loop(SEED_AXIS)
+            self.slideshow_loop(SEED_AXIS)
             return
         said, narrowed = narrow_to_acts(self._set, query)
         self._flash_note(said, kind=NOTICE if narrowed else WARNING)
 
-    def show_filter_to_the_act_on_screen(self) -> None:
+    def slideshow_filter_to_the_act_on_screen(self) -> None:
         said, narrowed = narrow_to_the_act_on_screen(self._set)
         self._flash_note(said, kind=NOTICE if narrowed else WARNING)
 
     @property
     def hud_act_filter(self) -> str:
         """The act(s) the set is narrowed to — what lights the map's row
-        buttons (see :class:`~origenerator.gui.show_host.ShowHost`)."""
+        buttons (see :class:`~origenerator.gui.slideshow_host.SlideshowHost`)."""
         return self._set.filters.act
 
-    def show_nav(self, direction: str) -> None:
+    def slideshow_nav(self, direction: str) -> None:
         """Step to the map cell one *direction* from the lit one, the way a
         thumbnail click lands on it."""
         target = self._set.nav_target(direction)
@@ -1119,7 +1124,7 @@ class SlideshowView(QWidget):
         if self._motion is None:
             return None
         control = self._actions.osr2_control
-        return show_device(
+        return slideshow_device(
             self._motion, pace_s=self.dwell_s, device_on=bool(osr2_device.device_on()),
             control=control.state() if control is not None else "",
             script=control.script if control is not None else None)
@@ -1134,8 +1139,8 @@ class SlideshowView(QWidget):
                 or post_pace_action(action, self))
 
     def set_audio_muted(self, muted: bool) -> None:
-        """Silence (or voice) this show outright — what a hosting session does
-        to a show landing on a satellite region."""
+        """Silence (or voice) this slideshow outright — what a hosting session does
+        to a slideshow landing on a satellite region."""
         self._pane.set_audio_muted(muted)
 
     def set_locked(self, locked: bool) -> bool:
@@ -1166,31 +1171,31 @@ class SlideshowView(QWidget):
 
     # The motion console reaches the three above by its own names: it drives this
     # view through a host protocol the main window's console shares.
-    def show_step(self, delta: int) -> None:
+    def slideshow_step(self, delta: int) -> None:
         self.step(delta)
 
-    def show_toggle_lock(self) -> None:
+    def slideshow_toggle_lock(self) -> None:
         self.toggle_lock()
 
-    def show_cull(self) -> None:
+    def slideshow_cull(self) -> None:
         self.cull()
 
     def set_dwell_s(self, seconds: int) -> None:
-        """Take a new pace, and hand it on: the number is app-wide, so a show
+        """Take a new pace, and hand it on: the number is app-wide, so a slideshow
         opened at nought that is turned up sets the pace for the next one too.
 
         Applied here as well as posted to the pace, rather than only waiting for
-        the signal back — a show sitting at nought while the app-wide pace already
+        the signal back — a slideshow sitting at nought while the app-wide pace already
         reads one gets no signal from a step up to one, and would stay frozen.
         """
         self._pace.set_seconds(seconds)  # fires _on_pace_changed if it moved
         self._apply_dwell(self._pace.seconds)  # and take it even if it didn't
 
     def is_showing(self) -> bool:
-        """Whether this show is on screen — what says a region is occupied."""
+        """Whether this slideshow is on screen — what says a region is occupied."""
         return self.isVisible()
 
-    # --- what this show's HUD says, in the Funestras' vocabulary -------------
+    # --- what this slideshow's HUD says, in the Funestras' vocabulary --------
 
     @property
     def hud_prompt_id(self) -> str:
@@ -1215,7 +1220,7 @@ class SlideshowView(QWidget):
 
     @property
     def hud_enhanced_mode(self) -> bool:
-        """Whether the show is narrowed to the pictures that have been enhanced
+        """Whether the slideshow is narrowed to the pictures that have been enhanced
         — the switch beside F-mode on its HUD."""
         return self._set.filters.enhanced
 
@@ -1240,7 +1245,7 @@ class SlideshowView(QWidget):
     def clear_modes(self) -> bool:
         """Every switch off at once — what "clear filter" has to mean once
         there is more than one to clear."""
-        return self._set.set_filters(ShowFilters())
+        return self._set.set_filters(SlideshowFilters())
 
     def show_item(self, path, *, lock: bool = False) -> None:
         """Jump to the item the HUD map named — a thumbnail click, the same
@@ -1254,7 +1259,7 @@ class SlideshowView(QWidget):
             self._flip_lock()
 
     def _jump_to(self, slide) -> None:
-        """Stand the show on *slide*, wherever the map found it: the lock
+        """Stand the slideshow on *slide*, wherever the map found it: the lock
         comes off, the way any step off a locked slide takes it off."""
         self._playlist.unlock()
         self._live = False
@@ -1262,10 +1267,10 @@ class SlideshowView(QWidget):
         self._show_current()
 
     def set_paused(self, paused: bool) -> None:
-        """Freeze or resume the show whole, with the room.
+        """Freeze or resume the slideshow whole, with the room.
 
         Distinct from the lock: a lock holds one slide by choice and replays
-        its clip; this stops time itself.  The Funestra's clock is the show's,
+        its clip; this stops time itself.  The Funestra's clock is the slideshow's,
         so a frozen picture stops counting down its dwell and a frozen clip
         stops playing, and a slide stepped to while frozen arrives frozen too.
         """
@@ -1311,9 +1316,9 @@ class SlideshowView(QWidget):
         Unlike a clip that ended, this one never will, so the replay a lock or
         a pace of nought asks for would hold a black screen for the rest of the
         session.  The item stays in the set — the fault is the backend's, not
-        the file's — but the show moves on.
+        the file's — but the slideshow moves on.
 
-        A pause is the one stop this yields to: the show is frozen, and a show
+        A pause is the one stop this yields to: the slideshow is frozen, and a slideshow
         that walked its set looking for something playable would be moving.
         The black rectangle waits for the resume.
         """
@@ -1324,14 +1329,14 @@ class SlideshowView(QWidget):
         self._set.step(1)
         self._show_current()
 
-    # --- the pause a spoken request puts on the show -----------------------
+    # --- the pause a spoken request puts on the slideshow ------------------
 
     def pause_for_request(self, paused: bool, note: str = "") -> None:
         """Stop (or release) the advance while a request is being spoken.
 
         Not the user's lock: a slide they had locked is still locked when the
         request ends, and one they hadn't goes back to its dwell. ``note`` is
-        what the corner should say while the show waits — the only sign, in a view
+        what the corner should say while the slideshow waits — the only sign, in a view
         with no panels, that the mic is taking a sentence.
         """
         self._playlist.set_paused(paused)
@@ -1397,12 +1402,12 @@ class SlideshowView(QWidget):
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,
                       still=None) -> None:
-        """An enhancement of one of these items landed: the show points at it
+        """An enhancement of one of these items landed: the slideshow points at it
         from here on, wherever that item sits in the running order.
 
         Not only while it is the one on screen. It was asked for minutes ago and
-        the show may have paged on since; and the playlist is the fixed set the
-        show opened with — nothing re-reads the folder — so a swap confined to the
+        the slideshow may have paged on since; and the playlist is the fixed set the
+        slideshow opened with — nothing re-reads the folder — so a swap confined to the
         current slide would leave every later pass replaying the version this
         one replaced. What is on screen changes only when the upgraded item is
         what's on it: it carries on the move the picture was on, as the frames
@@ -1496,7 +1501,7 @@ class SlideshowView(QWidget):
     def note_voice_command(self, message: str, *, kind: str = NOTICE) -> None:
         """Say what a spoken command did. Here rather than in the gallery's own
         caption because the speaker is looking at this — the window under it is
-        covered by the very show being talked to."""
+        covered by the very slideshow being talked to."""
         self._flash_note(message, ms=2500, kind=kind)
 
     def _refresh_note(self):
@@ -1573,13 +1578,13 @@ class SlideshowView(QWidget):
         elif key == Qt.Key.Key_Right:
             self._step_level(1) if shifted else self._step(1)
         elif key == Qt.Key.Key_Up:
-            self.show_nav("up") if shifted else self._delete_current()
+            self.slideshow_nav("up") if shifted else self._delete_current()
         elif key == Qt.Key.Key_Down:
-            self.show_nav("down") if shifted else self._lock_current()
+            self.slideshow_nav("down") if shifted else self._lock_current()
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             # The loop key, on both of the keys a session gives its two
             # satellites: seeds, then actions, then off.
-            self.show_loop_cycle()
+            self.slideshow_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._open_current()    # out of the slideshow, into its folder
         elif apply_motion_key(self._motion, key,
@@ -1597,11 +1602,11 @@ class SlideshowView(QWidget):
     def closeEvent(self, event):
         """Leave, handing the gallery the slide that was on screen.
 
-        However the show is left — Escape, a double-click, Enter, the spoken
+        However the slideshow is left — Escape, a double-click, Enter, the spoken
         "close", or ending on a locked slide — the picture you were looking at is
         the one you want to find afterwards, so the gallery picks it where the
-        show was playing. Only a show with nothing on screen hands nothing over,
-        which is a show whose last item was culled.
+        slideshow was playing. Only a slideshow with nothing on screen hands nothing over,
+        which is a slideshow whose last item was culled.
         """
         self.hide()
         self._pane.close_engine()  # lets go of every held file, so it can be deleted
@@ -1611,8 +1616,8 @@ class SlideshowView(QWidget):
         landing = self._land_on or self._current_prompt_id()
         # Both cleared before a second close could read them, so the handover
         # happens once. The lock outlives the first emit because the gallery
-        # reads this show's state there, and a slide closed under a lock is one
-        # a reopened show locks.
+        # reads this slideshow's state there, and a slide closed under a lock is one
+        # a reopened slideshow locks.
         self._land_on = None
         self.closed.emit()
         self._playlist.unlock()
@@ -1626,25 +1631,25 @@ class SlideshowOnAFunestra:
 
     The Funestra asks it about every press on the panel it wears and every
     verb, gives it a pass of its own each frame, and heads the panel with what
-    it says it is playing.  The window is the show's own, so closing the
-    Funestra closes nothing here: the show closes the Funestra, not the other
+    it says it is playing.  The window is the slideshow's own, so closing the
+    Funestra closes nothing here: the slideshow closes the Funestra, not the other
     way round.
     """
 
-    def __init__(self, show: SlideshowView) -> None:
-        self._show = show
+    def __init__(self, slideshow: SlideshowView) -> None:
+        self._slideshow = slideshow
 
     def apply_command(self, command: str) -> bool:
-        return self._show.press(command)
+        return self._slideshow.press(command)
 
     def tick(self) -> None:
-        self._show.follow_the_funestra()
+        self._slideshow.follow_the_funestra()
 
     def status_fields(self) -> dict[str, str]:
         return {}
 
     def top_block(self) -> ModeHud:
-        return ModeHud(video=self._show.item_label())
+        return ModeHud(video=self._slideshow.item_label())
 
     def set_showing(self, showing: bool) -> None:
         pass

@@ -4,7 +4,7 @@ Pure, Qt-free playlist state: what's on screen, how to step through it, and how
 long to dwell on an image before advancing. :class:`SlideshowPlaylist` plays a
 set of :class:`Slide` in a random order, reshuffled each pass, with the shuffle
 injectable so the order is deterministic under test; a lock holds one item against the advance,
-answering Fun Time's padlock. The set grows as generations land in what the show
+answering Fun Time's padlock. The set grows as generations land in what the slideshow
 is playing (:meth:`SlideshowPlaylist.add`) — a folder that is auto-generating is
 the case that asks for it — and it grows earlier still for one that is only being
 made: a :data:`LIVE` slide is the frames ComfyUI is streaming of a run, standing
@@ -13,17 +13,17 @@ Videos aren't dwell-timed: they play once and the view advances when they end,
 so ``dwell_ms`` returns ``None`` for them. Keeping this a plain, Qt-free object
 lets the policy be unit-tested without a window or a clock.
 
-A dwell of zero means never: the show holds whatever is on screen until an arrow
+A dwell of zero means never: the slideshow holds whatever is on screen until an arrow
 moves it.
 
-A third stop — :attr:`SlideshowPlaylist.paused` — is the show's own rather than
+A third stop — :attr:`SlideshowPlaylist.paused` — is the slideshow's own rather than
 the user's or the pace's: speaking a request stops the advance for as long as
 the sentence takes, and releases it without disturbing either of the others.
 
-Closing a show is rarely being done with it, so where one was is kept:
-:class:`ShowState` says it and :meth:`SlideshowPlaylist.resume` lays a fresh
+Closing a slideshow is rarely being done with it, so where one was is kept:
+:class:`SlideshowState` says it and :meth:`SlideshowPlaylist.resume` lays a fresh
 pass back out that way. It is said in generation ids rather than in places,
-because the set the next show plays is not the one this one held — items landed
+because the set the next slideshow plays is not the one this one held — items landed
 while it was away, and anything it culled is gone.
 """
 from __future__ import annotations
@@ -48,7 +48,7 @@ LIVE = "live"
 
 
 class Slide(NamedTuple):
-    """One thing a show plays: a file (or the frames of a run still making one),
+    """One thing a slideshow plays: a file (or the frames of a run still making one),
     what kind of media it is, the generation it came from, and the still it is
     drawn as while it is a neighbor rather than the one on screen.
 
@@ -89,13 +89,13 @@ class Slide(NamedTuple):
 
 
 @dataclass(frozen=True)
-class ShowFilters:
+class SlideshowFilters:
     favorites: bool = False
     enhanced: bool = False
     act: str = ""
 
     @classmethod
-    def restored(cls, saved) -> ShowFilters:
+    def restored(cls, saved) -> SlideshowFilters:
         if not isinstance(saved, dict):
             return cls()
         act = saved.get("act")
@@ -105,8 +105,8 @@ class ShowFilters:
 
 
 @dataclass(frozen=True)
-class ShowState:
-    """Where a show was when it closed, for whichever one opens next.
+class SlideshowState:
+    """Where a slideshow was when it closed, for whichever one opens next.
 
     ``order`` is the pass it was playing and ``current`` the slide it stood on,
     both as generation ids. The rest is what that slide was doing — locked against
@@ -123,7 +123,7 @@ class ShowState:
         return asdict(self)
 
     @classmethod
-    def restored(cls, saved) -> ShowState:
+    def restored(cls, saved) -> SlideshowState:
         if not isinstance(saved, dict):
             return cls()
         order, current = saved.get("order"), saved.get("current")
@@ -201,10 +201,10 @@ class SlideshowPlaylist:
     def restart(self) -> None:
         """Back to the top of the pass — the reset gesture's "start it again".
 
-        The top of the PASS, not of the set: a shuffled show's first slide is
+        The top of the PASS, not of the set: a shuffled slideshow's first slide is
         wherever its shuffle put it, and coming back to that is what starting
         over looks like from the outside.  The order itself is left as it is,
-        so a reset pressed twice does not keep dealing a different show.
+        so a reset pressed twice does not keep dealing a different slideshow.
         """
         self._pos = 0
 
@@ -252,17 +252,17 @@ class SlideshowPlaylist:
         return [self._items[index] for index in self._order]
 
     def order_ids(self) -> list:
-        """The pass in ids rather than in places — how a closing show hands its
+        """The pass in ids rather than in places — how a closing slideshow hands its
         order to the next one, over a set that will have moved on."""
         return [self._items[index].prompt_id for index in self._order]
 
     def resume(self, order_ids, current_id) -> bool:
-        """Lay the pass back out the way a closed show left it, standing on the
+        """Lay the pass back out the way a closed slideshow left it, standing on the
         slide it was showing. Returns whether that slide is still here to stand on.
 
-        It may not be — culled while the show was away, or this is another
+        It may not be — culled while the slideshow was away, or this is another
         folder's set entirely — and then nothing is disturbed: a pass laid out
-        around an item that isn't in it would open the show on an arbitrary
+        around an item that isn't in it would open the slideshow on an arbitrary
         stranger, which is worse than the shuffle it already has.
 
         Items the remembered order doesn't name follow the ones it does, keeping
@@ -308,7 +308,7 @@ class SlideshowPlaylist:
         return self.current()
 
     def add(self, item) -> bool:
-        """Take in an item that has landed since the show opened, and line it up
+        """Take in an item that has landed since the slideshow opened, and line it up
         after the other arrivals still waiting their turn. Returns whether it was
         new here.
 
@@ -383,7 +383,7 @@ class SlideshowPlaylist:
 
     def _remove(self, index: int) -> None:
         """Take the item at ``index`` out of the set and out of the running pass,
-        keeping the show standing where it stands: on the item that followed one
+        keeping the slideshow standing where it stands: on the item that followed one
         removed from under it, and on the same item otherwise."""
         at = self._order.index(index)
         del self._items[index]
@@ -400,7 +400,7 @@ class SlideshowPlaylist:
 
         Matched by id wherever the item sits, not only while it is the one on
         screen. An enhancement asked for from a slideshow lands minutes later, by
-        which time the show has long paged on, so an arrival dropped for being
+        which time the slideshow has long paged on, so an arrival dropped for being
         late would leave the pre-enhance file playing every pass for the rest of
         the session.
         """
@@ -436,25 +436,25 @@ class SlideshowPlaylist:
         return self._locked
 
     def set_locked(self, locked: bool) -> None:
-        """Put the lock back where a closed show left it — a slide it was closed
+        """Put the lock back where a closed slideshow left it — a slide it was closed
         on locked is one it reopens locked."""
         self._locked = bool(locked)
 
     def unlock(self) -> None:
         self._locked = False
 
-    # --- pause: a stop the show puts on itself -----------------------------
+    # --- pause: a stop the slideshow puts on itself ------------------------
 
     @property
     def paused(self) -> bool:
         """Whether something other than the user's lock is stopping the slide.
 
-        Speaking a request pauses the show: the request is *about* what is on
+        Speaking a request pauses the slideshow: the request is *about* what is on
         screen, and a set that pages on every few seconds would hand the words
         to whatever came up next. Kept apart from the lock so releasing one
         never releases the other — a paused slide the user had locked stays
         locked when the request ends, and stepping off a slide (which drops its
-        lock) doesn't quietly resume a show that is still listening.
+        lock) doesn't quietly resume a slideshow that is still listening.
         """
         return self._paused
 

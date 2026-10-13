@@ -6,7 +6,7 @@ panel and the app-wide settings it holds, which pictures the Enhance button woul
 act on and why a particular one is passed over, the launch of a batch under the
 folder its settings shape, and the run's appearance on every surface that shows
 the picture it improves: the tile's scrim, the version list's live row, a tab's
-streaming preview, and an open show's corner.
+streaming preview, and an open slideshow's corner.
 
 The spoken words that ask for one are here too -- "enhance" over a picture, and
 "fix <part>" for the same picture with a detail pass aimed at what was named --
@@ -92,13 +92,13 @@ class EnhanceHost(Protocol):
 class EnhanceController:
     """Every standalone enhance: its settings, its launches, and its live runs."""
 
-    def __init__(self, host: EnhanceHost, *, db, jobs, browser, shows,
+    def __init__(self, host: EnhanceHost, *, db, jobs, browser, slideshows,
                  info_tabs_of):
         self._host = host
         self._db = db
         self._jobs = jobs
         self._browser = browser
-        self._shows = shows
+        self._slideshows = slideshows
         # The tabs are built by the window's own layout, after this: asked for
         # rather than held, so a live run reaches whichever tabs exist by then.
         self._info_tabs_of = info_tabs_of
@@ -322,7 +322,7 @@ class EnhanceController:
             # Which image the run is of, by id: the params name only the file it
             # reads, and a file name can belong to more than one row. Stamped on
             # the row for the fold and for a restart, and remembered here for
-            # the tile, the version list and the show while it runs — after the
+            # the tile, the version list and the slideshow while it runs — after the
             # launch's own reconcile, which read the row before the stamp.
             self._db.set_enhance_target(prompt_id, row.get("prompt_id"))
             self._targets[prompt_id] = row.get("prompt_id")
@@ -360,7 +360,7 @@ class EnhanceController:
         didn't), the line the speaking surface should say, and its kind.
 
         Only an image that has received no enhancement gets one, the same gate a
-        fullscreen lock's Down uses — spoken over a show, this is a gesture made
+        fullscreen lock's Down uses — spoken over a slideshow, this is a gesture made
         with no view of the Enhance panel, and an image already carrying an
         enhancement someone chose must not be re-derived at whatever the settings
         happen to say now. Re-enhancing stays a deliberate act made in front of
@@ -437,7 +437,7 @@ class EnhanceController:
         return False
 
     def put_what_is_locked_first(self) -> None:
-        locked = [row for prompt_id in self._shows.locked_prompt_ids()
+        locked = [row for prompt_id in self._slideshows.locked_prompt_ids()
                   if (row := self._host.row_for(prompt_id)) is not None]
         self._jobs.put_first(job.prompt_id for job in self.jobs_targeting(locked))
 
@@ -539,24 +539,24 @@ class EnhanceController:
                 self._pending_for(row, running) if row else None
             )
         self._reconcile_tiles(running)
-        self.tell_the_shows()
+        self.tell_the_slideshows()
 
-    def tell_the_shows(self) -> None:
-        """Tell an open show how the enhancements in flight are going.
+    def tell_the_slideshows(self) -> None:
+        """Tell an open slideshow how the enhancements in flight are going.
 
-        A show is where a batch of them gets asked for — every locked slide is a
+        A slideshow is where a batch of them gets asked for — every locked slide is a
         run — so it is the surface most likely to be looking at a picture whose
-        turn has not come. The show cannot tell on its own: a lock hears only
+        turn has not come. The slideshow cannot tell on its own: a lock hears only
         that a run started, not where in the line it landed. Told, its HUD
         says whether the version is being made or waiting to be.
 
         Keyed by the mapping the tiles are drawn from, which covers every image
-        in the library rather than the open folder's — a show of a collection plays
+        in the library rather than the open folder's — a slideshow of a collection plays
         items from anywhere. The status is read off the job rather than its row:
         the row says "running" from the moment the job is handed to ComfyUI, and
         the wait on ComfyUI's own queue is exactly the stretch this names.
         """
-        self._shows.note_enhancing(
+        self._slideshows.note_enhancing(
             {prompt_id: "running" if job.state == "running" else "queued"
              for prompt_id, job in self._by_prompt.items()},
             {prompt_id: job.last_preview for prompt_id, job in self._by_prompt.items()
@@ -621,7 +621,7 @@ class EnhanceController:
         :meth:`run_of`'s question asked the other way round — over a set of
         images rather than one — for the callers that act on a whole set: the
         tile menu's Cancel, the delete about to take those images out from
-        under their runs, and the pictures the shows are locked on.
+        under their runs, and the pictures the slideshows are locked on.
         """
         running = self._enhances_in_flight()
         return [job for job in running

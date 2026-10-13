@@ -3840,8 +3840,8 @@ def test_a_recipe_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")
 
-    assert list(_workflow_rows(view._tree, "image")) == [f"{looping} images"]
-    assert list(_workflow_rows(view._tree, "video")) == [f"{looping} videos"]
+    assert list(_workflow_rows(view._tree, "image")) == [looping]
+    assert list(_workflow_rows(view._tree, "video")) == [looping]
 
 
 def test_with_several_folders_picked_the_path_opens_empty(qtbot):

@@ -61,7 +61,7 @@ PUBLISHED = {
     "favorite_folders", "favorite_generations", "start_frame_index",
     "cycle_shaped",
     "unreviewed_experiments",
-    "videos_from_source_image", "workflow_output_type", "workflows_of_both_kinds",
+    "videos_from_source_image", "workflow_output_type",
 }
 
 

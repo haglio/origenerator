@@ -29,7 +29,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
-from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names
+from tests.slideshow_hud_support import engine_of, funestra_of, hud_button_names, open_both_sides
 from tests.test_gallery_view import (  # the in-memory Database stand-in, and a row for it
     MODE_VERBS,
     FakeDB,
@@ -745,7 +745,7 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    view.fill_the_regions()
+    open_both_sides(view)
 
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow)
@@ -758,7 +758,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     """The Funestra under a region is blacked for the whole mode, so a region left
     empty is a black rectangle — not a fallback.  Two ways it can be left empty
     and both are answered: the slideshow covering it ends, and the base state was
-    asked for before the tree it reads had been built (the session's OPEN_SHOWS
+    asked for before the tree it reads had been built (the session's open
     races this app's boot)."""
     view = _fun_time_view(qtbot)
     tall = tmp_path / "tall.png"
@@ -770,7 +770,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
                                      if key == "__all__::portrait" else []))
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    view.fill_the_regions()          # asked for too early: nothing to play yet
+    open_both_sides(view)            # asked for too early: nothing to play yet
     assert view.region_slideshow("portrait") is None
 
     library["rows"] = base
@@ -950,7 +950,7 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     view = _fun_time_view(qtbot)
     library = _a_library_of_each_shape(view, tmp_path, monkeypatch)
 
-    view.fill_the_regions()
+    open_both_sides(view)
 
     for side in ("portrait", "landscape"):
         slideshow = view.region_slideshow(side)
@@ -971,7 +971,7 @@ def test_a_video_asked_for_in_origenerator_mode_is_made_while_both_regions_play(
     view = GalleryView(Database(tmp_path / "test.db"), fun_time=_session(), client=client)
     qtbot.addWidget(view)
     _a_library_of_each_shape(view, tmp_path, monkeypatch)
-    view.fill_the_regions()
+    open_both_sides(view)
     for side in ("portrait", "landscape"):
         qtbot.addWidget(view.region_slideshow(side))
 

@@ -7,8 +7,9 @@ slideshows the way it reaches the Funestras:
 
 * ``PORTRAIT_NEXT`` steps whatever holds the portrait region the way ``NEXT``
   steps the Portrait Funestra — same for ``PREV``/``TRASH``/``LOCK``/``RESET``
-  and the landscape side.  ``OPEN_SHOWS`` fills both regions (the session
-  switching INTO origenerator mode) and ``CLOSE_SLIDESHOWS`` clears them again;
+  and the landscape side.  ``PORTRAIT_OPEN_SLIDESHOW`` fills that region (its
+  Funestra switching INTO origenerator mode), ``PORTRAIT_CLOSE_SLIDESHOW``
+  clears it again and ``CLOSE_SLIDESHOWS`` clears both;
   ``FILTER_ENHANCED`` flips the enhanced-only switch a slideshow's HUD and the
   session's console both carry; ``GO_TO|<file>`` lands the gallery on the
   generation a file is a copy of, and ``RELEASE`` gives a window the session
@@ -41,10 +42,8 @@ from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOW,
     CLOSE_SLIDESHOWS,
     FILTER_ENHANCED,
-    FORMER_NAMES,
     GO_TO,
     HAND_OVER,
-    OPEN_SHOWS,
     OPEN_SLIDESHOW,
     RELEASE,
     SAY,
@@ -110,7 +109,6 @@ class FunTimeBridge(QObject):
         self._published = False
         # The verbs about the session's slideshows as a whole, rather than one side's.
         self._session_verbs = {
-            OPEN_SHOWS: lambda: self._gallery.fill_the_regions(),
             # Through the gallery, not slideshow by slideshow: it has to stop WANTING the
             # regions first, or each close it makes here is answered by the
             # base state opening again underneath it.
@@ -158,7 +156,6 @@ class FunTimeBridge(QObject):
             return
         keyword, marker, argument = _split_argument(line)
         keyword = keyword.upper()  # what it carries keeps its case
-        keyword = FORMER_NAMES.get(keyword, keyword)
         if keyword == HAND_OVER and marker == "|":
             frames, _, taken = argument.partition("|")
             self.hand_over_asked.emit(Path(frames), Path(taken))
@@ -174,7 +171,6 @@ class FunTimeBridge(QObject):
             logger.warning("Unknown Fun Time verb dropped: %s", line)
             return
         action, argument = side_press(side, keyword.lower(), argument)
-        action = FORMER_NAMES.get(action, action)
         if not marker and action in self._side_verbs:
             self._side_verbs[action](side)
             return

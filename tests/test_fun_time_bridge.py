@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 from funestra.file_channel import consume_command_file
 from funestra.hud_placement import HudCorner
 from funestra.playlist import read_playlist
@@ -22,6 +21,7 @@ from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.slideshow_buttons import answer
+from tests.slideshow_hud_support import open_both_sides
 from tests.test_gallery_view import FakeDB, _enhanced_image, _image, _row
 
 
@@ -192,20 +192,6 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
     assert [(c.collection_key, c.side) for c in played] == [(FAVORITES_KEY, "landscape")]
 
 
-def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
-    """Entering the mode opens it PLAYING, the way entering kino mode leaves
-    two Funestras playing — two empty rectangles asked the user to start the mode
-    they had just asked for."""
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    filled = []
-    monkeypatch.setattr(view, "fill_the_regions", lambda: filled.append(True))
-
-    (tmp_path / "origenerator_cmd.txt").write_text("OPEN_SHOWS\n", encoding="utf-8")
-    bridge._tick()
-
-    assert filled == [True]
-
-
 def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, monkeypatch):
     """Each of the session's Satellite Funestras goes into Origenerator mode by
     itself, so the session hands this app one side at a time."""
@@ -236,8 +222,9 @@ def test_a_released_bridge_answers_the_session_no_further(qtbot, tmp_path, monke
     monkeypatch.setattr(view, "set_room_paused", paused.append)
 
     (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
-    (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\nOPEN_SHOWS\n", encoding="utf-8")
-    monkeypatch.setattr(view, "fill_the_regions", lambda: paused.append("filled"))
+    (tmp_path / "origenerator_cmd.txt").write_text("RELEASE\nportrait_open_slideshow\n",
+                                                 encoding="utf-8")
+    monkeypatch.setattr(view, "fill_the_region", lambda side: paused.append("filled"))
     bridge._tick()
 
     assert paused == []
@@ -269,29 +256,9 @@ def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, t
     assert view.region_slideshow("portrait") is None
 
 
-@pytest.mark.parametrize(("said_before", "says_now"), [
-    ("CLOSE_SHOWS", "CLOSE_SLIDESHOWS"),
-    ("portrait_open_show", "portrait_open_slideshow"),
-    ("landscape_close_show", "landscape_close_slideshow"),
-])
-def test_a_session_that_still_says_show_is_answered_as_one_that_says_slideshow(
-        qtbot, tmp_path, monkeypatch, said_before, says_now):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    asked = []
-    for name in ("close_the_slideshows", "fill_the_region", "close_the_slideshow"):
-        monkeypatch.setattr(view, name, lambda *args, name=name: asked.append((name, args)))
-
-    for line in (said_before, says_now):
-        (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
-        bridge._tick()
-
-    assert len(asked) == 2
-    assert asked[0] == asked[1]
-
-
 def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
     """Both regions on their base state, each playing the ids named for it —
-    what OPEN_SHOWS puts up, and the arrangement one switch has to move.
+    what the session's two opens put up, and the arrangement one switch has to move.
 
     The ids are the fabricated rows' own, so the slideshow can tell which of its
     items carry an enhancement; the items above carry ids no row has.
@@ -309,7 +276,7 @@ def _fill_both_regions(qtbot, view, monkeypatch, tmp_path, portrait, landscape):
         {**(view.row_for(item[2]) or {}), **_row_of(item)}
         for item in library.get(key, [])])
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
-    view.fill_the_regions()
+    open_both_sides(view)
     slideshows = [view.region_slideshow(side) for side in ("portrait", "landscape")]
     for slideshow in slideshows:
         qtbot.addWidget(slideshow)
@@ -604,7 +571,8 @@ def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
                         lambda key: [_row_of(item) for item in library.get(key, [])])
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
 
-    _press(bridge, tmp_path, "OPEN_SHOWS")
+    _press(bridge, tmp_path, "portrait_open_slideshow")
+    _press(bridge, tmp_path, "landscape_open_slideshow")
 
     assert [str(item.path) for item in read_playlist(tmp_path / "portrait.tsv")] == [str(tall)]
     assert [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")] == [str(wide)]
@@ -644,7 +612,8 @@ def _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(view._slideshows, "rows_at",
                         lambda key: [_row_of(item) for item in library.get(key, [])])
     monkeypatch.setattr(view._slideshows, "items_of", _items_of)
-    _press(bridge, tmp_path, "OPEN_SHOWS")
+    _press(bridge, tmp_path, "portrait_open_slideshow")
+    _press(bridge, tmp_path, "landscape_open_slideshow")
     for side in ("landscape", "portrait"):
         _told(tmp_path, side)
     return view

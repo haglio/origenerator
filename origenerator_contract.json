@@ -1,10 +1,6 @@
 {
   "module": "origenerator",
   "window_title": "Origenerator",
-  "show_titles": {
-    "portrait": "Origenerator Portrait",
-    "landscape": "Origenerator Landscape"
-  },
   "check_launch_flag": "--check-launch",
   "required_flags": [
     "--fun-time",
@@ -60,18 +56,14 @@
   ],
   "command_case_blind": true,
   "command_lines": [
-    "OPEN_SHOWS",
     "CLOSE_SLIDESHOWS",
     "FILTER_ENHANCED",
     "RELEASE",
     "TAKE_BACK",
-    "CLOSE_SHOWS",
     "HAND_OVER|{frames}|{input}",
     "GO_TO|{file}",
     "portrait_open_slideshow",
     "portrait_close_slideshow",
-    "portrait_open_show",
-    "portrait_close_show",
     "portrait_prev",
     "portrait_next",
     "portrait_lock",
@@ -108,8 +100,6 @@
     "portrait_say:{words}",
     "landscape_open_slideshow",
     "landscape_close_slideshow",
-    "landscape_open_show",
-    "landscape_close_show",
     "landscape_prev",
     "landscape_next",
     "landscape_lock",

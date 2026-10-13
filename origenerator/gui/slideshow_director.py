@@ -39,7 +39,7 @@ from origenerator.config import (
 )
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
-from origenerator.fun_time_mode import SLIDESHOW_TITLES, region_for_items
+from origenerator.fun_time_mode import region_for_items
 from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
@@ -85,6 +85,8 @@ from origenerator.voice.slideshow_commands import SlideshowCommand
 from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
+
+_REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
 
 
 class SlideshowHost(Protocol):
@@ -720,7 +722,7 @@ class SlideshowDirector:
         occupant = self._region_slideshows.get(side)
         if occupant is not None and occupant.is_showing():
             occupant.close()
-        view.setWindowTitle(SLIDESHOW_TITLES[side])
+        view.setWindowTitle(_REGION_CAPTIONS[side])
         view.setWindowFlags(
             view.windowFlags()
             | Qt.WindowType.FramelessWindowHint
@@ -987,19 +989,6 @@ class SlideshowDirector:
         the same way.
         """
         return oriented_key(gallery.ALL_KEY, side)
-
-    def fill_the_regions(self) -> None:
-        """Put a slideshow on each region: the slideshow this window was taken over
-        on, on its side, and elsewhere the whole library, shuffled, one shape each.
-
-        What entering origenerator mode means — the session's own mode opens
-        with both Funestras playing, so this one opens with both regions playing
-        rather than with two empty rectangles and a mode that has to be started
-        by hand.  A region already holding a slideshow is left alone: the switch is
-        no reason to interrupt something already up.
-        """
-        for side in _ORIENTATIONS:
-            self.fill_the_region(side)
 
     def fill_the_wanted_regions(self) -> None:
         for side in _ORIENTATIONS:

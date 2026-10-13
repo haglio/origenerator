@@ -30,6 +30,7 @@ from origenerator.orientation import oriented_key
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
+from tests.slideshow_hud_support import open_both_sides
 
 PORTRAIT = "portrait"
 LANDSCAPE = "landscape"
@@ -634,7 +635,7 @@ def _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshow
 def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_as_it_was(slideshows):
     director, watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshows)
 
-    director.fill_the_regions()
+    open_both_sides(director)
 
     carried = director.region_slideshow(PORTRAIT)
     assert [slide[2] for slide in carried.items] == ["g1", "g2"]
@@ -646,10 +647,10 @@ def test_a_slideshow_up_when_a_session_takes_the_window_over_opens_on_its_side_a
 
 def test_the_slideshow_a_session_took_over_is_put_back_on_the_first_opening_only(slideshows):
     director, _watched = _a_slideshow_he_is_watching_when_the_session_takes_the_window_over(slideshows)
-    director.fill_the_regions()
+    open_both_sides(director)
 
     director.close_the_slideshows()
-    director.fill_the_regions()
+    open_both_sides(director)
 
     assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == ["g4"]
 
@@ -659,7 +660,7 @@ def test_a_window_handed_back_before_its_regions_opened_lets_go_of_the_slideshow
 
     director.become_standalone(motion=None)
     director.become_hosted(FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
 
     assert [slide[2] for slide in director.region_slideshow(PORTRAIT).items] == ["g4"]
 
@@ -690,7 +691,7 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slidesho
     director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
                                          for row in rows}
 
-    director.fill_the_regions()
+    open_both_sides(director)
 
     assert director.region_slideshow(PORTRAIT).levels == {"g4.png": ["newer", "older"]}
     assert director.region_slideshow(LANDSCAPE).levels == {"g5.png": ["newer", "older"]}
@@ -704,7 +705,7 @@ def test_a_sessions_regions_open_on_their_base_state_whatever_was_pressed(slides
     made[0].actions.filters_changed(SlideshowFilters(enhanced=True))
     made[0].close()
 
-    director.fill_the_regions()
+    open_both_sides(director)
 
     assert director.region_slideshow(PORTRAIT).taken_up == (SlideshowFilters(), False)
     assert director.region_slideshow(LANDSCAPE).taken_up == (SlideshowFilters(), False)
@@ -720,7 +721,7 @@ def test_a_region_says_how_long_it_took_to_fill(slideshows, caplog):
     director, _host, _made = slideshows(browser=browser, fun_time=FakeSession())
 
     with caplog.at_level("INFO", logger="origenerator.gui.slideshow_director"):
-        director.fill_the_regions()
+        open_both_sides(director)
 
     opened = [record.message for record in caplog.records if "region opens" in record.message]
     assert len(opened) == 2
@@ -729,7 +730,7 @@ def test_a_region_says_how_long_it_took_to_fill(slideshows, caplog):
 
 def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullscreen_slideshow(slideshows):
     director, _host, made = slideshows(fun_time=FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
     motion = object()
 
@@ -1065,7 +1066,7 @@ def test_a_region_slideshow_ending_comes_back_on_the_base_state(slideshows):
     # so a region left empty is a black rectangle rather than a fallback.
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = slideshows(browser=browser, fun_time=FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
     first = director.region_slideshow(PORTRAIT)
 
     first.close()
@@ -1079,7 +1080,7 @@ def test_closing_the_slideshows_drops_the_wanting_before_it_closes_anything(slid
     # base state, and these closes must not be.
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = slideshows(browser=browser, fun_time=FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
 
     director.close_the_slideshows()
     director.fill_the_wanted_regions()
@@ -1100,7 +1101,7 @@ def test_a_side_handed_over_alone_opens_on_that_side_alone(slideshows):
 def test_a_side_let_go_alone_stays_empty_and_leaves_the_other_playing(slideshows):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
     director, _host, _made = slideshows(browser=browser, fun_time=FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
     landscape = director.region_slideshow(LANDSCAPE)
 
     director.close_the_slideshow(PORTRAIT)
@@ -1148,10 +1149,10 @@ def test_a_side_let_go_before_it_was_handed_over_forgets_the_slideshow_asked_for
 def test_a_region_already_holding_a_slideshow_is_left_alone(slideshows):
     browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = slideshows(browser=browser, fun_time=FakeSession())
-    director.fill_the_regions()
+    open_both_sides(director)
     standing = director.region_slideshow(PORTRAIT)
 
-    director.fill_the_regions()
+    open_both_sides(director)
 
     assert director.region_slideshow(PORTRAIT) is standing
 

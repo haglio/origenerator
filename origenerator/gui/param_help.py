@@ -282,7 +282,7 @@ RECOMMENDED: dict[str, str] = {
     ),
     "split_step": (
         "Leave it at 0, which hands over halfway through the steps and suits a "
-        "Composition Focus of 8; set by hand, 40–60% of Steps is the usual span."
+        "Composition Focus of 8; set by hand, 40–60% of Steps is the usual good range."
     ),
     "guidance": (
         "Good range: 2.5–4.5; 3.5 is the usual start."
@@ -298,7 +298,8 @@ RECOMMENDED: dict[str, str] = {
         "seed and change only this, on two or three different prompts."
     ),
     "denoise": (
-        "Leave it at 1.0 for a new picture; 0.4–0.7 keeps more of a starting image."
+        "Leave it at 1.0 for a new picture; to keep more of a starting image, 0.4–0.7 "
+        "is the good range."
     ),
     "shift": (
         "Good range: 5–12; 8 is the usual start, 5 for a looping clip."

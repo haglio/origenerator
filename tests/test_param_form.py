@@ -2128,6 +2128,18 @@ def test_clicking_a_sections_warning_resolves_every_warning_in_it_and_none_outsi
     assert (values["steps"], values["cfg_high"], values["lora_strength_high"]) == (40, 6.0, 1.5)
 
 
+def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):
+    form = _wan_form(qtbot)
+    form.set_values({"steps": 50, "example_extra": "kept", "width": 640, "height": 960})
+    form.set_warnings(_STEPS_ADVICE)
+
+    qtbot.mouseClick(form._warning_marks["steps"], Qt.MouseButton.LeftButton)
+
+    values = form.get_values()
+    assert (values["steps"], values.get("example_extra"), values.get("width"),
+            values.get("height")) == (40, "kept", 640, 960)
+
+
 def test_a_warning_mark_sits_left_of_its_label(qtbot):
     form = _laid_out(qtbot, ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions()))
 

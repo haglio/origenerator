@@ -120,5 +120,11 @@ def test_one_value_is_recommended_as_advice_rather_than_as_a_range():
     assert RECOMMENDED["split_step"].startswith("Leave it at 0,")
 
 
+def test_every_span_of_numbers_is_called_a_good_range():
+    unnamed = sorted(key for key, text in RECOMMENDED.items()
+                     if re.search(r"\d–\d", text) and "good range" not in text.lower())
+    assert unnamed == []
+
+
 def test_the_one_composition_focus_says_nothing_about_passes():
     assert "pass" not in param_help("shift_high")

@@ -1569,7 +1569,7 @@ def test_panel_forwards_the_preview_drag_signals(panel):
 def test_the_tab_watches_no_run_of_its_own(panel):
     # Generate submits and is done with it. It used to fill with the tracked run's
     # steps, which took a third telling of one run — differently worded from the
-    # strip's queue and the shelf's card — and wired the control that starts work
+    # strip's queue and the collection's card — and wired the control that starts work
     # to the state of work already going.
     panel.set_generating(True)
     assert panel._generate_btn.text() == "Generate"

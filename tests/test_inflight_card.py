@@ -66,7 +66,7 @@ def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
 
 
 def test_media_badge_shows_only_when_the_item_names_a_type(qtbot):
-    # An in-flight card on the Recents shelf wears the same image/video badge as a
+    # An in-flight card in the Recents collection wears the same image/video badge as a
     # finished tile, so a queued video reads as a video before its first frame.
     plain = InFlightCard(_item())                    # no type known → no badge
     qtbot.addWidget(plain)
@@ -135,7 +135,7 @@ def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
 
 
 def test_the_clock_advances_between_polls(qtbot):
-    # The gallery re-feeds the shelf every 1.5s, which would make a seconds count
+    # The gallery re-feeds the collection every 1.5s, which would make a seconds count
     # skip; the card re-reads the clock itself so it moves a second at a time.
     card = InFlightCard(_item(status="running", started_at=time.time() - 5.5,
                               typical_seconds=100.0))
@@ -205,7 +205,7 @@ def test_the_run_s_own_frame_replaces_what_it_came_from(qtbot, tmp_path):
 
 
 def test_right_click_requests_a_menu_for_this_card(qtbot):
-    # The card is the only thing on the shelf standing for a run still being made,
+    # The card is the only thing in the collection standing for a run still being made,
     # so a right-click on it has to reach that run. It hands the gesture up with
     # its key rather than answering it, the way a finished tile does — what the
     # menu offers is the pane's business, not the card's.

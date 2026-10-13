@@ -403,7 +403,7 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
     run that made it — ``{prompt_id: (finished, id)}`` — for the images that have one.
 
     An enhancement is not an item beside the image but something that happens to
-    it, so the shelf that lists what you have lately made has to list the image
+    it, so the collection that lists what you have lately made has to list the image
     itself, moved: it belongs where its enhancement falls in the library's order,
     not where its own generation does (:func:`~origenerator.gallery.tree.
     recent_generations`). When the run finished and the id it ran under are that

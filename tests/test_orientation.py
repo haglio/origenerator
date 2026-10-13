@@ -2,7 +2,7 @@
 
 A mixed-shape set has no one screen to play on, so the tree is rooted on a
 Portrait row and a Landscape row and each carries the ENTIRE table of contents
-over its own shape's rows: the shelves, the folders the user composed, and the
+over its own shape's rows: the collections, the folders the user composed, and the
 All row over the library.  Standing anywhere is standing on one shape, so a
 slideshow started there has exactly one region to go to — and which one is read
 off the key rather than measured back out of the items.
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import QFrame, QLabel
 
 from origenerator import gallery
 from origenerator import orientation as orientation_module
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
@@ -113,7 +113,7 @@ def test_a_video_being_made_from_a_picture_goes_by_that_pictures_shape(tmp_path)
     # An i2v asks for no size — it keeps its start frame's aspect at a fixed
     # pixel budget in-graph — so the frame is the only thing saying which way
     # the video will come out. Without it a running portrait video sat on the
-    # Landscape side's Latest shelf and jumped sides the moment it landed.
+    # Landscape side's Latest collection and jumped sides the moment it landed.
     frame = tmp_path / "frame.png"
     Image.new("RGB", (90, 160)).save(frame)  # a tall start frame, named absolutely
     in_flight = _row("v1", "wan22_i2v",
@@ -433,7 +433,7 @@ def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     view.refresh()
 
     # No folders of that shape yet, so no Favorites and no library — but the
-    # shelves a first generation would land on are all there.
+    # collections a first generation would land on are all there.
     assert _rows(view._tree, "portrait") == ["All"]
     assert _under_all(view._tree, "portrait") == ["Experiments", "Requests", "Trash"]
     assert "Favorites" in _under_all(view._tree, "landscape")
@@ -471,7 +471,7 @@ def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
     assert _side_rows(view, "landscape") == ["w1"]
 
 
-def test_a_shelf_belongs_to_one_side(qtbot, tmp_path):
+def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
     view = GalleryView(FakeDB([tall, wide]))
@@ -484,8 +484,8 @@ def test_a_shelf_belongs_to_one_side(qtbot, tmp_path):
     # The slideshow plays exactly the listing — a homogeneous set, so the
     # hosting session routes the whole show to the portrait region.
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
-    # And it is what history remembers, so Back returns to that side's shelf.
-    assert view._current_shelf_key() == oriented_key(RECENTS_KEY, "portrait")
+    # And it is what history remembers, so Back returns to that side's collection.
+    assert view._current_collection_key() == oriented_key(RECENTS_KEY, "portrait")
 
 
 def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
@@ -504,7 +504,7 @@ def test_favorites_collects_the_bookmarks_of_its_own_side(qtbot, tmp_path):
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]
 
 
-def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
+def test_the_trash_and_requests_collections_split_too(qtbot, tmp_path):
     """The half-measure this replaces left Requests, Trash and All whole; the
     whole table of contents means the whole of it."""
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
@@ -521,10 +521,10 @@ def test_the_trash_and_requests_shelves_split_too(qtbot, tmp_path):
         assert _shown(view._item_by_key[oriented_key(TRASH_KEY, side)]) == f"(1) {TRASH_LABEL}"
 
     view._tree.setCurrentItem(view._item_by_key[oriented_key(TRASH_KEY, "portrait")])
-    assert view._current_shelf_key() == oriented_key(TRASH_KEY, "portrait")
+    assert view._current_collection_key() == oriented_key(TRASH_KEY, "portrait")
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
 
-    assert view._browser.rows_for_shelf(oriented_key(REQUESTS_KEY, "portrait")) == []
+    assert view._browser.rows_for_collection(oriented_key(REQUESTS_KEY, "portrait")) == []
 
 
 def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):

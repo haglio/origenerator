@@ -1126,7 +1126,7 @@ def _held_deletion(library_path, prompt_id, *, days_ago):
 
 def test_the_launch_keeps_a_deletion_however_long_it_has_been_held(qapp, library):
     # Nothing ages out. The bin holds what it holds until the user restores it
-    # or ends it from the Trash shelf, and two years is no different from two
+    # or ends it from the Trash collection, and two years is no different from two
     # minutes.
     _held_deletion(library, "p1", days_ago=730)
 

@@ -17,7 +17,7 @@ from PIL import Image
 from origenerator import fun_time_mode as contract
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
-from origenerator.gallery.shelves import FAVORITES_KEY
+from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gui import omnipause, show_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.show_buttons import answer
@@ -165,7 +165,7 @@ def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path,
 def test_a_spoken_phrase_from_the_session_runs_here(qtbot, tmp_path, monkeypatch):
     """The session owns the room's microphone, so it hears "landscape
     favorites" and posts the WORDS on this channel — matched here, against this
-    app's own vocabulary, because only this app knows what its shelves are."""
+    app's own vocabulary, because only this app knows what its collections are."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     spoken = []
     monkeypatch.setattr(view, "run_spoken_command", spoken.append)
@@ -182,13 +182,13 @@ def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path,
     command this app would have matched had it heard it itself."""
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
-    monkeypatch.setattr(view._shows, "play_shelf", played.append)
+    monkeypatch.setattr(view._shows, "play_collection", played.append)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
     bridge._tick()
 
-    assert [(c.shelf_key, c.side) for c in played] == [(FAVORITES_KEY, "landscape")]
+    assert [(c.collection_key, c.side) for c in played] == [(FAVORITES_KEY, "landscape")]
 
 
 def test_open_shows_fills_both_regions(qtbot, tmp_path, monkeypatch):
@@ -492,7 +492,7 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     played = []
-    monkeypatch.setattr(view._shows, "play_shelf", played.append)
+    monkeypatch.setattr(view._shows, "play_collection", played.append)
     monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
 
     (tmp_path / "origenerator_cmd.txt").write_text(

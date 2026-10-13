@@ -6,7 +6,7 @@ only from inside tests/test_gallery_view.py. Now it takes six narrow
 collaborators, and the stubs below are the whole of what standing one up
 costs. The wider behavior — how the view answers the pane's signals — stays
 pinned where the view is built; what lives here is the pane's own promise:
-its selection model, its shelves, and what each shelf collects.
+its selection model, its collections, and what each collection gathers.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
@@ -20,13 +20,13 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
     TRASH_KEY,
-    FolderShelf,
+    FolderCollection,
 )
 from origenerator.gui import browser_pane
 from origenerator.gui.browser_pane import (
@@ -47,7 +47,7 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def _row(prompt_id, seed, created_at=None):
-    """One finished, fabricated image row — the least a shelf tile needs."""
+    """One finished, fabricated image row — the least a collection tile needs."""
     return {
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
@@ -126,7 +126,7 @@ def _pane(qtbot, rows=(), lead_tiles=lambda group: LeadTiles(), scroll=None):
 
 def _open_recents(pane, rows):
     pane.set_model(rows, {}, [], [], [])
-    pane.show_shelf(RECENTS_KEY)
+    pane.show_collection(RECENTS_KEY)
 
 
 def _shown_in_order(scroll):
@@ -384,36 +384,36 @@ def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(
     assert _shown_in_order(scroll) == ["Now", "InFlightCard", heading, "g1"]
 
 
-def test_the_experiments_shelf_heads_each_batch_it_collected(qtbot):
+def test_the_experiments_collection_heads_each_batch_it_collected(qtbot):
     rows = [_row("e1", 1, "2026-09-12 23:00:00"), _row("e2", 2, "2026-09-12 19:00:00")]
     pane, scroll = _pane(qtbot, rows)
     pane.set_model([], {}, [], rows, [])
 
-    pane.show_shelf(EXPERIMENTS_KEY)
+    pane.show_collection(EXPERIMENTS_KEY)
 
     first, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == [first, "e1", second, "e2"]
 
 
-def test_the_requests_shelf_heads_each_batch_of_what_was_asked_for(qtbot):
+def test_the_requests_collection_heads_each_batch_of_what_was_asked_for(qtbot):
     rows = [_row("r1", 1, "2026-09-12 23:00:00"), _row("r2", 2, "2026-09-12 19:00:00")]
     pane, scroll = _pane(qtbot, rows)
     pane.set_model([], {}, [], [], [], request_items=[{"row": row} for row in rows])
 
-    pane.show_shelf(REQUESTS_KEY)
+    pane.show_collection(REQUESTS_KEY)
 
     first, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == [first, "r1", second, "r2"]
 
 
-def test_rows_for_shelf_answers_by_name_not_by_what_is_on_screen(qtbot):
+def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot):
     recents = [_row("g1", 1)]
     held = [_row("d1", 9)]
     pane, _scroll = _pane(qtbot, recents)
     pane.set_model(recents, {}, [], [], held)
-    pane.show_shelf(RECENTS_KEY)
+    pane.show_collection(RECENTS_KEY)
 
-    assert [r["prompt_id"] for r in pane.rows_for_shelf(TRASH_KEY)] == ["d1"]
+    assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"]
 
 
 def test_the_empty_trash_hint_promises_no_expiry(qtbot):
@@ -444,7 +444,7 @@ def test_a_folders_latest_lists_only_what_that_folder_holds(qtbot):
     pane, _scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
 
-    pane.show_shelf(FolderShelf(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
     assert pane.visible_prompt_ids() == ["a1"]
 
@@ -455,12 +455,12 @@ def test_a_folders_trash_holds_what_was_deleted_from_that_folder(qtbot):
     tree = gallery.build_gallery_tree(kept)
     pane, _scroll = _pane(qtbot, kept)
     pane.set_model(kept, {LANDSCAPE: tree}, kept, [], deleted)
-    trash = FolderShelf(TRASH_KEY, _models(tree)["alpha"].key).key
+    trash = FolderCollection(TRASH_KEY, _models(tree)["alpha"].key).key
 
-    pane.show_shelf(trash, LANDSCAPE)
+    pane.show_collection(trash, LANDSCAPE)
 
     assert pane.visible_prompt_ids() == ["a2"]
-    assert [row["prompt_id"] for row in pane.rows_for_shelf(oriented_key(trash, LANDSCAPE))]         == ["a2"]
+    assert [row["prompt_id"] for row in pane.rows_for_collection(oriented_key(trash, LANDSCAPE))]         == ["a2"]
 
 
 def _in_flight(prompt_id, checkpoint):
@@ -481,7 +481,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot, monkeypa
     monkeypatch.setattr(pane, "inflight_items",
                         lambda rows=None, requests=None: [_card("a2"), _card("b2")])
 
-    pane.show_shelf(FolderShelf(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(RECENTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
     assert list(pane._inflight_cards) == ["a2"]
 
@@ -497,14 +497,14 @@ def test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_b
     scene_two.favorite = True
     pane, _scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
-    favorites = FolderShelf(FAVORITES_KEY, alpha.key).key
+    favorites = FolderCollection(FAVORITES_KEY, alpha.key).key
 
-    pane.show_shelf(favorites, LANDSCAPE)
+    pane.show_collection(favorites, LANDSCAPE)
 
     assert pane.visible_prompt_ids() == ["a1"]
     assert pane._visible_keys == [scene_two.key]
     assert sorted(row["prompt_id"] for row in
-                  pane.rows_for_shelf(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+                  pane.rows_for_collection(oriented_key(favorites, LANDSCAPE))) == ["a1", "a2"]
 
 
 def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
@@ -514,7 +514,7 @@ def test_a_folders_experiments_are_the_ones_made_in_that_folder(qtbot):
     pane, _scroll = _pane(qtbot, kept + tried)
     pane.set_model(kept, {LANDSCAPE: tree}, kept + tried, tried, [])
 
-    pane.show_shelf(FolderShelf(EXPERIMENTS_KEY, _models(tree)["beta"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(EXPERIMENTS_KEY, _models(tree)["beta"].key).key, LANDSCAPE)
 
     assert pane.visible_prompt_ids() == ["b2"]
 
@@ -526,7 +526,7 @@ def test_a_folders_requests_are_the_ones_that_landed_in_it(qtbot):
     pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [],
                    request_items=[{"row": row} for row in rows])
 
-    pane.show_shelf(FolderShelf(REQUESTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(REQUESTS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
     assert pane.visible_prompt_ids() == ["a1"]
 
@@ -550,9 +550,9 @@ def _folders_of_folders(tree):
 
 
 def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeypatch):
-    # Every shelf of a side asks for its rows on each rebuild, and each ask
+    # Every collection of a side asks for its rows on each rebuild, and each ask
     # dealt the whole listing out to the side afresh: thirteen passes over the
-    # library per rebuild for five shelves.
+    # library per rebuild for five collections.
     dealt = []
     filter_rows = browser_pane.filter_rows
     monkeypatch.setattr(browser_pane, "filter_rows",
@@ -560,19 +560,19 @@ def test_a_listing_asked_for_again_is_not_dealt_to_its_side_again(qtbot, monkeyp
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("b1", "beta.safetensors")]
     pane, _scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
-    latest = oriented_key(FolderShelf(RECENTS_KEY, gallery.ALL_KEY).key, LANDSCAPE)
+    latest = oriented_key(FolderCollection(RECENTS_KEY, gallery.ALL_KEY).key, LANDSCAPE)
 
-    pane.shelf_counts(LANDSCAPE)
-    pane.rows_for_shelf(latest)
+    pane.collection_counts(LANDSCAPE)
+    pane.rows_for_collection(latest)
     once = len(dealt)
-    pane.shelf_counts(LANDSCAPE)
-    pane.rows_for_shelf(latest)
+    pane.collection_counts(LANDSCAPE)
+    pane.rows_for_collection(latest)
 
     assert len(dealt) == once
 
 
-def test_a_redraw_of_the_latest_shelf_keeps_the_tiles_it_already_drew(qtbot):
-    # Every landing redraws the shelf from a fresh model, and every tile the
+def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot):
+    # Every landing redraws the collection from a fresh model, and every tile the
     # user had scrolled into view was built again from its picture.
     rows = [_row("a", 1), _row("b", 2)]
     pane, _scroll = _pane(qtbot, rows)
@@ -608,8 +608,8 @@ def test_a_tile_whose_picture_changed_is_drawn_afresh(qtbot):
     assert pane._thumb_widgets["a"] is not tile
 
 
-def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_shelf(qtbot):
-    # A folder's tile and a shelf's answer a double-click differently, so one is
+def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_collection(qtbot):
+    # A folder's tile and a collection's answer a double-click differently, so one is
     # never wired for the other.
     rows = [_made_with("a1", "alpha.safetensors")]
     tree = gallery.build_gallery_tree(rows)
@@ -620,12 +620,12 @@ def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_shelf(qtbot):
     pane.show_thumbnails(leaf)
     in_folder = pane._thumb_widgets["a1"]
 
-    pane.show_shelf(RECENTS_KEY, LANDSCAPE)
+    pane.show_collection(RECENTS_KEY, LANDSCAPE)
 
     assert pane._thumb_widgets["a1"] is not in_folder
 
 
-def test_each_folders_shelf_counts_what_that_shelf_lists(qtbot):
+def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
     rows = [_made_with("a1", "alpha.safetensors", starred=1),
             _made_with("a2", "alpha.safetensors", prompt="scene two"),
             _made_with("b1", "beta.safetensors"),
@@ -640,36 +640,36 @@ def test_each_folders_shelf_counts_what_that_shelf_lists(qtbot):
     pane.set_model(rows, {LANDSCAPE: tree}, listed, [rows[1]], deleted,
                    request_items=[{"row": rows[2]}, {"row": listed[4]}])
 
-    counts = pane.shelf_counts(LANDSCAPE)
+    counts = pane.collection_counts(LANDSCAPE)
 
-    assert counts[FolderShelf(TRASH_KEY, _models(tree)["alpha"].key).key] == 1
+    assert counts[FolderCollection(TRASH_KEY, _models(tree)["alpha"].key).key] == 1
     for folder in _folders_of_folders(tree):
-        for shelf in (FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY):
-            key = FolderShelf(shelf, folder).key
-            listing = pane.rows_for_shelf(oriented_key(key, LANDSCAPE))
+        for collection in (FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY):
+            key = FolderCollection(collection, folder).key
+            listing = pane.rows_for_collection(oriented_key(key, LANDSCAPE))
             assert counts.get(key, 0) == len(listing), key
 
 
-def test_a_shelf_square_wears_the_mark_its_row_wears(qtbot):
+def test_a_collection_square_wears_the_mark_its_row_wears(qtbot):
     rows = [_made_with("a1", "alpha.safetensors")]
     pane, scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: gallery.build_gallery_tree(rows)}, rows, [], [])
 
-    pane.show_folder_tiles([], shelves=[oriented_key(TRASH_KEY, LANDSCAPE)])
+    pane.show_folder_tiles([], collections=[oriented_key(TRASH_KEY, LANDSCAPE)])
 
     (tile,) = scroll.widget().findChildren(FolderTile)
     assert [label for label in tile.findChildren(QLabel)
             if label.toolTip() == "Trash" and not label.pixmap().isNull()]
 
 
-def test_a_folders_shelf_squares_stand_apart_from_its_folders_behind_a_heading_line(qtbot):
+def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_heading_line(qtbot):
     rows = [_made_with("a1", "alpha.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, scroll = _pane(qtbot, rows)
     pane.set_model(rows, {LANDSCAPE: tree}, rows, [], [])
 
-    pane.show_folder_tiles(tree, shelves=[oriented_key(RECENTS_KEY, LANDSCAPE),
-                                          oriented_key(TRASH_KEY, LANDSCAPE)])
+    pane.show_folder_tiles(tree, collections=[oriented_key(RECENTS_KEY, LANDSCAPE),
+                                              oriented_key(TRASH_KEY, LANDSCAPE)])
 
     layout = scroll.widget().layout()
     shown = [layout.itemAt(index).widget() for index in range(layout.count())]

@@ -24,7 +24,7 @@ step of it is re-emitted as :attr:`VoiceSteering.request`.
 One thing outranks even that, and only while no request is open: an injected
 ``bare_matcher``, the strict whole-utterance vocabulary
 (:mod:`origenerator.voice.app_commands`). A word that IS a command, whole and
-alone, is a command — which is what lets "requests" reach the Requests shelf
+alone, is a command — which is what lets "requests" reach the Requests collection
 though "request" is the word a dictation opens on. Once one is open the
 dictation is back in front, because a command word said mid-sentence belongs to
 the sentence.
@@ -189,7 +189,7 @@ class VoiceSteering(QObject):
 
         An utterance that is nothing but a command word is that command, so long
         as no request is already being said — that is the one thing ahead of the
-        dictation, and it is what keeps a shelf named by the dictation's own
+        dictation, and it is what keeps a collection named by the dictation's own
         opening word reachable. Then the open dictation, which has first refusal
         over everything else because it is collecting a sentence and half of one
         landing in the prompt would be worse than either use alone. Then the

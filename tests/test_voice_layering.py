@@ -19,7 +19,7 @@ def _modules_loaded_by(module: str) -> set[str]:
 
 def test_the_vocabulary_pulls_in_no_widgets():
     # It takes a transcription and returns a NamedTuple. Reaching into the
-    # widget package for the shelf names pulled the whole of Qt along with them,
+    # widget package for the collection names pulled the whole of Qt along with them,
     # and inverted the layering every other module here keeps.
     loaded = _modules_loaded_by("origenerator.voice.commands")
     assert not [name for name in loaded if name.startswith("PyQt6")]

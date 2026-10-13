@@ -5,7 +5,7 @@ One of the six tables `Database` used to hold all of. Its readers are
 business with `generations` or the custom folders.
 
 A deleted generation's whole row travels here, plus where in the trash its files
-went, so the Trash shelf can list it, put both back, or end it for good. The
+went, so the Trash collection can list it, put both back, or end it for good. The
 record goes away when the item is restored or purged, and not otherwise —
 nothing here ages out; the generations row itself is gone the moment it is
 deleted, which is why the row travels here rather than staying gated by a flag.
@@ -35,7 +35,7 @@ class DeletionStore(Store):
             )
 
     def list_deletions(self) -> list[dict]:
-        """Every held deletion, newest first — what the Trash shelf lists.
+        """Every held deletion, newest first — what the Trash collection lists.
 
         The stamp only has second resolution, so a batch deleted together ties;
         the rowid breaks it, and an ``INSERT OR REPLACE`` takes a fresh one, so

@@ -6,7 +6,7 @@ not on the Generate form beside Seed, Dimensions and Output. It lives here
 instead, beside Genau's console, and it is app-wide: whatever is set here is
 what Enhance All runs with, what a single image's Enhance action runs with, and
 — with the tick on — what every image the app newly generates receives as it
-lands. It follows you rather than the folder, so it shows on the shelves
+lands. It follows you rather than the folder, so it shows in the collections
 (Recents, Favorites, Experiments) exactly as it does on a settings folder.
 
 Editing writes straight back through ``on_change`` — there is no Apply button —

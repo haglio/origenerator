@@ -799,7 +799,7 @@ def test_an_unheld_deletion_is_simply_absent(tmp_path):
     db.forget_deletion("never")  # must not raise
 
 
-# --- spoken requests (what the Requests shelf lists) -------------------------
+# --- spoken requests (what the Requests collection lists) --------------------
 
 
 def _record(db, prompt_id, source="src-1", heard="Request, no hat, over."):
@@ -839,7 +839,7 @@ def test_a_generation_nothing_asked_for_has_no_request(tmp_path):
 
 def test_a_request_outlives_the_generation_it_queued(tmp_path):
     # A delete here is undoable, so the record has to be waiting if the item
-    # comes back; the shelf skips what it can't resolve instead.
+    # comes back; the collection skips what it can't resolve instead.
     db = Database(tmp_path / "test.db")
     _record(db, "gen-1")
 

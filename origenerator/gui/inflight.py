@@ -1,6 +1,6 @@
 """What every surface knows about a generation that is still in flight.
 
-Three widgets show queued and running work — the Recents shelf's cards
+Three widgets show queued and running work — the Recents collection's cards
 (:mod:`origenerator.gui.inflight_card`), the lower strip's queue
 (:mod:`origenerator.gui.generation_queue`), and the config pane's live preview
 note — and none of them should know where a job came from or how to reach it.
@@ -40,7 +40,7 @@ class InFlightItem:
     media_type: str | None = None  # "image"/"video" for the corner badge, if known
     # Which side of the tree the job belongs to, by the shape it was asked to
     # come out: a running generation has no picture to measure, and its card has
-    # to sit on the shelf its picture will land on rather than move there later.
+    # to sit in the collection its picture will land in rather than move there later.
     orientation: str = "landscape"
     cancel: Callable[[], None] | None = None  # stop the job, when it can be cancelled from here
     auto_generating: bool = False  # its folder is auto-looping, so :attr:`cancel` means "next seed"

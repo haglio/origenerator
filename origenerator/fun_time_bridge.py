@@ -182,7 +182,7 @@ class FunTimeBridge(QObject):
             # The session owns the microphone for the whole room, so a spoken
             # command about one of these regions is heard THERE and sent here
             # as the words themselves — matched by this app's own vocabulary,
-            # which is the only place that knows its shelves and its parts.
+            # which is the only place that knows its collections and its parts.
             self._gallery.run_spoken_command(f"{side} {argument}")
             return
         self._apply_side(side, action, argument, line)

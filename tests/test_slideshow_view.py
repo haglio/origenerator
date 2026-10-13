@@ -441,7 +441,7 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     assert not view.isVisible()   # and the slideshow is out of the way
 
 
-def _shelf_view(qtbot):
+def _collection_view(qtbot):
     """A two-item show whose handovers are recorded — the ways out of a show."""
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, engine=FakeEngine(), shuffle=lambda order: None)
@@ -456,7 +456,7 @@ def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
     # Locking says "this is the one", so ending the show there means the same
     # thing Enter does: the gallery lands on that item rather than back wherever
     # it was when the show started.
-    view, opened = _shelf_view(qtbot)
+    view, opened = _collection_view(qtbot)
     _press(view, Qt.Key.Key_Right)  # onto the second slide
     _press(view, Qt.Key.Key_Down)   # lock it
 
@@ -469,7 +469,7 @@ def test_ending_a_show_on_a_locked_slide_hands_that_slide_over(qtbot):
 def test_ending_a_show_on_an_unlocked_slide_hands_that_slide_over(qtbot):
     # Escape is a way out like any other, and the picture on screen when you take
     # it is the one you want to find afterwards.
-    view, opened = _shelf_view(qtbot)
+    view, opened = _collection_view(qtbot)
     on_screen = view._playlist.current()[2]
 
     _press(view, Qt.Key.Key_Escape)
@@ -480,7 +480,7 @@ def test_ending_a_show_on_an_unlocked_slide_hands_that_slide_over(qtbot):
 def test_enter_on_a_locked_slide_hands_it_over_once(qtbot):
     # Enter and the lock name the same item, and the handover is closeEvent's, so
     # the gallery is asked to go there once rather than twice.
-    view, opened = _shelf_view(qtbot)
+    view, opened = _collection_view(qtbot)
     _press(view, Qt.Key.Key_Down)
 
     _press(view, Qt.Key.Key_Return)
@@ -490,7 +490,7 @@ def test_enter_on_a_locked_slide_hands_it_over_once(qtbot):
 
 def test_closing_a_show_twice_hands_over_once(qtbot):
     # Qt sends a close event to an already-closed window too.
-    view, opened = _shelf_view(qtbot)
+    view, opened = _collection_view(qtbot)
     _press(view, Qt.Key.Key_Down)
 
     view.close()

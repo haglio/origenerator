@@ -124,7 +124,7 @@ def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
 
 
 def test_a_bar_nobody_can_see_stops_scrolling(qtbot):
-    # One of these per queue row, per shelf card and per tile: a repaint every
+    # One of these per queue row, per collection card and per tile: a repaint every
     # tick for bars that are not on screen is a cost with nothing bought by it.
     narrow = ProgressCaption()
     qtbot.addWidget(narrow)

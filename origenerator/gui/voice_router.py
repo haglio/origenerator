@@ -8,7 +8,7 @@ one.
 What lives here is the whole path an utterance takes. The microphone and what it
 is listening for. The caption that says what was heard and what it did, with the
 one promise it holds while a request is still being worked out. The matching of
-an utterance to a shelf, a switch, a bar, a bank button, an order about the
+an utterance to a collection, a switch, a bar, a bank button, an order about the
 picture on screen, or a request said over several breaths -- and, for a hosted
 app, the same matching of words the session's own microphone heard and posted on
 this app's channel.
@@ -31,19 +31,19 @@ from PyQt6.QtWidgets import QLabel, QWidget
 from origenerator import gallery, prompt_edit
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
 from origenerator.content import genau_flick_word
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     REQUESTS_KEY as _REQUESTS_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.gallery.voice_commands import said_in
@@ -58,7 +58,7 @@ from origenerator.voice.app_commands import (
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
-    ShelfCommand,
+    CollectionCommand,
     ShowControl,
     SurfaceCommand,
     match_voice_command,
@@ -78,9 +78,9 @@ logger = logging.getLogger(__name__)
 _FLASH_MS = 4000
 
 
-# The shelf each spoken shelf name stands you in. What to call it back is the
+# The collection each spoken collection name stands you in. What to call it back is the
 # host's answer, so a row renamed is renamed in one place.
-_SHELVES = {
+_COLLECTIONS = {
     AppCommand.RECENTS: _RECENTS_KEY,
     AppCommand.FAVORITES: _FAVORITES_KEY,
     AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
@@ -180,12 +180,12 @@ class VoiceHost(Protocol):
     def steer_prompts(self, key: str, new_prompts: dict) -> None:
         """Put an edited pair back, for the loop's next launch."""
 
-    def shelf_label(self, key: str) -> str:
-        """What to call a shelf back — the plain name its row carries, without
+    def collection_label(self, key: str) -> str:
+        """What to call a collection back — the plain name its row carries, without
         the waiting-work count."""
 
-    def stand_in_shelf(self, key: str, side: str | None) -> bool:
-        """Select the shelf ``key`` names on ``side`` (or on whichever side the
+    def stand_in_collection(self, key: str, side: str | None) -> bool:
+        """Select the collection ``key`` names on ``side`` (or on whichever side the
         tree answers with), exactly as clicking its row does. ``False`` when the
         tree has no row for it at all."""
 
@@ -472,7 +472,7 @@ class VoiceRouter(QObject):
         Fun Time owns the microphone while this app is hosted — one mic, one
         transcription — so its recognizer hears "landscape favorites", posts the
         words on this app's channel, and they are matched here against this
-        app's own vocabulary: the session cannot know which shelves this tree
+        app's own vocabulary: the session cannot know which collections this tree
         has or which detail parts have detectors installed.
 
         The order is this app's own mic's (``VoiceSteering._meaning``).  A
@@ -506,7 +506,7 @@ class VoiceRouter(QObject):
         return True
 
     def on_command(self, matched) -> None:
-        """One recognized utterance: a shelf to play, a show command, a bare
+        """One recognized utterance: a collection to play, a show command, a bare
         word about the app or the slide in front of the speaker, or an order
         about the picture — each with the side it named, if it named one.
 
@@ -514,8 +514,8 @@ class VoiceRouter(QObject):
         :class:`SurfaceCommand`, whether or not a side was said: the wrapper is
         how the side travels, and the matchers put every one of them in it.
         """
-        if isinstance(matched, ShelfCommand):
-            self._shows.play_shelf(matched)
+        if isinstance(matched, CollectionCommand):
+            self._shows.play_collection(matched)
         elif isinstance(matched, ShowControl):
             self._shows.run_show_command(matched.command, matched.side)
         elif isinstance(matched, SurfaceCommand):
@@ -533,19 +533,19 @@ class VoiceRouter(QObject):
             # and dropping it silently is how that goes unnoticed for a release.
             logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
 
-    # --- the bare vocabulary: a shelf, a switch, the motion, or the slide ----
+    # --- the bare vocabulary: a collection, a switch, the motion, or the slide ---
 
     def _run_app_command(self, command: AppCommand, side: str | None = None) -> None:
         """One bare spoken word.
 
-        Four kinds, and which it is decides where it lands: a shelf name stands
-        the tree in that shelf, a switch word flips one of the app-wide
+        Four kinds, and which it is decides where it lands: a collection name stands
+        the tree in that collection, a switch word flips one of the app-wide
         switches, a motion word makes its key's move — and everything else is
         about whatever surface is in front of the speaker, which is the
         fullscreen show while one is up and the gallery otherwise.
         """
-        if command in _SHELVES:
-            self._go_to_shelf(command, side)
+        if command in _COLLECTIONS:
+            self._go_to_collection(command, side)
         elif command in _FILTERS:
             self._shows.filter_enhanced(_FILTERS[command], side)
         elif command in _SWITCHES:
@@ -557,23 +557,23 @@ class VoiceRouter(QObject):
         else:
             self._run_in_gallery(command)
 
-    def _go_to_shelf(self, command: AppCommand, side: str | None = None) -> None:
-        """Stand in the shelf a spoken name asks for, exactly as clicking its
+    def _go_to_collection(self, command: AppCommand, side: str | None = None) -> None:
+        """Stand in the collection a spoken name asks for, exactly as clicking its
         row does.
 
         Said over a show it still moves — the tree is under the show, and the
         move is what the show leaves you standing in — so the answer says which
-        shelf rather than refusing a command whose whole effect is out of sight.
+        collection rather than refusing a command whose whole effect is out of sight.
 
-        The name is All's copy of the shelf, on the utterance's own side;
+        The name is All's copy of the collection, on the utterance's own side;
         unsided, the host takes the tree's own answer for the folder — the same
         row a click would have landed on.
         """
-        key = _SHELVES[command]
-        label = self._host.shelf_label(key)
-        if not self._host.stand_in_shelf(key, side):
+        key = _COLLECTIONS[command]
+        label = self._host.collection_label(key)
+        if not self._host.stand_in_collection(key, side):
             # Recents and Favorites appear only once there is one
-            self._shows.answer(f"🎤 no {label} shelf yet", kind=WARNING)
+            self._shows.answer(f"🎤 no {label} collection yet", kind=WARNING)
             return
         self._shows.answer(f"🎤 {label}")
 

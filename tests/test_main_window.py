@@ -25,7 +25,7 @@ from origenerator.db import Database
 from origenerator.frame_channel import _HEADER
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import desktop_notices, main_window
 from origenerator.gui.headset_window import CAP_PX
@@ -35,7 +35,7 @@ from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.run_notice import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
-from tests.test_gallery_view import _select_first_leaf, _selected_folder, _shelf
+from tests.test_gallery_view import _collection, _select_first_leaf, _selected_folder
 from tests.test_hard_to_miss import _faded_backgrounds
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
@@ -587,7 +587,7 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
 
 def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp_path):
     # Where the user left off is where the app reopens. Experiments waiting for
-    # review used to hijack the launch onto their shelf; the count on the shelf's
+    # review used to hijack the launch into their collection; the count on the collection's
     # row already says they're there, and it can be visited when the user wants it.
     state = AppState(tmp_path / "ui.json")
     state.set("gallery_folder", "__recents__")
@@ -606,7 +606,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is _shelf(view, RECENTS_KEY)
+    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)
 
 
 def test_reconnects_a_running_reroll_after_restore(qtbot, tmp_path):
@@ -968,7 +968,7 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
     (folder_key,) = list(gv._live_jobs)
     pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
     assert pid in gv._browser._inflight_cards   # the running generation shows as a card
 
     gv._browser._on_inflight_clicked(pid)       # click that card
@@ -978,7 +978,7 @@ def test_generate_inflight_shows_on_recents_and_reveals_its_folder(qtbot, tmp_pa
 def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
     # The reported bug: a generation left running by a prior session (here an i2v
     # video), with the gallery restored onto Recents. It must show as an in-flight
-    # card — the shelf reads the database's running rows, so a card appears whether
+    # card — the collection reads the database's running rows, so a card appears whether
     # or not the re-roll controller has re-adopted the job this instant.
     db = Database(tmp_path / "t.db")
     vid_params = dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
@@ -998,7 +998,7 @@ def test_running_generate_job_shows_on_recents_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
     assert "vid_run" in gv._browser._inflight_cards
 
 

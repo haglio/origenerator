@@ -3,7 +3,7 @@
 Experiments belong to the stretch when Origenerator isn't running. ComfyUI is a
 server that outlives the app, so closing hands it a batch of policy-proposed
 variations and it works through them alone; the next launch finds the finished
-ones on the Experiments shelf (the startup reconcile finalizes their rows) and
+ones in the Experiments collection (the startup reconcile finalizes their rows) and
 drops whatever hadn't run yet, so an open app never has an experiment competing
 with the user for the GPU.
 """
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # How many experiments one absence gets. ComfyUI runs them back to back with
 # nobody watching, so this is the whole night's output — and every one comes back
 # as a card to review, so a bigger batch buys more results at the price of a
-# longer shelf. Enough to fill an evening, few enough to review in a sitting.
+# longer collection. Enough to fill an evening, few enough to review in a sitting.
 BATCH_SIZE = 8
 # Consecutive launches that didn't take before the batch is abandoned. A refused
 # launch is usually a proposal landing in a folder an earlier one claimed — worth
@@ -66,6 +66,6 @@ def cancel_experiments(db, client) -> int:
     is dropped and its abandoned row deleted, and one caught mid-render is
     stopped as well (:func:`origenerator.inflight.drop_in_flight`). Returns how
     many were dropped. Finished ones are untouched: they're the results waiting
-    on the shelf.
+    in the collection.
     """
     return drop_in_flight(db, client, GenerationSource.EXPERIMENT, "experiment")

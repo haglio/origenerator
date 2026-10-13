@@ -6,13 +6,13 @@ Three things can be said, and any of them may be led by a side:
   (:mod:`origenerator.gallery.voice_commands` owns both).
 * ``start`` / ``pause`` / ``stop slideshow`` — the show's own controls
   (:mod:`origenerator.voice.show_commands`).
-* ``<shelf>`` — play that shelf, the way its slideshow button would.
+* ``<collection>`` — play that collection, the way its slideshow button would.
 
 The side ("landscape fix teeth", "landscape favorites") is what makes them
 usable inside Fun Time, where two shows run at once on the satellite regions
 and NEITHER is the active window — the speaker is looking at one of them while
 the main window has the keyboard, so "the show that is up" names nothing and a
-shelf command has no region to land on. Standalone there is one show and no
+collection command has no region to land on. Standalone there is one show and no
 regions, so a side is accepted and ignored.
 
 Kept deliberately strict, because everything unmatched here falls through to a
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     EXPERIMENTS_LABEL,
     FAVORITES_KEY,
@@ -48,9 +48,9 @@ from origenerator.voice.text import words
 
 SIDES = (PORTRAIT, LANDSCAPE)
 
-# The shelves, addressed by the names they wear in the tree, so a rename
+# The collections, addressed by the names they wear in the tree, so a rename
 # carries into the vocabulary rather than leaving it saying the old word.
-SHELF_KEYS: dict[str, str] = {
+COLLECTION_KEYS: dict[str, str] = {
     RECENTS_LABEL.lower(): RECENTS_KEY,
     FAVORITES_LABEL.lower(): FAVORITES_KEY,
     EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
@@ -58,9 +58,9 @@ SHELF_KEYS: dict[str, str] = {
     TRASH_LABEL.lower(): TRASH_KEY,
 }
 
-# A shelf command is its name, at most led by a side: three words is already
+# A collection command is its name, at most led by a side: three words is already
 # generous. Anything longer is a sentence that happens to contain the word.
-_MAX_SHELF_WORDS = 3
+_MAX_COLLECTION_WORDS = 3
 
 
 class SurfaceCommand(NamedTuple):
@@ -72,10 +72,10 @@ class SurfaceCommand(NamedTuple):
     side: str | None = None
 
 
-class ShelfCommand(NamedTuple):
-    """Play the shelf *shelf_key*, on *side*'s region (``None`` — wherever the
+class CollectionCommand(NamedTuple):
+    """Play the collection *collection_key*, on *side*'s region (``None`` — wherever the
     set's own shape routes it)."""
-    shelf_key: str
+    collection_key: str
     side: str | None = None
 
 
@@ -85,12 +85,12 @@ class ShowControl(NamedTuple):
     side: str | None = None
 
 
-def match_voice_command(text: str) -> ShelfCommand | ShowControl | SurfaceCommand | None:
+def match_voice_command(text: str) -> CollectionCommand | ShowControl | SurfaceCommand | None:
     """What *text* asks for, or ``None`` when it is not a command at all.
 
     Each matcher is strict about its own shape and none can claim another's (a
     show command names the slideshow, a fix leads with "fix", a Genau command
-    leads with its own phrase, a shelf command is nothing but the shelf's
+    leads with its own phrase, a collection command is nothing but the collection's
     name), so the order only decides which is asked first.
     """
     side, spoken = split_side(text)
@@ -98,9 +98,9 @@ def match_voice_command(text: str) -> ShelfCommand | ShowControl | SurfaceComman
     if not rest and side is None:
         return None
 
-    shelf = _shelf_named(rest)
-    if shelf is not None:
-        return ShelfCommand(shelf, side)
+    collection = _collection_named(rest)
+    if collection is not None:
+        return CollectionCommand(collection, side)
 
     show = match_show_command(spoken)
     if show is not None:
@@ -157,15 +157,15 @@ def sided_app_command(text: str):
     return SurfaceCommand(matched, side) if side else matched
 
 
-def _shelf_named(words: list[str]) -> str | None:
-    """The shelf those words name, on their own — ``None`` for anything else.
+def _collection_named(words: list[str]) -> str | None:
+    """The collection those words name, on their own — ``None`` for anything else.
 
     The whole utterance has to BE the name: "favorites" is the command, while
     "put her in my favorites" is a prompt edit that mentions one.
     """
-    if not words or len(words) > _MAX_SHELF_WORDS:
+    if not words or len(words) > _MAX_COLLECTION_WORDS:
         return None
-    return SHELF_KEYS.get(" ".join(words))
+    return COLLECTION_KEYS.get(" ".join(words))
 
 
 def spoken_phrases() -> frozenset[str]:
@@ -175,4 +175,4 @@ def spoken_phrases() -> frozenset[str]:
     itself. One said here still works, by the slower road every sentence takes.
     """
     return (app_command_phrases() | command_phrases() | show_command_phrases()
-            | frozenset(SHELF_KEYS))
+            | frozenset(COLLECTION_KEYS))

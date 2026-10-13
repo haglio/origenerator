@@ -1,12 +1,12 @@
 """A request and the generation it queued.
 
-One of the six tables `Database` used to hold all of. What the Requests shelf
+One of the six tables `Database` used to hold all of. What the Requests collection
 lists, and the only record of why one generation differs from the one it came
 from: the item it was made about, what was heard, and the prompt pair before the
 edit (the pair after it is the queued generation's own params).
 
 Kept even when its generation goes -- a delete here is undoable, and a restored
-item should come back with the request that made it, so the shelf skips a record
+item should come back with the request that made it, so the collection skips a record
 it cannot resolve rather than the record being dropped.
 
 Spoken ("Request ... over") or typed: a folder rewrite asks the same thing of
@@ -44,7 +44,7 @@ class RequestStore(Store):
             )
 
     def list_requests(self) -> list[dict]:
-        """Every recorded request, newest first — the Requests shelf's listing.
+        """Every recorded request, newest first — the Requests collection's listing.
 
         The stamp has second resolution, so requests made in one burst tie; the
         rowid breaks it, keeping them in the order they were spoken.

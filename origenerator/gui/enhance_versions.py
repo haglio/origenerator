@@ -68,7 +68,7 @@ ENHANCE_LEVEL_MIME = "application/x-origenerator-enhance-level"
 
 _TILE = 96  # the thumbnail's side; the level's facts sit beside it
 _PLUS = _TILE * 2 // 3
-# The in-flight edge the Recents shelf's cards wear, so work in progress reads
+# The in-flight edge the Recents collection's cards wear, so work in progress reads
 # the same wherever it shows.
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 # The lit edge a level wears while the row that would duplicate it is hovered.
@@ -367,7 +367,7 @@ class _LevelRow(_Row):
 class _PendingRow(_Row):
     """The enhancement being made right now: its live frame, or the stage it's at.
 
-    Wears the same blue "in progress" edge as the Recents shelf's in-flight
+    Wears the same blue "in progress" edge as the Recents collection's in-flight
     cards, so a level under construction reads the same here as work in flight
     reads anywhere else in the app.
     """

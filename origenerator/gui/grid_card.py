@@ -83,7 +83,7 @@ def picture_size() -> QSize:
 
 
 # The two lines a folder's card carries that a generation's does not: how many
-# items are in it, and -- on the Favorites shelf, where a folder is out of its
+# items are in it, and -- in the Favorites collection, where a folder is out of its
 # parent's context -- the breadcrumb saying where it lives.
 COUNT_HEIGHT = 14
 BREADCRUMB_HEIGHT = 14
@@ -91,7 +91,7 @@ BREADCRUMB_HEIGHT = 14
 
 def folder_card_size(breadcrumb: bool = False) -> tuple:
     """A folder's outside: the same card as a generation's, plus its count line
-    and, on the shelf, its breadcrumb."""
+    and, in the collection, its breadcrumb."""
     width, height = card_size()
     height += CARD_SPACING + COUNT_HEIGHT
     if breadcrumb:

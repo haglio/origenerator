@@ -62,7 +62,7 @@ class InFlightItems:
         hasn't re-adopted — sorts to the back rather than jumping the queue on
         screen.
 
-        The strip's rows carry more than the shelf's cards do — a price, a kind, a
+        The strip's rows carry more than the collection's cards do — a price, a kind, a
         picture of what the job is made from or of the folder it will land in —
         and all of it is read off the row and the tree already in hand, so a poll
         costs one listing whatever the queue is showing. ``rows``/``requests``

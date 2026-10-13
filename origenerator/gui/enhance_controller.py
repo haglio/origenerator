@@ -80,7 +80,7 @@ class EnhanceHost(Protocol):
         """The settings-signature index a folder key is derived against."""
 
     def current_group(self):
-        """The folder on screen, or ``None`` on a shelf or a search."""
+        """The folder on screen, or ``None`` in a collection or a search."""
 
     def typical_run_seconds(self, job) -> float | None:
         """How long a run like this one usually takes, for the live bar."""
@@ -167,7 +167,7 @@ class EnhanceController:
         and aim the panel's own Enhance button with the bank button's ``offer``.
 
         The panel is app-wide and follows you rather than the folder, which is
-        why it shows on the shelves as readily as on a settings folder — but a
+        why it shows in the collections as readily as on a settings folder — but a
         video is the one place with no enhancement to configure at all, and live
         settings there advertise an action that isn't on offer. A mixed folder
         keeps them: the images in it are still enhanceable.
@@ -177,7 +177,7 @@ class EnhanceController:
 
     def _showing_only_videos(self) -> bool:
         """Whether everything in front of us is video — the picked thumbnails if
-        any are picked, else the folder on screen. Nothing in front (a shelf with
+        any are picked, else the folder on screen. Nothing in front (a collection with
         no pick) is not "only videos": there is simply nothing to say."""
         rows = [row for pid in self._host.selected_prompt_ids()
                 if (row := self._host.row_for(pid)) is not None]
@@ -551,7 +551,7 @@ class EnhanceController:
         says whether the version is being made or waiting to be.
 
         Keyed by the mapping the tiles are drawn from, which covers every image
-        in the library rather than the open folder's — a show of a shelf plays
+        in the library rather than the open folder's — a show of a collection plays
         items from anywhere. The status is read off the job rather than its row:
         the row says "running" from the moment the job is handed to ComfyUI, and
         the wait on ComfyUI's own queue is exactly the stretch this names.

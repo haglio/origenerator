@@ -22,7 +22,7 @@ from PIL import Image
 from PyQt6.QtCore import Qt
 
 from origenerator import gallery
-from origenerator.gallery.shelves import FAVORITES_KEY, RECENTS_KEY, FolderShelf
+from origenerator.gallery.collection import FAVORITES_KEY, RECENTS_KEY, FolderCollection
 from origenerator.gui import show_director as module
 from origenerator.gui.notice_overlay import FAVORITE, NOTICE, WARNING
 from origenerator.gui.show_director import ShowDirector
@@ -328,18 +328,18 @@ class FakeBrowser:
     """The middle pane reduced to the questions a show asks of it.
 
     Its gallery reads as new at every look unless a test gives it a *stamp*,
-    since most tests here change its shelves between looks."""
+    since most tests here change its collections between looks."""
 
-    def __init__(self, shelves=None, recents=False, searching=False, stamp=None):
-        self.shelves = shelves or {}
+    def __init__(self, collections=None, recents=False, searching=False, stamp=None):
+        self.collections = collections or {}
         self.recents = recents
         self.searching = searching
         self.stamp = stamp
-        self.shelves_asked = 0
+        self.collections_asked = 0
 
-    def rows_for_shelf(self, key):
-        self.shelves_asked += 1
-        return self.shelves.get(key)
+    def rows_for_collection(self, key):
+        self.collections_asked += 1
+        return self.collections.get(key)
 
     def model_stamp(self):
         return object() if self.stamp is None else self.stamp
@@ -542,13 +542,13 @@ def test_asking_for_a_second_show_standalone_replays_the_one_already_up(shows):
     # for while one is up -- by voice, or from the window Alt+Tab reaches --
     # re-points the show that is there rather than stacking another over it.
     director, _host, made = shows()
-    director.open([("a.png", "image", "g1", None)], location="shelf/a")
+    director.open([("a.png", "image", "g1", None)], location="collection/a")
 
-    again = director.open([("b.png", "image", "g2", None)], location="shelf/b")
+    again = director.open([("b.png", "image", "g2", None)], location="collection/b")
 
     assert made == [again]
     assert again.played == [[("b.png", "image", "g2", None)]]
-    assert director._live_shows == [(again, "shelf/b")]
+    assert director._live_shows == [(again, "collection/b")]
 
 
 def test_a_double_clicked_picture_plays_its_folder_newest_first_and_says_latest(shows):
@@ -567,8 +567,8 @@ def test_a_double_clicked_picture_plays_its_folder_newest_first_and_says_latest(
 
 def test_a_show_esc_put_back_goes_on_taking_in_what_lands_where_it_plays(shows):
     landed = _row("g2")
-    director, _host, made = shows(browser=FakeBrowser(shelves={"shelf/a": [_row("g1"), landed]}))
-    director.open([("g1.png", "image", "g1", None)], location="shelf/a")
+    director, _host, made = shows(browser=FakeBrowser(collections={"collection/a": [_row("g1"), landed]}))
+    director.open([("g1.png", "image", "g1", None)], location="collection/a")
     made[0].dwell_s = 4
     held = director.held_show()
     made[0].close()
@@ -617,12 +617,12 @@ def test_a_director_taken_into_a_session_closes_its_fullscreen_show_for_the_regi
 
 
 def _a_show_he_is_watching_when_the_session_takes_the_window_over(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       ALL_LANDSCAPE: [_row("g5")]})
     director, _host, made = shows(FakeHost(rows=[_row("g1"), _row("g2")]),
                                   browser=browser)
     director.open([("g1.png", "image", "g1", None), ("g2.png", "image", "g2", None)],
-                  side=PORTRAIT, location="shelf/a")
+                  side=PORTRAIT, location="collection/a")
     watched = made[0]
     watched.dwell_s = 6
     watched.state_at_close = ShowState(order=("g2", "g1"), current="g1", locked=True)
@@ -683,8 +683,8 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
     is not listing — so versions read off the browser's rows named none of the
     pictures on screen, and every versions button on the band was drawn faded
     however many enhancements that library held (2026-09-19)."""
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       ALL_LANDSCAPE: [_row("g5")]})
     director, host, made = shows(browser=browser, fun_time=FakeSession())
     assert host.visible == []  # the browser is somewhere else entirely
     director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
@@ -697,8 +697,8 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(shows):
 
 
 def test_a_sessions_regions_open_on_their_base_state_whatever_was_pressed(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       ALL_LANDSCAPE: [_row("g5")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], side=LANDSCAPE)
     made[0].actions.filters_changed(ShowFilters(enhanced=True))
@@ -715,8 +715,8 @@ def test_a_region_says_how_long_it_took_to_fill(shows, caplog):
     this mode up -- the one between the press and the pictures -- named in the
     line that says the region opened, so a slow one can be read off the log
     instead of counted off a stopwatch."""
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       ALL_LANDSCAPE: [_row("g5")]})
     director, _host, _made = shows(browser=browser, fun_time=FakeSession())
 
     with caplog.at_level("INFO", logger="origenerator.gui.show_director"):
@@ -747,11 +747,11 @@ def test_a_landing_reaches_the_show_whose_own_folder_holds_it(shows):
     # usually moved on by the time a generation lands.
     # On the two regions, which is the only place two shows are up at once:
     # standalone the monitor's one show takes over the new set instead.
-    browser = FakeBrowser(shelves={"shelf/a": [_row("g9")], "shelf/b": []})
+    browser = FakeBrowser(collections={"collection/a": [_row("g9")], "collection/b": []})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
-    director.open([("a.png", "image", "g1", None)], location="shelf/a",
+    director.open([("a.png", "image", "g1", None)], location="collection/a",
                   side=LANDSCAPE)
-    director.open([("b.png", "image", "g2", None)], location="shelf/b",
+    director.open([("b.png", "image", "g2", None)], location="collection/b",
                   side=PORTRAIT)
 
     director.note_finished(_row("g9", favorite=True))
@@ -803,27 +803,27 @@ def test_a_run_turned_down_frame_after_frame_looks_at_the_shows_set_once(shows):
     whether it would, and answering collected that show's whole set again -- on
     a region's base state, sorting the whole library by shape -- until Core
     stopped answering and Windows closed it (2026-10-07 23:31)."""
-    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")]}, stamp="one gallery")
+    browser = FakeBrowser(collections={"collection/a": [_row("g1")]}, stamp="one gallery")
     director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
                                   fun_time=FakeSession())
-    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
-    browser.shelves_asked = 0
+    director.open([("a.png", "image", "g1", None)], location="collection/a", side=LANDSCAPE)
+    browser.collections_asked = 0
 
     for frame in (b"one", b"two", b"three"):
         director.note_generating("g-run", frame)
 
     assert made[0].generating == []
-    assert browser.shelves_asked == 1
+    assert browser.collections_asked == 1
 
 
-def test_a_run_a_shelf_lists_only_after_the_next_rebuild_joins_on_the_frame_after_it(shows):
-    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")]}, stamp=1)
+def test_a_run_a_collection_lists_only_after_the_next_rebuild_joins_on_the_frame_after_it(shows):
+    browser = FakeBrowser(collections={"collection/a": [_row("g1")]}, stamp=1)
     director, _host, made = shows(browser=browser, db=FakeDB([_row("g7")]),
                                   fun_time=FakeSession())
-    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
+    director.open([("a.png", "image", "g1", None)], location="collection/a", side=LANDSCAPE)
 
     director.note_generating("g7", b"frame-one")
-    browser.shelves["shelf/a"].append(_row("g7"))
+    browser.collections["collection/a"].append(_row("g7"))
     browser.stamp = 2
     director.note_generating("g7", b"frame-two")
 
@@ -909,7 +909,7 @@ def test_shift_arrows_step_from_an_upscale_to_the_video_it_was_made_from(tmp_pat
 def test_a_region_reset_re_points_what_feeds_it(shows):
     # A generation landing in the library must reach a region that has been
     # reset back to the library, not the folder it used to be playing.
-    browser = FakeBrowser(shelves={ALL_LANDSCAPE: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=LANDSCAPE)
@@ -925,8 +925,8 @@ def test_a_set_handed_to_a_running_show_brings_its_own_versions_with_it(shows):
     its side's library.  A versions map still armed on the set the show opened
     with names none of the pictures now on screen, so the band's versions button
     goes faded over a whole library of enhancements (2026-09-19)."""
-    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g9")],
-                                   ALL_LANDSCAPE: [_row("g4")]})
+    browser = FakeBrowser(collections={LATEST_LANDSCAPE: [_row("g9")],
+                                       ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = shows(browser=browser,
                                   db=FakeDB([_row("g9"), _row("g4")]),
                                   fun_time=FakeSession())
@@ -944,7 +944,7 @@ def test_a_set_handed_to_a_running_show_brings_its_own_versions_with_it(shows):
 
 def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there(shows):
     two_pictures = [_picture("g9", "a red fox", seed=9), _picture("g4", "a blue car", seed=4)]
-    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: two_pictures})
+    browser = FakeBrowser(collections={LATEST_LANDSCAPE: two_pictures})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=LANDSCAPE)
@@ -958,8 +958,8 @@ def test_latest_points_a_region_show_at_its_sides_latest_and_feeds_it_from_there
 
 
 def test_shuffle_points_a_region_show_back_at_its_sides_whole_library(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   LATEST_PORTRAIT: [_row("g9")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       LATEST_PORTRAIT: [_row("g9")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
                   side=PORTRAIT)
@@ -972,7 +972,7 @@ def test_shuffle_points_a_region_show_back_at_its_sides_whole_library(shows):
 
 
 def test_a_show_on_its_own_takes_latest_of_the_shape_it_opened_on(shows):
-    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")]})
+    browser = FakeBrowser(collections={LATEST_PORTRAIT: [_row("g9")]})
     director, _host, made = shows(browser=browser)
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
@@ -982,7 +982,7 @@ def test_a_show_on_its_own_takes_latest_of_the_shape_it_opened_on(shows):
 
 
 def test_an_order_with_nothing_to_play_says_so_and_leaves_the_show_alone(shows):
-    director, _host, made = shows(browser=FakeBrowser(shelves={}), fun_time=FakeSession())
+    director, _host, made = shows(browser=FakeBrowser(collections={}), fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=LANDSCAPE)
 
@@ -1004,7 +1004,7 @@ def test_a_show_asks_this_director_for_its_order_hosted_or_not(shows, session):
 
 
 def test_a_loop_ending_on_a_folder_show_hands_it_the_library_it_is_ordered_by(shows):
-    browser = FakeBrowser(shelves={ALL_LANDSCAPE: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=LANDSCAPE)
@@ -1018,8 +1018,8 @@ def test_a_loop_ending_on_a_folder_show_hands_it_the_library_it_is_ordered_by(sh
 
 
 def test_a_show_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(shows):
-    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g9")],
-                                   ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={LATEST_PORTRAIT: [_row("g9")],
+                                       ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser)
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
     made[0].hud_order_label = LATEST_LABEL
@@ -1030,7 +1030,7 @@ def test_a_show_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(s
 
 
 def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_show_alone(shows):
-    director, _host, made = shows(browser=FakeBrowser(shelves={}))
+    director, _host, made = shows(browser=FakeBrowser(collections={}))
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   side=PORTRAIT)
 
@@ -1041,8 +1041,8 @@ def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_show_alone(show
 
 
 def test_a_second_set_in_the_one_window_brings_its_own_sides_library_with_it(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")],
-                                   ALL_LANDSCAPE: [_row("g7")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")],
+                                       ALL_LANDSCAPE: [_row("g7")]})
     director, _host, made = shows(browser=browser)
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
@@ -1063,7 +1063,7 @@ def test_a_show_asks_this_director_for_the_way_out_of_a_loop(shows):
 def test_a_region_show_ending_comes_back_on_the_base_state(shows):
     # In origenerator mode the Funestra underneath is blacked for the whole mode,
     # so a region left empty is a black rectangle rather than a fallback.
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.fill_the_regions()
     first = director.region_show(PORTRAIT)
@@ -1077,7 +1077,7 @@ def test_a_region_show_ending_comes_back_on_the_base_state(shows):
 def test_closing_the_shows_drops_the_wanting_before_it_closes_anything(shows):
     # A show closing while the mode still wants its regions is refilled with the
     # base state, and these closes must not be.
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = shows(browser=browser, fun_time=FakeSession())
     director.fill_the_regions()
 
@@ -1088,7 +1088,7 @@ def test_closing_the_shows_drops_the_wanting_before_it_closes_anything(shows):
 
 
 def test_a_side_handed_over_alone_opens_on_that_side_alone(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
     director, _host, _made = shows(browser=browser, fun_time=FakeSession())
 
     director.fill_the_region(PORTRAIT)
@@ -1098,7 +1098,7 @@ def test_a_side_handed_over_alone_opens_on_that_side_alone(shows):
 
 
 def test_a_side_let_go_alone_stays_empty_and_leaves_the_other_playing(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
     director, _host, _made = shows(browser=browser, fun_time=FakeSession())
     director.fill_the_regions()
     landscape = director.region_show(LANDSCAPE)
@@ -1121,7 +1121,7 @@ def test_a_show_for_a_side_the_session_still_plays_waits_for_the_session_to_hand
     """A slideshow started in the gallery on a side whose Funestra is still in
     Kino mode: the session is asked for that Funestra, and the show opens there
     once the session hands it over, rather than the side's library."""
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=_asking_session(tmp_path))
 
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
@@ -1135,7 +1135,7 @@ def test_a_show_for_a_side_the_session_still_plays_waits_for_the_session_to_hand
 
 def test_a_side_let_go_before_it_was_handed_over_forgets_the_show_asked_for_it(
         shows, tmp_path):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, made = shows(browser=browser, fun_time=_asking_session(tmp_path))
     director.open([("a.png", "image", "g1", None)], side=PORTRAIT)
 
@@ -1146,7 +1146,7 @@ def test_a_side_let_go_before_it_was_handed_over_forgets_the_show_asked_for_it(
 
 
 def test_a_region_already_holding_a_show_is_left_alone(shows):
-    browser = FakeBrowser(shelves={ALL_PORTRAIT: [_row("g4")]})
+    browser = FakeBrowser(collections={ALL_PORTRAIT: [_row("g4")]})
     director, _host, _made = shows(browser=browser, fun_time=FakeSession())
     director.fill_the_regions()
     standing = director.region_show(PORTRAIT)
@@ -1280,7 +1280,7 @@ def test_an_answer_keeps_its_kind_in_the_shows_corner(shows):
     director, _host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.answer("🎤 no Latest shelf yet", kind=WARNING)
+    director.answer("🎤 no Latest collection yet", kind=WARNING)
 
     assert made[0].said_kinds == [WARNING]
 
@@ -1303,31 +1303,31 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(shows):
     assert director.surface_for(LANDSCAPE) is not None
 
 
-def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_shelf(shows):
+def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(shows):
     # On a Funestra that word is F-mode, and a show is meant to read the same way.
 
     class Spoken:
-        shelf_key = FAVORITES_KEY
+        collection_key = FAVORITES_KEY
         side = None
 
     director, host, made = shows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.play_shelf(Spoken())
+    director.play_collection(Spoken())
 
     assert made[0].hud_favorites_filter is True
     assert len(made) == 1  # no second show opened
     assert host.said == ["🎤 F-mode on"]
 
 
-def test_a_spoken_shelf_with_nothing_in_it_opens_nothing(shows):
+def test_a_spoken_collection_with_nothing_in_it_opens_nothing(shows):
     class Spoken:
-        shelf_key = RECENTS_KEY
+        collection_key = RECENTS_KEY
         side = None
 
-    director, host, made = shows(browser=FakeBrowser(shelves={}))
+    director, host, made = shows(browser=FakeBrowser(collections={}))
 
-    director.play_shelf(Spoken())
+    director.play_collection(Spoken())
 
     assert made == []
     assert host.said == ["🎤 nothing there to play"]
@@ -1720,7 +1720,7 @@ def test_a_show_is_wired_to_the_library_of_the_side_it_opened_on(shows):
 
 
 def _a_sitting():
-    """Newest first, as a shelf lists: two seeds of one picture, another picture,
+    """Newest first, as a collection lists: two seeds of one picture, another picture,
     then two more seeds of the first."""
     return [_picture("g5", "a red fox", seed=5), _picture("g4", "a red fox", seed=4),
             _picture("g3", "a blue car", seed=3),
@@ -1741,7 +1741,7 @@ def test_a_show_of_latest_plays_one_of_each_run_of_a_folders_generations(shows):
 
 
 def test_a_show_of_a_folders_latest_plays_one_of_each_run_newest_first(shows):
-    location = oriented_key(FolderShelf(RECENTS_KEY, "workflow/a").key, PORTRAIT)
+    location = oriented_key(FolderCollection(RECENTS_KEY, "workflow/a").key, PORTRAIT)
     director, _host, made = shows(FakeHost(location=location, rows=_a_sitting()))
 
     director.start()
@@ -1760,16 +1760,16 @@ def test_a_show_of_a_folder_plays_every_one_of_its_seeds(shows):
 
 def test_a_seed_landing_while_latest_plays_reaches_it_as_its_runs_newest(shows):
     sitting = _a_sitting()
-    browser = FakeBrowser(shelves={LATEST_PORTRAIT: sitting})
+    browser = FakeBrowser(collections={LATEST_PORTRAIT: sitting})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
     director.open(director.items_of(director.rows_at(LATEST_PORTRAIT)),
                   location=LATEST_PORTRAIT, side=PORTRAIT)
     another_seed = _picture("g6", "a red fox", seed=6)
     a_new_picture = _picture("g7", "a green hill", seed=7)
 
-    browser.shelves[LATEST_PORTRAIT] = [another_seed, *sitting]
+    browser.collections[LATEST_PORTRAIT] = [another_seed, *sitting]
     director.note_finished(another_seed)
-    browser.shelves[LATEST_PORTRAIT] = [a_new_picture, another_seed, *sitting]
+    browser.collections[LATEST_PORTRAIT] = [a_new_picture, another_seed, *sitting]
     director.note_finished(a_new_picture)
 
     assert [added[0] for added in made[0].added] == ["g6", "g7"]
@@ -1780,8 +1780,8 @@ def test_a_show_of_favorites_plays_the_sides_whole_library_with_the_filter_on(sh
     so the switch can be let go to widen and the order pair still means the
     library rather than the bookmarks."""
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
-    browser = FakeBrowser(shelves={oriented_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
-                                   ALL_PORTRAIT: rows})
+    browser = FakeBrowser(collections={oriented_key(FAVORITES_KEY, PORTRAIT): [rows[0]],
+                                       ALL_PORTRAIT: rows})
     director, _host, made = shows(FakeHost(location=oriented_key(FAVORITES_KEY, PORTRAIT),
                                            rows=rows),
                                   browser=browser)
@@ -1800,7 +1800,7 @@ def _folder_of(rows):
 def test_a_show_of_a_folders_favorites_plays_that_folder_with_the_filter_on(shows):
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
     folder = oriented_key("workflow/a", PORTRAIT)
-    favorites = oriented_key(FolderShelf(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
+    favorites = oriented_key(FolderCollection(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
     director, _host, made = shows(FakeHost(location=favorites, rows=[rows[0]],
                                            groups={folder: _folder_of(rows)}))
 
@@ -1887,10 +1887,10 @@ def test_a_panel_opened_in_a_corner_is_there_and_open_on_the_next_launch(shows):
     assert relaunched.hud_place(LANDSCAPE) == (HudCorner.LOWER_RIGHT, False)
 
 
-def test_the_favorites_shelf_holds_f_mode_down_without_turning_it_on_for_the_next(shows):
+def test_the_favorites_collection_holds_f_mode_down_without_turning_it_on_for_the_next(shows):
     rows = [_picture("g1", "a red fox", seed=1), _picture("g2", "a blue car", seed=2)]
     folder = oriented_key("workflow/a", PORTRAIT)
-    favorites = oriented_key(FolderShelf(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
+    favorites = oriented_key(FolderCollection(FAVORITES_KEY, "workflow/a").key, PORTRAIT)
     host = FakeHost(location=favorites, rows=[rows[0]], groups={folder: _folder_of(rows)})
     director, host, made = shows(host)
     director.start()
@@ -2018,12 +2018,12 @@ def test_the_frames_of_the_enhancements_being_made_reach_every_show_that_is_up(s
 
 
 def test_a_run_reaches_each_show_whose_own_set_holds_it(shows):
-    browser = FakeBrowser(shelves={"shelf/a": [_row("g1"), _row("g-run")],
-                                   "shelf/b": [_row("g2")]})
+    browser = FakeBrowser(collections={"collection/a": [_row("g1"), _row("g-run")],
+                                       "collection/b": [_row("g2")]})
     director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
                                   fun_time=FakeSession())
-    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
-    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+    director.open([("a.png", "image", "g1", None)], location="collection/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="collection/b", side=PORTRAIT)
 
     director.note_generating("g-run", b"frame")
 
@@ -2032,10 +2032,10 @@ def test_a_run_reaches_each_show_whose_own_set_holds_it(shows):
 
 
 def test_every_show_that_is_up_hears_which_runs_are_still_being_made(shows):
-    browser = FakeBrowser(shelves={"shelf/a": [_row("g1")], "shelf/b": [_row("g2")]})
+    browser = FakeBrowser(collections={"collection/a": [_row("g1")], "collection/b": [_row("g2")]})
     director, _host, made = shows(browser=browser, fun_time=FakeSession())
-    director.open([("a.png", "image", "g1", None)], location="shelf/a", side=LANDSCAPE)
-    director.open([("b.png", "image", "g2", None)], location="shelf/b", side=PORTRAIT)
+    director.open([("a.png", "image", "g1", None)], location="collection/a", side=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], location="collection/b", side=PORTRAIT)
 
     director.note_in_flight([_being_made("g-run", frame=None)])
 
@@ -2043,7 +2043,7 @@ def test_every_show_that_is_up_hears_which_runs_are_still_being_made(shows):
 
 
 def test_a_latest_show_takes_a_new_run_after_the_browser_has_moved_on(shows):
-    browser = FakeBrowser(shelves={LATEST_LANDSCAPE: [_row("g1")]}, recents=False)
+    browser = FakeBrowser(collections={LATEST_LANDSCAPE: [_row("g1")]}, recents=False)
     director, _host, made = shows(browser=browser, db=FakeDB([_row("g-run")]),
                                   fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
@@ -2057,7 +2057,7 @@ def test_a_latest_show_takes_a_new_run_after_the_browser_has_moved_on(shows):
 def test_a_latest_show_turns_down_a_run_asked_for_in_the_other_shape(shows):
     run = _row("g-run")
     run["params_json"] = json.dumps({"width": 1024, "height": 768})
-    browser = FakeBrowser(shelves={LATEST_PORTRAIT: [_row("g1")]})
+    browser = FakeBrowser(collections={LATEST_PORTRAIT: [_row("g1")]})
     director, _host, made = shows(browser=browser, db=FakeDB([run]),
                                   fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,

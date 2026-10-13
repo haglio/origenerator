@@ -13,7 +13,7 @@ one a row gets is decided by what the job is:
   as a job that *is* that clip.
 * **What its folder already holds** — for everything else, up to four of the
   folder's own thumbnails. It says nothing about this run in particular; it says
-  which shelf of the gallery the run is headed for, which is what a picture-less
+  which collection of the gallery the run is headed for, which is what a picture-less
   job can be placed by at a glance.
 
 Both are drawn into a block of the same width — four square cells in a row, the

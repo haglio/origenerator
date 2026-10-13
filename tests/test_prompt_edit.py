@@ -156,7 +156,7 @@ def test_a_request_naming_nothing_yields_no_revision():
 
 
 def test_a_revision_carries_the_prompts_it_started_from():
-    # What the Requests shelf diffs against, so the record stands alone.
+    # What the Requests collection diffs against, so the record stands alone.
     revision = apply_request("a woman, freckles", "blurry", "no freckles")
 
     assert revision.old_positive == "a woman, freckles"

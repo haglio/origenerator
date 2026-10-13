@@ -2,7 +2,7 @@
 
 Every path an utterance takes used to be reachable only by building a 7,000-line
 widget: the caption's one promise and what takes it down, the bank button a word
-presses and what it answers with, the shelf a name stands you in, the bar a
+presses and what it answers with, the collection a name stands you in, the bar a
 number puts where it says, and a request said over three breaths. Here the bank
 is a handful of recorders and the host a handful of recorded calls.
 
@@ -16,7 +16,7 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from origenerator import gallery
-from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.notice_overlay import ERROR, NOTICE, WARNING
@@ -27,7 +27,7 @@ from origenerator.voice.app_commands import (
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
-    ShelfCommand,
+    CollectionCommand,
     ShowControl,
     SurfaceCommand,
     spoken_phrases,
@@ -146,7 +146,7 @@ class FakeShows:
         self.answer_kinds = []
         self.said = []
         self.kinds = []
-        self.shelves_played = []
+        self.collections_played = []
         self.show_commands = []
         self.filters = []
         self.slide_words = []
@@ -162,8 +162,8 @@ class FakeShows:
         self.said.append(message)
         self.kinds.append(kind)
 
-    def play_shelf(self, command):
-        self.shelves_played.append(command)
+    def play_collection(self, command):
+        self.collections_played.append(command)
 
     def run_show_command(self, command, side):
         self.show_commands.append((command, side))
@@ -228,8 +228,8 @@ class FakeDB:
 class FakeHost:
     """A gallery reduced to what the spoken words ask of one."""
 
-    def __init__(self, *, shelves=("__recents__",), selected=None):
-        self.shelves = set(shelves)
+    def __init__(self, *, collections=("__recents__",), selected=None):
+        self.collections = set(collections)
         self.selected = selected
         self.prompts = {"folder/a": {"positive": "a doll", "negative": "ugly"}}
         self.steered = []
@@ -245,12 +245,12 @@ class FakeHost:
     def steer_prompts(self, key, new_prompts):
         self.steered.append((key, new_prompts))
 
-    def shelf_label(self, key):
+    def collection_label(self, key):
         return "Latest" if key == RECENTS_KEY else key.strip("_").title()
 
-    def stand_in_shelf(self, key, side):
+    def stand_in_collection(self, key, side):
         self.stood_in.append((key, side))
-        return key in self.shelves
+        return key in self.collections
 
     def selected_generation(self):
         return self.selected
@@ -465,7 +465,7 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
 # --- where one word lands ---------------------------------------------------
 
 
-def test_a_shelf_name_stands_you_in_that_shelf(router):
+def test_a_collection_name_stands_you_in_that_collection(router):
     voice, host, shows = router()
 
     voice.on_command(AppCommand.RECENTS)
@@ -474,16 +474,16 @@ def test_a_shelf_name_stands_you_in_that_shelf(router):
     assert shows.answers == ["🎤 Latest"]
 
 
-def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
-    voice, _host, shows = router(FakeHost(shelves=()))
+def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
+    voice, _host, shows = router(FakeHost(collections=()))
 
     voice.on_command(AppCommand.RECENTS)
 
-    assert shows.answers == ["🎤 no Latest shelf yet"]
+    assert shows.answers == ["🎤 no Latest collection yet"]
     assert shows.answer_kinds == [WARNING]
 
 
-def test_a_named_side_picks_that_sides_copy_of_the_shelf(router):
+def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
     voice, host, _shows = router()
 
     voice.on_command(SurfaceCommand(AppCommand.RECENTS, "portrait"))
@@ -627,13 +627,13 @@ def test_undo_stays_the_gallerys_even_under_a_show(router):
     assert shows.slide_words == []
 
 
-def test_a_shelf_to_play_and_a_show_command_go_to_the_shows(router):
+def test_a_collection_to_play_and_a_show_command_go_to_the_shows(router):
     voice, _host, shows = router()
 
-    voice.on_command(ShelfCommand(RECENTS_KEY, "portrait"))
+    voice.on_command(CollectionCommand(RECENTS_KEY, "portrait"))
     voice.on_command(ShowControl(ShowCommand.STOP, "landscape"))
 
-    assert len(shows.shelves_played) == 1
+    assert len(shows.collections_played) == 1
     assert shows.show_commands == [(ShowCommand.STOP, "landscape")]
 
 

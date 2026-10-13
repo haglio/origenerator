@@ -68,15 +68,15 @@ from origenerator.config import (
 )
 from origenerator.db import Database
 from origenerator.gallery import tree as gallery_tree_module
-from origenerator.gallery.labels import workflow_label
-from origenerator.gallery.output import resolve_preview as real_resolve_preview
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
     TRASH_KEY,
 )
+from origenerator.gallery.labels import workflow_label
+from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_actions import GalleryActions
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
@@ -306,7 +306,7 @@ class FakeDB:
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
 
-    # --- the recovery bin (deletions held for the Trash shelf) -------------
+    # --- the recovery bin (deletions held for the Trash collection) --------
 
     def record_deletion(self, prompt_id, row, batch):
         self._deletions.pop(prompt_id, None)  # a re-delete goes to the back
@@ -324,7 +324,7 @@ class FakeDB:
     def forget_deletion(self, prompt_id):
         self._deletions.pop(prompt_id, None)
 
-    # --- spoken requests (what the Requests shelf lists) -------------------
+    # --- spoken requests (what the Requests collection lists) --------------
 
     def record_request(self, *, prompt_id, source_prompt_id, heard, **fields):
         self._requests[prompt_id] = {
@@ -447,7 +447,7 @@ def _side(tree, orientation=LANDSCAPE):
 
 
 def _top_level(tree, orientation=LANDSCAPE):
-    """One half's rows: its shelves, its custom folders, its All.
+    """One half's rows: its collections, its custom folders, its All.
 
     Landscape by default because that is where these fixtures land — a row with
     no thumbnail, no file on disk and no size in its params has no shape to
@@ -460,7 +460,7 @@ def _top_level(tree, orientation=LANDSCAPE):
 
 
 def _alls(tree, orientation=LANDSCAPE):
-    """What one half's All row holds: its shelves, then its workflow folders."""
+    """What one half's All row holds: its collections, then its workflow folders."""
     all_row = _top_level(tree, orientation)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
@@ -471,8 +471,8 @@ def _selected_folder(view):
     return base_of(view.selected_folder_key())
 
 
-def _shelf(view, key, orientation=LANDSCAPE):
-    """One side's copy of a shelf row. Landscape by default, like _top_level."""
+def _collection(view, key, orientation=LANDSCAPE):
+    """One side's copy of a collection row. Landscape by default, like _top_level."""
     return view._tree_item_for(oriented_key(key, orientation))
 
 
@@ -487,7 +487,7 @@ def _key(item):
 
 
 def _subs(item):
-    """A row's own folders, without the shelves a folder of folders leads with."""
+    """A row's own folders, without the collections a folder of folders leads with."""
     children = (item.child(i) for i in range(item.childCount()))
     return [child for child in children if child.data(0, _GROUP_ROLE) is not None]
 
@@ -498,11 +498,11 @@ def _at(item, *path):
     return item
 
 
-_SHELF_NAMES = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
+_COLLECTION_NAMES = ["Latest", "Favorites", "Experiments", "Requests", "Trash"]
 
 
-def _shelf_names(item):
-    """The shelves a folder leads with, in order — none of them a folder."""
+def _collection_names(item):
+    """The collections a folder leads with, in order — none of them a folder."""
     names = []
     for i in range(item.childCount()):
         if item.child(i).data(0, _GROUP_ROLE) is not None:
@@ -557,7 +557,7 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
 
     top = _top_level(view._tree)
     assert set(top) == {"All"}
-    assert _shelf_names(top["All"]) == _SHELF_NAMES
+    assert _collection_names(top["All"]) == _COLLECTION_NAMES
     # Media type grows no folder of its own any more; the two ticks over the
     # tree are what says which kinds are listed.
     assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
@@ -571,7 +571,7 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     assert len(_subs(_at(workflow_node, 0, 0))) == 1  # the two seeds collapse
 
 
-def test_every_folder_of_folders_leads_with_shelves_of_its_own(qtbot):
+def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
     view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -579,7 +579,7 @@ def test_every_folder_of_folders_leads_with_shelves_of_its_own(qtbot):
     model, lora, source = (_at(workflow, *[0] * depth) for depth in (1, 2, 3))
 
     for folder in (workflow, model, lora, source):
-        assert _shelf_names(folder) == _SHELF_NAMES
+        assert _collection_names(folder) == _COLLECTION_NAMES
     assert _at(source, 0).childCount() == 0
 
 
@@ -692,7 +692,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     for depth, item in rows_by_depth:
         starts.setdefault(depth, set()).add(name_x(item))
     # One name position per depth — every row of a level lines up with its
-    # siblings, shelves and folders alike...
+    # siblings, collections and folders alike...
     assert all(len(xs) == 1 for xs in starts.values()), starts
     # ...and each level sits exactly one indentation right of the one above.
     at = [next(iter(starts[d])) for d in sorted(starts)]
@@ -766,7 +766,7 @@ def _square_names(view):
     return [tile._text for tile in view._scroll.widget().findChildren(FolderTile)]
 
 
-def test_a_folder_of_folders_shows_its_shelves_as_squares_before_its_folders(qtbot):
+def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -774,10 +774,10 @@ def test_a_folder_of_folders_shows_its_shelves_as_squares_before_its_folders(qtb
 
     view._tree.setCurrentItem(lora)
 
-    assert _square_names(view) == [*_SHELF_NAMES, *(row.text(0) for row in _subs(lora))]
+    assert _square_names(view) == [*_COLLECTION_NAMES, *(row.text(0) for row in _subs(lora))]
 
 
-def test_clicking_a_shelf_square_opens_that_folders_shelf(qtbot):
+def test_clicking_a_collection_square_opens_that_folders_collection(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -788,7 +788,7 @@ def test_clicking_a_shelf_square_opens_that_folders_shelf(qtbot):
 
     trash.clicked.emit(trash.key)
 
-    assert view._tree.currentItem() is _shelf_row(workflow, "Trash")
+    assert view._tree.currentItem() is _collection_row(workflow, "Trash")
 
 
 def test_clicking_a_folder_tile_drills_into_it(qtbot):
@@ -975,8 +975,8 @@ def test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands(q
     assert view._tree.currentItem() is all_row
 
 
-def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
-    # A shelf is a collection of generations, so standing on one and searching it
+def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
+    # A collection is a set of generations, so standing in one and searching it
     # is the obvious thing to try — and it used to quietly search everything.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     rows[1]["starred"] = 1
@@ -984,14 +984,14 @@ def test_a_shelf_scopes_the_search_like_any_other_row(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["i2"]     # the favorited one alone
     assert "Favorites" in view._folder_path.display_text()
 
 
-def test_a_folders_shelf_scopes_the_search_and_names_its_path(qtbot):
+def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
     rows = [_image("i1", "a cat", 50, 1),
             _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                  "wan22_i2v_00001_.mp4")]
@@ -1009,20 +1009,20 @@ def test_a_folders_shelf_scopes_the_search_and_names_its_path(qtbot):
         f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest…")
 
 
-def _shelf_row(folder, label):
+def _collection_row(folder, label):
     (row,) = [folder.child(i) for i in range(folder.childCount())
               if folder.child(i).data(0, _GROUP_ROLE) is None and folder.child(i).text(0) == label]
     return row
 
 
-def test_a_folders_shelf_row_counts_what_that_folder_holds(qtbot):
+def test_a_folders_collection_row_counts_what_that_folder_holds(qtbot):
     view = GalleryView(_bin_db(rows=[_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")],
                                held=[("d1", _image("d1", "a cat", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _shown(_shelf_row(_image_workflow(view._tree), "Trash")) == "(1) Trash"
-    assert _shown(_shelf_row(_video_workflow(view._tree), "Trash")) == "Trash"
+    assert _shown(_collection_row(_image_workflow(view._tree), "Trash")) == "(1) Trash"
+    assert _shown(_collection_row(_video_workflow(view._tree), "Trash")) == "Trash"
 
 
 def test_starring_a_picture_counts_it_on_the_favorites_of_every_folder_above_it(qtbot):
@@ -1032,11 +1032,11 @@ def test_starring_a_picture_counts_it_on_the_favorites_of_every_folder_above_it(
 
     view.set_items_favorite(["i1"], True)
 
-    assert _shown(_shelf_row(_at(_image_workflow(view._tree), 0), "Favorites")) == "(1) Favorites"
-    assert _shown(_shelf_row(_video_workflow(view._tree), "Favorites")) == "Favorites"
+    assert _shown(_collection_row(_at(_image_workflow(view._tree), 0), "Favorites")) == "(1) Favorites"
+    assert _shown(_collection_row(_video_workflow(view._tree), "Favorites")) == "Favorites"
 
 
-def test_the_trash_shelf_searches_what_it_is_holding(qtbot):
+def test_the_trash_collection_searches_what_it_is_holding(qtbot):
     # A deleted row is out of the gallery's own list and lives only in the bin,
     # so a Trash search finds nothing at all unless the bin is indexed too.
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
@@ -1044,14 +1044,14 @@ def test_the_trash_shelf_searches_what_it_is_holding(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     _search_for(view, "cat")
 
     assert view.visible_prompt_ids() == ["d1"]
 
 
 def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
-    # The bin shares the index so its shelf can be searched; it must not leak
+    # The bin shares the index so its collection can be searched; it must not leak
     # into a search of the gallery, where those items are gone.
     view = GalleryView(_bin_db(rows=[_image("i1", "a dog", 50, 3)],
                                held=[("d1", _image("d1", "a cat", 50, 1))]))
@@ -1086,7 +1086,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     assert leaf.text(0) in placeholder      # right down to the folder itself
     assert videos.text(0) in placeholder    # and every branch above it
 
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     assert view._search.field.placeholderText() == "Search Landscape  ›  All  ›  Latest…"
 
 
@@ -1502,7 +1502,7 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
 
 
 def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
-    # A search's results are a gathered collection exactly as a shelf's are, and
+    # A search's results are gathered exactly as a collection's are, and
     # sitting through what one turned up is a good reason to have run it.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a dog", 50, 3)]
@@ -1716,7 +1716,7 @@ def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_i
 
 
 def test_a_folder_the_user_made_takes_no_favorite(qtbot):
-    # A bookmark of a bookmark shelf collects nothing, so its menu offers no
+    # A bookmark of a bookmark collection gathers nothing, so its menu offers no
     # Favorite — and the star its row shows on hover must not leave one either.
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_folder_key(_make_folder(view, "Mine", [cat]))
@@ -1738,16 +1738,16 @@ def test_the_favorite_button_offers_to_take_back_the_favorite_it_just_made(qtbot
     assert view._bank.favorite.toolTip().startswith("Unfavorite folder")
 
 
-def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_shelf(qtbot):
+def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot):
     view, _cat, dog = _two_leaf_view(qtbot)
     view._toggle_favorite(dog)
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     assert view._browser._visible_keys == [dog]
 
     view._toggle_favorite(dog)
 
     assert view._browser._visible_keys == []
-    assert _shown(_shelf(view, FAVORITES_KEY)) == "Favorites"  # and its count with it
+    assert _shown(_collection(view, FAVORITES_KEY)) == "Favorites"  # and its count with it
 
 
 def _long_list_view(qtbot):
@@ -1911,7 +1911,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     assert _image_workflow(view._tree).isExpanded()
 
 
-def test_favorite_shelf_is_pinned_first_and_collects_favorite_folders(qtbot):
+def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -1922,11 +1922,11 @@ def test_favorite_shelf_is_pinned_first_and_collects_favorite_folders(qtbot):
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
-    # The Favorites shelf sits just below Recents, above the media folders.
+    # The Favorites collection sits just below Recents, above the media folders.
     assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
     # Selecting it lists a tile for each favorited folder, wherever it lives.
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
     assert view._browser._visible_keys == [dog_key]
     assert view.visible_prompt_ids() == []
 
@@ -1956,18 +1956,18 @@ def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, *
                 source="experiment", experiment_verdict=verdict, **extra)
 
 
-def test_experiments_shelf_is_always_reachable(qtbot):
-    # The shelf hosts the feature's on/off switch, so it must exist before any
+def test_experiments_collection_is_always_reachable(qtbot):
+    # The collection hosts the feature's on/off switch, so it must exist before any
     # experiment does — an empty gallery included.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _alls(view._tree)["Experiments"]
-    assert shelf.text(0) == "Experiments"
+    collection = _alls(view._tree)["Experiments"]
+    assert collection.text(0) == "Experiments"
 
 
-def test_experiments_shelf_label_counts_the_unreviewed(qtbot):
+def test_experiments_collection_label_counts_the_unreviewed(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
         _experiment_row("e1"),
@@ -1981,12 +1981,12 @@ def test_experiments_shelf_label_counts_the_unreviewed(qtbot):
     assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
 
 
-def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
+def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
     view = GalleryView(FakeDB([_experiment_row("e1")]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert view.visible_prompt_ids() == ["e1"]
     tile = view._browser._thumb_widgets["e1"]
     tooltips = [b.toolTip() for b in tile._corner_buttons]
@@ -1995,14 +1995,14 @@ def test_experiments_shelf_offers_keep_and_reject_on_each_tile(qtbot):
 
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
-    # An experiment has a folder like anything else, so the shelf's double-click
+    # An experiment has a folder like anything else, so the collection's double-click
     # is the same jump Recents and Favorites make — no verdict needed first.
     experiment = _experiment_row("e1", steps=30)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     view._browser._thumb_widgets["e1"].double_clicked.emit("e1")
 
     assert _selected_folder(view) == gallery.settings_folder_key(experiment)
@@ -2016,15 +2016,15 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    # Unreviewed, but already filed in the tree — the shelf is a queue over it,
+    # Unreviewed, but already filed in the tree — the collection is a queue over it,
     # not a holding pen outside it.
     assert "SDXL Text-to-Image" in _workflow_rows(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
-    assert view.visible_prompt_ids() == []          # reviewed: off the shelf...
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
+    assert view.visible_prompt_ids() == []          # reviewed: out of the collection...
     assert "SDXL Text-to-Image" in _workflow_rows(view._tree)       # ...and still in its folder
 
 
@@ -2066,7 +2066,7 @@ def test_the_experiments_switch_reports_what_each_position_means(qtbot):
 
     view.set_experiments_enabled(True)           # a restored session turns it on
     assert view.experiments_enabled() is True
-    assert view._experiments_cb.isChecked()      # the shelf's switch reflects it
+    assert view._experiments_cb.isChecked()      # the collection's switch reflects it
     # The switch is a promise about the closed app, and says so.
     assert "close the app" in view._experiments_status.text()
 
@@ -2140,7 +2140,7 @@ def test_the_absence_batch_can_be_handed_a_policy_of_its_own(qtbot):
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
-    # The shelf reads the production app's own rows, so a verdict given in a
+    # The collection reads the production app's own rows, so a verdict given in a
     # preview is the verdict: the same items come up for review, and its count
     # shows on the tree.
     monkeypatch.setenv(ENV_FLAG, "1")
@@ -2149,12 +2149,12 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
     view.refresh()
 
     assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert sorted(view.visible_prompt_ids()) == ["e1", "e2"]
     assert "production app" not in view._browser._experiments_empty_hint()
 
 
-# --- the Trash shelf: deleted items, still recoverable ----------------------
+# --- the Trash collection: deleted items, still recoverable -----------------
 
 
 def _bin_db(rows=(), held=(), inherited=()):
@@ -2175,18 +2175,18 @@ def _bin_db(rows=(), held=(), inherited=()):
     return db
 
 
-def test_the_trash_shelf_is_always_reachable(qtbot):
+def test_the_trash_collection_is_always_reachable(qtbot):
     # A bin you can only find once you have something to recover is no use: the
     # point is knowing, before you delete, that deleting is not the end.
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _alls(view._tree)["Trash"]
-    assert shelf.text(0) == "Trash"
+    collection = _alls(view._tree)["Trash"]
+    assert collection.text(0) == "Trash"
 
 
-def test_the_trash_shelf_label_counts_what_it_holds(qtbot):
+def test_the_trash_collection_label_counts_what_it_holds(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
@@ -2195,19 +2195,19 @@ def test_the_trash_shelf_label_counts_what_it_holds(qtbot):
     assert _shown(_alls(view._tree)["Trash"]) == "(2) Trash"
 
 
-def test_the_trash_shelf_lists_deleted_items_newest_first(qtbot):
+def test_the_trash_collection_lists_deleted_items_newest_first(qtbot):
     view = GalleryView(_bin_db(held=[("old", _image("old", "a cat", 50, 1)),
                                      ("new", _image("new", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.visible_prompt_ids() == ["new", "old"]
 
 
-def test_a_deleted_item_reaches_the_shelf_the_moment_it_is_deleted(qtbot, tmp_path):
+def test_a_deleted_item_reaches_the_collection_the_moment_it_is_deleted(qtbot, tmp_path):
     # End to end through the real GalleryActions: delete a tile, and the item is
-    # standing on the Trash shelf rather than gone.
+    # standing in the Trash collection rather than gone.
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1", params_json="{}", workflow_json="{}")
@@ -2220,7 +2220,7 @@ def test_a_deleted_item_reaches_the_shelf_the_moment_it_is_deleted(qtbot, tmp_pa
 
     view._delete_rows([db.get_generation("p1")])
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.visible_prompt_ids() == ["p1"]
 
 
@@ -2229,7 +2229,7 @@ def test_each_trash_tile_offers_restore_and_permanent_delete(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     tooltips = [b.toolTip() for b in view._browser._thumb_widgets["d1"]._corner_buttons]
     assert any("Restore" in t for t in tooltips)
     assert any("permanently" in t for t in tooltips)
@@ -2242,27 +2242,27 @@ def test_a_trash_tile_is_captioned_like_any_other_tile(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     caption = view._browser._thumb_widgets["d1"]._text_label.text()
     assert "seed 1" in caption
     assert "left" not in caption
 
 
-def test_the_trash_shelf_states_no_deadline_over_what_it_holds(qtbot):
+def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view._avg_label.text() == ""
 
 
-def test_an_empty_trash_shelf_explains_what_it_is_for(qtbot):
+def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert "as long as you leave them" in view._browser._trash_empty_hint()
     assert view._avg_label.text() == ""  # the hint already says it; don't say it twice
 
@@ -2273,7 +2273,7 @@ def test_restoring_from_a_tile_hands_the_id_to_the_action(qtbot):
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     view._browser._thumb_widgets["d1"].corner_action_triggered.emit("d1", "restore")
 
@@ -2297,7 +2297,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
     view.restore_from_trash(["p1"])
 
     assert "SDXL Text-to-Image" in _workflow_rows(view._tree)      # back in the tree...
-    assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left on the shelf
+    assert view.visible_prompt_ids() == ["p1"]     # ...and landed on, not left in the collection
     assert view._db.list_deletions() == []
 
 
@@ -2308,7 +2308,7 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     asked = []
     monkeypatch.setattr(view, "_confirm", lambda text: asked.append(text) or False)
 
@@ -2343,8 +2343,8 @@ def _warnings_shown(monkeypatch):
     return said
 
 
-def _trash_shelf_view(qtbot, actions, held=(("d1", "a cat"),)):
-    """The Trash shelf open over the deletions given as ``(prompt_id, prompt)``,
+def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
+    """The Trash collection open over the deletions given as ``(prompt_id, prompt)``,
     with the first of them picked."""
     view = GalleryView(
         _bin_db(held=[(pid, _image(pid, prompt, 50, n))
@@ -2353,7 +2353,7 @@ def _trash_shelf_view(qtbot, actions, held=(("d1", "a cat"),)):
     )
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     view._browser.apply_selection(held[0][0], _NO_MOD)
     return view
 
@@ -2364,7 +2364,7 @@ _TWO_HELD = (("d1", "a cat"), ("d2", "a dog"))
 def test_a_trash_tiles_menu_carries_the_two_acts_a_deleted_item_has(qtbot, monkeypatch):
     # The hover corners act on the one tile under the pointer; the menu acts on
     # the whole pick, which is the only way to answer for a batch at once.
-    view = _trash_shelf_view(qtbot, FakeActions(), held=_TWO_HELD)
+    view = _trash_collection_view(qtbot, FakeActions(), held=_TWO_HELD)
     view._browser.apply_selection("d2", _CTRL)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -2376,7 +2376,7 @@ def test_a_trash_tiles_menu_carries_the_two_acts_a_deleted_item_has(qtbot, monke
 
 def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, monkeypatch):
     actions = FakeActions()
-    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)
+    view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
     view._browser.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
     _answer_menu(monkeypatch, "Restore 2 items")
@@ -2390,7 +2390,7 @@ def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch
     # This entry and the tile's own corner are the only two routes in the app that
     # take files with nothing under them, so the menu's wiring is not a detail.
     actions = FakeActions()
-    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)
+    view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
     view._browser.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
     _answer_menu(monkeypatch, "Delete 2 items permanently")
@@ -2403,9 +2403,9 @@ def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch
 
 def test_right_clicking_an_unpicked_trash_tile_narrows_to_that_one(qtbot, monkeypatch):
     # Otherwise a menu raised over one tile would answer for a pick somewhere else
-    # on the shelf — and here that means ending the wrong files for good.
+    # in the collection — and here that means ending the wrong files for good.
     actions = FakeActions()
-    view = _trash_shelf_view(qtbot, actions, held=_TWO_HELD)  # d1 is the picked one
+    view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)  # d1 is the picked one
     _answer_menu(monkeypatch, "Restore 1 item")
 
     _right_click(view, "d2")
@@ -2416,8 +2416,8 @@ def test_right_clicking_an_unpicked_trash_tile_narrows_to_that_one(qtbot, monkey
 def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
         qtbot, monkeypatch):
     # The arm that has never rendered once: a restore that throws must reach the
-    # user as a sentence, not as a shelf that quietly did nothing.
-    view = _trash_shelf_view(qtbot, _FailingActions())
+    # user as a sentence, not as a collection that quietly did nothing.
+    view = _trash_collection_view(qtbot, _FailingActions())
     said = _warnings_shown(monkeypatch)
 
     view.restore_from_trash(["d1"])
@@ -2429,7 +2429,7 @@ def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
 
 def test_a_purge_that_cannot_finish_says_why_and_keeps_the_item_picked(
         qtbot, monkeypatch):
-    view = _trash_shelf_view(qtbot, _FailingActions())
+    view = _trash_collection_view(qtbot, _FailingActions())
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
     said = _warnings_shown(monkeypatch)
 
@@ -2446,7 +2446,7 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     # confirm nothing; the confirmation is never reached (this test would trip the
     # suite's no-unanswered-dialog guard if it were).
     actions = _FailingActions()  # so much as touching them here would raise
-    view = _trash_shelf_view(qtbot, actions)
+    view = _trash_collection_view(qtbot, actions)
 
     view.restore_from_trash([])
     view.purge_from_trash([])
@@ -2454,7 +2454,7 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     assert actions.restored == [] and actions.purged == []
 
 
-def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
+def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
     # The picked items are already deleted, so the button's one remaining
     # meaning is "for good" — rather than a live-looking control doing nothing.
     actions = FakeActions()
@@ -2462,7 +2462,7 @@ def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     view._browser.apply_selection("d1", _NO_MOD)
     monkeypatch.setattr(view, "_confirm", lambda text: True)
 
@@ -2473,17 +2473,17 @@ def test_delete_on_the_trash_shelf_means_permanently(qtbot, monkeypatch):
     assert actions.deleted == []  # and never the ordinary delete path
 
 
-def test_the_delete_button_is_dark_on_an_unpicked_trash_shelf(qtbot):
+def test_the_delete_button_is_dark_on_an_unpicked_trash_collection(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     assert not view._bank.delete.isEnabled()
 
 
-def test_a_purge_clears_the_item_off_the_shelf(qtbot, tmp_path, monkeypatch):
+def test_a_purge_clears_the_item_off_the_collection(qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "test.db")
     db.insert_generation(prompt_id="p1", workflow_name="sdxl_t2i",
                          workflow_version="v1", params_json="{}", workflow_json="{}")
@@ -2498,27 +2498,27 @@ def test_a_purge_clears_the_item_off_the_shelf(qtbot, tmp_path, monkeypatch):
 
     view.purge_from_trash(["p1"])
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert view.visible_prompt_ids() == []
     assert db.list_deletions() == []
 
 
-def test_the_trash_shelf_is_a_place_back_returns_to(qtbot):
+def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
     view = GalleryView(_bin_db([_image("i1", "a cat", 50, 1)],
                                held=[("d1", _image("d1", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     view._navigation.go_back()
 
-    assert view._tree.currentItem() is _shelf(view, TRASH_KEY)
+    assert view._tree.currentItem() is _collection(view, TRASH_KEY)
 
 
 def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypatch):
     # One library, one trash: what any instance deleted, any instance can put
-    # back, so the shelf holds the same items whichever app is looking at it.
+    # back, so the collection holds the same items whichever app is looking at it.
     monkeypatch.setenv(ENV_FLAG, "1")
     db = _bin_db(held=[("mine", _image("mine", "a dog", 50, 2))],
                  inherited=[("live", _image("live", "a cat", 50, 1))])
@@ -2526,7 +2526,7 @@ def test_a_preview_offers_every_held_deletion_like_the_live_app(qtbot, monkeypat
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     assert sorted(view.visible_prompt_ids()) == ["live", "mine"]
     assert "preview" not in view._browser._trash_empty_hint()
 
@@ -2546,7 +2546,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     view._browser._thumbnail_clicked("d1", _NO_MOD)
 
@@ -2556,12 +2556,12 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
 
 
 def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
-    # The gesture a folder's tiles carry, since the one a shelf's carry — jump to
+    # The gesture a folder's tiles carry, since the one a collection's carry — jump to
     # its folder — is the single thing a deleted item hasn't got.
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1))]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     view._browser._thumbnail_double_clicked("d1")
 
@@ -2570,7 +2570,7 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
     assert view._info_tabs._preview_panel is not panel  # pinned: it stays
 
 
-def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
+def test_the_trash_collection_plays_as_a_slideshow(qtbot, monkeypatch):
     # Deciding what to keep out of a bin of sixty days' deletions is exactly what
     # a slideshow is for — one at a time, full size, rather than a grid of stamps.
     _resolve_by_id(monkeypatch)
@@ -2578,7 +2578,7 @@ def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
     assert not view._bank.slideshow.isHidden()
     view._shows.start()
@@ -2588,15 +2588,15 @@ def test_the_trash_shelf_plays_as_a_slideshow(qtbot, monkeypatch):
     view._shows.showing.close()
 
 
-def test_a_deleted_item_double_clicked_open_steps_through_the_shelf(qtbot, monkeypatch):
-    # Left/Right work here for the same reason they work in a folder: the shelf's
+def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, monkeypatch):
+    # Left/Right work here for the same reason they work in a folder: the collection's
     # items resolve to real files, so there is a set to step through.
     _resolve_by_id(monkeypatch)
     view = GalleryView(_bin_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     view._on_thumbnail_clicked("d1")
 
     show = _double_click_show(view, qtbot)
@@ -2607,7 +2607,7 @@ def test_a_deleted_item_double_clicked_open_steps_through_the_shelf(qtbot, monke
 
 
 def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
-    # End to end through the real delete: what the shelf hands the preview is the
+    # End to end through the real delete: what the collection hands the preview is the
     # clip where it now sits, not the folder it was taken out of.
     db = Database(tmp_path / "test.db")
     out = tmp_path / "out" / "video"
@@ -2623,7 +2623,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     view.refresh()
     view._delete_rows([db.get_generation("v1")])
 
-    view._tree.setCurrentItem(_shelf(view, TRASH_KEY))
+    view._tree.setCurrentItem(_collection(view, TRASH_KEY))
     (held,) = view._held_rows
     # The real resolver, not this module's autouse "nothing to show" stub.
     resolved = real_resolve_preview(held, tmp_path / "out")
@@ -2645,24 +2645,24 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)
 
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
     view._browser._drill_into(view._browser._visible_keys[0])  # click the favorited tile
     assert set(view.visible_prompt_ids()) == {"i2"}  # now inside the dog folder
 
 
-def test_favorite_shelf_shows_empty_state_when_nothing_is_favorite(qtbot):
+def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
     assert view._browser._visible_keys == []   # no tiles, just the hint
     assert view.visible_prompt_ids() == []
 
 
-def test_favorite_shelf_collects_favorite_items_as_thumbnails(qtbot):
+def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
     db.set_generation_favorite("i2", True)
@@ -2670,13 +2670,13 @@ def test_favorite_shelf_collects_favorite_items_as_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
-    assert view.visible_prompt_ids() == ["i2"]  # the favorited item, on the shelf
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
+    assert view.visible_prompt_ids() == ["i2"]  # the favorited item, in the collection
     assert view._browser._thumb_widgets["i2"]._favorite is True
 
 
-def test_favorite_shelf_shows_both_favorite_items_and_folders(qtbot):
+def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     db = FakeDB(rows)
     db.set_generation_favorite("i1", True)  # a favorited item
@@ -2688,13 +2688,13 @@ def test_favorite_shelf_shows_both_favorite_items_and_folders(qtbot):
     dog_key = _key(_at(lora, 1))
     view._toggle_favorite(dog_key)  # and a favorited folder
 
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
     assert view.visible_prompt_ids() == ["i1"]      # the item
     assert view._browser._visible_keys == [dog_key]  # the folder
 
 
-def test_unfavoriting_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
+def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
     db = FakeDB(rows)
     db.set_generation_favorite("i1", True)
@@ -2702,28 +2702,28 @@ def test_unfavoriting_an_item_from_the_shelf_removes_it(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
 
-    shelf = _alls(view._tree)["Favorites"]
-    view._tree.setCurrentItem(shelf)
+    collection = _alls(view._tree)["Favorites"]
+    view._tree.setCurrentItem(collection)
     assert view.visible_prompt_ids() == ["i1"]
     _answer_menu(monkeypatch, "Unfavorite 1 item")
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]
-    assert view.visible_prompt_ids() == []  # gone from the shelf at once
+    assert view.visible_prompt_ids() == []  # gone from the collection at once
 
 
-def test_favorite_shelf_stays_selected_across_a_refresh(qtbot):
+def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
 
-    view.refresh()  # a poll-driven rebuild must not knock us off the shelf
+    view.refresh()  # a poll-driven rebuild must not knock us out of the collection
 
     assert view._tree.currentItem().text(0) == "Favorites"
 
 
-def test_favorite_shelf_is_absent_until_a_folder_exists(qtbot):
+def test_favorite_collection_is_absent_until_a_folder_exists(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2746,7 +2746,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
         f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
 
 
-def test_a_folders_shelf_names_itself_by_its_path_to_the_slideshow_button(qtbot):
+def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -2758,7 +2758,7 @@ def test_a_folders_shelf_names_itself_by_its_path_to_the_slideshow_button(qtbot)
         f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
 
 
-def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
+def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]  # newest first
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2772,7 +2772,7 @@ def test_recents_shelf_is_pinned_first_and_lists_recent_items(qtbot):
     assert view._browser._visible_keys == []
 
 
-def test_recents_shelf_lists_imported_files_too(qtbot):
+def test_recents_collection_lists_imported_files_too(qtbot):
     # A file ComfyUI wrote on its own arrives at the launch that finds it, and
     # Latest is where it is looked for then -- it used to sit in its workflow's
     # folder alone, with nothing to say why it was not the newest thing here.
@@ -2786,7 +2786,7 @@ def test_recents_shelf_lists_imported_files_too(qtbot):
     assert sorted(view.visible_prompt_ids()) == ["gen", "imp"]
 
 
-def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
+def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -2794,7 +2794,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_shelf(qtbot):
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)  # click the recent tile for the dog
-    # Its details fill the info pane, but the shelf stays put — no navigation, so
+    # Its details fill the info pane, but the collection stays put — no navigation, so
     # every recent item is still listed.
     assert view.selected_generation() == "i2"
     assert view._browser.showing_recents()
@@ -2811,7 +2811,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     # Double-clicking a recent tile is the whole jump — no button stands in for it.
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
-    assert view._browser.showing_recents() is False             # off the shelf...
+    assert view._browser.showing_recents() is False             # out of the collection...
     assert set(view.visible_prompt_ids()) == {"i2"}     # ...into the dog's own folder
     # The item lands selected — its tile picked and highlighted, not merely
     # previewed — as if we'd navigated in and clicked it.
@@ -2903,7 +2903,7 @@ def test_right_clicking_a_recent_item_offers_its_folder_favorite_enhance_and_del
 
     _right_click(view, "i2")
 
-    # A shelf gathers items from all over, so where this one actually lives is
+    # A collection gathers items from all over, so where this one actually lives is
     # the question its menu is most often asked — it leads, above a separator.
     assert labels == ["Go to folder", "", "Favorite 1 item", "Enhance 1 image",
                       "Delete 1 item"]
@@ -2926,7 +2926,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
     assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
 
 
-def test_go_to_folder_from_a_shelf_opens_the_folder_and_lands_on_the_item(
+def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
@@ -2948,7 +2948,7 @@ def _folder_buttons(view):
             if button.isVisibleTo(panel)]
 
 
-def test_the_go_to_folder_button_takes_a_shelf_item_home_without_a_right_click(qtbot):
+def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_click(qtbot):
     # Pressed and released like a real one, because going there rebuilds the
     # block it sits in: the button is destroyed in the middle of its own click.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
@@ -2980,7 +2980,7 @@ def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
 
 
 def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
-    view = _trash_shelf_view(qtbot, FakeActions())
+    view = _trash_collection_view(qtbot, FakeActions())
 
     view._browser._thumb_widgets["d1"].clicked.emit("d1", _NO_MOD)
 
@@ -3002,9 +3002,9 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
 
 
-def test_a_kind_left_off_a_shelf_still_has_its_folder_to_go_to(qtbot):
-    # The choice narrows the shelf, not the folder list, so a tab showing a
-    # picture of the kind the shelf is not listing still has somewhere to go.
+def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
+    # The choice narrows the collection, not the folder list, so a tab showing a
+    # picture of the kind the collection is not listing still has somewhere to go.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows), actions=FakeActions())
     qtbot.addWidget(view)
@@ -3033,7 +3033,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     assert button.toolTip() == "Go to the folder this item is in"
 
 
-def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeypatch):
+def test_right_click_delete_on_the_recents_collection_removes_the_item(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows), actions=actions)
@@ -3050,7 +3050,7 @@ def test_right_click_delete_on_the_recents_shelf_removes_the_item(qtbot, monkeyp
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_right_click_favorite_on_the_recents_shelf_bookmarks_the_item(qtbot, monkeypatch):
+def test_right_click_favorite_on_the_recents_collection_bookmarks_the_item(qtbot, monkeypatch):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -3062,11 +3062,11 @@ def test_right_click_favorite_on_the_recents_shelf_bookmarks_the_item(qtbot, mon
     _right_click(view, "i1")
 
     assert db.get_generation("i1")["starred"]                # persisted
-    assert view._browser.showing_recents()                           # still on the shelf
+    assert view._browser.showing_recents()                           # still in the collection
     assert view._browser._thumb_widgets["i1"]._favorite is True    # the tile takes the star at once
 
 
-def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_path, monkeypatch):
+def test_right_click_enhance_on_the_recents_collection_queues_the_image(qtbot, tmp_path, monkeypatch):
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -3080,7 +3080,7 @@ def test_right_click_enhance_on_the_recents_shelf_queues_the_image(qtbot, tmp_pa
     assert job.workflow.name == "image_enhance"
 
 
-def test_recents_shelf_shows_empty_state_when_nothing_has_a_result(qtbot):
+def test_recents_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     pending = _row("wip", "sdxl_t2i", {"seed": 9}, "wip.png", status="running", output_files=None)
     view = GalleryView(FakeDB([pending]))
     qtbot.addWidget(view)
@@ -3090,19 +3090,19 @@ def test_recents_shelf_shows_empty_state_when_nothing_has_a_result(qtbot):
     assert view.visible_prompt_ids() == []  # nothing to show: just the hint
 
 
-def test_recents_shelf_stays_selected_across_a_refresh(qtbot):
+def test_recents_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    view.refresh()  # a poll-driven rebuild must not knock us off the shelf
+    view.refresh()  # a poll-driven rebuild must not knock us out of the collection
 
     assert view._tree.currentItem().text(0) == "Latest"
 
 
 def _many_recents(count):
-    """``count`` generated images, newest first, so the shelf runs past one page."""
+    """``count`` generated images, newest first, so the collection runs past one page."""
     return [_image(f"i{n}", "a cat", 50, n) for n in reversed(range(count))]
 
 
@@ -3111,7 +3111,7 @@ def _scroll_bar(view):
 
 
 def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
-    # The shelf lists every generation ever made, so it draws a page of tiles at a
+    # The collection lists every generation ever made, so it draws a page of tiles at a
     # time rather than all 120 at once.
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
@@ -3119,7 +3119,7 @@ def test_recents_opens_on_one_page_however_far_back_it_goes(qtbot):
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert len(view.visible_prompt_ids()) == 50
-    # And it's the newest page — the shelf still reads newest-first.
+    # And it's the newest page — the collection still reads newest-first.
     assert view.visible_prompt_ids()[0] == "i119"
 
 
@@ -3130,7 +3130,7 @@ def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     bar = _scroll_bar(view)
-    bar.setRange(0, 5000)          # a laid-out shelf with room to scroll
+    bar.setRange(0, 5000)          # a laid-out collection with room to scroll
     assert len(view.visible_prompt_ids()) == 50   # ...and no growth up at the top
 
     bar.setValue(bar.maximum())    # scroll to the end: the next page follows
@@ -3139,12 +3139,12 @@ def test_scrolling_to_the_end_of_recents_draws_the_next_page(qtbot):
     bar.setValue(bar.maximum())
     assert view.visible_prompt_ids() == [f"i{n}" for n in reversed(range(120))]
 
-    bar.setValue(bar.maximum())    # the true end of the shelf: nothing more to draw
+    bar.setValue(bar.maximum())    # the true end of the collection: nothing more to draw
     assert len(view.visible_prompt_ids()) == 120
 
 
 def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
-    # A generation landing rebuilds the gallery under the open shelf. That must not
+    # A generation landing rebuilds the gallery under the open collection. That must not
     # collapse it back to one page and throw away everything the user scrolled
     # down through — the new item just joins the top of what's already drawn.
     db = FakeDB(_many_recents(120))
@@ -3165,7 +3165,7 @@ def test_a_rebuild_keeps_the_pages_recents_had_been_scrolled_into(qtbot):
 
 
 def test_the_kinds_are_chosen_over_the_folders_contents_not_over_the_list(qtbot):
-    # The choice narrows what a shelf lists, so it belongs to the pane the shelf
+    # The choice narrows what a collection lists, so it belongs to the pane the collection
     # is drawn in — not over the folder list, which keeps every folder whichever
     # kind is chosen.
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
@@ -3195,7 +3195,7 @@ def test_each_kind_wears_a_mark_beside_its_word(qtbot):
     assert len({mark.cacheKey() for mark in marks}) == 3
 
 
-def test_the_kinds_open_on_both_and_are_offered_on_a_shelf_alone(qtbot):
+def test_the_kinds_open_on_both_and_are_offered_on_a_collection_alone(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -3205,7 +3205,7 @@ def test_the_kinds_open_on_both_and_are_offered_on_a_shelf_alone(qtbot):
     assert view._both_kinds.isChecked()
 
     # A folder holds one kind by construction, so there is nothing to choose
-    # there; a shelf gathers both, which is where the question belongs.
+    # there; a collection gathers both, which is where the question belongs.
     view._tree.setCurrentItem(_image_workflow(view._tree))
     assert view._kinds_bar.isHidden()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -3221,7 +3221,7 @@ def test_both_radios_wear_the_waiting_cursor_while_they_redraw(qtbot, monkeypatc
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     while_drawing = []
-    for owner, name in ((view, "_recount_the_shelves"), (view, "refresh")):
+    for owner, name in ((view, "_recount_the_collections"), (view, "refresh")):
         real = getattr(owner, name)
         monkeypatch.setattr(owner, name, lambda *a, _real=real: (
             while_drawing.append(QApplication.overrideCursor()), _real(*a))[1])
@@ -3234,7 +3234,7 @@ def test_both_radios_wear_the_waiting_cursor_while_they_redraw(qtbot, monkeypatc
     assert QApplication.overrideCursor() is None
 
 
-def test_choosing_one_kind_lists_the_shelf_again_and_leaves_the_list_alone(
+def test_choosing_one_kind_lists_the_collection_again_and_leaves_the_list_alone(
         qtbot, monkeypatch):
     # Every choice used to re-read the library and build the whole table of
     # contents again -- twice over, since the button going off reports as well
@@ -3256,7 +3256,7 @@ def test_choosing_one_kind_lists_the_shelf_again_and_leaves_the_list_alone(
     assert built == []
 
 
-def test_choosing_one_kind_lists_only_that_kind_on_a_shelf(qtbot):
+def test_choosing_one_kind_lists_only_that_kind_on_a_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -3276,7 +3276,7 @@ def test_choosing_one_kind_lists_only_that_kind_on_a_shelf(qtbot):
 
 def test_choosing_one_kind_leaves_every_folder_in_the_list(qtbot):
     # What the move fixes: clicking an image in a video's "from source image"
-    # section can navigate to that image's folder even while the shelves are
+    # section can navigate to that image's folder even while the collections are
     # listing videos, because the list still holds every folder.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
@@ -3309,7 +3309,7 @@ def test_choosing_one_kind_leaves_every_sides_folders_standing(qtbot):
 
 
 def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
-    # A filter change is a new listing, not a redraw of the old one, so the shelf
+    # A filter change is a new listing, not a redraw of the old one, so the collection
     # starts over at its newest item instead of holding the pages already scrolled.
     view = GalleryView(FakeDB(_many_recents(120)))
     qtbot.addWidget(view)
@@ -3327,7 +3327,7 @@ def test_a_new_media_filter_reopens_recents_on_its_first_page(qtbot):
 
 
 def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
-    # The filter narrows the whole shelf, so an in-flight card of a hidden type
+    # The filter narrows the whole collection, so an in-flight card of a hidden type
     # drops out alongside the finished thumbnails.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", workflow="wan22_i2v"))  # a running video
@@ -3337,7 +3337,7 @@ def test_media_filter_also_hides_inflight_cards_of_the_unchecked_type(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert "rr1" in view._browser._inflight_cards               # shown by default
 
-    view._images_only.setChecked(True)         # videos left off the shelf
+    view._images_only.setChecked(True)         # videos left out of the collection
     assert "rr1" not in view._browser._inflight_cards
 
 
@@ -3390,7 +3390,7 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
 
 
 def test_recents_tiles_are_badged_image_or_video(qtbot):
-    # The shelf mixes kinds, so each finished tile wears a corner badge naming its
+    # The collection mixes kinds, so each finished tile wears a corner badge naming its
     # own — an image thumbnail and a video thumbnail, told apart at a glance.
     rows = [
         _image("i1", "a cat", 50, 1),
@@ -3805,7 +3805,7 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     """A move always ends with the item on screen, drawn from its own folder.
 
     The pane can be showing something other than the row the tree has current —
-    a search's hits, a shelf — and setting a row Qt already holds current fires
+    a search's hits, a collection — and setting a row Qt already holds current fires
     no signal to draw anything. The move draws it itself in that case rather than
     trusting the signal, which is how a click came to fill the info pane while
     the middle pane under it stood still.
@@ -3999,7 +3999,7 @@ def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))   # a shelf is nobody's folder
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))   # a collection is nobody's folder
     assert not view._bank.favorite.isEnabled()
     assert view._bank.favorite.toolTip() == "Nothing here to favorite"
 
@@ -4148,7 +4148,7 @@ def test_the_favorites_count_follows_a_favorite_without_rebuilding_the_gallery(q
     assert rebuilds == []
 
 
-def test_unfavoriting_a_favorite_drops_it_from_the_shelf_with_a_real_library(qtbot, tmp_path):
+def test_unfavoriting_a_favorite_drops_it_from_the_collection_with_a_real_library(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=2)
     db.set_generation_favorite("g0", True)
     view = GalleryView(db, actions=FakeActions())
@@ -4492,7 +4492,7 @@ def test_history_spans_folder_navigation(qtbot):
     assert view._selected["prompt_id"] == "v1"  # Back walks generations across folders
 
 
-def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot):
+def test_back_returns_to_the_recents_collection_then_forward_reopens_the_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -4501,20 +4501,20 @@ def test_back_returns_to_the_recents_shelf_then_forward_reopens_the_folder(qtbot
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open i2 in its folder
     assert view._browser.showing_recents() is False
-    assert view._bank.back.isEnabled()                    # the shelf is somewhere to go back to
+    assert view._bank.back.isEnabled()                    # the collection is somewhere to go back to
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # Back returns to the Recents shelf
+    assert view._browser.showing_recents()                       # Back returns to the Recents collection
 
     view._navigation.go_forward()
     assert view._browser.showing_recents() is False              # Forward re-opens the folder
     assert view.selected_generation() == "i2"
 
 
-def test_back_returns_to_a_shelf_left_by_opening_a_folder(qtbot):
+def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     # The reported bug: a folder was no history stop at all, so leaving Recents by
     # clicking one in the tree recorded nothing and Back had nowhere to go from —
-    # the shelf was on the stack, but the cursor was still sitting on it.
+    # the collection was on the stack, but the cursor was still sitting on it.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -4568,7 +4568,7 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     assert len(view._navigation._history._stack) == depth
 
 
-def test_back_returns_to_the_favorite_shelf_after_drilling_into_a_folder(qtbot):
+def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a dog", 50, 2)]
     view = GalleryView(FakeDB(rows))
@@ -4580,32 +4580,32 @@ def test_back_returns_to_the_favorite_shelf_after_drilling_into_a_folder(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     view._browser._drill_into(view._browser._visible_keys[0])  # into the dog folder, on i2
     view._browser._thumbnail_clicked("i3", _NO_MOD)            # view another item there
-    assert view._tree.currentItem() is not _shelf(view, FAVORITES_KEY)
+    assert view._tree.currentItem() is not _collection(view, FAVORITES_KEY)
 
     view._navigation.go_back()                                      # the folder drilled into
     view._navigation.go_back()
-    assert view._tree.currentItem() is _shelf(view, FAVORITES_KEY)  # Back returns to Favorites
+    assert view._tree.currentItem() is _collection(view, FAVORITES_KEY)  # Back returns to Favorites
 
 
-def test_back_to_recents_restores_the_item_selected_on_the_shelf(qtbot):
+def test_back_to_recents_restores_the_item_selected_on_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)         # select i2 on the shelf
+    view._browser._thumb_widgets["i2"].clicked.emit("i2", _NO_MOD)         # select i2 in the collection
     view._browser._thumb_widgets["i2"].double_clicked.emit("i2")  # open it in its folder
     assert view._browser.showing_recents() is False
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # back on the shelf...
+    assert view._browser.showing_recents()                       # back in the collection...
     assert view.selected_generation() == "i2"            # ...with i2 previewed again
     assert view._browser._thumb_widgets["i2"].is_selected()       # and its tile re-highlighted
 
 
-def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
-    # The reported bug: previews on a shelf were shelf state rather than stops, so
-    # Back walked out of the shelf entirely instead of to the one looked at before.
+def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
+    # The reported bug: previews in a collection were collection state rather than stops, so
+    # Back walked out of the collection entirely instead of to the one looked at before.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a bird", 50, 1)]
     view = GalleryView(FakeDB(rows))
@@ -4616,7 +4616,7 @@ def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
         view._browser._thumb_widgets[pid].clicked.emit(pid, _NO_MOD)       # browse a few previews
 
     view._navigation.go_back()
-    assert view._browser.showing_recents()                       # still on the shelf...
+    assert view._browser.showing_recents()                       # still in the collection...
     assert view.selected_generation() == "i2"            # ...on the one before
 
     view._navigation.go_back()
@@ -4626,9 +4626,9 @@ def test_previewing_on_the_shelf_is_its_own_history_step(qtbot):
     assert view.selected_generation() == "i2"
 
 
-def test_back_to_a_shelf_item_re_highlights_its_tile(qtbot):
+def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     # Landing means landing: the item previewed and its tile lit, so which of the
-    # shelf's items Back returned to is visible in the pane and not just the panel.
+    # collection's items Back returned to is visible in the pane and not just the panel.
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -4695,7 +4695,7 @@ def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
     assert view._selected is None             # ...showing nothing picked
 
 
-def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
+def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     # A stop is a view, not just an item: the same generation sits in its own
     # folder too, and Back has to return to the pane it was actually picked in.
     rows = [_image("i1", "a cat", 50, 1)]
@@ -4703,7 +4703,7 @@ def test_an_item_looked_at_on_a_shelf_goes_back_to_that_shelf(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)         # previewed on the shelf
+    view._browser._thumb_widgets["i1"].clicked.emit("i1", _NO_MOD)         # previewed in the collection
     view._tree.setCurrentItem(view._leaf_by_id["i1"])    # then off to its folder
 
     view._navigation.go_back()
@@ -5429,7 +5429,7 @@ def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_
     # The composition, not just the rule: a preview's gallery builds its actions
     # around the production app's trash, the same one its rows and files belong
     # to, so a delete in a preview is a delete -- recoverable from the Trash
-    # shelf of whichever instance looks next.
+    # collection of whichever instance looks next.
     monkeypatch.setenv(ENV_FLAG, "1")
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -7191,7 +7191,7 @@ def test_esc_stops_auto_generate(qtbot, tmp_path):
     assert not view._auto.is_active(key)
 
 
-# --- slideshow: play a folder's or a shelf's media fullscreen ---------------
+# --- slideshow: play a folder's or a collection's media fullscreen ----------
 
 def _resolve_by_id(monkeypatch):
     """Resolve every row's preview to a per-row image path (the autouse default
@@ -7374,20 +7374,20 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert not view._bank.slideshow.isHidden()          # a folder with media offers it
     assert "this folder" in view._bank.slideshow.toolTip()
 
-    # The shelves are collections of media too, so each plays as a folder does...
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    # The collections hold media too, so each plays as a folder does...
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Latest" in view._bank.slideshow.toolTip()
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Favorites" in view._bank.slideshow.toolTip()
 
-    # ...while a shelf holding nothing at all doesn't offer one.
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    # ...while a collection holding nothing at all doesn't offer one.
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert view._bank.slideshow.isHidden()
 
 
-def test_a_show_after_one_of_the_favorites_shelf_is_not_held_to_the_favorites(qtbot,
+def test_a_show_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
                                                                                monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
@@ -7396,7 +7396,7 @@ def test_a_show_after_one_of_the_favorites_shelf_is_not_held_to_the_favorites(qt
                                     "sdxl_t2i_i2.png", starred=1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     view._shows.start()
     qtbot.addWidget(view._shows.showing)
     assert view._shows.showing.hud_favorites_filter
@@ -7412,12 +7412,12 @@ def test_a_show_after_one_of_the_favorites_shelf_is_not_held_to_the_favorites(qt
     show.close()
 
 
-def test_slideshow_plays_the_recents_shelf(qtbot, monkeypatch):
+def test_slideshow_plays_the_recents_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
 
     view._shows.start()
 
@@ -7431,13 +7431,13 @@ def test_recents_slideshow_honors_the_gallery_media_filter(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
-    view._images_only.setChecked(True)  # the shelf now lists images only
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
+    view._images_only.setChecked(True)  # the collection now lists images only
 
     view._shows.start()
 
     qtbot.addWidget(view._shows.showing)
-    # It plays what the shelf shows, not everything recent.
+    # It plays what the collection shows, not everything recent.
     assert [item[2] for item in view._shows.showing._playlist._items] == ["i1"]
     view._shows.showing.close()
 
@@ -7612,31 +7612,31 @@ def test_a_show_wears_one_panel_with_the_device_on_it(qtbot, monkeypatch):
     show.close()
 
 
-def test_slideshow_plays_the_experiments_shelf(qtbot, monkeypatch):
+def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
     # Reviewing a batch of experiments is exactly what a slideshow is for: full
     # screen, one at a time, rather than squinting at a grid of thumbnails.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([
         _experiment_row("e1"),
         _experiment_row("e2", seed=10),
-        _experiment_row("e3", verdict="up", seed=11),  # reviewed: off the shelf
+        _experiment_row("e3", verdict="up", seed=11),  # reviewed: out of the collection
     ]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert not view._bank.slideshow.isHidden()
     assert "Experiments" in view._bank.slideshow.toolTip()
 
     view._shows.start()
 
     qtbot.addWidget(view._shows.showing)
-    # What the shelf shows, so the judged one stays out of the rotation.
+    # What the collection shows, so the judged one stays out of the rotation.
     assert {item[2] for item in view._shows.showing._playlist._items} == {"e1", "e2"}
     view._shows.showing.close()
 
 
 def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
-    # Up on an unreviewed experiment is the shelf's Reject, not a plain delete:
+    # Up on an unreviewed experiment is the collection's Reject, not a plain delete:
     # the row survives to teach the policy what to steer away from.
     db = FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
     actions = FakeActions()
@@ -7660,7 +7660,7 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)  # "(no LoRA)"
     view._toggle_favorite(_key(_at(lora, 0)))   # ...and a favorited folder (the cat one)
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
     view._shows.start()
 
@@ -7670,12 +7670,12 @@ def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeyp
     view._shows.showing.close()
 
 
-def test_enter_in_a_shelf_slideshow_picks_the_slide_on_that_shelf(qtbot, monkeypatch):
+def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     view._shows.start()
     slideshow = view._shows.showing
     qtbot.addWidget(slideshow)
@@ -7684,7 +7684,7 @@ def test_enter_in_a_shelf_slideshow_picks_the_slide_on_that_shelf(qtbot, monkeyp
     slideshow.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, _NO_MOD))
 
     assert view._shows.showing is None               # out of the slideshow...
-    assert view._tree.currentItem() is _shelf(view, RECENTS_KEY)  # ...still on the shelf
+    assert view._tree.currentItem() is _collection(view, RECENTS_KEY)  # ...still in the collection
     assert view._browser.selected_ids == {shown}     # with that picture picked
     # And the item open in a tab: leaving a show for an item is a decision to
     # work on it, which a folder under a stale form isn't.
@@ -7694,7 +7694,7 @@ def test_enter_in_a_shelf_slideshow_picks_the_slide_on_that_shelf(qtbot, monkeyp
 def test_a_show_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
                                                                          monkeypatch):
     # Locking a slide is the user saying this is the one, so ending the show there
-    # picks it on the shelf the show was playing, the same as every other way out.
+    # picks it in the collection the show was playing, the same as every other way out.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -7717,7 +7717,7 @@ def test_a_show_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
 def test_a_show_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
         qtbot, monkeypatch):
     # However you leave -- Escape, a double-click, the spoken "close" -- the
-    # picture you were looking at is the one you want to find, picked on the shelf
+    # picture you were looking at is the one you want to find, picked in the collection
     # the show was playing rather than left for you to hunt for.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
@@ -7746,8 +7746,8 @@ def _laid_out_folder(qtbot, count=60):
 
 def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeypatch):
     # Latest draws fifty pictures at a time, so a show stepped well past them hands
-    # back one the shelf has not drawn yet: it is drawn, picked and scrolled to,
-    # rather than the shelf coming back with nothing marked on it.
+    # back one the collection has not drawn yet: it is drawn, picked and scrolled to,
+    # rather than the collection coming back with nothing marked on it.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n)
                                for n in reversed(range(120))]))
@@ -7808,7 +7808,7 @@ def test_leaving_a_show_of_all_picks_the_folder_square_its_slide_came_from(qtbot
 
 def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_from(
         qtbot, monkeypatch):
-    # A star on a folder puts the folder on the Favorites shelf, not the pictures
+    # A star on a folder puts the folder in the Favorites collection, not the pictures
     # inside it, so a slide that came out of one has no picture of its own there.
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
@@ -7816,8 +7816,8 @@ def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_fro
     lora = _at(_image_workflow(view._tree), 0, 0)
     bookmarked = _key(_at(lora, 0))
     view._toggle_favorite(bookmarked)
-    shelf = _shelf(view, FAVORITES_KEY)
-    view._tree.setCurrentItem(shelf)
+    collection = _collection(view, FAVORITES_KEY)
+    view._tree.setCurrentItem(collection)
     view._shows.start()
     slideshow = view._shows.showing
     qtbot.addWidget(slideshow)
@@ -7826,7 +7826,7 @@ def test_leaving_a_favorites_show_picks_the_bookmarked_folder_its_slide_came_fro
 
     slideshow.close()
 
-    assert view._tree.currentItem() is shelf
+    assert view._tree.currentItem() is collection
     picked = [tile.key for tile in _folder_squares(view) if tile.is_selected()]
     assert picked == [bookmarked]
 
@@ -7887,11 +7887,11 @@ def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
     assert _in_view(view, "n19")
 
 
-def test_taking_a_favorite_off_the_favorites_shelf_leaves_it_where_it_was(qtbot):
+def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(qtbot):
     view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n) | {"starred": 1}
                                for n in range(1, 61)]))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     qtbot.wait(1)
     far = view.visible_prompt_ids()[-3]
     view._browser.reveal_tile(far)
@@ -7975,7 +7975,7 @@ def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._toggle_favorite(_select_first_leaf(view))  # star the folder holding it too
-    view._tree.setCurrentItem(_shelf(view, FAVORITES_KEY))
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
     view._shows.start()
 
@@ -8078,7 +8078,7 @@ def test_a_run_in_a_folder_the_show_is_not_playing_stays_out(qtbot, monkeypatch)
 
 
 def test_a_run_being_made_joins_a_recents_show_too(qtbot, monkeypatch):
-    # Recents is a shelf of results and a run has none yet, so it cannot answer
+    # Recents is a collection of results and a run has none yet, so it cannot answer
     # off its own list — but every generation this app makes lands there.
     _resolve_finished_only(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
@@ -8272,7 +8272,7 @@ def _generation_failed_dialog(view):
 
 def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
     """A failed run leaves nothing — no file, so no tile, and the row it
-    does leave is one every shelf filters out for having produced nothing. So it
+    does leave is one every collection filters out for having produced nothing. So it
     used to simply disappear: minutes of GPU, the tile gone off the strip, and no
     word anywhere but the log. Someone watching read that as a success and went
     looking for the clip."""
@@ -9167,7 +9167,7 @@ def test_delete_passes_through_to_a_focused_text_field(qtbot, tmp_path, monkeypa
     assert db.get_generation("i1") is not None
 
 
-# --- Recents shelf: in-flight cards for queued/running generations ------------
+# --- Recents collection: in-flight cards for queued/running generations -------
 
 class _FakeRerollJob:
     """Minimal stand-in for a GenerationJob the gallery treats as a live re-roll."""
@@ -9268,7 +9268,7 @@ def _menu_offering(monkeypatch, module, pick=None):
 
 def test_right_clicking_an_inflight_card_offers_to_cancel_the_run(
         qtbot, tmp_path, monkeypatch):
-    # A card is the whole of what the shelf shows of a run being made, and it used
+    # A card is the whole of what the collection shows of a run being made, and it used
     # to answer a right-click with nothing at all: stopping the run meant finding
     # it again among the lower strip's rows.
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
@@ -9460,7 +9460,7 @@ def test_a_reroll_finishing_drops_its_inflight_card(qtbot):
 
 def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     # A tracked re-roll's live frame is pushed into its existing card between
-    # rebuilds, without re-rendering the whole shelf.
+    # rebuilds, without re-rendering the whole collection.
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", prompt="a cat"))
     view = GalleryView(db)
@@ -9478,8 +9478,8 @@ def test_inflight_card_frame_updates_in_place_without_a_rerender(qtbot):
     assert not card._image.pixmap().isNull()          # now showing the frame
 
 
-def test_recents_shelf_appears_for_a_running_generation(qtbot):
-    # A generation is running (a running DB row, no output yet): the Recents shelf
+def test_recents_collection_appears_for_a_running_generation(qtbot):
+    # A generation is running (a running DB row, no output yet): the Recents collection
     # appears and lists it as an in-flight card.
     view = GalleryView(FakeDB([_running_row("gen1")]))
     qtbot.addWidget(view)
@@ -9491,7 +9491,7 @@ def test_recents_shelf_appears_for_a_running_generation(qtbot):
 
 
 def test_inflight_running_cards_sort_before_queued(qtbot):
-    # Running generations sort before queued ones on the shelf, regardless of the
+    # Running generations sort before queued ones in the collection, regardless of the
     # order their in-flight rows come back from the database.
     db = FakeDB([
         _row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
@@ -9940,12 +9940,12 @@ def test_generate_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_
     panel._on_generate()                          # emits generate_requested -> a re-roll
     (pid,) = [job.prompt_id for job in gv._live_jobs.values()]
 
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
     assert pid in gv._browser._inflight_cards
 
     folder = _at(_image_workflow(gv._tree), 0, 0)
     gv._tree.setCurrentItem(folder)              # navigate away
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))    # and back
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))    # and back
     assert pid in gv._browser._inflight_cards, "card vanished after navigating away and back"
 
     gv._poll()
@@ -9965,11 +9965,11 @@ def test_reroll_inflight_card_persists_across_navigation_and_polls(qtbot, tmp_pa
     gv._start_reroll(folder_key)
     rr_pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
     assert rr_pid in gv._browser._inflight_cards
 
     gv._tree.setCurrentItem(gv._tree_item_for(folder_key))  # into the re-roll's folder
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))             # and back
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))             # and back
     assert rr_pid in gv._browser._inflight_cards, "re-roll card vanished after navigation"
 
     gv._poll()
@@ -9989,7 +9989,7 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     _reroll_tile(view).add_requested.emit()
     img_job = view._live_jobs[key]
 
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     assert img_job.prompt_id in view._browser._inflight_cards
 
     client.job_completed.emit(img_job.prompt_id, _IMG_REROLL_HISTORY)  # image -> video
@@ -10000,7 +10000,7 @@ def test_i2v_reroll_inflight_card_follows_the_image_to_video_handoff(qtbot, tmp_
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after handoff"
 
     view._tree.setCurrentItem(view._tree_item_for(key))   # away
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))        # and back
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))        # and back
     assert vid_job.prompt_id in view._browser._inflight_cards, "video-stage card missing after navigation"
 
 
@@ -10018,7 +10018,7 @@ def test_recents_shows_a_running_reroll_row_with_no_live_job(qtbot, tmp_path):
     gv = GalleryView(db, client=ComfyUIClient())
     qtbot.addWidget(gv)
     gv.refresh()
-    gv._tree.setCurrentItem(_shelf(gv, RECENTS_KEY))
+    gv._tree.setCurrentItem(_collection(gv, RECENTS_KEY))
 
     assert "rr_running" in gv._browser._inflight_cards
 
@@ -10994,7 +10994,7 @@ def test_a_genau_run_straight_from_the_combine_panel_waits_with_its_recipe_in_pa
     view = _combine_view_with_a_looping_recipe(qtbot, tmp_path)
 
     view._combine._generate_combination("img", "vid", intent=recipe_match.GENAU)
-    view._select_reroll(next(iter(view._live_jobs)))  # its card on the shelf, clicked
+    view._select_reroll(next(iter(view._live_jobs)))  # its card in the collection, clicked
 
     assert _front_panel(view)._live_source.recipe_prompt_edited
 
@@ -11543,16 +11543,16 @@ def test_the_enhance_panels_button_is_aimed_and_pressed_like_the_banks(qtbot, tm
 
 def test_enhance_panel_stays_up_wherever_you_are(qtbot, tmp_path):
     # The settings are the app's, not the folder's: they follow you, so they are
-    # as available on the shelves as inside a settings folder.
+    # as available in the collections as inside a settings folder.
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     assert not view._enhance.panel.isHidden()
 
-    for item in (_image_workflow(view._tree), _shelf(view, RECENTS_KEY),
-                 _shelf(view, FAVORITES_KEY), _shelf(view, EXPERIMENTS_KEY),
-                 _shelf(view, TRASH_KEY)):
+    for item in (_image_workflow(view._tree), _collection(view, RECENTS_KEY),
+                 _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
+                 _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
         assert not view._enhance.panel.isHidden()
 
@@ -11604,7 +11604,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
 
 
 def test_a_single_enhance_runs_at_the_same_settings_from_anywhere(qtbot, tmp_path):
-    # An image picked off the Recents shelf enhances at exactly what the panel
+    # An image picked out of the Recents collection enhances at exactly what the panel
     # says, the same as one picked inside its own folder — there is one setting.
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
@@ -11819,7 +11819,7 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
 
 def test_a_running_enhance_gets_no_card_of_its_own_on_recents(qtbot, tmp_path):
     # An enhancement is a version of an image, not an item beside it — so the
-    # shelf shows the run on that image's own tile, under the scrim, and never as
+    # collection shows the run on that image's own tile, under the scrim, and never as
     # a second card claiming something else is being made. The lower strip's
     # queue still lists it: that is what the GPU is doing.
     db = _enhanceable_db(tmp_path, count=1)
@@ -11841,7 +11841,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_recents(qtbot, tmp_path
     # With no card of its own, the run shows only on the tile of the image it is
     # upgrading — and that image can have been made a thousand tiles ago, where
     # nobody would find it. What is being done to an image is the newest thing
-    # about it, so the shelf lists it by that, and it stays there once the
+    # about it, so the collection lists it by that, and it stays there once the
     # enhancement has folded in.
     db = _enhanceable_db(tmp_path, count=3)
     view = GalleryView(db, client=_reroll_client())
@@ -11978,7 +11978,7 @@ def test_rejecting_an_experiment_cancels_the_enhance_being_made_of_it(qtbot, mon
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
 
-    view.trash_generation("g0")  # the Experiments shelf's Reject, from a slideshow
+    view.trash_generation("g0")  # the Experiments collection's Reject, from a slideshow
 
     assert job.state == "canceled"
     assert view._jobs.all_jobs == []
@@ -12057,7 +12057,7 @@ def test_combine_new_folder_lands_on_recents_then_reveals_on_finish(qtbot, tmp_p
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._browser.showing_recents()  # brand-new folder: watch it cook on the shelf
+    assert view._browser.showing_recents()  # brand-new folder: watch it cook in the collection
     prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
@@ -12286,7 +12286,7 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         qtbot, tmp_path, monkeypatch):
     view = _combine_view(qtbot, tmp_path)
-    view._tree.setCurrentItem(_shelf(view, RECENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, RECENTS_KEY))
     tile = view._browser._thumb_widgets["vid"]
     slot = view._combine.panel.video_slot._label
     in_flight = {}
@@ -13566,7 +13566,7 @@ def test_a_custom_folder_gets_its_own_row_and_shows_what_it_holds(qtbot):
     row = _top_level(view._tree)["Favorites"]
     view._tree.setCurrentItem(row)
 
-    assert row.childCount() == 0  # flat like a shelf: its items live elsewhere
+    assert row.childCount() == 0  # flat like a collection: its items live elsewhere
     assert view._browser._visible_keys == [cat]
     assert {r["prompt_id"] for r in view.rows_to_play()} == {"i1"}
 
@@ -13846,7 +13846,7 @@ def test_the_menu_over_a_folder_of_your_own_offers_only_its_removal(
 
     _tree_menu(view, gallery.custom_folder_key(folder_id))
 
-    # No star (a bookmark of a bookmark shelf collects nothing) and no delete —
+    # No star (a bookmark of a bookmark collection gathers nothing) and no delete —
     # removing one of these must never reach the generations it gathers.
     assert labels == ["Remove folder…"]
 
@@ -14574,7 +14574,7 @@ def _finish_reroll(view, job):
     view.refresh()
 
 
-def test_the_tree_carries_a_requests_shelf(qtbot):
+def test_the_tree_carries_a_requests_collection(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -14660,17 +14660,17 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
     assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
 
 
-def test_the_requests_shelf_lists_what_was_asked_for_as_ordinary_tiles(
+def test_the_requests_collection_lists_what_was_asked_for_as_ordinary_tiles(
         qtbot, tmp_path, monkeypatch):
     # An item a request made is an ordinary generation that happens to have been
-    # asked for out loud, so it gets the tile every other shelf gives one.
+    # asked for out loud, so it gets the tile every other collection gives one.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
-    view._tree.setCurrentItem(_shelf(view, REQUESTS_KEY))
+    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
 
     assert view.visible_prompt_ids() == [job.prompt_id]
     assert view._scroll.widget().findChildren(ThumbnailWidget)
@@ -14679,17 +14679,17 @@ def test_the_requests_shelf_lists_what_was_asked_for_as_ordinary_tiles(
 def test_a_request_still_generating_shows_as_a_live_card(
         qtbot, tmp_path, monkeypatch):
     # What "did it queue?" is answered by: the same in-flight card the Recents
-    # shelf gives work that is still in flight.
+    # collection gives work that is still in flight.
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     view._shows.showing.close()
 
-    view._tree.setCurrentItem(_shelf(view, REQUESTS_KEY))
+    view._tree.setCurrentItem(_collection(view, REQUESTS_KEY))
 
     assert view._scroll.widget().findChildren(InFlightCard)
 
 
-def test_the_shelf_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
+def test_the_collection_row_counts_what_is_waiting(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     _speak_request(view, qtbot, "Request, no hat, over.")
@@ -15270,12 +15270,12 @@ def test_the_recipe_match_really_leaves_the_ui_thread(qtbot, tmp_path, monkeypat
     assert next(iter(view._live_jobs.values())).workflow.name == "wan22_flf2v_loop"
 
 
-# --- the bare vocabulary: a shelf, a bank button, a word over the show --------
+# --- the bare vocabulary: a collection, a bank button, a word over the show ---
 
 
 def _listening(qtbot, tmp_path, db=None):
     """A gallery with the mic armed — the one switch that opens it — and its
-    tree drawn, so a shelf name has a row to land on."""
+    tree drawn, so a collection name has a row to land on."""
     view = GalleryView(db if db is not None else _seeded_db(tmp_path),
                        client=_reroll_client())
     qtbot.addWidget(view)
@@ -15291,7 +15291,7 @@ def _listening(qtbot, tmp_path, db=None):
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])
-def test_a_spoken_shelf_name_stands_you_in_that_shelf(qtbot, tmp_path, said, key):
+def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path, said, key):
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak(said)
@@ -15299,9 +15299,9 @@ def test_a_spoken_shelf_name_stands_you_in_that_shelf(qtbot, tmp_path, said, key
     assert _selected_folder(view) == key
 
 
-def test_the_requests_shelf_answers_the_plural_and_the_singular_still_dictates(
+def test_the_requests_collection_answers_the_plural_and_the_singular_still_dictates(
         qtbot, tmp_path):
-    # "request" opens a spoken request and "requests" is a shelf; one word
+    # "request" opens a spoken request and "requests" is a collection; one word
     # cannot do both, so the plural navigates and the singular still opens.
     view = _listening(qtbot, tmp_path)
 
@@ -15313,7 +15313,7 @@ def test_the_requests_shelf_answers_the_plural_and_the_singular_still_dictates(
     assert view._voice.listener._dictation.listening       # the singular still opens one
 
 
-def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(
+def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
         qtbot, tmp_path):
     # Favorites appears only once there are folders; a word for a row that isn't
     # there must not vanish, having already been claimed as a command.
@@ -15322,7 +15322,7 @@ def test_a_shelf_the_tree_has_not_got_says_so_rather_than_doing_nothing(
 
     view._voice.listener.speak("go to favorites")
 
-    assert view._voice.status.text() == "🎤 no Favorites shelf yet"
+    assert view._voice.status.text() == "🎤 no Favorites collection yet"
 
 
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
@@ -15551,7 +15551,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_shelf(view, EXPERIMENTS_KEY))
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
 
     view._browser._thumb_widgets["e1"].corner_action_triggered.emit("e1", "keep")
 

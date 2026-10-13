@@ -134,6 +134,21 @@ def test_a_mark_is_drawn_just_after_the_title_and_level_with_it(qtbot):
     assert abs(title_middle - mark_middle) <= 2
 
 
+_WARNING = "Steps: Example Model's page recommends 20–40 steps. Click to use 40."
+
+
+def test_a_warning_appears_left_of_the_title_without_moving_it(qtbot):
+    section = _shown_section(qtbot, "Calibration", width=300)
+    title = _drawn_above_the_rule(section._header)
+
+    section.warning.warn(_WARNING)
+
+    warning = section.warning.geometry()
+    assert [(x, y) for x, y in _drawn_above_the_rule(section._header)
+            if x > warning.right()] == title
+    assert warning.right() < min(x for x, _ in title)
+
+
 def test_a_squeezed_header_cuts_its_title_short_and_keeps_its_mark_whole(qtbot):
     section = _shown_section(qtbot, "Enhancement levels", width=300)
     section.set_mark(_solid_mark(), "Portrait")

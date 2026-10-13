@@ -141,21 +141,19 @@ class SplitFolderTree(QWidget):
         """The two choices over the sections: a list per shape, or one of both."""
         each_shape = _Choice(_SEPARATE, icons.each_shape_mark(BUTTON_MARK),
                              _EACH_SHAPE_TIP)
-        self._both_choice = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK),
-                                    _BOTH_TIP)
+        both = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK), _BOTH_TIP)
         self.each_shape_button = each_shape.button
-        self.both_button = self._both_choice.button
-        self._radio = QButtonGroup(self)
-        self._radio.setExclusive(True)
-        choices = QWidget()
-        FlowLayout(choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
-        for choice, sides in ((each_shape, ORIENTATIONS),
-                              (self._both_choice, (BOTH,))):
+        self.both_button = both.button
+        radio = QButtonGroup(self)
+        radio.setExclusive(True)
+        self._choices = QWidget()
+        FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
+        for choice, sides in ((each_shape, ORIENTATIONS), (both, (BOTH,))):
             choice.button.clicked.connect(lambda _checked, s=sides: self._pick_sides(s))
-            self._radio.addButton(choice.button)
-            choices.layout().addWidget(choice)
+            radio.addButton(choice.button)
+            self._choices.layout().addWidget(choice)
         self.each_shape_button.setChecked(True)
-        return choices
+        return self._choices
 
     # --- which sides the pane draws -----------------------------------------
 
@@ -174,12 +172,7 @@ class SplitFolderTree(QWidget):
         self.both_button.setChecked(self._sides == (BOTH,))
 
     def offer_both(self, offered: bool) -> None:
-        """Whether one list of both shapes is on offer at all.
-
-        Hosted by a Fun Time session it is not: the room plays a shape on each
-        of its two screens, so a mixed show would have nowhere to land.
-        """
-        self._both_choice.setVisible(offered)
+        self._choices.setVisible(offered)
         if not offered:
             self._pick_sides(ORIENTATIONS)
 

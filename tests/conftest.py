@@ -579,3 +579,14 @@ def _no_mouse_button_left_held():
     for button in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton,
                    Qt.MouseButton.RightButton):
         QTest.mouseRelease(stand_in, button)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _context_menus_open_on_release(qapp):
+    """Open a right-click's menu as the button comes up, as Windows does.
+
+    Offscreen, Qt opens it on the press, before the press has finished picking
+    the row under the pointer and redrawing the panes around it, so a menu that
+    opens fine for the user can open over the wrong widget in a test.
+    """
+    qapp.styleHints().setContextMenuTrigger(Qt.ContextMenuTrigger.Release)

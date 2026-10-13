@@ -15,7 +15,6 @@ from funestra.console import (
     OSR2_PARKED,
     OSR2_RETRACTED,
 )
-from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.robot_hand import PARK_CENTER, RETRACT_CENTER
 from PIL import Image
 from PIL import Image as _Image
@@ -33,6 +32,7 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtGui import QDrag, QKeyEvent, QMovie
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -96,7 +96,7 @@ from origenerator.gui.combine_panel import CombineRequest
 from origenerator.gui.enhance_versions import _AddRow, _LevelRow, _PendingRow
 from origenerator.gui.folder_request_tile import FolderRequestTile
 from origenerator.gui.folder_tile import FolderTile
-from origenerator.gui.folder_tree import RECENT_ROLE
+from origenerator.gui.folder_tree import RECENT_ROLE, _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.generating_tile import GeneratingTile
@@ -1695,11 +1695,21 @@ def _square_texts(view, key) -> list[str]:
     return [label.text() for label in square.findChildren(QLabel)]
 
 
-def test_favoriting_a_folder_stars_its_square_in_the_pane_beside_it(qtbot):
+def _click_beside_the_mark_of(qtbot, view, key, *, which):
+    """Click the star (``which=0``) or the trash (``which=1``) a folder's row
+    wears in the indentation left of its mark, through the window."""
+    _on_screen(qtbot, view, 1200, 800)
+    row = view._tree_item_for(key)
+    tree = row.treeWidget()
+    tree.scrollToItem(row)
+    gestures.click(tree.viewport(), _action_rects(tree.visualItemRect(row))[which].center())
+
+
+def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     view._tree.setCurrentItem(view._tree_item_for(cat).parent())  # both, as squares
 
-    view._toggle_favorite(dog)
+    _click_beside_the_mark_of(qtbot, view, dog, which=0)
 
     assert "★ " + view.group_for_key(dog).label in _square_texts(view, dog)
     assert view.group_for_key(cat).label in _square_texts(view, cat)  # and only that one
@@ -3586,12 +3596,7 @@ def test_folders_start_collapsed(qtbot):
 def _double_click_the_name_of(qtbot, row):
     tree = row.treeWidget()
     tree.scrollToItem(row)
-    name = tree.visualItemRect(row).center()
-    # QTest's double-click is the double-click event alone, where a mouse sends a
-    # press and a release first; the tree only takes a double-click on the row
-    # that press landed on.
-    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=name)
-    qtbot.mouseDClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=name)
+    gestures.double_click(tree.viewport(), tree.visualItemRect(row).center())
 
 
 def test_double_clicking_a_folder_of_folders_opens_it_and_expands_or_collapses_it(qtbot):
@@ -5881,7 +5886,7 @@ def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatc
     lora = _at(_image_workflow(view._tree), 0, 0)
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
-    view._tree.delete_clicked.emit(_key(_at(lora, 0)))
+    _click_beside_the_mark_of(qtbot, view, _key(_at(lora, 0)), which=1)
 
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}  # that row's folder
 
@@ -12878,7 +12883,13 @@ def _a_show_standing_on_its_own(qtbot, monkeypatch, **gallery):
 
 
 def _click_the_picture(show):
-    show.press(OMNIPAUSE_TOGGLE)
+    """A click on the show's picture, clear of its panel and of the corners that
+    open it, through the window the Funestra draws into."""
+    engine_of(show)
+    show.showFullScreen()
+    QTest.qWaitForWindowExposed(show)
+    window = show._pane._window
+    gestures.click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
 
 def test_a_click_on_a_show_pauses_the_device_the_sound_and_the_pictures_with_it(
@@ -13695,12 +13706,45 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
 # by nothing at all: swapping two arms of the custom folder's menu, so that its
 # harmless entry deleted the folder, used to pass all 657 tests.
 
+def _tall_on_screen(view):
+    if not view.isVisible():
+        view.resize(1200, 1400)  # room in the list below its last row
+        view.show()
+        QTest.qWaitForWindowExposed(view)
+
+
+def _below_the_last_row(tree) -> QPoint:
+    last = tree.model().index(0, 0)
+    while tree.indexBelow(last).isValid():
+        last = tree.indexBelow(last)
+    row = tree.visualRect(last)
+    below = QPoint(10, row.y() + row.height() + 8)
+    assert tree.viewport().rect().contains(below), "the list has no room below its last row"
+    return below
+
+
 def _tree_menu(view, key=None, side=LANDSCAPE):
-    """Raise a tree row's context menu the way the tree's own signal does, or the
-    empty-space menu below the last row of ``side`` when no key is given."""
-    view._on_tree_context_menu(
-        view._tree_item_for(key) if key is not None else None, QPoint(0, 0), side
-    )
+    """Right-click a folder's row in the list, or the empty space below the last
+    row of ``side`` when no key is given, through the window as a mouse does."""
+    _tall_on_screen(view)
+    if key is None:
+        tree = view._tree._trees[side]
+        at = _below_the_last_row(tree)
+    else:
+        row = view._tree_item_for(key)
+        tree = row.treeWidget()
+        tree.scrollToItem(row)
+        at = tree.visualItemRect(row).center()
+    gestures.right_click(tree.viewport(), at)
+
+
+def _square_menu(view, key):
+    """Right-click the square a folder is drawn as in the pane beside the list."""
+    _tall_on_screen(view)
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile.key == key]
+    view._scroll.ensureWidgetVisible(square)
+    gestures.right_click(square, square.rect().center())
 
 
 def test_a_folders_menu_offers_favorite_and_a_delete_kept_apart(qtbot, monkeypatch):
@@ -13765,10 +13809,11 @@ def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browse
         qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
+    view._tree.setCurrentItem(view._tree_item_for(dog).parent())  # both, as squares
     labels = []
     _menu_labels(monkeypatch, labels)
 
-    view._folder_context_menu(dog, QPoint(0, 0))
+    _square_menu(view, dog)
 
     assert "Add to folder" in labels
 
@@ -13791,7 +13836,7 @@ def test_a_gathered_folder_can_be_dropped_from_the_folder_showing_it(qtbot, monk
     view._tree.setCurrentItem(_top_level(view._tree)["Keepers"])  # standing inside it
     _answer_menu(monkeypatch, "Remove from “Keepers”")
 
-    _tree_menu(view, dog)
+    _square_menu(view, dog)
 
     (record,) = view._db.list_custom_folders()
     assert record["id"] == folder_id and record["items"] == [cat]

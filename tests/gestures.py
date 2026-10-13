@@ -28,3 +28,8 @@ def click(widget: QWidget, at: QPoint) -> None:
 def press_key(widget: QWidget, key: Qt.Key,
               modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier) -> None:
     QTest.keyClick(widget.window().windowHandle(), key, modifiers)
+
+
+def right_click(widget: QWidget, at: QPoint) -> None:
+    window, point = _where_the_mouse_lands(widget, at)
+    QTest.mouseClick(window, Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, point)

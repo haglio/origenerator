@@ -13,8 +13,9 @@ from typing import NamedTuple
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QIcon, QKeyEvent
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QWidget
 from shared_ui.colors import AMBER, GREEN, RED, TEXT_PRIMARY
 
@@ -250,13 +251,18 @@ def test_a_show_following_a_running_generation_has_no_set_to_narrow(qtbot, tmp_p
     assert len(view._playlist) == 0
 
 
-def _press(view, key):
-    view.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, Qt.KeyboardModifier.NoModifier))
+def _press(view, key, modifiers=Qt.KeyboardModifier.NoModifier):
+    """A key pressed at the show the way a keyboard presses it: through its
+    window, to whatever there has the focus."""
+    if not view.isActiveWindow():
+        view.show()
+        view.activateWindow()
+        QTest.qWaitForWindowActive(view)
+    gestures.press_key(view, key, modifiers)
 
 
 def _shift(view, key):
-    view.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key,
-                                 Qt.KeyboardModifier.ShiftModifier))
+    _press(view, key, Qt.KeyboardModifier.ShiftModifier)
 
 
 class _Arrows(NamedTuple):

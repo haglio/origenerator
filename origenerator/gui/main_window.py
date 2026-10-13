@@ -332,6 +332,7 @@ class OrigeneratorWindow(QMainWindow):
             except Exception as e:
                 logger.warning("Close-time %s failed: %s", chore.__name__, e)
         self._persist_session()
+        self._gallery_view.close()
         super().closeEvent(event)
 
     def _close_if_sure(self) -> None:

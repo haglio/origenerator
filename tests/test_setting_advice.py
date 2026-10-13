@@ -34,18 +34,22 @@ def _picture(**changes):
             "scheduler": "normal", "steps": 30, "cfg": 4.0, **changes}
 
 
+def _said(params):
+    return {key: advice.text for key, advice in setting_advice(params).items()}
+
+
 def test_a_picture_on_its_models_recommended_settings_gets_no_advice():
-    assert setting_advice(_picture()) == {}
+    assert _said(_picture()) == {}
 
 
 def test_a_sampler_the_models_page_does_not_name_is_advised_against():
-    advice = setting_advice(_picture(sampler_name="heun"))
+    advice = _said(_picture(sampler_name="heun"))
     assert advice == {"sampler_name": "Example Model's page recommends euler_ancestral "
                                       "or dpmpp_2m."}
 
 
 def test_a_step_spacing_the_models_page_does_not_pair_with_its_sampler_is_advised_against():
-    advice = setting_advice(_picture(sampler_name="dpmpp_2m", scheduler="normal"))
+    advice = _said(_picture(sampler_name="dpmpp_2m", scheduler="normal"))
     assert advice == {"scheduler": "Example Model's page pairs dpmpp_2m with karras."}
 
 
@@ -55,11 +59,11 @@ def test_a_sampler_the_models_page_names_without_a_step_spacing_takes_any_good_o
     monkeypatch.setattr(advice_module, "model_recommendations",
                         lambda: {"example_model.safetensors": page})
 
-    assert setting_advice(_picture(scheduler="karras")) == {}
+    assert _said(_picture(scheduler="karras")) == {}
 
 
 def test_steps_and_prompt_strength_outside_the_models_range_are_advised_against():
-    advice = setting_advice(_picture(steps=50, cfg=7.5))
+    advice = _said(_picture(steps=50, cfg=7.5))
     assert advice == {"steps": "Example Model's page recommends 20–40 steps.",
                       "cfg": "Example Model's page recommends 3–6."}
 
@@ -67,12 +71,12 @@ def test_steps_and_prompt_strength_outside_the_models_range_are_advised_against(
 def test_a_model_with_no_page_gets_only_the_step_spacing_its_sampler_wants():
     unknown = _picture(checkpoint="another_model.safetensors", sampler_name="dpmpp_2m",
                        steps=80, cfg=12.0)
-    assert setting_advice(unknown) == {"scheduler": "dpmpp_2m works best with karras or "
+    assert _said(unknown) == {"scheduler": "dpmpp_2m works best with karras or "
                                                     "exponential."}
 
 
 def test_euler_takes_any_step_spacing():
-    assert setting_advice(_picture(checkpoint="another.safetensors", sampler_name="euler",
+    assert _said(_picture(checkpoint="another.safetensors", sampler_name="euler",
                                    scheduler="karras")) == {}
 
 
@@ -81,7 +85,7 @@ def test_a_speed_lora_on_both_passes_asks_for_its_own_settings():
              "lora_low": "example_speed_low.safetensors", "lora_strength_high": 0.8,
              "lora_strength_low": 1.0, "steps": 20, "cfg_high": 3.5, "cfg_low": 1.0,
              "shift_high": 8.0}
-    assert setting_advice(video) == {
+    assert _said(video) == {
         "lora_strength_high": "Example Speed's page recommends a strength of 1.",
         "steps": "With the Example Speed LoRA, its page recommends 4–8 steps.",
         "cfg_high": "With the Example Speed LoRA, its page recommends 1.",
@@ -93,7 +97,7 @@ def test_a_speed_lora_on_one_pass_leaves_the_shared_settings_alone():
     video = {"lora_high": "None", "lora_low": "example_speed_low.safetensors",
              "lora_strength_low": 1.0, "steps": 20, "cfg_high": 3.5, "cfg_low": 1.0,
              "shift_high": 8.0}
-    assert setting_advice(video) == {}
+    assert _said(video) == {}
 
 
 def test_a_known_model_starts_a_fresh_picture_on_its_recommended_settings():
@@ -118,7 +122,27 @@ def test_without_a_page_only_the_spacing_its_sampler_wants_is_recommended():
 
 
 def test_a_sampler_off_the_page_still_hears_which_step_spacing_it_wants():
-    advice = setting_advice(_picture(sampler_name="dpmpp_sde", scheduler="normal"))
+    advice = _said(_picture(sampler_name="dpmpp_sde", scheduler="normal"))
     assert advice == {
         "sampler_name": "Example Model's page recommends euler_ancestral or dpmpp_2m.",
         "scheduler": "dpmpp_sde works best with karras."}
+
+
+def test_a_number_outside_its_models_range_is_set_to_the_nearer_end():
+    advice = setting_advice(_picture(steps=50, cfg=2.5))
+    assert (advice["steps"].fix, advice["cfg"].fix) == (40, 3)
+
+
+def test_a_dropdown_off_its_recommendation_is_set_to_the_nearest_recommended_choice():
+    assert setting_advice(_picture(sampler_name="heun"))["sampler_name"].fix == "euler_ancestral"
+    assert setting_advice(_picture(sampler_name="dpmpp_2m_sde"))["sampler_name"].fix == "dpmpp_2m"
+    assert setting_advice(_picture(scheduler="beta"))["scheduler"].fix == "simple"
+
+
+def test_a_speed_loras_settings_are_set_to_what_its_page_recommends():
+    video = {"lora_high": "example_speed_high.safetensors",
+             "lora_low": "example_speed_low.safetensors", "lora_strength_high": 0.8,
+             "lora_strength_low": 1.0, "steps": 20, "cfg_high": 3.5, "cfg_low": 1.0,
+             "shift_high": 8.0}
+    fixes = {key: advice.fix for key, advice in setting_advice(video).items()}
+    assert fixes == {"lora_strength_high": 1, "steps": 8, "cfg_high": 1, "shift_high": 5}

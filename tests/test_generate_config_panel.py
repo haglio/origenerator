@@ -2923,7 +2923,7 @@ def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, 
     blank_panel._param_form._widgets["steps"].setValue(80)
 
     assert not mark.isHidden()
-    assert mark.toolTip() == "Default Model's page recommends 20–40 steps."
+    assert mark.toolTip() == "Default Model's page recommends 20–40 steps. Click to use 40."
 
 
 def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):

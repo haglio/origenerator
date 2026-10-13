@@ -3,8 +3,10 @@
 Drop an image into the top slot, then supply a *recipe* either by picking an act
 from the Action list, which sends the app looking for a fitting past video, or by
 dropping a specific i2v video (shown in gray: it is here for its settings). The two
-are mutually exclusive. Generate re-runs the chosen recipe on the dropped image;
-“Edit individual…” hands it to a generate tab first.
+are mutually exclusive. A video dropped into the top slot lends it only the picture
+it was made from, and one let go between the slots lends each what it can. Generate
+re-runs the chosen recipe on the dropped image; “Edit individual…” hands it to a
+generate tab first.
 
 Under the dropdown, a pair of radios says what the result is *for*: a full-length
 video (the default), or a Genau flick — one complete cycle, looping. That choice
@@ -14,8 +16,8 @@ are no kind of cycle at all are not offered there.
 
 The panel is pure UI, reporting what was asked for as one :class:`CombineRequest` on
 :attr:`combine_requested`; its controller
-(:mod:`origenerator.gui.combine_controller`) owns the database, the slot predicates,
-the routing and both the generation and the generator tab.
+(:mod:`origenerator.gui.combine_controller`) owns the database, what each slot is
+lent, the routing and both the generation and the generator tab.
 """
 from __future__ import annotations
 
@@ -39,7 +41,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 
 from origenerator import animation_paths
 from origenerator.content import genau_flick_word
-from origenerator.gui.drop_slot import DropSlot
+from origenerator.gui.drop_slot import DropSlot, DropZone
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.media import MediaType
@@ -102,6 +104,8 @@ class CombinePanel(QWidget):
         room = self.video_slot.sizePolicy()
         room.setRetainSizeWhenHidden(True)
         self.video_slot.setSizePolicy(room)
+        self._between = DropZone((self.image_slot, self.video_slot))
+        self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)
         self.image_slot.changed.connect(self._sync)
         self.video_slot.changed.connect(self._on_video_changed)
         self.image_slot.activated.connect(self.item_activated)
@@ -191,11 +195,12 @@ class CombinePanel(QWidget):
             "Re-run a video's recipe on the dropped image: pick an act, or drop a video."
         )
         layout.addWidget(heading)
-        layout.addWidget(self.image_slot)
-        # One group apart from the next, the same distance the button bank
-        # puts between its groups.
-        layout.addSpacing(BUTTON_GROUP_GAP)
-        layout.addWidget(self._video_part)
+        parted = QVBoxLayout()
+        parted.setSpacing(0)  # the room between them is the whole gap
+        parted.addWidget(self.image_slot)
+        parted.addWidget(self._between)
+        parted.addWidget(self._video_part)
+        layout.addLayout(parted)
         layout.addWidget(self._intent_part)
         layout.addWidget(self._generate_btn)
         layout.addWidget(self._open_btn)

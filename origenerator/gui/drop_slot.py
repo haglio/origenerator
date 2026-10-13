@@ -1,11 +1,11 @@
-"""One drop target for a dragged gallery generation, holding what the item lends it.
+"""Drop targets for a dragged gallery generation: slots holding what it lends them.
 
-The gallery's combine panel pairs two of these — an image slot and a video slot.
-Each holds whatever its ``lent_by`` says a dropped generation lends it, and turns
-away one that lends it nothing; it previews what it holds — a video loops its clip,
-an image shows its still — and wears a corner badge of its own kind so it's clear
-which item belongs where. It knows only prompt_ids; the view supplies ``lent_by``
-and the preview, so the slot stays free of database knowledge.
+The gallery's combine panel pairs two slots — an image slot and a video slot — with
+a zone between them that drops into both. A slot holds whatever its ``lent_by``
+says a dropped generation lends it and turns away one that lends it nothing; it
+previews what it holds — a video loops its clip, an image shows its still — and
+wears a corner badge of its own kind so it's clear which item belongs where. It
+knows only prompt_ids; the view supplies ``lent_by`` and the preview.
 
 A slot whose item is held only for its settings is built ``grayscale``, and draws
 whatever lands in it drained of color (:mod:`origenerator.gui.grayscale`) — the
@@ -28,7 +28,59 @@ from origenerator.gui.media_badge import MediaBadge
 _PREVIEW_SIZE = 96  # the dropped thumbnail fits inside this; small enough for a 120px pane
 
 
-class DropSlot(QWidget):
+class DropZone(QWidget):
+    """Where a dragged generation can be let go: into every slot this zone reaches
+    that is showing and is lent something by it, each lit while the drag is here."""
+
+    def __init__(self, slots=(), parent=None):
+        super().__init__(parent)
+        self._slots = tuple(slots)
+        self.setAcceptDrops(True)
+
+    def reaches(self) -> tuple[DropSlot, ...]:
+        return tuple(slot for slot in self._slots if not slot.isHidden())
+
+    def _landing(self, mime) -> dict[DropSlot, str]:
+        if not mime.hasFormat(GENERATION_MIME):
+            return {}
+        dropped = bytes(mime.data(GENERATION_MIME)).decode("utf-8")
+        lent = {slot: slot.lent_by(dropped) for slot in self.reaches()}
+        return {slot: held for slot, held in lent.items() if held is not None}
+
+    def _aim(self, event):
+        landing = self._landing(event.mimeData())
+        for slot in self.reaches():
+            slot.set_targeted(slot in landing)
+        if landing:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _put_out(self):
+        for slot in self.reaches():
+            slot.set_targeted(False)
+
+    def dragEnterEvent(self, event):
+        self._aim(event)
+
+    def dragMoveEvent(self, event):
+        self._aim(event)
+
+    def dragLeaveEvent(self, event):
+        self._put_out()
+
+    def dropEvent(self, event):
+        self._put_out()
+        landing = self._landing(event.mimeData())
+        for slot, held in landing.items():
+            slot.set_item(held)
+        if landing:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+
+class DropSlot(DropZone):
     """A labeled drop zone that holds one accepted generation's prompt_id."""
 
     changed = pyqtSignal()  # the held item changed (dropped or cleared)
@@ -43,7 +95,7 @@ class DropSlot(QWidget):
         parent=None,
         grayscale: bool = False,
     ):
-        super().__init__(parent)
+        super().__init__(parent=parent)
         self._lent_by = lent_by
         self._preview = preview    # (prompt_id) -> (thumb_path, movie_path)
         self._placeholder = placeholder
@@ -53,7 +105,6 @@ class DropSlot(QWidget):
         self._grayscale = grayscale
         self._current_id: str | None = None
         self._movie: QMovie | None = None
-        self.setAcceptDrops(True)
         self.setMinimumWidth(0)  # shrink with the TOC pane rather than widen it
 
         layout = QVBoxLayout(self)
@@ -130,13 +181,14 @@ class DropSlot(QWidget):
 
     # --- drag & drop ------------------------------------------------------
 
-    def _lent(self, mime) -> str | None:
-        if not mime.hasFormat(GENERATION_MIME):
-            return None
-        return self._lent_by(bytes(mime.data(GENERATION_MIME)).decode("utf-8"))
+    def reaches(self) -> tuple[DropSlot, ...]:
+        return (self,)
+
+    def lent_by(self, prompt_id: str) -> str | None:
+        return self._lent_by(prompt_id)
 
     def accepts(self, prompt_id: str) -> bool:
-        return self._lent_by(prompt_id) is not None
+        return self.lent_by(prompt_id) is not None
 
     def set_candidate(self, active: bool):
         """Light the slot as a valid target for the in-progress drag (or clear it).
@@ -155,32 +207,6 @@ class DropSlot(QWidget):
         self._label.setProperty(state, on)
         self._label.style().unpolish(self._label)
         self._label.style().polish(self._label)
-
-    def dragEnterEvent(self, event):
-        self._aim(event)
-
-    def dragMoveEvent(self, event):
-        self._aim(event)
-
-    def _aim(self, event):
-        lands = self._lent(event.mimeData()) is not None
-        self.set_targeted(lands)
-        if lands:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragLeaveEvent(self, event):
-        self.set_targeted(False)
-
-    def dropEvent(self, event):
-        self.set_targeted(False)
-        held = self._lent(event.mimeData())
-        if held is None:
-            event.ignore()
-            return
-        self.set_item(held)
-        event.acceptProposedAction()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._current_id is not None:

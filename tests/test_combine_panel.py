@@ -2,28 +2,54 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
 from shared_ui.colors import hovered
+from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
 from shared_ui.testing import ground
 
 from origenerator import animation_paths, recipe_match
 from origenerator.gui.combine_panel import CombinePanel, CombineRequest, _text_inset
+from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.picture_state_picker import ACTION_LABEL
 from origenerator.gui.stylesheet import build_stylesheet
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
 
-def _panel(qtbot):
+def _panel(qtbot, start_pictures=None):
+    """Pictures are ``img*`` and videos ``vid*``; a video lends the image slot the
+    picture ``start_pictures`` names for it, and nothing when it names none."""
+    start_pictures = start_pictures or {}
     panel = CombinePanel(
-        image_lent_by=lambda pid: pid if pid.startswith("img") else None,
+        image_lent_by=lambda pid: pid if pid.startswith("img") else start_pictures.get(pid),
         video_lent_by=lambda pid: pid if pid.startswith("vid") else None,
         preview=lambda pid: (None, None),
     )
     qtbot.addWidget(panel)
     return panel
+
+
+def _drag_over(zone, pid):
+    # Hold the QMimeData in a local: the event keeps only a pointer to it.
+    mime = generation_mime(pid)
+    event = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    zone.dragEnterEvent(event)
+    return event
+
+
+def _let_go_over(zone, pid):
+    mime = generation_mime(pid)
+    event = QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    zone.dropEvent(event)
+    return event
+
+
+def _under_the_drag(slot) -> bool:
+    return slot._label.property("dropTarget")
 
 
 def _pick_act(panel, act):
@@ -225,6 +251,86 @@ def test_show_drop_candidates_lights_only_the_matching_slot(qtbot):
     assert panel.video_slot._label.property("dragActive") is False
 
 
+def test_a_video_let_go_between_the_slots_lands_in_both(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+
+    _let_go_over(panel._between, "vid1")
+
+    assert panel.image_slot.current_id() == "img1"  # the picture the video was made from
+    assert panel.video_slot.current_id() == "vid1"
+
+
+def test_a_video_over_the_room_between_the_slots_lights_both(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+
+    assert _drag_over(panel._between, "vid1").isAccepted()
+    assert _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
+
+    panel._between.dragLeaveEvent(QDragLeaveEvent())
+    assert not _under_the_drag(panel.image_slot) and not _under_the_drag(panel.video_slot)
+
+
+def test_letting_go_between_the_slots_puts_both_out(qtbot):
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    _drag_over(panel._between, "vid1")
+
+    _let_go_over(panel._between, "vid1")
+
+    assert not _under_the_drag(panel.image_slot) and not _under_the_drag(panel.video_slot)
+
+
+def test_between_the_slots_a_video_lands_only_where_it_lends_something(qtbot):
+    panel = _panel(qtbot)  # the gallery holds no picture vid7 was made from
+
+    _drag_over(panel._between, "vid7")
+    assert not _under_the_drag(panel.image_slot) and _under_the_drag(panel.video_slot)
+
+    _let_go_over(panel._between, "vid7")
+    assert panel.image_slot.current_id() is None
+    assert panel.video_slot.current_id() == "vid7"
+
+
+def test_a_picture_let_go_between_the_slots_lands_in_the_image_slot(qtbot):
+    panel = _panel(qtbot)
+
+    _let_go_over(panel._between, "img1")
+
+    assert panel.image_slot.current_id() == "img1"
+    assert panel.video_slot.current_id() is None
+
+
+def test_what_lends_neither_slot_anything_cannot_be_let_go_between_them(qtbot):
+    panel = _panel(qtbot)
+
+    assert not _drag_over(panel._between, "elsewhere").isAccepted()
+    assert not _let_go_over(panel._between, "elsewhere").isAccepted()
+
+
+def test_with_an_act_picked_the_room_between_reaches_only_the_image_slot(qtbot):
+    # The video slot is hidden under an act, so nothing shows it as a target.
+    panel = _panel(qtbot, start_pictures={"vid1": "img1"})
+    _pick_act(panel, "alpha")
+
+    _let_go_over(panel._between, "vid1")
+
+    assert panel.image_slot.current_id() == "img1"
+    assert panel.video_slot.current_id() is None
+    assert panel.selected_category() == "alpha"
+
+
+def test_the_room_between_the_slots_is_the_whole_gap_that_parts_them(qtbot):
+    panel = _panel(qtbot)
+    panel.setStyleSheet(build_stylesheet())
+    panel.show()
+    qtbot.waitExposed(panel)
+
+    between = panel._between.geometry()
+    assert between.top() == panel.image_slot.geometry().bottom() + 1
+    assert between.bottom() + 1 == panel._video_part.geometry().top()
+    # As far apart as a group's gap set them in this column before it took drops.
+    assert between.height() == BUTTON_GAP + BUTTON_GROUP_GAP
+
+
 def test_the_neutral_option_is_custom_leading_the_acts(qtbot):
     panel = _panel(qtbot)
     assert panel.selected_category() == ""  # neutral by default
@@ -397,10 +503,18 @@ def test_the_lane_defaults_to_kino(qtbot):
     assert not panel._genau_radio.isChecked()
 
 
+def _top_to_bottom(layout):
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        if item.layout() is not None:
+            yield from _top_to_bottom(item.layout())
+        elif item.widget() is not None:
+            yield item.widget()
+
+
 def test_the_radio_sits_below_the_dropdown_it_changes(qtbot):
     panel = _panel(qtbot)
-    layout = panel.layout()
-    order = [layout.itemAt(i).widget() for i in range(layout.count())]
+    order = list(_top_to_bottom(panel.layout()))
     assert order.index(panel._intent_part) == order.index(panel._video_part) + 1
 
 

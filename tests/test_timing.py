@@ -209,7 +209,7 @@ def test_the_percent_reading_is_empty_with_nothing_to_read_it_off():
 
 def test_progress_status_label_leads_with_how_far_along_it_is():
     # The one line every in-flight surface writes across its bar — the strip's
-    # queue, the shelf's cards, a folder's re-roll tile — so one run reads the
+    # queue, the collection's cards, a folder's re-roll tile — so one run reads the
     # same wherever it is being watched.
     assert RunTiming(83.0, (10, 20), 724.0).status_label() == "50% · 1:23 elapsed · ~6:02 left"
 

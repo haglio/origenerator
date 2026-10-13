@@ -45,7 +45,7 @@ def test_a_custom_folder_key_round_trips_to_its_id():
 
 
 @pytest.mark.parametrize("key", ["image", "image/sdxl_t2i", "__starred__", "__recents__"])
-def test_a_derived_or_shelf_key_is_not_a_custom_folder(key):
+def test_a_derived_or_collection_key_is_not_a_custom_folder(key):
     assert gallery.custom_folder_id(key) is None
 
 

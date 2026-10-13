@@ -68,7 +68,7 @@ def _held_prefix(held_days: int | None) -> str:
 
     It leads the line because the line is where you go to find out what a file
     *is*, and for a deleted one "how long until it's gone" is part of that. The
-    Trash shelf's tiles carry the other half of the arithmetic (how many days it
+    Trash collection's tiles carry the other half of the arithmetic (how many days it
     has left); this says how long it has been sitting there.
     """
     if held_days is None:

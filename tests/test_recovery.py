@@ -1,4 +1,4 @@
-"""The recovery bin — what the shelf sees, and what the launch reclaims."""
+"""The recovery bin — what the collection sees, and what the launch reclaims."""
 from __future__ import annotations
 
 import json
@@ -47,7 +47,7 @@ def test_an_undateable_record_reads_as_freshly_deleted():
     assert recovery.days_held(_record(deleted_at="not a date"), _NOW) == 0
 
 
-# --- what the shelf draws --------------------------------------------------
+# --- what the collection draws ---------------------------------------------
 
 
 def test_a_bin_item_is_the_deleted_row_plus_when_it_was_deleted():

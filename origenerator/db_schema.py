@@ -149,10 +149,10 @@ CREATE TABLE IF NOT EXISTS custom_folder_items (
 
 -- A request and the generation it queued: the item it was made about, what was
 -- heard, and the prompt pair before the edit (the pair after it is the queued
--- generation's own params). What the Requests shelf lists, and the only record
+-- generation's own params). What the Requests collection lists, and the only record
 -- of why that generation differs from the one it came from. Kept even when its
 -- generation goes: a delete here is undoable, and a restored item should come
--- back with the request that made it, so the shelf skips a record it can't
+-- back with the request that made it, so the collection skips a record it can't
 -- resolve rather than the record being dropped.
 --
 -- Spoken ("Request … over") or typed: a folder rewrite asks the same thing of
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS requests (
 );
 
 -- A deleted generation the recovery bin is still holding: the whole row the
--- delete dropped, and where in the trash its files went, so the Trash shelf can
+-- delete dropped, and where in the trash its files went, so the Trash collection can
 -- list it, put both back, or end it for good (see origenerator.recovery). The
 -- record goes away when the item is restored or purged, and not otherwise --
 -- nothing ages out; the generations row itself is gone the moment it is deleted,

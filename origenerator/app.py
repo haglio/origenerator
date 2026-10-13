@@ -531,7 +531,7 @@ def _reclaim_orphaned_trash(db, trash_dir: Path, logger) -> None:
     """Reclaim any trash folder no held deletion names (see origenerator.recovery).
 
     Nothing the recovery bin is holding is touched: a deletion stays until the
-    user restores it or ends it from the Trash shelf. This clears only what
+    user restores it or ends it from the Trash collection. This clears only what
     nothing can reach.
     """
     from origenerator import recovery

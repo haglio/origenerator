@@ -1,20 +1,20 @@
-"""The routing around the spoken commands: which side, and which shelf.
+"""The routing around the spoken commands: which side, and which collection.
 
 The vocabularies themselves live where they are owned — the picture commands
 in :mod:`origenerator.gallery.voice_commands`, the slideshow's in
 :mod:`origenerator.voice.show_commands`.  This is what wraps them: an optional
-leading side, and the shelf names, so an utterance can say WHICH show it means
+leading side, and the collection names, so an utterance can say WHICH show it means
 when two are running on the satellite regions.
 
 Everything this does NOT match falls through to a prompt rewrite, so the
-misses matter as much as the hits — a sentence mentioning a shelf is a prompt
+misses matter as much as the hits — a sentence mentioning a collection is a prompt
 edit, not an order to play it.
 """
 from __future__ import annotations
 
 import pytest
 
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
@@ -22,7 +22,7 @@ from origenerator.gallery.shelves import (
 )
 from origenerator.gallery.voice_commands import GENAU_COMMAND
 from origenerator.voice.commands import (
-    ShelfCommand,
+    CollectionCommand,
     ShowControl,
     SurfaceCommand,
     match_voice_command,
@@ -54,17 +54,17 @@ def test_a_fix_can_name_the_side_it_means(text, side):
     ("trash", TRASH_KEY, None),
     ("requests", REQUESTS_KEY, None),
 ])
-def test_a_shelf_name_is_an_order_to_play_it(text, key, side):
+def test_a_collection_name_is_an_order_to_play_it(text, key, side):
     command = match_voice_command(text)
 
-    assert command == ShelfCommand(key, side)
+    assert command == CollectionCommand(key, side)
 
 
-def test_the_shelf_names_are_the_tree_s_own():
-    """Spoken by the label the shelf wears, so a rename carries into the
+def test_the_collection_names_are_the_tree_s_own():
+    """Spoken by the label the collection wears, so a rename carries into the
     vocabulary rather than leaving it answering to the old word — "favorites"
-    is what the shelf says, where the key still says favorited."""
-    assert match_voice_command("favorites") == ShelfCommand(FAVORITES_KEY, None)
+    is what the collection says, where the key still says favorited."""
+    assert match_voice_command("favorites") == CollectionCommand(FAVORITES_KEY, None)
     assert match_voice_command("starred") is None
 
 

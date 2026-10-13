@@ -2,7 +2,7 @@
 
 Renders whatever the selected tree row calls for: a branch folder's child tiles, a
 settings leaf's thumbnail grid (with its re-roll tile), or the Recents / Favorites /
-Experiments / Requests / Trash shelf overviews. Owns the thumbnail multi-selection
+Experiments / Requests / Trash collection overviews. Owns the thumbnail multi-selection
 and the live in-flight cards.
 
 One thing it renders comes from no tree row at all: the gallery search's results,
@@ -36,17 +36,17 @@ from PyQt6.QtWidgets import (
 )
 
 from origenerator import gallery, search
-from origenerator.gallery.placement import Placement
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
+    COLLECTION_LABELS,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    SHELF_LABELS,
     TRASH_KEY,
-    FolderShelf,
-    folder_shelf,
+    FolderCollection,
+    folder_collection,
 )
+from origenerator.gallery.placement import Placement
 from origenerator.gui import icons
 from origenerator.gui.collapsible_section import _ARROW_OPEN, _ARROW_SHUT
 from origenerator.gui.corner_controls import enhance_state
@@ -78,7 +78,7 @@ REROLL_IMAGE = "image"
 
 _TILE_SPACING = 8   # gap between tiles in the flowing main view
 _PREVIEW_COUNT = 4  # thumbnails a folder tile shows as a preview
-# The Recents shelf lists every generation ever made, so it draws a page of tiles
+# The Recents collection lists every generation ever made, so it draws a page of tiles
 # at a time and adds the next once scrolled within _RECENTS_REACH pixels of the
 # end — far enough ahead (three tile rows) that the next page is there before the
 # user arrives at it, rather than after a visible stop.
@@ -90,7 +90,7 @@ _RECENTS_REACH = 600
 _SECTION_SPACING = 14
 # The most result tiles a search draws at once. A one-word query over a full
 # library can match most of it, and building thousands of thumbnails in a single
-# pass locks the window for seconds — the Recents shelf pages for the same
+# pass locks the window for seconds — the Recents collection pages for the same
 # reason. Search doesn't page: it is a narrowing tool, so the useful answer to
 # "too many to draw" is another word, and the count label says exactly that
 # rather than quietly showing a slice.
@@ -192,8 +192,8 @@ class _KeptTiles:
         return tile
 
 
-_SHELF_TILE = "shelf"
-_REVIEW_TILE = "shelf with a verdict"
+_COLLECTION_TILE = "collection"
+_REVIEW_TILE = "collection with a verdict"
 _FOLDER_TILE = "folder"
 _SEEDS_TILE = "folder with re-rolls"
 _TRASH_TILE = "trash"
@@ -260,7 +260,7 @@ class PaneHost:
     enhancing_run: Callable[[dict], object]
     # What every enhance runs at, app-wide — the Enhance subpanel's value.
     enhance_settings: Callable[[], object]
-    # Whether the background experimenter is on (the empty shelf teaches off it).
+    # Whether the background experimenter is on (the empty collection teaches off it).
     experiments_enabled: Callable[[], bool]
     # A settings folder's own tiles from the view — the re-roll tile, its request
     # mirror and the run in front of its line, each None where the folder has
@@ -280,7 +280,7 @@ class TreeNavigation:
     can stand the pane up by answering them alone.
     """
 
-    # The tree key of the selected row (a folder's, or a shelf's), or ``None``.
+    # The tree key of the selected row (a folder's, or a collection's), or ``None``.
     selected_folder_key: Callable[[], str | None]
     # Where folder ``key`` lives — the breadcrumb of its parent, "" at the top.
     # What a tile drawn far from the tree is captioned with, so identically
@@ -291,13 +291,13 @@ class TreeNavigation:
 
 
 @dataclass(frozen=True)
-class Shelf:
-    """One shelf: what it collects, and how it draws that.
+class PaneCollection:
+    """One collection: what it gathers, and how it draws that.
 
-    Five shelves were five parallel places each -- a branch in the renderer's
+    Five collections were five parallel places each -- a branch in the renderer's
     dispatch, a branch in the row gatherer, and a method apiece. Both branches
-    read this instead, so a sixth shelf is one entry rather than an edit in two
-    chains, and neither chain can answer for a shelf the other does not.
+    read this instead, so a sixth collection is one entry rather than an edit in two
+    chains, and neither chain can answer for a collection the other does not.
     """
 
     rows: Callable[[str | None, str], list[dict]]
@@ -305,7 +305,7 @@ class Shelf:
 
 
 class BrowserPane(QObject):
-    """Fills the middle scroll area (folder tiles / thumbnail grid / shelves) and
+    """Fills the middle scroll area (folder tiles / thumbnail grid / collections) and
     owns the thumbnail multi-selection and in-flight cards. Held by the GalleryView,
     which connects the signals below to its own handlers — a gesture on a tile is
     the pane's to notice and the view's to answer."""
@@ -345,25 +345,25 @@ class BrowserPane(QObject):
             on_cancel=self.cancel_requested.emit,
             on_reveal=self.reveal_reroll_requested.emit,
         )
-        # What each shelf collects and how it draws that, bound rather than
+        # What each collection gathers and how it draws that, bound rather than
         # named: a renamed renderer is an AttributeError at construction instead
-        # of a shelf that quietly draws nothing.
-        self._shelves = {
-            RECENTS_KEY: Shelf(
+        # of a collection that quietly draws nothing.
+        self._collections = {
+            RECENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._recent_rows, side, folder),
                 render=self._render_recents),
-            FAVORITES_KEY: Shelf(
+            FAVORITES_KEY: PaneCollection(
                 rows=self._combined_favorite_rows,
                 render=lambda: self._show_favorites(
-                    self._favorite_folders(self._shelf_orientation, self._shelf_folder),
-                    self._favorite_items(self._shelf_orientation, self._shelf_folder))),
-            EXPERIMENTS_KEY: Shelf(
+                    self._favorite_folders(self._collection_orientation, self._collection_folder),
+                    self._favorite_items(self._collection_orientation, self._collection_folder))),
+            EXPERIMENTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._experiment_rows, side, folder),
                 render=self._render_experiments),
-            REQUESTS_KEY: Shelf(
+            REQUESTS_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._requested_rows, side, folder),
                 render=self._render_requests),
-            TRASH_KEY: Shelf(
+            TRASH_KEY: PaneCollection(
                 rows=lambda side, folder: self._in_folder(self._trash_rows, side, folder),
                 render=self._render_trash),
         }
@@ -377,9 +377,9 @@ class BrowserPane(QObject):
         self._kept = _KeptTiles()             # the last pane's tiles, while a new one draws
         self._inflight_cards: dict[str, InFlightCard] = {}   # live in-flight cards, by job key
         self._inflight_by_key: dict[str, InFlightItem] = {}  # their items, for click routing
-        self._inflight_signature: tuple = ()  # the in-flight set now drawn on the shelf
+        self._inflight_signature: tuple = ()  # the in-flight set now drawn in the collection
         self._recent_rows = _Listing()      # every generated row, newest first
-        self._recents_flow = None           # the open shelf's layout, to grow into
+        self._recents_flow = None           # the open collection's layout, to grow into
         self._recents_drawn = 0             # finished items it has drawn so far
         self._listed = _Listing()
         self._experiment_rows = _Listing()  # unreviewed experiments, newest first
@@ -387,11 +387,11 @@ class BrowserPane(QObject):
         self._search_rows: list[dict] = []  # the open search's hits, in shown order
         self._showing_search = False        # a query owns the pane, whatever the tree says
         self._requested_rows = _Listing()   # what spoken requests made
-        # Which side's shelf is open ("portrait" / "landscape"), or None off the
-        # shelves — set by each show_*_overview, read by the renderers and
-        # shelf_rows. Every shelf belongs to one side, so on one it is never None.
-        self._shelf_orientation: str | None = None
-        self._shelf_folder = gallery.ALL_KEY
+        # Which side's collection is open ("portrait" / "landscape"), or None off the
+        # collections — set by each show_*_overview, read by the renderers and
+        # collection_rows. Every collection belongs to one side, so on one it is never None.
+        self._collection_orientation: str | None = None
+        self._collection_folder = gallery.ALL_KEY
         self._placements: dict[str | None, Placement] = {}
         self._image_index: dict = {}
         self._models_taken = 0
@@ -401,10 +401,10 @@ class BrowserPane(QObject):
 
     def set_model(self, recent_rows, side_trees, listed_rows, experiment_rows,
                   trash_rows, request_items=(), image_index=None):
-        """Take the newly rebuilt gallery model the shelves render from.
+        """Take the newly rebuilt gallery model the collections render from.
 
         ``side_trees`` is per side (``{orientation: [folders]}``): a folder is
-        drawn on whichever sides hold rows of that shape, so each Favorites shelf
+        drawn on whichever sides hold rows of that shape, so each Favorites collection
         collects the copies of the bookmarks its own side has.
         """
         self._models_taken += 1
@@ -417,14 +417,15 @@ class BrowserPane(QObject):
         self._placements = {side: Placement(gallery.all_group(tree), self._image_index)
                             for side, tree in side_trees.items()}
 
-    def _open_shelf_rows(self, shelf: str) -> list[dict]:
-        return self._shelves[shelf].rows(self._shelf_orientation, self._shelf_folder)
+    def _open_collection_rows(self, collection: str) -> list[dict]:
+        return self._collections[collection].rows(self._collection_orientation,
+                                                  self._collection_folder)
 
     def _in_folder(self, listing: _Listing, side: str | None, folder: str) -> list[dict]:
         """What *folder* holds of *listing* on *side*, of the kinds now chosen.
 
-        Every shelf's rows come through here, which is why the Images / Videos /
-        Both choice is applied here and nowhere else: a shelf gathers both kinds,
+        Every collection's rows come through here, which is why the Images / Videos /
+        Both choice is applied here and nowhere else: a collection gathers both kinds,
         and nothing else in the gallery does.
         """
         return self._placement(side).held_by(
@@ -489,14 +490,14 @@ class BrowserPane(QObject):
         return container, flow
 
     def restart_recents_listing(self):
-        """Drop the pages the Recents shelf has drawn so its next render starts
+        """Drop the pages the Recents collection has drawn so its next render starts
         over at the newest item — what a change of the gallery's media filter
         deserves, being a new listing rather than a redraw of the old one at the
         offset the old one was read at."""
         self._forget_recents_paging()
 
     def _forget_recents_paging(self):
-        """Drop the Recents shelf's paging state, because the pane it was drawn in
+        """Drop the Recents collection's paging state, because the pane it was drawn in
         is being replaced. :meth:`_render_recents` re-establishes it for the new
         one; anything else leaves it cleared, so a scroll of some *other* pane
         can't grow tiles into a layout that is no longer on screen."""
@@ -536,21 +537,21 @@ class BrowserPane(QObject):
             if tile.key == folder_key:
                 tile.set_favorite(favorite)
 
-    def show_folder_tiles(self, groups, shelves=()):
+    def show_folder_tiles(self, groups, collections=()):
         container, flow = self._new_tile_pane()
-        for key in shelves:
-            self._add_shelf_tile(flow, key)
-        if shelves and groups:
+        for key in collections:
+            self._add_collection_tile(flow, key)
+        if collections and groups:
             flow.add_full_row(_time_heading(" "))
         for group in groups:
             self._add_folder_tile(flow, group, favorite=group.favorite)
         self.show_widget(container)
 
-    def _add_shelf_tile(self, flow, key: str):
-        rows = self.rows_for_shelf(key)
-        shelf = folder_shelf(split_key(key)[0])
-        tile = FolderTile(key, SHELF_LABELS[shelf.shelf], _thumbnails_of(rows), len(rows),
-                          badge=icons.shelf_badge(shelf.shelf))
+    def _add_collection_tile(self, flow, key: str):
+        rows = self.rows_for_collection(key)
+        collection = folder_collection(split_key(key)[0])
+        tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
+                          badge=icons.collection_badge(collection.which))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 
@@ -563,7 +564,7 @@ class BrowserPane(QObject):
         The breadcrumb is what makes this readable at all — a grouping can hold two
         folders that are both called "30 steps" from opposite corners of the tree,
         so the bare label the hierarchy relies on isn't enough here (the Favorites
-        shelf shows its folders the same way, for the same reason).
+        collection shows its folders the same way, for the same reason).
         """
         folders = gallery.child_groups(group)
         container, flow = self._new_tile_pane()
@@ -699,30 +700,30 @@ class BrowserPane(QObject):
             self._add_folder_tile(flow, tile.group, favorite=tile.group.favorite,
                                   context=self._tree.folder_context(tile.group.key))
         else:
-            self._add_shelf_thumbnail(flow, tile.row)
+            self._add_collection_thumbnail(flow, tile.row)
         self._search_rows.extend(tile.rows or [tile.row])
 
     def showing_search(self) -> bool:
-        """Whether a query owns the pane. Unlike the shelves this is not a tree
+        """Whether a query owns the pane. Unlike the collections this is not a tree
         row, so it is answered by what was last drawn rather than by what is
         selected: the tree keeps whatever folder it had while a search runs."""
         return self._showing_search
 
-    # --- the shelves: Recents / Favorites / Experiments / Requests / Trash -----
+    # --- the collections: Recents / Favorites / Experiments / Requests / Trash ---
 
-    def show_shelf(self, key: str, orientation: str | None = None):
-        shelf = folder_shelf(key)
-        if shelf is None:
+    def show_collection(self, key: str, orientation: str | None = None):
+        collection = folder_collection(key)
+        if collection is None:
             return
-        self._shelf_orientation = orientation
-        self._shelf_folder = shelf.folder
-        self._shelves[shelf.shelf].render()
+        self._collection_orientation = orientation
+        self._collection_folder = collection.folder
+        self._collections[collection.which].render()
 
     def _render_recents(self):
-        """The Recents shelf: a card for every in-flight generation (queued or
+        """The Recents collection: a card for every in-flight generation (queued or
         running, from a Generate tab or a gallery re-roll) atop the recently
         finished items. Clicking an in-flight card reveals where its job runs; a
-        finished one previews in the info pane, right here on the shelf, the way
+        finished one previews in the info pane, right here in the collection, the way
         a thumbnail does inside a folder — and double-clicking it jumps to its
         own folder.
 
@@ -730,16 +731,16 @@ class BrowserPane(QObject):
         finished thumbnails a page at a time; a hint when the media-type filter
         leaves neither. Both the cards and the thumbnails obey that filter.
 
-        The shelf has no end — it lists every generation ever made — so it opens on
+        The collection has no end — it lists every generation ever made — so it opens on
         one page and grows as it's scrolled into (:meth:`grow_recents`). A redraw of
-        a shelf already on screen (a landing generation rebuilds the gallery under
+        a collection already on screen (a landing generation rebuilds the gallery under
         it) keeps the pages that were open, so the place its caller puts back
         (:meth:`return_to`) is still drawn to stand on, rather than snapping the
         user back up to the newest item.
         """
         drawn = self._recents_drawn
         container, flow = self._new_tile_pane()  # which forgets that count
-        rows = self._open_shelf_rows(RECENTS_KEY)
+        rows = self._open_collection_rows(RECENTS_KEY)
         items = self._latest_inflight_items()
         self._inflight_signature = _inflight_signature(items)
         self._inflight_cards = {}
@@ -752,7 +753,7 @@ class BrowserPane(QObject):
         _open_sections(flow, gallery.section_headings(rows),
                        opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
                        draw_leading=draw_leading)
-        # An empty shelf teaches how to fill it rather than showing a blank pane.
+        # An empty collection teaches how to fill it rather than showing a blank pane.
         if not (items or rows):
             self.show_widget(self._empty_state(self._recents_empty_hint()))
             return
@@ -761,49 +762,49 @@ class BrowserPane(QObject):
         self.show_widget(container)
 
     def _draw_recents_page(self, count: int):
-        """Add up to ``count`` more finished items to the open shelf, picking up
+        """Add up to ``count`` more finished items to the open collection, picking up
         where the last page left off. Short (or empty) at the end of the list."""
-        rows = self._open_shelf_rows(RECENTS_KEY)
+        rows = self._open_collection_rows(RECENTS_KEY)
         start = self._recents_drawn
         page = rows[start:start + count]
         _draw_between_headings(self._recents_flow, page, gallery.section_headings(rows),
-                               lambda row: self._add_shelf_thumbnail(self._recents_flow, row),
+                               lambda row: self._add_collection_thumbnail(self._recents_flow, row),
                                start=start)
         self._recents_drawn += len(page)
 
     def grow_recents(self, *_):
-        """Draw the next page once the shelf is scrolled near its end — what makes
+        """Draw the next page once the collection is scrolled near its end — what makes
         Recents keep going instead of stopping at a fixed count.
 
         Wired to the browser scroll bar's value *and* its range: the value for the
         scrolling itself, the range because a pane only gets its real one once the
-        page just drawn has been laid out, which is when a shelf redrawn back at
+        page just drawn has been laid out, which is when a collection redrawn back at
         the offset it was being read at finds itself already near the end. A range
-        of zero is that not-yet-laid-out pane rather than a shelf scrolled to its
+        of zero is that not-yet-laid-out pane rather than a collection scrolled to its
         end, so it waits rather than drawing pages nobody has scrolled to.
         """
         if (self._recents_flow is None
-                or self._recents_drawn >= len(self._open_shelf_rows(RECENTS_KEY))):
+                or self._recents_drawn >= len(self._open_collection_rows(RECENTS_KEY))):
             return
         bar = self._scroll_bar()
         if bar.maximum() and bar.value() >= bar.maximum() - _RECENTS_REACH:
             self._draw_recents_page(_RECENTS_PAGE)
 
     def _scroll_bar(self):
-        """The browser pane's vertical scroll bar: what the shelf grows off, and
+        """The browser pane's vertical scroll bar: what the collection grows off, and
         what a redraw puts back where the user was reading."""
         return self._scroll.verticalScrollBar()
 
-    def _add_shelf_thumbnail(self, flow, row, corner_actions=None):
-        """Build one finished-item tile for a shelf (Recents/Favorites/Experiments):
+    def _add_collection_thumbnail(self, flow, row, corner_actions=None):
+        """Build one finished-item tile for a collection (Recents/Favorites/Experiments):
         preview it here on a click, open its own folder on a double-click, drag it
         to a combine slot, and right-click it for the same star / enhance / delete
         menu a tile inside a folder offers; ``corner_actions`` become the tile's
         hover controls (a review's keep/reject, wired to the verdict)."""
         def wire(tw):
-            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, on the shelf
-            tw.double_clicked.connect(self._shelf_double_clicked)  # or open its folder
-            # Every shelf gets the folder menu — an item is no less actionable for
+            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, in the collection
+            tw.double_clicked.connect(self._collection_double_clicked)  # or open its folder
+            # Every collection gets the folder menu — an item is no less actionable for
             # being listed by when it was made or by its bookmark rather than by its
             # settings.
             tw.context_requested.connect(self._thumbnail_context_menu)
@@ -813,7 +814,7 @@ class BrowserPane(QObject):
             self._wire_drag(tw)
 
         return self._draw_tile(
-            flow, row, _REVIEW_TILE if corner_actions else _SHELF_TILE, wire,
+            flow, row, _REVIEW_TILE if corner_actions else _COLLECTION_TILE, wire,
             media_type=gallery.media_type_of_row(row),  # a corner badge: image or video
             movie_path=self._host.animated_preview(row),  # videos loop; images stay still
             favorite=bool(row.get("starred")),
@@ -844,14 +845,14 @@ class BrowserPane(QObject):
         return tile
 
     def _visible_inflight_items(self, rows=None, requests=None) -> list:
-        """The in-flight items the shelf draws: what the gallery's media-type
-        filter keeps and the side the shelf belongs to, less the enhancements.
-        The full set still decides whether the shelf exists at all; this narrows
+        """The in-flight items the collection draws: what the gallery's media-type
+        filter keeps and the side the collection belongs to, less the enhancements.
+        The full set still decides whether the collection exists at all; this narrows
         only what is drawn.
 
         A standalone enhance never earns a card of its own here, for the reason it
         never earns a folder in the tree: it is not a result, it is an upgrade of
-        one, and the image it upgrades is already on this shelf wearing the
+        one, and the image it upgrades is already in this collection wearing the
         "Enhancing…" scrim and streaming the run's frames. A card beside that tile
         says a second thing is being made, and clicking it goes nowhere — the
         folder it would open is the one the tree declines to grow. The lower
@@ -859,25 +860,25 @@ class BrowserPane(QObject):
         belongs.
         """
         media_types = self._host.media_types()
-        side = self._shelf_orientation
+        side = self._collection_orientation
         return [it for it in self.inflight_items(rows=rows, requests=requests)
                 if it.media_type in media_types
                 and it.job_kind != gallery.JobKind.ENHANCE
                 and (side is None or it.orientation == side)]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list:
-        placement = self._placement(self._shelf_orientation)
+        placement = self._placement(self._collection_orientation)
         return [item for item in self._visible_inflight_items(rows, requests)
-                if placement.holds(self._shelf_folder, item.key)]
+                if placement.holds(self._collection_folder, item.key)]
 
     def inflight_orientations(self, rows) -> set[str]:
-        """Which sides have work in flight — what keeps a Recents shelf up on a
+        """Which sides have work in flight — what keeps a Recents collection up on a
         side with no folders yet, so a first-ever generation of that shape is
         visible while it runs."""
         return {row_orientation(row) for row in rows if gallery.is_in_progress(row)}
 
     def _recents_empty_hint(self) -> str:
-        """The teaching hint for an empty shelf, worded for the kinds it is
+        """The teaching hint for an empty collection, worded for the kinds it is
         listing."""
         media_types = self._host.media_types()
         noun = "generations" if len(media_types) == 2 else (
@@ -894,12 +895,12 @@ class BrowserPane(QObject):
         re-roll's latest frame into its card. The poll passes the listing it
         already read (``rows``/``requests``); left off, they are read here.
 
-        Whichever pane drew them — the Recents shelf, or a settings folder with
-        a batch in flight. Only the shelf re-renders on a change to the
+        Whichever pane drew them — the Recents collection, or a settings folder with
+        a batch in flight. Only the collection re-renders on a change to the
         *set* of jobs (a defensive guard — a started or finished re-roll
         normally moves the DB fingerprint and forces a full rebuild anyway); a
         folder is rebuilt by that same fingerprint and must not be redrawn as
-        the shelf. A pane holding no cards asks the database nothing.
+        the collection. A pane holding no cards asks the database nothing.
         """
         if not self._inflight_cards and not self.showing_recents():
             return
@@ -968,8 +969,8 @@ class BrowserPane(QObject):
             item.stop_auto()
             item.cancel()
 
-    def _shelf_double_clicked(self, prompt_id: str):
-        """A shelf tile's double-click: go to the item's own folder, and keep the
+    def _collection_double_clicked(self, prompt_id: str):
+        """A collection tile's double-click: go to the item's own folder, and keep the
         tab that lands there — its tile picked, highlighted and scrolled to, as
         if you'd navigated in and clicked it (:meth:`GalleryView.follow_link`
         answers the jump).
@@ -979,15 +980,15 @@ class BrowserPane(QObject):
         self.item_jump_requested.emit(prompt_id)
         self.tab_pin_requested.emit()
 
-    # --- the Experiments shelf: unreviewed background experiments ------------
+    # --- the Experiments collection: unreviewed background experiments -------
 
     def _render_experiments(self):
-        """The Experiments shelf: what the background experimenter has come up
+        """The Experiments collection: what the background experimenter has come up
         with since the user last looked, newest first, each tile wearing
         keep/reject hover controls. A kept item just leaves the queue — it has
         been in its own folder since it ran; a rejected one is trashed and
         teaches the policy what to avoid. Clicking previews the item right here
-        and double-clicking opens its folder, like the other shelves."""
+        and double-clicking opens its folder, like the other collections."""
         container, flow = self._new_tile_pane()
         actions = [
             CornerAction("keep", icons.experiment_verdict_icon("up"),
@@ -995,10 +996,10 @@ class BrowserPane(QObject):
             CornerAction("reject", icons.experiment_verdict_icon("down"),
                          "Reject — trash it and steer future experiments away"),
         ]
-        rows = self._open_shelf_rows(EXPERIMENTS_KEY)
+        rows = self._open_collection_rows(EXPERIMENTS_KEY)
 
         def draw(row):
-            self._add_shelf_thumbnail(flow, row, corner_actions=list(actions))
+            self._add_collection_thumbnail(flow, row, corner_actions=list(actions))
 
         headings = gallery.section_headings(rows)
         _open_sections(flow, headings)
@@ -1018,28 +1019,28 @@ class BrowserPane(QObject):
                 "models. Results collect here; your keep/reject verdicts steer "
                 "what gets tried next.")
 
-    # --- the Requests shelf: what you asked for out loud ---------------------
+    # --- the Requests collection: what you asked for out loud ----------------
 
     def _render_requests(self):
-        """The Requests shelf: what your spoken requests made, newest first —
+        """The Requests collection: what your spoken requests made, newest first —
         ordinary tiles, since what a request produced is an ordinary generation
         that happens to have been asked for out loud. What was heard and what it
         changed in the prompt show where the prompt does, in the config tab a
         click loads.
 
-        One still generating shows as the live card the Recents shelf gives
+        One still generating shows as the live card the Recents collection gives
         in-flight work, so a request you have just spoken is visibly under way
         rather than absent until it lands."""
         container, flow = self._new_tile_pane()
         in_flight = {item.key: item for item in self.inflight_items()}
-        rows = self._open_shelf_rows(REQUESTS_KEY)
+        rows = self._open_collection_rows(REQUESTS_KEY)
         drawn = [row for row in rows
                  if row["prompt_id"] in in_flight or gallery.produced_output(row)]
 
         def draw(row):
             live = in_flight.get(row["prompt_id"])
             if live is None:
-                self._add_shelf_thumbnail(flow, row)
+                self._add_collection_thumbnail(flow, row)
             else:
                 self._add_inflight_card(flow, live)
 
@@ -1060,14 +1061,14 @@ class BrowserPane(QObject):
                 "thing of every image in that folder at once, typed rather "
                 "than spoken.")
 
-    # --- the Trash shelf: deleted items, still recoverable -------------------
+    # --- the Trash collection: deleted items, still recoverable --------------
 
     def _render_trash(self):
-        """The Trash shelf: every deleted item the recovery bin is still
+        """The Trash collection: every deleted item the recovery bin is still
         holding, newest first, each tile wearing restore / delete-permanently
         hover controls and captioned with how long it has left. A restored item
         returns to its own folder, files and all; a purged one is gone for good,
-        which is what the whole shelf exists to make deliberate rather than
+        which is what the whole collection exists to make deliberate rather than
         automatic."""
         container, flow = self._new_tile_pane()
         actions = [
@@ -1076,19 +1077,19 @@ class BrowserPane(QObject):
             CornerAction("purge", icons.recovery_action_icon("purge"),
                          "Delete permanently — remove it and its files for good"),
         ]
-        rows = self._open_shelf_rows(TRASH_KEY)
+        rows = self._open_collection_rows(TRASH_KEY)
         for row in rows:
             self._add_trash_thumbnail(flow, row, list(actions))
         self.show_widget(container if rows
                          else self._empty_state(self._trash_empty_hint()))
 
     def _add_trash_thumbnail(self, flow, row, corner_actions):
-        """One deleted item's tile — a shelf tile like any other, wired to
+        """One deleted item's tile — a collection tile like any other, wired to
         everything a deleted item can still do.
 
         Its files are all in the trash rather than gone, and the bin kept its row
         whole, so it previews on a click, loops if it's a video, opens full size,
-        plays in the shelf's slideshow and fills a config tab with the settings
+        plays in the collection's slideshow and fills a config tab with the settings
         that made it — the whole point of a bin being that you can look before you
         decide. Double-clicking opens it as a Generate tab (the gesture a folder's
         tiles carry) rather than jumping to its folder, which is the one thing a
@@ -1135,7 +1136,7 @@ class BrowserPane(QObject):
         base, _orientation = split_key(self._tree.selected_folder_key())
         return base == TRASH_KEY
 
-    # --- the Favorites shelf: every bookmark — items and folders — in one place ---
+    # --- the Favorites collection: every bookmark — items and folders — in one place ---
 
     def _favorite_items(self, side: str | None, folder: str) -> list[dict]:
         return self._placement(side).held_by(folder, gallery.favorite_generations(
@@ -1152,18 +1153,18 @@ class BrowserPane(QObject):
         ])
 
     def _show_favorites(self, groups, rows):
-        """The Favorites shelf: the individual favorited images and videos as
+        """The Favorites collection: the individual favorited images and videos as
         thumbnails, then one tile per bookmarked folder (each captioned with its
         breadcrumb so identically-named folders stay tellable apart). A favorited
         item previews here on click and opens its own folder on double-click; a
         folder tile lists its sub-folders."""
         container, flow = self._new_tile_pane()
         for row in rows:
-            self._add_shelf_thumbnail(flow, row)
+            self._add_collection_thumbnail(flow, row)
         for group in groups:
             self._add_folder_tile(flow, group, favorite=False,
                                   context=self._tree.folder_context(group.key))
-        # An empty shelf teaches how to fill it rather than showing a blank pane.
+        # An empty collection teaches how to fill it rather than showing a blank pane.
         self.show_widget(container if (rows or groups) else self._empty_state(
             "No bookmarks yet.\n\nStar an image or video from its right-click menu, "
             "or favorite a folder from the list, to collect them here."
@@ -1172,7 +1173,7 @@ class BrowserPane(QObject):
 
     @staticmethod
     def _empty_state(text: str) -> QWidget:
-        """A centered hint filling an otherwise-blank shelf pane."""
+        """A centered hint filling an otherwise-blank collection pane."""
         label = QLabel(text)
         label.setObjectName("estimateLabel")
         label.setWordWrap(True)
@@ -1188,67 +1189,68 @@ class BrowserPane(QObject):
             return f"seed {seed}"
         return (row.get("positive_prompt") or "")[:40] or "(no prompt)"
 
-    # --- what the open shelf collects (the slideshow plays it) --------------
+    # --- what the open collection gathers (the slideshow plays it) ----------
 
-    def shelf_rows(self) -> list[dict] | None:
-        """Every generation the open shelf collects, in shelf order — or ``None``
-        off the shelves, where a folder is what's on screen instead.
+    def collection_rows(self) -> list[dict] | None:
+        """Every generation the open collection gathers, in collection order — or ``None``
+        outside the collections, where a folder is what's on screen instead.
 
         The slideshow plays these, so they have to match the tiles: Recents is its
         listed items (the media-type filter already applied), Favorites is its
         favorited items plus everything under each bookmarked folder, since a folder
         tile there stands for its whole folder, Experiments is its unreviewed
         queue, Requests is what your spoken requests made, and Trash is what the
-        bin is holding — deleted is not unwatchable, and a shelf of items you are
+        bin is holding — deleted is not unwatchable, and a collection of items you are
         deciding whether to keep is exactly one you want to sit and look through.
         A favorited item inside a favorited folder is one item, so repeats drop out.
-        A running search collects too — its hits are a gathered collection
-        exactly as a shelf's are, and sitting through what a search turned up is
+        A running search gathers too — its hits are gathered exactly as a
+        collection's are, and sitting through what a search turned up is
         one of the better reasons to have run it.
         """
         if self.showing_search():
             return list(self._search_rows)
-        return self.selected_shelf_rows()
+        return self.selected_collection_rows()
 
-    def shelf_counts(self, side: str) -> dict[str, int]:
+    def collection_counts(self, side: str) -> dict[str, int]:
         placement = self._placement(side)
-        tallies = {shelf: placement.tally(self._shelves[shelf].rows(side, gallery.ALL_KEY))
-                   for shelf in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
+        tallies = {collection: placement.tally(
+                       self._collections[collection].rows(side, gallery.ALL_KEY))
+                   for collection in (EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)}
         tallies[FAVORITES_KEY] = placement.tally_favorites(
             self._listed.on(side, self._host.media_types()))
-        return {FolderShelf(shelf, folder).key: count
-                for shelf, tally in tallies.items() for folder, count in tally.items()}
+        return {FolderCollection(collection, folder).key: count
+                for collection, tally in tallies.items() for folder, count in tally.items()}
 
-    def selected_shelf_rows(self) -> list[dict] | None:
-        """What the *selected* shelf collects, whatever is currently drawn.
+    def selected_collection_rows(self) -> list[dict] | None:
+        """What the *selected* collection gathers, whatever is currently drawn.
 
-        The same answer as :meth:`shelf_rows` off a search, and the one that
-        matters during one: a search standing on a shelf is scoped to that
-        shelf's items, and the results now on screen are no use for working out
+        The same answer as :meth:`collection_rows` off a search, and the one that
+        matters during one: a search standing in a collection is scoped to that
+        collection's items, and the results now on screen are no use for working out
         what those are.
 
-        Asked of the selected row's own key, which is the same key the shelf was
+        Asked of the selected row's own key, which is the same key the collection was
         rendered for. Written out again here, it was the five answers below a
         second time over, once against the side the key names and once against
         the side the render remembered.
         """
-        return self.rows_for_shelf(self._tree.selected_folder_key())
+        return self.rows_for_collection(self._tree.selected_folder_key())
 
-    def rows_for_shelf(self, key: str | None) -> list[dict] | None:
-        """What the shelf *key* collects right now — :meth:`shelf_rows` for a
-        shelf that is not the one on screen.
+    def rows_for_collection(self, key: str | None) -> list[dict] | None:
+        """What the collection *key* gathers right now — :meth:`collection_rows` for a
+        collection that is not the one on screen.
 
         Named rather than "what is showing" because a hosted show outlives the
         selection that opened it: inside Fun Time the shows run on the satellite
         regions while the browser goes on being used elsewhere, so keeping a
         running show fed — and answering a spoken "landscape favorites" — both
-        need a shelf's collection asked for by name.
+        need a collection's rows asked for by name.
         """
         base, orientation = split_key(key)
-        shelf = folder_shelf(base)
-        if shelf is None:
+        collection = folder_collection(base)
+        if collection is None:
             return None
-        return self._shelves[shelf.shelf].rows(orientation, shelf.folder)
+        return self._collections[collection.which].rows(orientation, collection.folder)
 
     # --- the thumbnail grid: a settings leaf's generations ------------------
 
@@ -1407,7 +1409,7 @@ class BrowserPane(QObject):
         its newest items with the one you asked for highlighted off-screen.
 
         False where this pane has no picture of its own for it."""
-        self._draw_open_shelf_past(prompt_id)
+        self._draw_open_collection_past(prompt_id)
         widget = self._thumb_widgets.get(prompt_id)
         if widget is None:
             return False  # nothing drawn for it here: an in-flight row, or a folder
@@ -1419,10 +1421,10 @@ class BrowserPane(QObject):
         defer(self._scroll, lambda: self._reapply_reveal(prompt_id, widget))
         return True
 
-    def _draw_open_shelf_past(self, prompt_id: str) -> None:
+    def _draw_open_collection_past(self, prompt_id: str) -> None:
         if self._recents_flow is None:
             return
-        listed = [row["prompt_id"] for row in self._open_shelf_rows(RECENTS_KEY)]
+        listed = [row["prompt_id"] for row in self._open_collection_rows(RECENTS_KEY)]
         if prompt_id not in listed:
             return
         beyond = (listed.index(prompt_id) + 1 + _NEIGHBORS_PAST_A_REVEAL

@@ -1,4 +1,4 @@
-"""The bare spoken vocabulary — a shelf, a button, an order to the slide.
+"""The bare spoken vocabulary — a collection, a button, an order to the slide.
 
 One word is the whole utterance or it is nothing, because everything this
 matcher declines is rewritten into a prompt instead: a loose match here would
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gallery.shelves import FAVORITES_KEY
+from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,
@@ -18,9 +18,9 @@ from origenerator.voice.app_commands import (
     phrases_heard_only_outright,
     spoken_phrases,
 )
-from origenerator.voice.commands import ShelfCommand, match_voice_command
+from origenerator.voice.commands import CollectionCommand, match_voice_command
 
-# --- the shelves that lead the tree, each by the name on its row -------------
+# --- the collections that lead the tree, each by the name on its row ---------
 
 @pytest.mark.parametrize("said, wanted", [
     ("experiments", AppCommand.EXPERIMENTS),
@@ -28,20 +28,20 @@ from origenerator.voice.commands import ShelfCommand, match_voice_command
     ("recents", AppCommand.RECENTS),
     ("trash", AppCommand.TRASH),
 ])
-def test_a_shelf_answers_to_its_own_bare_name(said, wanted):
+def test_a_collection_answers_to_its_own_bare_name(said, wanted):
     assert match_app_command(said) is wanted
 
 
 @pytest.mark.parametrize("said", ["go to experiments", "open experiments",
-                                  "show experiments", "experiments shelf"])
-def test_a_shelf_also_answers_to_a_sentence_shaped_ask(said):
+                                  "show experiments", "experiments collection"])
+def test_a_collection_also_answers_to_a_sentence_shaped_ask(said):
     assert match_app_command(said) is AppCommand.EXPERIMENTS
 
 
-def test_the_requests_shelf_answers_only_to_the_plural():
+def test_the_requests_collection_answers_only_to_the_plural():
     # "request" is what opens a spoken request, and one word cannot both open a
     # sentence and navigate away from it. The plural is what the row is
-    # labeled, so it is the plural that reaches the shelf.
+    # labeled, so it is the plural that reaches the collection.
     assert match_app_command("requests") is AppCommand.REQUESTS
     assert match_app_command("request") is None
 
@@ -182,15 +182,15 @@ def test_the_show_filter_is_said_either_way_round_not_toggled():
     assert match_app_command("no filter") is AppCommand.FILTER_OFF
 
 
-def test_marking_a_favorite_and_standing_in_the_favorites_shelf_are_different_words():
+def test_marking_a_favorite_and_standing_in_the_favorites_collection_are_different_words():
     assert match_app_command("favorite") is AppCommand.FAVORITE
     assert match_app_command("go to favorites") is AppCommand.FAVORITES
-    assert match_app_command("favorites shelf") is AppCommand.FAVORITES
+    assert match_app_command("favorites collection") is AppCommand.FAVORITES
 
 
-def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_shelf():
+def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_collection():
     assert match_app_command("favorites") is None
-    assert match_voice_command("favorites") == ShelfCommand(FAVORITES_KEY, None)
+    assert match_voice_command("favorites") == CollectionCommand(FAVORITES_KEY, None)
 
 
 # --- what must NOT match: everything else steers a prompt --------------------

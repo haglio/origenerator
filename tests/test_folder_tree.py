@@ -5,7 +5,7 @@ from PyQt6.QtGui import QDragMoveEvent, QDropEvent
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem, QTreeWidgetItem
 from shared_ui.colors import BLUE
 
-from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gui import folder_tree, icons
 from origenerator.gui.folder_tree import (
     COUNT_ROLE,
@@ -185,19 +185,19 @@ def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
 # --- picking several folders, and dragging them onto a collecting row ---------
 
 def _collecting_tree(qtbot):
-    """A tree with a collecting shelf row atop two ordinary folders."""
+    """A tree with a collecting row, the Favorites collection, atop two ordinary folders."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
-    shelf = QTreeWidgetItem(["Favorites"])
-    shelf.setData(0, DROP_KEY_ROLE, "__starred__")
+    collection = QTreeWidgetItem(["Favorites"])
+    collection.setData(0, DROP_KEY_ROLE, "__starred__")
     a = _folder_row("A", "k/a")
     b = _folder_row("B", "k/b")
-    for item in (shelf, a, b):
+    for item in (collection, a, b):
         tree.addTopLevelItem(item)
     tree.resize(320, 200)
     tree.show()
     qtbot.waitExposed(tree)
-    return tree, shelf, a, b
+    return tree, collection, a, b
 
 
 def _drag(keys):
@@ -226,7 +226,7 @@ def _drag_move_at(tree, item, mime):
 
 
 def test_several_folders_can_be_picked_at_once(qtbot):
-    tree, _shelf, a, b = _collecting_tree(qtbot)
+    tree, _collection, a, b = _collecting_tree(qtbot)
 
     a.setSelected(True)
     b.setSelected(True)
@@ -235,10 +235,10 @@ def test_several_folders_can_be_picked_at_once(qtbot):
                                            oriented_key("k/b", LANDSCAPE)]
 
 
-def test_a_shelf_row_holding_no_folder_contributes_no_key(qtbot):
-    tree, shelf, a, _b = _collecting_tree(qtbot)
+def test_a_collection_row_holding_no_folder_contributes_no_key(qtbot):
+    tree, collection, a, _b = _collecting_tree(qtbot)
 
-    shelf.setSelected(True)
+    collection.setSelected(True)
     a.setSelected(True)
 
     assert tree.selected_folder_keys() == [oriented_key("k/a", LANDSCAPE)]
@@ -247,7 +247,7 @@ def test_a_shelf_row_holding_no_folder_contributes_no_key(qtbot):
 def test_navigating_to_a_row_replaces_the_picked_set(qtbot):
     # setCurrentItem reads the live keyboard modifiers unless told otherwise, so
     # a programmatic move made while Ctrl is held would otherwise ADD the row.
-    tree, _shelf, a, b = _collecting_tree(qtbot)
+    tree, _collection, a, b = _collecting_tree(qtbot)
     a.setSelected(True)
     b.setSelected(True)
 
@@ -281,7 +281,7 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
     # The payload's producer and its reader, in one pass. Every other drag test
     # here writes the mime itself, so the format could be anything at all and they
     # would all still pass.
-    tree, shelf, a, b = _collecting_tree(qtbot)
+    tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
@@ -290,7 +290,7 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
 
     tree.startDrag(Qt.DropAction.CopyAction)
     (drag,) = started
-    _drop_at(tree, shelf, drag.mime)
+    _drop_at(tree, collection, drag.mime)
 
     assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE),
                                         oriented_key("k/b", LANDSCAPE)])]
@@ -299,7 +299,7 @@ def test_a_drag_carries_the_picked_folders_in_the_words_the_drop_reads(qtbot, mo
 def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch):
     # The file-manager rule, and what keeps a multi-selection the user has since
     # forgotten about from riding along on the next drag.
-    tree, shelf, a, b = _collecting_tree(qtbot)
+    tree, collection, a, b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
@@ -309,16 +309,16 @@ def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch
 
     tree.startDrag(Qt.DropAction.CopyAction)
     (drag,) = started
-    _drop_at(tree, shelf, drag.mime)
+    _drop_at(tree, collection, drag.mime)
 
     assert dropped == [("__starred__", [oriented_key("k/a", LANDSCAPE)])]
 
 
 def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
-    # A shelf collects folders; it is not one, so there is nothing to pick it up by.
-    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    # A collection gathers folders; it is not one, so there is nothing to pick it up by.
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     started = _started_drags(monkeypatch)
-    tree.setCurrentItem(shelf)
+    tree.setCurrentItem(collection)
 
     tree.startDrag(Qt.DropAction.CopyAction)
 
@@ -326,23 +326,23 @@ def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
 
 
 def test_dropping_folders_on_a_collecting_row_reports_them(qtbot):
-    tree, shelf, a, b = _collecting_tree(qtbot)
+    tree, collection, a, b = _collecting_tree(qtbot)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
 
     mime = _drag(["k/a", "k/b"])
 
-    event = _drop_at(tree, shelf, mime)
+    event = _drop_at(tree, collection, mime)
 
     assert dropped == [("__starred__", ["k/a", "k/b"])]
     assert event.isAccepted()
     # The tree's shape comes from the generations, so nothing was reparented.
     assert tree.topLevelItemCount() == 3
-    assert shelf.childCount() == 0
+    assert collection.childCount() == 0
 
 
 def test_an_ordinary_folder_refuses_a_drop(qtbot):
-    tree, _shelf, a, b = _collecting_tree(qtbot)
+    tree, _collection, a, b = _collecting_tree(qtbot)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
 
@@ -355,27 +355,27 @@ def test_an_ordinary_folder_refuses_a_drop(qtbot):
 
 
 def test_a_collecting_row_refuses_a_drop_of_only_itself(qtbot):
-    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
 
     mime = _drag(["__starred__"])
 
-    assert not _drag_move_at(tree, shelf, mime).isAccepted()
-    _drop_at(tree, shelf, mime)
+    assert not _drag_move_at(tree, collection, mime).isAccepted()
+    _drop_at(tree, collection, mime)
 
     assert dropped == []
 
 
 def test_a_drop_carrying_something_other_than_folders_is_ignored(qtbot):
-    tree, shelf, _a, _b = _collecting_tree(qtbot)
+    tree, collection, _a, _b = _collecting_tree(qtbot)
     dropped = []
     tree.folders_dropped.connect(lambda key, keys: dropped.append((key, keys)))
     text = QMimeData()
     text.setText("k/a")  # a plain-text drag from anywhere else
 
-    assert not _drag_move_at(tree, shelf, text).isAccepted()
-    _drop_at(tree, shelf, text)
+    assert not _drag_move_at(tree, collection, text).isAccepted()
+    _drop_at(tree, collection, text)
 
     assert dropped == []
 
@@ -458,32 +458,32 @@ def _laid_out(tree, item, element) -> QRect:
     return tree.style().subElementRect(element, option, tree)
 
 
-def _tree_with_a_shelf(qtbot):
-    """A shelf row under a workflow folder, under All, the way a side lays them out."""
+def _tree_with_a_collection(qtbot):
+    """A collection row under a workflow folder, under All, the way a side lays them out."""
     tree = FolderTree(_ROLE)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")
     folder = _folder_row("Workflow", "wf")
     folder.setIcon(0, icons.level_badge_icon("workflow"))
-    shelf = QTreeWidgetItem(["Latest"])
-    shelf.setIcon(0, icons.shelf_icon(RECENTS_KEY))
-    folder.addChild(shelf)
+    collection = QTreeWidgetItem(["Latest"])
+    collection.setIcon(0, icons.collection_icon(RECENTS_KEY))
+    folder.addChild(collection)
     top.addChild(folder)
     tree.addTopLevelItem(top)
     tree.expandAll()
     tree.show()
     qtbot.waitExposed(tree)
-    return tree, shelf
+    return tree, collection
 
 
-def test_a_picked_shelf_row_is_blue_from_its_mark_to_its_name(qtbot):
-    tree, shelf = _tree_with_a_shelf(qtbot)
+def test_a_picked_collection_row_is_blue_from_its_mark_to_its_name(qtbot):
+    tree, collection = _tree_with_a_collection(qtbot)
     tree.setStyleSheet(build_stylesheet())
-    tree.setCurrentItem(shelf)
+    tree.setCurrentItem(collection)
 
-    mark = _laid_out(tree, shelf, QStyle.SubElement.SE_ItemViewItemDecoration)
-    name = _laid_out(tree, shelf, QStyle.SubElement.SE_ItemViewItemText)
-    middle = tree.visualRect(tree.indexFromItem(shelf)).center().y()
+    mark = _laid_out(tree, collection, QStyle.SubElement.SE_ItemViewItemDecoration)
+    name = _laid_out(tree, collection, QStyle.SubElement.SE_ItemViewItemText)
+    middle = tree.visualRect(tree.indexFromItem(collection)).center().y()
     image = tree.viewport().grab().toImage()
     between = [image.pixelColor(x, middle).name() for x in range(mark.right() + 1, name.left())]
     assert between and set(between) == {BLUE.name()}
@@ -511,14 +511,14 @@ def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
 
 
 def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
-    tree, shelf, a, _b = _collecting_tree(qtbot)
+    tree, collection, a, _b = _collecting_tree(qtbot)
     other_half = FolderTree(_ROLE)
     qtbot.addWidget(other_half)
     mime = QMimeData()
     mime.setData(FOLDER_KEYS_MIME, a.data(0, TREE_KEY_ROLE).encode("utf-8"))
     dropped = []
     tree.folders_dropped.connect(lambda target, keys: dropped.append(keys))
-    pos = QPointF(tree.visualRect(tree.indexFromItem(shelf)).center())
+    pos = QPointF(tree.visualRect(tree.indexFromItem(collection)).center())
     move = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     drop = QDropEvent(pos, Qt.DropAction.CopyAction, mime,

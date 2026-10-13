@@ -36,11 +36,11 @@ from origenerator.gui.stylesheet import CHOSEN
 _MIN_SECTION_HEIGHT = 90
 
 _TIPS = {
-    side: (f"Everything {side}-shaped — its own shelves, folders and library. "
+    side: (f"Everything {side}-shaped — its own collections, folders and library. "
            f"A slideshow started here plays {side} pictures alone.")
     for side in ORIENTATIONS
 } | {
-    BOTH: ("Everything, both shapes together — its own shelves, folders and "
+    BOTH: ("Everything, both shapes together — its own collections, folders and "
            "library. A slideshow started here mixes portrait and landscape "
            "pictures in the one show."),
 }

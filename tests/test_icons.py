@@ -9,7 +9,7 @@ from shared_ui.colors import AMBER, GREEN, RED, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.icons import glyph_pixmap
 from shared_ui.spacing import BUTTON_MARK
 
-from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gui import icons
 from origenerator.media import MediaType
 
@@ -29,15 +29,15 @@ def _style_tab_close_pixmap():
     return pixmap
 
 
-def test_a_shelfs_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
+def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
     drawn = []
     real = icons.glyph_icon
     monkeypatch.setattr(icons, "glyph_icon",
                         lambda *args, **kwargs: drawn.append(args) or real(*args, **kwargs))
-    icons.shelf_icon.cache_clear()
+    icons.collection_icon.cache_clear()
 
     for _ in range(3):
-        icons.shelf_icon(icons.EXPERIMENTS_KEY)
+        icons.collection_icon(icons.EXPERIMENTS_KEY)
 
     assert drawn == [("flask",)]
 
@@ -81,7 +81,7 @@ def test_each_level_badge_is_tellable_from_its_siblings(qtbot):
 
 
 def test_media_type_badges_render_for_image_and_video(qtbot):
-    # The Recents shelf marks each tile image-or-video with a small corner badge;
+    # The Recents collection marks each tile image-or-video with a small corner badge;
     # both types must draw a non-blank pixmap so neither shows an empty square.
     image_badge = icons.media_type_badge(MediaType.IMAGE)
     video_badge = icons.media_type_badge(MediaType.VIDEO)
@@ -125,10 +125,10 @@ def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
     assert not _ink_at_the_edges(icons.separate_mark(BUTTON_MARK))
 
 
-def test_a_shelf_mark_is_drawn_once():
-    """One redraw of the folder list asked for these 1,280 times -- five shelves
+def test_a_collection_mark_is_drawn_once():
+    """One redraw of the folder list asked for these 1,280 times -- five collections
     for every folder of folders, on every side -- and drew each one afresh."""
-    assert icons.shelf_icon(RECENTS_KEY) is icons.shelf_icon(RECENTS_KEY)
+    assert icons.collection_icon(RECENTS_KEY) is icons.collection_icon(RECENTS_KEY)
 
 
 def test_the_both_kinds_mark_draws_a_picture_beside_a_play():
@@ -231,7 +231,7 @@ def test_a_spent_enhance_corner_keeps_its_look_when_it_is_disabled(qtbot):
 
 
 def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
-    # The tree paints a favorited leaf (and the Favorites shelf) with the filled star,
+    # The tree paints a favorited leaf (and the Favorites collection) with the filled star,
     # so it wears the badge's green: one color for "favorited", tile or folder row.
     filled = icons.star_icon(filled=True).pixmap(QSize(48, 48), QIcon.Mode.Normal)
     assert filled.toImage().pixelColor(24, 25) == GREEN
@@ -341,7 +341,7 @@ def _dominant_color(pixmap) -> int:
 
 
 def test_experiment_icons_render_and_verdicts_differ(qtbot):
-    # The Experiments shelf marker draws in both modes like the other shelves'.
+    # The Experiments collection marker draws in both modes like the other collections'.
     flask = icons.flask_icon()
     size = QSize(24, 24)
     assert not flask.pixmap(size, QIcon.Mode.Normal).isNull()

@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
 
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunTimeSession, Rect
-from origenerator.gallery.shelves import RECENTS_KEY
+from origenerator.gallery.collection import RECENTS_KEY
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
@@ -26,7 +26,7 @@ from origenerator.gui.notice_overlay import NOTICE, WARNING
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.show_panel import show_hud_model
 from origenerator.voice.app_commands import AppCommand
-from origenerator.voice.commands import ShelfCommand, SurfaceCommand
+from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
 from tests.show_hud_support import engine_of, funestra_of, hud_button_names
@@ -565,12 +565,12 @@ def test_a_hud_map_click_jumps_the_show_to_that_item(qtbot, tmp_path, monkeypatc
 
 
 def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypatch):
-    """Recents is the Funestras' Latest: the shelf lists newest first and its
+    """Recents is the Funestras' Latest: the collection lists newest first and its
     slideshow plays that order, where every other set shuffles — and the
     show's HUD status line says which."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_current_shelf_key", lambda: RECENTS_KEY)
+    monkeypatch.setattr(view, "_current_collection_key", lambda: RECENTS_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, "tall", 100, 200, count=3)
     show = view._shows._region_shows["portrait"]
     qtbot.addWidget(show)
@@ -581,8 +581,8 @@ def test_a_recents_slideshow_plays_latest_not_shuffled(qtbot, tmp_path, monkeypa
 
 def test_f_mode_on_a_show_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
     """The Funestras' F-mode, meaning on a show what it means on a Funestra:
-    narrow to the favorites — the favorited items, the same collection the
-    Favorites shelf lists — and widen back on the second press."""
+    narrow to the favorites — the favorited items, the same ones the
+    Favorites collection lists — and widen back on the second press."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._shows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -655,22 +655,22 @@ def test_a_landing_reaches_only_the_show_playing_its_folder(qtbot, tmp_path, mon
     assert landscape.pass_size() == counts[1] + 1   # its folder
 
 
-def test_a_spoken_side_and_shelf_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
-    """"landscape latest": that shelf's landscape items, on the landscape
+def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, monkeypatch):
+    """"landscape latest": that collection's landscape items, on the landscape
     region — a show STARTED by voice, with nothing up beforehand and the
     browser left wherever it was.  Latest plays newest-first, and its HUD says
-    so, exactly as the shelf's own slideshow button opens it."""
+    so, exactly as the collection's own slideshow button opens it."""
     view = _fun_time_view(qtbot)
     still = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(still)
     rows = [{"prompt_id": "new-1", "thumbnail_path": str(still)}]
-    monkeypatch.setattr(view._browser, "rows_for_shelf",
+    monkeypatch.setattr(view._browser, "rows_for_collection",
                         lambda key: rows if key == "__recents__::landscape" else [])
     monkeypatch.setattr(view._shows, "items_of",
                         lambda r: [(str(still), "image", row["prompt_id"], str(still))
                                    for row in r])
 
-    view._voice.on_command(ShelfCommand("__recents__", "landscape"))
+    view._voice.on_command(CollectionCommand("__recents__", "landscape"))
 
     show = view.region_show("landscape")
     assert show is not None and show.isVisible()
@@ -791,7 +791,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch):
     """On a Funestra "favorites" is F-mode — narrow what is playing to them — so
     on a show it is the same switch, the one its HUD already draws.  Opening
-    the shelf as a fresh show would answer a word the HUD has a button for with
+    the collection as a fresh show would answer a word the HUD has a button for with
     something else entirely."""
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -800,11 +800,11 @@ def test_a_spoken_favorites_is_the_shows_own_f_mode(qtbot, tmp_path, monkeypatch
     show = view.region_show("portrait")
     qtbot.addWidget(show)
 
-    view._voice.on_command(ShelfCommand("__starred__", "portrait"))
+    view._voice.on_command(CollectionCommand("__starred__", "portrait"))
     assert show.hud_favorites_filter is True
     assert show.pass_size() == 1     # narrowed to the one favorite
 
-    view._voice.on_command(ShelfCommand("__starred__", "portrait"))
+    view._voice.on_command(CollectionCommand("__starred__", "portrait"))
     assert show.hud_favorites_filter is False          # and the word widens it back
 
 
@@ -944,7 +944,7 @@ def test_the_regions_open_on_the_whole_library_of_their_own_shape(
     its own orientation, the way each Satellite Funestra shuffles the whole
     library of its own.
 
-    It opened on the Latest shelf before this — a recent slice rather than the
+    It opened on the Latest collection before this — a recent slice rather than the
     library — and on a black screen before that.
     """
     view = _fun_time_view(qtbot)
@@ -1102,7 +1102,7 @@ def _moving_pictures(view):
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
     """Swept rather than listed: after the freeze, no movie under this window is
-    running — the grid tiles, the shelves, a tab's history strip, the "Animated
+    running — the grid tiles, the collections, a tab's history strip, the "Animated
     in" strip, the info pane's own animated still.
 
     Written this way because the listed version was wrong three times over: the

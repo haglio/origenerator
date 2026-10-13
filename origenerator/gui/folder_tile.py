@@ -42,7 +42,7 @@ class FolderTile(QFrame):
         self.setObjectName("folderTile")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # The same card the generations beside it in the flow stand in, plus the
-        # breadcrumb line the Favorites shelf's tiles carry.
+        # breadcrumb line the Favorites collection's tiles carry.
         self.setFixedSize(*grid_card.folder_card_size(breadcrumb=bool(context)))
         self.setStyleSheet(grid_card.idle_css("folderTile"))
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

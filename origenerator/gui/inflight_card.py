@@ -1,6 +1,6 @@
-"""A card for one in-flight generation, on the gallery's Recents shelf.
+"""A card for one in-flight generation, on the gallery's Recents collection.
 
-The shelf leads with a card per generation currently queued or running — from a
+The collection leads with a card per generation currently queued or running — from a
 Generate tab or a gallery re-roll — so all in-flight work is visible in one
 place. Each card mirrors the job's latest live preview frame and, when clicked,
 opens the gallery folder the job is running in and selects its live tile.
@@ -111,7 +111,7 @@ class InFlightCard(QWidget):
     def update_item(self, item: InFlightItem):
         """Refresh the card in place from a fresh descriptor — a new live frame, a
         queued→running flip, another step of progress — so a live update never
-        rebuilds the whole shelf."""
+        rebuilds the whole collection."""
         self._item = item
         self._caption.setText(item.caption)
         pixmap = QPixmap()

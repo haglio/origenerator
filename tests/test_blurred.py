@@ -47,7 +47,7 @@ def test_the_backdrop_is_soft_and_dim_rather_than_the_picture_itself(qtbot, tmp_
 
 
 def test_the_same_picture_at_the_same_size_is_only_rendered_once(qtbot, tmp_path):
-    # The shelves rebuild on every poll, and this reads a full-size render off
+    # The collections rebuild on every poll, and this reads a full-size render off
     # disk — so a second ask hands back the very same pixmap.
     path = _picture(tmp_path / "src.png")
 

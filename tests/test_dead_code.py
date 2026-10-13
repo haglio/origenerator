@@ -146,20 +146,20 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # 19247 when auto-generate's bolt lost its ring: the icon's account of the ring
 # the bolt broke out of went with the ring.
 #
-# 19168 when every folder of folders got the five shelves of its own: the notes on
-# when each shelf row is drawn, where the gallery lands, how a shelf is titled,
-# searched and named to the slideshow, and what a Favorites shelf collects are
-# test_favorite_shelf_is_absent_until_a_folder_exists,
+# 19168 when every folder of folders got the five collections of its own: the notes on
+# when each collection row is drawn, where the gallery lands, how a collection is titled,
+# searched and named to the slideshow, and what a Favorites collection gathers are
+# test_favorite_collection_is_absent_until_a_folder_exists,
 # test_both_halves_are_drawn_even_for_a_shape_with_nothing_in_it,
 # test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands,
 # test_a_folders_latest_lists_what_that_folder_made_under_its_path,
-# test_a_folders_shelf_scopes_the_search_and_names_its_path and
+# test_a_folders_collection_scopes_the_search_and_names_its_path and
 # test_a_folders_favorites_are_its_starred_pictures_and_the_favorite_folders_below_it.
 #
-# 19161 when a shelf row's mark moved under its folder's own mark and a folder of
+# 19161 when a collection row's mark moved under its folder's own mark and a folder of
 # your own lost the star it could not use: the list's note on where it draws a
-# shelf's mark, and on which rows wear a star and a delete, are
-# test_a_shelf_rows_mark_stands_under_its_folders_own_mark and
+# collection's mark, and on which rows wear a star and a delete, are
+# test_a_collection_rows_mark_stands_under_its_folders_own_mark and
 # test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark.
 #
 # 19159 when each folder of your own came to live on one side: the note that
@@ -289,10 +289,10 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # test_a_pane_with_no_room_for_a_track_draws_nothing.
 #
 # 18710 when every mark in the table of contents moved into its level's column:
-# the notes on drawing a shelf's mark in the caret column under its folder's own,
+# the notes on drawing a collection's mark in the caret column under its folder's own,
 # on starting its name where the folder's began, and on which rows go without a
 # mark, are test_every_row_of_a_level_wears_its_mark_in_one_column_and_its_name_in_the_next,
-# test_a_picked_shelf_row_is_blue_from_its_mark_to_its_name and
+# test_a_picked_collection_row_is_blue_from_its_mark_to_its_name and
 # test_a_folder_of_images_wears_the_photo_and_a_folder_of_videos_the_play_mark.
 #
 # 18616 when a desktop notice became a video's alone, taken down to what the
@@ -308,7 +308,7 @@ def test_nothing_is_imported_or_assigned_and_left_unread():
 # the notes on what each kind's hover says, and that a workflow this build has
 # no template for adds no line, are test_each_kind_of_work_is_spelled_out_on_hover
 # and test_a_workflow_this_build_has_no_template_for_contributes_no_line, and the
-# Recents shelf's note on asking the queue for its word for an enhance is the
+# Recents collection's note on asking the queue for its word for an enhance is the
 # name JobKind.ENHANCE.
 #
 # 18408 when the Slideshow moved onto a Funestra: the window the show drew for

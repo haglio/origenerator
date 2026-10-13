@@ -82,7 +82,7 @@ class AllGroup:
     It exists so there is somewhere to *stand* that means everything. The tree
     selection scopes the search, so without a root over the workflow folders
     there would be no way to ask a question of the gallery as a whole — the
-    shelves are collections rather than folders, and a workflow folder is already
+    collections are not folders, and a workflow folder is already
     one recipe out of many.
     """
 

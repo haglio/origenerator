@@ -105,7 +105,7 @@ def test_refold_keeps_the_true_original_and_leads_with_the_newest(tmp_path):
 def test_fold_records_where_the_run_fell_in_the_librarys_order(tmp_path):
     # The transient row is deleted here, and with it the only thing that said
     # when this enhancement happened. Its id rides onto the level instead, which
-    # is what lifts the image up the Recents shelf to where the run belongs
+    # is what lifts the image up the Recents collection to where the run belongs
     # rather than leaving it where it was generated.
     db = Database(tmp_path / "t.db")
     _add_source(db)
@@ -183,7 +183,7 @@ def test_a_stamped_run_is_awaited_by_id_not_by_file(tmp_path):
     assert [r["prompt_id"] for r in awaiting] == ["first"]
 
 
-def test_a_stamped_run_moves_its_own_image_up_the_shelf(tmp_path):
+def test_a_stamped_run_moves_its_own_image_up_the_collection(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_source(db, "first", filename="sdxl_t2i_twin.png")
     _add_source(db, "second", filename="sdxl_t2i_twin.png")

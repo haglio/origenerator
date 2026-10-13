@@ -16,7 +16,7 @@ generations deleted, or its key drifted before the reconcile catches up — is
 simply skipped rather than dropped from the saved list, so a folder that comes
 back rejoins the grouping it was in.
 
-Keys are ``__custom__/<id>``: prefixed like the synthetic shelves so no derived
+Keys are ``__custom__/<id>``: prefixed like the synthetic collections so no derived
 folder key can collide with one, and carrying the row id so the saved folder is
 recoverable from the key alone.
 """
@@ -38,7 +38,7 @@ def custom_folder_key(folder_id: int) -> str:
 
 def custom_folder_id(key: str) -> int | None:
     """The saved custom folder a key names, or ``None`` if it names anything else
-    (a derived folder, a shelf, or the unsaved selection)."""
+    (a derived folder, a collection, or the unsaved selection)."""
     if not isinstance(key, str) or not key.startswith(CUSTOM_PREFIX):
         return None
     try:

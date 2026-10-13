@@ -1,7 +1,7 @@
 """A progress bar that carries its own caption, read on top of the fill.
 
 Every surface that reports a run in flight — the lower strip's queue, the
-Recents shelf's cards, a folder's generating tile — says two things at once: how
+Recents collection's cards, a folder's generating tile — says two things at once: how
 far along it is, and how long that has taken. Laid out separately -- a line of
 text above a bar, or a percentage in a caption with no bar at all -- they spend
 two rows on one reading and leave each surface free to invent its own
@@ -146,7 +146,7 @@ class ProgressCaption(QProgressBar):
     def _retime_scroll(self) -> None:
         """Run the scroll while there is more caption than bar, and only then.
 
-        A bar per queue row, per shelf card and per tile is a lot of repainting
+        A bar per queue row, per collection card and per tile is a lot of repainting
         to leave running for lines that already fit — and a line that fits and
         crawls anyway reads as a fault.
         """

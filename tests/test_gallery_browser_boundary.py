@@ -96,15 +96,15 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     private preview widget is gone, and its two remaining drivers ask the panel. 80 → 77: the queue's cards are a join over four
     sources and no rendering at all, so they are built outside the pane now
     (`gui/inflight_items.py`) and it keeps a one-line delegation. 77 -> 74: what
-    the selected shelf collects is asked of its own key, so the five answers
+    the selected collection gathers is asked of its own key, so the five answers
     written out a second time went, and with them the three predicates only that
     second copy asked. The pane keeps 74 while its three selection fields go: which
     tiles are picked, the anchor a Shift-click measures from and the order they
     are shown are a `ThumbnailSelection` now, so what stays are delegations, and the
-    five shelves are one `Shelf` record apiece rather than a branch in each of two
+    five collections are one `PaneCollection` record apiece rather than a branch in each of two
     chains. 74 -> 75: the card for a run still in flight was built by hand on
     Latest, in a folder and on Requests, and is one method now, so Requests can
-    draw its cards between the time headings that split the shelf into batches.
+    draw its cards between the time headings that split the collection into batches.
     371 -> 341:
     the fullscreen shows came out as `ShowDirector` -- thirty-two methods out,
     sixteen of what stays renamed to the host contract they now answer, and two
@@ -147,7 +147,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     hands that window back when it ends, and `become_standalone` asks the
     arrangement to unfold them. 266 -> 267: a folder's star stopped redrawing the
     whole gallery and is told in place, as an item's always was, so re-counting
-    the Favorites shelf and drawing it again where it is open is one method both
+    the Favorites collection and drawing it again where it is open is one method both
     of them ask. And the pane 75 -> 77: it marks a folder's square in place, and
     reads the bookmarked folders off each side's folders when it needs them
     rather than keeping a list a star would leave stale. 267 -> 268: a Fun Time
@@ -157,10 +157,10 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     a discarded seed's relaunch comes before the folder's redraw, so the tab
     following the loop keeps following it, and the drop and the redraw that
     `_drop_reroll` wrapped for its one caller are that caller's own lines. And the
-    pane 77 -> 83: every folder of folders has its own five shelves, so a shelf's
+    pane 77 -> 83: every folder of folders has its own five collections, so a collection's
     rows are asked for a folder as well as a side -- a side's placement of its
-    rows, a folder's share of a list, the open shelf's rows, a folder's own cards
-    in flight, its starred pictures, the counts every folder's shelves wear and
+    rows, a folder's share of a list, the open collection's rows, a folder's own cards
+    in flight, its starred pictures, the counts every folder's collections wear and
     the square each of them shows among the folder's own are seven methods, and
     the lister of Latest's rows they replace went. 267 -> 266: a combination
     draws fresh seeds, so it never repeats a run and the question the gallery
@@ -185,7 +185,7 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     list gained its Portrait / Landscape / Both radio and the Images / Videos /
     Both choice moved to the pane that lists the items, so the view answers the
     radio, offers or hides the kinds, keeps each side's list against the library
-    it was built from, and re-counts the shelves on their own. And the pane
+    it was built from, and re-counts the collections on their own. And the pane
     87 -> 88: a pane drawn over another takes back the tiles it would build again
     the same, so the three places that built a tile hand their row to the one
     method that takes it back or builds it. 276 -> 274: a double-click on a

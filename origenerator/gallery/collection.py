@@ -1,11 +1,11 @@
-"""The five shelves every folder of folders leads with, by key and by label.
+"""The five collections every folder of folders leads with, by key and by label.
 
 Names rather than widgets: the tree draws a row for each of these under every
 such folder, and the spoken vocabulary matches an utterance against the same
-five, so neither owns them. They live here, beside the folder keys, because a shelf key is an
-identity a stored expansion and a navigation history are written under — it
-outlives every widget that ever draws it, and a changed value would orphan
-both.
+five, so neither owns them. They live here, beside the folder keys, because a
+collection key is an identity a stored expansion and a navigation history are
+written under — it outlives every widget that ever draws it, and a changed
+value would orphan both.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ RECENTS_KEY = "__recents__"   # synthetic tree node listing recently generated i
 RECENTS_LABEL = "Latest"
 # "Latest" rather than "Recents" because that is the word the Funestras use
 # for the same ordering — a Fun Time session's browse says Latest, and this
-# shelf is that same newest-first listing of what the app has made.
+# collection is that same newest-first listing of what the app has made.
 FAVORITES_KEY = "__starred__"   # synthetic tree node collecting every favorited folder
 # Its row label: the same concept as a Fun Time Funestra's favorites (the star
 # there IS the favorite mark), so it wears that name.  The key stays
@@ -30,22 +30,22 @@ REQUESTS_LABEL = "Requests"
 TRASH_KEY = "__trash__"   # synthetic node: deleted items still held for recovery
 TRASH_LABEL = "Trash"
 
-SHELVES = (RECENTS_KEY, FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)
-SHELF_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
-                EXPERIMENTS_KEY: EXPERIMENTS_LABEL, REQUESTS_KEY: REQUESTS_LABEL,
-                TRASH_KEY: TRASH_LABEL}
+COLLECTIONS = (RECENTS_KEY, FAVORITES_KEY, EXPERIMENTS_KEY, REQUESTS_KEY, TRASH_KEY)
+COLLECTION_LABELS = {RECENTS_KEY: RECENTS_LABEL, FAVORITES_KEY: FAVORITES_LABEL,
+                     EXPERIMENTS_KEY: EXPERIMENTS_LABEL, REQUESTS_KEY: REQUESTS_LABEL,
+                     TRASH_KEY: TRASH_LABEL}
 _IN_FOLDER = "@"
 
 
-class FolderShelf(NamedTuple):
-    shelf: str
+class FolderCollection(NamedTuple):
+    which: str
     folder: str
 
     @property
     def key(self) -> str:
-        return self.shelf if self.folder == ALL_KEY else f"{self.shelf}{_IN_FOLDER}{self.folder}"
+        return self.which if self.folder == ALL_KEY else f"{self.which}{_IN_FOLDER}{self.folder}"
 
 
-def folder_shelf(key: str | None) -> FolderShelf | None:
-    shelf, _, folder = (key or "").partition(_IN_FOLDER)
-    return FolderShelf(shelf, folder or ALL_KEY) if shelf in SHELVES else None
+def folder_collection(key: str | None) -> FolderCollection | None:
+    collection, _, folder = (key or "").partition(_IN_FOLDER)
+    return FolderCollection(collection, folder or ALL_KEY) if collection in COLLECTIONS else None

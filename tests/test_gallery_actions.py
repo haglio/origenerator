@@ -249,7 +249,7 @@ def test_eviction_past_the_limit_leaves_the_oldest_in_the_bin(tmp_path):
     assert db.get_generation("p1") is None
     assert not actions.can_undo()
     # ...but falling off the stack no longer ends anything: the evicted delete is
-    # held in the bin, files and all, and is restorable from the Trash shelf.
+    # held in the bin, files and all, and is restorable from the Trash collection.
     assert [r["prompt_id"] for r in db.list_deletions()] == ["p1"]
     actions.restore_deleted(["p1"])
     assert db.get_generation("p1") == first
@@ -273,7 +273,7 @@ def test_a_delete_is_held_in_the_bin_with_the_row_it_dropped(tmp_path):
 
 
 def test_undoing_a_delete_takes_it_back_out_of_the_bin(tmp_path):
-    # Otherwise the Trash shelf would go on offering to restore an item that is
+    # Otherwise the Trash collection would go on offering to restore an item that is
     # already back in the gallery.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "p1", "a.png")
@@ -416,8 +416,8 @@ def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
 
 
 def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
-    # The Experiments shelf's reject trashes files like any delete, so it needs
-    # the same release — the shelf is where an item is most likely on screen.
+    # The Experiments collection's reject trashes files like any delete, so it needs
+    # the same release — the collection is where an item is most likely on screen.
     seen = []
     actions, db, output_dir = _actions(tmp_path, release_files=seen.extend)
     row = _completed_row(db, output_dir, "e1", "exp.mp4", subfolder="video")
@@ -429,7 +429,7 @@ def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
 
 def test_rejecting_an_experiment_files_nothing_in_the_bin(tmp_path):
     # The bin holds deleted rows so they can be put back; a rejection keeps its
-    # row (verdict and all), so there is no orphan for the Trash shelf to offer.
+    # row (verdict and all), so there is no orphan for the Trash collection to offer.
     actions, db, output_dir = _actions(tmp_path)
     row = _completed_row(db, output_dir, "e1", "exp.png")
 

@@ -61,7 +61,7 @@ def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list
 
     Those two are kept for the same reason: the row about to be deleted is what
     said where this enhancement falls in the library's order, and the image it
-    upgraded sorts on the shelf by the newest one it has received
+    upgraded sorts in the collection by the newest one it has received
     (:func:`enhancement_recency`)."""
     settings = level_settings(params)
     return [
@@ -187,7 +187,7 @@ def disown_foreign_runs(db) -> int:
     made, and say how many rows that repaired.
 
     A level records the id of the transient row its enhancement ran under
-    (:func:`_history_entries`), and the Recents shelf seats an enhanced image by
+    (:func:`_history_entries`), and the Recents collection seats an enhanced image by
     that number wherever the level does not also say when the run finished — the
     image belongs where its newest enhancement falls in the library's order, not
     where its own generation does. So an id from somewhere else seats the image

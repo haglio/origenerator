@@ -1,6 +1,6 @@
 """The full-screen slideshow -- the one way this app fills the screen with a picture.
 
-It plays a set of generations: a folder's, a shelf's, or the one folder a
+It plays a set of generations: a folder's, a collection's, or the one folder a
 double-clicked picture came from, which is why there is no second fullscreen
 viewer with its own keys.  The set is not frozen at the opening: a run joins it
 on its first frame, which is what a show of a filling folder is watched for.
@@ -1206,7 +1206,7 @@ class SlideshowView(QWidget):
     @property
     def hud_is_favorite(self) -> bool:
         """Whether the item on screen is a favorite (favorited) — the Funestras'
-        star readout, over the same collection the Favorites shelf lists."""
+        star readout, over the same items the Favorites collection lists."""
         return self._set.is_favorite
 
     @property
@@ -1543,7 +1543,7 @@ class SlideshowView(QWidget):
 
     def _open_current(self):
         """Enter: leave the slideshow and hand its item to the gallery, which
-        opens the folder it lives in — the way out of a shelf's slideshow, where
+        opens the folder it lives in — the way out of a collection's slideshow, where
         what you're watching came from folders all over the tree."""
         self._land_on = self._current_prompt_id()
         self.close()  # the handover is closeEvent's, so it happens exactly once

@@ -1,10 +1,10 @@
 """A browser-style back/forward history of the views the middle pane has shown.
 
 Qt-free so the traversal logic stays unit-testable without a widget toolkit. The
-gallery records every view the user lands on — a folder, a shelf (Recents,
+gallery records every view the user lands on — a folder, a collection (Recents,
 Favorites, ...), a search's results, and whichever item is picked in it — and
 Back/Forward return to exactly that view, whether it was a generation reached by
-an i2v's input-image link or the shelf they drilled from.
+an i2v's input-image link or the collection they drilled from.
 """
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ class Location:
     """One view of the middle pane, in the three parts it takes to rebuild it.
 
     A bare key would say only *where* the pane was pointed, which is not enough to
-    return to what was on screen: the same shelf shows a different thing depending
+    return to what was on screen: the same collection shows a different thing depending
     on which of its items is picked, and the same folder shows its search results
     instead while a query is running. All three parts together are what Back has
     to restore for it to land where the user actually was.
     """
 
-    view: str            # the tree row the pane is drawn from: a folder or a shelf
+    view: str            # the tree row the pane is drawn from: a folder or a collection
     query: str = ""      # the search running over that row, if one is
     item: str | None = None  # the generation picked in it, if any
 

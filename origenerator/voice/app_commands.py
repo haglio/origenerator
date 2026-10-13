@@ -1,9 +1,9 @@
-"""What a bare spoken word asks of the app — a shelf, a button, the picture.
+"""What a bare spoken word asks of the app — a collection, a button, the picture.
 
 Fun Time's Funestras answer single words: "weird" condemns the clip, "lock" holds
 it, "next" walks on. The same words work here, and beside them the rest of what
-the toolbar does and the names of the shelves that lead the tree — so
-"experiments" stands you in the Experiments shelf exactly as clicking its row
+the toolbar does and the names of the collections that lead the tree — so
+"experiments" stands you in the Experiments collection exactly as clicking its row
 does, and "undo" takes back the last delete without reaching for the mouse.
 
 Every phrase is matched against the WHOLE utterance, and that is the only thing
@@ -26,7 +26,7 @@ slide over a show and walks the history in the gallery, because in both places
 it means the one before. The app-wide switches (the mic, the audio bed, the
 OSR2) and the motion's own bars belong to no surface and answer from either.
 
-One word is deliberately missing. The Requests shelf answers to the plural
+One word is deliberately missing. The Requests collection answers to the plural
 "requests" and never to the singular, because "request" is what opens a spoken
 request (:mod:`origenerator.voice.dictation`) and a word cannot both open a
 sentence and navigate away from it. :class:`~origenerator.voice.steering.
@@ -44,7 +44,7 @@ from origenerator.voice.text import words
 class AppCommand(Enum):
     """One thing a bare spoken word asks the app for."""
 
-    # The shelves that lead the tree, each reached by its own name.
+    # The collections that lead the tree, each reached by its own name.
     RECENTS = "recents"
     FAVORITES = "favorites"
     EXPERIMENTS = "experiments"
@@ -154,10 +154,10 @@ def _say(command: AppCommand | BarSetting, *phrases: str) -> None:
         _PHRASES[phrase] = command
 
 
-# The shelves, by name. Each answers bare — which is the whole point, since the
-# name is what the row says — and to a verb in front of it or the word "shelf"
+# The collections, by name. Each answers bare — which is the whole point, since the
+# name is what the row says — and to a verb in front of it or the word "collection"
 # after it, for a speaker who would rather say a sentence.
-_SHELF_NAMES: dict[AppCommand, tuple[str, ...]] = {
+_COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.RECENTS: ("recents", "recent"),
     AppCommand.FAVORITES: ("favorites",),
     AppCommand.EXPERIMENTS: ("experiments", "experiment"),
@@ -166,14 +166,14 @@ _SHELF_NAMES: dict[AppCommand, tuple[str, ...]] = {
     AppCommand.REQUESTS: ("requests",),
     AppCommand.TRASH: ("trash",),
 }
-_SHELF_VERBS = ("go to", "open", "show")
-# Said on its own, this one already plays the shelf, or narrows a show to it
-# (origenerator.voice.commands.SHELF_KEYS), so standing in it takes the sentence.
+_COLLECTION_VERBS = ("go to", "open", "show")
+# Said on its own, this one already plays the collection, or narrows a show to it
+# (origenerator.voice.commands.COLLECTION_KEYS), so standing in it takes the sentence.
 _NEVER_SAID_BARE = frozenset({"favorites"})
-for _shelf, _names in _SHELF_NAMES.items():
+for _collection, _names in _COLLECTION_NAMES.items():
     for _name in _names:
-        _say(_shelf, *(() if _name in _NEVER_SAID_BARE else (_name,)), f"{_name} shelf",
-             *(f"{_verb} {_name}" for _verb in _SHELF_VERBS))
+        _say(_collection, *(() if _name in _NEVER_SAID_BARE else (_name,)), f"{_name} collection",
+             *(f"{_verb} {_name}" for _verb in _COLLECTION_VERBS))
 
 # The transport. Fun Time's "next"/"previous"/"skip"/"back" all land here,
 # because in both rooms they mean the one after and the one before.

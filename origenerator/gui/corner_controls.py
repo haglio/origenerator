@@ -5,7 +5,7 @@ same thing, so they offer the same three acts on it, in the same three corners:
 bookmark it (top right), bin it (lower left), enhance it (lower right). Learn
 them once and they are in the same places wherever a generation is on screen.
 Top-LEFT is not one of them: the media-type badge has always lived there, and a
-control that landed on it would be a control that moves depending on which shelf
+control that landed on it would be a control that moves depending on which collection
 you happened to open.
 
 Each mark is the state and the button at once. A filled green star IS the
@@ -32,7 +32,7 @@ TRASH = "trash"
 ENHANCE = "enhance"
 
 # The geometry the browser pane's other hover controls (a tile's per-seed
-# re-rolls, a review shelf's keep/reject) already use, shared so the star can sit
+# re-rolls, a review collection's keep/reject) already use, shared so the star can sit
 # in a row with them along the top of a tile and read as one bank rather than as
 # a stray chip beside two matching ones.
 CORNER_SIZE = 28
@@ -176,7 +176,7 @@ class CornerControls(QObject):
         """Put each control in its own corner of ``picture``, in host coordinates.
 
         Three of the four: top-left belongs to the media-type badge, and to the
-        review controls a shelf lays along that edge.
+        review controls a collection lays along that edge.
         """
         inner = picture.adjusted(CORNER_INSET, CORNER_INSET,
                                  -CORNER_INSET, -CORNER_INSET)

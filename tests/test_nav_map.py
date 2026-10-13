@@ -278,8 +278,8 @@ def test_the_lora_that_animated_a_video_comes_before_a_likelier_picture():
 
 
 def test_a_run_of_generations_from_one_folder_is_stood_for_by_the_newest_of_them():
-    """A shelf lists newest first, and a sitting usually makes several seeds of
-    one configuration in a row: the shelf's show plays the newest of each such
+    """A collection lists newest first, and a sitting usually makes several seeds of
+    one configuration in a row: the collection's show plays the newest of each such
     run, and a folder come back to later is a run of its own."""
     newest_first = [_image("g5", "a red fox", seed=5), _image("g4", "a red fox", seed=4),
                     _image("g3", "a blue car", seed=3),

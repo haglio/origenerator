@@ -37,7 +37,7 @@ as it's worth giving up. The extra height all goes to the line: the thumbnail
 never grows past the strip's opening height, so a queue dragged tall is a queue
 you can read rather than one enormous frame.
 
-It's fed the in-flight view-models the Recents shelf uses
+It's fed the in-flight view-models the Recents collection uses
 (:class:`origenerator.gui.inflight.InFlightItem`), leading job first, refreshed on
 every poll so the frame and progress stay live; a refresh updates rows in place,
 so a drag is never yanked out from under the user. Reordering is asked for, not

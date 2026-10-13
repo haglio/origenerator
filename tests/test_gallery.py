@@ -1544,7 +1544,7 @@ def test_recent_generations_lists_a_run_by_when_it_finished_not_when_it_was_aske
 
 
 def test_recent_generations_lists_imported_files_where_they_arrived():
-    # A file ComfyUI wrote that no instance of this app queued joins the shelf at
+    # A file ComfyUI wrote that no instance of this app queued joins the collection at
     # the launch that found it, which is when it is looked for there; leaving
     # imports off Latest hid a clip queued straight on ComfyUI in its workflow's
     # folder alone.
@@ -1563,8 +1563,8 @@ def test_recent_generations_lists_a_file_found_on_disk_by_when_it_was_found_howe
     assert [r["prompt_id"] for r in recent_generations([found, made])] == ["imp", "gen"]
 
 
-def test_recent_generations_leaves_experiments_to_their_own_shelf():
-    # An experiment is reviewed on the Experiments shelf; listed here as well it
+def test_recent_generations_leaves_experiments_to_their_own_collection():
+    # An experiment is reviewed in the Experiments collection; listed here as well it
     # would read as something asked for. Everything else with a result is here,
     # including a cycle cut for the Genau lane, which has no run under it.
     generated = _img("gen", "a cat", 50, 1)
@@ -1577,14 +1577,14 @@ def test_recent_generations_leaves_experiments_to_their_own_shelf():
 
 def test_recent_generations_excludes_rows_that_produced_no_output():
     # Mirrors the tree: a failed or in-flight row wrote no file, so it has nothing
-    # to show and stays off the shelf.
+    # to show and stays out of the collection.
     done = _img("done", "a cat", 50, 1)
     pending = _row(prompt_id="wip", output_files=None)
     assert [r["prompt_id"] for r in recent_generations([done, pending])] == ["done"]
 
 
 def test_recent_generations_is_uncapped():
-    # The shelf keeps going as far back as the user has generated — nothing is
+    # The collection keeps going as far back as the user has generated — nothing is
     # trimmed off the end here; the pane draws it a page at a time as it scrolls.
     rows = [_img(f"i{n}", "a cat", 50, n) for n in range(200)]
     assert len(recent_generations(rows)) == 200
@@ -1612,7 +1612,7 @@ def test_favorite_generations_collects_favorite_items_newest_first():
 
 def test_favorite_generations_includes_imported_files():
     # A bookmark is a bookmark: an imported image the user favorited belongs on the
-    # Favorites shelf.
+    # Favorites collection.
     imported = _row(prompt_id="imp", source="imported", starred=1,
                     output_files=json.dumps([{"filename": "imp.png"}]))
     assert [r["prompt_id"] for r in favorite_generations([imported])] == ["imp"]
@@ -1638,9 +1638,9 @@ def test_rows_of_media_types_with_nothing_checked_is_empty():
     assert rows_of_media_types(rows, set()) == []
 
 
-def _shelf(*ids_and_seeds):
+def _collection(*ids_and_seeds):
     """Finished images newest-first, ids ascending with age — the shape the DB
-    hands the shelf (``ORDER BY id DESC``)."""
+    hands the collection (``ORDER BY id DESC``)."""
     return [_img(pid, "a cat", 50, n, id=n) for pid, n in ids_and_seeds]
 
 
@@ -1653,12 +1653,12 @@ def _enhance_run(prompt_id, source_file, row_id, *, done=None):
 
 
 def test_recent_generations_lifts_an_image_an_enhance_is_running_on():
-    # An enhancement gets no card of its own on the shelf — it is a version of an
+    # An enhancement gets no card of its own in the collection — it is a version of an
     # image, not an item beside one — so the image itself has to move, or the run
     # is listed nowhere and the picture being worked on stays buried under
     # everything made since.
     running = _enhance_run("e1", "sdxl_t2i_i1.png", 4)
-    rows = [running] + _shelf(("i3", 3), ("i2", 2), ("i1", 1))
+    rows = [running] + _collection(("i3", 3), ("i2", 2), ("i1", 1))
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
 
 
@@ -1666,10 +1666,10 @@ def test_recent_generations_keeps_a_folded_enhancement_where_its_run_landed():
     # The transient row is deleted by the fold, so the level it left is
     # what remembers where the run fell in the library's order: the image stays
     # lifted after it completes rather than dropping back to where it was made.
-    i1, = _shelf(("i1", 1))
+    i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 4}])
-    rows = _shelf(("i3", 3), ("i2", 2)) + [i1]
+    rows = _collection(("i3", 3), ("i2", 2)) + [i1]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
 
 
@@ -1679,7 +1679,7 @@ def _finished(row, asked, finished):
 
 def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_finished():
     enhanced, slow, later = (_finished(row, asked, finished) for row, asked, finished in zip(
-        _shelf(("enhanced", 1), ("slow", 2), ("later", 4)),
+        _collection(("enhanced", 1), ("slow", 2), ("later", 4)),
         ("19:00:00", "19:05:00", "19:50:00"), ("19:00:09", "19:30:00", "19:50:09")))
     enhanced["enhance_history"] = json.dumps([{
         "filename": "image_enhance_e1.png", "params": {}, "run_id": 3,
@@ -1690,14 +1690,14 @@ def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_fin
 
 def test_recent_generations_leads_with_an_image_being_enhanced_over_a_run_that_finished_before_it_was_asked():
     old, slow = (_finished(row, asked, finished) for row, asked, finished in zip(
-        _shelf(("old", 1), ("slow", 2)), ("08:00:00", "19:05:00"), ("08:00:09", "19:30:00")))
+        _collection(("old", 1), ("slow", 2)), ("08:00:00", "19:05:00"), ("08:00:09", "19:30:00")))
     running = {**_enhance_run("e1", "sdxl_t2i_old.png", 3), "created_at": "2026-09-12 19:45:00"}
     assert [r["prompt_id"] for r in recent_generations([running, slow, old])] == ["old", "slow"]
 
 
 def test_recent_generations_seats_an_enhancement_folded_before_finishes_were_recorded_under_the_next_thing_asked_for():
     old, before, after = (_finished(row, asked, finished) for row, asked, finished in zip(
-        _shelf(("old", 1), ("before", 2), ("after", 4)),
+        _collection(("old", 1), ("before", 2), ("after", 4)),
         ("08:00:00", "19:05:00", "19:50:00"), ("08:00:09", "19:05:09", "19:50:09")))
     old["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
@@ -1708,10 +1708,10 @@ def test_recent_generations_seats_an_enhancement_folded_before_finishes_were_rec
 def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():
     # The lift is a place in the order, not a pin to the top: something made
     # since the enhancement is still the newer thing.
-    i1, = _shelf(("i1", 1))
+    i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}, "run_id": 3}])
-    rows = _shelf(("i4", 4)) + [i1] + _shelf(("i2", 2))
+    rows = _collection(("i4", 4)) + [i1] + _collection(("i2", 2))
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i4", "i1", "i2"]
 
 
@@ -1719,22 +1719,22 @@ def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place
     # A level folded before the run's id was recorded has nothing to sort by, and
     # keeps the image where it was made — an enhancement older than the record of
     # it is an enhancement from long ago.
-    i1, = _shelf(("i1", 1))
+    i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}}])
-    rows = _shelf(("i3", 3), ("i2", 2)) + [i1]
+    rows = _collection(("i3", 3), ("i2", 2)) + [i1]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
 
 
 def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():
     # A re-enhance runs on the pre-enhance file, still listed under the enhanced
     # one: the row it belongs to is the same image, so it is that image that moves.
-    i1, = _shelf(("i1", 1))
+    i1, = _collection(("i1", 1))
     i1["output_files"] = json.dumps([{"filename": "image_enhance_e1.png"},
                                      {"filename": "sdxl_t2i_i1.png"}])
     i1["original_files"] = json.dumps([{"filename": "sdxl_t2i_i1.png"}])
     running = _enhance_run("e2", "sdxl_t2i_i1.png", 4)
-    rows = [running] + _shelf(("i3", 3), ("i2", 2)) + [i1]
+    rows = [running] + _collection(("i3", 3), ("i2", 2)) + [i1]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i1", "i3", "i2"]
 
 
@@ -1830,7 +1830,7 @@ def test_resolve_preview_falls_back_to_thumbnail_when_output_missing(tmp_path):
 
 def test_resolve_preview_follows_a_file_the_bin_has_re_pointed(tmp_path):
     # A deleted generation's files sit in the trash, and its row says so — which
-    # is what lets the Trash shelf play a deleted video rather than offer a still.
+    # is what lets the Trash collection play a deleted video rather than offer a still.
     out = tmp_path / "output"
     out.mkdir()
     trashed = tmp_path / "trash" / "abc" / "0_wan22_i2v_1_.mp4"

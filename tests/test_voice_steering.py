@@ -317,8 +317,8 @@ def _bare_steering(says):
 
 
 def test_a_bare_command_word_beats_an_opening_request(qtbot):
-    # "requests" is a shelf and "request" opens a dictation; whole and alone,
-    # the word is the command — otherwise the shelf would be unreachable.
+    # "requests" is a collection and "request" opens a dictation; whole and alone,
+    # the word is the command — otherwise the collection would be unreachable.
     steering, listener = _bare_steering("requests")
     ran, spoken = [], []
     steering.request.connect(spoken.append)

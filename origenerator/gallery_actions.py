@@ -17,7 +17,7 @@ history has forked, the branch you left is gone.
 Falling off that stack no longer ends anything, though: a delete also files the
 row and its trashed files in the recovery bin, which holds them for weeks (see
 :mod:`origenerator.recovery`). So the stack is the quick "that was a mistake",
-and the bin — restored or ended from the gallery's Trash shelf, through
+and the bin — restored or ended from the gallery's Trash collection, through
 :meth:`GalleryActions.restore_deleted` and :meth:`GalleryActions.purge_deleted` —
 is the slow one.
 """
@@ -88,7 +88,7 @@ class GalleryActions:
 
         Each row's files go into a batch of their own, filed in the recovery bin
         beside the row it dropped — so an item stays restorable from the Trash
-        shelf long after this session's undo stack has forgotten the delete, and
+        collection long after this session's undo stack has forgotten the delete, and
         one item of a deleted folder can be brought back without the rest.
         """
         if not rows:
@@ -289,14 +289,14 @@ class GalleryActions:
         """Reject a background experiment: trash its files and clear their
         references, keeping the row itself — its params and down-verdict are what
         the experiment policy learns from. One undoable step: undo restores the
-        files and returns the item to the review shelf (verdict cleared).
+        files and returns the item to the review collection (verdict cleared).
 
         The verdict is recorded here, with the file cleanup, so the whole
         rejection is one reversible unit rather than half in the view.
 
         Nothing is filed in the recovery bin: the bin holds *deleted rows*, and
         this row is kept — it stays in the gallery's own hands, verdict and all,
-        so there is no orphan for a Trash shelf to offer back.
+        so there is no orphan for a Trash collection to offer back.
 
         An enhancement being made of the rejected item is stopped like any
         delete's would be (:meth:`_stop_enhancements`): the row survives, but
@@ -320,7 +320,7 @@ class GalleryActions:
                 output_files=row.get("output_files"),
                 thumbnail_path=row.get("thumbnail_path"),
             )
-            return None  # back on the review shelf, not in any folder
+            return None  # back in the review collection, not in any folder
 
         self._history.push(UndoEntry("Reject experiment", undo, batch.purge,
                               redo=lambda: self.reject_experiment(row)))

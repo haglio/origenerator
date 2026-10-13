@@ -155,7 +155,7 @@ class ToolbarBank(QWidget):
         self.undo = _tool_button(icons.undo_icon(), "Undo", acts.undo)
         self.redo = _tool_button(icons.redo_icon(), "Redo", acts.redo)
         # Shown wherever there's a collection of media to play — a folder, or the
-        # Recents/Favorites shelf — with its tooltip naming that subject.
+        # Recents/Favorites collection — with its tooltip naming that subject.
         self.slideshow = _tool_button(
             icons.slideshow_icon(), "Play this folder as a slideshow",
             acts.start_show)
@@ -203,7 +203,7 @@ class ToolbarBank(QWidget):
             # going again without the keyboard. On is listening, off is not.
             self.mic = _tool_button(
                 icons.mic_icon(),
-                "Listen: bare words for the shelves and this bank (“experiments”, "
+                "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a show (“next”, "
                 "“weird”, “lock”), orders about the picture (“enhance”, “fix "
                 "hands”, “genau it”), and prompt steering while a folder is "

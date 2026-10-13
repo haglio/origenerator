@@ -22,7 +22,7 @@ say where the work has been.
 
 Folders can be picked several at a time (Shift for a run, Ctrl for a scattered
 set) and dragged onto a *collecting* row — one carrying its key under
-``DROP_KEY_ROLE``: the Favorites shelf, or a custom folder. A drop emits
+``DROP_KEY_ROLE``: the Favorites collection, or a custom folder. A drop emits
 ``folders_dropped`` and is never applied to the tree itself, so nothing is ever
 reparented; what a collecting row does with the dropped folders is the view's
 business, not this widget's.
@@ -202,7 +202,7 @@ class FolderTree(QTreeWidget):
     # --- dragging folders onto a collecting row ----------------------------
 
     def selected_folder_keys(self) -> list[str]:
-        """The tree keys of the picked folder rows, top-down. Shelf rows that hold
+        """The tree keys of the picked folder rows, top-down. Collection rows that hold
         no folder of their own (Recents, Experiments) contribute nothing.
 
         Tree keys rather than folder keys so a set picked across both sides
@@ -236,7 +236,7 @@ class FolderTree(QTreeWidget):
 
     def _drop_target_key(self, pos) -> str | None:
         """The key of the collecting row under ``pos``, or ``None`` where a drop
-        would land on an ordinary folder, a shelf that collects nothing, or the
+        would land on an ordinary folder, a collection that collects nothing, or the
         empty space below the tree."""
         index = self.indexAt(pos)
         key = index.data(DROP_KEY_ROLE) if index.isValid() else None

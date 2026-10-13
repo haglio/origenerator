@@ -71,8 +71,8 @@ def show_hud_model(side: str, host, *, hosted: bool = True,
                                locked=locked, order=order_label,
                                f_mode=favorites_filter, enhanced=enhanced,
                                filter_label=act_filter),
-        # The Funestras' favorite star, over the same collection the Favorites
-        # shelf lists: it lights when the item on screen is a favorite.
+        # The Funestras' favorite star, over the same items the Favorites
+        # collection lists: it lights when the item on screen is a favorite.
         is_favorite=host.hud_is_favorite,
         item_note=host.hud_item_note,
         # The buttons this show answers, in the bands the panel draws them in —

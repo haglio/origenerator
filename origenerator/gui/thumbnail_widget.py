@@ -26,7 +26,7 @@ from origenerator.gui.stage_scrim import StageScrim
 _IMAGE_SIZE = grid_card.picture_size()  # the picture area, inside the family card
 _BORDER_PX = 2
 # Hover-revealed corner action buttons (an i2v tile's per-seed re-rolls, a review
-# shelf's keep/reject): the same translucent chip the corner controls sit on, blue
+# collection's keep/reject): the same translucent chip the corner controls sit on, blue
 # on hover, laid along the tile's top-left edge — the one edge the three corner
 # controls leave alone.
 _CORNER_BUTTON_CSS = (
@@ -135,7 +135,7 @@ class ThumbnailWidget(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        # In a mixed listing (the Recents shelf) a corner badge names the kind;
+        # In a mixed listing (the Recents collection) a corner badge names the kind;
         # inside a single-type folder the caller leaves it off as redundant. Which
         # corner it takes is MediaBadge's own business, and it says so.
         if media_type:
@@ -143,7 +143,7 @@ class ThumbnailWidget(QWidget):
 
         # Star, trash and plus in the tile's other three corners: what the item is
         # (bookmarked, enhanced) and what can be done to it, as one mark each, all
-        # of them up whenever there is an item under them. A Trash-shelf tile
+        # of them up whenever there is an item under them. A Trash-collection tile
         # passes controls=False — its item is already deleted, so there is nothing
         # here to bookmark, bin or enhance, and its own restore/purge controls are
         # the two acts left.
@@ -356,7 +356,7 @@ class ThumbnailWidget(QWidget):
 
     def _hover_buttons(self) -> list:
         """Every child a cursor can be over while it is still "on the tile" — the
-        shelf's own actions and the three corner controls alike."""
+        collection's own actions and the three corner controls alike."""
         controls = [] if self._controls is None else self._controls.buttons()
         return self._corner_buttons + controls
 

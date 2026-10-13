@@ -9,7 +9,7 @@ app does not want to be in at all.
 
 So the table of contents exists twice over, once per shape: the TOC pane is two
 trees, Portrait and Landscape, each under a standing label and each carrying the
-ENTIRE contents — every shelf, the All row, the media → workflow → model → LoRA
+ENTIRE contents — every collection, the All row, the media → workflow → model → LoRA
 → settings hierarchy, and the folders the user composed — built from that
 shape's rows alone (:mod:`origenerator.gui.split_folder_tree` lays them out).
 Whatever you are standing on is one shape by construction, so its slideshow has

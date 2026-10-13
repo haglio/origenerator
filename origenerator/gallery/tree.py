@@ -281,7 +281,7 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
 def favorite_folders(tree: list[WorkflowGroup]) -> list:
     """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
-    Powers the gallery's Favorites shelf: a folder is bookmarked in place (its
+    Powers the gallery's Favorites collection: a folder is bookmarked in place (its
     position in the tree never changes) and collected here so all bookmarks —
     however deeply nested — are reachable from one spot.
     """
@@ -323,7 +323,7 @@ def folder_names_by_row(
 
 
 def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
-    """Every row with a result, newest first — the whole of the Recents shelf's list.
+    """Every row with a result, newest first — the whole of the Recents collection's list.
 
     Made here or found on disk alike. Made here is a Generate tab or a gallery
     re-roll -- or, with no run under it at all, a single cycle cut out of a
@@ -333,9 +333,9 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     here there is nowhere at all that says it happened. Found on disk is a file
     ComfyUI wrote that no instance of this app queued (``source``
     ``"imported"``): it arrives at the launch that finds it, and that is when it
-    is looked for on Latest. An experiment has a shelf of its own and is left
+    is looked for on Latest. An experiment has a collection of its own and is left
     out. As in the tree, only rows that produced an output file appear — the
-    shelf is a gallery of results, so a failed or in-flight run with nothing to
+    collection is a gallery of results, so a failed or in-flight run with nothing to
     show doesn't surface.
 
     An image being enhanced, or lately enhanced, sits where the *enhancement*
@@ -346,13 +346,13 @@ def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:
     the picture being worked on could sit a thousand tiles down, unfindable. What
     an image is having done to it is the newest thing about it.
 
-    Nothing is capped here: the shelf keeps going as far back as the user has ever
+    Nothing is capped here: the collection keeps going as far back as the user has ever
     generated, and the pane draws a page of tiles at a time as it's scrolled into
     (:meth:`~origenerator.gui.browser_pane.BrowserPane.grow_recents`).
 
     The gallery's image/video filter is applied to ``rows`` before they reach
     here (:func:`rows_of_media_types`), the same way it is for every other
-    shelf.
+    collection.
     """
     listed = [
         row for row in rows
@@ -371,7 +371,7 @@ def row_recency(row: dict, bumped: dict[str, tuple[datetime, int]]) -> tuple[dat
     ``bumped`` is :func:`~origenerator.gallery.enhance.enhancement_recency` over
     the same rows. An image being enhanced is being worked on now, so it counts
     as the newest thing in the library rather than as whenever it was generated
-    — which is what puts it at the head of the Latest shelf and what marks the
+    — which is what puts it at the head of the Latest collection and what marks the
     folder it sits in as lately worked in.
     """
     enhanced_at, enhanced_by = bumped.get(row.get("prompt_id"), (BEFORE_EVERY_RECORD, 0))
@@ -438,25 +438,25 @@ def recently_worked_folders(
 
 def favorite_generations(rows: list[dict]) -> list[dict]:
     """Every favorited image or video that produced an output, newest first — the
-    individual bookmarks the Favorites shelf collects alongside favorited folders.
+    individual bookmarks the Favorites collection gathers alongside favorited folders.
 
     Any produced row the user favorited qualifies, imported files included (unlike
-    the Recents shelf, which is app-made results only). ``rows`` arrive newest-first
+    the Recents collection, which is app-made results only). ``rows`` arrive newest-first
     (the caller lists them by descending id), so the result is too.
     """
     return [row for row in rows if row.get("starred") and produced_output(row)]
 
 
 def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
-    """Each request paired with what it made, newest first — the Requests shelf's
+    """Each request paired with what it made, newest first — the Requests collection's
     list. Spoken, or typed as one picture of a folder-wide rewrite: both leave
-    the same record, and both belong on the shelf of things you asked for.
+    the same record, and both belong in the collection of things you asked for.
 
     ``records`` are the rows :meth:`Database.list_requests` returns; each gains
     a ``"row"`` (the generation the request queued) and a ``"source_row"`` (the
     item it was made about, or ``None`` when that has since gone). An in-flight
-    generation is kept, unlike the other shelves' listings — a request you have
-    just spoken should appear at once, and the whole of what this shelf shows
+    generation is kept, unlike the other collections' listings — a request you have
+    just spoken should appear at once, and the whole of what this collection shows
     about it (what was heard, what changed in the prompt) is readable before
     there is a picture to look at.
 
@@ -476,7 +476,7 @@ def requested_generations(records: list[dict], rows: list[dict]) -> list[dict]:
 
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:
     """The finished experiments awaiting the user's verdict, newest first — the
-    Experiments shelf's review queue. Only completed results qualify: a failed
+    Experiments collection's review queue. Only completed results qualify: a failed
     experiment has nothing to judge, and an in-flight one shows as a live card."""
     return [
         row for row in rows
@@ -616,7 +616,7 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     A running standalone enhance is machinery, not a generation: its result folds
     into the image it upgrades, so its transient row must not grow an "Image
     Enhance" folder while it cooks (its progress shows on the tile of the image
-    it is upgrading, under that tile's "Enhancing…" scrim — the Recents shelf
+    it is upgrading, under that tile's "Enhancing…" scrim — the Recents collection
     gives it no card of its own either). A completed one still in the DB — its
     source image deleted before it could fold — stays visible, so it can be found
     and deleted rather than haunting the disk invisibly. A re-derived base render
@@ -704,7 +704,7 @@ def build_gallery_tree(
 
     A background experiment is nested like anything else, from the moment it
     starts running: it is a generation, so it gets the folder its settings put it
-    in, and the Experiments shelf is a review queue over those rows rather than a
+    in, and the Experiments collection is a review queue over those rows rather than a
     holding pen outside the tree.
     """
     folder_meta = folder_meta or {}

@@ -8,11 +8,11 @@ is playing as generations land there, frozen with the room, and let go when it
 closes (which puts a satellite region back on its base state).
 
 The spoken words about a show are here too -- close it, lock it, narrow it to
-the favorites or to the enhanced ones, step off the slide, play a shelf. They
+the favorites or to the enhanced ones, step off the slide, play a collection. They
 are words about a show rather than words about the microphone, and a router that
 carried them would only have to hand every one of them straight back.
 
-What stays with the host is what a show is *of*: which folder or shelf the
+What stays with the host is what a show is *of*: which folder or collection the
 gallery is standing in, what plays from there, and what a gesture inside a show
 does back in the window. :class:`ShowHost` names each of those.
 """
@@ -40,13 +40,13 @@ from origenerator.config import (
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.fun_time_bridge import ask_for_omnipause, ask_for_the_funestra
 from origenerator.fun_time_mode import SHOW_TITLES, region_for_items
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gallery.shelves import folder_shelf
+from origenerator.gallery.collection import folder_collection
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_show import FunestraShow
@@ -70,7 +70,7 @@ from origenerator.orientation import (
     row_orientation,
 )
 from origenerator.orientation import (
-    split_key as _split_shelf_key,
+    split_key as _split_collection_key,
 )
 from origenerator.show_buttons import PANEL_CORNER
 from origenerator.slideshow import (
@@ -92,7 +92,7 @@ class ShowHost(Protocol):
 
     def show_location(self) -> str | None:
         """Where the view on screen is playing FROM, as something re-askable: a
-        shelf key on a shelf, else the open folder's key."""
+        collection key in a collection, else the open folder's key."""
 
     def rows_to_play(self) -> list[dict]:
         """The generations a show opened from the view on screen would play."""
@@ -107,7 +107,7 @@ class ShowHost(Protocol):
         """The folder ``key`` names, as the side it is looked at from holds it."""
 
     def media_types(self) -> set[str]:
-        """The kinds the shelves are listing — Images, Videos or both."""
+        """The kinds the collections are listing — Images, Videos or both."""
 
     def row_for(self, prompt_id: str) -> dict | None:
         """The generation row ``prompt_id`` names, or ``None``."""
@@ -189,7 +189,7 @@ class ShowDirector:
         self._standalone_side: str | None = None
         self._hud_corners: dict[str, HudCorner] = {}
         self._hud_minimized: dict[str, bool] = {}
-        # Every show currently up, each with the shelf/folder key it opened
+        # Every show currently up, each with the collection/folder key it opened
         # from: what a landing generation is offered to, so a show keeps up
         # with an auto-generating folder however far the browser has moved on.
         # A list rather than one, because Fun Time runs two at once.
@@ -298,21 +298,21 @@ class ShowDirector:
     # --- opening one --------------------------------------------------------
 
     def start(self, *, side: str | None = None):
-        """Open what's on screen — a folder, or the Latest/Favorites shelf —
+        """Open what's on screen — a folder, or the Latest/Favorites collection —
         as a fullscreen slideshow, shuffled and running at the app-wide pace,
         and standing where the last show was closed when that slide is in
         here."""
         location = self._host.show_location()
-        base, orientation = _split_shelf_key(location)
-        shelf = folder_shelf(base)
+        base, orientation = _split_collection_key(location)
+        collection = folder_collection(base)
         side = side or orientation
         # Favorites is not a set of its own: it is its folder with the
         # favorites switch held down, so the switch can be let go to widen and
         # the order pair means the folder rather than the bookmarks.
-        favorites = shelf is not None and shelf.shelf == _FAVORITES_KEY
+        favorites = collection is not None and collection.which == _FAVORITES_KEY
         if favorites:
             side = side or self._host.side_in_view()
-            location = oriented_key(shelf.folder, side)
+            location = oriented_key(collection.folder, side)
             rows = self.rows_at(location)
         else:
             rows = self._one_per_run_where_the_order_is_newest_first(
@@ -320,12 +320,12 @@ class ShowDirector:
         items = self.items_of(rows)
         if not items:
             return
-        # Recents is Latest, exactly as on a Fun Time Funestra: the shelf lists
+        # Recents is Latest, exactly as on a Fun Time Funestra: the collection lists
         # newest first and its slideshow plays that order, where every other
         # set shuffles — and the show's HUD status line says which.  Latest
         # opens on the newest rather than where the last Latest show stopped:
         # the newest is what it is opened for.
-        latest = shelf is not None and shelf.shelf == _RECENTS_KEY
+        latest = collection is not None and collection.which == _RECENTS_KEY
         self.open(items, rows=rows, location=location, side=side,
                   resume=None if latest else self._show_state,
                   filters=replace(self._filters, favorites=True) if favorites else None,
@@ -399,7 +399,7 @@ class ShowDirector:
         versions each item steps are both read off them, and a show asked for
         them itself would be asking the library what its caller already knows.
 
-        ``location`` is the shelf or folder key the set came from, kept so the
+        ``location`` is the collection or folder key the set came from, kept so the
         show can be fed what lands there while it runs (:meth:`note_finished`) —
         a running show has to keep up with the folder it is playing, and the
         browser will have moved on by then.  ``side`` names the satellite region
@@ -674,15 +674,15 @@ class ShowDirector:
     def rows_at(self, location) -> list[dict]:
         """What a show opened at *location* would play if it opened now.
 
-        Every key names a shape as well as a place: the shelves narrow
-        themselves (``rows_for_shelf`` splits the key it is handed), and a
+        Every key names a shape as well as a place: the collections narrow
+        themselves (``rows_for_collection`` splits the key it is handed), and a
         folder row was built from one side's rows to begin with.  That is what
         lets a region's base state be "the whole library, this side's shape"
         and still be re-askable as the library grows.
         """
         if not location:
             return []
-        rows = self._browser.rows_for_shelf(location)
+        rows = self._browser.rows_for_collection(location)
         if rows is not None:
             return self._one_per_run_where_the_order_is_newest_first(location, rows)
         group = self._host.group_for_key(location)
@@ -693,8 +693,8 @@ class ShowDirector:
         of a configuration at a time; its show plays one of each such run, and
         the map's row reaches the rest.  Every other set is shuffled, where a
         run is not a run of anything."""
-        shelf = folder_shelf(_split_shelf_key(location)[0])
-        if shelf is None or shelf.shelf != _RECENTS_KEY:
+        collection = folder_collection(_split_collection_key(location)[0])
+        if collection is None or collection.which != _RECENTS_KEY:
             return rows
         return one_per_stretch(rows, image_index=self._host.image_config_index())
 
@@ -1209,9 +1209,9 @@ class ShowDirector:
 
         A folder's show answers off those rows as usual: the tree keeps a run in
         flight in the folder its settings put it in, so it is already among them.
-        A shelf's cannot — Recents is a shelf of results and a run has none yet —
+        A collection's cannot — Recents is a collection of results and a run has none yet —
         so Recents answers for itself, by its own rule: every generation this app
-        makes lands there, and this is one. The other shelves are deliberate sets
+        makes lands there, and this is one. The other collections are deliberate sets
         (favorited, requested, condemned) that nothing joins by being made, and a
         search's hits are a set that was already asked for.
 
@@ -1237,7 +1237,7 @@ class ShowDirector:
         return self._held_at[location]
 
     def _recents_would_take(self, row: dict, location) -> bool:
-        base, side = _split_shelf_key(location)
+        base, side = _split_collection_key(location)
         playing_recents = (base == _RECENTS_KEY if location
                            else self._browser.showing_recents()
                            and not self._browser.showing_search())
@@ -1366,36 +1366,36 @@ class ShowDirector:
             else f"🎤 slideshow at {seconds}s"
         )
 
-    def play_shelf(self, command) -> None:
-        """A spoken shelf name, on the named side.
+    def play_collection(self, command) -> None:
+        """A spoken collection name, on the named side.
 
         "Favorites" is the exception, and it is the Funestras' own meaning: on a
         Funestra that word is F-mode — narrow what is playing to the favorites —
         so on a show it is the same switch, the one its HUD draws.  Opening the
-        shelf as a fresh show instead would answer a word the HUD already has a
+        collection as a fresh show instead would answer a word the HUD already has a
         button for with something else entirely.
 
-        The rest play: every shelf belongs to one side, so a named side picks
+        The rest play: every collection belongs to one side, so a named side picks
         that side's copy and what lands on a region is homogeneous — exactly as
-        it is when that shelf's own slideshow button opens it — and Latest plays
-        newest-first the way that shelf's own show does.  Standalone, and hosted
-        with no side named, it is the shelf on the side being browsed: there is
-        no shelf spanning both to fall back to, and the half you are looking at
+        it is when that collection's own slideshow button opens it — and Latest plays
+        newest-first the way that collection's own show does.  Standalone, and hosted
+        with no side named, it is the collection on the side being browsed: there is
+        no collection spanning both to fall back to, and the half you are looking at
         is the half the word meant.  The browser is left where it is: this
         starts a show, it does not go browsing."""
-        if command.shelf_key == _FAVORITES_KEY:
+        if command.collection_key == _FAVORITES_KEY:
             self.toggle_favorites_filter(command.side)
             return
         orientation = (command.side if command.side and self._fun_time is not None
                        else self._host.side_in_view())
-        key = oriented_key(command.shelf_key, orientation)
+        key = oriented_key(command.collection_key, orientation)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
             self._host.say("🎤 nothing there to play")
             return
         self.open(items, rows=rows, location=key, side=command.side,
-                  **self._order(command.shelf_key == _RECENTS_KEY))
+                  **self._order(command.collection_key == _RECENTS_KEY))
 
     def toggle_favorites_filter(self, side) -> None:
         """The spoken "favorites": the show's own F-mode switch, flipped.
@@ -1479,18 +1479,18 @@ class ShowDirector:
     def _favorite_prompt_ids(self) -> set[str]:
         """Which generations are favorites, for the shows' HUD: the star readout
         on the current item, and the favorites narrowing — the same concepts the
-        Funestras' HUD wears, over the same collection the Favorites shelf lists.
+        Funestras' HUD wears, over the same items the Favorites collection lists.
 
-        That collection, and not merely the marked rows: a folder bookmarked
+        Those items, and not merely the marked rows: a folder bookmarked
         there stands for everything under it, so a show narrowed to the
-        favorites keeps what the shelf would have shown.
+        favorites keeps what the collection would have shown.
         """
         marked = {row["prompt_id"] for row in self._db.list_generations()
                   if row.get("starred")}
         for side in _ORIENTATIONS:
             key = oriented_key(_FAVORITES_KEY, side)
             marked.update(row["prompt_id"]
-                          for row in (self._browser.rows_for_shelf(key) or ()))
+                          for row in (self._browser.rows_for_collection(key) or ()))
         return marked
 
     def _enhanced_ids_of(self, rows) -> set[str]:

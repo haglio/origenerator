@@ -50,16 +50,16 @@ from shared_ui.colors import (
 )
 from shared_ui.icons import CANVAS, PEN_WIDTH, draw_glyph, glyph_icon, glyph_pixmap
 
-from origenerator.gallery.groups import SettingsGroup, folder_level
-from origenerator.gallery.output import media_type_of_row
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
+    COLLECTION_LABELS,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     RECENTS_KEY,
     REQUESTS_KEY,
-    SHELF_LABELS,
     TRASH_KEY,
 )
+from origenerator.gallery.groups import SettingsGroup, folder_level
+from origenerator.gallery.output import media_type_of_row
 from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
@@ -78,7 +78,7 @@ _LEVEL_BADGES = {
     "source_image": ("I", GREEN),
 }
 
-# The Recents shelf mixes images and videos in one flow, so each tile wears a
+# The Recents collection mixes images and videos in one flow, so each tile wears a
 # small corner badge naming its kind. A white glyph on a translucent dark chip,
 # so it reads over a thumbnail of any color.
 _BADGE_CHIP = QColor(0, 0, 0, 160)
@@ -161,8 +161,8 @@ def audio_icon() -> QIcon:
 
 
 def trash_icon(*, color=None) -> QIcon:
-    """A trash can — the Trash shelf's mark, and the Delete button that fills
-    it. One glyph for both ends of a deletion, so the shelf reads as where that
+    """A trash can — the Trash collection's mark, and the Delete button that fills
+    it. One glyph for both ends of a deletion, so the collection reads as where that
     button's items go."""
     return glyph_icon("trash", color=color, size=_SIZE)
 
@@ -234,15 +234,15 @@ def flask_icon() -> QIcon:
 
 
 @cache
-def shelf_icon(shelf: str) -> QIcon:
+def collection_icon(collection: str) -> QIcon:
     return {
         RECENTS_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
         EXPERIMENTS_KEY: flask_icon, REQUESTS_KEY: mic_icon, TRASH_KEY: trash_icon,
-    }[shelf]()
+    }[collection]()
 
 
-def shelf_badge(shelf: str) -> tuple[QIcon, str]:
-    return shelf_icon(shelf), SHELF_LABELS[shelf]
+def collection_badge(collection: str) -> tuple[QIcon, str]:
+    return collection_icon(collection), COLLECTION_LABELS[collection]
 
 
 def all_icon() -> QIcon:
@@ -298,7 +298,7 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 
 @cache
 def recovery_action_icon(action: str) -> QIcon:
-    """A Trash-shelf tile's review hover-buttons: a circular arrow back
+    """A Trash-collection tile's review hover-buttons: a circular arrow back
     ("restore" — the item and its files return to where they were) or a trash can
     ("purge" — end it for good; nothing else empties the bin). White line art on
     the buttons' own translucent chip, like the experiment verdict controls."""

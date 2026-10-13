@@ -80,7 +80,7 @@ def test_ctrl_moves_the_anchor_so_the_next_run_starts_there(picked):
 
 
 def test_a_shift_click_with_its_anchor_gone_lands_as_a_plain_click(picked):
-    # A pane redrawn under the selection, or a shelf paged on, leaves the anchor
+    # A pane redrawn under the selection, or a collection paged on, leaves the anchor
     # nowhere on screen: there is no run to measure, and a range from nowhere is
     # worse than the one tile that was actually clicked.
     selection = picked("a", "b")

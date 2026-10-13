@@ -297,7 +297,7 @@ def test_a_video_tile_grows_no_plus_at_all(qtbot):
 
 
 def test_the_corners_ignore_the_cursor_crossing_the_tile(qtbot):
-    # Hovering the tile reveals a shelf's own actions and nothing else — the
+    # Hovering the tile reveals a collection's own actions and nothing else — the
     # three corners were already up and stay up.
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN)
     qtbot.addWidget(tw)
@@ -366,7 +366,7 @@ def test_an_enhancing_tile_keeps_its_star_trash_and_plus(qtbot):
 
 
 def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
-    # The Trash shelf's tiles: their item is already deleted, so there is nothing
+    # The Trash collection's tiles: their item is already deleted, so there is nothing
     # to bookmark, bin or enhance, and their own two acts take the corners.
     tw = ThumbnailWidget("p1", None, "label", controls=False,
                          corner_actions=_corner_actions())
@@ -374,7 +374,7 @@ def test_a_tile_can_decline_the_corner_controls_entirely(qtbot):
     assert tw._controls is None
 
 
-def test_a_shelfs_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
+def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
     # Keep/reject (and the per-seed re-rolls) run along the edge the three corner
     # controls stay off, so neither set lands on the other.
     tw = ThumbnailWidget("p1", None, "label", enhance=icons.ENHANCE_OPEN,

@@ -46,19 +46,19 @@ from origenerator.db import Database
 from origenerator.experiments.background import queue_experiments
 from origenerator.experiments.policy import ExperimentPolicy
 from origenerator.fun_time_mode import FunTimeSession
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     RECENTS_KEY as _RECENTS_KEY,
 )
-from origenerator.gallery.shelves import (
+from origenerator.gallery.collection import (
     REQUESTS_KEY as _REQUESTS_KEY,
 )
-from origenerator.gallery.shelves import SHELF_LABELS, FolderShelf, folder_shelf
 from origenerator.gallery_actions import GalleryActions, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
@@ -150,7 +150,7 @@ from origenerator.orientation import (
     side_of as _side_of,
 )
 from origenerator.orientation import (
-    split_key as _split_shelf_key,
+    split_key as _split_collection_key,
 )
 from origenerator.osr2_driver import Osr2Driver
 from origenerator.osr2_motion_driver import Osr2MotionDriver
@@ -308,8 +308,8 @@ class GalleryView(QWidget):
             ),
         )
         # Derives the background experiments this gallery hands ComfyUI as the
-        # app closes (the Experiments shelf's switch): variations of the user's
-        # own work, landing on that shelf for review at the next launch.
+        # app closes (the Experiments collection's switch): variations of the user's
+        # own work, landing in that collection for review at the next launch.
         self._experiment_policy = experiment_policy or ExperimentPolicy(
             registry=WORKFLOW_REGISTRY, rng=random.Random()
         )
@@ -426,12 +426,12 @@ class GalleryView(QWidget):
         # are built before _build_ui, whose field drives them.
         self._search = GallerySearchController(
             self, parent=self, expander=search_expander)
-        # The held deletions the Trash shelf lists, as gallery rows re-pointed at
+        # The held deletions the Trash collection lists, as gallery rows re-pointed at
         # their files in the trash — the rows under everything a deleted item can
         # still do (see :meth:`row_for`).
         self._held_rows: list[dict] = []
         self._selected_row: dict | None = None  # the saved generation on display in the info pane
-        # The browser pane renders the middle column (tiles / thumbnails / shelves)
+        # The browser pane renders the middle column (tiles / thumbnails / collections)
         # and owns the thumbnail multi-selection and in-flight cards. Its signals
         # carry every gesture made on a tile; the handlers here answer them. The
         # scroll area is its canvas — built here so it can be handed over, placed
@@ -846,7 +846,7 @@ class GalleryView(QWidget):
 
     def _build_browser_pane(self):
         """The middle pane: the folder's path, the button bank under it, the
-        shelf's own bars, and the flowing contents -- with the Enhance settings
+        collection's own bars, and the flowing contents -- with the Enhance settings
         standing at its foot, under a handle of their own.
         """
         browser, browser_column = pane()
@@ -876,9 +876,9 @@ class GalleryView(QWidget):
             hosted=self._fun_time is not None,
         )
         browser_column.addWidget(self._bank)
-        # The Experiments shelf's controls: the background experimenter's on/off
+        # The Experiments collection's controls: the background experimenter's on/off
         # switch and a one-line status. Rides under the header, and appears only
-        # while that shelf is open.
+        # while that collection is open.
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         # Scheduling an absence is the production app's alone, so a branch session
@@ -892,12 +892,12 @@ class GalleryView(QWidget):
         experiments_row.addWidget(self._experiments_cb)
         experiments_row.addWidget(self._experiments_status)
         experiments_row.addStretch(1)
-        self._experiments_bar.hide()  # shown only on the Experiments shelf
+        self._experiments_bar.hide()  # shown only in the Experiments collection
         self._sync_experiments_bar()
         browser_column.addWidget(self._experiments_bar)
-        # Which kinds a shelf lists. Here rather than over the folder list,
+        # Which kinds a collection lists. Here rather than over the folder list,
         # because a folder under image/… holds images and one under video/…
-        # holds videos: only a shelf gathers both, so only a shelf has the
+        # holds videos: only a collection gathers both, so only a collection has the
         # question to answer, and asking it here leaves every folder in the
         # list reachable whichever kind is chosen.
         self._images_only = QRadioButton("Images")
@@ -913,13 +913,13 @@ class GalleryView(QWidget):
         word = icons.MARK_BESIDE_A_WORD
         for kind, mark in zip((self._images_only, self._videos_only, self._both_kinds),
                               marks):
-            kind.setToolTip("Which kinds this shelf lists")
+            kind.setToolTip("Which kinds this collection lists")
             kind.setIcon(mark)
             kind.setIconSize(QSize(word, word))
             kind.toggled.connect(self._on_media_filter_changed)
             kinds_row.addWidget(kind)
         kinds_row.addStretch(1)
-        self._kinds_bar.hide()  # shown on the shelves, which are what gather both
+        self._kinds_bar.hide()  # shown in the collections, which are what gather both
         browser_column.addWidget(self._kinds_bar)
         browser_column.addWidget(self._search.bar)
         self._avg_label = QLabel("")
@@ -933,7 +933,7 @@ class GalleryView(QWidget):
         # been picked.
         self._scroll.background_clicked.connect(
             self._browser.clear_thumbnail_selection)
-        # The Recents shelf has no end: reaching the end of what it has drawn
+        # The Recents collection has no end: reaching the end of what it has drawn
         # draws the next page. Range as well as value — see BrowserPane.grow_recents.
         self._scroll.verticalScrollBar().valueChanged.connect(self._browser.grow_recents)
         self._scroll.verticalScrollBar().rangeChanged.connect(self._browser.grow_recents)
@@ -943,7 +943,7 @@ class GalleryView(QWidget):
         # Enhance, and (with its tick on) each image the app newly generates.
         # App-wide and always here: enhancement is whatever you are doing at the
         # moment, not a property of the folder you happen to be standing in, so
-        # it shows on the shelves as readily as on a settings folder. Deliberately
+        # it shows in the collections as readily as on a settings folder. Deliberately
         # not on the Generate form: every setting there picks the folder a run
         # lands in, and this one doesn't.
         enhance, enhance_column = pane()
@@ -1267,7 +1267,7 @@ class GalleryView(QWidget):
         if self._bank.mic is not None:  # hosted, the session owns the microphone
             self._bank.mic.setChecked(True if enabled is None else bool(enabled))
 
-    # --- background experiments: the closing batch and the shelf's controls ---
+    # --- background experiments: the closing batch and the collection's controls ---
 
     def experiments_enabled(self) -> bool:
         """Whether the background experimenter is on (for session persistence)."""
@@ -1284,7 +1284,7 @@ class GalleryView(QWidget):
 
         Called from the window's close, the one moment the GPU becomes nobody's:
         ComfyUI outlives the app and works through the batch alone, and the next
-        launch finalizes what finished onto the Experiments shelf. A no-op with
+        launch finalizes what finished into the Experiments collection. A no-op with
         the switch off. Returns how many were queued.
 
         Only the production app schedules an absence. A branch preview shares the
@@ -1356,7 +1356,7 @@ class GalleryView(QWidget):
         self._sync_experiments_bar()
 
     def _review_queue(self, rows) -> list[dict]:
-        """The experiments waiting on the user's verdict — the Experiments shelf."""
+        """The experiments waiting on the user's verdict — the Experiments collection."""
         return gallery.unreviewed_experiments(rows)
 
     def _sync_experiments_bar(self):
@@ -1385,9 +1385,9 @@ class GalleryView(QWidget):
         return self._jobs.job_for(key).prompt_id
 
     def _on_experiment_verdict(self, prompt_id: str, action_id: str):
-        """A review from the Experiments shelf: "keep" admits the result to the
+        """A review from the Experiments collection: "keep" admits the result to the
         gallery proper; "reject" records the down-verdict the policy learns from
-        and trashes the files (undoable). Either way the item leaves the shelf."""
+        and trashes the files (undoable). Either way the item leaves the collection."""
         if action_id == "keep":
             self._db.set_experiment_verdict(prompt_id, "up")
         else:
@@ -1702,7 +1702,7 @@ class GalleryView(QWidget):
             else:
                 # No DB change, but the in-flight cards still need each running
                 # re-roll's live frame pushed in — it advances between rebuilds.
-                # Wherever they were drawn: the Recents shelf, or a folder with
+                # Wherever they were drawn: the Recents collection, or a folder with
                 # a batch of them in flight.
                 self._browser.refresh_inflight(rows=rows, requests=requests)
             # The lower strip is always on screen, so refresh it every tick —
@@ -1763,8 +1763,8 @@ class GalleryView(QWidget):
         self._image_rows = [r for r in rows
                             if gallery.media_type_of_row(r) == MediaType.IMAGE]
         self._combine.offer_the_acts(rows)
-        # Every kind, in the tree and in the index: which kinds a shelf lists is
-        # the shelf's own question, answered by the Images / Videos / Both
+        # Every kind, in the tree and in the index: which kinds a collection lists is
+        # the collection's own question, answered by the Images / Videos / Both
         # buttons over the folder's contents, so a folder of the kind those
         # buttons are not asking for is still a folder you can open and navigate
         # to (:meth:`media_types`).
@@ -1795,15 +1795,15 @@ class GalleryView(QWidget):
         # indexing waits until both are built.
         #
         # The trash's held rows are indexed alongside the gallery's own, because
-        # standing on the Trash shelf and searching it has to find something —
+        # standing in the Trash collection and searching it has to find something —
         # a deleted row is out of ``list_generations`` and lives only in the bin.
-        # They are reachable only from that shelf: every other scope is a set of
+        # They are reachable only from that collection: every other scope is a set of
         # ids drawn from the live tree (see :meth:`search_scope`).
         self._search.index.update(listed + held, gallery.folder_names_by_row(
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_folders))
         requests = self._db.list_requests()
-        requested = gallery.requested_generations(requests, listed)  # the Requests shelf
+        requested = gallery.requested_generations(requests, listed)  # the Requests collection
         bumped = gallery.enhancement_recency(listed)
         self._browser.set_model(
             gallery.recent_generations(listed, bumped=bumped),
@@ -1890,9 +1890,9 @@ class GalleryView(QWidget):
         """The sides the pane is drawing, in the order it draws them.
 
         A side is the whole table of contents over the rows it holds: its own
-        hierarchy, its own copies of the folders the user composed, and shelves
+        hierarchy, its own copies of the folders the user composed, and collections
         whose counts are its own — a number covering more than the side draws
-        would send you to a shelf that then showed you nothing.
+        would send you to a collection that then showed you nothing.
 
         Only the drawn sides are built. The radio's other answer is a section
         nobody can see, and filling it would cost every rebuild a table of
@@ -1907,7 +1907,7 @@ class GalleryView(QWidget):
             # generation of that shape is visible while it runs.
             show_recents=bool(trees[side]) or any(_side_holds(side, shape)
                                                   for shape in inflight),
-            shelf_counts=self._browser.shelf_counts(side),
+            collection_counts=self._browser.collection_counts(side),
         ) for side in self._tree.sides]
 
     def _on_sides_changed(self):
@@ -2011,7 +2011,7 @@ class GalleryView(QWidget):
         return prompt_id in self._browser.visible_prompt_ids()
 
     def show_folder(self, key: str) -> bool:
-        """Draw the folder or shelf ``key`` names, saying whether the tree had a
+        """Draw the folder or collection ``key`` names, saying whether the tree had a
         row for it at all.
 
         ``_tree_item_for`` rather than a bare lookup: a stop recorded before the
@@ -2055,9 +2055,9 @@ class GalleryView(QWidget):
     def search_scope(self) -> _SearchScope:
         """What the search covers: the path it is scoped to, and what is under it.
 
-        The tree's selection is the scope, whatever kind of row it is. A shelf
-        counts: Recents, Favorites, Experiments and Trash are each a collection of
-        generations, and standing on one and searching it is the obvious thing to
+        The tree's selection is the scope, whatever kind of row it is. A collection
+        counts: Recents, Favorites, Experiments and Trash are each a set of
+        generations, and standing in one and searching it is the obvious thing to
         try. The All row over the workflow folders is what covers the library
         entire, since every other folder narrows the answer before the query does.
 
@@ -2065,15 +2065,15 @@ class GalleryView(QWidget):
         empty-result message all name the scope by.
         """
         item = self._tree.currentItem()
-        if self._current_shelf_key() is not None:
-            rows = self._browser.selected_shelf_rows() or []
+        if self._current_collection_key() is not None:
+            rows = self._browser.selected_collection_rows() or []
             return _SearchScope(self._tree_view.breadcrumb(item),
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
             # Nothing selected, or the caret resting on a side's header row: the
             # whole gallery, since neither names a folder to narrow to. The
-            # trash's held rows share the index but belong to their shelf alone.
+            # trash's held rows share the index but belong to their collection alone.
             return _SearchScope(gallery.ALL_LABEL, self._live_ids)
         return _SearchScope(self._tree_view.breadcrumb(item),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
@@ -2121,18 +2121,19 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim()
-        base, orientation = _split_shelf_key(self._tree_view.selected_folder_key())
-        shelf = folder_shelf(base)
-        self._experiments_bar.setVisible(shelf is not None and shelf.shelf == _EXPERIMENTS_KEY)
-        self._offer_the_kinds(shelf is not None)
+        base, orientation = _split_collection_key(self._tree_view.selected_folder_key())
+        collection = folder_collection(base)
+        self._experiments_bar.setVisible(collection is not None
+                                         and collection.which == _EXPERIMENTS_KEY)
+        self._offer_the_kinds(collection is not None)
         if current is None:
             self._folder_path.set_display("")
             self._avg_label.setText("")
             self._browser.show_empty()
             self._re_aim()
             return
-        if shelf is not None:
-            self._open_shelf(shelf, orientation, current)
+        if collection is not None:
+            self._open_collection(collection, orientation, current)
             return
         group = current.data(0, _GROUP_ROLE)
         # A folder's place in the tree is where the user is standing, side and
@@ -2146,7 +2147,7 @@ class GalleryView(QWidget):
         landed = self._land_on_the_first_item()
         if group is not None:
             # A folder is somewhere the user went, so Back can return to it — and
-            # so leaving a shelf for one is a step Back can undo at all. The item
+            # so leaving a collection for one is a step Back can undo at all. The item
             # it landed on goes on the stop with it, so coming back lands there
             # too rather than on a folder with nothing picked in it.
             self._navigation.record(landed)
@@ -2175,19 +2176,19 @@ class GalleryView(QWidget):
         self._browser.apply_selection(first, Qt.KeyboardModifier.NoModifier)
         return first
 
-    def _open_shelf(self, shelf: FolderShelf, orientation: str | None, item):
-        if shelf.shelf == _EXPERIMENTS_KEY:
+    def _open_collection(self, collection: FolderCollection, orientation: str | None, item):
+        if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._folder_path.set_display(self._shelf_title(shelf, item))
+        self._folder_path.set_display(self._collection_title(collection, item))
         self._avg_label.setText("")
         self._clear_metadata()
-        self._browser.show_shelf(shelf.key, orientation)
-        if shelf.shelf == _REQUESTS_KEY:
+        self._browser.show_collection(collection.key, orientation)
+        if collection.which == _REQUESTS_KEY:
             self._re_aim()
         self._navigation.record()
 
-    def _shelf_title(self, shelf: FolderShelf, item) -> str:
-        star = "★ " if shelf.shelf == _FAVORITES_KEY else ""
+    def _collection_title(self, collection: FolderCollection, item) -> str:
+        star = "★ " if collection.which == _FAVORITES_KEY else ""
         return f"{self._tree_view.breadcrumb(item.parent())}{PATH_SEPARATOR}{star}{item.text(0)}"
 
     def _show_group_contents(self, group, item):
@@ -2197,7 +2198,7 @@ class GalleryView(QWidget):
             self._browser.show_custom_folder(group)
         else:
             self._browser.show_folder_tiles(gallery.child_groups(group),
-                                            shelves=self._tree_view.shelves_in(item))
+                                            collections=self._tree_view.collections_in(item))
 
     def _go_to_folder(self, key: str):
         """Go to a folder: select its tree row, which draws it.
@@ -2413,7 +2414,7 @@ class GalleryView(QWidget):
     @property
     def _live_jobs(self) -> dict:
         """The live re-roll jobs, keyed by settings-folder key. Owned by the
-        controller; surfaced here for the Recents shelf and the info pane."""
+        controller; surfaced here for the Recents collection and the info pane."""
         return self._jobs.jobs
 
     @property
@@ -2425,8 +2426,8 @@ class GalleryView(QWidget):
         return self._selected_row
 
     # The folder tree's key→item and prompt→item maps are owned by the GalleryTree
-    # renderer; surfaced here for navigation, selection, and rebuild. A shelf's row
-    # is reached separately, through _shelf_item.
+    # renderer; surfaced here for navigation, selection, and rebuild. A collection's row
+    # is reached separately, through _collection_item.
     @property
     def _item_by_key(self) -> dict:
         return self._tree_view.item_by_key
@@ -2436,7 +2437,7 @@ class GalleryView(QWidget):
         return self._tree_view.leaf_by_id
 
     def selected_folder_key(self) -> str | None:
-        """The selected row's tree key (or a shelf's), from the tree renderer."""
+        """The selected row's tree key (or a collection's), from the tree renderer."""
         return self._tree_view.selected_folder_key()
 
     def side_in_view(self) -> str:
@@ -2482,9 +2483,9 @@ class GalleryView(QWidget):
         here = oriented_key(folder, self.side_in_view())
         return self._item_by_key[here if here in drawn else drawn[0]]
 
-    def _shelf_item(self, shelf_key: str, orientation: str | None = None):
-        """One side's copy of a shelf row — the side being browsed by default."""
-        return self._tree_view.shelf_item(shelf_key, orientation or self.side_in_view())
+    def _collection_item(self, collection_key: str, orientation: str | None = None):
+        """One side's copy of a collection row — the side being browsed by default."""
+        return self._tree_view.collection_item(collection_key, orientation or self.side_in_view())
 
     def _folder_context(self, key: str) -> str:
         """Where folder ``key`` lives: the breadcrumb of its parent, or "" at the
@@ -2496,14 +2497,14 @@ class GalleryView(QWidget):
         return self._tree_view.breadcrumb(item.parent())
 
     def current_group(self):
-        """The folder on screen, or ``None`` (a shelf, a search, or an empty
+        """The folder on screen, or ``None`` (a collection, a search, or an empty
         selection).
 
         While several folders are picked that's the unsaved folder they make, so
         everything reading this — the slideshow, the title, the average, the delete
         button — sees one folder whether or not it has been saved yet.
 
-        A running search is ``None`` for the same reason a shelf is: the tree
+        A running search is ``None`` for the same reason a collection is: the tree
         still has a row selected, but that folder is not what the pane is showing,
         and every reader of this would otherwise offer its action — auto-generate,
         Enhance All, delete-the-folder — against something off screen."""
@@ -2919,12 +2920,12 @@ class GalleryView(QWidget):
         show up to put it in the corner of."""
         self._voice.say(message)
 
-    def shelf_label(self, key: str) -> str:
-        """A shelf's plain name, for a spoken word to be answered in."""
-        return SHELF_LABELS[key]
+    def collection_label(self, key: str) -> str:
+        """A collection's plain name, for a spoken word to be answered in."""
+        return COLLECTION_LABELS[key]
 
-    def stand_in_shelf(self, key: str, side: str | None) -> bool:
-        """Select a shelf's row, exactly as clicking it does, and say whether the
+    def stand_in_collection(self, key: str, side: str | None) -> bool:
+        """Select a collection's row, exactly as clicking it does, and say whether the
         tree had one — Recents and Favorites appear only once there is one."""
         item = self._tree_item_for(oriented_key(key, side) if side else key)
         if item is None:
@@ -2949,11 +2950,11 @@ class GalleryView(QWidget):
 
     def rows_to_play(self) -> list[dict]:
         """The generations the slideshow would play from the view on screen: the
-        shelf's collection on a shelf, else everything under the selected
+        collection's own rows in a collection, else everything under the selected
         folder.  All of it: narrowing a show to its favorites or its enhanced
         pictures is the show's own doing, from the two switches on its HUD.
         """
-        rows = self._browser.shelf_rows()
+        rows = self._browser.collection_rows()
         if rows is None:
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
@@ -2963,7 +2964,7 @@ class GalleryView(QWidget):
         """What the slideshow button would play, named for its tooltip."""
         if self._showing_search():
             return "these results"
-        if self._current_shelf_key() is not None:
+        if self._current_collection_key() is not None:
             return self._tree_view.breadcrumb(self._tree.currentItem())
         return "this folder"
 
@@ -3047,7 +3048,7 @@ class GalleryView(QWidget):
         folder on screen. It toggles, so the tip says which way it will go — a set
         already favorited all over unfavorites.
 
-        Dark where a star means nothing: a shelf, or a deleted item in the bin,
+        Dark where a star means nothing: a collection, or a deleted item in the bin,
         which has no folder to be bookmarked in.
         """
         pids = self.selected_prompt_ids() if self._browser.selected_ids else []
@@ -3084,7 +3085,7 @@ class GalleryView(QWidget):
     def _favoritable_folder(self):
         """The folder on screen if a star can be set on it, else ``None``.
 
-        A shelf has no group at all, and a multi-selection's folder isn't one
+        A collection has no group at all, and a multi-selection's folder isn't one
         yet — it has no row to hang a star on until it's saved, which is what
         the Group button beside this one is for."""
         if self._selection_group is not None:
@@ -3150,7 +3151,7 @@ class GalleryView(QWidget):
             old_negative=revision.old_negative, new_positive=revision.positive,
             new_negative=revision.negative,
         )
-        self.refresh()  # the shelf shows the request the moment it is spoken
+        self.refresh()  # the collection shows the request the moment it is spoken
         return f"🎤 {revision.describe()} — generating", NOTICE
 
     def delete_enhance_levels(self, prompt_id: str, filenames: list):
@@ -3173,15 +3174,15 @@ class GalleryView(QWidget):
 
     def show_location(self):
         """Where the view on screen is playing FROM, as something re-askable:
-        a shelf key on a shelf, else the open folder's key.
+        a collection key in a collection, else the open folder's key.
 
         A key rather than the rows themselves, because the point of holding it
         is to ask again later — after a generation lands in that folder, when
         the rows are new objects and the browser is somewhere else entirely.
         """
-        shelf = self._current_shelf_key()
-        if shelf is not None:
-            return shelf
+        collection = self._current_collection_key()
+        if collection is not None:
+            return collection
         # The row's own key, not the folder's: which side the folder is being
         # looked at from is what decides the screen a show of it goes to.
         return (self.selected_folder_key()
@@ -3229,11 +3230,11 @@ class GalleryView(QWidget):
         undoable delete as anywhere else.
 
         An unreviewed experiment is rejected instead of deleted: the Experiments
-        shelf plays as a slideshow, so Up there is the shelf's own Reject, and
+        collection plays as a slideshow, so Up there is the collection's own Reject, and
         that keeps the row whose params the policy learns to steer away from.
 
         An item already in the bin has no row to delete, so Up does nothing over
-        the Trash shelf's slideshow. Deliberate: the only delete left there is the
+        the Trash collection's slideshow. Deliberate: the only delete left there is the
         permanent one, and that is not a thing to do on a keystroke — it is asked
         for from the tile, and confirmed.
         """
@@ -3341,7 +3342,7 @@ class GalleryView(QWidget):
         into once the finished row gives the folder a node."""
         if self._stand_on_the_run_in(key):
             return  # an existing folder: watch the live tile there
-        if (recents := self._shelf_item(_RECENTS_KEY, self._launched_side(key))) is not None:
+        if (recents := self._collection_item(_RECENTS_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
             self._tree.setCurrentItem(recents)
 
@@ -3349,7 +3350,7 @@ class GalleryView(QWidget):
         """Which side a job just launched in folder ``key`` will land on.
 
         Read off the size it asked for, since it has no picture to measure yet —
-        the same thing that puts its in-flight card on one Recents shelf rather
+        the same thing that puts its in-flight card in one Recents collection rather
         than the other. With no job to ask, the side being browsed.
         """
         job = self._jobs.job_for(key)
@@ -3390,7 +3391,7 @@ class GalleryView(QWidget):
         progress, its button discards it, and its preview follows the run's
         frames to the picture they land as
         (:meth:`GenerateConfigPanel.watch_folder`). That is what a click on the
-        tile or on the shelf's card asks for, and the tab comes to the front as a
+        tile or on the collection's card asks for, and the tab comes to the front as a
         clicked thumbnail's does.
 
         The folder tile's "+" lands its run the same way: that press is a press
@@ -3554,7 +3555,7 @@ class GalleryView(QWidget):
         finished_row = self._db.get_generation(prompt_id)
         if (finished_row is not None
                 and finished_row.get("source") == GenerationSource.EXPERIMENT):
-            # A background experiment landed: it waits on the Experiments shelf
+            # A background experiment landed: it waits in the Experiments collection
             # for review rather than moving the user's view — no front-tab load,
             # no slideshow feed, no auto-loop or combine bookkeeping.
             self.refresh()
@@ -3660,7 +3661,7 @@ class GalleryView(QWidget):
 
     def media_types(self) -> set[str]:
         """The media types the gallery's two ticks currently include — what
-        the folder tree, every shelf, the in-flight cards and the search index are
+        the folder tree, every collection, the in-flight cards and the search index are
         all built from. Both on (the default) means every type; both off means
         none."""
         if self._images_only.isChecked():
@@ -3670,17 +3671,17 @@ class GalleryView(QWidget):
         return {MediaType.IMAGE, MediaType.VIDEO}
 
     def _on_media_filter_changed(self, checked=True):
-        """Another kind was chosen: list the shelf again under it."""
+        """Another kind was chosen: list the collection again under it."""
         if not checked:
             return
         with working():
             self._browser.restart_recents_listing()  # a new choice is a new listing
-            self._recount_the_shelves()
-            base, orientation = _split_shelf_key(self.selected_folder_key())
-            shelf = folder_shelf(base)
-            if shelf is not None:
-                self._browser.show_shelf(shelf.key, orientation)
-        # A shelf the choice empties has no item to select, so the signal that
+            self._recount_the_collections()
+            base, orientation = _split_collection_key(self.selected_folder_key())
+            collection = folder_collection(base)
+            if collection is not None:
+                self._browser.show_collection(collection.key, orientation)
+        # A collection the choice empties has no item to select, so the signal that
         # normally re-syncs the show button never fires — and it went on
         # offering a show of nothing.
         self._re_aim()
@@ -3688,7 +3689,7 @@ class GalleryView(QWidget):
     def _offer_the_kinds(self, offered: bool) -> None:
         """Offer the Images / Videos / Both choice, or take it away.
 
-        Away on anything but a shelf: a folder holds one kind, so all three
+        Away on anything but a collection: a folder holds one kind, so all three
         buttons there are three ways of asking the same question, and a search
         and a set of folders shown together are answered by what was asked for
         rather than by this."""
@@ -3845,7 +3846,7 @@ class GalleryView(QWidget):
         bookmark it, enhance it, bin it.
 
         "Go to folder" is left off when the pane already IS that folder, which is
-        what makes it appear exactly where it is worth having: on the shelves and
+        what makes it appear exactly where it is worth having: in the collections and
         among a search's hits, where what you are looking at was gathered from
         somewhere else. Enhance is offered whenever any picked item is a finished
         image — the handler skips the rest — and enhances deliberately, so an
@@ -3938,31 +3939,31 @@ class GalleryView(QWidget):
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0
-        if not self._redrew_the_favorites_shelf():
+        if not self._redrew_the_favorites_collection():
             self._browser.refresh_corners()
         self._info_tabs.reconcile_previews(self._live_ids)
         if ids & self._browser.selected_ids:
             self._re_aim()
 
-    def _recount_the_shelves(self) -> None:
+    def _recount_the_collections(self) -> None:
         for side in self._tree.sides:
-            self._tree_view.set_shelf_counts(side, self._browser.shelf_counts(side))
+            self._tree_view.set_collection_counts(side, self._browser.collection_counts(side))
 
-    def _redrew_the_favorites_shelf(self) -> bool:
-        self._recount_the_shelves()
-        base, orientation = _split_shelf_key(self.selected_folder_key())
-        shelf = folder_shelf(base)
-        if shelf is None or shelf.shelf != _FAVORITES_KEY:
+    def _redrew_the_favorites_collection(self) -> bool:
+        self._recount_the_collections()
+        base, orientation = _split_collection_key(self.selected_folder_key())
+        collection = folder_collection(base)
+        if collection is None or collection.which != _FAVORITES_KEY:
             return False
         place = self._browser.place()
-        self._browser.show_shelf(shelf.key, orientation)
+        self._browser.show_collection(collection.key, orientation)
         self._browser.return_to(place)
         return True
 
     def _delete_selection(self):
         """Delete picked thumbnails, or the current folder if none are picked.
 
-        On the Trash shelf the picked items are already deleted, so Delete means
+        In the Trash collection the picked items are already deleted, so Delete means
         the only deletion left: ending them for good. Same button, same key, the
         one meaning it can have where it is standing — rather than a control that
         looks live and quietly does nothing.
@@ -3978,10 +3979,10 @@ class GalleryView(QWidget):
         if group is not None:
             self._delete_folder(group)
 
-    # --- the Trash shelf: restoring a delete, or ending it -------------------
+    # --- the Trash collection: restoring a delete, or ending it --------------
 
     def _bin_records(self) -> list[dict]:
-        """The held deletions the Trash shelf offers."""
+        """The held deletions the Trash collection offers."""
         return self._db.list_deletions()
 
     def _on_trash_action(self, prompt_id: str, action_id: str):
@@ -3992,7 +3993,7 @@ class GalleryView(QWidget):
             self.purge_from_trash([prompt_id])
 
     def _trash_menu(self, global_pos):
-        """Right-click on the Trash shelf: restore or permanently delete the
+        """Right-click in the Trash collection: restore or permanently delete the
         picked items — the same two actions the tiles' hover corners carry,
         reachable for a whole selection at once. The pane has already narrowed
         the selection to the tile under the cursor when it was outside it."""
@@ -4010,7 +4011,7 @@ class GalleryView(QWidget):
     def restore_from_trash(self, prompt_ids):
         """Bring deleted items back — files to where they were, rows to the
         gallery — and land on one of them in its own folder, so a restore ends
-        with the thing you recovered in front of you rather than on the shelf it
+        with the thing you recovered in front of you rather than in the collection it
         just left."""
         if not prompt_ids:
             return
@@ -4247,7 +4248,7 @@ class GalleryView(QWidget):
 
     def _custom_folder_context_menu(self, group, global_pos: QPoint):
         """A folder the user made: remove the grouping. It has no star (a
-        bookmark of a bookmark shelf collects nothing) and no delete — removing
+        bookmark of a bookmark collection gathers nothing) and no delete — removing
         it must never touch the generations it gathers."""
         menu = QMenu(self)
         remove_action = menu.addAction("Remove folder…")
@@ -4268,7 +4269,7 @@ class GalleryView(QWidget):
         self._fingerprint = (self._fingerprint[0],
                              _folder_meta_fingerprint(self._folder_meta))
         self._drawn_version += 1
-        if not self._redrew_the_favorites_shelf():
+        if not self._redrew_the_favorites_collection():
             self._browser.mark_folder_favorite(key, favorite)
         self._re_aim()
 
@@ -4301,8 +4302,8 @@ class GalleryView(QWidget):
         """The spoken request that made this generation, with the item it was
         asked about resolved onto it — or ``None`` when nothing asked for it.
 
-        Read off the shelf's own listing rather than the database, so the tab's
-        link and the shelf's card can never disagree about what a request was
+        Read off the collection's own listing rather than the database, so the tab's
+        link and the collection's card can never disagree about what a request was
         about.
         """
         return next((item for item in self._request_items()
@@ -4315,12 +4316,12 @@ class GalleryView(QWidget):
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         """A generation was picked, wherever it was picked — in a folder, on a
-        shelf, among a search's hits, through a followed link, by a step Back.
+        collection, among a search's hits, through a followed link, by a step Back.
         """
         if not self._show_generation(prompt_id):
             return
         # Each generation looked at is its own browsing step, wherever it was
-        # looked at: in a folder, on a shelf, or among a search's hits. The view it
+        # looked at: in a folder, in a collection, or among a search's hits. The view it
         # was picked in goes on the stack with it, so Back returns to the item AND
         # to the pane it was one of — not to some other folder that also holds it.
         self._navigation.record(prompt_id)
@@ -4356,7 +4357,7 @@ class GalleryView(QWidget):
     def animated_preview(self, row: dict) -> str | None:
         """The looping-WebP preview for a video ``row`` — ``None`` for an image or a
         video whose file is gone or unreadable, so the tile shows its still instead.
-        Feeds the grid tiles and the Recents shelf (the info pane's 'Animated in'
+        Feeds the grid tiles and the Recents collection (the info pane's 'Animated in'
         strip resolves the same path through :func:`gallery.animated_preview_path`)."""
         return gallery.animated_preview_path(
             row, self._actions.output_dir, self._actions.thumb_dir)
@@ -4400,7 +4401,7 @@ class GalleryView(QWidget):
             with self._navigation.off_the_record():
                 # Setting a row that is already its half's current one fires no
                 # signal, and the pane would go on showing whatever it holds —
-                # the shelf or the search hits the move was made from. So the
+                # the collection or the search hits the move was made from. So the
                 # drawing is done here in that case rather than waited for.
                 drawn_by_the_signal = not self._tree.is_current(item)
                 self._tree.setCurrentItem(item)
@@ -4435,9 +4436,9 @@ class GalleryView(QWidget):
 
     # --- back/forward navigation ------------------------------------------
 
-    def _current_shelf_key(self) -> str | None:
+    def _current_collection_key(self) -> str | None:
         key = self.selected_folder_key()
-        return key if folder_shelf(_base_of(key)) is not None else None
+        return key if folder_collection(_base_of(key)) is not None else None
 
 
 

@@ -26,7 +26,7 @@ class NavigationHost(Protocol):
     """What a history needs of the gallery around it, and nothing else."""
 
     def selected_folder_key(self) -> str | None:
-        """The folder or shelf the tree has selected, or ``None`` with nothing
+        """The folder or collection the tree has selected, or ``None`` with nothing
         open at all."""
 
     def selected_prompt_id(self) -> str | None:
@@ -36,7 +36,7 @@ class NavigationHost(Protocol):
         """Whether the pane has a tile for this generation right now."""
 
     def show_folder(self, key: str) -> bool:
-        """Draw the folder or shelf ``key`` names, returning whether the tree
+        """Draw the folder or collection ``key`` names, returning whether the tree
         had a row for it — a stop whose folder a delete emptied has none."""
 
     def go_to_generation(self, prompt_id: str) -> None:
@@ -93,7 +93,7 @@ class NavigationController:
             self._sync_buttons()
 
     def record(self, item: str | None = None) -> None:
-        """Record what the middle pane now shows: the folder or shelf the tree has
+        """Record what the middle pane now shows: the folder or collection the tree has
         selected, the query running over it, and ``item`` if the gesture picked one.
 
         Skipped while a rebuild or Back/Forward is what put it there. Everything
@@ -149,7 +149,7 @@ class NavigationController:
         return Location(view, self._search.query, item)
 
     def _restore(self, location: Location) -> None:
-        """Re-show a stop as it stood — its folder or shelf, the query that was
+        """Re-show a stop as it stood — its folder or collection, the query that was
         running over it, and the item that was picked in it — without recording the
         move (which walks history rather than adding to it).
 

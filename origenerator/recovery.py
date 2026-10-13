@@ -5,7 +5,7 @@ Deleting a generation moves its files into the trash and drops its row (see
 stack can reverse. That hold does not end on its own at all -- not at the next
 launch, not ever -- because the delete also records the row it dropped and the
 batch its files went into. The gallery's Trash
-shelf lists those records, puts one back, or ends one for good — and ending one
+collection lists those records, puts one back, or ends one for good — and ending one
 by hand is the only thing that ends one. :func:`reclaim_orphans` is all that is
 left for launch to do: clear the batch folders no record names, and leave
 everything the bin holds exactly where it is.
@@ -14,7 +14,7 @@ A record is the whole story of one delete — ``{"prompt_id", "row", "batch",
 "deleted_at"}``, as :meth:`origenerator.db.Database.list_deletions` returns it —
 so nothing about a deleted item has to be reconstructed from the disk. This
 module is pure data over the database and the trash, with no Qt dependency, so
-what the shelf shows can be unit-tested directly.
+what the collection shows can be unit-tested directly.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def days_held(record: dict, now: datetime | None = None) -> int:
 
 
 def bin_items(records, now: datetime | None = None) -> list[dict]:
-    """The held deletions as gallery rows the Trash shelf can draw, newest first.
+    """The held deletions as gallery rows the Trash collection can draw, newest first.
 
     Each is the row exactly as it was deleted — so its media type, its star and
     its caption read the way they did in the gallery — with its files re-pointed
@@ -72,7 +72,7 @@ def bin_items(records, now: datetime | None = None) -> list[dict]:
     that resolves files through
     :func:`~origenerator.gallery.output.output_file_path` — which follows the
     re-pointed path. Left alone, those rows resolve to the folder the files were
-    taken out of, so the shelf could offer a stored thumbnail and nothing else:
+    taken out of, so the collection could offer a stored thumbnail and nothing else:
     no video to play, nothing to open full size.
     """
     now = now or _now()
@@ -147,7 +147,7 @@ def reclaim_orphans(db, trash) -> int:
     that fell off the undo stack, a batch from before the bin existed, or a
     folder left by a crash between the move and the record. Nothing here
     reads a clock. A held deletion stays until the user restores it or ends it
-    from the Trash shelf, however long that takes.
+    from the Trash collection, however long that takes.
     """
     return trash.purge_orphans([
         (record.get("batch") or {}).get("subdir") for record in db.list_deletions()

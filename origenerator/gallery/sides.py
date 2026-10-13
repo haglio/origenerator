@@ -6,7 +6,7 @@ app has one screen, where either shape fits, so the list can also be drawn once
 over the whole library — the side a mixed slideshow is started from.
 
 These words are what a tree key is built from, so they are data the same way a
-shelf key is: stored expansions, bookmarks and navigation history are written
+collection key is: stored expansions, bookmarks and navigation history are written
 with them, and a changed value would orphan every one.
 """
 from __future__ import annotations

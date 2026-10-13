@@ -63,7 +63,7 @@ class ThumbnailSelection:
         browser.
 
         A Shift-click whose anchor is no longer on screen -- a pane redrawn under
-        it, a shelf paged on -- has no run to measure, so it lands as a plain
+        it, a collection paged on -- has no run to measure, so it lands as a plain
         click rather than as a range from nowhere.
         """
         if ctrl:

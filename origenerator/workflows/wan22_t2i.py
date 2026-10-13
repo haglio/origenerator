@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
+from origenerator.workflows.wan_experts import wan_expert_shift_param
 
 
 class Wan22T2iWorkflow(WorkflowTemplate):
@@ -69,8 +70,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=2048, step=16),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=50),
             ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, defaults["cfg"], min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift_high", "Composition Focus (First Pass)", ParamType.FLOAT, defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("shift_low", "Composition Focus (Second Pass)", ParamType.FLOAT, defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
+            wan_expert_shift_param(defaults),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25),

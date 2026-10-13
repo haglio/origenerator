@@ -16,6 +16,15 @@ params covered — a new param must be explained before it can ship.
 """
 from __future__ import annotations
 
+_COMPOSITION_FOCUS = (
+    "How the steps split between composition (the layout, the poses and, in a "
+    "video, the motion) and fine detail. Higher keeps the picture noisy for "
+    "longer, so more of the steps decide composition; lower gives more of them to "
+    "texture and detail. Good range: 5–12; 8 is the usual start, 5 for a looping "
+    "clip. Where a run has two passes it sets both, and Handoff Step moves with "
+    "it."
+)
+
 # Keyed by param name; the value is the whole tooltip. Second person, no
 # trailing period on a single clause, one sentence or two at most — a tooltip
 # that runs long is one nobody finishes reading.
@@ -164,26 +173,8 @@ PARAM_HELP: dict[str, str] = {
         "generates from pure noise; lower keeps more of what was there and only "
         "re-imagines the rest."
     ),
-    "shift": (
-        "How the steps split between composition (the layout, the poses and the "
-        "motion) and fine detail. Higher spends more of them while the "
-        "picture is still mostly noise, where composition is decided; lower spends "
-        "more at the end, on texture and detail. 8 is the usual start."
-    ),
-    "shift_high": (
-        "For the first pass (high noise): how the steps split between composition "
-        "(the layout, the poses and, in a video, the motion) and fine detail. "
-        "Higher spends more of them on composition, lower more on texture "
-        "and detail. Keep it equal to the second pass's: two values hand over at "
-        "mismatched noise, which tends to leave grain or smearing."
-    ),
-    "shift_low": (
-        "For the second pass (low noise): how the steps split between composition "
-        "(the layout, the poses and, in a video, the motion) and fine detail. "
-        "Higher spends more of them on composition, lower more on texture "
-        "and detail. Keep it equal to the first pass's: two values hand over at "
-        "mismatched noise, which tends to leave grain or smearing."
-    ),
+    "shift": _COMPOSITION_FOCUS,
+    "shift_high": _COMPOSITION_FOCUS,
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (

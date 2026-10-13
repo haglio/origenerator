@@ -23,6 +23,7 @@ from origenerator.workflows.model_files import list_model_files
 from origenerator.workflows.wan_experts import (
     wan_expert_lora_params,
     wan_expert_model_params,
+    wan_expert_shift_param,
 )
 
 # A scene with a line renders on WAN 2.2's speech-to-video model: one model in
@@ -142,8 +143,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("split_step", "Handoff Step", ParamType.INT, defaults["split_step"], min_val=0, max_val=100),
             ParamDef("cfg_high", "Prompt Strength (First Pass)", ParamType.FLOAT, defaults["cfg_high"], min_val=0.0, max_val=30.0, step=0.1),
             ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, defaults["cfg_low"], min_val=0.0, max_val=30.0, step=0.1),
-            ParamDef("shift_high", "Composition Focus (First Pass)", ParamType.FLOAT, defaults["shift_high"], min_val=0.0, max_val=20.0, step=0.5),
-            ParamDef("shift_low", "Composition Focus (Second Pass)", ParamType.FLOAT, defaults["shift_low"], min_val=0.0, max_val=20.0, step=0.5),
+            wan_expert_shift_param(defaults),
             *wan_expert_model_params(defaults),
             ParamDef("unet_s2v", "Speaking Model", ParamType.COMBO, defaults["unet_s2v"], options=speech),
             *wan_expert_lora_params(defaults),

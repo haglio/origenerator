@@ -1990,3 +1990,14 @@ def test_each_sampler_in_the_dropdown_explains_itself_on_hover(qtbot):
     assert tips == [option_help("sampler_name", "euler"),
                     option_help("sampler_name", "euler_ancestral")]
     assert all(tips)
+
+
+def test_one_composition_focus_gives_both_passes_its_value(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
+    qtbot.addWidget(form)
+
+    form.set_values({"shift_high": 9.0, "shift_low": 5.0})  # made when each pass had its own
+    assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (9.0, 9.0)
+
+    form._widgets["shift_high"].setValue(6.0)
+    assert (form.get_values()["shift_high"], form.get_values()["shift_low"]) == (6.0, 6.0)

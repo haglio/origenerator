@@ -59,7 +59,8 @@ from origenerator.gallery.collection import (
     REQUESTS_KEY,
     TRASH_KEY,
 )
-from origenerator.gallery.groups import SettingsGroup, folder_level
+from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
+from origenerator.gallery.labels import MEDIA_LABELS
 from origenerator.gallery.output import media_type_of_row
 from origenerator.gallery.sides import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
@@ -622,16 +623,13 @@ def tab_close_icon(widget=None) -> QIcon:
     return QIcon(pixmap)
 
 
-_MEDIA_FOLDER_KINDS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
-
-
 def folder_badge(group) -> tuple[QIcon, str] | None:
     level = folder_level(group)
     if level is not None:
         return level_badge_icon(level), LEVEL_LABELS[level]
-    if isinstance(group, SettingsGroup):
-        media = media_type_of_row(group.rows[0])
-        return media_type_icon(media), _MEDIA_FOLDER_KINDS[media]
+    if isinstance(group, (MediaGroup, SettingsGroup)):
+        media = media_type_of_row(rows_under(group)[0])
+        return media_type_icon(media), MEDIA_LABELS[media]
     return None
 
 

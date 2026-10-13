@@ -2090,8 +2090,8 @@ class GalleryView(QWidget):
         The tree's selection is the scope, whatever kind of row it is. A collection
         counts: Recents, Favorites, Experiments and Trash are each a set of
         generations, and standing in one and searching it is the obvious thing to
-        try. The All row over the workflow folders is what covers the library
-        entire, since every other folder narrows the answer before the query does.
+        try. The All row is what covers the library entire, since every other
+        folder narrows the answer before the query does.
 
         ``path`` is the row's breadcrumb — what the field, the header and the
         empty-result message all name the scope by.
@@ -4513,8 +4513,8 @@ def _custom_folders_by_side(trees, records) -> dict[str, list]:
 
 def _group_workflow(group) -> str | None:
     """The single workflow a folder belongs to, or ``None`` if it spans several
-    (the All row) and so has no one workflow time to fall back on."""
-    if isinstance(group, gallery.AllGroup):
+    (All, Images, Videos) and so has no one workflow time to fall back on."""
+    if isinstance(group, (gallery.AllGroup, gallery.MediaGroup)):
         return None
     if isinstance(group, gallery.WorkflowGroup):
         return group.workflow_name

@@ -1,7 +1,7 @@
 """The folder tree's node types and the helpers that walk them.
 
-Each level of the gallery hierarchy — workflow, model, LoRA, source image,
-settings — is a small dataclass holding its stable key, display label, star state,
+Each level of the gallery hierarchy — media, workflow, model, LoRA, source
+image, settings — is a small dataclass holding its stable key, display label, star state,
 and children. The walkers (:func:`child_groups`, :func:`rows_under`) and the
 tier/level classifiers (:func:`folder_level`, :func:`group_level`) work off those
 types alone, so they live with the definitions rather than with the tree builder.
@@ -76,19 +76,27 @@ class WorkflowGroup:
 
 
 @dataclass
+class MediaGroup:
+    key: str
+    label: str
+    children: list[WorkflowGroup]
+    favorite: bool = False
+    level: ClassVar[str] = "media"
+
+
+@dataclass
 class AllGroup:
-    """The whole library as one folder: every workflow folder, gathered under a row.
+    """The whole library as one folder: Images and Videos, gathered under a row.
 
     It exists so there is somewhere to *stand* that means everything. The tree
-    selection scopes the search, so without a root over the workflow folders
+    selection scopes the search, so without a root over Images and Videos
     there would be no way to ask a question of the gallery as a whole — the
-    collections are not folders, and a workflow folder is already
-    one recipe out of many.
+    collections are not folders, and either kind is already half of it.
     """
 
     key: str
     label: str
-    children: list[WorkflowGroup]
+    children: list[MediaGroup]
     favorite: bool = False
     level: ClassVar[str] = "all"
 
@@ -114,8 +122,8 @@ class CustomGroup:
 
 def folder_level(group) -> str | None:
     """Which hierarchy level a folder sits at: ``"workflow"``, ``"model"``,
-    ``"lora"`` or ``"source_image"`` — ``None`` for the All row, the settings
-    leaves and a custom folder.
+    ``"lora"`` or ``"source_image"`` — ``None`` for the All row, Images and
+    Videos, the settings leaves and a custom folder.
 
     Powers the lettered chip the gallery draws on tree rows and browser tiles, so
     a folder's place in the hierarchy reads at a glance rather than by counting
@@ -151,8 +159,8 @@ def rows_under(group) -> list[dict]:
 
 
 def group_level(group) -> str:
-    """Which tier of the tree ``group`` sits at: all, workflow, model, lora,
-    source_image, custom, or settings. A bookmark records its tier so its key can
+    """Which tier of the tree ``group`` sits at: all, media, workflow, model,
+    lora, source_image, custom, or settings. A bookmark records its tier so its key can
     be recomputed from one of its rows under whatever key formula is current (see
     :func:`folder_key_at_level`)."""
     return group.level

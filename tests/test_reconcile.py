@@ -331,6 +331,18 @@ def test_reconcile_leaves_a_truly_orphaned_bookmark_untouched(tmp_path):
     assert summary["orphaned"] == 1
 
 
+def test_a_star_on_images_stays_on_the_folder_the_images_are_in(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                   filename="sdxl_t2i_p1.png")
+    db.set_folder_favorite("image", True)
+
+    summary = reconcile_folder_meta(db)
+
+    assert summary == {"refreshed": 1, "repointed": 0, "orphaned": 0}
+    assert db.folder_meta_map()["image"]["starred"] is True
+
+
 def test_reconcile_merges_when_the_target_folder_is_already_bookmarked(tmp_path):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},

@@ -1,8 +1,8 @@
 """Nest a flat list of generations into the gallery's folder tree.
 
-The gallery view organizes generations as nested folders:
-workflow -> model -> LoRA -> [source image] ->
-settings group (rows sharing every setting except per-instance ones: the seed,
+The gallery view organizes generations as nested folders: Images or
+Videos -> workflow -> model -> LoRA -> [source image] -> settings group
+(rows sharing every setting except per-instance ones: the seed,
 and — for an image-to-video workflow — the specific start-frame *file*. A re-roll
 regenerates that frame, so the raw filename is per-instance; but the
 *configuration* that produced the frame is not, so it is folded back into the
@@ -11,13 +11,11 @@ while two built from differently configured images split apart. The enhance
 tail's params are excluded too, so an enhanced render and its unenhanced twin
 land in one folder — enhancement is a finish on an image, not another image).
 
-Media type is not a folder of its own — the gallery's Images/Videos ticks
-decide which kinds are listed (``media_types``) — but it still keys every folder,
-so a workflow that has produced both gets one workflow folder per kind. That
-split is what lets the source-image level stay a property of *videos* alone: it
+A workflow that has produced both kinds gets a folder under each. That split
+is what lets the source-image level stay a property of *videos* alone: it
 grows under a video workflow folder, while a still an image-conditioned workflow
-happened to output (an imported PNG under a video prefix) sits in that workflow's
-image folder and is grouped like any other image.
+happened to output (an imported PNG under a video prefix) sits under Images and
+is grouped like any other image.
 
 Each level below the workflow is a *projection* of that settings key onto one
 facet, splitting a folder into sub-folders that differ in that facet alone: model
@@ -40,6 +38,7 @@ from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     AllGroup,
     LoraGroup,
+    MediaGroup,
     ModelGroup,
     SettingsGroup,
     SourceImageGroup,
@@ -55,6 +54,7 @@ from origenerator.gallery.keys import (
     source_image_key,
 )
 from origenerator.gallery.labels import (
+    MEDIA_LABELS,
     _source_image_label,
     lora_label,
     model_label,
@@ -123,10 +123,6 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     workflow_name = row.get("workflow_name") or "unknown"
     params_json = row.get("params_json")
     if level == "media":
-        # A tier the tree no longer grows — the Images/Videos folders became the
-        # gallery's two ticks — but a star made while it did still records
-        # it, so the key stays computable. It matches no current folder, and the
-        # reconcile orphans that bookmark rather than raising over its tier.
         return media_type
     if level == "workflow":
         return f"{media_type}/{workflow_name}"
@@ -144,7 +140,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
 
 def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
     workflow_name = row.get("workflow_name") or "unknown"
-    levels = ("workflow", "model", "lora",
+    levels = ("media", "workflow", "model", "lora",
               *(("source_image",) if _grows_source_images(media_type_of_row(row), workflow_name)
                 else ()),
               "settings")
@@ -279,7 +275,7 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
     return (meta.get("custom_name") or label, bool(meta.get("starred")))
 
 
-def favorite_folders(tree: list[WorkflowGroup]) -> list:
+def favorite_folders(tree: list[MediaGroup]) -> list:
     """Every favorited folder in ``tree``, at any depth, in top-down tree order.
 
     Powers the gallery's Favorites collection: a folder is bookmarked in place (its
@@ -685,9 +681,9 @@ def build_gallery_tree(
     *, image_index: dict | None = None,
     both_kinds: frozenset[str] | None = None,
     name_of: Callable[[str], str] | None = None,
-) -> list[WorkflowGroup]:
-    """Nest rows into workflow -> model -> LoRA -> [source image] -> settings
-    folders.
+) -> list[MediaGroup]:
+    """Nest rows into Images and Videos, then workflow -> model -> LoRA ->
+    [source image] -> settings folders.
 
     ``image_index`` is the start-frame index the source-image folders are keyed
     by, for a caller who narrowed ``rows`` — see :func:`start_frame_index`, which
@@ -698,10 +694,10 @@ def build_gallery_tree(
     it to a single "(no LoRA)" folder. The source-image level appears only under
     a video workflow folder (a still an image-conditioned workflow output is
     grouped like any other image). Which rows are nested at all is
-    :func:`placeable_rows`. Folders are placed by the oldest of their rows,
-    newest-made first (the caller orders rows newest-first); neither a new
-    generation in a folder nor a star moves it — bookmarks are gathered by
-    :func:`favorite_folders` instead. ``folder_meta``
+    :func:`placeable_rows`. Images lead Videos; every other folder is placed by
+    the oldest of its rows, newest-made first (the caller orders rows
+    newest-first); neither a new generation in a folder nor a star moves it —
+    bookmarks are gathered by :func:`favorite_folders` instead. ``folder_meta``
     (keyed by each folder's stable ``key``) overrides the default label and
     supplies the star state.
 
@@ -716,36 +712,42 @@ def build_gallery_tree(
     rows = placeable_rows(rows)
     if image_index is None:
         image_index = start_frame_index(rows)
-    tree = []
-    for (media_type, wf_name), wf_rows in _group_by_creation(
-        rows, lambda r: (media_type_of_row(r), r.get("workflow_name") or "unknown")
+    by_kind = dict(_group_by_creation(rows, media_type_of_row))
+    return [_media_folder(media_type, by_kind[media_type], folder_meta, image_index, both_kinds,
+                          name_of or _unnamed)
+            for media_type in MediaType if media_type in by_kind]
+
+
+def _media_folder(media_type, rows, folder_meta, image_index, both_kinds,
+                  name_of) -> MediaGroup:
+    label, favorite = _overlay(MEDIA_LABELS[media_type], media_type, folder_meta)
+    workflows = []
+    for wf_name, wf_rows in _group_by_creation(
+        rows, lambda r: r.get("workflow_name") or "unknown"
     ):
-        wf_key = f"{media_type}/{wf_name}"
         wf_label, wf_favorite = _workflow_folder_label(media_type, wf_name, folder_meta,
                                                        both_kinds)
-        tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of or _unnamed)
-        tree.append(WorkflowGroup(
-            wf_key, wf_name, wf_label,
+        tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of)
+        workflows.append(WorkflowGroup(
+            f"{media_type}/{wf_name}", wf_name, wf_label,
             _build_model_groups(tier, wf_rows),
             wf_favorite,
         ))
-    return tree
+    return MediaGroup(str(media_type), label, workflows, favorite)
 
 
 def _unnamed(_prompt_id: str) -> str:
     return ""
 
 
-# The row over the workflow folders, standing for the library entire. Not part of
-# the grouping — build_gallery_tree still returns the workflow folders, and
-# everything reading that (favorited folders, custom folders, the browser's tiles)
-# is unchanged — this is a folder wrapped *around* the result, for somewhere to
-# stand that means everything.
+# The row over Images and Videos, standing for the library entire: a folder
+# wrapped *around* what build_gallery_tree returns, for somewhere to stand that
+# means everything.
 ALL_KEY = "__all__"
 ALL_LABEL = "All"
 
 
 def all_group(tree_model, folder_meta: dict[str, dict] | None = None) -> AllGroup:
-    """The workflow folders gathered under one folder, named and starred like any other."""
+    """Images and Videos gathered under one folder, named and starred like any other."""
     label, favorite = _overlay(ALL_LABEL, ALL_KEY, folder_meta or {})
     return AllGroup(ALL_KEY, label, list(tree_model), favorite)

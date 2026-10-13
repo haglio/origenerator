@@ -460,7 +460,7 @@ def _top_level(tree, side=LANDSCAPE):
 
 
 def _alls(tree, side=LANDSCAPE):
-    """What one half's All row holds: its collections, then its workflow folders."""
+    """What one half's All row holds: its collections, then Images and Videos."""
     all_row = _top_level(tree, side)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
@@ -512,15 +512,13 @@ def _collection_names(item):
 
 
 def _workflow_rows(tree, media=None, side=LANDSCAPE):
-    """The workflow rows, which hang under the All row that tops the tree, by
-    label — narrowed to one media type ("image"/"video") when ``media`` says so."""
+    """The workflow rows, which hang under Images and Videos, by label — one
+    kind's alone ("image"/"video") when ``media`` says so."""
     all_row = _top_level(tree, side).get("All")
     if all_row is None:
         return {}
-    rows = _subs(all_row)
-    if media is not None:
-        rows = [row for row in rows if _key(row).startswith(f"{media}/")]
-    return {row.text(0): row for row in rows}
+    kinds = [kind for kind in _subs(all_row) if media in (None, _key(kind))]
+    return {row.text(0): row for kind in kinds for row in _subs(kind)}
 
 
 def _image_workflow(tree, side=LANDSCAPE):
@@ -558,8 +556,6 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     top = _top_level(view._tree)
     assert set(top) == {"All"}
     assert _collection_names(top["All"]) == _COLLECTION_NAMES
-    # Media type grows no folder of its own any more; the two ticks over the
-    # tree are what says which kinds are listed.
     assert set(_workflow_rows(view._tree)) == {"SDXL Text-to-Image", "WAN 2.2 Image-to-Video"}
 
     workflow_node = _image_workflow(view._tree)
@@ -962,8 +958,8 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
 
 def test_the_all_row_searches_the_whole_library(qtbot):
     # What All is for: every other folder narrows the answer before the query
-    # does, so without a row above the workflow folders there is nowhere to
-    # stand that means everything.
+    # does, so without a row above Images and Videos there is nowhere to stand
+    # that means everything.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
@@ -975,17 +971,144 @@ def test_the_all_row_searches_the_whole_library(qtbot):
     assert set(view.visible_prompt_ids()) == {"i1", "v1"}
 
 
-def test_the_all_row_holds_the_workflow_folders_and_is_where_the_gallery_lands(qtbot):
+def test_the_all_row_holds_images_and_videos_and_is_where_the_gallery_lands(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
     view.refresh()
 
     all_row = _top_level(view._tree)["All"]
-    assert [row.text(0) for row in _subs(all_row)] == [
-        "SDXL Text-to-Image", "WAN 2.2 Image-to-Video"]
+    assert [row.text(0) for row in _subs(all_row)] == ["Images", "Videos"]
     assert all_row.isExpanded()   # shut, it would be a tree with nothing in it
     assert view._tree.currentItem() is all_row
+
+
+def test_each_side_grows_a_folder_for_a_kind_only_where_it_holds_that_kind(qtbot):
+    tall_picture = _row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1,
+                                           "width": 100, "height": 200}, "sdxl_t2i_i1.png")
+    wide_video = _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
+                      "wan22_i2v_00001_.mp4")
+    view = GalleryView(FakeDB([tall_picture, wide_video]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert [row.text(0) for row in _subs(_top_level(view._tree, PORTRAIT)["All"])] == ["Images"]
+    assert [row.text(0) for row in _subs(_top_level(view._tree, LANDSCAPE)["All"])] == ["Videos"]
+
+
+def test_entering_the_path_of_videos_goes_to_the_videos(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _enter_folder_path(view, qtbot, "Landscape  ›  All  ›  Videos")
+
+    assert view._tree.currentItem() is _alls(view._tree)["Videos"]
+
+
+def _of_both_kinds(qtbot, actions=None):
+    rows = [_image("i1", "a cat", 50, 1),
+            _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
+                 "wan22_i2v_00001_.mp4")]
+    view = GalleryView(FakeDB(rows), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    return view
+
+
+def test_standing_on_images_searches_the_images_alone(qtbot):
+    view = _of_both_kinds(qtbot)
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
+
+    _search_for(view, "cat")
+
+    assert view.visible_prompt_ids() == ["i1"]
+
+
+def test_a_slideshow_started_on_videos_plays_the_videos_alone(qtbot):
+    view = _of_both_kinds(qtbot)
+    view._tree.setCurrentItem(_alls(view._tree)["Videos"])
+
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["v1"]
+    assert [row["prompt_id"]
+            for row in view._slideshows.rows_at(view.slideshow_location())] == ["v1"]
+
+
+def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
+    view = _of_both_kinds(qtbot)
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+
+    assert _square_names(view) == [*_COLLECTION_NAMES, "Images", "Videos"]
+    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
+                 if tile.key == "image"]
+    (mark,) = [label for label in square.findChildren(QLabel)
+               if label.toolTip() == "Images" and not label.pixmap().isNull()]
+    size = mark.pixmap().size()
+    assert mark.pixmap().toImage() == icons.media_type_icon("image").pixmap(size).toImage()
+
+
+def test_images_shows_its_workflow_folders_as_squares(qtbot):
+    view = _of_both_kinds(qtbot)
+
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
+
+    assert _square_names(view) == ["SDXL Text-to-Image"]
+
+
+def test_videos_once_favorited_is_a_square_in_alls_favorites(qtbot, monkeypatch):
+    view = _of_both_kinds(qtbot)
+    _answer_menu(monkeypatch, "Favorite")
+
+    _tree_menu(view, "video")
+    view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
+
+    assert _square_names(view) == ["Videos"]
+
+
+def test_a_folder_of_your_own_can_gather_the_videos_whole(qtbot):
+    view = _of_both_kinds(qtbot)
+
+    _make_folder(view, "Clips", ["video"])
+    view._tree.setCurrentItem(_top_level(view._tree)["Clips"])
+
+    assert _square_names(view) == ["Videos"]
+    assert [row["prompt_id"] for row in view.rows_to_play()] == ["v1"]
+
+
+def test_images_and_videos_offer_on_their_menus_what_all_offers(qtbot, monkeypatch):
+    view = _of_both_kinds(qtbot)
+    menus = []
+    for key in (gallery.ALL_KEY, "image", "video"):
+        labels = []
+        _menu_labels(monkeypatch, labels)
+        _tree_menu(view, key)
+        menus.append(labels)
+
+    assert menus == [["Favorite"]] * 3
+
+
+def test_the_delete_key_on_images_deletes_nothing(qtbot):
+    actions = FakeActions()
+    view = _of_both_kinds(qtbot, actions)
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
+    view._confirm = lambda text: True
+
+    view._delete_selection()
+
+    assert actions.deleted == []
+
+
+def test_images_lend_no_one_workflows_time_when_nothing_in_them_was_timed(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db.recent_durations = lambda workflow_name, limit=10: [600.0]
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
+
+    assert view._avg_label.text() == ""
 
 
 def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
@@ -1019,7 +1142,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
     assert view.visible_prompt_ids() == ["i1"]
     assert view._search.field.placeholderText() == (
-        f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest…")
+        f"Search {SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest…")
 
 
 def _collection_row(folder, label):
@@ -2756,7 +2879,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     assert view.visible_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
+        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
@@ -2768,7 +2891,7 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.slideshow_subject() == (
-        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  {workflow.text(0)}  ›  Latest")
+        f"{SIDE_LABELS[LANDSCAPE]}  ›  All  ›  Images  ›  {workflow.text(0)}  ›  Latest")
 
 
 def test_recents_collection_is_pinned_first_and_lists_recent_items(qtbot):
@@ -3777,11 +3900,11 @@ def test_a_folder_of_each_kind_keeps_its_name_whichever_kind_is_chosen(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")
-    assert {f"{looping} images", f"{looping} videos"} <= set(_alls(view._tree))
+    assert {f"{looping} images", f"{looping} videos"} <= set(_workflow_rows(view._tree))
 
     view._videos_only.setChecked(True)
 
-    assert {f"{looping} images", f"{looping} videos"} <= set(_alls(view._tree))
+    assert {f"{looping} images", f"{looping} videos"} <= set(_workflow_rows(view._tree))
 
 
 def test_with_several_folders_picked_the_path_opens_empty(qtbot):

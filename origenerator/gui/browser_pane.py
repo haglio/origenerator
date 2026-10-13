@@ -874,7 +874,8 @@ class BrowserPane(QObject):
         menu a tile inside a folder offers; ``corner_actions`` become the tile's
         hover controls (a review's keep/reject, wired to the verdict)."""
         def wire(tw):
-            tw.clicked.connect(self._thumbnail_clicked)  # preview it here, in the collection
+            tw.pressed.connect(self.apply_selection)
+            tw.clicked.connect(self.thumbnail_activated)  # preview it here, in the collection
             tw.double_clicked.connect(self._collection_double_clicked)  # or open its folder
             # Every collection gets the folder menu — an item is no less actionable for
             # being listed by when it was made or by its bookmark rather than by its
@@ -1161,7 +1162,8 @@ class BrowserPane(QObject):
         actions that do apply: restore, or end it for good.
         """
         def wire(tile):
-            tile.clicked.connect(self._thumbnail_clicked)          # preview it here
+            tile.pressed.connect(self.apply_selection)
+            tile.clicked.connect(self.thumbnail_activated)          # preview it here
             tile.double_clicked.connect(self._thumbnail_double_clicked)  # or reuse its settings
             tile.context_requested.connect(self._trash_context_menu)
             tile.corner_action_triggered.connect(self.trash_action_triggered)
@@ -1294,7 +1296,8 @@ class BrowserPane(QObject):
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
         def wire(tw):
-            tw.clicked.connect(self._thumbnail_clicked)
+            tw.pressed.connect(self.apply_selection)
+            tw.clicked.connect(self.thumbnail_activated)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
@@ -1386,10 +1389,6 @@ class BrowserPane(QObject):
         return self._selection.shown
 
     # --- multi-selection ---------------------------------------------------
-
-    def _thumbnail_clicked(self, prompt_id: str, modifiers: Qt.KeyboardModifier):
-        self.apply_selection(prompt_id, modifiers)
-        self.thumbnail_activated.emit(prompt_id)  # the view records the visit itself
 
     def _thumbnail_double_clicked(self, prompt_id: str):
         """Open a thumbnail as a Generate tab and keep that tab.

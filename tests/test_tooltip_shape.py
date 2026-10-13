@@ -5,6 +5,7 @@ import html
 from PyQt6.QtCore import QEvent, QPoint
 from PyQt6.QtGui import QHelpEvent
 from PyQt6.QtWidgets import QApplication, QLabel, QListWidget, QListWidgetItem, QToolTip
+from shared_ui.colors import WHITE
 
 from origenerator.gui.stylesheet import dress_application
 from origenerator.gui.tooltip_shape import shaped
@@ -66,3 +67,9 @@ def test_the_dressed_app_shows_a_long_choice_tooltip_as_a_block(qapp, qtbot):
     _hover(choices.viewport(), choices.visualItemRect(item).center())
 
     assert QToolTip.text() == shaped(LONG)
+
+
+def test_a_tooltip_can_open_with_a_bold_white_lead():
+    assert shaped("Euler a on model pages.", lead="Recommended.") == (
+        f'<p style="white-space:pre"><b style="color:{WHITE.name()}">Recommended.</b> '
+        "Euler a on model pages.</p>")

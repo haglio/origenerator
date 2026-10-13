@@ -414,8 +414,17 @@ class ParamForm(QWidget):
     def set_warnings(self, advice: dict[str, Advice]) -> None:
         self._advice = dict(advice)
         for key, mark in self._warning_marks.items():
-            found = advice.get(key)
-            mark.warn(f"{found.text} Click to use {found.fix_shown}." if found else "")
+            mark.warn(self._warning(key))
+        for title, section in self._sections.items():
+            section.warning.warn(self._warnings_about(self._present_keys[title]))
+
+    def _warning(self, key: str) -> str:
+        found = self._advice.get(key)
+        return f"{found.text} Click to use {found.fix_shown}." if found else ""
+
+    def _warnings_about(self, keys: list[str]) -> str:
+        return "\n".join(f"{self._labels[key].text()}: {self._warning(key)}"
+                         for key in keys if key in self._advice)
 
     def show_prompt_diff(self, key: str, before: str, after: str) -> None:
         """Mark a prompt field with the change a spoken request made to it —

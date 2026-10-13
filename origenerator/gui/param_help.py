@@ -8,11 +8,10 @@ keeps the twelve descriptions of ``cfg`` from drifting into twelve different
 claims. The grouping lives in :mod:`origenerator.gui.param_sections` for exactly
 the same reason.
 
-Written for someone who knows what they want the picture to do and not what a
-sampler is: each line says what moving the number does to the result, and where
-a value has a practical range or a known trap, it says that too. Kept Qt-free so
-the text is unit-testable, and a guard test keeps every registered workflow's
-params covered — a new param must be explained before it can ship.
+Each line says what moving the setting does to the result, and every number
+recommends a "Good range:" for it, which the user asked for on every tooltip.
+Kept Qt-free so the text is unit-testable, and guard tests keep every registered
+workflow's params covered and ranged before a new one can ship.
 """
 from __future__ import annotations
 
@@ -25,9 +24,7 @@ _COMPOSITION_FOCUS = (
     "it."
 )
 
-# Keyed by param name; the value is the whole tooltip. Second person, no
-# trailing period on a single clause, one sentence or two at most — a tooltip
-# that runs long is one nobody finishes reading.
+# Keyed by param name; the value is the whole tooltip.
 PARAM_HELP: dict[str, str] = {
     # --- prompts and the picture a run starts from ---
     "positive_prompt": (
@@ -120,83 +117,98 @@ PARAM_HELP: dict[str, str] = {
     "lora_strength_high": (
         "How hard the first pass's LoRA (high noise) pulls. 1.0 is its intended "
         "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
-        "picture."
+        "picture. Good range: 0.6–1.2."
     ),
     "lora_strength_low": (
         "How hard the second pass's LoRA (low noise) pulls. 1.0 is its intended "
         "strength; below 0.5 it barely shows, above 1.2 it tends to take over the "
-        "picture."
+        "picture. Good range: 0.6–1.2."
     ),
 
     # --- calibration ---
     "steps": (
         "How many times the model goes over the picture, refining it. More steps "
         "means more settled detail and a longer wait, with little gain once the "
-        "picture has stopped changing."
+        "picture has stopped changing. Good range: 25–40 for SDXL pictures, 20–30 for "
+        "Flux and WAN, and 4–8 when a speed LoRA is loaded."
     ),
     "cfg": (
-        "How strictly the model obeys the prompt (the CFG scale underneath). Too "
-        "low drifts off it; too high burns contrast and flattens detail."
+        "How strictly the model obeys the prompt (the CFG scale underneath). Too low "
+        "drifts off it; too high burns contrast and flattens detail. Good range: 3–7 "
+        "for SDXL pictures, where most model pages ask for 4–5; 3–5 for WAN; 1 with a "
+        "speed LoRA."
     ),
     "cfg_high": (
         "Prompt strength for the first pass (high noise; the CFG scale underneath), "
         "where the motion is settled. A LoRA's author often publishes a different "
-        "number for each pass; where they publish one, put it in both."
+        "number for each pass; where they publish one, put it in both. Good range: "
+        "3–4, or 1 with a speed LoRA on this pass."
     ),
     "cfg_low": (
         "Prompt strength for the second pass (low noise; the CFG scale underneath), "
-        "where the texture is settled."
+        "where the texture is settled. Good range: 3–4, or 1 with a speed LoRA on "
+        "this pass."
     ),
     "split_step": (
         "The step where the first pass (high noise) hands over to the second (low "
-        "noise; the split step); 0 hands over at half the steps. Leave it there "
-        "unless something looks off: hand over later, a bigger number, when the "
-        "motion comes out weak or the layout wanders, and earlier when the detail "
-        "comes out soft or smeared. Move it with Composition Focus too: lower "
-        "focus wants an earlier handoff, higher a later one."
+        "noise; the split step). The first pass settles the layout and the motion and "
+        "the second refines the detail; the two models are built to switch at one "
+        "noise level, and Composition Focus decides which step reaches it, a lower "
+        "focus sooner and a higher one later. Good range: 0, which hands over at half "
+        "the steps and suits a Composition Focus of 8, or 40–60% of Steps. Hand over "
+        "later (a bigger number) when the motion comes out weak or the layout "
+        "wanders, and earlier when the detail comes out soft or smeared."
     ),
     "guidance": (
         "How strictly the model obeys the prompt (Flux's guidance value). It wants "
-        "much smaller numbers than prompt strength does elsewhere — this model's "
-        "usable range sits low."
+        "much smaller numbers than prompt strength does elsewhere. Good range: "
+        "2.5–4.5; 3.5 is the usual start."
     ),
     "sampler_name": (
-        "The method that walks the noise down to a picture. They differ in look "
-        "and in how many steps they need to settle."
+        "How the picture moves from noise toward the model's guess at each step; "
+        "hover each choice for how it works and how long it takes. Good choices: "
+        "euler_ancestral (Euler a on model pages), dpmpp_2m with Step Spacing karras "
+        "(DPM++ 2M Karras) or dpmpp_sde with karras (DPM++ SDE Karras), the ones "
+        "model pages recommend most."
     ),
     "scheduler": (
-        "How the noise level is spaced across the steps. It changes where the "
-        "detail lands more than whether the image is good."
+        "How the noise removed is spread across the steps: normal spreads it evenly, "
+        "while karras and exponential take big steps first and small ones at the end, "
+        "so more of the run goes to fine detail. It matters less than the Sampler and "
+        "goes with it. Good choices: normal or simple with euler and euler_ancestral, "
+        "karras with the dpmpp ones (DPM++ 2M Karras on model pages). To compare two, "
+        "keep the seed and change only this, on two or three different prompts."
     ),
     "denoise": (
         "How much of the starting image is redrawn (the denoise strength). 1.0 "
         "generates from pure noise; lower keeps more of what was there and only "
-        "re-imagines the rest."
+        "re-imagines the rest. Good range: 1.0 for a new picture; 0.4–0.7 to keep "
+        "more of a starting image."
     ),
     "shift": _COMPOSITION_FOCUS,
     "shift_high": _COMPOSITION_FOCUS,
 
     # --- the enhance tail (off the form; the Enhance subpanel owns these) ---
     "enhance_scale": (
-        "How much bigger the enhanced version is than the render it came from. "
-        "2x is the usual finish; past 3x the pass has to invent a lot."
+        "How much bigger the enhanced version is than the render it came from. Past "
+        "3x the pass has to invent a lot. Good range: 1.5–2x."
     ),
     "enhance_steps": (
-        "How many times the enhancement goes over the enlarged picture. Around 20 "
-        "is enough to build texture without redrawing anything."
+        "How many times the enhancement goes over the enlarged picture. Around 20 is "
+        "enough to build texture without redrawing anything. Good range: 15–25."
     ),
     "enhance_denoise": (
-        "How far the enhance may stray from the picture it is refining (its "
-        "denoise). 0.15 adds skin and fabric texture; by 0.3 it starts re-imagining "
-        "anatomy, which is where creases turn into wounds."
+        "How far the enhance may stray from the picture it is refining (its denoise). "
+        "0.15 adds skin and fabric texture; by 0.3 it starts re-imagining anatomy, "
+        "which is where creases turn into wounds. Good range: 0.1–0.2."
     ),
     "enhance_detail_fixes": (
-        "Which parts the enhance goes back over and redraws on their own, and "
-        "how hard it redraws each. This is what mends a mouth melted into its "
-        "teeth or a finger too many, and it can afford to be bold where the "
-        "whole-picture pass cannot, since nothing outside the regions found is "
-        "touched: around 0.45 actually re-forms a bad hand, while below 0.3 it "
-        "only tidies the one it was given."
+        "Which parts the enhance goes back over and redraws on their own, and how "
+        "hard it redraws each. This is what mends a mouth melted into its teeth or a "
+        "finger too many, and it can afford to be bold where the whole-picture pass "
+        "cannot, since nothing outside the regions found is touched: around 0.45 "
+        "actually re-forms a bad hand, while below 0.3 it only tidies the one it was "
+        "given. Good range: 0.3–0.5 for each part."
     ),
 
     # --- structure transfer ---
@@ -206,37 +218,72 @@ PARAM_HELP: dict[str, str] = {
     ),
     "controlnet": "The model that holds the picture to the structure image (a ControlNet).",
     "controlnet_strength": (
-        "How firmly the output is held to the structure image. Lower lets the "
-        "prompt reshape things; higher traces the source closely."
+        "How firmly the output is held to the structure image. Lower lets the prompt "
+        "reshape things; higher traces the source closely. Good range: 0.5–0.9."
     ),
     "controlnet_end": (
-        "How far into the drawing the structure keeps being held. Letting go "
-        "early lets the last steps add detail the structure has no opinion on."
+        "How far into the drawing the structure keeps being held. Letting go early "
+        "lets the last steps add detail the structure has no opinion on. Good range: "
+        "0.6–1.0."
     ),
 
     # --- size and length ---
-    "width": "The output width in pixels.",
-    "height": "The output height in pixels.",
+    "width": (
+        "The output width in pixels. Good range: about one megapixel in all for SDXL, "
+        "such as 832×1216, 1024×1024 or 1216×832; up to about two for Flux and WAN "
+        "2.2 Text-to-Image."
+    ),
+    "height": (
+        "The output height in pixels. Good range: about one megapixel in all for "
+        "SDXL, such as 832×1216, 1024×1024 or 1216×832; up to about two for Flux and "
+        "WAN 2.2 Text-to-Image."
+    ),
     "frame_count": (
-        "How long the clip runs, in seconds — of real motion, at any frame rate. "
-        "Pick a length or type one; it is rounded to the frames the model works "
-        "in, and stops where the model stops."
+        "How long the clip runs, in seconds — of real motion, at any frame rate. Pick "
+        "a length or type one; it is rounded to the frames the model works in, and "
+        "stops where the model stops. Good range: 5–10 s for a clip and 1–3 s for a "
+        "loop; a longer clip is made in pieces, each starting on the last frame of "
+        "the one before, and can drift."
     ),
     "frame_rate": (
-        "How smooth the motion looks. The model always paces the action at 16 "
-        "frames a second; a higher rate fills in the frames between those, so "
-        "the clip runs the same length at the same speed, just less steppy. "
-        "Rates are multiples of 16 because the frames are filled in a whole "
-        "number at a time; anything else settles onto the nearest."
+        "How smooth the motion looks. The model always paces the action at 16 frames "
+        "a second; a higher rate fills in the frames between those, so the clip runs "
+        "the same length at the same speed, just less steppy. Rates are multiples of "
+        "16 because the frames are filled in a whole number at a time; anything else "
+        "settles onto the nearest. Good range: 16, as the model makes it, or 32 for "
+        "smoother motion."
     ),
 
     # --- the authored motion (track-conditioned video) ---
-    "motion_hz": "How many cycles per second the generated motion runs at.",
-    "motion_x": "The horizontal line the motion travels along, in pixels across the frame.",
-    "motion_ceiling": "The pixel row the motion reaches at the high end of its travel.",
-    "motion_floor": "The pixel row the motion reaches at the low end of its travel.",
-    "anchor_x": "The horizontal position of the point that stays put while the motion moves.",
-    "anchor_y": "The vertical position of the point that stays put while the motion moves.",
+    "motion_hz": (
+        "How many up-and-down cycles per second the generated motion runs at. Good "
+        "range: 0.5–2; 1.2 to start."
+    ),
+    "motion_x": (
+        "The horizontal line the motion travels along, in pixels across the frame. "
+        "Good range: leave it at its starting value, and the app aims it from the "
+        "Start Image itself; set by hand, keep it on the part that moves."
+    ),
+    "motion_ceiling": (
+        "The pixel row the motion reaches at the high end of its travel. Good range: "
+        "leave it at its starting value, and the app aims it from the Start Image "
+        "itself; set by hand, keep it on the part that moves."
+    ),
+    "motion_floor": (
+        "The pixel row the motion reaches at the low end of its travel. Good range: "
+        "leave it at its starting value, and the app aims it from the Start Image "
+        "itself; set by hand, keep it on the part that moves."
+    ),
+    "anchor_x": (
+        "The horizontal position of the point that stays put while the motion moves. "
+        "Good range: leave it at its starting value, and the app aims it from the "
+        "Start Image itself; set by hand, keep it on the part that moves."
+    ),
+    "anchor_y": (
+        "The vertical position of the point that stays put while the motion moves. "
+        "Good range: leave it at its starting value, and the app aims it from the "
+        "Start Image itself; set by hand, keep it on the part that moves."
+    ),
 
     # --- sound ---
     "audio_prompt": (
@@ -346,7 +393,6 @@ OPTION_HELP: dict[str, dict[str, str]] = {
         ),
     },
 }
-
 
 def param_help(key: str) -> str:
     """The tooltip for one param, or ``""`` when it has none.

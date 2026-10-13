@@ -14,7 +14,7 @@ import pytest
 from origenerator.gallery import ENHANCE_SETTING_KEYS
 from origenerator.gui.param_help import PARAM_HELP, option_help, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.base import SAMPLER_OPTIONS
+from origenerator.workflows.base import SAMPLER_OPTIONS, ParamType
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
@@ -98,3 +98,17 @@ def test_every_sampler_says_how_it_works_and_how_long_it_takes():
     unexplained = [name for name in SAMPLER_OPTIONS
                    if "per step" not in option_help("sampler_name", name)]
     assert unexplained == []
+
+
+@pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
+def test_every_number_on_a_form_recommends_a_good_range(workflow_name):
+    numbers = (ParamType.INT, ParamType.FLOAT)
+    unranged = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+                      if pd.type in numbers and "Good range:" not in param_help(pd.key))
+    assert unranged == []
+
+
+def test_the_sampler_and_step_spacing_recommend_their_good_choices():
+    assert "Good choices:" in PARAM_HELP["sampler_name"]
+    assert "Good choices:" in PARAM_HELP["scheduler"]
+    assert "Good range:" in PARAM_HELP["enhance_detail_fixes"]

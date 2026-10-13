@@ -163,6 +163,7 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
+_TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
 # How long the search waits after the last keystroke before asking the local LLM
 # to widen the query. Long enough to be a real pause rather than a gap between
 # two characters — the table-widened results are already on screen throughout, so
@@ -581,14 +582,15 @@ class GalleryView(QWidget):
                     else:
                         self._undo()
                     return True
-                # The OSR2 motion keys work right here in the main window too —
-                # not only in the fullscreen show — under the same guards that
-                # keep them out of text fields and other windows.
-                if (not event.modifiers()
-                        and apply_motion_key(self._osr2_motion, event.key(),
-                                             on_drive_toggle=self.toggle_osr2_drive)):
-                    self._motion_panel.refresh()
-                    return True
+            # The OSR2 motion keys work right here in the main window too — not
+            # only in the fullscreen show — whatever was clicked last, unless it
+            # is a text field taking the key as a character.
+            if (self._gallery_owns_keys(even_from_the_info_pane=True)
+                    and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+                    and apply_motion_key(self._osr2_motion, event.key(),
+                                         on_drive_toggle=self.toggle_osr2_drive)):
+                self._motion_panel.refresh()
+                return True
         # Not the base class's answer, which is this one anyway: this filter is
         # on the whole application, so it is handed events about objects that
         # are being destroyed, and handing one of those back to C++ dereferences
@@ -640,10 +642,7 @@ class GalleryView(QWidget):
         than the key doing nothing at all."""
         if self._find_bar.isVisible():
             return True
-        focus = QApplication.focusWidget()
-        return isinstance(
-            focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
-        )
+        return isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
 
     def _running_now(self) -> _Running:
         """Everything the app is doing under its own steam right now."""
@@ -734,25 +733,19 @@ class GalleryView(QWidget):
         active = QApplication.activeWindow()
         return active is not None and active is not self.window()
 
-    def _gallery_owns_keys(self) -> bool:
-        """True when a gallery key (Delete/Undo) should act, not pass through.
-
-        Only while the view is on screen, nothing else owns the keystroke (no
-        dialog/popup and no other active window), the focus isn't in a text field
-        (which keeps its own keys), and the focus isn't inside the info-pane
-        config tabs — a config form's combos and buttons aren't text fields, so
-        editing one must not let Delete wipe a thumbnail.
-        """
-        if not self.isVisible():
-            return False
-        if self._other_window_owns_keys():
+    def _gallery_owns_keys(self, *, even_from_the_info_pane: bool = False) -> bool:
+        """True when a gallery key should act rather than pass through: the view
+        is on screen, nothing else owns the keystroke (no dialog/popup and no other
+        active window), and the focus isn't in a text field typing it. Delete and
+        Undo also yield to the info-pane config tabs, so editing a form cannot wipe
+        a thumbnail; the device's keys are asked for even from there."""
+        if not self.isVisible() or self._other_window_owns_keys():
             return False
         focus = QApplication.focusWidget()
-        if focus is not None and self._info_tabs.isAncestorOf(focus):
-            return False  # editing a config in the info pane — its keys, not ours
-        return not isinstance(
-            focus, (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
-        )
+        if isinstance(focus, _TEXT_FIELDS):
+            return False
+        return even_from_the_info_pane or not (
+            focus is not None and self._info_tabs.isAncestorOf(focus))
 
     def _build_ui(self):
         """Put the three panes on screen, in the order their contents need.

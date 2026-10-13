@@ -12,7 +12,7 @@ import re
 import pytest
 
 from origenerator.gallery import ENHANCE_SETTING_KEYS
-from origenerator.gui.param_help import PARAM_HELP, option_help, param_help
+from origenerator.gui.param_help import PARAM_HELP, RECOMMENDED, option_help, param_help
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import SAMPLER_OPTIONS, ParamType
 
@@ -101,14 +101,24 @@ def test_every_sampler_says_how_it_works_and_how_long_it_takes():
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
-def test_every_number_on_a_form_recommends_a_good_range(workflow_name):
+def test_every_number_on_a_form_recommends_what_to_set_it_to(workflow_name):
     numbers = (ParamType.INT, ParamType.FLOAT)
-    unranged = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
-                      if pd.type in numbers and "Good range:" not in param_help(pd.key))
-    assert unranged == []
+    unadvised = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
+                       if pd.type in numbers and pd.key not in RECOMMENDED)
+    assert unadvised == []
 
 
-def test_the_sampler_and_step_spacing_recommend_their_good_choices():
-    assert "Good choices:" in PARAM_HELP["sampler_name"]
-    assert "Good choices:" in PARAM_HELP["scheduler"]
-    assert "Good range:" in PARAM_HELP["enhance_detail_fixes"]
+def test_the_sampler_step_spacing_and_fixes_recommend_what_to_set_them_to():
+    assert {"sampler_name", "scheduler", "enhance_detail_fixes"} <= RECOMMENDED.keys()
+
+
+def test_a_tooltip_ends_with_what_to_set_it_to():
+    assert param_help("steps") == f"{PARAM_HELP['steps']} {RECOMMENDED['steps']}"
+
+
+def test_one_value_is_recommended_as_advice_rather_than_as_a_range():
+    assert RECOMMENDED["split_step"].startswith("Leave it at 0,")
+
+
+def test_the_one_composition_focus_says_nothing_about_passes():
+    assert "pass" not in param_help("shift_high")

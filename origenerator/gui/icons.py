@@ -35,7 +35,7 @@ from __future__ import annotations
 from functools import cache
 
 from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QStyle, QStyleOption
 from shared_ui.colors import (
     AMBER,
@@ -188,8 +188,34 @@ def star_icon(*, filled: bool) -> QIcon:
 
 
 @cache
-def recommended_icon() -> QIcon:
-    return glyph_icon("check", color=GREEN)
+def thumbs_up_icon() -> QIcon:
+    canvas = QPixmap(_SIZE, _SIZE)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.scale(_SIZE / 24, _SIZE / 24)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(TEXT_PRIMARY)
+    painter.drawRoundedRect(QRectF(1.5, 10, 4, 12), 0.8, 0.8)
+    painter.drawPath(_thumb_and_fist())
+    painter.end()
+    return QIcon(canvas)
+
+
+def _thumb_and_fist() -> QPainterPath:
+    hand = QPainterPath(QPointF(7, 11))
+    hand.lineTo(11.2, 3.2)
+    hand.quadTo(12.2, 1.6, 13.6, 2.4)
+    hand.quadTo(15, 3.4, 14.5, 5.5)
+    hand.lineTo(13.4, 9.5)
+    hand.lineTo(20, 9.5)
+    hand.quadTo(22.4, 9.6, 22.2, 12)
+    hand.lineTo(20.6, 19.8)
+    hand.quadTo(20.1, 22, 17.8, 22)
+    hand.lineTo(9, 22)
+    hand.quadTo(7, 22, 7, 20)
+    hand.closeSubpath()
+    return hand
 
 
 @cache

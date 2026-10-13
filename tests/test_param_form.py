@@ -28,6 +28,7 @@ from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.scenes_editor import SPEAKING_HELP, SPEAKING_NOTE
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.tooltip_shape import shaped
 from origenerator.seed_history import SeedUse
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE, VOICE_OPTIONS
@@ -2122,13 +2123,32 @@ def _items_wearing(dropdown, icon):
             if dropdown.itemIcon(i).cacheKey() == icon.cacheKey()}
 
 
-def test_the_recommended_choices_wear_a_check_and_the_rest_a_blank_as_wide(qtbot):
+def test_the_recommended_choices_wear_a_thumbs_up_and_the_rest_a_blank_as_wide(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
     qtbot.addWidget(form)
 
     form.mark_recommended({"sampler_name": ("euler_ancestral", "dpmpp_2m"), "scheduler": ()})
 
     samplers, spacings = form._widgets["sampler_name"], form._widgets["scheduler"]
-    assert _items_wearing(samplers, icons.recommended_icon()) == {"euler_ancestral", "dpmpp_2m"}
+    assert _items_wearing(samplers, icons.thumbs_up_icon()) == {"euler_ancestral", "dpmpp_2m"}
     assert len(_items_wearing(samplers, icons.unmarked_icon())) == samplers.count() - 2
     assert len(_items_wearing(spacings, icons.unmarked_icon())) == spacings.count()
+
+
+def _item_tooltip(dropdown, text):
+    return dropdown.itemData(dropdown.findText(text), Qt.ItemDataRole.ToolTipRole)
+
+
+def test_a_recommended_choices_tooltip_opens_with_recommended(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["sdxl_t2i"].param_definitions())
+    qtbot.addWidget(form)
+    samplers = form._widgets["sampler_name"]
+
+    form.mark_recommended({"sampler_name": ("euler_ancestral",), "scheduler": ()})
+
+    assert _item_tooltip(samplers, "euler_ancestral") == shaped(
+        option_help("sampler_name", "euler_ancestral"), lead="Recommended.")
+    assert _item_tooltip(samplers, "heun") == option_help("sampler_name", "heun")
+    form.mark_recommended({"sampler_name": (), "scheduler": ()})
+    assert _item_tooltip(samplers, "euler_ancestral") == option_help(
+        "sampler_name", "euler_ancestral")

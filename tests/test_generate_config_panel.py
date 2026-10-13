@@ -2931,6 +2931,6 @@ def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_p
 
     form = blank_panel._param_form
     marked = {key: {form._widgets[key].itemText(i) for i in range(form._widgets[key].count())
-                    if form._widgets[key].itemIcon(i).cacheKey() == icons.recommended_icon().cacheKey()}
+                    if form._widgets[key].itemIcon(i).cacheKey() == icons.thumbs_up_icon().cacheKey()}
               for key in ("sampler_name", "scheduler")}
     assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}

@@ -28,10 +28,11 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelColumn, WarningMark
 from origenerator.gui.no_wheel import NoWheelSpinBox
 from origenerator.gui.param_fields import field_kind, grey_out_of_reach
-from origenerator.gui.param_help import param_help
+from origenerator.gui.param_help import option_help, param_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
+from origenerator.gui.tooltip_shape import shaped
 from origenerator.seed_history import SeedHistory
 from origenerator.setting_advice import Advice
 from origenerator.speech import CUSTOM_VOICE
@@ -388,9 +389,14 @@ class ParamForm(QWidget):
             dropdown = self._widgets.get(key)
             if isinstance(dropdown, QComboBox):
                 for index in range(dropdown.count()):
-                    dropdown.setItemIcon(index, icons.recommended_icon()
-                                         if dropdown.itemText(index) in good
+                    option = dropdown.itemText(index)
+                    help_text = option_help(key, option) or ""
+                    recommended = option in good
+                    dropdown.setItemIcon(index, icons.thumbs_up_icon() if recommended
                                          else icons.unmarked_icon())
+                    dropdown.setItemData(index, shaped(help_text, lead="Recommended.")
+                                         if recommended else help_text or None,
+                                         Qt.ItemDataRole.ToolTipRole)
 
     def set_warnings(self, advice: dict[str, Advice]) -> None:
         self._advice = dict(advice)

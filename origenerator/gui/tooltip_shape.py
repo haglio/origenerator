@@ -7,15 +7,21 @@ import textwrap
 
 from PyQt6.QtCore import QEvent, QObject, QRect, Qt
 from PyQt6.QtWidgets import QAbstractItemView, QToolTip, QWidget
+from shared_ui.colors import WHITE
 
 LONGEST_LINE = 80
 
 
-def shaped(text: str) -> str:
-    if len(text) <= LONGEST_LINE or Qt.mightBeRichText(text):
+def shaped(text: str, *, lead: str = "") -> str:
+    if not lead and (len(text) <= LONGEST_LINE or Qt.mightBeRichText(text)):
         return text
-    lines = "\n".join(textwrap.fill(part, LONGEST_LINE) for part in text.split("\n"))
-    return '<p style="white-space:pre">' + html.escape(lines, quote=False) + "</p>"
+    whole = f"{lead} {text}" if lead else text
+    lines = "\n".join(textwrap.fill(part, LONGEST_LINE) for part in whole.split("\n"))
+    block = html.escape(lines, quote=False)
+    if lead:
+        bold = html.escape(lead, quote=False)
+        block = f'<b style="color:{WHITE.name()}">{bold}</b>' + block[len(bold):]
+    return '<p style="white-space:pre">' + block + "</p>"
 
 
 class ShapeLongTooltips(QObject):

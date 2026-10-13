@@ -11,7 +11,14 @@ import json
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QPixmap
+from PyQt6.QtGui import (
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QEnterEvent,
+    QPixmap,
+)
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QApplication,
@@ -1432,17 +1439,22 @@ def test_the_card_dims_when_it_would_only_duplicate_a_level(qtbot):
     assert "already has a version" in card.toolTip()
 
 
-def test_hovering_the_dimmed_card_lights_the_level_it_would_duplicate(qtbot):
+def test_hovering_the_dimmed_card_outlines_the_level_it_would_duplicate_in_white(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_levels(_items(_levels(2)), add=EnhanceOffer("2x", 1))
-    duplicate = versions._rows[1]
-    assert duplicate._picture.styleSheet() == ""
+    (card,) = versions._host.findChildren(_AddRow)
+    duplicate = versions._rows[1]._picture
+    point = QPointF(card.rect().center())
+    resting = duplicate.styleSheet()
 
-    versions._highlight_level(1, True)
-    assert "border" in duplicate._picture.styleSheet()
-    versions._highlight_level(1, False)
-    assert duplicate._picture.styleSheet() == ""
+    QApplication.sendEvent(card, QEnterEvent(point, point, QPointF(card.mapToGlobal(point))))
+    outline = duplicate.grab().toImage().pixelColor(0, duplicate.height() // 2).name()
+    QApplication.sendEvent(card, QEvent(QEvent.Type.Leave))
+
+    assert resting == ""
+    assert outline == TEXT_PRIMARY.name()
+    assert duplicate.styleSheet() == ""
 
 
 def test_a_level_carries_its_settings_as_a_drag_payload():

@@ -28,6 +28,7 @@ from origenerator.db import Database
 from origenerator.gallery import parse_params
 from origenerator.generation_state import GenerationStatus
 from origenerator.run_notice import Notice, notice_for, outcome_of_row
+from origenerator.single_instance import Copies
 from origenerator.windows_toast import show as show_toast
 from origenerator.windows_toast import toast_xml
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -137,28 +138,8 @@ def main(argv: list[str] | None = None) -> int:
     db = Database(LIBRARY_STATE_DIR / "origenerator.db")
     watch(db, ComfyUIApi(COMFYUI_HOST, COMFYUI_PORT),
           announce=lambda notice: _raise_on_the_desktop(notice, identity),
-          app_is_running=app_has_the_library)
+          app_is_running=Copies(LIBRARY_STATE_DIR).one_holds_the_library)
     return 0
-
-
-def app_has_the_library() -> bool:
-    """Whether a copy of the app is holding the library this watcher waits for.
-
-    ``OpenMutexW`` takes no ownership: claiming the mutex is how the app makes
-    itself the only copy (:mod:`origenerator.single_instance`).
-    """
-    import ctypes  # noqa: PLC0415
-
-    from app_support.win32 import mutex_name  # noqa: PLC0415
-    synchronize = 0x00100000
-    library = os.path.normcase(os.path.realpath(LIBRARY_STATE_DIR))
-    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-    handle = kernel32.OpenMutexW(synchronize, False,
-                                 mutex_name("Global\\Origenerator", library))
-    if not handle:
-        return False
-    kernel32.CloseHandle(handle)
-    return True
 
 
 if __name__ == "__main__":

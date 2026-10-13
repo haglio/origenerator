@@ -256,6 +256,107 @@ PARAM_HELP: dict[str, str] = {
 }
 
 
+# One line of help per choice a dropdown offers, keyed by param name, then choice.
+OPTION_HELP: dict[str, dict[str, str]] = {
+    "sampler_name": {
+        "euler": (
+            "Each step moves straight toward the model's guess of the finished picture, "
+            "so it settles smoothly and early. One model run per step, the quickest kind."
+        ),
+        "euler_ancestral": (
+            "Euler a on model pages: euler plus a little fresh noise after every step, so "
+            "small details keep being re-imagined, with livelier texture, and a change of "
+            "Steps changes the small details. One model run per step, as fast as euler."
+        ),
+        "heun": (
+            "Takes each step, checks it with a second guess and averages the two, so each "
+            "step is more accurate. Two model runs per step, about twice as slow as "
+            "euler."
+        ),
+        "heunpp2": (
+            "heun with up to a third guess per step. Up to three model runs per step, the "
+            "slowest of the ones that keep to Steps."
+        ),
+        "dpm_2": (
+            "Checks each step with a second guess from halfway along it. Two model runs "
+            "per step, about twice as slow as euler."
+        ),
+        "dpm_2_ancestral": (
+            "dpm_2 plus a little fresh noise after every step, like euler_ancestral. Two "
+            "model runs per step, about twice as slow as euler."
+        ),
+        "lms": (
+            "Aims each step with the guesses from the last few steps. One model run per "
+            "step, as fast as euler; it can wobble at low Steps."
+        ),
+        "dpm_fast": (
+            "A quick solver that spends exactly Steps model runs and ignores Step "
+            "Spacing. About one model run per step, as fast as euler."
+        ),
+        "dpm_adaptive": (
+            "Keeps going until the picture stops changing, choosing its own number of "
+            "steps and ignoring Steps and Step Spacing. One model run per step or more, "
+            "and the whole run often takes several times as long as euler's."
+        ),
+        "dpmpp_2s_ancestral": (
+            "A DPM++ solver that takes a second guess at each step, plus a little fresh "
+            "noise after it. Two model runs per step, about twice as slow as euler."
+        ),
+        "dpmpp_sde": (
+            "A DPM++ solver with a second guess at each step and a measured amount of "
+            "fresh noise, for detailed, lively pictures; with karras it is the DPM++ SDE "
+            "Karras of model pages. Two model runs per step, about twice as slow as "
+            "euler."
+        ),
+        "dpmpp_sde_gpu": (
+            "dpmpp_sde with its fresh noise made on the graphics card, with similar "
+            "results. Two model runs per step, about twice as slow as euler."
+        ),
+        "dpmpp_2m": (
+            "Aims each step with the previous step's guess, so it is sharp and accurate "
+            "at modest Steps; with karras it is the DPM++ 2M Karras many model pages "
+            "recommend. One model run per step, as fast as euler."
+        ),
+        "dpmpp_2m_sde": (
+            "dpmpp_2m plus a measured amount of fresh noise at each step, for more "
+            "texture. One model run per step, as fast as euler."
+        ),
+        "dpmpp_2m_sde_gpu": (
+            "dpmpp_2m_sde with its fresh noise made on the graphics card, with similar "
+            "results. One model run per step, as fast as euler."
+        ),
+        "dpmpp_3m_sde": (
+            "Aims each step with the last two steps' guesses, plus fresh noise; it wants "
+            "a few more Steps than dpmpp_2m. One model run per step, as fast as euler."
+        ),
+        "dpmpp_3m_sde_gpu": (
+            "dpmpp_3m_sde with its fresh noise made on the graphics card, with similar "
+            "results. One model run per step, as fast as euler."
+        ),
+        "ddpm": (
+            "The original diffusion sampler, adding fresh noise at every step; it needs "
+            "many Steps to come out clean. One model run per step, as fast as euler."
+        ),
+        "lcm": (
+            "Only for LCM models, which finish in 4 to 8 steps; on any other model it "
+            "ruins the picture. One model run per step, as fast as euler."
+        ),
+        "ddim": (
+            "An early sampler that moves straight toward the guess, much like euler. One "
+            "model run per step, as fast as euler."
+        ),
+        "uni_pc": (
+            "Aims each step from earlier guesses and corrects it afterwards, which does "
+            "well at low Steps. One model run per step, as fast as euler."
+        ),
+        "uni_pc_bh2": (
+            "uni_pc with a different correction, often a little better at very low Steps. "
+            "One model run per step, as fast as euler."
+        ),
+    },
+}
+
+
 def param_help(key: str) -> str:
     """The tooltip for one param, or ``""`` when it has none.
 
@@ -263,3 +364,7 @@ def param_help(key: str) -> str:
     and an explanation that says nothing is worse than no explanation at all.
     """
     return PARAM_HELP.get(key, "")
+
+
+def option_help(key: str, option: str) -> str:
+    return OPTION_HELP.get(key, {}).get(option, "")

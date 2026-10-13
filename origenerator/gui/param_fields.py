@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 
 from origenerator.gui import diff_text
 from origenerator.gui.no_wheel import NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
+from origenerator.gui.param_help import option_help
 from origenerator.gui.preset_combo import PresetComboBox
 from origenerator.gui.prompt_field import PromptField
 from origenerator.gui.seed_combo import SeedComboBox
@@ -205,8 +207,10 @@ class _Presets(FieldKind):
 class _Choice(FieldKind):
     def make(self, pd):
         widget = NoWheelComboBox()
-        if pd.options:
-            widget.addItems(pd.options)
+        for row, option in enumerate(pd.options or []):
+            widget.addItem(option)
+            widget.setItemData(row, option_help(pd.key, option) or None,
+                               Qt.ItemDataRole.ToolTipRole)
         _select_combo_value(widget, str(pd.default))
         return widget
 

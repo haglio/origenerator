@@ -224,7 +224,7 @@ def test_the_pane_puts_both_shapes_in_one_list_when_asked(qtbot, tmp_path):
     view.refresh()
     assert view._tree.sides == ("portrait", "landscape")
 
-    view._tree.both_button.click()
+    view._tree.together_button.click()
 
     assert view._tree.sides == (BOTH,)
     assert _rows(view._tree, BOTH) == ["All"]
@@ -266,9 +266,9 @@ def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypa
     view.refresh()
     built = _counting_builds(monkeypatch)
 
-    view._tree.both_button.click()
-    view._tree.each_shape_button.click()
-    view._tree.both_button.click()
+    view._tree.together_button.click()
+    view._tree.separate_button.click()
+    view._tree.together_button.click()
 
     assert built == [1]
 
@@ -303,18 +303,18 @@ def test_the_radio_over_the_list_wears_each_word_beside_its_button(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _word_beside(view._tree.each_shape_button) == "Separate"
-    assert _word_beside(view._tree.both_button) == "Together"
-    assert view._tree.each_shape_button.isChecked()
-    assert not view._tree.both_button.isChecked()
-    for button in (view._tree.each_shape_button, view._tree.both_button):
+    assert _word_beside(view._tree.separate_button) == "Separate"
+    assert _word_beside(view._tree.together_button) == "Together"
+    assert view._tree.separate_button.isChecked()
+    assert not view._tree.together_button.isChecked()
+    for button in (view._tree.separate_button, view._tree.together_button):
         assert button.text() == ""
         assert button.property(CHOSEN) is True
         assert not button.icon().isNull()
 
 
 def _choice_rows(tree):
-    buttons = (tree.each_shape_button, tree.both_button)
+    buttons = (tree.separate_button, tree.together_button)
     for button in buttons:
         word = button.parent().findChild(QLabel)
         assert button.width() == button.height()
@@ -351,10 +351,10 @@ def test_clicking_a_choice_s_word_picks_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    word = view._tree.both_button.parent().findChild(QLabel)
+    word = view._tree.together_button.parent().findChild(QLabel)
     qtbot.mouseClick(word, Qt.MouseButton.LeftButton)
 
-    assert view._tree.both_button.isChecked()
+    assert view._tree.together_button.isChecked()
     assert view._tree.sides == (BOTH,)
 
 

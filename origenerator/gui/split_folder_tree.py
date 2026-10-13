@@ -46,10 +46,10 @@ _TIPS = {
 }
 _SEPARATE = "Separate"
 _TOGETHER = "Together"
-_EACH_SHAPE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
-                   "slideshow started in one plays that shape alone")
-_BOTH_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
-             "landscape pictures")
+_SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
+                 "slideshow started in one plays that shape alone")
+_TOGETHER_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
+                 "landscape pictures")
 
 
 class _Choice(QFrame):
@@ -139,20 +139,19 @@ class SplitFolderTree(QWidget):
 
     def _build_radio(self) -> QWidget:
         """The two choices over the sections: a list per shape, or one of both."""
-        each_shape = _Choice(_SEPARATE, icons.each_shape_mark(BUTTON_MARK),
-                             _EACH_SHAPE_TIP)
-        both = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK), _BOTH_TIP)
-        self.each_shape_button = each_shape.button
-        self.both_button = both.button
+        separate = _Choice(_SEPARATE, icons.separate_mark(BUTTON_MARK), _SEPARATE_TIP)
+        together = _Choice(_TOGETHER, icons.side_mark(BOTH, BUTTON_MARK), _TOGETHER_TIP)
+        self.separate_button = separate.button
+        self.together_button = together.button
         radio = QButtonGroup(self)
         radio.setExclusive(True)
         self._choices = QWidget()
         FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
-        for choice, sides in ((each_shape, ORIENTATIONS), (both, (BOTH,))):
+        for choice, sides in ((separate, ORIENTATIONS), (together, (BOTH,))):
             choice.button.clicked.connect(lambda _checked, s=sides: self._pick_sides(s))
             radio.addButton(choice.button)
             self._choices.layout().addWidget(choice)
-        self.each_shape_button.setChecked(True)
+        self.separate_button.setChecked(True)
         return self._choices
 
     # --- which sides the pane draws -----------------------------------------
@@ -168,10 +167,10 @@ class SplitFolderTree(QWidget):
             section.setVisible(side in self._sides)
         if self._active not in self._sides:
             self._active = self._sides[0]
-        self.each_shape_button.setChecked(self._sides != (BOTH,))
-        self.both_button.setChecked(self._sides == (BOTH,))
+        self.separate_button.setChecked(self._sides != (BOTH,))
+        self.together_button.setChecked(self._sides == (BOTH,))
 
-    def offer_both(self, offered: bool) -> None:
+    def offer_separate_and_together(self, offered: bool) -> None:
         self._choices.setVisible(offered)
         if not offered:
             self._pick_sides(ORIENTATIONS)

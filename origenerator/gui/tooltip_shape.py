@@ -3,17 +3,19 @@ run wider than the whole screen."""
 from __future__ import annotations
 
 import html
+import textwrap
 
 from PyQt6.QtCore import QEvent, QObject, QRect, Qt
 from PyQt6.QtWidgets import QAbstractItemView, QToolTip, QWidget
 
-ONE_LINE = 60
+LONGEST_LINE = 80
 
 
 def shaped(text: str) -> str:
-    if len(text) <= ONE_LINE or Qt.mightBeRichText(text):
+    if len(text) <= LONGEST_LINE or Qt.mightBeRichText(text):
         return text
-    return "<p>" + html.escape(text, quote=False).replace("\n", "<br>") + "</p>"
+    lines = "\n".join(textwrap.fill(part, LONGEST_LINE) for part in text.split("\n"))
+    return '<p style="white-space:pre">' + html.escape(lines, quote=False) + "</p>"
 
 
 class ShapeLongTooltips(QObject):

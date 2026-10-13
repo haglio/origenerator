@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+
 from PyQt6.QtCore import QEvent, QPoint
 from PyQt6.QtGui import QHelpEvent
 from PyQt6.QtWidgets import QApplication, QLabel, QListWidget, QListWidgetItem, QToolTip
@@ -20,8 +22,19 @@ def test_a_short_tooltip_stays_one_line():
 
 
 def test_a_long_tooltip_is_shown_as_a_block_of_lines():
-    assert shaped(LONG) == ("<p>How strictly the model obeys the prompt. Too low drifts off it; "
-                            "too high burns contrast &amp; flattens &lt;detail&gt;.</p>")
+    assert shaped(LONG) == ('<p style="white-space:pre">How strictly the model obeys the prompt. '
+                            "Too low drifts off it; too high burns\ncontrast &amp; flattens "
+                            "&lt;detail&gt;.</p>")
+
+
+def test_every_line_of_a_long_tooltip_is_at_most_eighty_characters():
+    words = " ".join(f"word{n}" for n in range(60))
+
+    lines = html.unescape(shaped(words).removeprefix('<p style="white-space:pre">')
+                          .removesuffix("</p>")).split("\n")
+
+    assert max(len(line) for line in lines) <= 80
+    assert " ".join(lines) == words
 
 
 def test_a_tooltip_already_written_as_rich_text_is_left_as_written():

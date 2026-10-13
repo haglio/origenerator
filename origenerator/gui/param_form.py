@@ -186,6 +186,7 @@ class ParamForm(QWidget):
         self._present_keys: dict[str, list[str]] = {}
         self._label_columns: dict[str, LabelColumn] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
+        self._defs = {pd.key: pd for pd in self._param_defs}
         # A workflow that tells a story in scenes hands both prompts, the scene
         # lengths and the lines to one editor (see origenerator.gui.scenes_editor);
         # None for a workflow with one prompt and one length.
@@ -398,7 +399,7 @@ class ParamForm(QWidget):
     def _resolve_warnings(self, keys: list[str]) -> None:
         for key in keys:
             if key in self._advice:
-                self.set_values({key: self._advice[key].fix})
+                self._write_field(self._defs[key], self._advice[key].fix)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
         for key, good in choices.items():
@@ -488,7 +489,7 @@ class ParamForm(QWidget):
         return scenes + [w for w in self._widgets.values() if isinstance(w, QPlainTextEdit)]
 
     def _has_param(self, key: str) -> bool:
-        return any(pd.key == key for pd in self._param_defs)
+        return key in self._defs
 
     def _build_swap_button(self):
         """Add a swap-width-and-height button when the form has both dimensions.
@@ -651,7 +652,7 @@ class ParamForm(QWidget):
         return self._unlock_btn is not None and self._unlock_btn.isChecked()
 
     def _size_source(self) -> str:
-        image = next((pd for pd in self._param_defs if pd.key == "input_image"), None)
+        image = self._defs.get("input_image")
         return image.label.lower() if image is not None else "image"
 
     def _unlock_tip(self, unlocked: bool) -> str:
@@ -718,7 +719,7 @@ class ParamForm(QWidget):
         it unchanged, so a full path lets the user draw an input from anywhere;
         a recording is read by the voice from wherever it is.
         """
-        pd = next(p for p in self._param_defs if p.key == key)
+        pd = self._defs[key]
         path, _ = QFileDialog.getOpenFileName(
             self,
             f"Select {pd.label}",

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -380,6 +381,15 @@ class ParamForm(QWidget):
         holder.setContentsMargins(0, 0, 0, 0)
         holder.addWidget(mark)
         return slot
+
+    def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
+        for key, good in choices.items():
+            dropdown = self._widgets.get(key)
+            if isinstance(dropdown, QComboBox):
+                for index in range(dropdown.count()):
+                    dropdown.setItemIcon(index, icons.recommended_icon()
+                                         if dropdown.itemText(index) in good
+                                         else icons.unmarked_icon())
 
     def set_warnings(self, advice: dict[str, str]) -> None:
         for key, mark in self._warning_marks.items():

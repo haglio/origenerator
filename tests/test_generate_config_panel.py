@@ -2924,3 +2924,13 @@ def test_a_setting_off_its_models_recommendation_shows_its_warning(blank_panel, 
 
     assert not mark.isHidden()
     assert mark.toolTip() == "Default Model's page recommends 20–40 steps."
+
+
+def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+
+    form = blank_panel._param_form
+    marked = {key: {form._widgets[key].itemText(i) for i in range(form._widgets[key].count())
+                    if form._widgets[key].itemIcon(i).cacheKey() == icons.recommended_icon().cacheKey()}
+              for key in ("sampler_name", "scheduler")}
+    assert marked == {"sampler_name": {"euler_ancestral"}, "scheduler": {"normal"}}

@@ -539,7 +539,8 @@ def _on_screen(qtbot, view, width, height):
     qtbot.addWidget(view)
     view.resize(width, height)
     view.show()
-    qtbot.waitExposed(view)
+    view.activateWindow()
+    qtbot.waitActive(view)
     view.refresh()
 
 
@@ -1554,7 +1555,7 @@ def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, mon
     # reach for a find.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _tab_with_prompts(view)
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: False)
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: False)
 
     assert _press_ctrl_f(view, monkeypatch) is True
 
@@ -5963,7 +5964,7 @@ def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
+    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: True)
     _open_leaf(view)
     view._browser.apply_selection("i1", _NO_MOD)
     view._delete_selection()
@@ -7269,9 +7270,7 @@ def test_a_standalone_huds_transport_lands_on_the_show_itself(qtbot, monkeypatch
 def test_starting_a_show_while_the_last_one_sits_minimized_puts_it_back_on_screen(
         qtbot, monkeypatch):
     view, show = _a_show_standing_on_its_own(qtbot, monkeypatch)
-    view.resize(1200, 800)
-    view.show()
-    qtbot.waitExposed(view)
+    _on_screen(qtbot, view, 1200, 800)
     gestures.click(show._pane._window, button_on_screen(show, f"{show.hud_side}_minimize"))
     assert show.isMinimized()
 
@@ -9070,21 +9069,23 @@ def test_delete_works_with_gallery_as_the_central_widget(qtbot, tmp_path):
     assert db.get_generation("i1") is None
 
 
-def test_gallery_hands_off_keys_while_a_config_form_is_focused(qtbot, tmp_path, monkeypatch):
-    # The grid and an editable config form are now visible together, so the app-wide
-    # Delete/Undo filter must disarm while a config field has focus — its combos and
-    # buttons aren't text fields, so without this it would wipe a gallery thumbnail.
-    view = GalleryView(Database(tmp_path / "t.db"), client=ComfyUIClient())
-    qtbot.addWidget(view)
-    view.show()
-    qtbot.waitExposed(view)
-    panel = view._info_tabs._add_subtab()
+def test_delete_after_a_click_in_the_info_pane_wipes_no_thumbnail(qtbot, tmp_path):
+    # The grid and an editable config form are visible together, so the app-wide
+    # Delete/Undo filter must disarm while a config control has focus — its combos
+    # and buttons aren't text fields, so without this it would wipe a thumbnail.
+    view, db, _file_path = _shown_view_with_one_image(qtbot, tmp_path)
+    _open_leaf(view)
+    view.activateWindow()
+    qtbot.waitActive(view)
+    thumb = view._browser._thumb_widgets["i1"]
+    gestures.click(thumb, thumb.rect().center())
+    form = view._info_tabs.current_config_panel()._param_form
+    header = next(iter(form._sections.values()))._header
+    gestures.click(header, header.rect().center())
 
-    monkeypatch.setattr(QApplication, "focusWidget", lambda: panel._workflow_combo)
-    assert view._gallery_owns_keys() is False   # editing a config: the gallery hands off
+    gestures.press_key(view, Qt.Key.Key_Delete)
 
-    monkeypatch.setattr(QApplication, "focusWidget", lambda: view._tree)
-    assert view._gallery_owns_keys() is True     # browsing the tree: the gallery owns Delete
+    assert db.get_generation("i1") is not None
 
 
 def test_delete_works_without_a_thumbnail_holding_focus(qtbot, tmp_path):
@@ -12495,21 +12496,34 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     assert not view._osr2_motion.active
 
 
-def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot, monkeypatch):
+def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     # Space is genau's "drives" key and the switch is the same control, so it has
     # to reach the switch: routed to the motion directly it would start a second
     # source alongside a funscript the switch already had streaming.
     view, driver, panel = _osr2_view(qtbot)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
+    _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")] and not view._osr2_motion.active
 
-    space = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, _NO_MOD)
-    assert view.eventFilter(view, space) is True
+    gestures.press_key(view, Qt.Key.Key_Space)
 
     assert not view.osr2_control.isChecked()      # the switch went off, not the motion
     assert driver.stopped >= 1 and not view._osr2_motion.active
+
+
+def test_space_after_a_click_in_the_info_pane_drives_rather_than_pressing_it_again(qtbot):
+    view, _driver, _panel = _osr2_view(qtbot)
+    section = next(iter(_tab_with_prompts(view)._param_form._sections.values()))
+    _on_screen(qtbot, view, 1400, 900)
+    gestures.click(section._header, section._header.rect().center())
+    folded = section.is_collapsed()
+    assert QApplication.focusWidget() is section._header
+
+    gestures.press_key(view, Qt.Key.Key_Space)
+
+    assert view.osr2_control.isChecked()
+    assert section.is_collapsed() == folded
 
 
 def test_a_show_gets_space_wired_to_the_switch(qtbot):
@@ -12923,10 +12937,21 @@ def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
     # "Always available": the same keys the fullscreen views answer are routed
     # app-wide by the gallery's event filter, under its own-keys guards.
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda: True)
-    event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_L, _NO_MOD)
-    assert view.eventFilter(view, event) is True
+    _on_screen(qtbot, view, 1400, 900)
+
+    gestures.press_key(view, Qt.Key.Key_L)
+
     assert ("speed", 5) in view._osr2_motion.calls
+
+
+def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_does(
+        qtbot, monkeypatch):
+    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
+    _on_screen(qtbot, view, 1400, 900)
+
+    gestures.press_key(view, Qt.Key.Key_9, Qt.KeyboardModifier.KeypadModifier)
+
+    assert ("amplitude", 10) in view._osr2_motion.calls
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
@@ -13042,7 +13067,7 @@ def test_esc_stops_osr2_even_without_gallery_key_focus(qtbot):
     _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
-    view._gallery_owns_keys = lambda: False  # focus is inside a config tab
+    view._gallery_owns_keys = lambda **_kw: False  # focus is inside a config tab
 
     handled = _press_escape(view)
 

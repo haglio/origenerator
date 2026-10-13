@@ -366,8 +366,7 @@ def test_the_close_batch_reaches_the_queue(qtbot, tmp_path, monkeypatch):
     # tabs, the gallery folder and the window's place, with nothing in the log.
     #
     # Everything but the socket is the real path: the submit is stubbed,
-    # because a job the server refuses is dropped from the line, which would
-    # leave this passing or failing on whether a ComfyUI happened to be up.
+    # because a job the server refuses is dropped from the line.
     monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
     db = Database(tmp_path / "t.db")
     for i in range(3):

@@ -16,6 +16,7 @@ from __future__ import annotations
 import http.client
 import io
 import json
+import socket
 import urllib.error
 from unittest.mock import MagicMock, patch
 
@@ -366,6 +367,20 @@ def test_a_mistake_in_the_probe_itself_is_not_passed_off_as_no_comfyui():
     with patch("urllib.request.urlopen", return_value=_mock_response(200, None)), \
             pytest.raises(TypeError):
         comfyui_responding("127.0.0.1", 8188)
+
+def test_no_test_can_reach_the_comfyui_running_on_this_machine(monkeypatch):
+    dialed = []
+
+    def dial(address, *_args, **_kwargs):
+        dialed.append(address)
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr(socket, "create_connection", dial)
+
+    with pytest.raises(urllib.error.URLError):
+        ComfyUIApi().submit_job({}, "a-prompt-id")
+
+    assert dialed == []
 
 
 # --- a submit the server answered too late ----------------------------------------

@@ -1,18 +1,11 @@
 """How big this app draws, and why a session on the monitors draws it smaller.
 
-Standalone Origenerator owns a monitor and in a headset room a screen, and both
-draw its buttons at the shared family's ordinary ``BUTTON_SIZE`` -- all but the
-bank beside the OSR2 console, which is the console's ``BUTTON_SIZE_HUD`` either way.
-
-On the monitors a session puts it in the Random Favs Browser's upright rect,
-inches from that session's satellite HUDs, which draw at the family's smaller
-``BUTTON_SIZE_HUD``.  Two banks of the same buttons at two sizes on one screen
-read as two applications sharing a monitor rather than as one session, so there
-this app draws at the ratio between them.  The whole app scales, not the
-buttons alone -- a 28px bank shrunk to 18px inside panes still sized for 28px
-leaves the marks stranded -- through ``QT_SCALE_FACTOR``, which Qt reads once
-before the first ``QApplication`` exists, so every widget, font, margin and
-stylesheet pixel follows the same number, bare integers included.
+There it sits inches from that session's satellite HUDs, which draw at the
+family's smaller ``BUTTON_SIZE_HUD``, so it draws at the ratio between the two
+sizes; standalone and in a headset room it draws full size.  The whole app
+scales rather than the buttons alone, through ``QT_SCALE_FACTOR``, which Qt
+reads once before the first ``QApplication`` exists, so every widget, font,
+margin and stylesheet pixel follows the one number.
 
 The one thing that must NOT follow it is a rect Fun Time hands us: those arrive
 in device pixels, measured off the monitor with Win32, while every Qt

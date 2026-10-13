@@ -33,6 +33,7 @@ from origenerator.fun_time_mode import (
     HEADSET_SCROLL,
     FunTimeSession,
 )
+from origenerator.win32 import keep_out_of_sight
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +260,12 @@ class HeadsetWindow(QObject):
         QApplication.postEvent(target, QContextMenuEvent(
             QContextMenuEvent.Reason.Mouse, target.mapFromGlobal(at), at))
 
+    def _keep_its_menus_off_the_monitors(self) -> None:
+        """A menu is a window of its own, so it stays on the monitors when this
+        one goes out of sight, opening over a window he cannot see."""
+        for top in opened_over(self._window):
+            keep_out_of_sight(int(top.winId()))
+
     def _scroll(self, delta: int) -> None:
         target = self._under_the_pointer()
         if _held_off(target):
@@ -280,6 +287,7 @@ class HeadsetWindow(QObject):
             return
         self._asked = False
         self._looked_at = now
+        self._keep_its_menus_off_the_monitors()
         grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
         image = within_the_cap(painted_over(grabbed, windows_opened_over(
             self._window, scale=pixels_per_coordinate(grabbed, self._window))))

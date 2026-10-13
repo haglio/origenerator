@@ -12,6 +12,7 @@ from PyQt6.QtMultimedia import QVideoFrame
 from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
 
 from origenerator.fun_time_mode import parse_app_args
+from origenerator.gui import headset_window
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.headset_window import (
     _IDLE_LOOK_S,
@@ -411,6 +412,28 @@ class TestWhatOpensOverTheWindow:
         assert (patch.width, patch.height) == (
             round(menu.width() * 0.5), round(menu.height() * 0.5))
         menu.close()
+
+    def test_a_menu_open_over_the_window_is_off_the_monitors_too(
+            self, tmp_path, qtbot, monkeypatch):
+        """A menu is a window of its own, so taking the window a room has off
+        the monitors leaves its menus on them, opening over nothing he can
+        see."""
+        window = self._window(qtbot)
+        menu = QMenu(window)
+        menu.addAction("one")
+        menu.popup(window.mapToGlobal(QPoint(40, 60)))
+        qtbot.waitUntil(menu.isVisible)
+        its_window = int(menu.winId())
+        hidden = []
+        monkeypatch.setattr(headset_window, "keep_out_of_sight", hidden.append)
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        try:
+            headset.publish(now=1.0)
+        finally:
+            headset.close()
+            menu.close()
+
+        assert hidden == [its_window]
 
     def test_a_press_off_a_menu_puts_it_away(self, tmp_path, qtbot):
         """As a mouse pressed anywhere else would: a list left open is a list

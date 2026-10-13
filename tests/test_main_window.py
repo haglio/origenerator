@@ -1153,6 +1153,40 @@ def test_a_takeover_by_the_headset_draws_at_the_desktop_scale(qtbot, tmp_path):
     assert ui_scale.active_scale() == 1.0
 
 
+def _watched_sight(monkeypatch):
+    seen = []
+    monkeypatch.setattr(main_window, "keep_out_of_sight",
+                        lambda hwnd: seen.append(("out of sight", hwnd)))
+    monkeypatch.setattr(main_window, "bring_back_into_sight",
+                        lambda hwnd: seen.append(("in sight", hwnd)))
+    return seen
+
+
+def test_a_window_a_room_in_the_headset_has_is_off_the_monitors(
+        qtbot, tmp_path, monkeypatch):
+    """It is shown rather than parked so that Windows goes on drawing it, and
+    he found it on his desktop -- by then as big as the desktop it is drawn
+    for.  Out of sight it is still drawn and he is not shown it."""
+    win = _window(qtbot, tmp_path)
+    seen = _watched_sight(monkeypatch)
+
+    win.become_hosted(_headset_session(tmp_path))
+
+    assert seen == [("out of sight", int(win.winId()))]
+
+
+def test_a_window_the_monitors_take_back_is_in_sight_again(
+        qtbot, tmp_path, monkeypatch):
+    """Parked out of sight it would come back from the taskbar invisible."""
+    win = _window(qtbot, tmp_path)
+    win.become_hosted(_headset_session(tmp_path))
+    seen = _watched_sight(monkeypatch)
+
+    win.become_standalone()
+
+    assert seen == [("in sight", int(win.winId()))]
+
+
 def test_a_window_hosted_on_the_monitors_hands_no_picture_over(qtbot, tmp_path):
     """There the window itself is what is seen, so a frame written every tick
     would be work for nobody."""

@@ -25,7 +25,12 @@ from origenerator.gui.hard_to_miss import hard_to_miss
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
-from origenerator.win32 import out_of_sight, place_window_in_device_pixels
+from origenerator.win32 import (
+    bring_back_into_sight,
+    keep_out_of_sight,
+    out_of_sight,
+    place_window_in_device_pixels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -254,9 +259,11 @@ class OrigeneratorWindow(QMainWindow):
 
     def _hand_the_window_over(self, session: FunTimeSession) -> None:
         """Publish this window's picture for a room in the headset, which has no
-        monitor to put it on.  Shown rather than parked: Qt draws nothing for a
-        window Windows has unmapped, so a parked one has no picture to hand."""
+        monitor to put it on.  Shown, because Qt draws nothing for a window
+        Windows has unmapped, and out of sight, because he is not in front of
+        it."""
         self.show()
+        keep_out_of_sight(int(self.winId()))
         self.hands_its_window_over = HeadsetWindow(self, session, parent=self)
 
     def _answer_the_crossings(self, bridge: FunTimeBridge) -> None:
@@ -288,6 +295,7 @@ class OrigeneratorWindow(QMainWindow):
 
     def _take_the_window_back(self) -> None:
         if self.hands_its_window_over is not None:
+            bring_back_into_sight(int(self.winId()))
             self.hands_its_window_over.close()
             self.hands_its_window_over.deleteLater()
             self.hands_its_window_over = None

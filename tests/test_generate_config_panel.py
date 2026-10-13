@@ -2964,6 +2964,25 @@ def test_picking_another_model_puts_its_range_in_the_tooltip(blank_panel, recomm
     assert tips["cfg"].endswith(" Other Model's page recommends 3–7.")
 
 
+def _on_screen(qtbot, panel):
+    panel.resize(700, 1400)
+    panel.show()
+    qtbot.waitExposed(panel)
+    return panel
+
+
+def test_clicking_a_sections_warning_leaves_no_warning_in_it(qtbot, blank_panel, recommended):
+    blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
+    form = _on_screen(qtbot, blank_panel)._param_form
+    form.set_values({"sampler_name": "dpmpp_2m", "scheduler": "normal", "steps": 80})
+    calibration = form._sections["Calibration"].warning
+
+    qtbot.mouseClick(calibration, Qt.MouseButton.LeftButton)
+
+    assert calibration.isHidden()
+    assert _drawing_settings(blank_panel)[:3] == ("euler_ancestral", "normal", 40)
+
+
 def test_a_fresh_pictures_dropdowns_mark_what_its_models_page_recommends(blank_panel, recommended):
     blank_panel._workflow_combo.setCurrentIndex(_combo_index(blank_panel, "sdxl_t2i"))
 

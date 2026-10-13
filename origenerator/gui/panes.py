@@ -13,25 +13,31 @@ def pane() -> tuple[QWidget, QVBoxLayout]:
     return widget, column
 
 
-def _as_panes(splitter: QSplitter) -> QSplitter:
-    splitter.setChildrenCollapsible(False)
-    splitter.setHandleWidth(6)
-    return splitter
-
-
-def pane_splitter(orientation: Qt.Orientation) -> QSplitter:
+class PaneSplitter(QSplitter):
     """Panes parted by the thick handle that is dragged to resize them, none of
     which can be dragged shut."""
-    return _as_panes(QSplitter(orientation))
+
+    def __init__(self, orientation: Qt.Orientation):
+        super().__init__(orientation)
+        self.setChildrenCollapsible(False)
+        self.setHandleWidth(6)
+
+    def hold_still(self, held: bool) -> None:
+        for index in range(self.count()):
+            self.handle(index).setEnabled(not held)
 
 
-class FootSplitter(QSplitter):
+def hold_the_borders_still(within: QWidget, held: bool) -> None:
+    for splitter in within.findChildren(PaneSplitter):
+        splitter.hold_still(held)
+
+
+class FootSplitter(PaneSplitter):
     """Panes stacked over a foot that opens at the foot's own height and follows
     it as that changes, until its handle is dragged."""
 
     def __init__(self):
         super().__init__(Qt.Orientation.Vertical)
-        _as_panes(self)
         self._dragged = False
         self.splitterMoved.connect(self._on_dragged)
 

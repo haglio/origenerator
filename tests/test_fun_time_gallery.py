@@ -21,6 +21,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generate_config_panel import GenerateConfigPanel
 from origenerator.gui.info_pane_tabs import InfoPaneTabs
 from origenerator.gui.notice_overlay import NOTICE, WARNING
+from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.show_panel import show_hud_model
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import ShelfCommand, SurfaceCommand
@@ -1456,6 +1457,42 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
     view._voice.on_command(AppCommand.DRIVE_ON)
 
     assert answers == [("🎤 OSR2 control can't be switched here", WARNING)]
+
+
+def _thick_borders(view):
+    return [splitter.handle(index) for splitter in view.findChildren(PaneSplitter)
+            for index in range(1, splitter.count())]
+
+
+def test_a_hosted_gallery_holds_every_thick_border_still(qtbot):
+    """Inside a session the borders between the panes could not be moved, and
+    the pointer still turned into a resize arrow over them. Held, a border takes
+    no drag and keeps the ordinary pointer (tests/test_panes.py)."""
+    view = _fun_time_view(qtbot)
+
+    borders = _thick_borders(view)
+    assert borders
+    assert not any(border.isEnabled() for border in borders)
+
+
+def test_a_gallery_taken_into_a_session_holds_its_borders_until_handed_back(qtbot):
+    view = GalleryView(FakeDB([]))
+    qtbot.addWidget(view)
+    assert all(border.isEnabled() for border in _thick_borders(view))
+
+    view.become_hosted(_session())
+    assert not any(border.isEnabled() for border in _thick_borders(view))
+
+    view.become_standalone()
+    assert all(border.isEnabled() for border in _thick_borders(view))
+
+
+def test_a_tab_opened_in_a_session_holds_its_border_still(qtbot):
+    view = _fun_time_view(qtbot)
+
+    opened = view._info_tabs._add_subtab()
+
+    assert not opened._media_split.handle(1).isEnabled()
 
 
 def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):

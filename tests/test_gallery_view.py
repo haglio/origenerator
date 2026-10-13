@@ -12433,6 +12433,21 @@ def test_dragging_a_browser_thumbnail_lights_its_combine_slot(qtbot, tmp_path):
     assert view._combine.panel.video_slot._label.property("dragActive") is False
 
 
+def test_a_video_dragged_from_a_picture_the_gallery_holds_lights_the_image_slot_too(
+        qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    recipe = json.loads(db.get_generation("vid")["params_json"])
+    db.set_params_json("vid", json.dumps(dict(recipe, input_image="sdxl_pick.png [output]")))
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._combine.drag_started("vid")
+
+    assert view._combine.panel.image_slot._label.property("dragActive") is True
+    assert view._combine.panel.video_slot._label.property("dragActive") is True
+
+
 def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path):
     # The front generate tab's preview drags onto combine like a browser thumbnail.
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())

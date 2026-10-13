@@ -8,7 +8,9 @@ from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 import origenerator.gui.metadata_block as mb
 from origenerator import config
+from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.metadata_block import MetadataBlock
+from tests import gestures
 
 
 def _row(**overrides):
@@ -39,6 +41,19 @@ def block(qtbot):
 def _texts(block):
     """Every label's text, with the on-screen wrapping zero-width spaces removed."""
     return [lbl.text().replace("\u200b", "") for lbl in block.findChildren(QLabel)]
+
+
+def test_a_folded_block_stays_folded_for_the_next_item_shown(qtbot, block):
+    block.show_row(_row())
+    block.resize(400, 300)
+    block.show()
+    qtbot.waitExposed(block)
+    header = block.findChild(CollapsibleSection)._header
+    gestures.click(header, header.rect().center())
+
+    block.show_row(_row(created_at="2026-07-02"))
+
+    assert block.findChild(CollapsibleSection).is_collapsed()
 
 
 def test_the_way_to_the_folder_leads_the_block(qtbot):

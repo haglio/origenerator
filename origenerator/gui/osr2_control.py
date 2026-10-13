@@ -1,7 +1,7 @@
 """The app's one OSR2 switch: on drives the device, off parks it.
 
 The switch itself has no widget: the console's button sets it, and so do Space,
-Esc, a spoken word and a resumed session.
+a spoken word and a resumed session.
 
 It holds both of the app's drivers, because "what is the OSR2 doing" is one
 question and they are two halves of the answer: the funscript driver while a

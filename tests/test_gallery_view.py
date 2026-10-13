@@ -7332,23 +7332,6 @@ def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path)
     assert caption.bottomLeft().y() <= view._search.field.mapTo(view, QPoint(0, 0)).y()
 
 
-def test_esc_stops_auto_generate(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    _keys_are_the_gallerys(view)  # said outright, not inherited from a neighbour
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_auto(True)
-    assert view._auto.is_active(key)
-
-    handled = view.eventFilter(
-        view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
-    )
-
-    assert handled is True
-    assert not view._auto.is_active(key)
-
-
 # --- slideshow: play a folder's or a collection's media fullscreen ----------
 
 def _resolve_by_id(monkeypatch):
@@ -13146,7 +13129,7 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     assert view._osr2_motion.active
 
 
-def test_escape_panic_parks_a_running_motion(qtbot, monkeypatch):
+def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
     view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Esc is the gallery's here — no dialog and no fullscreen view up. Said
     # outright, because which window Qt calls active is ambient in a test process
@@ -13155,8 +13138,7 @@ def test_escape_panic_parks_a_running_motion(qtbot, monkeypatch):
     view.osr2_control.setChecked(True)
     assert view._osr2_motion.active
     assert view._handle_escape() is True
-    assert not view.osr2_control.isChecked()
-    assert view._osr2_motion.held == OSR2_PARKED
+    assert view._osr2_motion.frozen
 
 
 def test_the_motion_keys_work_in_the_main_window_too(qtbot, monkeypatch):
@@ -13272,37 +13254,50 @@ def _keys_are_the_gallerys(view):
     view._other_window_owns_keys = lambda: False
 
 
-def test_esc_stops_osr2_driving(qtbot):
-    view, driver, panel = _osr2_view(qtbot)
-    _keys_are_the_gallerys(view)
-    panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)  # driving the device
-    assert driver.started
-
-    handled = _press_escape(view)
-
-    assert handled is True
-    assert view.osr2_control.isChecked() is False and not view.osr2_control.isChecked()
-    assert driver.stopped >= 1
-
-
-def test_esc_stops_osr2_even_without_gallery_key_focus(qtbot):
-    # The driven video usually lives in the focused info-pane tab, where the gallery
-    # doesn't own Delete/Undo — Esc must still reach the device from there.
-    view, driver, panel = _osr2_view(qtbot)
+def _driving_the_device(qtbot):
+    view, _driver, panel = _osr2_view(qtbot)
     _keys_are_the_gallerys(view)
     panel.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     view.osr2_control.setChecked(True)
-    view._gallery_owns_keys = lambda **_kw: False  # focus is inside a config tab
+    return view
 
-    handled = _press_escape(view)
 
-    assert handled is True and driver.stopped >= 1
+def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
+    # The driven video usually lives in the focused info-pane tab, where the gallery
+    # doesn't own Delete/Undo.
+    view = _driving_the_device(qtbot)
+    view._gallery_owns_keys = lambda **_kw: False
+
+    assert _press_escape(view) is True
+    assert omnipause.frozen() and view.osr2_control.isChecked()
+
+
+def _typing_in_a_text_field(qtbot, monkeypatch):
+    field = QLineEdit()
+    qtbot.addWidget(field)
+    # Said outright rather than clicked into: which widget Qt calls focused is
+    # ambient offscreen, and it answers None however the focus was set.
+    monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: field))
+
+
+def test_esc_pauses_a_moving_osr2_even_from_a_text_field(qtbot, monkeypatch):
+    view = _driving_the_device(qtbot)
+    _typing_in_a_text_field(qtbot, monkeypatch)
+
+    assert _press_escape(view) is True
+    assert omnipause.frozen()
+
+
+def test_esc_from_a_text_field_never_plays_a_paused_room_again(qtbot, monkeypatch):
+    view = _driving_the_device(qtbot)
+    view.set_room_paused(True)
+    _typing_in_a_text_field(qtbot, monkeypatch)
+
+    assert _press_escape(view) is False
+    assert omnipause.frozen()
 
 
 def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
-    # With nothing running Esc starts the room, but not out of a press that
-    # meant "close this": a find is open, so the key is the find's.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     positive, _negative = _tab_with_prompts(view).prompt_fields()
     positive.setPlainText("a cat")  # something for the find to search
@@ -13310,30 +13305,22 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     assert view._find_bar.isVisible()
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
+    assert not omnipause.frozen()
 
 
 def test_esc_in_a_text_field_is_the_fields_own(qtbot, tmp_path, monkeypatch):
-    # Renaming a folder, writing a prompt: Esc there is how you take it back, and
-    # taking it back must not open a slideshow and drive the OSR2.
-
+    # Renaming a folder, writing a prompt: Esc there is how you take it back.
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    positive, _negative = _tab_with_prompts(view).prompt_fields()
-    # Said outright rather than clicked into: which widget Qt calls focused is
-    # ambient offscreen, and it answers None however the focus was set.
-    monkeypatch.setattr(QApplication, "focusWidget", staticmethod(lambda: positive))
+    _typing_in_a_text_field(qtbot, monkeypatch)
 
     assert view._handle_escape() is False
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
+    assert not omnipause.frozen()
 
 
-def test_the_console_hints_that_esc_stops_the_device(qtbot):
-    # The only place the Esc shortcut is discoverable.  It used to be the
-    # toolbar switch's tooltip; the console is what carries that switch now,
-    # and the gallery's is the panel Esc actually answers at.
+def test_the_console_hints_that_esc_pauses_the_room(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
-    assert "Esc" in view._motion_panel.toolTip()
+    assert view._motion_panel.toolTip().endswith(" · Esc pauses")
 
 
 def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
@@ -13379,6 +13366,60 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     assert view._other_window_owns_keys() is True
 
 
+def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
+    """A gallery on screen with the sound on and a standalone Slideshow over it,
+    active: where a key pressed at the Slideshow lands."""
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, output_dir: ("g0.png", "image"))
+    bed = _FakeAmbientAudio()
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), ambient_audio=bed)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view.show()
+    view._bank.audio.setChecked(True)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow)
+    slideshow.activateWindow()
+    QTest.qWaitForWindowActive(slideshow)
+    return view, bed, slideshow
+
+
+def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
+        qtbot, tmp_path, monkeypatch):
+    view, bed, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
+
+    gestures.press_key(slideshow, Qt.Key.Key_Escape)
+
+    assert omnipause.frozen() and bed.frozen
+    assert view._slideshows.showing is slideshow and slideshow.isVisible()
+    assert view._bank.audio.isChecked()
+
+
+def _press_escape_at_the_gallery(view):
+    if not view.isActiveWindow():
+        view.show()
+        view.activateWindow()
+        QTest.qWaitForWindowActive(view)
+    gestures.press_key(view, Qt.Key.Key_Escape)
+
+
+def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
+        qtbot, tmp_path, monkeypatch):
+    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
+    del view._other_window_owns_keys
+    view._toggle_auto(True)
+    view._bank.audio.setChecked(True)
+
+    _press_escape_at_the_gallery(view)
+    assert omnipause.frozen() and bed.frozen
+    assert view._auto.is_active(key) and view._bank.audio.isChecked()
+
+    _press_escape_at_the_gallery(view)
+    assert not omnipause.frozen() and not bed.frozen
+
+
 def _startable_view(qtbot, tmp_path, monkeypatch):
     """A gallery on a loopable folder with nothing running — the app as it opens,
     and what Esc has to be able to start from."""
@@ -13392,261 +13433,28 @@ def _startable_view(qtbot, tmp_path, monkeypatch):
     return view, bed, _select_first_leaf(view)
 
 
-def _stoppable_view(qtbot, tmp_path, monkeypatch):
-    """That gallery with everything Esc is meant to stop actually running: a loop,
-    the audio bed, and a fullscreen slideshow — plus the mic, which it is meant to
-    leave alone."""
+def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anything(
+        qtbot, tmp_path, monkeypatch):
     view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    view._toggle_auto(True)
-    view._bank.audio.setChecked(True)
-    view._bank.mic.setChecked(True)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing)
-    return view, bed, key
+    del view._other_window_owns_keys
 
+    _press_escape_at_the_gallery(view)
 
-def test_esc_turns_off_everything_the_app_is_doing(qtbot, tmp_path, monkeypatch):
-    # One key for the whole room: the loop, the sound, and the slideshow all stop
-    # together, so there is no second thing still going after the panic-stop.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    assert view._auto.is_active(key) and bed.starts == 1 and view._slideshows.showing is not None
-
-    handled = _press_escape(view)
-
-    assert handled is True
-    assert not view._auto.is_active(key)
-    assert not view._bank.audio.isChecked() and bed.stops == 1
-    assert view._slideshows.showing is None
+    assert omnipause.frozen()
+    assert view._slideshows.showing is None and bed.starts == 0
+    assert not view._auto.is_active(key) and not view.osr2_control.isChecked()
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
-    # The one switch it never touches: speaking is how anything it just stopped
-    # gets going again without reaching for the keyboard.
-    view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
-
-    _press_escape(view)
-
-    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
-
-
-def test_esc_over_the_slideshow_stops_what_is_running_behind_it(qtbot, tmp_path,
-                                                                monkeypatch):
-    # The slideshow is a window of ours, and Esc closes it — but on its own that left
-    # the loop and the sound running under it, which is the opposite of what
-    # the key means. So this one window doesn't take the key away.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    slideshow = view._slideshows.showing
-    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: slideshow))
-    view._other_window_owns_keys = lambda: True  # the slideshow is up and active
-
-    handled = _press_escape(view)
-
-    assert handled is True
-    assert view._slideshows.showing is None and not view._auto.is_active(key) and bed.stops == 1
-
-
-def test_esc_over_the_slideshow_still_defers_to_a_dialog_on_top_of_it(qtbot, tmp_path,
-                                                                      monkeypatch):
-    # A dropdown or dialog opened over the slideshow owns Esc, as it does everywhere.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    slideshow = view._slideshows.showing
-    popup = QWidget()
-    qtbot.addWidget(popup)
-    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: slideshow))
-    monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: popup))
-    view._other_window_owns_keys = lambda: True
-
-    assert _press_escape(view) is False
-    assert view._slideshows.showing is slideshow and view._auto.is_active(key) and bed.stops == 0
-    slideshow.close()
-
-
-def test_esc_on_a_freshly_opened_app_starts_everything(qtbot, tmp_path, monkeypatch):
-    # Nothing running and nothing held back — the app as it opens. The key is the
-    # one thing to reach for either way, so it starts the room rather than
-    # waiting to be taught what the room was by a stop it never saw.
-    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    assert not view._bank.audio.isChecked() and view._slideshows.showing is None
-
-    assert _press_escape(view) is True
-
-    assert view._auto.is_active(key)
-    assert view._bank.audio.isChecked() and bed.starts == 1
-    assert view.osr2_control.isChecked()
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing)
-
-
-def test_the_standing_start_is_stopped_by_the_next_press(qtbot, tmp_path, monkeypatch):
-    # What it started, it takes away again — the key alternates from a standing
-    # start exactly as it does from a stop.
-    view, bed, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    _press_escape(view)
-    qtbot.addWidget(view._slideshows.showing)
-
-    assert _press_escape(view) is True
-
-    assert not view._auto.is_active(key) and view._slideshows.showing is None
-    assert not view._bank.audio.isChecked() and bed.stops == 1
-    assert not view.osr2_control.isChecked()
-
-
-def test_esc_again_puts_back_everything_it_took_off(qtbot, tmp_path, monkeypatch):
-    # The other half of the panic-stop: press it once and the room goes quiet,
-    # press it again and it comes back as it was — the way leaving an OmniPause
-    # hands the room back rather than leaving every switch to be found again.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    playlist = view._slideshows.showing._playlist
-    playing = (playlist.in_play_order(), playlist.current())
-
-    _press_escape(view)
-    assert not view._auto.is_active(key) and view._slideshows.showing is None
-
-    assert _press_escape(view) is True
-
-    assert view._auto.is_active(key)
-    assert view._bank.audio.isChecked() and bed.starts == 2
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing)
-    playlist = view._slideshows.showing._playlist
-    assert (playlist.in_play_order(), playlist.current()) == playing  # same set, same picture
-
-
-def test_the_resumed_slideshow_opens_on_the_picture_it_was_closed_on(qtbot, tmp_path,
-                                                                     monkeypatch):
-    # Not a fresh shuffle of the folder: the pass it was playing, taken up where
-    # it stopped, so what comes next is what would have come next.
-    view, _bed, _key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    slideshow = view._slideshows.showing
-    slideshow._step(1)
-    slideshow._step(1)
-    was_showing, was_at = slideshow._playlist.current(), slideshow._playlist.index
-
-    _press_escape(view)
-    _press_escape(view)
-
-    qtbot.addWidget(view._slideshows.showing)
-    assert view._slideshows.showing._playlist.current() == was_showing
-    assert view._slideshows.showing._playlist.index == was_at
-
-
-def test_the_resumed_slideshow_is_narrowed_the_way_it_was_and_can_still_widen(qtbot,
-                                                                              monkeypatch):
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
-                               _enhanced_image("i2", "a dog", 50, 2)]))
-    qtbot.addWidget(view)
-    _keys_are_the_gallerys(view)
-    view.refresh()
-    _open_recents(view)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing)
-    view._slideshows.showing.toggle_enhanced_mode()
-
-    _press_escape(view)
-    _press_escape(view)
-
-    slideshow = view._slideshows.showing
-    qtbot.addWidget(slideshow)
-    assert slideshow.hud_enhanced_mode
-    assert [item[2] for item in slideshow._playlist._items] == ["i2"]
-    slideshow.toggle_enhanced_mode()
-    assert sorted(item[2] for item in slideshow._playlist._items) == ["i1", "i2"]
-    slideshow.close()
-
-
-def test_the_resumed_loop_runs_its_own_folder_not_the_one_on_screen(qtbot, tmp_path,
-                                                                    monkeypatch):
-    # A loop is a standing instruction about one recipe, and the gallery has
-    # usually moved on by the time Esc is pressed twice: it goes back to the
-    # folder it was running in, whatever is selected now.
-    view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    _press_escape(view)
-    other = next(k for k in view._item_by_key if k != key)
-    view._tree.setCurrentItem(view._item_by_key[other])
-
-    _press_escape(view)
-
-    assert view._auto.is_active(key) and not view._auto.is_active(other)
-    if view._slideshows.showing is not None:
-        qtbot.addWidget(view._slideshows.showing)
-
-
-def test_esc_goes_on_alternating_stop_and_start(qtbot, tmp_path, monkeypatch):
-    # What is put back is put back for good: a third press stops it all over
-    # again rather than the key doing nothing from there on.
-    view, bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-
-    _press_escape(view)
-    _press_escape(view)
-    if view._slideshows.showing is not None:
-        qtbot.addWidget(view._slideshows.showing)
-
-    assert _press_escape(view) is True
-    assert not view._auto.is_active(key)
-    assert not view._bank.audio.isChecked() and bed.stops == 2
-    assert view._slideshows.showing is None
-
-
-def test_a_slideshow_of_a_run_in_flight_comes_back_as_a_slideshow_of_the_folder(
-        qtbot, tmp_path, monkeypatch):
-    # A slideshow following a generation has no pass to take up — what it was watching
-    # has landed or gone by the time Esc is pressed again — so it comes back as
-    # the folder in front, rather than being the one thing that stays shut.
+    # Speaking is how anything gets going again without reaching for the keyboard.
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
-    view._slideshows.open([], frame=_png_bytes())  # following a run, no items yet
-    qtbot.addWidget(view._slideshows.showing)
-    assert view._slideshows.showing.is_live()
+    del view._other_window_owns_keys
+    view._bank.mic.setChecked(True)
 
-    _press_escape(view)
-    assert view._slideshows.showing is None
+    _press_escape_at_the_gallery(view)
 
-    _press_escape(view)
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing)
-
-
-def test_esc_offers_back_what_was_on_when_it_was_pressed(qtbot, tmp_path,
-                                                         monkeypatch):
-    # It holds what it took, not a growing memory of everything ever stopped:
-    # something switched on by hand after a stop is all the next press takes
-    # away, and all the one after that puts back.
-    view, _bed, key = _stoppable_view(qtbot, tmp_path, monkeypatch)
-    _press_escape(view)
-    view._bank.audio.setChecked(True)  # by hand, with everything else still off
-
-    _press_escape(view)
-    _press_escape(view)
-
-    assert view._bank.audio.isChecked()
-    assert not view._auto.is_active(key) and view._slideshows.showing is None
-
-
-def test_esc_puts_back_a_motion_that_was_running_without_the_switch(qtbot,
-                                                                    monkeypatch):
-    # Started by a motion key rather than the OSR2 switch, so it is the motion
-    # itself that has to be started again — the switch was never on to restore.
-    view, _key = _looping_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    view._auto.stop_all()
-    view._osr2_motion.start()
-
-    _press_escape(view)
-    assert not view._osr2_motion.active
-
-    _press_escape(view)
-    assert view._osr2_motion.active and not view.osr2_control.isChecked()
-
-
-def test_esc_stops_the_audio_bed_on_its_own(qtbot):
-    # Nothing else running: the switch alone is enough for Esc to have acted.
-    view, bed = _audio_view(qtbot)
-    _keys_are_the_gallerys(view)
-    view._bank.audio.setChecked(True)
-
-    assert _press_escape(view) is True
-    assert not view._bank.audio.isChecked() and bed.stops == 1
+    assert omnipause.frozen()
+    assert view._bank.mic.isChecked() and view._voice.listener.commands_on
 
 
 # --- folders the user composes: multi-select, group, drop, remove -------------

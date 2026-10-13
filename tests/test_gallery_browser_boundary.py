@@ -223,8 +223,11 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     280 -> 279: the session opens each side on its own, so the open of both
     at once, which nothing sends now, went. 279 -> 281: the session hears the
     rest of a spoken request it posted here, so whether one is being taken, and
-    dropping one whose slideshow closed, are two forwarders to the voice.)"""
+    dropping one whose slideshow closed, are two forwarders to the voice.
+    281 -> 278: Esc pauses the room rather than stopping everything and
+    putting it back, so the four methods that read, stopped and restarted
+    what was running went, and one asks whether the OSR2 is moving.)"""
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(VIEW, "GalleryView").body) == 281
+               for x in _class_def(VIEW, "GalleryView").body) == 278
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(PANE, "BrowserPane").body) == 85

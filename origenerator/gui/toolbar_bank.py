@@ -163,7 +163,7 @@ class ToolbarBank(QWidget):
         self.auto = _tool_button(
             icons.autoloop_icon(),
             "Auto-generate: repeatedly generate variations of this folder until "
-            "toggled off (Esc stops it too)",
+            "toggled off",
             acts.toggle_auto, checkable=True,
         )
         self.auto.setStyleSheet(_LIT)
@@ -198,16 +198,15 @@ class ToolbarBank(QWidget):
             )
             self.audio.setStyleSheet(_LIT)
             # The microphone stands apart from the switches above: those are what
-            # the app is doing, and Esc turns all of them off at once — the mic is
-            # the one thing it leaves alone, since speaking is how any of them get
-            # going again without the keyboard. On is listening, off is not.
+            # the app is doing, and the mic is what it hears with. On is listening,
+            # off is not.
             self.mic = _tool_button(
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
                 "“weird”, “lock”), orders about the picture (“enhance”, “fix "
                 "hands”, “animate as doggy”), and prompt steering while a folder is "
-                "auto-generating (left listening by Esc, which stops everything else)",
+                "auto-generating",
                 acts.toggle_mic, checkable=True,
             )
             self.mic.setStyleSheet(_LIT)
@@ -221,8 +220,7 @@ class ToolbarBank(QWidget):
             (self.undo, self.redo),                  # what you did
             (self.group,),                           # …to the picked folders
             (self.favorite, self.enhance, self.delete),  # …to what's in front
-            (self.slideshow, self.auto, self.audio),  # what the app is doing,
-                                                      # and Esc stops
+            (self.slideshow, self.auto, self.audio),  # what the app is doing
             (self.mic,),                             # what it hears with
         ):
             buttons = tuple(b for b in buttons if b is not None)

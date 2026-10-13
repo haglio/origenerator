@@ -1195,6 +1195,27 @@ def test_a_panel_handed_back_from_a_session_stacks_its_portrait_picture_over_the
     assert panel._media_split.indexOf(panel._preview_pane) == 0
 
 
+def test_a_picture_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
+    """A landscape picture after a portrait one in the same tab came back with
+    a third of the column where a fresh tab gives it two thirds, and so did
+    every portrait tab a session handed back."""
+    panel = GenerateConfigPanel(None, FakeDB([]), fun_time=_session())
+    qtbot.addWidget(panel)
+    panel.resize(600, 1000)
+    panel._preview._pixmap = QPixmap(1200, 700)
+    panel.show()
+    qtbot.wait(1)
+
+    panel._preview._pixmap = QPixmap(400, 900)
+    panel._reflow_for_the_media()
+    panel._preview._pixmap = QPixmap(1200, 700)
+    panel._reflow_for_the_media()
+    qtbot.wait(1)
+
+    picture, settings = panel._media_split.sizes()
+    assert picture > settings
+
+
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
     tabs = InfoPaneTabs(None, FakeDB([]))
     qtbot.addWidget(tabs)

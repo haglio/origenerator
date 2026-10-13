@@ -929,7 +929,7 @@ class GenerateConfigPanel(QWidget):
         self._media_split.setStretchFactor(0, 3 if beside else 0)
         self._media_split.setStretchFactor(1, 4 if beside else 0)
         if sum(sizes) > 0:
-            self._media_split.setSizes(sorted(sizes, reverse=beside))
+            self._media_split.setSizes(sorted(sizes, reverse=True))
 
     def _media_is_portrait(self) -> bool:
         size = self._preview.media_size()

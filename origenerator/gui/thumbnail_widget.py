@@ -59,7 +59,8 @@ class CornerAction(NamedTuple):
 
 
 class ThumbnailWidget(QWidget):
-    clicked = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the click
+    pressed = pyqtSignal(str, Qt.KeyboardModifier)  # prompt_id, the keys held during the press
+    clicked = pyqtSignal(str)  # prompt_id, let go of without being dragged
     double_clicked = pyqtSignal(str)  # prompt_id — an "open" gesture
     context_requested = pyqtSignal(str, QPoint)  # prompt_id, global position
     corner_action_triggered = pyqtSignal(str, str)  # prompt_id, action_id
@@ -379,12 +380,16 @@ class ThumbnailWidget(QWidget):
         # the custom-context-menu signal and must NOT collapse a multi-selection.
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_out.note_press(event)
-            self.clicked.emit(self.prompt_id, event.modifiers())
+            self.pressed.emit(self.prompt_id, event.modifiers())
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.drag_out.pressed:
+            self.drag_out.forget()
+            self.clicked.emit(self.prompt_id)
 
     def mouseMoveEvent(self, event):
-        # Drag the generation out to a combine drop slot, but only once the press
-        # has travelled far enough to read as a drag rather than a click — so a
-        # plain click still just selects, and a double-click still opens.
+        # Drag the generation out to wherever it is dropped, but only once the press
+        # has travelled far enough to read as a drag rather than a click.
         if not self.drag_out.should_start(event):
             return
         # The tile's picture trails the cursor — the frame a video tile's looping

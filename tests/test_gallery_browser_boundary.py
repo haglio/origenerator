@@ -256,4 +256,4 @@ def test_the_classes_hold_the_splits_sizes_as_equalities():
     assert sum(isinstance(x, ast.FunctionDef)
                for x in _class_def(VIEW, "GalleryView").body) == 274
     assert sum(isinstance(x, ast.FunctionDef)
-               for x in _class_def(PANE, "BrowserPane").body) == 84
+               for x in _class_def(PANE, "BrowserPane").body) == 83
